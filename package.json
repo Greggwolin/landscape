@@ -17,6 +17,10 @@
     "db:audit:apis": "node scripts/audit-apis.mjs",
     "generate:types": "node scripts/generate-types.mjs",
     "normalize:chats": "node scripts/normalize-ai-chats.mjs",
+    "auto-commit:start": "./scripts/start-auto-commit.sh start",
+    "auto-commit:stop": "./scripts/start-auto-commit.sh stop",
+    "auto-commit:status": "./scripts/start-auto-commit.sh status",
+    "auto-commit:setup": "./scripts/setup-auto-start.sh",
     "prepare": "husky install"
   },
   "dependencies": {
