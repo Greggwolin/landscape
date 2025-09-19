@@ -1,0 +1,2251 @@
+[{
+  "table_name": "core_fin_budget_version",
+  "column_name": "budget_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_budget_version_budget_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_budget_version",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_budget_version",
+  "column_name": "as_of",
+  "data_type": "date",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_budget_version",
+  "column_name": "status",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": "'draft'::text"
+}, {
+  "table_name": "core_fin_budget_version",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_category_category_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "parent_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "kind",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "class",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "event",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "scope",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "detail",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "core_fin_category",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_category_uom",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_category_uom",
+  "column_name": "uom_code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ad",
+  "column_name": "ad_code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ad",
+  "column_name": "ad_group",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ad",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ae",
+  "column_name": "ae_coa",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ae",
+  "column_name": "ae_group",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_crosswalk_ae",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_curve",
+  "column_name": "curve_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_curve_curve_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_curve",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_curve",
+  "column_name": "points_json",
+  "data_type": "jsonb",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_curve",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "fact_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_fact_actual_fact_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "pe_level",
+  "data_type": "USER-DEFINED",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "pe_id",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "uom_code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "qty",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": "1"
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "rate",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "txn_date",
+  "data_type": "date",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "source_doc",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_actual",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "fact_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_fact_budget_fact_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "budget_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "pe_level",
+  "data_type": "USER-DEFINED",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "pe_id",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "funding_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "uom_code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "qty",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": "1"
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "rate",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "start_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "end_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "curve_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_fact_budget",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "funding_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_fin_funding_source_funding_id_seq'::regclass)"
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "type",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "subclass",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "rank",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "lender_party",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "core_fin_funding_source",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_fin_pe_applicability",
+  "column_name": "category_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_pe_applicability",
+  "column_name": "pe_level",
+  "data_type": "USER-DEFINED",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_uom",
+  "column_name": "uom_code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_uom",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_uom",
+  "column_name": "uom_type",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_fin_uom",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "core_fin_uom",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "item_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('core_lookup_item_item_id_seq'::regclass)"
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "list_key",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "sort_order",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "0"
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "label",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "core_lookup_item",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_lookup_list",
+  "column_name": "list_key",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_list",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_list",
+  "column_name": "description",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_list",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "core_lookup_list",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "list_key",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "list_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "item_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "sort_order",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "label",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "core_lookup_vw",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "glossary_id",
+  "data_type": "uuid",
+  "is_nullable": "NO",
+  "column_default": "gen_random_uuid()"
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "jurisdiction_city",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "jurisdiction_county",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "jurisdiction_state",
+  "data_type": "character",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "jurisdiction_display",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "district_code",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "district_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "family_name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "local_code_raw",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "local_code_canonical",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "code_token_kind",
+  "data_type": "USER-DEFINED",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "code_token_confidence",
+  "data_type": "numeric",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "mapped_use",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "allowance",
+  "data_type": "character",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "purpose_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "intent_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "conditions_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "development_standards",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "use_standard_refs",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "definitions_refs",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "narrative_section_ref",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "narrative_src_url",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "source_doc_url",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "effective_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "amending_ord_list",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "glossary_zoning",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "com_spec_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "subtype_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "far_min",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "far_max",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "cov_max_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "pk_per_ksf",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "hgt_max_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "sb_front_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "sb_side_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "sb_corner_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "sb_rear_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "os_min_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "eff_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_com_spec",
+  "column_name": "doc_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_family",
+  "column_name": "family_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_family",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_family",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_family",
+  "column_name": "active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "lu_family",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "res_spec_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "subtype_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "dua_min",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "dua_max",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "lot_w_min_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "lot_d_min_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "lot_area_min_sf",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "sb_front_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "sb_side_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "sb_corner_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "sb_rear_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "hgt_max_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "cov_max_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "os_min_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "pk_per_unit",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "eff_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_res_spec",
+  "column_name": "doc_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "subtype_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "family_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "name",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "ord",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+}, {
+  "table_name": "lu_subtype",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "market_assumptions",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "market_assumptions",
+  "column_name": "commission_basis",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "market_assumptions",
+  "column_name": "demand_unit",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "market_assumptions",
+  "column_name": "uom",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "market_assumptions",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+}, {
+  "table_name": "planning_doc",
+  "column_name": "doc_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "project_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "jurisdiction_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "doc_type",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "title",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "doc_url",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "eff_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "section_ref",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "planning_doc",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "res_lot_product",
+  "column_name": "product_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "res_lot_product",
+  "column_name": "code",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "res_lot_product",
+  "column_name": "lot_w_ft",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "res_lot_product",
+  "column_name": "lot_d_ft",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "res_lot_product",
+  "column_name": "lot_area_sf",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "subtype_lot_product",
+  "column_name": "subtype_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "subtype_lot_product",
+  "column_name": "product_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "acquisition_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_acquisition_acquisition_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "contact_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "event_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "event_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "description",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "is_applied_to_purchase",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": "true"
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "units_conveyed",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "measure_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_acquisition",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_approval",
+  "column_name": "approval_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_approval",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_approval",
+  "column_name": "approval_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_approval",
+  "column_name": "approval_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_approval",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_area",
+  "column_name": "area_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_area",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_area",
+  "column_name": "area_alias",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_area",
+  "column_name": "area_no",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_assumptionrule",
+  "column_name": "rule_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_assumptionrule",
+  "column_name": "rule_category",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_assumptionrule",
+  "column_name": "rule_key",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_assumptionrule",
+  "column_name": "rule_value",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "budget_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "devphase_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "budget_category",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "budget_subcategory",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "source_table",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "source_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "measure_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "cost_per_unit",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget",
+  "column_name": "quantity",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "budget_item_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_budget_items_budget_item_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "structure_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "quantity",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "cost_per_unit",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_budget_items",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "structure_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_budget_structure_structure_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "scope",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "category",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "detail",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "cost_method",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": "'$$'::character varying"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "measure_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "is_system",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": "true"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "created_by",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "sort_order",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": "0"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "start_period",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_budget_structure",
+  "column_name": "periods_to_complete",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_capitalization",
+  "column_name": "capitalization_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_capitalization",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_capitalization",
+  "column_name": "capital_source",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_capitalization",
+  "column_name": "amount",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_capitalization",
+  "column_name": "notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "contact_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_contacts_contact_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "company_name",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "contact_person",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "email",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "phone",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "address_line1",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "address_line2",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "city",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "state",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "zip",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "is_parent",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": "false"
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_company_name",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_contact_person",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_email",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_phone",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_address_line1",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_address_line2",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_city",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_state",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "parent_zip",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_contacts",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "landuse_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "landuse_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "landuse_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "subtype_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "name",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "description",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "active",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": "true"
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_landuse",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "landuse_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "rsf_to_gfa_eff",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "employee_density",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "floor_plate_efficiency",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "clear_height_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "loading_dock_ratio",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "truck_court_depth_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "trailer_parking_ratio",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": "now()"
+}, {
+  "table_name": "tbl_landuse_program",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": "now()"
+}, {
+  "table_name": "tbl_lot_type",
+  "column_name": "producttype_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_lot_type",
+  "column_name": "producttype_name",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_lot_type",
+  "column_name": "typical_lot_width",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_lot_type",
+  "column_name": "typical_lot_depth",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "measure_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_measures_measure_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "measure_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "measure_name",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "measure_category",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "is_system",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": "true"
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "created_by",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "property_types",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_measures",
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_TIMESTAMP"
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "parcel_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "area_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "phase_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "landuse_code",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "landuse_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "acres_gross",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lot_width",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lot_depth",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lot_product",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lot_area",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "units_total",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lots_frontfeet",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "planning_loss",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "plan_efficiency",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "saledate",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "saleprice",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "lot_type_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_parcel",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_phase",
+  "column_name": "phase_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_phase",
+  "column_name": "area_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_phase",
+  "column_name": "phase_name",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_phase",
+  "column_name": "phase_no",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_phase",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "project_id",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "project_name",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "acres_gross",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "location_lat",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "location_lon",
+  "data_type": "double precision",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_project",
+  "column_name": "start_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "zoning_control_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": "nextval('tbl_zoning_control_zoning_control_id_seq'::regclass)"
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "jurisdiction_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "zoning_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "landuse_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "site_coverage_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "site_far",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "max_stories",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "max_height_ft",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "parking_ratio_per1000sf",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "parking_stall_sf",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "site_common_area_pct",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "parking_sharing_flag",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "parking_structured_flag",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "setback_notes",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "scenario_id",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "valid_from",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": "CURRENT_DATE"
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "valid_to",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": "now()"
+}, {
+  "table_name": "tbl_zoning_control",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": "now()"
+}, {
+  "table_name": "tmp_search_results",
+  "column_name": "table_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tmp_search_results",
+  "column_name": "column_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "tmp_search_results",
+  "column_name": "value",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "glossary_id",
+  "data_type": "uuid",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "jurisdiction_display",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "jurisdiction_city",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "jurisdiction_county",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "jurisdiction_state",
+  "data_type": "character",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "family_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "district_code",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "district_name",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "local_code_raw",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "local_code_canonical",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "code_token_kind",
+  "data_type": "USER-DEFINED",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "code_token_confidence",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "mapped_use",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "allowance",
+  "data_type": "character",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "purpose_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "intent_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "conditions_text",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "development_standards",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "use_standard_refs",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "definitions_refs",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "narrative_section_ref",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "narrative_src_url",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "source_doc_url",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "effective_date",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": null
+}, {
+  "table_name": "vw_zoning_glossary_export",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": null
+}]

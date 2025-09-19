@@ -1,0 +1,339 @@
+<svg width="1400" height="1000" viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .table-box { fill: #f8f9fa; stroke: #333; stroke-width: 2; rx: 8; }
+      .table-header { fill: #4a90e2; }
+      .table-text { font-family: 'Arial', sans-serif; font-size: 12px; fill: #333; }
+      .table-title { font-family: 'Arial', sans-serif; font-size: 14px; font-weight: bold; fill: white; }
+      .pk-field { fill: #ffeaa7; }
+      .fk-field { fill: #ddd6fe; }
+      .relationship-line { stroke: #666; stroke-width: 2; fill: none; }
+      .section-title { font-family: 'Arial', sans-serif; font-size: 16px; font-weight: bold; fill: #2d3748; }
+      .legend-box { fill: #f7fafc; stroke: #a0aec0; stroke-width: 1; rx: 4; }
+    </style>
+  </defs>
+
+  <!-- Section Headers -->
+  <text x="70" y="30" class="section-title">🏗️ CORE PROJECT HIERARCHY</text>
+  <text x="70" y="280" class="section-title">🏠 LAND USE VALIDATION</text>
+  <text x="70" y="480" class="section-title">🏛️ JURISDICTION & ZONING</text>
+  <text x="700" y="30" class="section-title">📊 SUPPORTING SYSTEMS</text>
+  <text x="700" y="280" class="section-title">💰 FINANCIAL</text>
+  <text x="700" y="480" class="section-title">⚙️ CORE LOOKUP SYSTEM</text>
+
+  <!-- CORE PROJECT HIERARCHY -->
+  <!-- tbl_project -->
+  <g>
+    <rect x="50" y="50" width="180" height="120" class="table-box"/>
+    <rect x="50" y="50" width="180" height="25" class="table-header"/>
+    <text x="140" y="68" class="table-title" text-anchor="middle">tbl_project</text>
+    <rect x="55" y="80" width="170" height="15" class="pk-field"/>
+    <text x="60" y="91" class="table-text">project_id (PK)</text>
+    <text x="60" y="106" class="table-text">project_name</text>
+    <text x="60" y="121" class="table-text">acres_gross</text>
+    <text x="60" y="136" class="table-text">location_lat</text>
+    <text x="60" y="151" class="table-text">start_date</text>
+  </g>
+
+  <!-- tbl_area -->
+  <g>
+    <rect x="280" y="50" width="150" height="105" class="table-box"/>
+    <rect x="280" y="50" width="150" height="25" class="table-header"/>
+    <text x="355" y="68" class="table-title" text-anchor="middle">tbl_area</text>
+    <rect x="285" y="80" width="140" height="15" class="pk-field"/>
+    <text x="290" y="91" class="table-text">area_id (PK)</text>
+    <rect x="285" y="95" width="140" height="15" class="fk-field"/>
+    <text x="290" y="106" class="table-text">project_id (FK)</text>
+    <text x="290" y="121" class="table-text">area_alias</text>
+    <text x="290" y="136" class="table-text">area_no</text>
+  </g>
+
+  <!-- tbl_phase -->
+  <g>
+    <rect x="480" y="50" width="150" height="120" class="table-box"/>
+    <rect x="480" y="50" width="150" height="25" class="table-header"/>
+    <text x="555" y="68" class="table-title" text-anchor="middle">tbl_phase</text>
+    <rect x="485" y="80" width="140" height="15" class="pk-field"/>
+    <text x="490" y="91" class="table-text">phase_id (PK)</text>
+    <rect x="485" y="95" width="140" height="15" class="fk-field"/>
+    <text x="490" y="106" class="table-text">area_id (FK)</text>
+    <rect x="485" y="110" width="140" height="15" class="fk-field"/>
+    <text x="490" y="121" class="table-text">project_id (FK)</text>
+    <text x="490" y="136" class="table-text">phase_name</text>
+    <text x="490" y="151" class="table-text">phase_no</text>
+  </g>
+
+  <!-- tbl_parcel -->
+  <g>
+    <rect x="50" y="190" width="180" height="150" class="table-box"/>
+    <rect x="50" y="190" width="180" height="25" class="table-header"/>
+    <text x="140" y="208" class="table-title" text-anchor="middle">tbl_parcel</text>
+    <rect x="55" y="220" width="170" height="15" class="pk-field"/>
+    <text x="60" y="231" class="table-text">parcel_id (PK)</text>
+    <rect x="55" y="235" width="170" height="15" class="fk-field"/>
+    <text x="60" y="246" class="table-text">area_id (FK)</text>
+    <rect x="55" y="250" width="170" height="15" class="fk-field"/>
+    <text x="60" y="261" class="table-text">phase_id (FK)</text>
+    <rect x="55" y="265" width="170" height="15" class="fk-field"/>
+    <text x="60" y="276" class="table-text">landuse_code (FK)</text>
+    <text x="60" y="291" class="table-text">acres_gross</text>
+    <text x="60" y="306" class="table-text">units_total</text>
+    <rect x="55" y="310" width="170" height="15" class="fk-field"/>
+    <text x="60" y="321" class="table-text">lot_type_id (FK)</text>
+  </g>
+
+  <!-- LAND USE VALIDATION SYSTEM -->
+  <!-- lu_family -->
+  <g>
+    <rect x="50" y="300" width="150" height="120" class="table-box"/>
+    <rect x="50" y="300" width="150" height="25" class="table-header"/>
+    <text x="125" y="318" class="table-title" text-anchor="middle">lu_family</text>
+    <rect x="55" y="330" width="140" height="15" class="pk-field"/>
+    <text x="60" y="341" class="table-text">family_id (PK)</text>
+    <text x="60" y="356" class="table-text">code</text>
+    <text x="60" y="371" class="table-text">name</text>
+    <text x="60" y="386" class="table-text">ord</text>
+    <text x="60" y="401" class="table-text">active</text>
+  </g>
+
+  <!-- lu_subtype -->
+  <g>
+    <rect x="250" y="300" width="150" height="120" class="table-box"/>
+    <rect x="250" y="300" width="150" height="25" class="table-header"/>
+    <text x="325" y="318" class="table-title" text-anchor="middle">lu_subtype</text>
+    <rect x="255" y="330" width="140" height="15" class="pk-field"/>
+    <text x="260" y="341" class="table-text">subtype_id (PK)</text>
+    <rect x="255" y="345" width="140" height="15" class="fk-field"/>
+    <text x="260" y="356" class="table-text">family_id (FK)</text>
+    <text x="260" y="371" class="table-text">code</text>
+    <text x="260" y="386" class="table-text">name</text>
+    <text x="260" y="401" class="table-text">ord</text>
+  </g>
+
+  <!-- tbl_landuse -->
+  <g>
+    <rect x="450" y="300" width="180" height="105" class="table-box"/>
+    <rect x="450" y="300" width="180" height="25" class="table-header"/>
+    <text x="540" y="318" class="table-title" text-anchor="middle">tbl_landuse</text>
+    <rect x="455" y="330" width="170" height="15" class="pk-field"/>
+    <text x="460" y="341" class="table-text">landuse_id (PK)</text>
+    <text x="460" y="356" class="table-text">landuse_code</text>
+    <text x="460" y="371" class="table-text">landuse_type</text>
+    <text x="460" y="386" class="table-text">description</text>
+  </g>
+
+  <!-- tbl_landuse_program -->
+  <g>
+    <rect x="450" y="425" width="180" height="135" class="table-box"/>
+    <rect x="450" y="425" width="180" height="25" class="table-header"/>
+    <text x="540" y="443" class="table-title" text-anchor="middle">tbl_landuse_program</text>
+    <rect x="455" y="455" width="170" height="15" class="pk-field"/>
+    <text x="460" y="466" class="table-text">program_id (PK)</text>
+    <rect x="455" y="470" width="170" height="15" class="fk-field"/>
+    <text x="460" y="481" class="table-text">landuse_code (FK)</text>
+    <text x="460" y="496" class="table-text">density_units_acre</text>
+    <text x="460" y="511" class="table-text">employee_density</text>
+    <text x="460" y="526" class="table-text">floor_plate_efficiency</text>
+    <text x="460" y="541" class="table-text">parking_ratio</text>
+  </g>
+
+  <!-- JURISDICTION & ZONING -->
+  <!-- glossary_zoning -->
+  <g>
+    <rect x="50" y="500" width="200" height="150" class="table-box"/>
+    <rect x="50" y="500" width="200" height="25" class="table-header"/>
+    <text x="150" y="518" class="table-title" text-anchor="middle">glossary_zoning</text>
+    <rect x="55" y="530" width="190" height="15" class="pk-field"/>
+    <text x="60" y="541" class="table-text">glossary_id (PK)</text>
+    <text x="60" y="556" class="table-text">jurisdiction_city</text>
+    <text x="60" y="571" class="table-text">jurisdiction_state</text>
+    <text x="60" y="586" class="table-text">local_code_raw</text>
+    <text x="60" y="601" class="table-text">mapped_use</text>
+    <text x="60" y="616" class="table-text">development_standards</text>
+    <text x="60" y="631" class="table-text">effective_date</text>
+  </g>
+
+  <!-- tbl_zoning_control -->
+  <g>
+    <rect x="300" y="500" width="200" height="150" class="table-box"/>
+    <rect x="300" y="500" width="200" height="25" class="table-header"/>
+    <text x="400" y="518" class="table-title" text-anchor="middle">tbl_zoning_control</text>
+    <rect x="305" y="530" width="190" height="15" class="pk-field"/>
+    <text x="310" y="541" class="table-text">zoning_control_id (PK)</text>
+    <text x="310" y="556" class="table-text">jurisdiction_id</text>
+    <text x="310" y="571" class="table-text">zoning_code</text>
+    <rect x="305" y="575" width="190" height="15" class="fk-field"/>
+    <text x="310" y="586" class="table-text">landuse_code (FK)</text>
+    <text x="310" y="601" class="table-text">site_coverage_pct</text>
+    <text x="310" y="616" class="table-text">max_height_ft</text>
+    <text x="310" y="631" class="table-text">parking_ratio</text>
+  </g>
+
+  <!-- SUPPORTING SYSTEMS -->
+  <!-- tbl_lot_type -->
+  <g>
+    <rect x="720" y="50" width="180" height="105" class="table-box"/>
+    <rect x="720" y="50" width="180" height="25" class="table-header"/>
+    <text x="810" y="68" class="table-title" text-anchor="middle">tbl_lot_type</text>
+    <rect x="725" y="80" width="170" height="15" class="pk-field"/>
+    <text x="730" y="91" class="table-text">producttype_id (PK)</text>
+    <text x="730" y="106" class="table-text">producttype_name</text>
+    <text x="730" y="121" class="table-text">typical_lot_width</text>
+    <text x="730" y="136" class="table-text">typical_lot_depth</text>
+  </g>
+
+  <!-- planning_doc -->
+  <g>
+    <rect x="950" y="50" width="180" height="135" class="table-box"/>
+    <rect x="950" y="50" width="180" height="25" class="table-header"/>
+    <text x="1040" y="68" class="table-title" text-anchor="middle">planning_doc</text>
+    <rect x="955" y="80" width="170" height="15" class="pk-field"/>
+    <text x="960" y="91" class="table-text">doc_id (PK)</text>
+    <rect x="955" y="95" width="170" height="15" class="fk-field"/>
+    <text x="960" y="106" class="table-text">project_id (FK)</text>
+    <text x="960" y="121" class="table-text">jurisdiction_id</text>
+    <text x="960" y="136" class="table-text">doc_type</text>
+    <text x="960" y="151" class="table-text">title</text>
+    <text x="960" y="166" class="table-text">doc_url</text>
+  </g>
+
+  <!-- FINANCIAL -->
+  <!-- tbl_capitalization -->
+  <g>
+    <rect x="720" y="300" width="180" height="120" class="table-box"/>
+    <rect x="720" y="300" width="180" height="25" class="table-header"/>
+    <text x="810" y="318" class="table-title" text-anchor="middle">tbl_capitalization</text>
+    <rect x="725" y="330" width="170" height="15" class="pk-field"/>
+    <text x="730" y="341" class="table-text">capitalization_id (PK)</text>
+    <rect x="725" y="345" width="170" height="15" class="fk-field"/>
+    <text x="730" y="356" class="table-text">project_id (FK)</text>
+    <text x="730" y="371" class="table-text">capital_source</text>
+    <text x="730" y="386" class="table-text">amount</text>
+    <text x="730" y="401" class="table-text">notes</text>
+  </g>
+
+  <!-- tbl_budget -->
+  <g>
+    <rect x="950" y="300" width="180" height="120" class="table-box"/>
+    <rect x="950" y="300" width="180" height="25" class="table-header"/>
+    <text x="1040" y="318" class="table-title" text-anchor="middle">tbl_budget</text>
+    <rect x="955" y="330" width="170" height="15" class="pk-field"/>
+    <text x="960" y="341" class="table-text">budget_id (PK)</text>
+    <text x="960" y="356" class="table-text">devphase_id</text>
+    <text x="960" y="371" class="table-text">budget_category</text>
+    <text x="960" y="386" class="table-text">amount</text>
+    <text x="960" y="401" class="table-text">notes</text>
+  </g>
+
+  <!-- CORE LOOKUP SYSTEM -->
+  <!-- core_lookup_list -->
+  <g>
+    <rect x="720" y="500" width="180" height="105" class="table-box"/>
+    <rect x="720" y="500" width="180" height="25" class="table-header"/>
+    <text x="810" y="518" class="table-title" text-anchor="middle">core_lookup_list</text>
+    <rect x="725" y="530" width="170" height="15" class="pk-field"/>
+    <text x="730" y="541" class="table-text">list_key (PK)</text>
+    <text x="730" y="556" class="table-text">name</text>
+    <text x="730" y="571" class="table-text">description</text>
+    <text x="730" y="586" class="table-text">is_active</text>
+  </g>
+
+  <!-- core_lookup_item -->
+  <g>
+    <rect x="950" y="500" width="180" height="120" class="table-box"/>
+    <rect x="950" y="500" width="180" height="25" class="table-header"/>
+    <text x="1040" y="518" class="table-title" text-anchor="middle">core_lookup_item</text>
+    <rect x="955" y="530" width="170" height="15" class="pk-field"/>
+    <text x="960" y="541" class="table-text">item_id (PK)</text>
+    <rect x="955" y="545" width="170" height="15" class="fk-field"/>
+    <text x="960" y="556" class="table-text">list_key (FK)</text>
+    <text x="960" y="571" class="table-text">sort_order</text>
+    <text x="960" y="586" class="table-text">code</text>
+    <text x="960" y="601" class="table-text">label</text>
+  </g>
+
+  <!-- RELATIONSHIPS -->
+  <!-- Project → Area -->
+  <line x1="230" y1="110" x2="280" y2="110" class="relationship-line"/>
+  <circle cx="275" cy="110" r="3" fill="#666"/>
+  
+  <!-- Area → Phase -->
+  <line x1="430" y1="102" x2="480" y2="102" class="relationship-line"/>
+  <circle cx="475" cy="102" r="3" fill="#666"/>
+  
+  <!-- Phase → Parcel -->
+  <line x1="480" y1="140" x2="250" y2="140" class="relationship-line"/>
+  <line x1="250" y1="140" x2="250" y2="175" class="relationship-line"/>
+  <line x1="250" y1="175" x2="230" y2="175" class="relationship-line"/>
+  <line x1="230" y1="175" x2="230" y2="250" class="relationship-line"/>
+  <circle cx="230" cy="255" r="3" fill="#666"/>
+  
+  <!-- Family → Subtype -->
+  <line x1="200" y1="360" x2="250" y2="360" class="relationship-line"/>
+  <circle cx="245" cy="360" r="3" fill="#666"/>
+  
+  <!-- Landuse → Landuse Program -->
+  <line x1="540" y1="405" x2="540" y2="425" class="relationship-line"/>
+  <circle cx="540" cy="420" r="3" fill="#666"/>
+  
+  <!-- Parcel → Landuse -->
+  <line x1="230" y1="270" x2="450" y2="270" class="relationship-line"/>
+  <line x1="450" y1="270" x2="450" y2="343" class="relationship-line"/>
+  <circle cx="450" cy="343" r="3" fill="#666"/>
+  
+  <!-- Zoning Control → Landuse -->
+  <line x1="500" y1="580" x2="540" y2="580" class="relationship-line"/>
+  <line x1="540" y1="580" x2="540" y2="405" class="relationship-line"/>
+  <circle cx="540" cy="405" r="3" fill="#666"/>
+  
+  <!-- Project → Capitalization -->
+  <line x1="230" y1="110" x2="650" y2="110" class="relationship-line"/>
+  <line x1="650" y1="110" x2="650" y2="360" class="relationship-line"/>
+  <line x1="650" y1="360" x2="720" y2="360" class="relationship-line"/>
+  <circle cx="715" cy="360" r="3" fill="#666"/>
+  
+  <!-- Project → Planning Doc -->
+  <line x1="230" y1="90" x2="950" y2="90" class="relationship-line"/>
+  <line x1="950" y1="90" x2="950" y2="106" class="relationship-line"/>
+  <circle cx="950" cy="106" r="3" fill="#666"/>
+  
+  <!-- Lookup List → Lookup Item -->
+  <line x1="900" y1="553" x2="950" y2="553" class="relationship-line"/>
+  <circle cx="945" cy="553" r="3" fill="#666"/>
+  
+  <!-- Parcel → Lot Type -->
+  <line x1="230" y1="250" x2="650" y2="250" class="relationship-line"/>
+  <line x1="650" y1="250" x2="650" y2="103" class="relationship-line"/>
+  <line x1="650" y1="103" x2="720" y2="103" class="relationship-line"/>
+  <circle cx="715" cy="103" r="3" fill="#666"/>
+
+  <!-- LEGEND -->
+  <g transform="translate(50, 700)">
+    <text x="0" y="20" class="section-title">LEGEND</text>
+    <rect x="0" y="30" width="500" height="120" class="legend-box"/>
+    
+    <rect x="10" y="45" width="15" height="15" class="pk-field"/>
+    <text x="35" y="56" class="table-text">Primary Key (PK)</text>
+    
+    <rect x="10" y="65" width="15" height="15" class="fk-field"/>
+    <text x="35" y="76" class="table-text">Foreign Key (FK)</text>
+    
+    <line x1="10" y1="90" x2="40" y2="90" class="relationship-line"/>
+    <circle cx="35" cy="90" r="3" fill="#666"/>
+    <text x="50" y="95" class="table-text">One-to-Many Relationship</text>
+    
+    <text x="10" y="115" class="table-text">Database Architecture: Master Planned Community (MPC) Development</text>
+    <text x="10" y="130" class="table-text">Core Hierarchy: Project → Area → Phase → Parcel</text>
+  </g>
+  
+  <!-- Database Stats -->
+  <g transform="translate(600, 700)">
+    <rect x="0" y="30" width="350" height="120" class="legend-box"/>
+    <text x="10" y="50" class="table-text">DATABASE STATISTICS</text>
+    <text x="10" y="70" class="table-text">• Total Tables: 17</text>
+    <text x="10" y="85" class="table-text">• Total Relationships: 14</text>
+    <text x="10" y="100" class="table-text">• Core Entity Types: 5</text>
+    <text x="10" y="115" class="table-text">• Land Use Validation: 3-tier system</text>
+    <text x="10" y="130" class="table-text">• Document Management: Integrated</text>
+  </g>
+</svg>
