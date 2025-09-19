@@ -5,7 +5,8 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BudgetContent from './components/Budget/BudgetContent';
-import MarketAssumptions from './components/MarketAssumptions';
+// import MarketAssumptions from './components/MarketAssumptions';
+import MarketAssumptionsComparison from './components/MarketAssumptionsComparison';
 import PlanningContent from './components/Planning/PlanningContent';
 import PlanningContentGrid from './components/Archive/PlanningContentGrid';
 import PlanningContentHot from './components/Archive/PlanningContentHot';
@@ -17,6 +18,7 @@ import DevStatus from './components/DevStatus/DevStatus';
 import { ProjectProvider, useProjectContext } from './components/ProjectProvider';
 import DocumentManagement from './components/Documents/DocumentManagement';
 import HomeOverview from './components/Home/HomeOverview';
+import GrowthRates from './components/GrowthRates';
 
 const LandscapeAppInner: React.FC = () => {
   const [activeView, setActiveView] = useState('home');
@@ -24,14 +26,15 @@ const LandscapeAppInner: React.FC = () => {
 
   // Listen for cross-component navigation requests (e.g., open Planning from Overview)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ view?: string }>
-      const v = ce?.detail?.view
-      if (typeof v === 'string') setActiveView(v)
-    }
-    window.addEventListener('navigateToView', handler as EventListener)
-    return () => window.removeEventListener('navigateToView', handler as EventListener)
-  }, [])
+    const handler = (e: CustomEvent<{ view?: string }>) => {
+      const view = e.detail?.view;
+      if (typeof view === 'string') {
+        setActiveView(view);
+      }
+    };
+    window.addEventListener('navigateToView', handler);
+    return () => window.removeEventListener('navigateToView', handler);
+  }, []);
 
   const renderContent = () => {
     switch (activeView) {
@@ -59,7 +62,9 @@ const LandscapeAppInner: React.FC = () => {
       case 'acquisition':
         return <ComingSoonContent title="Acquisition" />;
       case 'market':
-        return <MarketAssumptions projectId={activeProject?.project_id ?? null} />;
+        return <MarketAssumptionsComparison projectId={activeProject?.project_id ?? null} />;
+      case 'growth-rates':
+        return <GrowthRates projectId={activeProject?.project_id ?? null} />;
       case 'project-costs':
         return <BudgetContent projectId={activeProject?.project_id ?? null} />;
       case 'project-revenues':

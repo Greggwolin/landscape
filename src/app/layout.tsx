@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
-import './globals.css';  // Add this line
+import './globals.css';
+// Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
+// Alternative: import { ThemeProvider } from '@/themes/mui-materio';
 
 export const metadata: Metadata = {
   title: "Landscape (Materio Skin)", 
