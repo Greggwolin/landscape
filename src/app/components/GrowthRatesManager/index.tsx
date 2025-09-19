@@ -1,6 +1,24 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import Typography from '@mui/material/Typography'
+import Button from '@mui/material/Button'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TextField from '@mui/material/TextField'
+import Chip from '@mui/material/Chip'
+import Box from '@mui/material/Box'
+import Paper from '@mui/material/Paper'
+import CircularProgress from '@mui/material/CircularProgress'
+import Avatar from '@mui/material/Avatar'
 
 interface GrowthRateStep {
   step_id?: number
@@ -38,6 +56,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState(0)
 
   // Default step structure matching ARGUS pattern
   const defaultSteps: GrowthRateStep[] = [
@@ -68,6 +87,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
       const defaultSet = sets.find((s: GrowthRateSet) => s.is_default) || sets[0]
       if (defaultSet) {
         setActiveSetId(defaultSet.set_id)
+        setActiveTab(0)
         await loadStepsForSet(defaultSet.set_id)
       }
     } catch (error) {
@@ -157,176 +177,200 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
     return firstValidStep ? `${firstValidStep.rate}%` : '0.00%'
   }
 
+  const getAvatarIcon = () => {
+    switch (cardType) {
+      case 'cost': return 'ri-money-dollar-circle-line'
+      case 'revenue': return 'ri-line-chart-line'
+      case 'absorption': return 'ri-bar-chart-line'
+      default: return 'ri-line-chart-line'
+    }
+  }
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue)
+    const selectedSet = growthSets[newValue]
+    if (selectedSet) {
+      setActiveSetId(selectedSet.set_id)
+      loadStepsForSet(selectedSet.set_id)
+      setIsEditing(false)
+    }
+  }
+
   if (isLoading) {
     return (
-      <div className="w-full border rounded-lg bg-white p-4">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-          <div className="h-8 bg-gray-200 rounded"></div>
-        </div>
-      </div>
+      <Card className='bs-full'>
+        <CardContent>
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+            <CircularProgress />
+          </Box>
+        </CardContent>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <div className="w-full border rounded-lg bg-white p-4">
-        <div className="text-red-600">Error: {error}</div>
-      </div>
+      <Card className='bs-full'>
+        <CardContent>
+          <Typography color="error">Error: {error}</Typography>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="w-full border rounded-lg bg-white">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center text-white text-xs">
-              📈
-            </div>
-            <h3 className="font-medium">{getCardTitle()}</h3>
+    <Card className='bs-full'>
+      <CardContent>
+        <div className='flex justify-between items-center is-full mbe-5'>
+          <div className='flex items-center gap-3'>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+              <i className={getAvatarIcon()} />
+            </Avatar>
+            <Typography variant="h6" color="text.primary" className='font-medium'>
+              {getCardTitle()}
+            </Typography>
           </div>
-          <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
-            {getCurrentRate()}
-          </div>
+          <Chip
+            label={getCurrentRate()}
+            color="primary"
+            size="small"
+          />
         </div>
-      </div>
 
-      <div className="p-4 space-y-4">
         {/* Growth Rate Set Tabs */}
-        <div className="border-b">
-          <div className="flex space-x-1">
-            {growthSets.map((set) => (
-              <button
-                key={set.set_id}
-                onClick={() => {
-                  setActiveSetId(set.set_id)
-                  loadStepsForSet(set.set_id)
-                  setIsEditing(false)
-                }}
-                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeSetId === set.set_id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {set.set_name}
-              </button>
-            ))}
-          </div>
-        </div>
+        {growthSets.length > 0 && (
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={activeTab} onChange={handleTabChange} aria-label="growth rate sets">
+              {growthSets.map((set, index) => (
+                <Tab key={set.set_id} label={set.set_name} />
+              ))}
+            </Tabs>
+          </Box>
+        )}
 
         {/* Current Set Configuration */}
         {activeSetId && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-gray-700">
+          <Box>
+            <div className='flex justify-between items-center mb-3'>
+              <Typography variant="body2" color="text.secondary">
                 Step-based growth assumptions:
-              </h4>
-              <div className="flex gap-2">
+              </Typography>
+              <div className='flex gap-2'>
                 {isEditing ? (
                   <>
-                    <button
+                    <Button
+                      variant="contained"
+                      size="small"
                       onClick={saveSteps}
-                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                     >
                       Save / Update
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
                       onClick={() => setIsEditing(false)}
-                      className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  <button
+                  <Button
+                    variant="outlined"
+                    size="small"
                     onClick={() => setIsEditing(true)}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200"
                   >
                     Edit
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
 
             {/* Steps Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Step</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">From Period</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Periods</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Thru Period</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Step</TableCell>
+                    <TableCell>From Period</TableCell>
+                    <TableCell>Rate</TableCell>
+                    <TableCell>Periods</TableCell>
+                    <TableCell>Thru Period</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {activeSteps.map((step, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-3 py-2 font-medium">{step.step_number}</td>
-                      <td className="px-3 py-2">
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {step.step_number}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
                         {isEditing ? (
-                          <input
+                          <TextField
                             type="number"
+                            size="small"
                             value={step.from_period || ''}
                             onChange={(e) => handleStepChange(index, 'from_period', parseInt(e.target.value) || null)}
-                            className="w-16 px-2 py-1 border rounded text-sm"
+                            sx={{ width: 80 }}
                           />
                         ) : (
                           step.from_period || '-'
                         )}
-                      </td>
-                      <td className="px-3 py-2">
+                      </TableCell>
+                      <TableCell>
                         {isEditing ? (
-                          <div className="flex items-center">
-                            <input
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <TextField
                               type="number"
-                              step="0.1"
+                              size="small"
+                              inputProps={{ step: 0.1 }}
                               value={step.rate || ''}
                               onChange={(e) => handleStepChange(index, 'rate', parseFloat(e.target.value) || null)}
-                              className="w-16 px-2 py-1 border rounded text-sm"
+                              sx={{ width: 80 }}
                             />
-                            <span className="ml-1 text-blue-600">%</span>
-                          </div>
+                            <Typography variant="body2" color="primary">%</Typography>
+                          </Box>
                         ) : (
                           step.rate ? (
-                            <span className="text-blue-600">{step.rate}%</span>
+                            <Typography variant="body2" color="primary">{step.rate}%</Typography>
                           ) : '-'
                         )}
-                      </td>
-                      <td className="px-3 py-2">
+                      </TableCell>
+                      <TableCell>
                         {isEditing ? (
-                          <input
+                          <TextField
                             type="number"
+                            size="small"
                             value={step.periods || ''}
                             onChange={(e) => handleStepChange(index, 'periods', parseInt(e.target.value) || null)}
                             placeholder="E"
-                            className="w-16 px-2 py-1 border rounded text-sm"
+                            sx={{ width: 80 }}
                           />
                         ) : (
                           step.periods || 'E'
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">
-                        {step.periods && step.from_period
-                          ? step.from_period + step.periods - 1
-                          : step.periods === null ? 'E' : '-'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {step.periods && step.from_period
+                            ? step.from_period + step.periods - 1
+                            : step.periods === null ? 'E' : '-'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-            <div className="text-xs text-gray-500 mt-2">
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
               E = End of Analysis
-            </div>
-          </div>
+            </Typography>
+          </Box>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 

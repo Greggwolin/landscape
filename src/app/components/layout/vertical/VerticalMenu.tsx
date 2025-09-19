@@ -154,9 +154,6 @@ const VerticalMenu = ({ scrollMenu }: { scrollMenu: (container: ScrollContainer,
           <MenuItem href='/account-settings' icon={<i className='ri-user-settings-line' />}>
             Account Settings
           </MenuItem>
-          <MenuItem href='/growth-rates' icon={<i className='ri-line-chart-line' />}>
-            Growth Rates
-          </MenuItem>
           <SubMenu label='Auth Pages' icon={<i className='ri-shield-keyhole-line' />}>
             <MenuItem href='/login' target='_blank'>
               Login
