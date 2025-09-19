@@ -1,0 +1,91 @@
+/* Horizon-inspired dark theme overrides for react-data-grid and Handsontable */
+
+/* React Data Grid (v7) */
+.rdg-dark {
+  --rdg-background-color: #0f1419;
+  --rdg-color: #d0d4db;
+  --rdg-border-color: #232a34;
+  --rdg-header-background-color: #1a2028;
+  --rdg-header-color: #e3e7ee;
+  --rdg-row-hover-background-color: #141a22;
+  --rdg-row-selected-background-color: #18202a;
+  --rdg-selection-color: #4f8cff; /* accent */
+  font-size: 0.98rem;
+}
+
+.rdg-dark .rdg-header-row {
+  background-color: var(--rdg-header-background-color);
+  color: var(--rdg-header-color);
+}
+
+.rdg-dark .rdg-row,
+.rdg-dark .rdg-summary-row {
+  background-color: var(--rdg-background-color);
+  color: var(--rdg-color);
+}
+
+.rdg-dark .rdg-cell {
+  border-color: var(--rdg-border-color);
+  justify-content: center;
+  text-align: center;
+}
+.rdg-dark .rdg-header-cell { justify-content: center; text-align: center; }
+
+.rdg-dark .rdg-row:hover .rdg-cell {
+  background-color: var(--rdg-row-hover-background-color);
+}
+
+.rdg-dark .rdg-cell.selected,
+.rdg-dark .rdg-cell:focus {
+  outline: 1px solid var(--rdg-selection-color);
+  outline-offset: -1px;
+}
+
+/* Handsontable (community) */
+.ht-theme-dark {
+  --hot-bg: #0f1419;
+  --hot-fg: #d0d4db;
+  --hot-border: #232a34;
+  --hot-header-bg: #1a2028;
+  --hot-header-fg: #e3e7ee;
+  --hot-hover: #141a22;
+  --hot-selected: #18202a;
+  --hot-accent: #4f8cff;
+}
+
+.ht-theme-dark .handsontable table {
+  background-color: var(--hot-bg) !important;
+  color: var(--hot-fg) !important;
+  font-size: 0.98rem !important;
+}
+
+.ht-theme-dark .handsontable td,
+.ht-theme-dark .handsontable th {
+  border-color: var(--hot-border) !important;
+  background-color: var(--hot-bg) !important;
+  color: var(--hot-fg) !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  line-height: 1.35 !important;
+}
+
+.ht-theme-dark .handsontable th,
+.ht-theme-dark .ht_clone_top thead th {
+  background-color: var(--hot-header-bg) !important;
+  color: var(--hot-header-fg) !important;
+}
+
+.ht-theme-dark .handsontable tbody tr:hover td {
+  background-color: var(--hot-hover) !important;
+}
+
+.ht-theme-dark .area, /* selection */
+.ht-theme-dark .ht__highlight td {
+  background-color: var(--hot-selected) !important;
+}
+
+.ht-theme-dark .current {
+  box-shadow: inset 0 0 0 1px var(--hot-accent) !important;
+}
