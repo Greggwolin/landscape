@@ -1,0 +1,16 @@
+husky - DEPRECATED
+
+Please remove the following two lines from .husky/pre-commit:
+
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+They WILL FAIL in v10.0.0
+
+→ No staged files match any configured task.
+[main e4f5be8] Auto-commit: Save work progress - 2025-09-19 17:48:06
+ 4 files changed, 73 insertions(+)
+ create mode 100644 .auto-commit.pid
+ create mode 100644 auto-commit.log
+ create mode 100755 scripts/setup-auto-start.sh
+Auto-commit successful at 2025-09-19 17:48:06
