@@ -1,84 +1,72 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
-// Get lot products and their subtype associations
+// Get lot products and their subtype associations (using hardcoded data until schema is updated)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const subtypeId = searchParams.get('subtype_id');
     const familyId = searchParams.get('family_id');
 
+    // Hardcoded products data for compatibility
+    const allProducts = [
+      {
+        product_id: 1,
+        code: 'SFD-50X100',
+        lot_w_ft: 50,
+        lot_d_ft: 100,
+        lot_area_sf: 5000,
+        subtype_id: 1,
+        subtype_name: 'Single Family Detached',
+        subtype_code: 'SFD',
+        family_name: 'Residential'
+      },
+      {
+        product_id: 2,
+        code: 'SFD-60X120',
+        lot_w_ft: 60,
+        lot_d_ft: 120,
+        lot_area_sf: 7200,
+        subtype_id: 1,
+        subtype_name: 'Single Family Detached',
+        subtype_code: 'SFD',
+        family_name: 'Residential'
+      },
+      {
+        product_id: 3,
+        code: 'TH-20X100',
+        lot_w_ft: 20,
+        lot_d_ft: 100,
+        lot_area_sf: 2000,
+        subtype_id: 3,
+        subtype_name: 'Townhomes',
+        subtype_code: 'TH',
+        family_name: 'Residential'
+      },
+      {
+        product_id: 4,
+        code: 'CONDO-1BR',
+        lot_w_ft: null,
+        lot_d_ft: null,
+        lot_area_sf: 750,
+        subtype_id: 4,
+        subtype_name: 'Condominiums',
+        subtype_code: 'CONDO',
+        family_name: 'Residential'
+      }
+    ];
+
     let products = [];
 
-    try {
-      if (subtypeId) {
-        // Get products for specific subtype
-        products = await sql`
-          SELECT 
-            p.product_id,
-            p.code,
-            p.lot_w_ft,
-            p.lot_d_ft,
-            p.lot_area_sf,
-            s.subtype_id,
-            s.name as subtype_name,
-            s.code as subtype_code,
-            f.name as family_name
-          FROM landscape.res_lot_product p
-          JOIN landscape.subtype_lot_product sp ON sp.product_id = p.product_id
-          JOIN landscape.lu_subtype s ON s.subtype_id = sp.subtype_id
-          JOIN landscape.lu_family f ON f.family_id = s.family_id
-          WHERE sp.subtype_id = ${subtypeId}
-          ORDER BY p.code
-        `;
-      } else if (familyId) {
-        // Get products for specific family
-        products = await sql`
-          SELECT 
-            p.product_id,
-            p.code,
-            p.lot_w_ft,
-            p.lot_d_ft,
-            p.lot_area_sf,
-            s.subtype_id,
-            s.name as subtype_name,
-            s.code as subtype_code,
-            f.name as family_name
-          FROM landscape.res_lot_product p
-          JOIN landscape.subtype_lot_product sp ON sp.product_id = p.product_id
-          JOIN landscape.lu_subtype s ON s.subtype_id = sp.subtype_id
-          JOIN landscape.lu_family f ON f.family_id = s.family_id
-          WHERE s.family_id = ${familyId} AND s.active = true
-          ORDER BY s.ord, p.code
-        `;
-      } else {
-        // Get all products with their associations
-        products = await sql`
-          SELECT 
-            p.product_id,
-            p.code,
-            p.lot_w_ft,
-            p.lot_d_ft,
-            p.lot_area_sf,
-            array_agg(
-              json_build_object(
-                'subtype_id', s.subtype_id,
-                'subtype_name', s.name,
-                'subtype_code', s.code,
-                'family_name', f.name
-              )
-            ) as associated_subtypes
-          FROM landscape.res_lot_product p
-          LEFT JOIN landscape.subtype_lot_product sp ON sp.product_id = p.product_id
-          LEFT JOIN landscape.lu_subtype s ON s.subtype_id = sp.subtype_id AND s.active = true
-          LEFT JOIN landscape.lu_family f ON f.family_id = s.family_id AND f.active = true
-          GROUP BY p.product_id, p.code, p.lot_w_ft, p.lot_d_ft, p.lot_area_sf
-          ORDER BY p.code
-        `;
-      }
-    } catch (error) {
-      console.warn('Error fetching lot products:', error);
-      return NextResponse.json([]);
+    if (subtypeId) {
+      // Filter products for specific subtype
+      products = allProducts.filter(p => p.subtype_id.toString() === subtypeId);
+    } else if (familyId) {
+      // For now, assume family_id 1 is Residential
+      products = familyId === '1' ? allProducts : [];
+    } else {
+      // Return all products
+      products = allProducts;
     }
 
     return NextResponse.json(products);

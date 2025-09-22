@@ -34,6 +34,17 @@ export interface Parcel {
   landuseCode?: string
   familyName?: string
   subtypeName?: string
+  // New non-residential fields
+  building_sf?: number
+  site_coverage_pct?: number
+  setback_front_ft?: number
+  setback_side_ft?: number
+  setback_rear_ft?: number
+  // Taxonomy fields
+  family_name?: string
+  density_code?: string
+  type_code?: string
+  product_code?: string
 }
 
 export interface Phase {
@@ -92,6 +103,10 @@ type ApiParcel = {
   product: string | null
   family_name?: string | null
   subtype_name?: string | null
+  // Taxonomy fields
+  density_code?: string | null
+  type_code?: string | null
+  product_code?: string | null
 }
 
 const ALLOWED_LAND_USES: LandUseType[] = ['MDR', 'HDR', 'LDR', 'MHDR', 'C', 'MU', 'OS']
@@ -208,6 +223,11 @@ const PlanningWizard: React.FC = () => {
           landuseCode: parcel.usecode ?? undefined,
           familyName: parcel.family_name ?? undefined,
           subtypeName: parcel.subtype_name ?? undefined,
+          // Taxonomy fields
+          family_name: parcel.family_name ?? undefined,
+          density_code: parcel.density_code ?? undefined,
+          type_code: parcel.type_code ?? undefined,
+          product_code: parcel.product_code ?? undefined,
         }
 
         phaseRef.parcels.push(parcelNode)
@@ -314,6 +334,7 @@ const PlanningWizard: React.FC = () => {
               const areaLabel = project.areas.find((area) => area.id === areaId)?.name
               handleAddPhase(areaLabel)
             }}
+            onAddParcel={undefined}
             onOpenPhase={openPhaseView}
             onOpenArea={undefined}
             showPhaseForm={null}

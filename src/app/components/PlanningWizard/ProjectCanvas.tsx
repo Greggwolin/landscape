@@ -1,14 +1,16 @@
 'use client'
-// FORCE RECOMPILE 2025-09-20-15:32
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Project } from './PlanningWizard'
 import DropZone from './DropZone'
+import SimpleTaxonomySelector from '../LandUse/SimpleTaxonomySelector'
+import InlineTaxonomySelector from '../LandUse/InlineTaxonomySelector'
 
 interface ProjectCanvasProps {
   project: Project
   onAddArea?: () => void
   onAddPhase?: (areaId: string) => void
+  onAddParcel?: (areaId: string, phaseId: string) => void
   onOpenPhase?: (areaId: string, phaseId: string) => void
   onOpenArea?: (areaId: string) => void
   showPhaseForm?: { areaId: string; areaName: string } | null
@@ -19,6 +21,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
   project,
   onAddArea,
   onAddPhase,
+  onAddParcel,
   onOpenPhase,
   onOpenArea,
   showPhaseForm,
@@ -32,21 +35,23 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
   }
 
   const [editing, setEditing] = useState<{ areaId: string; phaseId: string; parcelId: string } | null>(null)
+  const [addingParcel, setAddingParcel] = useState<{ areaId: string; phaseId: string } | null>(null)
   const [draft, setDraft] = useState({
-    landuseCode: '',
-    product: '',
+    acres: 0,
+    units: 0,
+    family_name: '',
+    density_code: '',
+    type_code: '',
+    product_code: '',
+  })
+  const [newParcelDraft, setNewParcelDraft] = useState({
+    family_name: '',
+    density_code: '',
+    type_code: '',
+    product_code: '',
     acres: 0,
     units: 0,
   })
-  const [families, setFamilies] = useState<{ family_id: string; name: string; code?: string }[]>([])
-  const [subtypes, setSubtypes] = useState<{ subtype_id: string; family_id: string; name: string }[]>([])
-  const [codes, setCodes] = useState<{ landuse_code: string; name: string; family_id?: string; subtype_id?: string }[]>([])
-  const [selectedFamily, setSelectedFamily] = useState('')
-  const [selectedSubtype, setSelectedSubtype] = useState('')
-  const [choicesLoaded, setChoicesLoaded] = useState(false)
-  const [loadingChoices, setLoadingChoices] = useState(false)
-  const [productOptions, setProductOptions] = useState<string[]>([])
-  const [loadingProducts, setLoadingProducts] = useState(false)
 
   const handlePhaseDrop = (areaId: string) => (item: { type: string }) => {
     if (item.type === 'phase') {
@@ -92,135 +97,69 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
     [project.areas],
   )
 
-  const ensureChoicesLoaded = useCallback(async () => {
-    if (choicesLoaded || loadingChoices) return
-    setLoadingChoices(true)
-    try {
-      const [codesRes, famRes, subRes] = await Promise.all([
-        fetch('/api/landuse/choices?type=codes'),
-        fetch('/api/landuse/choices?type=families'),
-        fetch('/api/landuse/choices?type=subtypes'),
-      ])
-      const [codesData, familiesData, subtypesData] = await Promise.all([
-        codesRes.ok ? codesRes.json() : Promise.resolve([]),
-        famRes.ok ? famRes.json() : Promise.resolve([]),
-        subRes.ok ? subRes.json() : Promise.resolve([]),
-      ])
-
-      const normalizedCodes = Array.isArray(codesData)
-        ? codesData
-            .map((record: Record<string, unknown>) => {
-              const codeValue = record.landuse_code ?? record.code
-              if (typeof codeValue !== 'string') return null
-              const nameValue = record.name ?? record.display_name ?? codeValue
-              const familyVal = record.family_id
-              const subtypeVal = record.subtype_id
-              return {
-                landuse_code: codeValue.trim(),
-                name: typeof nameValue === 'string' ? nameValue : codeValue.trim(),
-                family_id: familyVal != null ? String(familyVal) : undefined,
-                subtype_id: subtypeVal != null ? String(subtypeVal) : undefined,
-              }
-            })
-            .filter(Boolean) as typeof codes
-        : []
-
-      const normalizedFamilies = Array.isArray(familiesData)
-        ? familiesData
-            .map((record: Record<string, unknown>) => {
-              const idValue = record.family_id ?? record.id
-              const nameValue = record.name ?? record.family_name ?? record.code
-              if (idValue == null || typeof nameValue !== 'string') return null
-              return {
-                family_id: String(idValue),
-                name: nameValue.trim(),
-                code: typeof record.code === 'string' ? record.code : undefined,
-              }
-            })
-            .filter(Boolean) as typeof families
-        : []
-
-      const normalizedSubtypes = Array.isArray(subtypesData)
-        ? subtypesData
-            .map((record: Record<string, unknown>) => {
-              const subtypeValue = record.subtype_id ?? record.id
-              const familyValue = record.family_id ?? record.family
-              const nameValue = record.name ?? record.subtype_name ?? record.code
-              if (subtypeValue == null || familyValue == null || typeof nameValue !== 'string') return null
-              return {
-                subtype_id: String(subtypeValue),
-                family_id: String(familyValue),
-                name: nameValue.trim(),
-              }
-            })
-            .filter(Boolean) as typeof subtypes
-        : []
-
-      setCodes(normalizedCodes)
-      setFamilies(normalizedFamilies)
-      setSubtypes(normalizedSubtypes)
-      setChoicesLoaded(true)
-    } catch (err) {
-      console.error('Failed to load land use data', err)
-    } finally {
-      setLoadingChoices(false)
-    }
-  }, [choicesLoaded, loadingChoices])
 
   const startEditingParcel = useCallback(
-    async (areaId: string, phaseId: string, parcelId: string) => {
+    (areaId: string, phaseId: string, parcelId: string) => {
       const { parcelRef } = findParcel(areaId, phaseId, parcelId)
       if (!parcelRef) return
-      await ensureChoicesLoaded()
-      setEditing({ areaId, phaseId, parcelId })
-      setDraft({
-        landuseCode: parcelRef.landuseCode ?? parcelRef.landUse ?? '',
-        product: parcelRef.product ?? '',
-        acres: Number(parcelRef.acres ?? 0),
-        units: Number(parcelRef.units ?? 0),
+
+      console.log('🚀 startEditingParcel - parcelRef:', parcelRef)
+      console.log('🚀 startEditingParcel - taxonomy fields:', {
+        family_name: parcelRef.family_name,
+        density_code: parcelRef.density_code,
+        type_code: parcelRef.type_code,
+        product_code: parcelRef.product_code,
       })
 
-      const preferredFamilyName = parcelRef.familyName
-      const preferredCode = parcelRef.landuseCode ?? parcelRef.landUse ?? ''
-      const preferredSubtypeName = parcelRef.subtypeName
-
-      let famId = ''
-      let subtypeId = ''
-
-      if (preferredCode) {
-        const meta = codes.find((code) => code.landuse_code === preferredCode)
-        if (meta) {
-          famId = meta.family_id ?? ''
-          subtypeId = meta.subtype_id ?? ''
-        }
+      setEditing({ areaId, phaseId, parcelId })
+      const draftValues = {
+        acres: Number(parcelRef.acres ?? 0),
+        units: Number(parcelRef.units ?? 0),
+        family_name: parcelRef.family_name || '',
+        density_code: parcelRef.density_code || '',
+        type_code: parcelRef.type_code || '',
+        product_code: parcelRef.product_code || '',
       }
-
-      if (!famId && preferredFamilyName) {
-        const match = families.find((f) => f.name === preferredFamilyName || f.code === preferredFamilyName)
-        if (match) famId = match.family_id
-      }
-
-      if (!subtypeId && preferredSubtypeName) {
-        const match = subtypes.find((s) => s.name === preferredSubtypeName)
-        if (match) subtypeId = match.subtype_id
-      }
-
-      setSelectedFamily(famId)
-      setSelectedSubtype(subtypeId)
+      console.log('🚀 startEditingParcel - setting draft to:', draftValues)
+      setDraft(draftValues)
     },
-    [ensureChoicesLoaded, findParcel, codes, families, subtypes],
+    [findParcel],
   )
 
   const cancelEdit = () => {
     setEditing(null)
     setDraft({
-      landuseCode: '',
-      product: '',
+      acres: 0,
+      units: 0,
+      family_name: '',
+      density_code: '',
+      type_code: '',
+      product_code: '',
+    })
+  }
+
+  const cancelAddParcel = () => {
+    setAddingParcel(null)
+    setNewParcelDraft({
+      family_name: '',
+      density_code: '',
+      type_code: '',
+      product_code: '',
       acres: 0,
       units: 0,
     })
-    setSelectedFamily('')
-    setSelectedSubtype('')
+  }
+
+  const startAddingParcel = (areaId: string, phaseId: string) => {
+    setAddingParcel({ areaId, phaseId })
+    setNewParcelDraft({
+      family_name: '',
+      density_code: '',
+      type_code: '',
+      product_code: '',
+      acres: 0,
+      units: 0,
+    })
   }
 
   const editingParcel = useMemo(() => {
@@ -229,270 +168,28 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
     return parcelRef ?? null
   }, [editing, findParcel])
 
-  const editingProductCode = editingParcel?.product?.trim() ?? ''
 
-  const filteredSubtypes = useMemo(
-    () => subtypes.filter((s) => !selectedFamily || s.family_id === selectedFamily),
-    [subtypes, selectedFamily],
-  )
 
-  const filteredCodes = useMemo(
-    () =>
-      codes.filter(
-        (code) => (!selectedFamily || code.family_id === selectedFamily) && (!selectedSubtype || code.subtype_id === selectedSubtype),
-      ),
-    [codes, selectedFamily, selectedSubtype],
-  )
-
-  useEffect(() => {
-    if (!editing || !choicesLoaded) return
-    const { parcelRef } = findParcel(editing.areaId, editing.phaseId, editing.parcelId)
-    if (!parcelRef) return
-
-    const preferredCode = parcelRef.landuseCode ?? parcelRef.landUse ?? ''
-    const preferredFamilyName = parcelRef.familyName
-    const preferredSubtypeName = parcelRef.subtypeName
-
-    let famId = selectedFamily
-    let subtypeId = selectedSubtype
-
-    if (!famId && preferredCode) {
-      const meta = codes.find((c) => c.landuse_code === preferredCode)
-      if (meta) {
-        famId = meta.family_id ?? ''
-        subtypeId = meta.subtype_id ?? ''
-      }
-    }
-
-    if (!famId && preferredFamilyName) {
-      const familyMatch = families.find((f) => f.name === preferredFamilyName || f.code === preferredFamilyName)
-      if (familyMatch) famId = familyMatch.family_id
-    }
-
-    if (!subtypeId && preferredSubtypeName) {
-      const subtypeMatch = subtypes.find((s) => s.name === preferredSubtypeName)
-      if (subtypeMatch) subtypeId = subtypeMatch.subtype_id
-    }
-
-    if (famId !== selectedFamily) setSelectedFamily(famId)
-    if (subtypeId !== selectedSubtype) setSelectedSubtype(subtypeId)
-    if (!draft.landuseCode && preferredCode) {
-      setDraft((prev) => ({ ...prev, landuseCode: preferredCode }))
-    }
-  }, [editing, choicesLoaded, codes, families, subtypes, selectedFamily, selectedSubtype, draft.landuseCode, findParcel])
-
-  useEffect(() => {
-    if (!editing) return
-
-    // Auto-select landuse code when there's only one option
-    if (!draft.landuseCode && filteredCodes.length === 1) {
-      setDraft((prev) => ({ ...prev, landuseCode: filteredCodes[0].landuse_code }))
-    }
-
-    // Auto-select the first landuse code when subtype changes and there are multiple codes
-    // This ensures Commercial/Retail gets a code automatically
-    if (!draft.landuseCode && filteredCodes.length > 0 && selectedSubtype) {
-      setDraft((prev) => ({ ...prev, landuseCode: filteredCodes[0].landuse_code }))
-    }
-  }, [editing, filteredCodes, draft.landuseCode, selectedSubtype])
-
-  const isSingleFamilySubtype = useMemo(() => {
-    if (selectedSubtype) {
-      const subtype = filteredSubtypes.find((s) => s.subtype_id === selectedSubtype)
-      if (subtype) {
-        const name = subtype.name.toLowerCase()
-        return name.includes('single family') || name.includes('single-family') || name.includes('sf')
-      }
-    }
-    const fallback = editingParcel?.subtypeName ?? ''
-    return fallback.toLowerCase().includes('single family') || fallback.toLowerCase().includes('single-family')
-  }, [selectedSubtype, filteredSubtypes, editingParcel])
-
-  useEffect(() => {
-    if (!isSingleFamilySubtype) {
-      setProductOptions([])
-      setLoadingProducts(false)
-      return
-    }
-
-    const subtypeParam = selectedSubtype?.trim()
-    const familyParam = selectedFamily?.trim()
-
-    if (!subtypeParam && !familyParam) {
-      setProductOptions(editingProductCode ? [editingProductCode] : [])
-      setLoadingProducts(false)
-      return
-    }
-
-    let cancelled = false
-    const controller = new AbortController()
-
-    const loadProducts = async () => {
-      setLoadingProducts(true)
-      try {
-        const queryParam = subtypeParam ? `subtype_id=${encodeURIComponent(subtypeParam)}` : `family_id=${encodeURIComponent(familyParam)}`
-        const res = await fetch(`/api/landuse/products?${queryParam}`, { signal: controller.signal })
-        if (!res.ok) throw new Error(await res.text())
-        const data = await res.json()
-
-        if (cancelled) return
-
-        const codes = Array.isArray(data)
-          ? Array.from(
-              new Set(
-                data
-                  .map((record: Record<string, unknown>) => {
-                    const value = record.code
-                    return typeof value === 'string' ? value.trim() : null
-                  })
-                  .filter((value): value is string => Boolean(value)),
-              ),
-            ).sort((a, b) => a.localeCompare(b))
-          : []
-
-        if (editingProductCode && !codes.includes(editingProductCode)) {
-          codes.unshift(editingProductCode)
-        }
-
-        setProductOptions(codes)
-      } catch (error) {
-        if (controller.signal.aborted) return
-        console.error('Failed to load lot products', error)
-        setProductOptions(editingProductCode ? [editingProductCode] : [])
-      } finally {
-        if (!cancelled) {
-          setLoadingProducts(false)
-        }
-      }
-    }
-
-    loadProducts()
-
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [isSingleFamilySubtype, selectedSubtype, selectedFamily, editingProductCode])
-
-  useEffect(() => {
-    if (!isSingleFamilySubtype && draft.product) {
-      setDraft((prev) => ({ ...prev, product: '' }))
-    }
-  }, [isSingleFamilySubtype, draft.product])
-
-  useEffect(() => {
-    if (!editing) return
-
-    const forceControlStyling = () => {
-      // Target all select elements in the document that might be related
-      const allSelects = document.querySelectorAll<HTMLSelectElement>('select')
-      allSelects.forEach((element) => {
-        if (element.classList.contains('parcel-inline-select') || element.closest('.planning-wizard-content')) {
-          // Force styles on the select element
-          element.style.setProperty('color', '#000', 'important')
-          element.style.setProperty('background-color', '#fff', 'important')
-          element.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-          element.style.setProperty('color-scheme', 'light', 'important')
-          element.style.setProperty('-webkit-appearance', 'menulist', 'important')
-          element.style.setProperty('appearance', 'menulist', 'important')
-          element.style.setProperty('border', '1px solid #6b7280', 'important')
-
-          // Force option styling more aggressively
-          const options = element.querySelectorAll('option')
-          options.forEach((option) => {
-            option.style.setProperty('color', '#000', 'important')
-            option.style.setProperty('background-color', '#fff', 'important')
-            option.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-            option.style.setProperty('background', '#fff', 'important')
-          })
-        }
-      })
-
-      // Also target all option elements globally
-      const allOptions = document.querySelectorAll<HTMLOptionElement>('option')
-      allOptions.forEach((option) => {
-        if (option.closest('.planning-wizard-content')) {
-          option.style.setProperty('color', '#000', 'important')
-          option.style.setProperty('background-color', '#fff', 'important')
-          option.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-          option.style.setProperty('background', '#fff', 'important')
-        }
-      })
-
-      const inputs = document.querySelectorAll<HTMLInputElement>('.parcel-inline-input')
-      inputs.forEach((element) => {
-        element.style.setProperty('color', '#000', 'important')
-        element.style.setProperty('background-color', '#fff', 'important')
-        element.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-        element.style.setProperty('color-scheme', 'light', 'important')
-      })
-    }
-
-    const raf = requestAnimationFrame(forceControlStyling)
-
-    // Set up a persistent interval to ensure styling sticks
-    const interval = setInterval(forceControlStyling, 100)
-
-    // Set up a MutationObserver to watch for changes
-    const observer = new MutationObserver(() => {
-      forceControlStyling()
-    })
-
-    const container = document.querySelector('.planning-wizard-content')
-    if (container) {
-      observer.observe(container, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class']
-      })
-    }
-
-    return () => {
-      cancelAnimationFrame(raf)
-      clearInterval(interval)
-      observer.disconnect()
-    }
-  }, [editing, draft, selectedFamily, selectedSubtype])
-
-  const handleFamilyChange = (value: string) => {
-    setSelectedFamily(value)
-    setSelectedSubtype('')
-    setDraft((prev) => ({ ...prev, landuseCode: '' }))
-  }
-
-  const handleSubtypeChange = (value: string) => {
-    setSelectedSubtype(value)
-    // Clear landuse code initially, but it will be auto-set by the useEffect below
-    setDraft((prev) => ({ ...prev, landuseCode: '' }))
-  }
-
-  const handleUsecodeChange = (value: string) => {
-    setDraft((prev) => ({ ...prev, landuseCode: value }))
-  }
 
   const saveInlineEdit = async () => {
-    if (!editing || !editingParcel?.dbId) return
-    const landuseCode = (draft.landuseCode || '').trim()
-    if (!landuseCode) {
-      alert('Select a land use code before saving.')
+    if (!editing || !editingParcel?.dbId) {
       return
     }
 
-    const productValue = (draft.product ?? '').trim()
-
-    const payload: Record<string, unknown> = {
-      landuse_code: landuseCode,
-      product: isSingleFamilySubtype && productValue ? productValue : null,
-      acres: Number(draft.acres),
-      units: Number(draft.units),
+    // Validate taxonomy selection
+    if (!draft.family_name) {
+      alert('Please select a family before saving.')
+      return
     }
 
-    console.log('Saving parcel with payload:', payload)
-    console.log('Is single family subtype:', isSingleFamilySubtype)
-    console.log('Selected family:', selectedFamily)
-    console.log('Selected subtype:', selectedSubtype)
-    console.log('Draft landuse code:', draft.landuseCode)
+    const payload = {
+      acres: Number(draft.acres),
+      units: Number(draft.units),
+      family_name: draft.family_name,
+      density_code: draft.density_code || null,
+      type_code: draft.type_code || null,
+      product_code: draft.product_code || null,
+    }
 
     try {
       const res = await fetch(`/api/parcels/${editingParcel.dbId}`, {
@@ -500,40 +197,75 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error(await res.text())
 
-      // Cancel editing first to show default view
-      cancelEdit()
-
-      // Force multiple refresh attempts to ensure data updates
-      try {
-        await onRefresh?.()
-
-        // Dispatch multiple events to ensure refresh
-        window.dispatchEvent(new CustomEvent('dataChanged', {
-          detail: {
-            entity: 'parcel',
-            id: editingParcel.dbId,
-            projectId: projectIdFromId(project.id),
-          },
-        }))
-
-        // Additional refresh events with delays
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('dataChanged'))
-          onRefresh?.()
-        }, 50)
-
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('dataChanged'))
-        }, 200)
-
-      } catch (refreshError) {
-        console.error('Error during refresh:', refreshError)
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText)
       }
+
+      cancelEdit()
+      await onRefresh?.()
+      window.dispatchEvent(new CustomEvent('dataChanged'))
     } catch (err) {
-      console.error('Failed to save parcel', err)
-      alert('Failed to save parcel changes')
+      console.error('Save error:', err)
+      alert(`Failed to save parcel changes: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const saveNewParcel = async (areaId: string, phaseId: string) => {
+    if (!addingParcel) return
+
+    // Validate required fields
+    if (!newParcelDraft.family_name) {
+      alert('Please select family before saving.')
+      return
+    }
+
+    try {
+      // Get the area and phase database IDs
+      const area = project.areas.find(a => a.id === areaId)
+      const phase = area?.phases.find(p => p.id === phaseId)
+
+      if (!area || !phase) {
+        alert('Could not find area or phase information.')
+        return
+      }
+
+      const projectId = projectIdFromId(project.id)
+      if (!projectId) {
+        alert('Could not determine project ID.')
+        return
+      }
+
+      const payload = {
+        project_id: projectId,
+        area_id: area.areaDbId,
+        phase_id: phase.phaseDbId,
+        family_name: newParcelDraft.family_name,
+        density_code: newParcelDraft.density_code || null,
+        type_code: newParcelDraft.type_code || null,
+        product_code: newParcelDraft.product_code || null,
+        acres_gross: newParcelDraft.acres || null,
+        units_total: newParcelDraft.units || null,
+      }
+
+      const res = await fetch('/api/parcels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText)
+      }
+
+      cancelAddParcel()
+      await onRefresh?.()
+      window.dispatchEvent(new CustomEvent('dataChanged'))
+    } catch (err) {
+      console.error('Failed to create parcel', err)
+      alert('Failed to create parcel: ' + (err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -631,9 +363,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                         editing && editing.areaId === area.id && editing.phaseId === phase.id && editing.parcelId === parcel.id
                                       const tileColor = getLandUseColor(parcel.landUse)
                                       const borderColor = getLandUseBorderColor(parcel.landUse)
-                                      const currentLanduseCode = codes.find(c => c.landuse_code === (parcel.landuseCode ?? parcel.landUse))
-                                      const currentFamily = families.find(f => f.family_id === currentLanduseCode?.family_id)
-                                      const tileDisplayCode = currentFamily?.code || parcel.landuseCode || parcel.landUse
+                                      const tileDisplayCode = parcel.family_name || parcel.landuseCode || parcel.landUse
 
                                       return (
                                         <div
@@ -649,107 +379,57 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                         >
                                           {isEditing && (
                                             <div
-                                              className="p-2 text-white min-h-48"
+                                              className="p-1 bg-gray-800 bg-opacity-90"
                                               onClick={(e) => e.stopPropagation()}
                                               onMouseDown={(e) => e.stopPropagation()}
                                             >
-                                              <div className="flex items-center justify-between text-sm font-semibold mb-3">
-                                                <span>Parcel {parcel.name.replace('Parcel: ', '')}</span>
-                                                <span className="text-xs uppercase tracking-wide opacity-80">
-                                                  {tileDisplayCode || '—'}
-                                                </span>
-                                              </div>
-
-                                              {loadingChoices && !choicesLoaded ? (
-                                                <div className="text-sm text-center py-4">Loading options…</div>
-                                              ) : (
-                                                <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-2 text-xs">
-                                                  <label className="text-gray-200 font-medium self-center">Type</label>
-                                                  <select
-                                                    className="parcel-inline-select h-6 w-24 rounded border border-gray-500 bg-white px-1 text-xs text-black"
-                                                    value={selectedFamily}
-                                                    onChange={(e) => handleFamilyChange(e.target.value)}
-                                                    style={{
-                                                      color: '#000 !important',
-                                                      backgroundColor: '#fff !important',
-                                                      WebkitTextFillColor: '#000 !important'
-                                                    }}
-                                                  >
-                                                    <option value="">Select</option>
-                                                    {families.map((family) => (
-                                                      <option key={family.family_id} value={family.family_id}>
-                                                        {family.name}
-                                                      </option>
-                                                    ))}
-                                                  </select>
-
-                                                  <label className="text-gray-200 font-medium self-center">Use</label>
-                                                  <select
-                                                    className="parcel-inline-select h-6 w-24 rounded border border-gray-500 bg-white px-1 text-xs text-black"
-                                                    value={selectedSubtype}
-                                                    onChange={(e) => handleSubtypeChange(e.target.value)}
-                                                    disabled={!selectedFamily}
-                                                    style={{
-                                                      color: '#000 !important',
-                                                      backgroundColor: '#fff !important',
-                                                      WebkitTextFillColor: '#000 !important'
-                                                    }}
-                                                  >
-                                                    <option value="">All</option>
-                                                    {filteredSubtypes.map((sub) => (
-                                                      <option key={sub.subtype_id} value={sub.subtype_id}>
-                                                        {sub.name}
-                                                      </option>
-                                                    ))}
-                                                  </select>
-
-                                                  {isSingleFamilySubtype && (
-                                                    <>
-                                                      <label className="text-gray-200 font-medium self-center">Product</label>
-                                                      <select
-                                                        className="parcel-inline-select h-6 w-20 rounded border border-gray-500 bg-white px-1 text-xs text-black"
-                                                        value={draft.product}
-                                                        onChange={(e) => setDraft((prev) => ({ ...prev, product: e.target.value }))}
-                                                        disabled={loadingProducts || (!productOptions.length && !draft.product)}
-                                                        style={{
-                                                          color: '#000 !important',
-                                                          backgroundColor: '#fff !important',
-                                                          WebkitTextFillColor: '#000 !important'
-                                                        }}
-                                                      >
-                                                        <option value="">{loadingProducts ? 'Loading…' : 'Select'}</option>
-                                                        {productOptions.map((option) => (
-                                                          <option key={option} value={option}>
-                                                            {option}
-                                                          </option>
-                                                        ))}
-                                                      </select>
-                                                    </>
-                                                  )}
-
-                                                  <label className="text-gray-200 font-medium self-center">Acres</label>
-                                                  <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    className="h-6 w-12 rounded border border-gray-500 bg-white px-1 text-xs text-black text-right"
-                                                    value={draft.acres}
-                                                    onChange={(e) => setDraft((prev) => ({ ...prev, acres: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                                                  />
-
-                                                  <label className="text-gray-200 font-medium self-center">Units</label>
-                                                  <input
-                                                    type="number"
-                                                    step="1"
-                                                    className="h-6 w-12 rounded border border-gray-500 bg-white px-1 text-xs text-black text-right"
-                                                    value={draft.units}
-                                                    onChange={(e) => setDraft((prev) => ({ ...prev, units: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                                                  />
+                                              <div className="text-center mb-2">
+                                                <div className="font-semibold text-xs leading-tight mb-0.5">
+                                                  Parcel {parcel.name.replace('Parcel: ', '')}
                                                 </div>
-                                              )}
-
-                                              <div className="flex justify-end gap-2 mt-4">
+                                              </div>
+                                              <InlineTaxonomySelector
+                                                value={{
+                                                  family_name: draft.family_name,
+                                                  density_code: draft.density_code,
+                                                  type_code: draft.type_code,
+                                                  product_code: draft.product_code,
+                                                }}
+                                                onChange={(values) => setDraft((prev) => ({ ...prev, ...values }))}
+                                              />
+                                              <table className="w-full text-xs">
+                                                <tbody>
+                                                  <tr>
+                                                    <td className="opacity-90 align-top pr-1 w-12">Acres:</td>
+                                                    <td className="font-medium w-16">
+                                                      <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={draft.acres || ''}
+                                                        onChange={(e) => setDraft((prev) => ({ ...prev, acres: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                        placeholder="Acres"
+                                                      />
+                                                    </td>
+                                                  </tr>
+                                                  {draft.family_name !== 'Commercial' && (
+                                                    <tr>
+                                                      <td className="opacity-90 align-top pr-1">Units:</td>
+                                                      <td className="font-medium">
+                                                        <input
+                                                          type="text"
+                                                          value={draft.units}
+                                                          onChange={(e) => setDraft((prev) => ({ ...prev, units: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                                                          className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                        />
+                                                      </td>
+                                                    </tr>
+                                                  )}
+                                                </tbody>
+                                              </table>
+                                              <div className="flex gap-1 justify-end mt-2">
                                                 <button
-                                                  className="px-3 py-1 text-xs border border-gray-500 text-gray-200 rounded hover:bg-gray-700"
+                                                  className="px-2 py-0.5 text-xs bg-gray-600 text-white rounded hover:bg-gray-500 transition-colors"
                                                   onClick={(e) => {
                                                     e.stopPropagation()
                                                     cancelEdit()
@@ -758,7 +438,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                   Cancel
                                                 </button>
                                                 <button
-                                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                  className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
                                                   onClick={(e) => {
                                                     e.stopPropagation()
                                                     saveInlineEdit()
@@ -779,21 +459,30 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                               <table className="w-full text-xs">
                                                 <tbody>
                                                   <tr>
-                                                    <td className="opacity-90 align-top pr-1 w-12">Type:</td>
-                                                    <td className="font-medium w-16">{tileDisplayCode || parcel.landUse}</td>
+                                                    <td className="opacity-90 align-top pr-1 w-12">Family:</td>
+                                                    <td className="font-medium w-16">{parcel.family_name || parcel.landUse}</td>
                                                   </tr>
-                                                  <tr>
-                                                    <td className="opacity-90 align-top pr-1">Use:</td>
-                                                    <td className="font-medium">{parcel.subtypeName || 'Unknown'}</td>
-                                                  </tr>
+                                                  {parcel.type_code && (
+                                                    <tr>
+                                                      <td className="opacity-90 align-top pr-1">Type:</td>
+                                                      <td className="font-medium">{parcel.type_code}</td>
+                                                    </tr>
+                                                  )}
+                                                  {/* Product row - now positioned after Type */}
+                                                  {parcel.product_code && (
+                                                    <tr>
+                                                      <td className="opacity-90 align-top pr-1">Product:</td>
+                                                      <td className="font-medium">{parcel.product_code}</td>
+                                                    </tr>
+                                                  )}
                                                   <tr>
                                                     <td className="opacity-90 align-top pr-1">Acres:</td>
                                                     <td className="font-medium">{parcel.acres}</td>
                                                   </tr>
-                                                  {parcel.product && parcel.subtypeName?.toLowerCase().includes('single family') && (
+                                                  {parcel.family_name !== 'Commercial' && (
                                                     <tr>
-                                                      <td className="opacity-90 align-top pr-1">Product:</td>
-                                                      <td className="font-medium">{parcel.product}</td>
+                                                      <td className="opacity-90 align-top pr-1">Units:</td>
+                                                      <td className="font-medium">{parcel.units || 0}</td>
                                                     </tr>
                                                   )}
                                                 </tbody>
@@ -806,6 +495,100 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                     })}
                                   </div>
                                 )}
+
+                                {/* New Parcel Tile for Inline Creation */}
+                                {addingParcel && addingParcel.areaId === area.id && addingParcel.phaseId === phase.id && (
+                                  <div
+                                    className="bg-gray-600 border-gray-500 text-white rounded text-xs cursor-pointer border hover:outline hover:outline-2 transition-all duration-200 overflow-hidden col-span-2 p-2 min-h-48"
+                                    style={{outlineColor: 'rgb(33,88,226)'}}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div
+                                      className="p-2 text-white min-h-48"
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between text-sm font-semibold mb-3">
+                                        <span>New Parcel</span>
+                                        <span className="text-xs uppercase tracking-wide opacity-80">NEW</span>
+                                      </div>
+                                      <div className="space-y-4">
+                                        <SimpleTaxonomySelector
+                                          value={{
+                                            family_name: newParcelDraft.family_name,
+                                            density_code: newParcelDraft.density_code,
+                                            type_code: newParcelDraft.type_code,
+                                            product_code: newParcelDraft.product_code,
+                                          }}
+                                          onChange={(values) => setNewParcelDraft((prev) => ({ ...prev, ...values }))}
+                                        />
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-1">Acres</label>
+                                            <input
+                                              type="text"
+                                              pattern="[0-9]*\.?[0-9]*"
+                                              className="w-full rounded border border-gray-500 bg-white px-2 py-1 text-sm text-black"
+                                              value={newParcelDraft.acres}
+                                              onChange={(e) => setNewParcelDraft((prev) => ({ ...prev, acres: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                                            />
+                                          </div>
+
+                                          {/* Only show Units for non-commercial families */}
+                                          {newParcelDraft.family_name !== 'Commercial' && (
+                                            <div>
+                                              <label className="block text-sm font-medium text-gray-300 mb-1">Units</label>
+                                              <input
+                                                type="text"
+                                                pattern="[0-9]*"
+                                                className="w-full rounded border border-gray-500 bg-white px-2 py-1 text-sm text-black"
+                                                value={newParcelDraft.units}
+                                                onChange={(e) => setNewParcelDraft((prev) => ({ ...prev, units: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                    <div className="flex justify-end gap-2 mt-4">
+                                      <button
+                                        className="px-3 py-1 text-xs border border-gray-500 text-gray-200 rounded hover:bg-gray-700"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          cancelAddParcel()
+                                        }}
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          saveNewParcel(area.id, phase.id)
+                                        }}
+                                      >
+                                        Save
+                                      </button>
+                                    </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Add Parcel Button */}
+                                <div className="mt-3 pt-2 border-t border-gray-600">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      startAddingParcel(area.id, phase.id)
+                                    }}
+                                    disabled={addingParcel !== null}
+                                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-medium py-2 px-3 rounded transition-colors duration-200 flex items-center justify-center gap-1"
+                                  >
+                                    <span className="text-sm">+</span>
+                                    Add Parcel
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>

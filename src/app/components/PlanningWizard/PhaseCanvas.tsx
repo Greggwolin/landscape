@@ -5,6 +5,7 @@ import { Project, Area, Phase, Parcel, LandUseType } from './PlanningWizard'
 import DropZone from './DropZone'
 import ParcelForm from './forms/ParcelForm'
 import NavigationTiles from './NavigationTiles'
+import ParcelTile from './ParcelTile'
 
 interface PhaseCanvasProps {
   project: Project
@@ -74,31 +75,6 @@ const PhaseCanvas: React.FC<PhaseCanvasProps> = ({
     setShowParcelForm(false)
   }
 
-  const getLandUseColor = (landUse: LandUseType) => {
-    switch (landUse) {
-      case 'LDR': return 'bg-emerald-600'
-      case 'MDR': return 'bg-green-600'
-      case 'HDR': return 'bg-teal-600'
-      case 'MHDR': return 'bg-cyan-600'
-      case 'C': return 'bg-orange-600'
-      case 'MU': return 'bg-amber-600'
-      case 'OS': return 'bg-blue-600'
-      default: return 'bg-slate-600'
-    }
-  }
-
-  const getLandUseBorderColor = (landUse: LandUseType) => {
-    switch (landUse) {
-      case 'LDR': return 'border-emerald-500'
-      case 'MDR': return 'border-green-500'
-      case 'HDR': return 'border-teal-500'
-      case 'MHDR': return 'border-cyan-500'
-      case 'C': return 'border-orange-500'
-      case 'MU': return 'border-amber-500'
-      case 'OS': return 'border-blue-500'
-      default: return 'border-slate-500'
-    }
-  }
 
   return (
     <div className="flex h-full">
@@ -136,75 +112,16 @@ const PhaseCanvas: React.FC<PhaseCanvasProps> = ({
             >
               <div className="p-4 grid grid-cols-3 gap-4 h-full overflow-y-auto">
                 {phase.parcels.map((parcel) => (
-                  <div
+                  <ParcelTile
                     key={parcel.id}
-                    className={`${getLandUseColor(parcel.landUse)} ${getLandUseBorderColor(parcel.landUse)} text-white border-2 rounded-lg p-3 cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-white transition-all duration-200 h-fit`}
+                    parcel={parcel}
+                    mode="view"
                     onClick={() => {
                       if (onOpenParcel) {
                         onOpenParcel(area.id, phase.id, parcel.id)
                       }
                     }}
-                  >
-                    <div className="text-center mb-2">
-                      <div className="font-bold text-sm mb-1 leading-tight">
-                        Parcel {parcel.name.replace('Parcel: ', '')}
-                      </div>
-                      {(parcel as any).description && (
-                        <p className="text-xs text-gray-100 opacity-90 mb-2">{(parcel as any).description}</p>
-                      )}
-                      {parcel.notes && (
-                        <p className="text-xs text-gray-200 opacity-80 italic">{parcel.notes}</p>
-                      )}
-                    </div>
-                    <table className="w-full text-xs">
-                      <tbody>
-                        <tr>
-                          <td className="opacity-90 align-top pr-2 w-16">Use:</td>
-                          <td className="font-semibold w-20">{parcel.landUse}</td>
-                        </tr>
-                        <tr>
-                          <td className="opacity-90 align-top pr-2">Acres:</td>
-                          <td className="font-semibold">{parcel.acres}</td>
-                        </tr>
-                        {parcel.units > 0 && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Units:</td>
-                            <td className="font-semibold">{parcel.units}</td>
-                          </tr>
-                        )}
-                        {(parcel.frontage ?? 0) > 0 && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Frontage:</td>
-                            <td className="font-semibold">{parcel.frontage} ft</td>
-                          </tr>
-                        )}
-                        {Boolean(parcel.product) && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Product:</td>
-                            <td className="font-semibold">{parcel.product}</td>
-                          </tr>
-                        )}
-                        {Boolean(parcel.status) && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Status:</td>
-                            <td className="font-semibold">{parcel.status}</td>
-                          </tr>
-                        )}
-                        {(parcel.efficiency ?? 0) > 0 && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Efficiency:</td>
-                            <td className="font-semibold">{(parcel.efficiency * 100).toFixed(0)}%</td>
-                          </tr>
-                        )}
-                        {(parcel.density_gross ?? 0) > 0 && (
-                          <tr>
-                            <td className="opacity-90 align-top pr-2">Density:</td>
-                            <td className="font-semibold">{parcel.density_gross.toFixed(1)} u/ac</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  />
                 ))}
               </div>
             </DropZone>
@@ -217,6 +134,9 @@ const PhaseCanvas: React.FC<PhaseCanvasProps> = ({
         <ParcelForm
           areaName={area.name}
           phaseName={phase.name}
+          projectId={phase.projectId}
+          areaId={area.dbId}
+          phaseId={phase.dbId}
           onSubmit={handleParcelFormSubmit}
           onCancel={handleParcelFormCancel}
         />

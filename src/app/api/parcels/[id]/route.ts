@@ -12,12 +12,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Handle each field update separately to properly support null values
     let hasUpdates = false
 
-    // Handle landuse_code
-    if (body.landuse_code !== undefined || body.usecode !== undefined) {
-      const landuse_code = body.landuse_code ?? body.usecode
-      await sql`UPDATE landscape.tbl_parcel SET landuse_code = ${landuse_code} WHERE parcel_id = ${id}::bigint`
-      hasUpdates = true
-    }
+    // Skip landuse_code updates entirely to avoid foreign key constraints
+    // We now use the new taxonomy fields instead
 
     // Handle lot_product (allow null to clear the field)
     if (body.lot_product !== undefined || body.product !== undefined) {
@@ -66,6 +62,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (body.lot_depth !== undefined && body.lot_depth !== null) {
       await sql`UPDATE landscape.tbl_parcel SET lot_depth = ${body.lot_depth}::numeric WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    // Handle taxonomy fields
+    if (body.family_name !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET family_name = ${body.family_name} WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.density_code !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET density_code = ${body.density_code} WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.type_code !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET type_code = ${body.type_code} WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.product_code !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET product_code = ${body.product_code} WHERE parcel_id = ${id}::bigint`
       hasUpdates = true
     }
 

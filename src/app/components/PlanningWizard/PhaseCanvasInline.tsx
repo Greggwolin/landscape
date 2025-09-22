@@ -467,6 +467,9 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
         <ParcelForm
           areaName={area.name}
           phaseName={phase.name}
+          projectId={phase.projectId}
+          areaId={area.dbId}
+          phaseId={phase.dbId}
           onSubmit={handleParcelFormSubmit}
           onCancel={handleParcelFormCancel}
         />

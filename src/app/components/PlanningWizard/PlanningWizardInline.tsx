@@ -44,6 +44,9 @@ export interface Phase {
   name: string
   parcels: Parcel[]
   saved?: boolean
+  dbId?: number // Database phase_id
+  areaDbId?: number // Database area_id
+  projectId?: number // Database project_id
 }
 
 export interface Area {
@@ -51,6 +54,8 @@ export interface Area {
   name: string
   phases: Phase[]
   saved?: boolean
+  dbId?: number // Database area_id
+  projectId?: number // Database project_id
 }
 
 export interface Project {
@@ -174,11 +179,26 @@ const PlanningWizardInline: React.FC = () => {
           const areaId = `area-${areaNo}`
           const phaseId = `phase-${areaNo}-${phaseNo}`
           if (!areasMap.has(areaNo)) {
-            areasMap.set(areaNo, { id: areaId, name: `Area ${areaNo}`, phases: [], saved: true })
+            areasMap.set(areaNo, {
+              id: areaId,
+              name: `Area ${areaNo}`,
+              phases: [],
+              saved: true,
+              dbId: ph.area_id, // Store database area_id
+              projectId: projectId // Store project_id for new parcels
+            })
           }
           const areaRef = areasMap.get(areaNo)!
           if (!areaRef.phases.find(p => p.id === phaseId)) {
-            areaRef.phases.push({ id: phaseId, name: `Phase ${areaNo}.${phaseNo}`, parcels: [], saved: true })
+            areaRef.phases.push({
+              id: phaseId,
+              name: `Phase ${areaNo}.${phaseNo}`,
+              parcels: [],
+              saved: true,
+              dbId: ph.phase_id, // Store database phase_id
+              areaDbId: ph.area_id, // Store database area_id for convenience
+              projectId: projectId // Store project_id for new parcels
+            })
           }
         }
 

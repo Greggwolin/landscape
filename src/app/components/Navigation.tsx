@@ -55,8 +55,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         { id: 'market', label: 'Market', icon: '🧮' },
         { id: 'growth-rates', label: 'Growth Rates', icon: '📊' },
         { id: 'project-costs', label: 'Project Costs', icon: '💰' },
-        { id: 'project-revenues', label: 'Project Revenues', icon: '📈' },
-        { id: 'growth-rates', label: 'Growth Rates', icon: '📊' }
+        { id: 'project-revenues', label: 'Project Revenues', icon: '📈' }
       ],
       isCollapsible: true
     },
