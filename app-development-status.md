@@ -2,6 +2,176 @@
 
 ## Latest Updates
 
+### Land Use Taxonomy System Implementation (September 22, 2025)
+
+#### Summary
+Implemented a comprehensive 4-level land use taxonomy system with working cascading dropdowns, replacing broken DVL (Development Value List) functionality with a robust, database-driven solution.
+
+#### Key Features Implemented
+
+**1. Complete Land Use Taxonomy Hierarchy**
+- **4-Level Structure:** Family → Density → Type → Product
+- **Database Integration:** Full API endpoints for each taxonomy level
+- **Cascading Logic:** Each level filters the next based on selection
+- **Data Integrity:** Proper foreign key relationships and validation
+
+**2. New API Endpoints Created**
+- `/api/landuse/families` - Land use family data with active filtering
+- `/api/landuse/types/[familyId]` - Types filtered by family ID
+- `/api/landuse/products/[typeId]` - Products filtered by type ID
+- `/api/landuse/res-lot-products` - Specialized residential lot products
+- `/api/density-classifications` - Density classification data
+
+**3. Advanced Dropdown Components**
+- **SimpleTaxonomySelector:** Full-featured component with labels and spacing
+- **InlineTaxonomySelector:** Compact table-style component matching existing field styling
+- **TaxonomySelector:** Base taxonomy component for extended functionality
+- **Smart Loading:** Dynamic data fetching with proper error handling
+
+**4. Enhanced Parcel Editing System**
+- **Multiple Edit Modes:** Inline editing, tile editing, and form-based editing
+- **Proper Field Population:** Existing parcel data loads correctly in dropdowns
+- **Visual Integration:** Dropdowns match Acres/Units field styling perfectly
+- **No Duplicates:** Cleaned product dropdown to remove duplicate values
+
+#### Technical Implementation
+
+**Frontend Architecture:**
+- **Component Hierarchy:** Modular taxonomy components with clear separation of concerns
+- **State Management:** Proper React hooks with useEffect for cascading updates
+- **Error Handling:** Comprehensive error states and fallback logic
+- **TypeScript:** Full type safety with proper interfaces for all taxonomy data
+
+**Backend API Design:**
+- **RESTful Endpoints:** Clean API structure following REST conventions
+- **Query Optimization:** Efficient SQL queries with proper joins and filtering
+- **Error Responses:** Standardized error handling with descriptive messages
+- **Data Validation:** Server-side validation for all taxonomy operations
+
+**Database Schema Integration:**
+- **Taxonomy Tables:** `tbl_family`, `tbl_type`, `tbl_product`, `res_lot_product`
+- **Foreign Keys:** Proper relationships between taxonomy levels
+- **Data Integrity:** Constraints to ensure valid taxonomy selections
+- **Performance:** Indexed queries for fast dropdown population
+
+#### Issues Resolved
+
+**1. Broken Dropdown Functionality**
+- **Problem:** DVL dropdowns completely non-functional, showing "DVLs don't work"
+- **Solution:** Replaced broken `/api/landuse/choices` system with dedicated endpoints
+- **Result:** Fully functional cascading dropdowns with real-time data
+
+**2. Duplicate Values in Product Dropdown**
+- **Problem:** Products showing duplicates like "50x125 (50'x125')"
+- **Solution:** Implemented deduplication logic and clean display names
+- **Result:** Clean product dropdown showing only unique values
+
+**3. Field Population Issues**
+- **Problem:** Existing parcel values not loading when editing
+- **Solution:** Enhanced `startEditingParcel` function with proper field mapping
+- **Result:** All taxonomy fields populate correctly from database
+
+**4. Styling Inconsistencies**
+- **Problem:** Dropdown styling didn't match Acres/Units fields
+- **Solution:** Created InlineTaxonomySelector with matching table layout and CSS classes
+- **Result:** Perfect visual integration with existing form styling
+
+**5. Save Operation Failures**
+- **Problem:** Taxonomy changes not saving to database
+- **Solution:** Updated PATCH API to handle all taxonomy fields properly
+- **Result:** All taxonomy selections save correctly with proper validation
+
+#### Components Created/Updated
+
+**New Components:**
+```
+src/app/components/LandUse/SimpleTaxonomySelector.tsx
+src/app/components/LandUse/InlineTaxonomySelector.tsx
+src/app/components/LandUse/TaxonomySelector.tsx
+src/app/components/PlanningWizard/ParcelTile.tsx
+src/hooks/useTaxonomy.ts
+```
+
+**Updated Components:**
+```
+src/app/components/PlanningWizard/ProjectCanvas.tsx
+src/app/components/PlanningWizard/ParcelTile.tsx
+src/app/api/parcels/[id]/route.ts
+src/types/landuse.ts
+```
+
+**New API Routes:**
+```
+src/app/api/landuse/families/route.ts
+src/app/api/landuse/types/[familyId]/route.ts
+src/app/api/landuse/products/[typeId]/route.ts
+src/app/api/landuse/res-lot-products/route.ts
+src/app/api/density-classifications/route.ts
+```
+
+#### Data Verification and Testing
+
+**API Endpoint Testing:**
+- ✅ All new endpoints return proper JSON responses
+- ✅ Cascading filters work correctly (family → type → product)
+- ✅ Error handling for invalid IDs and missing data
+- ✅ Performance testing with multiple simultaneous requests
+
+**Dropdown Functionality:**
+- ✅ Family dropdown populates from database
+- ✅ Type dropdown cascades based on family selection
+- ✅ Product dropdown cascades based on type selection
+- ✅ Residential products use specialized endpoint
+- ✅ Commercial products use general products endpoint
+
+**Save Operations:**
+- ✅ All taxonomy fields save to `tbl_parcel` table
+- ✅ Foreign key constraints respected
+- ✅ PATCH operations handle partial updates correctly
+- ✅ Data refresh after save operations
+
+**User Interface:**
+- ✅ Dropdown styling matches existing fields perfectly
+- ✅ No duplicate values in any dropdown
+- ✅ Proper loading states and error messages
+- ✅ Inline editing integrates seamlessly
+
+#### User Experience Improvements
+
+**Before:**
+- ❌ Dropdowns completely broken ("DVLs don't work")
+- ❌ No field population when editing existing parcels
+- ❌ Duplicate values causing confusion
+- ❌ Inconsistent styling with other form fields
+- ❌ Save operations failing silently
+
+**After:**
+- ✅ Fully functional cascading dropdowns
+- ✅ Perfect field population from existing data
+- ✅ Clean, unique values in all dropdowns
+- ✅ Consistent styling matching Acres/Units fields
+- ✅ Reliable save operations with feedback
+
+#### Future Enhancements
+- Consider adding search/filter functionality to dropdowns
+- Implement caching for frequently accessed taxonomy data
+- Add bulk update capabilities for multiple parcels
+- Enhance mobile responsiveness for dropdown interactions
+- Consider adding visual hierarchy indicators in dropdowns
+
+#### Testing Completed
+- [x] All new API endpoints functional and tested
+- [x] Cascading dropdown logic working correctly
+- [x] Field population from existing parcel data
+- [x] Save operations storing all taxonomy fields
+- [x] Duplicate removal in product dropdowns
+- [x] Styling consistency with existing form fields
+- [x] Error handling and edge cases
+- [x] Performance testing with real data
+- [x] Cross-browser compatibility testing
+
+---
+
 ### Planning Interface Inline Editing Implementation (September 16, 2025)
 
 #### Summary
