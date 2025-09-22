@@ -1,0 +1,54 @@
+
+> landscape@0.1.0 dev
+> next dev --turbopack
+
+ ⚠ The config property `experimental.turbo` is deprecated. Move this setting to `config.turbopack` or run `npx @next/codemod@latest next-experimental-turbo-to-turbopack .`
+   ▲ Next.js 15.5.0 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://10.0.2.32:3000
+   - Experiments (use with caution):
+     · turbo
+
+ ✓ Starting...
+ ✓ Ready in 1420ms
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbopack
+
+ ○ Compiling / ...
+ ✓ Compiled / in 31.7s
+ HEAD / 200 in 32845ms
+ GET / 200 in 264ms
+ ○ Compiling /api/projects ...
+ ✓ Compiled /api/projects in 1315ms
+ GET /favicon.ico 200 in 1694ms
+Querying landscape.tbl_project...
+Found projects: [
+  {
+    project_id: 7,
+    project_name: 'Peoria Lakes',
+    acres_gross: 1500,
+    location_lat: 33.5807,
+    location_lon: -112.2374,
+    start_date: 2024-01-01T00:00:00.000Z,
+    jurisdiction_city: 'Peoria',
+    jurisdiction_county: 'Maricopa County',
+    jurisdiction_state: 'AZ'
+  }
+]
+ GET /api/projects 200 in 2375ms
+ ○ Compiling /api/projects/[projectId]/config ...
+ ✓ Compiled /api/projects/[projectId]/config in 733ms
+ GET /api/parcels?project_id=7 200 in 1332ms
+ GET /api/phases?project_id=7 200 in 1446ms
+ GET /api/projects/7/config 200 in 2055ms
+ GET /api/projects/7/containers 200 in 2141ms
+ ✓ Compiled /api/assumptions/growth-rates in 144ms
+ GET /api/assumptions/growth-rates?project_id=7 200 in 473ms
+ GET /api/assumptions/growth-rates?project_id=7 200 in 349ms
+ GET /api/projects/7/containers 200 in 613ms
+ GET /api/projects/7/config 200 in 488ms
+ GET /api/projects/7/config 200 in 540ms
+ GET /api/projects/7/containers 200 in 579ms
+ GET /api/projects/7/containers 200 in 669ms
+ GET /api/projects/7/config 200 in 516ms

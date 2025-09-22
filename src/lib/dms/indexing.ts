@@ -3,10 +3,11 @@
  */
 
 import { sql } from './db';
-import { indexDocuments, SearchableDocument } from './meili';
+import { indexDocuments } from './meili';
+import { DMSDocument, SearchableDocument } from '../../types/dms';
 
 // Convert database document to searchable format
-export function documentToSearchable(dbDoc: any): SearchableDocument {
+export function documentToSearchable(dbDoc: DMSDocument): SearchableDocument {
   return {
     doc_id: dbDoc.doc_id,
     project_id: dbDoc.project_id,
@@ -36,7 +37,7 @@ export function documentToSearchable(dbDoc: any): SearchableDocument {
 }
 
 // Build searchable text from document fields
-function buildSearchableText(dbDoc: any): string {
+function buildSearchableText(dbDoc: DMSDocument): string {
   const parts = [
     dbDoc.doc_name,
     dbDoc.doc_type,
