@@ -252,18 +252,30 @@ export async function PUT(request: Request) {
     }
 
     const result = updatedRows[0]
-    const resultValue = typeof result.ruleValue === 'string'
-      ? JSON.parse(result.ruleValue)
-      : result.ruleValue
+    console.log('Update result:', result)
+
+    let resultValue
+    try {
+      // Fix: Use snake_case field name from database
+      const rawValue = result.rule_value || result.ruleValue
+      resultValue = typeof rawValue === 'string'
+        ? JSON.parse(rawValue)
+        : rawValue
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, 'Raw value:', result.rule_value)
+      return NextResponse.json({ error: 'Invalid JSON in rule value' }, { status: 500 })
+    }
+
+    console.log('Parsed result value:', resultValue)
 
     if (!resultValue) {
       return NextResponse.json({ error: 'Invalid rule value after update' }, { status: 500 })
     }
 
     return NextResponse.json({
-      id: result.ruleId,
-      name: getCategoryDisplayName(result.ruleCategory || ''),
-      category: result.ruleCategory,
+      id: result.rule_id || result.ruleId,
+      name: getCategoryDisplayName(result.rule_category || result.ruleCategory || ''),
+      category: result.rule_category || result.ruleCategory,
       globalRate: resultValue.globalRate || '',
       steps: resultValue.steps || [],
       impact: resultValue.impact || { dollarAmount: '$0', percentOfProject: '0%', irrImpact: '0' },
@@ -344,6 +356,37 @@ export async function POST(request: Request) {
     console.error('Growth rates POST error:', err)
     return NextResponse.json({
       error: 'Failed to create growth rate assumption',
+      details: msg
+    }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Assumption ID required' }, { status: 400 })
+    }
+
+    const deletedRows = await sql<Assumptionrule>`
+      DELETE FROM landscape.tbl_assumptionrule
+      WHERE rule_id = ${parseInt(id)}
+      RETURNING rule_id
+    `
+
+    if (!deletedRows || deletedRows.length === 0) {
+      return NextResponse.json({ error: 'Assumption not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, id: deletedRows[0].ruleId })
+
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Growth rates DELETE error:', err)
+    return NextResponse.json({
+      error: 'Failed to delete growth rate assumption',
       details: msg
     }, { status: 500 })
   }
