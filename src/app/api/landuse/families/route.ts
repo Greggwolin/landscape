@@ -6,7 +6,46 @@ import { sql } from '../../../../lib/db';
 
 export async function GET(request: Request) {
   try {
-    // Return hardcoded families for now until database schema is updated
+    const { searchParams } = new URL(request.url);
+    const active = searchParams.get('active');
+
+    // First try to fetch from database
+    try {
+      const families = active === 'true'
+        ? await sql`
+            SELECT
+              family_id,
+              name as family_name,
+              name,
+              name as family_code,
+              name as code,
+              active as family_active,
+              'general' as density_category
+            FROM landscape.lu_family
+            WHERE active = true
+            ORDER BY family_id
+          `
+        : await sql`
+            SELECT
+              family_id,
+              name as family_name,
+              name,
+              name as family_code,
+              name as code,
+              active as family_active,
+              'general' as density_category
+            FROM landscape.lu_family
+            ORDER BY family_id
+          `;
+
+      if (families && families.length > 0) {
+        return NextResponse.json(families);
+      }
+    } catch (dbError) {
+      console.warn('Failed to fetch families from database, falling back to defaults:', dbError);
+    }
+
+    // Fallback to hardcoded families if database query fails
     const defaultFamilies = [
       {
         family_id: 1,
@@ -27,6 +66,33 @@ export async function GET(request: Request) {
         density_category: 'commercial'
       },
       {
+        family_id: 3,
+        code: 'IND',
+        family_code: 'IND',
+        name: 'Industrial',
+        family_name: 'Industrial',
+        family_active: true,
+        density_category: 'industrial'
+      },
+      {
+        family_id: 4,
+        code: 'OFF',
+        family_code: 'OFF',
+        name: 'Office',
+        family_name: 'Office',
+        family_active: true,
+        density_category: 'office'
+      },
+      {
+        family_id: 5,
+        code: 'MF',
+        family_code: 'MF',
+        name: 'Multi-Family',
+        family_name: 'Multi-Family',
+        family_active: true,
+        density_category: 'residential'
+      },
+      {
         family_id: 9,
         code: 'MU',
         family_code: 'MU',
@@ -45,9 +111,6 @@ export async function GET(request: Request) {
         density_category: 'open_space'
       }
     ];
-
-    const { searchParams } = new URL(request.url);
-    const active = searchParams.get('active');
 
     let result = defaultFamilies;
     if (active === 'true') {

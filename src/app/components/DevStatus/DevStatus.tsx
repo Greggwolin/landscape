@@ -75,7 +75,7 @@ const DevStatus: React.FC = () => {
             mobile: 'not-started',
             accessibility: 'not-started',
             priority: 'high',
-            completion: 75
+            completion: 95
           },
           {
             name: 'Parcel Detail',
@@ -102,7 +102,7 @@ const DevStatus: React.FC = () => {
           minor: 4
         },
         technicalDebt: {
-          database: 2,
+          database: 1,
           codeQuality: 3,
           infrastructure: 4
         },

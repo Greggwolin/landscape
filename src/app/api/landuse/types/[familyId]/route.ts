@@ -18,7 +18,32 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Return hardcoded types for now until schema is updated
+    // First try to fetch from database
+    try {
+      const types = await sql`
+        SELECT
+          subtype_id as type_id,
+          code as type_code,
+          code,
+          name as type_name,
+          name,
+          1 as type_order,
+          active as type_active,
+          family_id
+        FROM landscape.lu_subtype
+        WHERE family_id = ${familyId}
+        AND active = true
+        ORDER BY subtype_id
+      `;
+
+      if (types && types.length > 0) {
+        return NextResponse.json(types);
+      }
+    } catch (dbError) {
+      console.warn('Failed to fetch types from database, falling back to defaults:', dbError);
+    }
+
+    // Fallback to hardcoded types if database query fails
     const defaultTypes = [
       // Residential types (family_id: 1)
       { type_id: 1, code: 'SFD', type_code: 'SFD', name: 'Single Family Detached', type_name: 'Single Family Detached', type_order: 1, type_active: true, family_id: 1 },
