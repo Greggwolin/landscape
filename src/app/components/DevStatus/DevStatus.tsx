@@ -8,8 +8,6 @@ interface StatusData {
     name: string;
     design: 'complete' | 'in-progress' | 'not-started';
     functionality: 'complete' | 'in-progress' | 'not-started';
-    mobile: 'complete' | 'in-progress' | 'not-started';
-    accessibility: 'complete' | 'in-progress' | 'not-started';
     priority: 'high' | 'medium' | 'low';
     completion: number;
   }[];
@@ -54,8 +52,6 @@ const DevStatus: React.FC = () => {
             name: 'Home Dashboard',
             design: 'complete',
             functionality: 'in-progress',
-            mobile: 'not-started',
-            accessibility: 'not-started',
             priority: 'high',
             completion: 85
           },
@@ -63,8 +59,6 @@ const DevStatus: React.FC = () => {
             name: 'Land Use Management',
             design: 'complete',
             functionality: 'complete',
-            mobile: 'not-started',
-            accessibility: 'not-started',
             priority: 'high',
             completion: 100
           },
@@ -72,8 +66,6 @@ const DevStatus: React.FC = () => {
             name: 'Planning Overview',
             design: 'complete',
             functionality: 'complete',
-            mobile: 'not-started',
-            accessibility: 'not-started',
             priority: 'high',
             completion: 95
           },
@@ -81,17 +73,27 @@ const DevStatus: React.FC = () => {
             name: 'Parcel Detail',
             design: 'complete',
             functionality: 'complete',
-            mobile: 'not-started',
-            accessibility: 'not-started',
             priority: 'high',
             completion: 75
+          },
+          {
+            name: 'Market Assumptions (Global)',
+            design: 'complete',
+            functionality: 'complete',
+            priority: 'high',
+            completion: 100
+          },
+          {
+            name: 'Growth Rates',
+            design: 'complete',
+            functionality: 'complete',
+            priority: 'high',
+            completion: 95
           },
           {
             name: 'Financial Modeling',
             design: 'not-started',
             functionality: 'not-started',
-            mobile: 'not-started',
-            accessibility: 'not-started',
             priority: 'low',
             completion: 0
           }
@@ -190,6 +192,24 @@ const DevStatus: React.FC = () => {
           'Better visual hierarchy for form sections'
         ]
       },
+      'Market Assumptions (Global)': {
+        context: 'Comprehensive integration with database-driven UOM options and complete UI reorganization. Market Factors card moved to right side, table restructured with logical groupings, and all dropdowns now use database UOM codes.',
+        outstanding: [
+          'UOM search/filter functionality for large option sets',
+          'UOM preference saving for user-specific defaults',
+          'Validation for UOM compatibility with calculation types',
+          'UOM conversion capabilities between related units'
+        ]
+      },
+      'Growth Rates': {
+        context: 'Database-driven UOM integration completed. Table styling synchronized with Market Assumptions page for consistency.',
+        outstanding: [
+          'Advanced calculation engine integration',
+          'Historical data visualization features',
+          'Bulk update capabilities for multiple rates',
+          'Export functionality for rate data'
+        ]
+      },
       'Financial Modeling': {
         context: 'Not yet implemented. Planned for future releases with advanced modeling capabilities.',
         outstanding: [
@@ -237,19 +257,17 @@ const DevStatus: React.FC = () => {
     alert(`Chat functionality would open here with context about ${pageName}`);
   };
 
-  const calculateCompletion = (design: string, functionality: string, mobile: string, accessibility: string) => {
+  const calculateCompletion = (design: string, functionality: string) => {
     const statusWeights = {
-      'complete': 25,
-      'in-progress': 12.5,
+      'complete': 50,
+      'in-progress': 25,
       'not-started': 0
     };
-    
+
     const designScore = statusWeights[design as keyof typeof statusWeights] || 0;
     const functionalityScore = statusWeights[functionality as keyof typeof statusWeights] || 0;
-    const mobileScore = statusWeights[mobile as keyof typeof statusWeights] || 0;
-    const accessibilityScore = statusWeights[accessibility as keyof typeof statusWeights] || 0;
-    
-    return designScore + functionalityScore + mobileScore + accessibilityScore;
+
+    return designScore + functionalityScore;
   };
 
   const handleFormFieldChange = (field: string, value: string) => {
@@ -262,10 +280,8 @@ const DevStatus: React.FC = () => {
     if (editingRow !== null && editFormData && statusData) {
       // Calculate new completion percentage
       const newCompletion = calculateCompletion(
-        editFormData.design, 
-        editFormData.functionality, 
-        editFormData.mobile, 
-        editFormData.accessibility
+        editFormData.design,
+        editFormData.functionality
       );
       
       // Update the statusData with new values
@@ -418,8 +434,6 @@ const DevStatus: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Progress</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Design</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Functionality</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Mobile</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Accessibility</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
                 </tr>
@@ -452,18 +466,6 @@ const DevStatus: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         {getStatusIcon(page.functionality)}
                         <span className="text-sm text-gray-300">{getStatusText(page.functionality)}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(page.mobile)}
-                        <span className="text-sm text-gray-300">{getStatusText(page.mobile)}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(page.accessibility)}
-                        <span className="text-sm text-gray-300">{getStatusText(page.accessibility)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -509,7 +511,7 @@ const DevStatus: React.FC = () => {
                   {/* Notes Accordion Row */}
                   {expandedNotes === index && (
                     <tr className="bg-gray-850">
-                      <td colSpan={8} className="px-6 py-4 border-t border-gray-700">
+                      <td colSpan={6} className="px-6 py-4 border-t border-gray-700">
                         <div className="space-y-4">
                           <div>
                             <h4 className="text-sm font-medium text-white mb-2 flex items-center">
@@ -542,11 +544,11 @@ const DevStatus: React.FC = () => {
                   {/* Edit Form Row */}
                   {editingRow === index && (
                     <tr className="bg-gray-850">
-                      <td colSpan={8} className="px-6 py-4 border-t border-gray-700">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <td colSpan={6} className="px-6 py-4 border-t border-gray-700">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Design</label>
-                            <select 
+                            <select
                               value={editFormData?.design || 'not-started'}
                               onChange={(e) => handleFormFieldChange('design', e.target.value)}
                               className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm"
@@ -558,7 +560,7 @@ const DevStatus: React.FC = () => {
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Functionality</label>
-                            <select 
+                            <select
                               value={editFormData?.functionality || 'not-started'}
                               onChange={(e) => handleFormFieldChange('functionality', e.target.value)}
                               className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm"
@@ -569,20 +571,8 @@ const DevStatus: React.FC = () => {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Mobile</label>
-                            <select 
-                              value={editFormData?.mobile || 'not-started'}
-                              onChange={(e) => handleFormFieldChange('mobile', e.target.value)}
-                              className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm"
-                            >
-                              <option value="complete">✅ Complete</option>
-                              <option value="in-progress">🟡 In Progress</option>
-                              <option value="not-started">❌ Not Started</option>
-                            </select>
-                          </div>
-                          <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Priority</label>
-                            <select 
+                            <select
                               value={editFormData?.priority || 'medium'}
                               onChange={(e) => handleFormFieldChange('priority', e.target.value)}
                               className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm"

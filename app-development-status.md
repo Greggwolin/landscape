@@ -2,6 +2,152 @@
 
 ## Latest Updates
 
+### Market Assumptions Global Page Integration (September 23, 2025)
+
+#### Summary
+Completed comprehensive integration of the Market Assumptions page with database-driven UOM (Unit of Measure) options and extensive UI reorganization to match the Growth Rates page formatting and functionality.
+
+#### Key Features Implemented
+
+**1. Complete UI Layout Reorganization**
+- **Card Restructuring:** Moved Market Factors card to right side, Current Land Pricing to left side
+- **Table Layout Updates:** Synchronized Market Factors table styling with Growth Rates page for consistency
+- **Font Standardization:** Unified font sizes across all tables to match existing patterns
+- **Column Organization:** Added "Family" column as first column with proper width adjustments
+
+**2. Market Factors Table Restructuring**
+- **Group Reorganization:** Restructured line items into logical groups:
+  - Planning & Engineering (Entitlements, Engineering, Offsite, Onsite, Subdivision)
+  - Development (Management, General Admin, Legal/Accounting)
+  - Operations (Property Tax, Insurance, Commissions, Other COS, Contingency)
+  - Other (Housing Demand, Price/Revenue Growth, Direct Project Costs Growth)
+- **Header Simplification:** Single "Amount" header for cleaner table structure
+- **Operations Naming:** Renamed "Ownership" group to "Operations" for clarity
+
+**3. Database-Driven UOM Integration**
+- **API Endpoint:** Implemented `/api/fin/uoms` endpoint fetching from `landscape.core_fin_uom` table
+- **Dynamic Dropdowns:** All Unit dropdowns now populate from database instead of hardcoded values
+- **Consistent Display:** Changed from displaying full UOM names to displaying concise `uom_code` field
+- **Universal Coverage:** Applied UOM integration to all relevant dropdowns including previously hardcoded ones
+
+**4. Inflation Column Implementation**
+- **Market Factors Enhancement:** Added Inflate column as last column in Market Factors table
+- **Selective Application:** Configured specific line items to exclude inflation (Contingency, Commissions, Other COS per requirements)
+- **Consistent Styling:** Maintained same dropdown styling as other columns
+
+**5. State Management Enhancement**
+- **Market Factor Units:** Implemented comprehensive state tracking for all market factor unit selections
+- **Change Detection:** Added smart change tracking and navigation warning functionality
+- **Save Button Logic:** Implemented smart save button activation based on actual data changes
+
+#### Technical Implementation
+
+**Frontend Architecture:**
+- **Component Synchronization:** MarketAssumptionsNative.tsx updated to match GrowthRates.tsx patterns
+- **State Management:** Enhanced with `marketFactorUnits` state for tracking all UOM selections
+- **Event Handlers:** Implemented `updateMarketFactorUnit` function for unit dropdown changes
+- **Change Tracking:** Added comprehensive change detection with `hasUnsavedChanges` state
+
+**Database Integration:**
+- **UOM API:** `/api/fin/uoms` endpoint returning active UOM codes and names
+- **Dynamic Loading:** UOM options fetched on component mount with proper error handling
+- **Field Mapping:** All relevant dropdowns now use database UOM options instead of static values
+
+**UI/UX Improvements:**
+- **Layout Consistency:** Both Market Factors and Current Land Pricing cards now follow identical patterns
+- **Responsive Design:** Proper card widths (50% each) with appropriate spacing
+- **Visual Hierarchy:** Clear group separations and logical line item ordering
+- **User Feedback:** Smart save button states and navigation warnings
+
+#### Issues Resolved
+
+**1. Port Conflict Resolution**
+- **Problem:** Development server automatically switched to port 3001 due to port 3000 being occupied
+- **Solution:** Identified port conflict and restarted server on correct port 3000
+- **Result:** Application now accessible at expected localhost:3000 address
+
+**2. UOM Display Standardization**
+- **Problem:** Dropdowns showing long UOM names instead of concise codes
+- **Solution:** Updated all MenuItem displays to use `option.code` instead of `option.name`
+- **Result:** Clean, concise UOM codes (SQFT, UNIT, FF, %) displayed consistently
+
+**3. Inconsistent Dropdown Functionality**
+- **Problem:** Commission, Other COS, and Contingency had hardcoded limited dropdowns
+- **Solution:** Replaced all hardcoded dropdowns with full database-driven UOM options
+- **Result:** All line items now have consistent UOM dropdown functionality
+
+**4. Table Structure Inconsistencies**
+- **Problem:** Market Factors table had different styling and organization than Growth Rates
+- **Solution:** Complete restructuring to match Growth Rates table patterns and requirements
+- **Result:** Unified user experience across both major assumption pages
+
+#### Components Modified
+
+**Updated Components:**
+```
+src/app/components/MarketAssumptionsNative.tsx - Complete restructuring and UOM integration
+src/app/components/GrowthRates.tsx - UOM integration updates
+```
+
+**API Integration:**
+```
+src/app/api/fin/uoms/route.ts - Database UOM endpoint (verified working)
+```
+
+#### Data Verification and Testing
+
+**UOM API Testing:**
+- ✅ `/api/fin/uoms` endpoint returns proper JSON with uom_code and name fields
+- ✅ All UOM options load correctly in dropdowns
+- ✅ Database connection verified with active UOM records
+- ✅ Error handling for API failures implemented
+
+**Dropdown Functionality:**
+- ✅ All Market Factors line items have UOM dropdown functionality
+- ✅ UOM codes display correctly (SQFT, UNIT, FF, %, etc.)
+- ✅ Commission, Other COS, and Contingency now use full UOM options
+- ✅ State tracking works for all unit selections
+
+**UI Layout Verification:**
+- ✅ Market Factors card positioned on right side (50% width)
+- ✅ Current Land Pricing card positioned on left side (50% width)
+- ✅ Table styling matches Growth Rates page exactly
+- ✅ Group organization follows specified requirements
+
+**State Management Testing:**
+- ✅ Change tracking detects UOM dropdown modifications
+- ✅ Save button activates appropriately on changes
+- ✅ Navigation warnings work for unsaved changes
+- ✅ All state updates properly synchronized
+
+#### User Experience Improvements
+
+**Before:**
+- ❌ Inconsistent layout between Market Factors and Growth Rates pages
+- ❌ Hardcoded UOM options limiting flexibility
+- ❌ Mixed dropdown functionality across line items
+- ❌ Unclear table organization and grouping
+
+**After:**
+- ✅ Consistent layout and styling across all assumption pages
+- ✅ Database-driven UOM options providing full flexibility
+- ✅ Uniform dropdown functionality for all line items
+- ✅ Logical grouping and clear table organization
+
+#### Future Enhancements
+- Consider adding UOM search/filter functionality for large option sets
+- Implement UOM preference saving for user-specific defaults
+- Add validation for UOM compatibility with specific calculation types
+- Consider adding UOM conversion capabilities between related units
+
+#### Files Modified in This Update
+```
+src/app/components/MarketAssumptionsNative.tsx (major restructuring)
+src/app/components/GrowthRates.tsx (UOM display updates)
+```
+
+---
+
 ### Land Use Taxonomy System Implementation (September 22, 2025)
 
 #### Summary

@@ -169,12 +169,13 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
       </div>
 
       {/* Land Use Pricing */}
-      <LandUsePricing 
+      <LandUsePricing
         landUsePricing={landUsePricing}
         setLandUsePricing={setLandUsePricing}
         uomOptions={(lookupLists['uom'] ?? []).map(o => ({ code: o.code, label: o.label }))}
         inflationOptions={inflationOptions}
         onOpenGrowthDetail={(rid) => { setSelectedGrowthRate(rid); setShowGrowthDetail(true); }}
+        projectId={projectId}
       />
 
       {/* Growth Rate Detail Modal */}

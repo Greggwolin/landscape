@@ -25,7 +25,12 @@ import {
   Chip,
   Avatar,
   Stack,
-  styled
+  styled,
+  Select,
+  MenuItem,
+  FormControl,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   Business as BuildingIcon,
@@ -34,7 +39,8 @@ import {
   KeyboardArrowDown as ArrowDownIcon,
   KeyboardArrowUp as ArrowUpIcon,
   Analytics,
-  Timeline
+  Timeline,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import type {
   GrowthRateAssumption,
@@ -171,6 +177,30 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Land pricing state
+  const [landPricingLoading, setLandPricingLoading] = useState(true);
+  const [landPricingSaving, setLandPricingSaving] = useState(false);
+  const [activeLandUseTypes, setActiveLandUseTypes] = useState<any[]>([]);
+  const [pricingData, setPricingData] = useState<any[]>([]);
+  const [originalPricingData, setOriginalPricingData] = useState<any[]>([]);
+  const [landPricingError, setLandPricingError] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // UOM and inflation options for land pricing
+  const [uomOptions, setUomOptions] = useState<Array<{code: string, name: string}>>([]);
+  const inflationOptions = ['Global', 'Custom 1', 'Custom 2', 'Custom 3'];
+
+  // Analysis impact visibility state
+  const [showAnalysisImpact, setShowAnalysisImpact] = useState<Record<number, boolean>>({});
+
+  // Function to toggle analysis impact visibility
+  const toggleAnalysisImpact = (assumptionId: number) => {
+    setShowAnalysisImpact(prev => ({
+      ...prev,
+      [assumptionId]: !prev[assumptionId]
+    }));
+  };
+
   // Helper function to get color for assumption category
   const getCategoryColor = (category: string): string => {
     switch (category) {
@@ -178,6 +208,87 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       case 'PRICE_APPRECIATION': return '#28c76f';
       case 'SALES_ABSORPTION': return '#ff9f43';
       default: return '#7367f0';
+    }
+  };
+
+  // Land pricing functions
+  const formatCurrency = (value: number): string => {
+    if (value === 0 || isNaN(value)) return '0';
+    if (value % 1 === 0) {
+      return value.toLocaleString('en-US');
+    }
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const parseCurrency = (value: string): number => {
+    const cleaned = value.replace(/,/g, '');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Function to check if pricing data has changed
+  const checkForChanges = (newData: any[]) => {
+    const hasChanges = JSON.stringify(newData) !== JSON.stringify(originalPricingData);
+    setHasUnsavedChanges(hasChanges);
+  };
+
+  const updatePricingData = (typeCode: string, field: string, value: any) => {
+    setPricingData(prev => {
+      const newData = prev.map(item =>
+        item.lu_type_code === typeCode
+          ? { ...item, [field]: value }
+          : item
+      );
+      checkForChanges(newData);
+      return newData;
+    });
+  };
+
+  const savePricingData = async () => {
+    setLandPricingSaving(true);
+    try {
+      const response = await fetch('/api/market-pricing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          pricing_data: pricingData
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to save pricing data');
+
+      // Update original data and reset unsaved changes
+      setOriginalPricingData([...pricingData]);
+      setHasUnsavedChanges(false);
+      setTimeout(() => setLandPricingSaving(false), 1000);
+    } catch (err) {
+      console.error('Failed to save pricing data:', err);
+      setLandPricingError('Failed to save pricing data');
+      setLandPricingSaving(false);
+    }
+  };
+
+  const navigateToPlanning = () => {
+    window.dispatchEvent(new CustomEvent('navigateToView', {
+      detail: { view: 'planning' }
+    }));
+  };
+
+  const getChipColor = (familyName: string) => {
+    switch (familyName?.toLowerCase()) {
+      case 'residential':
+        return { backgroundColor: '#28c76f', color: '#ffffff' };
+      case 'commercial':
+        return { backgroundColor: '#ff9f43', color: '#ffffff' };
+      case 'industrial':
+        return { backgroundColor: '#ea5455', color: '#ffffff' };
+      case 'mixed use':
+        return { backgroundColor: '#7367f0', color: '#ffffff' };
+      case 'open space':
+        return { backgroundColor: '#00cfe8', color: '#ffffff' };
+      default:
+        return { backgroundColor: '#6c757d', color: '#ffffff' };
     }
   };
 
@@ -226,6 +337,63 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     fetchAssumptions();
   }, [projectId]);
 
+  // Load land pricing data
+  useEffect(() => {
+    const initializeLandPricingData = async () => {
+      if (!projectId) return;
+
+      setLandPricingLoading(true);
+      try {
+        const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`);
+        if (!typesResponse.ok) throw new Error('Failed to load land use types');
+        const types = await typesResponse.json();
+        setActiveLandUseTypes(types);
+
+        // Load UOM options
+        const uomResponse = await fetch('/api/fin/uoms');
+        if (uomResponse.ok) {
+          const uoms = await uomResponse.json();
+          setUomOptions(uoms.map((uom: any) => ({ code: uom.uom_code, name: uom.name })));
+        }
+
+        const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`);
+        if (!pricingResponse.ok) throw new Error('Failed to load pricing data');
+        const existingPricing = await pricingResponse.json();
+
+        const existingPricingMap = existingPricing.reduce((acc: any, item: any) => {
+          acc[item.lu_type_code] = item;
+          return acc;
+        }, {});
+
+        const mergedPricingData = types.map((type: any) => {
+          const existing = existingPricingMap[type.code];
+          return existing ? {
+            ...existing,
+            type_name: type.name,
+            price_per_unit: parseFloat(existing.price_per_unit) || 0
+          } : {
+            lu_type_code: type.code,
+            type_name: type.name,
+            price_per_unit: 0,
+            unit_of_measure: 'LS', // Default to LS UOM code
+            inflation_type: 'Global'
+          };
+        });
+
+        setPricingData(mergedPricingData);
+        setOriginalPricingData([...mergedPricingData]);
+        setHasUnsavedChanges(false);
+        setLandPricingLoading(false);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        setLandPricingError('Failed to load pricing data');
+        setLandPricingLoading(false);
+      }
+    };
+
+    initializeLandPricingData();
+  }, [projectId]);
+
   // Auto-expand cards with custom values on page load
   useEffect(() => {
     if (assumptions.length > 0) {
@@ -242,6 +410,20 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       }
     }
   }, [assumptions, customNames, customSteps, editingSteps]);
+
+  // Navigation warning for unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes to land pricing data. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const handleCustomToggle = (assumptionId: number) => {
     const newExpanded = new Set(expandedCards);
@@ -300,6 +482,75 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     setEditMode(prev => ({
       ...prev,
       [key]: prev[key] === false ? true : false
+    }));
+  };
+
+  const handleClearTab = (assumptionId: number) => {
+    const tabIndex = cardTabs[assumptionId] || 0;
+
+    // Don't allow clearing the default tab (tab 0)
+    if (tabIndex === 0) return;
+
+    // Clear custom name
+    const nameKey = `${assumptionId}-${tabIndex}`;
+    setCustomNames(prev => {
+      const newNames = { ...prev };
+      delete newNames[nameKey];
+      return newNames;
+    });
+
+    // Clear editing names
+    setEditingNames(prev => {
+      const newNames = { ...prev };
+      delete newNames[nameKey];
+      return newNames;
+    });
+
+    // Clear all custom step values for this tab
+    setCustomSteps(prev => {
+      const newSteps = { ...prev };
+      Object.keys(newSteps).forEach(key => {
+        if (key.startsWith(`${assumptionId}-${tabIndex}-`)) {
+          delete newSteps[key];
+        }
+      });
+      return newSteps;
+    });
+
+    // Clear all editing step values for this tab
+    setEditingSteps(prev => {
+      const newSteps = { ...prev };
+      Object.keys(newSteps).forEach(key => {
+        if (key.startsWith(`${assumptionId}-${tabIndex}-`)) {
+          delete newSteps[key];
+        }
+      });
+      return newSteps;
+    });
+
+    // Reset visible rows for this tab
+    setVisibleRows(prev => {
+      const newRows = { ...prev };
+      const rowKey = `${assumptionId}-${tabIndex}`;
+      newRows[rowKey] = 1;
+      return newRows;
+    });
+
+    // Clear focused fields for this tab
+    setFocusedFields(prev => {
+      const newFields = { ...prev };
+      Object.keys(newFields).forEach(key => {
+        if (key.startsWith(`${assumptionId}-${tabIndex}-`)) {
+          delete newFields[key];
+        }
+      });
+      return newFields;
+    });
+
+    // Reset edit mode for this tab
+    setEditMode(prev => ({
+      ...prev,
+      [nameKey]: true
     }));
   };
 
@@ -835,6 +1086,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                 <Card key={assumption.id} sx={{
                   transition: 'all 0.3s ease-in-out',
                   cursor: 'pointer',
+                  minHeight: 120, // Ensure consistent card heights
                   '&:hover': {
                     transform: 'translateY(-1px)',
                     boxShadow: 3
@@ -908,6 +1160,31 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                           }}
                         >
                           Custom
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAnalysisImpact(assumption.id);
+                          }}
+                          tabIndex={-1}
+                          sx={{
+                            borderColor: color,
+                            color: color,
+                            minWidth: 50,
+                            fontSize: '0.7rem',
+                            textTransform: 'none',
+                            height: 24,
+                            '&:hover': {
+                              backgroundColor: color + '10',
+                              borderColor: color,
+                              transform: 'scale(1.02)'
+                            },
+                            transition: 'all 0.2s ease-in-out'
+                          }}
+                        >
+                          Analysis
                         </Button>
                       </Stack>
                     </Stack>
@@ -1020,6 +1297,24 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                           >
                             Delete
                           </Button>
+                          {/* Clear button - only show for custom tabs */}
+                          {(cardTabs[assumption.id] || 0) > 0 && (
+                            <Button
+                              variant="outlined"
+                              color="warning"
+                              size="small"
+                              onClick={() => handleClearTab(assumption.id)}
+                              tabIndex={-1}
+                              sx={{
+                                fontSize: '0.7rem',
+                                minWidth: 50,
+                                height: 24,
+                                textTransform: 'none'
+                              }}
+                            >
+                              Clear
+                            </Button>
+                          )}
                         </Stack>
 
                         {/* ARGUS-Style Steps Table */}
@@ -1144,202 +1439,292 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
             })}
           </Box>
 
-          {/* Right Column - Enhanced Impact Analysis */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, md: 2 } }}>
+          {/* Right Column - Land Pricing Card */}
+          <Box>
+            {/* Land Pricing Section */}
+            <Card>
+              <CardHeader
+                title="Current Land Pricing"
+                action={
+                  !landPricingLoading && activeLandUseTypes.length > 0 && hasUnsavedChanges && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={landPricingSaving ? <CircularProgress size={16} /> : <SaveIcon />}
+                      onClick={savePricingData}
+                      disabled={landPricingSaving}
+                      sx={{ textTransform: 'none', fontWeight: 500 }}
+                    >
+                      {landPricingSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                  )
+                }
+              />
+              <CardContent>
+                {landPricingLoading && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                )}
+
+                {landPricingError && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {landPricingError}
+                  </Alert>
+                )}
+
+                {!landPricingLoading && activeLandUseTypes.length === 0 && (
+                  <Box>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      Pricing Requires at least 1 Project Parcel
+                    </Alert>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={navigateToPlanning}
+                      startIcon={<Chip label="Planning" size="small" />}
+                    >
+                      Go to Planning
+                    </Button>
+                  </Box>
+                )}
+
+                {!landPricingLoading && activeLandUseTypes.length > 0 && (
+                  <TableContainer component={Paper} sx={{ mt: 2, border: '1px solid', borderColor: 'divider' }}>
+                    <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, px: 1 } }}>
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: 'rgba(138, 141, 147, 0.16)' }}>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '20%' }}>Family</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '30%' }}>Description</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '12%' }}>LU Code</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'right', width: '20%' }}>$/Unit</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center', width: '9%' }}>Unit</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center', width: '9%' }}>Inflate</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {pricingData.map((item, index) => (
+                          <TableRow
+                            key={item.lu_type_code || index}
+                            sx={{
+                              '&:hover': { backgroundColor: 'action.hover' },
+                              '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }
+                            }}
+                          >
+                            <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
+                              <Chip
+                                label={activeLandUseTypes.find(t => t.code === item.lu_type_code)?.family_name || 'Unknown'}
+                                size="small"
+                                sx={{
+                                  ...getChipColor(activeLandUseTypes.find(t => t.code === item.lu_type_code)?.family_name || ''),
+                                  fontWeight: 600,
+                                  fontSize: '0.7rem',
+                                  height: '20px',
+                                  '& .MuiChip-label': { px: 1 }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
+                              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                {item.type_name || activeLandUseTypes.find(t => t.code === item.lu_type_code)?.name || ''}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
+                              <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                {item.lu_type_code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'right', py: 0.5 }}>
+                              <TextField
+                                size="small"
+                                type="text"
+                                variant="outlined"
+                                value={formatCurrency(item.price_per_unit || 0)}
+                                onChange={(e) => updatePricingData(item.lu_type_code, 'price_per_unit', parseCurrency(e.target.value))}
+                                inputProps={{
+                                  style: { textAlign: 'right', fontSize: '0.85rem', padding: '4px 6px' }
+                                }}
+                                sx={{
+                                  width: '100%',
+                                  '& .MuiOutlinedInput-root': {
+                                    height: '28px',
+                                    '& fieldset': { borderColor: 'divider' },
+                                    '&:hover fieldset': { borderColor: 'primary.main' },
+                                    '&.Mui-focused fieldset': { borderColor: 'primary.main' }
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center', py: 0.5 }}>
+                              <FormControl size="small" sx={{ width: '100%' }}>
+                                <Select
+                                  value={item.unit_of_measure || 'LS'}
+                                  onChange={(e) => updatePricingData(item.lu_type_code, 'unit_of_measure', e.target.value)}
+                                  sx={{
+                                    height: '28px',
+                                    fontSize: '0.75rem',
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' }
+                                  }}
+                                >
+                                  {uomOptions.map(option => (
+                                    <MenuItem key={option.code} value={option.code} sx={{ fontSize: '0.75rem' }}>
+                                      {option.code}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center', py: 0.5 }}>
+                              <FormControl size="small" sx={{ width: '100%' }}>
+                                <Select
+                                  value={item.inflation_type || 'Global'}
+                                  onChange={(e) => updatePricingData(item.lu_type_code, 'inflation_type', e.target.value)}
+                                  sx={{
+                                    height: '28px',
+                                    fontSize: '0.75rem',
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' }
+                                  }}
+                                >
+                                  {inflationOptions.map(option => (
+                                    <MenuItem key={option} value={option} sx={{ fontSize: '0.75rem' }}>
+                                      {option}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Analysis Impact Cards (shown when button is clicked) */}
             {assumptions.map((assumption) => {
               const { color, name } = getCategoryInfo(assumption.category);
-              const isExpanded = expandedCards.has(assumption.id);
-              
+              const showImpact = showAnalysisImpact[assumption.id];
+
+              if (!showImpact) return null;
+
               return (
                 <Card key={assumption.id} sx={{
+                  mt: 2,
                   transition: 'all 0.3s ease-in-out',
-                  '&:hover': {
-                    transform: 'translateY(-1px)',
-                    boxShadow: 2
-                  },
-                  ...(isExpanded && {
-                    boxShadow: 4,
-                    borderColor: color + '40',
-                    transform: 'translateY(-2px)'
-                  })
+                  boxShadow: 4,
+                  borderColor: color + '40',
+                  border: `2px solid ${color}40`
                 }}>
-                  <CardContent sx={{ py: { xs: 1.5, md: 2 } }}>
-                    {!isExpanded ? (
-                      <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }}>
-                        <Typography variant="subtitle2" sx={{
-                          fontWeight: 600,
-                          flexGrow: 1,
-                          fontSize: { xs: '0.8125rem', md: '0.875rem' }
-                        }}>
-                          Analysis Impact
-                        </Typography>
-
-                        <Stack direction="row" spacing={{ xs: 2, md: 3 }}>
-                          {[
-                            { label: '$', value: assumption.impact.dollarAmount, color: 'text.primary' },
-                            { label: '%', value: assumption.impact.percentOfProject, color: color },
-                            {
-                              label: 'IRR',
-                              value: assumption.impact.irrImpact,
-                              color: assumption.impact.irrImpact.startsWith('+') ? '#28c76f' : '#ea5455'
-                            }
-                          ].map((metric, idx) => (
-                            <Box key={idx} textAlign="center" sx={{
-                              minWidth: { xs: 40, md: 45 },
-                              p: 0.5,
-                              borderRadius: 1,
-                              backgroundColor: 'grey.50',
-                              transition: 'all 0.2s ease-in-out',
-                              '&:hover': {
-                                backgroundColor: 'grey.100',
-                                transform: 'scale(1.05)'
-                              }
-                            }}>
-                              <Typography variant="caption" color="text.secondary" sx={{
-                                fontSize: { xs: '0.625rem', md: '0.65rem' }
-                              }}>
-                                {metric.label}
-                              </Typography>
-                              <Typography variant="caption" sx={{
-                                display: 'block',
-                                fontSize: { xs: '0.6875rem', md: '0.75rem' },
-                                fontWeight: 'bold',
-                                color: metric.color
-                              }}>
-                                {metric.value}
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Stack>
-                      </Stack>
-                    ) : (
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ 
-                          fontWeight: 600,
-                          mb: 2,
-                          fontSize: '0.875rem'
-                        }}>
-                          Analysis Impact
-                        </Typography>
-                        
-                        {/* Expanded Impact Metrics */}
-                        <Box sx={{ display: 'flex', gap: { xs: 1.5, md: 2 }, mb: 2 }}>
-                          {[
-                            { label: '$ Amount', value: assumption.impact.dollarAmount, color: 'text.primary' },
-                            { label: '% of Project', value: assumption.impact.percentOfProject, color: color },
-                            {
-                              label: 'IRR Impact',
-                              value: `${assumption.impact.irrImpact} bps`,
-                              color: assumption.impact.irrImpact.startsWith('+') ? '#28c76f' : '#ea5455'
-                            }
-                          ].map((metric, idx) => (
-                            <Box key={idx} sx={{
-                              flex: 1,
-                              textAlign: 'center',
-                              p: { xs: 1, md: 1.5 },
-                              borderRadius: 1,
-                              border: `1px solid ${metric.color}20`,
-                              backgroundColor: `${metric.color}10`,
-                              transition: 'all 0.2s ease-in-out',
-                              '&:hover': {
-                                backgroundColor: `${metric.color}20`,
-                                transform: 'translateY(-1px)',
-                                boxShadow: 1
-                              }
-                            }}>
-                              <Typography variant="caption" color="text.secondary" sx={{
-                                fontSize: { xs: '0.625rem', md: '0.65rem' }
-                              }}>
-                                {metric.label}
-                              </Typography>
-                              <Typography variant="body2" sx={{
-                                fontWeight: 'bold',
-                                color: metric.color,
-                                fontSize: { xs: '0.8125rem', md: '0.875rem' }
-                              }}>
-                                {metric.value}
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
-                  </CardContent>
-
-                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                    <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-                      <Box sx={{ 
-                        backgroundColor: 'grey.50', 
-                        px: 2, 
-                        py: 1, 
-                        borderBottom: 1,
-                        borderColor: 'divider'
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" sx={{
+                        fontWeight: 600,
+                        fontSize: '0.875rem'
                       }}>
-                        <Typography variant="caption" sx={{ 
-                          fontWeight: 500,
-                          fontSize: '0.7rem'
+                        Analysis Impact - {name}
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => toggleAnalysisImpact(assumption.id)}
+                        sx={{
+                          borderColor: color,
+                          color: color,
+                          fontSize: '0.7rem',
+                          textTransform: 'none',
+                          height: 24
+                        }}
+                      >
+                        Close
+                      </Button>
+                    </Stack>
+
+                    {/* Impact Metrics */}
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      {[
+                        { label: '$ Amount', value: assumption.impact.dollarAmount, color: 'text.primary' },
+                        { label: '% of Project', value: assumption.impact.percentOfProject, color: color },
+                        {
+                          label: 'IRR Impact',
+                          value: `${assumption.impact.irrImpact} bps`,
+                          color: assumption.impact.irrImpact.startsWith('+') ? '#28c76f' : '#ea5455'
+                        }
+                      ].map((metric, idx) => (
+                        <Box key={idx} sx={{
+                          flex: 1,
+                          textAlign: 'center',
+                          p: 1.5,
+                          borderRadius: 1,
+                          border: `1px solid ${metric.color}20`,
+                          backgroundColor: `${metric.color}10`
                         }}>
-                          Impact Visualization
-                        </Typography>
-                      </Box>
-                      
-                      <CardContent>
-                        <Stack spacing={1.5}>
-                          {[
-                            { 
-                              icon: Analytics, 
-                              title: 'Sensitivity Chart', 
-                              subtitle: 'IRR vs Rate Change',
-                              height: 80 
-                            },
-                            { 
-                              icon: Timeline, 
-                              title: 'Timeline Impact', 
-                              subtitle: 'Cash Flow Effect',
-                              height: 60 
-                            }
-                          ].map((chart, idx) => (
-                            <Paper 
-                              key={idx}
-                              variant="outlined" 
-                              sx={{ 
-                                height: chart.height,
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                borderStyle: 'dashed',
-                                bgcolor: 'grey.50'
-                              }}
-                            >
-                              <Box textAlign="center">
-                                <chart.icon sx={{ color: 'text.disabled', mb: 0.5 }} />
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'block' }}>
-                                  {chart.title}
-                                </Typography>
-                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
-                                  {chart.subtitle}
-                                </Typography>
-                              </Box>
-                            </Paper>
-                          ))}
-                          
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                            {metric.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{
+                            fontWeight: 'bold',
+                            color: metric.color,
+                            fontSize: '0.875rem'
+                          }}>
+                            {metric.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Impact Visualization */}
+                    <Stack spacing={1.5}>
+                      {[
+                        {
+                          icon: Analytics,
+                          title: 'Sensitivity Chart',
+                          subtitle: 'IRR vs Rate Change',
+                          height: 80
+                        },
+                        {
+                          icon: Timeline,
+                          title: 'Timeline Impact',
+                          subtitle: 'Cash Flow Effect',
+                          height: 60
+                        }
+                      ].map((chart, idx) => (
+                        <Paper
+                          key={idx}
+                          variant="outlined"
+                          sx={{
+                            height: chart.height,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderStyle: 'dashed',
+                            bgcolor: 'grey.50'
+                          }}
+                        >
                           <Box textAlign="center">
-                            <Typography variant="caption" sx={{ color: getCategoryColor(assumption.category), fontSize: '0.75rem' }}>
-                              ↓
+                            <chart.icon sx={{ color: 'text.disabled', mb: 0.5 }} />
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'block' }}>
+                              {chart.title}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block' }}>
-                              Dynamic Analysis
+                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                              {chart.subtitle}
                             </Typography>
                           </Box>
-                        </Stack>
-                      </CardContent>
-                    </Box>
-                  </Collapse>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </CardContent>
                 </Card>
               );
             })}
           </Box>
         </Box>
+
       </Box>
     </ThemeProvider>
   );

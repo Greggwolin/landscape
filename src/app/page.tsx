@@ -6,7 +6,7 @@ import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BudgetContent from './components/Budget/BudgetContent';
 // import MarketAssumptions from './components/MarketAssumptions';
-import MarketAssumptionsComparison from './components/MarketAssumptionsComparison';
+import MarketAssumptionsNative from './components/MarketAssumptionsNative';
 import PlanningContent from './components/Planning/PlanningContent';
 import PlanningContentGrid from './components/Archive/PlanningContentGrid';
 import PlanningContentHot from './components/Archive/PlanningContentHot';
@@ -62,7 +62,7 @@ const LandscapeAppInner: React.FC = () => {
       case 'acquisition':
         return <ComingSoonContent title="Acquisition" />;
       case 'market':
-        return <MarketAssumptionsComparison projectId={activeProject?.project_id ?? null} />;
+        return <MarketAssumptionsNative projectId={activeProject?.project_id ?? null} />;
       case 'growth-rates':
         return <GrowthRates projectId={activeProject?.project_id ?? null} />;
       case 'project-costs':

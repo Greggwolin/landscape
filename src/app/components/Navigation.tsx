@@ -36,7 +36,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Home',
       items: [
-        { id: 'home', label: 'Home', icon: '🏠' }
+        { id: 'home', label: 'Home', icon: '🏠' },
+        { id: 'dev-status', label: 'Development Status', icon: '📊' }
       ]
     },
     {
@@ -52,7 +53,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       title: 'Assumptions',
       items: [
         { id: 'acquisition', label: 'Acquisition', icon: '🏡' },
-        { id: 'market', label: 'Market', icon: '🧮' },
+        { id: 'market', label: 'Global', icon: '🧮' },
         { id: 'growth-rates', label: 'Growth Rates', icon: '📊' },
         { id: 'project-costs', label: 'Project Costs', icon: '💰' },
         { id: 'project-revenues', label: 'Project Revenues', icon: '📈' }
@@ -83,7 +84,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       items: [
         { id: 'settings', label: 'Settings', icon: '⚙️' },
         { id: 'zoning-glossary', label: 'Zoning Glossary', icon: '🏷️' },
-        { id: 'dev-status', label: 'Development Status', icon: '📊' },
         { id: 'planning', label: `${level2Label} Planner (Legacy)`, icon: '🪄' }
       ]
     }
