@@ -56,8 +56,8 @@ const MarketFactors: React.FC<Props> = ({
       <div className="p-2 space-y-1">
         {marketFactors.filter(item => item.enabled).map(item => (
           <div key={item.id} className="flex items-center text-xs space-x-2">
-            <div className="w-1/3 text-white">{item.name}</div>
-            <div className="w-1/6">
+            <div className="w-2/5 text-white">{item.name}</div>
+            <div className="w-20">
               <div className="relative flex items-center">
                 <input
                   type="text"
@@ -75,10 +75,10 @@ const MarketFactors: React.FC<Props> = ({
                 )}
               </div>
             </div>
-            <div className="w-1/2 flex items-center space-x-2">
+            <div className="flex-1 flex items-center space-x-2">
               {item.name === 'Housing Demand' && (
                 <select
-                  className="w-1/2 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
+                  className="bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
                   value={item.unit}
                   onChange={(e) => setMarketFactors(prev => prev.map(f => f.id === item.id ? { ...f, unit: e.target.value } : f))}
                 >
@@ -100,7 +100,7 @@ const MarketFactors: React.FC<Props> = ({
               {item.name === 'Commissions' && (
                 <>
                   <select
-                    className="w-1/3 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
+                    className="bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
                     value={item.unit}
                     onChange={(e) => setMarketFactors(prev => prev.map(f => f.id === item.id ? { ...f, unit: e.target.value } : f))}
                   >
@@ -118,7 +118,7 @@ const MarketFactors: React.FC<Props> = ({
               )}
               {(item.name === 'Other / COS' || item.name === 'Other') && (
                 <select
-                  className="w-1/2 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
+                  className="bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
                   value={item.unit}
                   onChange={(e) => setMarketFactors(prev => prev.map(f => f.id === item.id ? { ...f, unit: e.target.value } : f))}
                 >

@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { formatNumber, parseNumber } from '../../lib/number'
+import type { ProcessedUOMOptions } from '../../lib/uom-utils'
 
 type CostItem = {
   id: number
@@ -23,10 +24,10 @@ type Props = {
   projectCosts: ProjectCostsState
   updateProjectCost: (section: keyof ProjectCostsState, id: number, field: keyof CostItem, value: any) => void
   embedded?: boolean
-  uomOptions?: { code: string; label: string }[]
+  uomOptions?: ProcessedUOMOptions
 }
 
-const ProjectCosts: React.FC<Props> = ({ projectCosts, updateProjectCost, embedded = false, uomOptions = [] }) => {
+const ProjectCosts: React.FC<Props> = ({ projectCosts, updateProjectCost, embedded = false, uomOptions }) => {
   const renderCostSection = (title: string, section: CostItem[], sectionKey: keyof ProjectCostsState) => (
     <div className="overflow-hidden">
       <div className="bg-slate-700 px-3 py-2 border-b border-slate-600">
@@ -64,9 +65,24 @@ const ProjectCosts: React.FC<Props> = ({ projectCosts, updateProjectCost, embedd
                 value={item.unit}
                 onChange={(e) => updateProjectCost(sectionKey, item.id, 'unit', e.target.value)}
               >
-                {uomOptions.map(opt => (
-                  <option key={opt.code} value={opt.label}>{opt.label}</option>
-                ))}
+                {uomOptions?.all?.map((option, index) => {
+                  if ('isDivider' in option) {
+                    return (
+                      <option key={`divider-${index}`} disabled style={{
+                        borderTop: '1px solid #6b7280',
+                        backgroundColor: '#374151',
+                        fontSize: '0.7em',
+                        fontStyle: 'italic',
+                        color: '#9ca3af'
+                      }}>
+                        ────── Time-based ──────
+                      </option>
+                    );
+                  }
+                  return (
+                    <option key={option.code} value={option.label}>{option.label}</option>
+                  );
+                }) ?? []}
               </select>
             </div>
           </div>

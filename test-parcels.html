@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Parcels Loading</title>
+</head>
+<body>
+    <h1>Testing Parcel Loading</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <script>
+        console.log('Starting parcel test...');
+
+        fetch('/pinal_parcels.geojson')
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json();
+            })
+            .then(data => {
+                console.log('GeoJSON loaded successfully');
+                console.log('Features count:', data.features.length);
+                console.log('First feature:', data.features[0]);
+
+                document.getElementById('status').textContent = 'Success!';
+                document.getElementById('results').innerHTML = `
+                    <p>Features loaded: ${data.features.length}</p>
+                    <p>First parcel ID: ${data.features[0]?.properties?.PARCELID || 'N/A'}</p>
+                    <p>Sample coordinates: ${JSON.stringify(data.features[0]?.geometry?.coordinates[0][0] || 'N/A')}</p>
+                `;
+            })
+            .catch(error => {
+                console.error('Error loading parcels:', error);
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            });
+    </script>
+</body>
+</html>

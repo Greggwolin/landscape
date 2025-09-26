@@ -607,6 +607,94 @@ const DevStatus: React.FC = () => {
           </div>
         </div>
 
+        {/* Little Bugs Section */}
+        <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+            <Bug className="w-5 h-5 mr-2 text-red-400" />
+            🐛 Little Bugs
+          </h3>
+          <div className="space-y-6">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+              <h4 className="text-md font-medium text-white mb-3 flex items-center">
+                <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm mr-2">1</span>
+                Inflation Cards
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <span className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs mt-0.5">1</span>
+                  <div className="flex-1">
+                    <div className="text-gray-300 text-sm">
+                      <strong>Custom tabs initialization:</strong> Rather than starting with 3 "custom" tabs, when user clicks custom chip, the table should only contain a blank Custom 1 input table and tab. Once the Custom 1 inflation set is saved, an "Add" chip should appear which if clicked, creates the second custom inflation rate set.
+                    </div>
+                    <div className="mt-2">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full border bg-yellow-100 text-yellow-800 border-yellow-200">
+                        UX Improvement
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <span className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs mt-0.5">2</span>
+                  <div className="flex-1">
+                    <div className="text-gray-300 text-sm">
+                      <strong>Name field persistence:</strong> After save, custom inflation set "Name" field doesn't repopulate with saved name (tab names are OK).
+                    </div>
+                    <div className="mt-2">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full border bg-red-100 text-red-800 border-red-200">
+                        Data Persistence Bug
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+              <h4 className="text-md font-medium text-white mb-3 flex items-center">
+                <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm mr-2">2</span>
+                Market Factors Percentage-Based Costs
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs mt-0.5">1</span>
+                  <div className="flex-1">
+                    <div className="text-gray-300 text-sm">
+                      <strong>Percentage calculation mechanism:</strong> Need to design a mechanism for dealing with costs that are a % of something (e.g., commissions as % of sales price, management fees as % of revenue).
+                    </div>
+                    <div className="mt-2">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full border bg-blue-100 text-blue-800 border-blue-200">
+                        Design Task
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+              <h4 className="text-md font-medium text-white mb-3 flex items-center">
+                <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm mr-2">3</span>
+                Market Factors & Inflation Input Formatting
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <span className="w-5 h-5 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs mt-0.5">1</span>
+                  <div className="flex-1">
+                    <div className="text-gray-300 text-sm">
+                      <strong>Layout and formatting refinements:</strong> Refine the formatting, spacing, and visual presentation of the market factors and growth rate inflation input pages for better usability and professional appearance.
+                    </div>
+                    <div className="mt-2">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full border bg-purple-100 text-purple-800 border-purple-200">
+                        Design Polish
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Quick Actions */}
         <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">📋 Quick Actions</h3>

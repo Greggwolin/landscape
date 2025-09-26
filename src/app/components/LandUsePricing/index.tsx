@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatNumber, parseNumber } from '../../lib/number'
 import { useRouter } from 'next/navigation'
+import type { UOMOption } from '../../lib/uom-utils'
 
 type LandUseItem = {
   lu_type_code: string
@@ -15,7 +16,7 @@ type LandUseItem = {
 type Props = {
   landUsePricing?: LandUseItem[]
   setLandUsePricing?: React.Dispatch<React.SetStateAction<LandUseItem[]>>
-  uomOptions: { code: string; label: string }[]
+  uomOptions: UOMOption[]
   inflationOptions: string[]
   onOpenGrowthDetail: (rateId: string) => void
   projectId?: number | null
@@ -221,8 +222,8 @@ const LandUsePricing: React.FC<Props> = ({
                 value={item.unit_of_measure}
                 onChange={(e) => updatePricingData(item.lu_type_code, 'unit_of_measure', e.target.value)}
               >
-                {['LS', 'SF', 'Unit', 'Acre'].map(option => (
-                  <option key={option} value={option}>{option}</option>
+                {uomOptions.map(option => (
+                  <option key={option.code} value={option.code}>{option.label}</option>
                 ))}
               </select>
             </div>

@@ -8,7 +8,8 @@ export async function GET(request: Request) {
     if (!projectId) return NextResponse.json({})
 
     const rows = await sql`
-      SELECT project_id, commission_basis, demand_unit, uom, updated_at
+      SELECT project_id, commission_basis, demand_unit, uom,
+             dvl_per_year, dvl_per_quarter, dvl_per_month, updated_at
       FROM landscape.market_assumptions
       WHERE project_id = ${projectId}
       LIMIT 1
@@ -24,18 +25,28 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { project_id, commission_basis, demand_unit, uom } = body ?? {}
+    const { project_id, commission_basis, demand_unit, uom, dvl_per_year, dvl_per_quarter, dvl_per_month } = body ?? {}
     if (!project_id) return NextResponse.json({ error: 'project_id required' }, { status: 400 })
 
     const rows = await sql`
-      INSERT INTO landscape.market_assumptions (project_id, commission_basis, demand_unit, uom)
-      VALUES (${project_id}, ${commission_basis}, ${demand_unit}, ${uom})
+      INSERT INTO landscape.market_assumptions (
+        project_id, commission_basis, demand_unit, uom,
+        dvl_per_year, dvl_per_quarter, dvl_per_month
+      )
+      VALUES (
+        ${project_id}, ${commission_basis}, ${demand_unit}, ${uom},
+        ${dvl_per_year}, ${dvl_per_quarter}, ${dvl_per_month}
+      )
       ON CONFLICT (project_id) DO UPDATE SET
         commission_basis = EXCLUDED.commission_basis,
         demand_unit = EXCLUDED.demand_unit,
         uom = EXCLUDED.uom,
+        dvl_per_year = EXCLUDED.dvl_per_year,
+        dvl_per_quarter = EXCLUDED.dvl_per_quarter,
+        dvl_per_month = EXCLUDED.dvl_per_month,
         updated_at = NOW()
-      RETURNING project_id, commission_basis, demand_unit, uom, updated_at
+      RETURNING project_id, commission_basis, demand_unit, uom,
+                dvl_per_year, dvl_per_quarter, dvl_per_month, updated_at
     `
     return NextResponse.json(rows?.[0] ?? { success: true })
   } catch (err: unknown) {

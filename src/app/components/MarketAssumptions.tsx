@@ -5,6 +5,8 @@ import MarketFactors from './MarketFactors'
 import ProjectCosts from './ProjectCosts'
 import LandUsePricing from './LandUsePricing'
 import GrowthRateDetail from './GrowthRateDetail'
+import DVLTimeSeries from './DVLTimeSeries'
+import { processUOMOptions } from '../lib/uom-utils'
 
 type LookupResp = { [k: string]: { code: string; label: string; sort_order?: number }[] }
 
@@ -68,8 +70,24 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
   const [showGrowthDetail, setShowGrowthDetail] = useState(false)
   const [selectedGrowthRate, setSelectedGrowthRate] = useState<number | string | null>(null)
 
+  const [dvlTimeSeriesData, setDvlTimeSeriesData] = useState({
+    dvlPerYear: null as number | null,
+    dvlPerQuarter: null as number | null,
+    dvlPerMonth: null as number | null
+  })
+
   const [lookupLists, setLookupLists] = useState<LookupResp>({})
-  const inflationOptions = ['Global', 'Custom 1', 'Custom 2', 'Custom 3']
+  const [hasCustomRates, setHasCustomRates] = useState(false)
+
+  // Dynamic inflation options based on whether custom rates are established
+  const inflationOptions = hasCustomRates
+    ? ['Global', 'Custom 1', 'Custom 2', 'Custom 3']
+    : ['Global', 'None']
+
+  // Process UOM options to separate time-based items
+  const processedUOMOptions = processUOMOptions(
+    (lookupLists['uom'] ?? []).map(o => ({ code: o.code, label: o.label }))
+  )
 
   const updateProjectCost = (section: string, id: number, field: string, value: any) => {
     setProjectCosts(prev => ({
@@ -79,17 +97,34 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
   }
 
   useEffect(() => {
-    const loadLookups = async () => {
+    const loadData = async () => {
       try {
-        const res = await fetch('/api/lookups?key=uom,commission_basis,housing_demand_unit,contingency_name', { cache: 'no-store' })
-        const data = await res.json()
-        setLookupLists(data)
+        // Load lookups
+        const lookupRes = await fetch('/api/lookups?key=uom,commission_basis,housing_demand_unit,contingency_name', { cache: 'no-store' })
+        const lookupData = await lookupRes.json()
+        setLookupLists(lookupData)
+
+        // Check for custom growth rates configuration
+        if (projectId) {
+          try {
+            const growthRes = await fetch(`/api/assumptions/growth-rates?project_id=${projectId}`, { cache: 'no-store' })
+            const growthData = await growthRes.json()
+            // Check if any custom growth rates have been configured beyond defaults
+            const hasCustomConfig = growthData?.assumptions?.some((assumption: any) =>
+              assumption.category && !['DEVELOPMENT_COSTS', 'PRICE_APPRECIATION', 'SALES_ABSORPTION'].includes(assumption.category)
+            )
+            setHasCustomRates(hasCustomConfig || false)
+          } catch (growthError) {
+            console.error('Failed to load growth rates', growthError)
+            setHasCustomRates(false)
+          }
+        }
       } catch (e) {
-        console.error('Failed to load lookups', e)
+        console.error('Failed to load data', e)
       }
     }
-    loadLookups()
-  }, [])
+    loadData()
+  }, [projectId])
 
   useEffect(() => {
     if (projectId) {
@@ -123,7 +158,15 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
       const res = await fetch('/api/assumptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, commission_basis: commission, demand_unit: demandUnit, uom: defaultUom })
+        body: JSON.stringify({
+          project_id: projectId,
+          commission_basis: commission,
+          demand_unit: demandUnit,
+          uom: defaultUom,
+          dvl_per_year: dvlTimeSeriesData.dvlPerYear,
+          dvl_per_quarter: dvlTimeSeriesData.dvlPerQuarter,
+          dvl_per_month: dvlTimeSeriesData.dvlPerMonth
+        })
       })
       if (!res.ok) throw new Error(await res.text())
       setSaveStatus('saved')
@@ -163,16 +206,22 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
         {/* Embedded Project Costs sections */}
         <div className="px-0 py-2">
           <ProjectCosts embedded projectCosts={projectCosts} updateProjectCost={updateProjectCost}
-            uomOptions={(lookupLists['uom'] ?? []).map(o => ({ code: o.code, label: o.label }))}
+            uomOptions={processedUOMOptions}
           />
         </div>
       </div>
+
+      {/* DVL Time Series */}
+      <DVLTimeSeries
+        projectId={projectId}
+        onDataChange={setDvlTimeSeriesData}
+      />
 
       {/* Land Use Pricing */}
       <LandUsePricing
         landUsePricing={landUsePricing}
         setLandUsePricing={setLandUsePricing}
-        uomOptions={(lookupLists['uom'] ?? []).map(o => ({ code: o.code, label: o.label }))}
+        uomOptions={processedUOMOptions.regular}
         inflationOptions={inflationOptions}
         onOpenGrowthDetail={(rid) => { setSelectedGrowthRate(rid); setShowGrowthDetail(true); }}
         projectId={projectId}

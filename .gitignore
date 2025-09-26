@@ -59,3 +59,11 @@ docs/ai-chats/*.zip
 # Development containers
 .devcontainer/.env
 docker-compose.override.yml
+# Large GIS files
+src/app/GIS/*.shp
+src/app/GIS/*.dbf
+src/app/GIS/*.shx
+src/app/GIS/*.sbn
+src/app/GIS/*.sbx
+public/pinal_parcels.geojson
+*.geojson
