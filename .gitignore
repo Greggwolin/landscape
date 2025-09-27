@@ -67,3 +67,6 @@ src/app/GIS/*.sbn
 src/app/GIS/*.sbx
 public/pinal_parcels.geojson
 *.geojson
+
+# Temporary backups
+*_backup
