@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import ProjectStructureChoice from '../setup/ProjectStructureChoice'
-import PropertyPackageUpload from './PropertyPackageUpload'
 import GISMap from '../MapLibre/GISMap'
 import PlanNavigation from './PlanNavigation'
 
@@ -12,14 +11,13 @@ interface GISSetupWorkflowProps {
   onCancel?: () => void
 }
 
-type WorkflowStep = 'structure' | 'boundary' | 'package' | 'navigation'
+type WorkflowStep = 'structure' | 'boundary' | 'navigation'
 
 interface WorkflowState {
   currentStep: WorkflowStep
   completedSteps: Set<WorkflowStep>
   structureType?: 'simple' | 'master_plan'
   boundarySet: boolean
-  packageProcessed: boolean
 }
 
 interface ProjectData {
@@ -28,6 +26,12 @@ interface ProjectData {
   structure_type?: string
   boundary_acres?: number
   parcel_count?: number
+  location?: {
+    description: string
+    latitude?: number
+    longitude?: number
+    confidence?: number
+  }
 }
 
 const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
@@ -38,8 +42,7 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
   const [workflowState, setWorkflowState] = useState<WorkflowState>({
     currentStep: 'structure',
     completedSteps: new Set(),
-    boundarySet: false,
-    packageProcessed: false
+    boundarySet: false
   })
 
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
@@ -50,7 +53,6 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
   const steps = [
     { id: 'structure', title: 'Choose Structure', description: 'Select project organization type' },
     { id: 'boundary', title: 'Set Boundary', description: 'Define project boundary from tax parcels' },
-    { id: 'package', title: 'Upload Package', description: 'Process property documents with AI' },
     { id: 'navigation', title: 'Navigate Project', description: 'Review and manage parcels' }
   ] as const
 
@@ -58,6 +60,32 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
   useEffect(() => {
     loadProjectData()
   }, [projectId])
+
+  const checkExistingUploads = async (projectId: number) => {
+    try {
+      const response = await fetch(`/api/ai/ingest-property-package?project_id=${projectId}`)
+      if (response.ok) {
+        const data = await response.json()
+
+        // Check if there are any uploads with location information
+        if (data.ingestion_history && data.ingestion_history.length > 0) {
+          console.log('Found existing uploads:', data.ingestion_history)
+
+          // TODO: Extract location information from document analysis
+          // For now, return mock location data for Red Valley
+          if (projectId === 8) { // Red Valley project
+            return {
+              description: "corner of Anderson and Farrell Roads in Maricopa, AZ",
+              confidence: 0.85
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing uploads:', error)
+    }
+    return null
+  }
 
   const loadProjectData = async () => {
     try {
@@ -76,6 +104,9 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
       const parcelsResponse = await fetch(`/api/gis/plan-parcels?project_id=${projectId}&include_geometry=false`)
       const parcelsData = parcelsResponse.ok ? await parcelsResponse.json() : null
 
+      // Check for existing document uploads and extract location information
+      const locationInfo = await checkExistingUploads(projectId)
+
       const completedSteps = new Set<WorkflowStep>()
       let currentStep: WorkflowStep = 'structure'
 
@@ -85,12 +116,7 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
 
         if (boundaryExists) {
           completedSteps.add('boundary')
-          currentStep = 'package'
-
-          if (parcelsData?.parcels?.length > 0) {
-            completedSteps.add('package')
-            currentStep = 'navigation'
-          }
+          currentStep = 'navigation'
         }
       }
 
@@ -99,15 +125,15 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
         project_name: projectInfo.project_name,
         structure_type: projectInfo.structure_type,
         boundary_acres: boundaryExists ? parseFloat(boundaryResponse.ok ? '0' : '0') : undefined,
-        parcel_count: parcelsData?.statistics?.total_parcels || 0
+        parcel_count: parcelsData?.statistics?.total_parcels || 0,
+        location: locationInfo
       })
 
       setWorkflowState({
         currentStep,
         completedSteps,
         structureType: projectInfo.structure_type,
-        boundarySet: boundaryExists,
-        packageProcessed: parcelsData?.parcels?.length > 0
+        boundarySet: boundaryExists
       })
 
     } catch (err) {
@@ -134,24 +160,11 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
     setWorkflowState(prev => ({
       ...prev,
       boundarySet: true,
-      currentStep: 'package',
+      currentStep: 'navigation',
       completedSteps: new Set([...prev.completedSteps, 'boundary'])
     }))
   }
 
-  const handlePackageComplete = (results: { parcels_created: number }) => {
-    setWorkflowState(prev => ({
-      ...prev,
-      packageProcessed: true,
-      currentStep: 'navigation',
-      completedSteps: new Set([...prev.completedSteps, 'package'])
-    }))
-
-    setProjectData(prev => prev ? {
-      ...prev,
-      parcel_count: results.parcels_created
-    } : null)
-  }
 
   const goToStep = (step: WorkflowStep) => {
     // Only allow navigation to completed steps or the next step
@@ -301,25 +314,18 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
               projectId={projectId}
               mode="parcel-select"
               onBoundaryConfirmed={handleBoundaryConfirmed}
+              projectLocation={projectData?.location}
               className="h-full"
             />
           </div>
         )}
 
-        {workflowState.currentStep === 'package' && workflowState.structureType && (
-          <div className="h-full flex items-center justify-center">
-            <PropertyPackageUpload
-              projectId={projectId}
-              structureType={workflowState.structureType}
-              onUploadComplete={handlePackageComplete}
-            />
-          </div>
-        )}
 
         {workflowState.currentStep === 'navigation' && (
           <div className="h-full">
             <PlanNavigation
               projectId={projectId}
+              projectLocation={projectData?.location}
               className="h-full"
             />
           </div>

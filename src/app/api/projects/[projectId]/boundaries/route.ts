@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
+import { sql } from '@/lib/db'
 
 interface ParcelBoundary {
   parcelId: string
@@ -16,10 +16,11 @@ interface RequestBody {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const projectId = parseInt(params.projectId)
+    const resolvedParams = await params
+    const projectId = parseInt(resolvedParams.projectId)
     if (isNaN(projectId)) {
       return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
     }
@@ -37,51 +38,33 @@ export async function POST(
     const totalAcres = parcels.reduce((sum, parcel) => sum + parcel.grossAcres, 0)
 
     // Start transaction
-    await query('BEGIN')
+    await sql`BEGIN`
 
     try {
       // Clear existing project boundaries
-      await query(
-        'DELETE FROM landscape.project_boundaries WHERE project_id = $1',
-        [projectId]
-      )
+      await sql`DELETE FROM landscape.project_boundaries WHERE project_id = ${projectId}`
 
       // Insert project summary record
-      const projectBoundaryResult = await query(
-        `INSERT INTO landscape.project_boundaries
+      const projectBoundaryResult = await sql`
+        INSERT INTO landscape.project_boundaries
          (project_id, parcel_count, total_acres, dissolved_geometry, created_at)
-         VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4), NOW())
-         RETURNING boundary_id`,
-        [projectId, parcels.length, totalAcres, JSON.stringify(dissolvedBoundary)]
-      )
+         VALUES (${projectId}, ${parcels.length}, ${totalAcres}, ST_GeomFromGeoJSON(${JSON.stringify(dissolvedBoundary)}), NOW())
+         RETURNING boundary_id`
 
-      const boundaryId = projectBoundaryResult.rows[0].boundary_id
+      const boundaryId = projectBoundaryResult[0].boundary_id
 
       // Insert individual parcel records
       for (const parcel of parcels) {
-        await query(
-          `INSERT INTO landscape.project_parcel_boundaries
+        await sql`
+          INSERT INTO landscape.project_parcel_boundaries
            (boundary_id, project_id, parcel_id, geometry, gross_acres, owner_name, site_address, created_at)
-           VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4), $5, $6, $7, NOW())`,
-          [
-            boundaryId,
-            projectId,
-            parcel.parcelId,
-            JSON.stringify(parcel.geometry),
-            parcel.grossAcres,
-            parcel.ownerName,
-            parcel.siteAddress
-          ]
-        )
+           VALUES (${boundaryId}, ${projectId}, ${parcel.parcelId}, ST_GeomFromGeoJSON(${JSON.stringify(parcel.geometry)}), ${parcel.grossAcres}, ${parcel.ownerName}, ${parcel.siteAddress}, NOW())`
       }
 
       // Update project total acres
-      await query(
-        'UPDATE landscape.tbl_project SET acres_gross = $1 WHERE project_id = $2',
-        [totalAcres, projectId]
-      )
+      await sql`UPDATE landscape.tbl_project SET acres_gross = ${totalAcres} WHERE project_id = ${projectId}`
 
-      await query('COMMIT')
+      await sql`COMMIT`
 
       console.log(`Successfully saved ${parcels.length} parcels (${totalAcres.toFixed(2)} acres) for project ${projectId}`)
 
@@ -94,7 +77,7 @@ export async function POST(
       })
 
     } catch (error) {
-      await query('ROLLBACK')
+      await sql`ROLLBACK`
       throw error
     }
 
@@ -109,27 +92,26 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const projectId = parseInt(params.projectId)
+    const resolvedParams = await params
+    const projectId = parseInt(resolvedParams.projectId)
     if (isNaN(projectId)) {
       return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
     }
 
     // Get project boundaries
-    const boundariesResult = await query(
-      `SELECT pb.*,
+    const boundariesResult = await sql`
+      SELECT pb.*,
               ST_AsGeoJSON(pb.dissolved_geometry) as dissolved_geojson,
               pb.created_at
        FROM landscape.project_boundaries pb
-       WHERE pb.project_id = $1
+       WHERE pb.project_id = ${projectId}
        ORDER BY pb.created_at DESC
-       LIMIT 1`,
-      [projectId]
-    )
+       LIMIT 1`
 
-    if (boundariesResult.rows.length === 0) {
+    if (boundariesResult.length === 0) {
       return NextResponse.json({
         boundaries: null,
         parcels: [],
@@ -137,19 +119,17 @@ export async function GET(
       })
     }
 
-    const boundary = boundariesResult.rows[0]
+    const boundary = boundariesResult[0]
 
     // Get individual parcels
-    const parcelsResult = await query(
-      `SELECT ppb.*,
+    const parcelsResult = await sql`
+      SELECT ppb.*,
               ST_AsGeoJSON(ppb.geometry) as geojson
        FROM landscape.project_parcel_boundaries ppb
-       WHERE ppb.boundary_id = $1
-       ORDER BY ppb.parcel_id`,
-      [boundary.boundary_id]
-    )
+       WHERE ppb.boundary_id = ${boundary.boundary_id}
+       ORDER BY ppb.parcel_id`
 
-    const parcels = parcelsResult.rows.map(row => ({
+    const parcels = parcelsResult.map(row => ({
       parcelId: row.parcel_id,
       geometry: JSON.parse(row.geojson),
       grossAcres: parseFloat(row.gross_acres),

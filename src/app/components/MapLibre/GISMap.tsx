@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { parcelLoader } from '../../utils/parcelLoader'
+import { geocodeLocation, getZoomLevel, type GeocodingResult } from '../../../lib/geocoding'
 
 interface GISMapProps {
   projectId: number
@@ -10,6 +11,12 @@ interface GISMapProps {
   onParcelSelect?: (features: Record<string, unknown>[]) => void
   onParcelClick?: (parcel: Record<string, unknown>) => void
   onBoundaryConfirmed?: () => void
+  projectLocation?: {
+    description: string
+    latitude?: number
+    longitude?: number
+    confidence?: number
+  }
   className?: string
 }
 
@@ -43,6 +50,7 @@ const GISMap: React.FC<GISMapProps> = ({
   onParcelSelect,
   onParcelClick,
   onBoundaryConfirmed,
+  projectLocation,
   className = ''
 }) => {
   console.log('🔥 GISMap component rendering...', { mode, projectId })
@@ -57,9 +65,40 @@ const GISMap: React.FC<GISMapProps> = ({
   const [loadingParcels, setLoadingParcels] = useState<boolean>(false)
   const [selectionMode, setSelectionMode] = useState<'pan' | 'select'>('pan')
   const selectionModeRef = useRef<'pan' | 'select'>('pan')
+  const [geocodingResult, setGeocodingResult] = useState<GeocodingResult | null>(null)
 
   // Pinal County parcel service configuration
   const PINAL_PARCELS_URL = 'https://rogue.casagrandeaz.gov/arcgis/rest/services/Pinal_County/Pinal_County_Parcels/MapServer/0'
+
+  // Geocode project location if provided
+  useEffect(() => {
+    const handleGeocode = async () => {
+      if (projectLocation?.description && !projectLocation.latitude) {
+        console.log('🌍 Geocoding project location:', projectLocation.description)
+        try {
+          const result = await geocodeLocation(projectLocation.description)
+          if (result) {
+            console.log('✅ Geocoding successful:', result)
+            setGeocodingResult(result)
+          } else {
+            console.log('❌ Geocoding failed for:', projectLocation.description)
+          }
+        } catch (error) {
+          console.error('Error geocoding location:', error)
+        }
+      } else if (projectLocation?.latitude && projectLocation?.longitude) {
+        // Use provided coordinates directly
+        setGeocodingResult({
+          latitude: projectLocation.latitude,
+          longitude: projectLocation.longitude,
+          confidence: projectLocation.confidence || 0.8,
+          source: 'manual'
+        })
+      }
+    }
+
+    handleGeocode()
+  }, [projectLocation])
 
   // Dissolve parcel boundaries into a single boundary (simplified client-side approach)
   const dissolveParcelBoundaries = async (parcels: PinalParcel[]): Promise<GeoJSON.Geometry | null> => {
@@ -166,8 +205,12 @@ const GISMap: React.FC<GISMapProps> = ({
               }
             ]
           },
-          center: [-111.927912, 33.028911], // Anderson Road & Farrell Road intersection, exact coordinates
-          zoom: 13  // Wider view - 3x bigger area to show more parcels
+          center: geocodingResult
+            ? [geocodingResult.longitude, geocodingResult.latitude]
+            : [-111.927912, 33.028911], // Default: Anderson Road & Farrell Road intersection
+          zoom: geocodingResult
+            ? getZoomLevel(geocodingResult)
+            : 13  // Default zoom level
         })
 
         // Map instance created, waiting for load event
@@ -228,7 +271,7 @@ const GISMap: React.FC<GISMapProps> = ({
         map.current = null
       }
     }
-  }, [mode])
+  }, [mode, geocodingResult])
 
   // Setup parcel selection mode for Pinal County tax parcels
   const setupParcelSelectMode = async () => {
@@ -427,9 +470,9 @@ const GISMap: React.FC<GISMapProps> = ({
             console.log('🔧 DEBUG: grossac TYPE =', typeof feature.properties?.grossac)
             console.log('🔧 DEBUG: feature.properties.ownernme1 =', feature.properties?.ownernme1)
 
-            // Use composite key: grossac + owner name to ensure uniqueness
-            const parcelId = `${feature.properties?.grossac}_${feature.properties?.ownernme1}`.replace(/[^a-zA-Z0-9_]/g, '_')
-            console.log('🔧 DEBUG: parcelId (composite) =', parcelId)
+            // Use APN (Assessor Parcel Number) as unique identifier
+            const parcelId = feature.properties?.parcelid
+            console.log('🔧 DEBUG: parcelId (APN) =', parcelId)
 
             console.log('🏷️ PARCEL ID FROM FEATURE:', parcelId)
             console.log('🏷️ ALL FEATURE PROPERTIES:', feature.properties)
@@ -456,27 +499,18 @@ const GISMap: React.FC<GISMapProps> = ({
                 if (selectedArray.length > 0) {
                   console.log('✅ Setting selection filters for parcels:', selectedArray)
 
-                  // Create composite filter using both grossac and owner name for unique identification
-                  const compositeFilters = selectedArray.map(compositeId => {
-                    const [grossac, ...ownerParts] = compositeId.split('_')
-                    const ownerName = ownerParts.join(' ').replace(/_/g, ' ')
-                    return ['all',
-                      ['==', 'grossac', Number(grossac)],
-                      ['==', 'ownernme1', ownerName]
-                    ]
-                  })
+                  // Use APN-based filter for unique identification
+                  const filter = selectedArray.length === 1
+                    ? ['==', 'parcelid', selectedArray[0]]
+                    : ['in', 'parcelid', ...selectedArray]
 
-                  const exactFilter = compositeFilters.length === 1
-                    ? compositeFilters[0]
-                    : ['any', ...compositeFilters]
-
-                  console.log('🎯 COMPOSITE FILTER:', exactFilter)
-                  map.current?.setFilter('tax-parcels-selected-fill', exactFilter)
-                  map.current?.setFilter('tax-parcels-selected-stroke', exactFilter)
+                  console.log('🎯 APN FILTER:', filter)
+                  map.current?.setFilter('tax-parcels-selected-fill', filter)
+                  map.current?.setFilter('tax-parcels-selected-stroke', filter)
                 } else {
                   console.log('❌ Clearing selection filters')
-                  map.current?.setFilter('tax-parcels-selected-fill', ['in', 'grossac', ''])
-                  map.current?.setFilter('tax-parcels-selected-stroke', ['in', 'grossac', ''])
+                  map.current?.setFilter('tax-parcels-selected-fill', ['in', 'parcelid', ''])
+                  map.current?.setFilter('tax-parcels-selected-stroke', ['in', 'parcelid', ''])
                 }
 
                 // Update selected parcel details for UI display
@@ -485,23 +519,17 @@ const GISMap: React.FC<GISMapProps> = ({
 
                 if (sourceData && 'features' in sourceData) {
                   Array.from(newSelected).forEach(selectedParcelId => {
-                    console.log('🔍 LOOKING FOR COMPOSITE PARCEL ID:', selectedParcelId)
+                    console.log('🔍 LOOKING FOR APN:', selectedParcelId)
 
-                    // Parse composite ID back to components
-                    const [grossac, ...ownerParts] = selectedParcelId.split('_')
-                    const ownerName = ownerParts.join(' ').replace(/_/g, ' ')
-                    console.log('🔍 PARSED - grossac:', grossac, 'owner:', ownerName)
-
-                    const selectedFeature = sourceData.features.find(f => {
-                      const featureCompositeId = `${f.properties?.grossac}_${f.properties?.ownernme1}`.replace(/[^a-zA-Z0-9_]/g, '_')
-                      return featureCompositeId === selectedParcelId
-                    })
+                    const selectedFeature = sourceData.features.find(f =>
+                      f.properties?.parcelid === selectedParcelId
+                    )
                     console.log('🎯 FOUND FEATURE FOR LOOKUP:', selectedFeature?.properties)
                     if (selectedFeature?.properties) {
                       const parcelDetail = {
-                        PARCELID: selectedFeature.properties.grossac,
+                        PARCELID: selectedFeature.properties.parcelid,  // Use actual APN
                         OWNERNME1: selectedFeature.properties.ownernme1,
-                        SITEADDRESS: selectedFeature.properties.siteaddress,
+                        SITEADDRESS: selectedFeature.properties.siteaddres,  // Corrected field name
                         GROSSAC: selectedFeature.properties.grossac,
                         geometry: selectedFeature.geometry
                       }

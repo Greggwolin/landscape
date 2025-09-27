@@ -82,11 +82,11 @@ async function convertShapefile() {
                 type: "Feature",
                 geometry: transformedGeometry,
                 properties: {
-                    PARCELID: feature.properties.PARCELID,
-                    OBJECTID: feature.properties.OBJECTID,
+                    parcelid: feature.properties.parcelid,  // APN field (corrected case)
+                    objectid: feature.properties.objectid,  // Object ID (corrected case)
                     grossac: feature.properties.grossac,
                     ownernme1: feature.properties.ownernme1,
-                    siteaddress: feature.properties.siteaddress
+                    siteaddres: feature.properties.siteaddres  // Site address (corrected field name)
                 }
             };
 
