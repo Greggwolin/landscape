@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Card,
@@ -13,7 +13,6 @@ import {
   Tab,
   Tabs,
   Collapse,
-  IconButton,
   TextField,
   Table,
   TableBody,
@@ -42,6 +41,7 @@ import {
   Timeline,
   Save as SaveIcon
 } from '@mui/icons-material';
+import { BarChart } from '@mui/x-charts/BarChart';
 import type {
   GrowthRateAssumption,
   GrowthRatesResponse
@@ -212,19 +212,78 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
   };
 
   // Land pricing functions
-  const formatCurrency = (value: number): string => {
-    if (value === 0 || isNaN(value)) return '0';
-    if (value % 1 === 0) {
-      return value.toLocaleString('en-US');
-    }
-    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+const formatCurrency = (value: number): string => {
+  if (value === 0 || isNaN(value)) return '0';
+  if (value % 1 === 0) {
+    return value.toLocaleString('en-US');
+  }
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
   const parseCurrency = (value: string): number => {
     const cleaned = value.replace(/,/g, '');
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? 0 : parsed;
   };
+
+const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '0';
+  return value.toLocaleString('en-US', options);
+};
+
+// Helper function to determine which tabs should be available for an assumption
+const getAvailableTabs = (assumptionId: number, assumptions: GrowthRateAssumption[], customNames: Record<string, string>) => {
+  const baseAssumption = assumptions.find(a => a.id === assumptionId);
+  if (!baseAssumption) return [{ label: 'Custom 1', content: 'custom1' }];
+
+  // Count how many custom sets exist for this category
+  const customSetsInCategory = assumptions.filter(a =>
+    a.category === baseAssumption.category &&
+    a.id !== assumptionId &&
+    a.id > 3 // Only count actual saved custom sets
+  ).length;
+
+  const tabs = [];
+
+  // Always show Custom 1 tab as the first tab (tab 0)
+  const custom1Key = `${assumptionId}-0`;
+  const custom1Name = customNames[custom1Key];
+  if (custom1Name && custom1Name.trim()) {
+    tabs.push({ label: custom1Name, content: 'custom1' });
+  } else {
+    tabs.push({ label: 'Custom 1', content: 'custom1' });
+  }
+
+  // Show Custom 2 tab only if Custom 1 has been saved (we have at least 1 custom set)
+  if (customSetsInCategory >= 1) {
+    const custom2Key = `${assumptionId}-1`;
+    const custom2Name = customNames[custom2Key];
+    if (custom2Name && custom2Name.trim()) {
+      tabs.push({ label: custom2Name, content: 'custom2' });
+    } else {
+      tabs.push({ label: 'Custom 2', content: 'custom2' });
+    }
+  }
+
+  // Show Custom 3 tab only if Custom 2 has been saved (we have at least 2 custom sets)
+  if (customSetsInCategory >= 2) {
+    const custom3Key = `${assumptionId}-2`;
+    const custom3Name = customNames[custom3Key];
+    if (custom3Name && custom3Name.trim()) {
+      tabs.push({ label: custom3Name, content: 'custom3' });
+    } else {
+      tabs.push({ label: 'Custom 3', content: 'custom3' });
+    }
+  }
+
+  return tabs;
+};
+
+const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Record<string, string> = {}): GrowthRateAssumption[] =>
+  (assumptions || []).map(assumption => ({
+    ...assumption,
+    tabs: getAvailableTabs(assumption.id, assumptions || [], customNames)
+  }));
 
   // Function to check if pricing data has changed
   const checkForChanges = (newData: any[]) => {
@@ -292,6 +351,40 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     }
   };
 
+  const activeTypeMap = useMemo(() => {
+    const map = new Map<string, any>();
+    activeLandUseTypes.forEach((type) => {
+      map.set(type.code, type);
+    });
+    return map;
+  }, [activeLandUseTypes]);
+
+  const familyTotals = useMemo(() => {
+    return activeLandUseTypes.reduce((acc, type) => {
+      const familyName = type.family_name || 'Unknown';
+      const acres = Number(type.total_acres ?? type.acres ?? 0);
+      const units = Number(type.total_units ?? type.units ?? 0);
+
+      if (!acc[familyName]) {
+        acc[familyName] = { acres: 0, units: 0 };
+      }
+
+      acc[familyName].acres += acres;
+      acc[familyName].units += units;
+      return acc;
+    }, {} as Record<string, { acres: number; units: number }>);
+  }, [activeLandUseTypes]);
+
+  const familyDistribution = useMemo(() => {
+    return Object.entries(familyTotals)
+      .map(([family, totals]) => ({
+        family,
+        acres: Number(totals.acres ?? 0),
+        units: Number(totals.units ?? 0)
+      }))
+      .sort((a, b) => b.acres - a.acres);
+  }, [familyTotals]);
+
   // Fetch growth rate assumptions from API
   useEffect(() => {
     const fetchAssumptions = async () => {
@@ -315,17 +408,14 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
           throw new Error(data.error);
         }
 
-        // Override tabs to show Custom 1, 2, 3 instead of API tabs
-        const assumptionsWithCustomTabs = (data.assumptions || []).map((assumption: any) => ({
+        // Initially load with basic tab structure, will be updated by useEffect when customNames changes
+        const baseAssumptions = (data.assumptions || []).map((assumption: any) => ({
           ...assumption,
           tabs: [
-            { label: "Custom 1", content: "" },
-            { label: "Custom 2", content: "" },
-            { label: "Custom 3", content: "" }
+            { label: 'Custom 1', content: 'custom1' }
           ]
         }));
-
-        setAssumptions(assumptionsWithCustomTabs);
+        setAssumptions(baseAssumptions);
       } catch (err) {
         console.error('Error fetching growth rate assumptions:', err);
         setError(err instanceof Error ? err.message : 'Failed to load assumptions');
@@ -346,8 +436,13 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       try {
         const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`);
         if (!typesResponse.ok) throw new Error('Failed to load land use types');
-        const types = await typesResponse.json();
-        setActiveLandUseTypes(types);
+        const typesData = await typesResponse.json();
+        const normalizedTypes = (typesData || []).map((type: any) => ({
+          ...type,
+          total_acres: typeof type.total_acres === 'number' ? type.total_acres : Number(type.total_acres) || 0,
+          total_units: typeof type.total_units === 'number' ? type.total_units : Number(type.total_units) || 0
+        }));
+        setActiveLandUseTypes(normalizedTypes);
 
         // Load UOM options
         const uomResponse = await fetch('/api/fin/uoms');
@@ -365,15 +460,17 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
           return acc;
         }, {});
 
-        const mergedPricingData = types.map((type: any) => {
+        const mergedPricingData = normalizedTypes.map((type: any) => {
           const existing = existingPricingMap[type.code];
           return existing ? {
             ...existing,
             type_name: type.name,
+            family_name: type.family_name,
             price_per_unit: parseFloat(existing.price_per_unit) || 0
           } : {
             lu_type_code: type.code,
             type_name: type.name,
+            family_name: type.family_name,
             price_per_unit: 0,
             unit_of_measure: 'LS', // Default to LS UOM code
             inflation_type: 'Global'
@@ -410,6 +507,14 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       }
     }
   }, [assumptions, customNames, customSteps, editingSteps]);
+
+  // Update tabs when custom names change
+  useEffect(() => {
+    if (assumptions.length > 0) {
+      const updatedAssumptions = applyCustomTabs(assumptions, customNames);
+      setAssumptions(updatedAssumptions);
+    }
+  }, [customNames]);
 
   // Navigation warning for unsaved changes
   useEffect(() => {
@@ -466,13 +571,23 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
   const getCustomTabLabel = (assumptionId: number, tabIndex: number, originalLabel: string) => {
     const key = `${assumptionId}-${tabIndex}`;
-    return customNames[key] || originalLabel;
+    const customName = customNames[key];
+
+    // If there's a custom name being edited, show that
+    const editingKey = `${assumptionId}-${tabIndex}`;
+    const editingName = editingNames[editingKey];
+    if (editingName !== undefined) {
+      return editingName || originalLabel;
+    }
+
+    // Otherwise show saved custom name or default
+    return customName || originalLabel;
   };
 
   const isInEditMode = (assumptionId: number) => {
     const tabIndex = cardTabs[assumptionId] || 0;
     const key = `${assumptionId}-${tabIndex}`;
-    // All tabs start in edit mode when first accessed, but can be locked
+    // All custom tabs start in edit mode when first accessed
     return editMode[key] !== false;
   };
 
@@ -487,9 +602,6 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
   const handleClearTab = (assumptionId: number) => {
     const tabIndex = cardTabs[assumptionId] || 0;
-
-    // Don't allow clearing the default tab (tab 0)
-    if (tabIndex === 0) return;
 
     // Clear custom name
     const nameKey = `${assumptionId}-${tabIndex}`;
@@ -509,8 +621,10 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     // Clear all custom step values for this tab
     setCustomSteps(prev => {
       const newSteps = { ...prev };
+      const customKey = `${assumptionId}-${tabIndex}`;
+      delete newSteps[customKey];
       Object.keys(newSteps).forEach(key => {
-        if (key.startsWith(`${assumptionId}-${tabIndex}-`)) {
+        if (key.startsWith(`${customKey}-`)) {
           delete newSteps[key];
         }
       });
@@ -532,7 +646,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     setVisibleRows(prev => {
       const newRows = { ...prev };
       const rowKey = `${assumptionId}-${tabIndex}`;
-      newRows[rowKey] = 1;
+      delete newRows[rowKey];
       return newRows;
     });
 
@@ -547,11 +661,29 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       return newFields;
     });
 
-    // Reset edit mode for this tab
-    setEditMode(prev => ({
+    // Reset edit mode for this tab - set to true (default edit mode for custom tabs)
+    setEditMode(prev => {
+      const newMode = { ...prev };
+      newMode[nameKey] = true;
+      return newMode;
+    });
+
+    // Reset the visible row count to 1 for this tab
+    const visibleKey = `${assumptionId}-${tabIndex}`;
+    setVisibleRows(prev => ({
       ...prev,
-      [nameKey]: true
+      [visibleKey]: 1
     }));
+
+    // Don't switch back to tab 0, keep the user on the current tab but with cleared data
+    // This allows them to immediately start entering new data without having to switch tabs again
+
+    // Reset the tab name to "Add Custom Set"
+    setEditingNames(prev => {
+      const newNames = { ...prev };
+      newNames[nameKey] = '';
+      return newNames;
+    });
   };
 
   const getVisibleRowCount = (assumptionId: number) => {
@@ -831,7 +963,12 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
   const handleSave = async (assumptionId: number) => {
     try {
       const assumption = assumptions.find(a => a.id === assumptionId);
-      if (!assumption) return;
+      if (!assumption) {
+        console.error('Assumption not found for ID:', assumptionId);
+        return;
+      }
+
+      console.log('Saving assumption:', assumption);
 
       const tabIndex = cardTabs[assumptionId] || 0;
       const nameKey = `${assumptionId}-${tabIndex}`;
@@ -845,13 +982,20 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
         }));
       }
 
-      // Build updated steps with only editable values (rate and periods)
-      const updatedSteps = assumption.steps.map((step, stepIndex) => {
-        const rateValue = getStepValue(assumptionId, stepIndex, 'rate', step.rate) || step.rate;
-        const periodsValue = getStepValue(assumptionId, stepIndex, 'periods', step.periods);
+      // Build updated steps from current editing state
+      const updatedSteps = [];
+      const visibleCount = getVisibleRowCount(assumptionId);
+
+      // Ensure we have at least one step
+      const stepCount = Math.max(1, visibleCount);
+
+      for (let stepIndex = 0; stepIndex < stepCount; stepIndex++) {
+        const originalStep = assumption.steps[stepIndex];
+        const rateValue = getStepValue(assumptionId, stepIndex, 'rate', originalStep?.rate || '2.5%');
+        const periodsValue = getStepValue(assumptionId, stepIndex, 'periods', originalStep?.periods || 12);
 
         // Ensure rate is properly formatted with %
-        let formattedRate = step.rate; // Default to original rate
+        let formattedRate = '2.5%'; // Default rate
         if (rateValue && rateValue !== '-' && rateValue !== '') {
           if (typeof rateValue === 'string' && !rateValue.includes('%') && !rateValue.includes('/mo')) {
             const numValue = parseFloat(rateValue);
@@ -861,71 +1005,183 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
           } else {
             formattedRate = rateValue;
           }
+        } else if (originalStep?.rate) {
+          formattedRate = originalStep.rate;
         }
 
-        return {
-          ...step, // Keep all original values
+        const fromPeriod = getCalculatedFromPeriod(assumptionId, stepIndex);
+        const thruPeriod = getCalculatedThruPeriod(assumptionId, stepIndex);
+
+        // Ensure all values are valid for API validation
+        const finalPeriodsValue = periodsValue === 'E' || periodsValue === 'e' ? 'E' : (parseInt(periodsValue) || originalStep?.periods || 12);
+        const finalFromPeriod = typeof fromPeriod === 'number' && fromPeriod > 0 ? fromPeriod : (originalStep?.period || (stepIndex === 0 ? 1 : 1));
+        const finalThruPeriod = typeof thruPeriod === 'number' && thruPeriod > 0 ? thruPeriod : (originalStep?.thru || (stepIndex === 0 ? 12 : 12));
+
+        const step = {
+          step: stepIndex + 1,
+          period: finalFromPeriod,
           rate: formattedRate,
-          periods: (() => {
-            const val = periodsValue;
-            return val === 'E' || val === 'e' ? 'E' : (parseInt(val) || step.periods);
-          })()
+          periods: finalPeriodsValue,
+          thru: finalThruPeriod
         };
-      });
 
-      const requestBody = {
-        id: assumptionId,
-        projectId,
-        globalRate: assumption.globalRate,
-        steps: updatedSteps,
-        impact: assumption.impact
-      };
+        // Only add optional fields if they exist
+        if (originalStep?.product) step.product = originalStep.product;
+        if (originalStep?.timing) step.timing = originalStep.timing;
 
-      console.log('Saving assumption:', requestBody);
-      console.log('Original assumption:', assumption);
-      console.log('Updated steps:', updatedSteps);
-
-      const response = await fetch('/api/assumptions/growth-rates', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Save failed:', response.status, response.statusText, errorData);
-        throw new Error(`Failed to save assumption: ${response.status} ${response.statusText}`);
+        updatedSteps.push(step);
       }
 
-      // Refresh data
-      const url = projectId
-        ? `/api/assumptions/growth-rates?project_id=${projectId}`
-        : '/api/assumptions/growth-rates';
+      console.log('Built steps for API:', updatedSteps);
 
-      const fetchResponse = await fetch(url);
-      const data = await fetchResponse.json();
+      // All tabs are now custom tabs, so always save to API as a new assumption
+      const customName = currentName?.trim() || getCustomTabLabel(assumptionId, tabIndex, `Custom ${tabIndex + 1}`);
 
-      // Override tabs to show Custom 1, 2, 3 instead of API tabs
-      const assumptionsWithCustomTabs = (data.assumptions || []).map((assumption: any) => ({
-        ...assumption,
-        tabs: [
-          { label: "Custom 1", content: "" },
-          { label: "Custom 2", content: "" },
-          { label: "Custom 3", content: "" }
-        ]
-      }));
+        try {
+          // Ensure all required fields have proper defaults
+          const requestData = {
+            projectId,
+            category: assumption.category || 'DEVELOPMENT_COSTS',
+            name: customName,
+            globalRate: assumption.globalRate || '0%',
+            steps: updatedSteps || [],
+            impact: assumption.impact || {
+              dollarAmount: "$0",
+              percentOfProject: "0%",
+              irrImpact: "0"
+            }
+          };
 
-      setAssumptions(assumptionsWithCustomTabs);
+          console.log('Sending POST request with data:', requestData);
 
-      // Lock the custom set after saving
-      const savedTabIndex = cardTabs[assumptionId] || 0;
-      const editKey = `${assumptionId}-${savedTabIndex}`;
-      setEditMode(prev => ({
-        ...prev,
-        [editKey]: false
-      }));
+          const response = await fetch('/api/assumptions/growth-rates', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Create failed:', response.status, response.statusText, errorData);
+            // Try to parse error data as JSON for better error reporting
+            try {
+              const errorJson = JSON.parse(errorData);
+              throw new Error(`Failed to create assumption: ${errorJson.error} - ${errorJson.details || ''}`);
+            } catch {
+              throw new Error(`Failed to create assumption: ${response.status} ${response.statusText} - ${errorData}`);
+            }
+          }
+
+          // Refresh data to show the new assumption
+          const url = projectId
+            ? `/api/assumptions/growth-rates?project_id=${projectId}`
+            : '/api/assumptions/growth-rates';
+
+          const fetchResponse = await fetch(url);
+          const data = await fetchResponse.json();
+          setAssumptions(applyCustomTabs(data.assumptions, customNames));
+
+          // Update the tab label to show the saved name
+          const tabIndex = cardTabs[assumptionId] || 0;
+          const nameKey = `${assumptionId}-${tabIndex}`;
+          setCustomNames(prev => ({
+            ...prev,
+            [nameKey]: customName
+          }));
+
+          // Clear the editing state for this tab
+          setEditingNames(prev => {
+            const newNames = { ...prev };
+            delete newNames[nameKey];
+            return newNames;
+          });
+
+          // Clear editing steps for this tab
+          setEditingSteps(prev => {
+            const newState = { ...prev };
+            Object.keys(newState).forEach(key => {
+              if (key.startsWith(`${assumptionId}-${tabIndex}-`)) {
+                delete newState[key];
+              }
+            });
+            return newState;
+          });
+
+          // Reset edit mode for this tab
+          const editKey = `${assumptionId}-${tabIndex}`;
+          setEditMode(prev => ({
+            ...prev,
+            [editKey]: false
+          }));
+
+          // Show success message
+          alert(`Successfully saved "${customName}" as a new assumption set!`);
+
+        } catch (apiError) {
+          console.error('Failed to save custom tab to API:', apiError);
+          // Fall back to local storage for custom tabs
+          const customKey = `${assumptionId}-${tabIndex}`;
+
+          if (currentName && currentName.trim()) {
+            setCustomNames(prev => ({
+              ...prev,
+              [customKey]: currentName.trim()
+            }));
+          }
+
+          setCustomSteps(prev => ({
+            ...prev,
+            [customKey]: updatedSteps
+          }));
+
+          setVisibleRows(prev => ({
+            ...prev,
+            [customKey]: updatedSteps.length || 1
+          }));
+        }
+
+      // Show success message
+      alert(`Successfully saved "${customName}" as a new custom set!`);
+        console.log('Creating project-specific version of default assumption');
+
+        const createRequestData = {
+          projectId,
+          category: assumption.category || 'DEVELOPMENT_COSTS',
+          name: assumption.name || 'Custom Growth Rate',
+          globalRate: assumption.globalRate || '0%',
+          steps: updatedSteps || [],
+          impact: assumption.impact || {
+            dollarAmount: "$0",
+            percentOfProject: "0%",
+            irrImpact: "0"
+          }
+        };
+
+        console.log('Creating default assumption with data:', createRequestData);
+
+        const createResponse = await fetch('/api/assumptions/growth-rates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createRequestData)
+        });
+
+        if (!createResponse.ok) {
+          const errorData = await createResponse.text();
+          console.error('Create failed:', createResponse.status, createResponse.statusText, errorData);
+          try {
+            const errorJson = JSON.parse(errorData);
+            throw new Error(`Failed to create assumption: ${errorJson.error} - ${errorJson.details || ''}`);
+          } catch {
+            throw new Error(`Failed to create assumption: ${createResponse.status} ${createResponse.statusText} - ${errorData}`);
+          }
+        }
+
+      // Show success message - simplified for now
+      alert(`Successfully saved changes!`);
 
     } catch (err) {
       console.error('Error saving assumption:', err);
@@ -937,24 +1193,152 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
     const assumption = assumptions.find(a => a.id === assumptionId);
     if (!assumption) return;
 
-    const customAssumptions = assumptions.filter(a => a.category === assumption.category);
-    const isLastCustom = customAssumptions.length === 1;
+    const activeTabIndex = cardTabs[assumptionId] || 0;
 
-    const confirmMessage = isLastCustom
-      ? `Are you sure you want to delete "${assumption.name}"? This is the only custom rate for this category. The Global Rate will be inherited to all items subject to this rate.`
-      : `Are you sure you want to delete "${assumption.name}"?`;
+    // Since all tabs are now custom tabs, we can clear any tab
+    // But distinguish between clearing unsaved custom tabs vs deleting actual saved sets
+    const tabLabel = getCustomTabLabel(assumptionId, activeTabIndex, `Custom ${activeTabIndex + 1}`);
+
+    // Check if this is a saved custom set (separate card) vs an unsaved custom tab
+    const isCustomSet = assumptionId > 3;
+    const isDefaultAssumption = assumptionId <= 3;
+
+    if (!isCustomSet && !isDefaultAssumption) {
+      // This is an unsaved custom tab, just clear it
+      if (window.confirm(`Clear ${tabLabel}? This will remove any unsaved values.`)) {
+        handleClearTab(assumptionId);
+      }
+      return;
+    }
+
+    let confirmMessage;
+    if (isDefaultAssumption) {
+      confirmMessage = `"${assumption.name}" is a default assumption and cannot be deleted. This will reset it to default values.`;
+    } else if (isCustomSet) {
+      confirmMessage = `Are you sure you want to delete the custom set "${assumption.name}"? This action cannot be undone.`;
+    } else {
+      const customAssumptions = assumptions.filter(a => a.category === assumption.category);
+      const isLastCustom = customAssumptions.length === 1;
+      confirmMessage = isLastCustom
+        ? `Are you sure you want to delete "${assumption.name}"? This is the only custom rate for this category. The Global Rate will be inherited to all items subject to this rate.`
+        : `Are you sure you want to delete "${assumption.name}"?`;
+    }
 
     if (window.confirm(confirmMessage)) {
       try {
-        const response = await fetch(`/api/assumptions/growth-rates?id=${assumptionId}`, {
-          method: 'DELETE',
+        console.log('Attempting to delete assumption with ID:', assumptionId);
+
+        // For default assumptions, we might get a 404 since they don't exist in the database
+        // For custom sets (ID > 3), we need to actually delete them from the database
+        if (isCustomSet || (!isDefaultAssumption && assumptionId > 3)) {
+          const response = await fetch(`/api/assumptions/growth-rates?id=${assumptionId}`, {
+            method: 'DELETE',
+          });
+
+          console.log('Delete response status:', response.status);
+
+          if (response.status === 404) {
+            console.warn('Assumption not found in database, treating as successful delete');
+          } else if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Delete failed:', response.status, response.statusText, errorData);
+            // Try to parse error data as JSON for better error reporting
+            try {
+              const errorJson = JSON.parse(errorData);
+              throw new Error(`Failed to delete assumption: ${errorJson.error} - ${errorJson.details || ''}`);
+            } catch {
+              throw new Error(`Failed to delete assumption: ${response.status} ${response.statusText} - ${errorData}`);
+            }
+          }
+        } else {
+          console.log('Skipping API delete for default assumption, will refresh data to reset to defaults');
+        }
+
+        console.log('Delete operation successful, clearing local state');
+
+        // Clear all local state for this assumption
+        setExpandedCards(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(assumptionId);
+          return newSet;
         });
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Delete failed:', response.status, response.statusText, errorData);
-          throw new Error(`Failed to delete assumption: ${response.status} ${response.statusText}`);
-        }
+        setCardTabs(prev => {
+          const newTabs = { ...prev };
+          delete newTabs[assumptionId];
+          return newTabs;
+        });
+
+        // Clear all custom data for this assumption
+        setCustomNames(prev => {
+          const newNames = { ...prev };
+          Object.keys(newNames).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newNames[key];
+            }
+          });
+          return newNames;
+        });
+
+        setEditingNames(prev => {
+          const newNames = { ...prev };
+          Object.keys(newNames).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newNames[key];
+            }
+          });
+          return newNames;
+        });
+
+        setCustomSteps(prev => {
+          const newSteps = { ...prev };
+          Object.keys(newSteps).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newSteps[key];
+            }
+          });
+          return newSteps;
+        });
+
+        setEditingSteps(prev => {
+          const newSteps = { ...prev };
+          Object.keys(newSteps).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newSteps[key];
+            }
+          });
+          return newSteps;
+        });
+
+        setVisibleRows(prev => {
+          const newRows = { ...prev };
+          Object.keys(newRows).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newRows[key];
+            }
+          });
+          return newRows;
+        });
+
+        setFocusedFields(prev => {
+          const newFields = { ...prev };
+          Object.keys(newFields).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newFields[key];
+            }
+          });
+          return newFields;
+        });
+
+        setEditMode(prev => {
+          const newMode = { ...prev };
+          Object.keys(newMode).forEach(key => {
+            if (key.startsWith(`${assumptionId}-`)) {
+              delete newMode[key];
+            }
+          });
+          return newMode;
+        });
 
         // Refresh data
         const url = projectId
@@ -963,7 +1347,16 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
         const fetchResponse = await fetch(url);
         const data = await fetchResponse.json();
-        setAssumptions(data.assumptions || []);
+        setAssumptions(applyCustomTabs(data.assumptions, customNames));
+
+        // Show success message
+        if (isDefaultAssumption) {
+          alert(`Successfully reset "${assumption.name}" to default values!`);
+        } else if (isCustomSet) {
+          alert(`Successfully deleted custom set "${assumption.name}"!`);
+        } else {
+          alert(`Successfully deleted "${assumption.name}"!`);
+        }
 
       } catch (err) {
         console.error('Error deleting assumption:', err);
@@ -1012,7 +1405,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       <ThemeProvider theme={materioTheme}>
         <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default', p: 4 }}>
           <Typography variant="h4" sx={{ mb: 4, color: 'primary.main', fontWeight: 600 }}>
-            Growth Rates / Inflation
+            Market Rates & Prices
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
             <Typography variant="body1" color="text.secondary">
@@ -1020,6 +1413,9 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
             </Typography>
           </Box>
         </Box>
+
+
+
       </ThemeProvider>
     );
   }
@@ -1029,7 +1425,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
       <ThemeProvider theme={materioTheme}>
         <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default', p: 4 }}>
           <Typography variant="h4" sx={{ mb: 4, color: 'primary.main', fontWeight: 600 }}>
-            Growth Rates / Inflation
+            Market Rates & Prices
           </Typography>
           <Card>
             <CardContent>
@@ -1059,44 +1455,48 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
           fontWeight: 600,
           fontSize: { xs: '1.25rem', md: '1.5rem' }
         }}>
-          Growth Rates / Inflation
+          Market Rates & Prices
         </Typography>
 
         <Card sx={{ p: { xs: 2, md: 3 }, mb: { xs: 2, md: 3 } }}>
           <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-            Core Growth & Inflation Assumptions
+            Inflation, Growth & Absorption Rates
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            ARGUS-style step-based growth assumptions driving project economics.
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
           </Typography>
         </Card>
 
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '400px 1fr' },
-          gap: { xs: 2, md: 3 }
-        }}>
-          {/* Left Column - Enhanced Assumption Cards */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, md: 2 } }}>
-            {assumptions.map((assumption) => {
-              const { color, icon: IconComponent, name, description } = getCategoryInfo(assumption.category);
-              const isExpanded = expandedCards.has(assumption.id);
-              
-              return (
-                <Card key={assumption.id} sx={{
-                  transition: 'all 0.3s ease-in-out',
-                  cursor: 'pointer',
-                  minHeight: 120, // Ensure consistent card heights
-                  '&:hover': {
-                    transform: 'translateY(-1px)',
-                    boxShadow: 3
-                  },
-                  ...(isExpanded && {
-                    boxShadow: 4,
-                    borderColor: color + '40',
-                    transform: 'translateY(-2px)'
-                  })
-                }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'repeat(3, minmax(0, 1fr))'
+            },
+            gap: { xs: 2, md: 3 },
+            mb: { xs: 2, md: 3 }
+          }}
+        >
+          {assumptions.map((assumption) => {
+            const { color, icon: IconComponent, name } = getCategoryInfo(assumption.category);
+            const isExpanded = expandedCards.has(assumption.id);
+
+            return (
+              <Card key={assumption.id} sx={{
+                transition: 'all 0.3s ease-in-out',
+                cursor: 'pointer',
+                minHeight: 120, // Ensure consistent card heights
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: 3
+                },
+                ...(isExpanded && {
+                  boxShadow: 4,
+                  borderColor: color + '40',
+                  transform: 'translateY(-2px)'
+                })
+              }}>
                   <CardContent
                     sx={{
                       py: { xs: 1.5, md: 2 },
@@ -1437,73 +1837,98 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                 </Card>
               );
             })}
-          </Box>
+        </Box>
 
-          {/* Right Column - Land Pricing Card */}
-          <Box>
-            {/* Land Pricing Section */}
-            <Card>
-              <CardHeader
-                title="Current Land Pricing"
-                action={
-                  !landPricingLoading && activeLandUseTypes.length > 0 && hasUnsavedChanges && (
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={landPricingSaving ? <CircularProgress size={16} /> : <SaveIcon />}
-                      onClick={savePricingData}
-                      disabled={landPricingSaving}
-                      sx={{ textTransform: 'none', fontWeight: 500 }}
-                    >
-                      {landPricingSaving ? 'Saving...' : 'Save'}
-                    </Button>
-                  )
-                }
-              />
-              <CardContent>
-                {landPricingLoading && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                )}
+        {/* Land Pricing Section */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'repeat(12, minmax(0, 1fr))'
+            },
+            gap: { xs: 2, md: 3 },
+            alignItems: 'flex-start',
+            mb: { xs: 2, md: 3 }
+          }}
+        >
+          <Card
+            sx={{
+              gridColumn: {
+                xs: '1 / -1',
+                md: '1 / span 8'
+              }
+            }}
+          >
+            <CardHeader
+              title="Current Land Pricing"
+              action={
+                !landPricingLoading && activeLandUseTypes.length > 0 && hasUnsavedChanges && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={landPricingSaving ? <CircularProgress size={16} /> : <SaveIcon />}
+                    onClick={savePricingData}
+                    disabled={landPricingSaving}
+                    sx={{ textTransform: 'none', fontWeight: 500 }}
+                  >
+                    {landPricingSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                )
+              }
+            />
+            <CardContent>
+              {landPricingLoading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              )}
 
-                {landPricingError && (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {landPricingError}
+              {landPricingError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {landPricingError}
+                </Alert>
+              )}
+
+              {!landPricingLoading && activeLandUseTypes.length === 0 && (
+                <Box>
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    Pricing Requires at least 1 Project Parcel
                   </Alert>
-                )}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={navigateToPlanning}
+                    startIcon={<Chip label="Planning" size="small" />}
+                  >
+                    Go to Planning
+                  </Button>
+                </Box>
+              )}
 
-                {!landPricingLoading && activeLandUseTypes.length === 0 && (
-                  <Box>
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                      Pricing Requires at least 1 Project Parcel
-                    </Alert>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={navigateToPlanning}
-                      startIcon={<Chip label="Planning" size="small" />}
-                    >
-                      Go to Planning
-                    </Button>
-                  </Box>
-                )}
+              {!landPricingLoading && activeLandUseTypes.length > 0 && (
+                <TableContainer component={Paper} sx={{ mt: 2, border: '1px solid', borderColor: 'divider' }}>
+                  <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, px: 1 } }}>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: 'rgba(138, 141, 147, 0.16)' }}>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000' }}>Family</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000' }}>Description</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000' }}>LU Code</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'right' }}>Acres</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'right' }}>Units</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'right' }}>$/Unit</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center' }}>Unit</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center' }}>Inflate</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pricingData.map((item, index) => {
+                        const typeInfo = activeTypeMap.get(item.lu_type_code) || {};
+                        const familyName = typeInfo?.family_name || item.family_name || 'Unknown';
+                        const familyTotal = familyTotals[familyName] || { acres: 0, units: 0 };
+                        const chipStyles = getChipColor(familyName);
 
-                {!landPricingLoading && activeLandUseTypes.length > 0 && (
-                  <TableContainer component={Paper} sx={{ mt: 2, border: '1px solid', borderColor: 'divider' }}>
-                    <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, px: 1 } }}>
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: 'rgba(138, 141, 147, 0.16)' }}>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '20%' }}>Family</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '30%' }}>Description</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', width: '12%' }}>LU Code</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'right', width: '20%' }}>$/Unit</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center', width: '9%' }}>Unit</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#000000', textAlign: 'center', width: '9%' }}>Inflate</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {pricingData.map((item, index) => (
+                        return (
                           <TableRow
                             key={item.lu_type_code || index}
                             sx={{
@@ -1513,10 +1938,10 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                           >
                             <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
                               <Chip
-                                label={activeLandUseTypes.find(t => t.code === item.lu_type_code)?.family_name || 'Unknown'}
+                                label={familyName}
                                 size="small"
                                 sx={{
-                                  ...getChipColor(activeLandUseTypes.find(t => t.code === item.lu_type_code)?.family_name || ''),
+                                  ...chipStyles,
                                   fontWeight: 600,
                                   fontSize: '0.7rem',
                                   height: '20px',
@@ -1526,12 +1951,22 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                             </TableCell>
                             <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
                               <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                {item.type_name || activeLandUseTypes.find(t => t.code === item.lu_type_code)?.name || ''}
+                                {item.type_name || typeInfo?.name || ''}
                               </Typography>
                             </TableCell>
                             <TableCell sx={{ py: 0.5 }} tabIndex={-1}>
                               <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
                                 {item.lu_type_code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'right', py: 0.5 }} tabIndex={-1}>
+                              <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                {formatNumber(familyTotal.acres, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'right', py: 0.5 }} tabIndex={-1}>
+                              <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                {formatNumber(familyTotal.units, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                               </Typography>
                             </TableCell>
                             <TableCell sx={{ textAlign: 'right', py: 0.5 }}>
@@ -1598,132 +2033,169 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
                               </FormControl>
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+          {familyDistribution.length > 0 && (
+            <Card
+              sx={{
+                gridColumn: {
+                  xs: '1 / -1',
+                  md: '9 / span 4'
+                }
+              }}
+            >
+              <CardHeader
+                title="Land Use Distribution"
+                subheader="Acres vs Units"
+              />
+              <CardContent>
+                <BarChart
+                  height={320}
+                  dataset={familyDistribution}
+                  xAxis={[{
+                    scaleType: 'band',
+                    dataKey: 'family',
+                    tickPlacement: 'middle',
+                    tickLabelStyle: {
+                      fontSize: 12,
+                      angle: familyDistribution.length > 4 ? -35 : 0,
+                      textAnchor: familyDistribution.length > 4 ? 'end' : 'middle'
+                    }
+                  }]}
+                  series={[
+                    { dataKey: 'acres', label: 'Acres', color: '#7367f0' },
+                    { dataKey: 'units', label: 'Units', color: '#28c76f' }
+                  ]}
+                  margin={{ top: 16, right: 16, bottom: 70, left: 50 }}
+                />
               </CardContent>
             </Card>
+          )}
 
-            {/* Analysis Impact Cards (shown when button is clicked) */}
-            {assumptions.map((assumption) => {
-              const { color, name } = getCategoryInfo(assumption.category);
-              const showImpact = showAnalysisImpact[assumption.id];
+        </Box>
 
-              if (!showImpact) return null;
+        {/* Analysis Impact Cards (shown when button is clicked) */}
+        {assumptions.map((assumption) => {
+          const { color, name } = getCategoryInfo(assumption.category);
+          const showImpact = showAnalysisImpact[assumption.id];
 
-              return (
-                <Card key={assumption.id} sx={{
-                  mt: 2,
-                  transition: 'all 0.3s ease-in-out',
-                  boxShadow: 4,
-                  borderColor: color + '40',
-                  border: `2px solid ${color}40`
-                }}>
-                  <CardContent>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{
-                        fontWeight: 600,
+          if (!showImpact) return null;
+
+          return (
+            <Card key={assumption.id} sx={{
+              mt: 2,
+              transition: 'all 0.3s ease-in-out',
+              boxShadow: 4,
+              borderColor: color + '40',
+              border: `2px solid ${color}40`
+            }}>
+              <CardContent>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{
+                    fontWeight: 600,
+                    fontSize: '0.875rem'
+                  }}>
+                    Analysis Impact - {name}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => toggleAnalysisImpact(assumption.id)}
+                    sx={{
+                      borderColor: color,
+                      color: color,
+                      fontSize: '0.7rem',
+                      textTransform: 'none',
+                      height: 24
+                    }}
+                  >
+                    Close
+                  </Button>
+                </Stack>
+
+                {/* Impact Metrics */}
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  {[
+                    { label: '$ Amount', value: assumption.impact.dollarAmount, color: 'text.primary' },
+                    { label: '% of Project', value: assumption.impact.percentOfProject, color: color },
+                    {
+                      label: 'IRR Impact',
+                      value: `${assumption.impact.irrImpact} bps`,
+                      color: assumption.impact.irrImpact.startsWith('+') ? '#28c76f' : '#ea5455'
+                    }
+                  ].map((metric, idx) => (
+                    <Box key={idx} sx={{
+                      flex: 1,
+                      textAlign: 'center',
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: `1px solid ${metric.color}20`,
+                      backgroundColor: `${metric.color}10`
+                    }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                        {metric.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{
+                        fontWeight: 'bold',
+                        color: metric.color,
                         fontSize: '0.875rem'
                       }}>
-                        Analysis Impact - {name}
+                        {metric.value}
                       </Typography>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => toggleAnalysisImpact(assumption.id)}
-                        sx={{
-                          borderColor: color,
-                          color: color,
-                          fontSize: '0.7rem',
-                          textTransform: 'none',
-                          height: 24
-                        }}
-                      >
-                        Close
-                      </Button>
-                    </Stack>
-
-                    {/* Impact Metrics */}
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                      {[
-                        { label: '$ Amount', value: assumption.impact.dollarAmount, color: 'text.primary' },
-                        { label: '% of Project', value: assumption.impact.percentOfProject, color: color },
-                        {
-                          label: 'IRR Impact',
-                          value: `${assumption.impact.irrImpact} bps`,
-                          color: assumption.impact.irrImpact.startsWith('+') ? '#28c76f' : '#ea5455'
-                        }
-                      ].map((metric, idx) => (
-                        <Box key={idx} sx={{
-                          flex: 1,
-                          textAlign: 'center',
-                          p: 1.5,
-                          borderRadius: 1,
-                          border: `1px solid ${metric.color}20`,
-                          backgroundColor: `${metric.color}10`
-                        }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            {metric.label}
-                          </Typography>
-                          <Typography variant="body2" sx={{
-                            fontWeight: 'bold',
-                            color: metric.color,
-                            fontSize: '0.875rem'
-                          }}>
-                            {metric.value}
-                          </Typography>
-                        </Box>
-                      ))}
                     </Box>
+                  ))}
+                </Box>
 
-                    {/* Impact Visualization */}
-                    <Stack spacing={1.5}>
-                      {[
-                        {
-                          icon: Analytics,
-                          title: 'Sensitivity Chart',
-                          subtitle: 'IRR vs Rate Change',
-                          height: 80
-                        },
-                        {
-                          icon: Timeline,
-                          title: 'Timeline Impact',
-                          subtitle: 'Cash Flow Effect',
-                          height: 60
-                        }
-                      ].map((chart, idx) => (
-                        <Paper
-                          key={idx}
-                          variant="outlined"
-                          sx={{
-                            height: chart.height,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderStyle: 'dashed',
-                            bgcolor: 'grey.50'
-                          }}
-                        >
-                          <Box textAlign="center">
-                            <chart.icon sx={{ color: 'text.disabled', mb: 0.5 }} />
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'block' }}>
-                              {chart.title}
-                            </Typography>
-                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
-                              {chart.subtitle}
-                            </Typography>
-                          </Box>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </Box>
-        </Box>
+                {/* Impact Visualization */}
+                <Stack spacing={1.5}>
+                  {[
+                    {
+                      icon: Analytics,
+                      title: 'Sensitivity Chart',
+                      subtitle: 'IRR vs Rate Change',
+                      height: 80
+                    },
+                    {
+                      icon: Timeline,
+                      title: 'Timeline Impact',
+                      subtitle: 'Cash Flow Effect',
+                      height: 60
+                    }
+                  ].map((chart, idx) => (
+                    <Paper
+                      key={idx}
+                      variant="outlined"
+                      sx={{
+                        height: chart.height,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderStyle: 'dashed',
+                        bgcolor: 'grey.50'
+                      }}
+                    >
+                      <Box textAlign="center">
+                        <chart.icon sx={{ color: 'text.disabled', mb: 0.5 }} />
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'block' }}>
+                          {chart.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                          {chart.subtitle}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })}
 
       </Box>
     </ThemeProvider>

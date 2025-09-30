@@ -52,17 +52,17 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Assumptions',
       items: [
-        { id: 'acquisition', label: 'Acquisition', icon: '🏡' },
         { id: 'market', label: 'Global', icon: '🧮' },
-        { id: 'growth-rates', label: 'Growth Rates', icon: '📊' },
-        { id: 'project-costs', label: 'Project Costs', icon: '💰' },
+        { id: 'growth-rates', label: 'Market Rates & Prices', icon: '📊' },
         { id: 'project-revenues', label: 'Project Revenues', icon: '📈' }
       ],
       isCollapsible: true
     },
     {
-      title: 'Development',
+      title: 'Budgets',
       items: [
+        { id: 'acquisition', label: 'Acquisition', icon: '🏡' },
+        { id: 'project-costs', label: 'Project Costs', icon: '💰' },
         { id: 'entitlements', label: 'Stage 1 - Entitlements', icon: '📋' },
         { id: 'engineering', label: 'Stage 2 - Engineering', icon: '⚙️' },
         { id: 'development', label: 'Stage 3 - Development', icon: '🏗️' },

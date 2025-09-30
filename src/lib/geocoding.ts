@@ -13,6 +13,19 @@ export interface GeocodingResult {
   }
 }
 
+export interface ReverseGeocodingResult {
+  city?: string
+  county?: string
+  state?: string
+  country?: string
+  confidence: number
+  source: 'nominatim' | 'cache'
+  coordinates: {
+    latitude: number
+    longitude: number
+  }
+}
+
 // Known locations for faster lookup (can be expanded)
 const KNOWN_LOCATIONS: Record<string, GeocodingResult> = {
   // Red Valley area - Anderson and Farrell Roads intersection in Maricopa, AZ
@@ -153,4 +166,55 @@ export function getZoomLevel(result: GeocodingResult): number {
   if (result.confidence > 0.6) return 14  // Medium confidence
   if (result.confidence > 0.4) return 12  // Lower confidence
   return 10 // Very low confidence - stay zoomed out
+}
+
+/**
+ * Reverse geocoding: converts coordinates to city/county/state information
+ */
+export async function reverseGeocode(latitude: number, longitude: number): Promise<ReverseGeocodingResult | null> {
+  console.log(`🔄 Reverse geocoding coordinates: ${latitude}, ${longitude}`)
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Landscape-GIS-App/1.0'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Nominatim reverse API error: ${response.status}`)
+    }
+
+    const result = await response.json()
+
+    if (result && result.address) {
+      const address = result.address
+
+      // Extract jurisdiction information
+      const city = address.city || address.town || address.village || address.hamlet || ''
+      const county = address.county || ''
+      const state = address.state || ''
+      const country = address.country || ''
+
+      console.log(`✅ Reverse geocoding result:`, { city, county, state, country })
+
+      return {
+        city,
+        county,
+        state,
+        country,
+        confidence: result.importance || 0.5,
+        source: 'nominatim',
+        coordinates: { latitude, longitude }
+      }
+    }
+
+    console.log('❌ No reverse geocoding results found')
+    return null
+  } catch (error) {
+    console.error('Reverse geocoding error:', error)
+    return null
+  }
 }

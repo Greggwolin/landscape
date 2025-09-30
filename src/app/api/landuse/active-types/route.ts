@@ -19,7 +19,12 @@ export async function GET(request: Request) {
     try {
       // First get the unique type codes from parcels with counts
       const parcelTypes = await sql`
-        SELECT type_code, family_name, COUNT(*) as parcel_count
+        SELECT
+          type_code,
+          family_name,
+          COUNT(*) as parcel_count,
+          SUM(COALESCE(acres_gross, 0))::float AS total_acres,
+          SUM(COALESCE(units_total, 0))::float AS total_units
         FROM landscape.tbl_parcel
         WHERE project_id = ${projectId}
         AND type_code IS NOT NULL
@@ -89,7 +94,9 @@ export async function GET(request: Request) {
           code: parcel.type_code,
           name: displayName,
           family_name: familyName,
-          parcel_count: parcel.parcel_count
+          parcel_count: parcel.parcel_count,
+          total_acres: Number(parcel.total_acres) || 0,
+          total_units: Number(parcel.total_units) || 0
         });
       }
 

@@ -302,11 +302,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <th className="text-left px-2 py-2 font-medium text-gray-300">{level2Label}</th>
                 <th className="text-left px-2 py-2 font-medium text-gray-300">{level3Label} ID</th>
                 <th className="text-center px-2 py-2 font-medium text-gray-300">Use Family</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Use Code</th>
+                <th className="text-center px-2 py-2 font-medium text-gray-300">Use Type</th>
                 <th className="text-center px-2 py-2 font-medium text-gray-300">Product</th>
                 <th className="text-center px-2 py-2 font-medium text-gray-300">Acres</th>
                 <th className="text-center px-2 py-2 font-medium text-gray-300">Units</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Efficiency</th>
                 <th className="text-center px-2 py-2 font-medium text-gray-300">Actions</th>
               </tr>
             </thead>
@@ -388,42 +387,40 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 // Inline-editable parcel row
 const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; getFamilyName: (parcel: Parcel) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, getFamilyName, projectId }) => {
   const [editing, setEditing] = useState(false)
-  const [codes, setCodes] = useState<{ landuse_code: string; name: string; family_id?: string; subtype_id?: string }[]>([])
+  const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
-  const [subtypes, setSubtypes] = useState<{ subtype_id: string; family_id: string; name: string }[]>([])
+  const [types, setTypes] = useState<{ type_id: string; family_id: string; name: string }[]>([])
   const [selectedFamily, setSelectedFamily] = useState<string>('')
-  const [selectedSubtype, setSelectedSubtype] = useState<string>('')
+  const [selectedType, setSelectedType] = useState<string>('')
   const [draft, setDraft] = useState({
-    usecode: parcel.usecode ?? '',
     product: parcel.product ?? '',
     acres: parcel.acres ?? 0,
     units: parcel.units ?? 0,
-    efficiency: parcel.efficiency ?? 0,
     frontfeet: parcel.frontfeet ?? 0,
   })
 
-  const normalizeCodes = (input: unknown): { landuse_code: string; name: string; family_id?: string; subtype_id?: string }[] => {
+  const normalizeProducts = (input: unknown): { product_id: string; code: string; name?: string; subtype_id?: string }[] => {
     if (!Array.isArray(input)) return []
     return input
       .map(entry => {
         if (typeof entry !== 'object' || entry === null) return null
         const record = entry as Record<string, unknown>
-        const codeValue = record.landuse_code ?? record.code
-        if (typeof codeValue !== 'string') return null
-        const landuse_code = codeValue.trim()
-        if (!landuse_code) return null
-        const nameValue = record.name ?? record.display_name
-        const name = typeof nameValue === 'string' && nameValue.trim().length > 0 ? nameValue : landuse_code
-        const familyVal = record.family_id
+        const productIdValue = record.product_id
+        const codeValue = record.code
+        const nameValue = record.name
+        if (productIdValue == null || typeof codeValue !== 'string') return null
+        const product_id = String(productIdValue)
+        const code = codeValue.trim()
+        if (!product_id || !code) return null
         const subtypeVal = record.subtype_id
         return {
-          landuse_code,
-          name,
-          family_id: familyVal != null ? String(familyVal) : undefined,
+          product_id,
+          code,
+          name: typeof nameValue === 'string' ? nameValue.trim() : undefined,
           subtype_id: subtypeVal != null ? String(subtypeVal) : undefined
         }
       })
-      .filter(value => value !== null) as { landuse_code: string; name: string; family_id?: string; subtype_id?: string }[]
+      .filter(value => value !== null) as { product_id: string; code: string; name?: string; subtype_id?: string }[]
   }
 
   const normalizeFamilies = (input: unknown): { family_id: string; name: string }[] => {
@@ -443,46 +440,126 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
       .filter((value): value is { family_id: string; name: string } => Boolean(value))
   }
 
-  const normalizeSubtypes = (input: unknown): { subtype_id: string; family_id: string; name: string }[] => {
+  const normalizeTypes = (input: unknown): { type_id: string; family_id: string; name: string }[] => {
     if (!Array.isArray(input)) return []
     return input
       .map(entry => {
         if (typeof entry !== 'object' || entry === null) return null
         const record = entry as Record<string, unknown>
-        const subtypeValue = record.subtype_id ?? record.id
-        const familyValue = record.family_id ?? record.family
-        const nameValue = record.name ?? record.subtype_name ?? record.code
-        if (subtypeValue == null || familyValue == null || typeof nameValue !== 'string') return null
-        const subtype_id = String(subtypeValue)
-        const family_id = String(familyValue)
-        const name = nameValue.trim()
-        if (!subtype_id || !family_id || !name) return null
-        return { subtype_id, family_id, name }
+        const typeValue = record.type_id ?? record.subtype_id
+        const familyValue = record.family_id
+        const nameValue = record.type_name ?? record.name
+        if (typeValue != null && familyValue != null && typeof nameValue === 'string') {
+          const type_id = String(typeValue)
+          const family_id = String(familyValue)
+          const name = nameValue.trim()
+          if (type_id && family_id && name) {
+            return { type_id, family_id, name }
+          }
+        }
+        return null
       })
-      .filter((value): value is { subtype_id: string; family_id: string; name: string } => Boolean(value))
+      .filter((value): value is { type_id: string; family_id: string; name: string } => Boolean(value))
+  }
+
+  const loadTypesForFamily = async (familyId: string, preselectedTypeId?: string) => {
+    try {
+      const response = await fetch(`/api/landuse/types/${familyId}`)
+      if (response.ok) {
+        const typesData = await response.json()
+        const normalizedTypes = normalizeTypes(typesData)
+        setTypes(normalizedTypes)
+        if (preselectedTypeId) {
+          setSelectedType(preselectedTypeId)
+          loadProductsForType(preselectedTypeId)
+        }
+        console.log('Loaded types for family', familyId, ':', normalizedTypes.length)
+      }
+    } catch (e) {
+      console.error('Failed to load types for family', familyId, e)
+    }
+  }
+
+  // Map type_id from types API to subtype_id used in lot products
+  const mapTypeIdToSubtypeId = (typeId: string): string | null => {
+    const mapping: Record<string, string> = {
+      // Residential
+      '7': '7',  // Single Family Detached: type_id 7 → subtype_id 7
+      '8': '8',  // Single Family Attached: type_id 8 → subtype_id 8
+      '9': '9',  // Townhomes: type_id 9 → subtype_id 9
+      '10': '10', // Condominiums: type_id 10 → subtype_id 10
+      '11': '11', // Apartments: type_id 11 → subtype_id 11
+      '12': '12', // Multi-Family: type_id 12 → subtype_id 12
+
+      // Commercial
+      '14': '14', // Retail: type_id 14 → subtype_id 14
+      '15': '15', // Office: type_id 15 → subtype_id 15
+      '16': '16', // Hotel: type_id 16 → subtype_id 16
+    }
+    return mapping[typeId] || null
+  }
+
+  const loadProductsForType = async (typeId: string) => {
+    try {
+      // Map type_id to the actual subtype_id used in products
+      const actualSubtypeId = mapTypeIdToSubtypeId(typeId)
+      console.log('Mapping type_id', typeId, 'to subtype_id', actualSubtypeId)
+
+      if (actualSubtypeId) {
+        // Use the new lot-products API endpoint
+        const response = await fetch(`/api/landuse/lot-products/${actualSubtypeId}`)
+        if (response.ok) {
+          const lotProductsData = await response.json()
+          console.log('Raw lot products response:', lotProductsData)
+          const normalizedProducts = normalizeProducts(lotProductsData)
+          console.log('Normalized products:', normalizedProducts)
+          setProducts(normalizedProducts)
+          console.log('Loaded lot products for type', typeId, '(subtype_id:', actualSubtypeId, '):', normalizedProducts.length, 'products:', normalizedProducts.map((p: any) => p.code))
+        } else {
+          console.error('Failed to fetch lot products:', response.statusText)
+          setProducts([])
+        }
+      } else {
+        console.log('No subtype_id mapping found for type_id', typeId)
+        setProducts([])
+      }
+    } catch (e) {
+      console.error('Failed to load products for type', typeId, e)
+    }
   }
 
   useEffect(() => {
     if (editing) {
       ;(async () => {
         try {
-          // Use regular APIs (non-jurisdiction filtered) for the inline edit experience
-          // The ParcelDetailCard handles jurisdiction-specific filtering
-          const [codesRes, famRes, subRes] = await Promise.all([
-            fetch('/api/landuse/choices?type=codes'),
-            fetch('/api/landuse/choices?type=families'),
-            fetch('/api/landuse/choices?type=subtypes')
-          ])
-          const [codesData, familiesData, subtypesData] = await Promise.all([
-            codesRes.ok ? codesRes.json() : Promise.resolve([]),
-            famRes.ok ? famRes.json() : Promise.resolve([]),
-            subRes.ok ? subRes.json() : Promise.resolve([])
-          ])
-          setCodes(normalizeCodes(codesData))
-          setFamilies(normalizeFamilies(familiesData))
-          setSubtypes(normalizeSubtypes(subtypesData))
-        } catch (e) { console.error('Failed to load land use lists', e) }
+          console.log('🔥 Edit mode activated for parcel:', parcel.parcel_id)
+
+          // Load families data
+          const famRes = await fetch('/api/landuse/families')
+          const familiesData = famRes.ok ? await famRes.json() : []
+          const normalizedFamilies = normalizeFamilies(familiesData)
+          setFamilies(normalizedFamilies)
+
+          // Set the draft values to current parcel values
+          setDraft({
+            product: parcel.product || '',
+            acres: parcel.acres || 0,
+            units: parcel.units || 0,
+            frontfeet: parcel.frontfeet || 0,
+          })
+
+          // TODO: Add pre-population logic here step by step
+          console.log('Loaded families:', normalizedFamilies.length)
+        } catch (e) {
+          console.error('Failed to load land use lists', e)
+        }
       })()
+    } else {
+      // Reset selections when not editing
+      setSelectedFamily('')
+      setSelectedType('')
+      setTypes([])
+      setProducts([])
     }
   }, [editing])
 
@@ -492,17 +569,15 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          usecode: draft.usecode,
           product: draft.product,
           acres: Number(draft.acres),
           units: Number(draft.units),
-          efficiency: Number(draft.efficiency),
           frontfeet: Number(draft.frontfeet),
         })
       })
       if (!res.ok) throw new Error(await res.text())
 
-      const updatedParcel = { ...parcel, ...draft, acres: Number(draft.acres), units: Number(draft.units), efficiency: Number(draft.efficiency) } as Parcel
+      const updatedParcel = { ...parcel, ...draft, acres: Number(draft.acres), units: Number(draft.units) } as Parcel
       onSaved(updatedParcel)
       setEditing(false)
 
@@ -523,51 +598,89 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
       <td className="px-2 py-1.5 text-gray-300">{parcel.area_no}</td>
       <td className="px-2 py-1.5 text-gray-300">{parcel.phase_name}</td>
       <td className="px-2 py-1.5 text-gray-300">{parcel.parcel_name}</td>
-      <td className="px-2 py-1.5 text-center text-gray-300">{getFamilyName(parcel)}</td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex gap-2">
-              <select className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs" value={selectedFamily} onChange={e => { setSelectedFamily(e.target.value); setSelectedSubtype('') }}>
-                <option value="">All Families</option>
-                {families.map(f => <option key={f.family_id} value={f.family_id}>{f.name}</option>)}
-              </select>
-              <select className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs" value={selectedSubtype} onChange={e => setSelectedSubtype(e.target.value)}>
-                <option value="">All Subtypes</option>
-                {subtypes.filter(st => !selectedFamily || st.family_id === selectedFamily).map(st => <option key={st.subtype_id} value={st.subtype_id}>{st.name}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-wrap gap-1 justify-center max-w-[520px]">
-            {codes.filter(c => (!selectedFamily || c.family_id === selectedFamily) && (!selectedSubtype || c.subtype_id === selectedSubtype)).map(c => (
-              <button key={c.landuse_code}
-                type="button"
-                className={`px-2 py-0.5 rounded-full text-xs border ${draft.usecode === c.landuse_code ? 'bg-blue-700 border-blue-600 text-white' : 'bg-gray-700 border-gray-600 text-gray-200'}`}
-                onClick={() => setDraft(d => ({ ...d, usecode: c.landuse_code }))}
-                title={c.name}
+          <div className="w-32">
+            <select
+              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+              value={selectedFamily}
+              onChange={e => {
+                const newFamily = e.target.value
+                setSelectedFamily(newFamily);
+                setSelectedType('');
+                setDraft(d => ({ ...d, product: '' }))
+                if (newFamily) {
+                  loadTypesForFamily(newFamily)
+                } else {
+                  setTypes([])
+                  setProducts([])
+                }
+              }}
+            >
+              <option value="">Select Family</option>
+              {families.map(f => <option key={f.family_id} value={f.family_id}>{f.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <span className="text-gray-300">{getFamilyName(parcel)}</span>
+        )}
+      </td>
+      <td className="px-2 py-1.5 text-center">
+        {editing ? (
+          <div className="flex flex-col gap-1 w-32">
+            {selectedFamily && (
+              <select
+                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+                value={selectedType}
+                onChange={e => {
+                  const newType = e.target.value
+                  setSelectedType(newType)
+                  setDraft(d => ({ ...d, product: '' }))
+                  if (newType) {
+                    loadProductsForType(newType)
+                  } else {
+                    setProducts([])
+                  }
+                }}
               >
-                {c.landuse_code}
-              </button>
-            ))}
-            </div>
+                <option value="">Select Type</option>
+                {types.filter(t => t.family_id === selectedFamily).map(t =>
+                  <option key={t.type_id} value={t.type_id}>{t.name}</option>
+                )}
+              </select>
+            )}
+            {selectedFamily && selectedType && (
+              <select
+                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+                value={draft.product}
+                onChange={e => setDraft(d => ({ ...d, product: e.target.value }))}
+              >
+                <option value="">Select Product</option>
+                {products.map(p => (
+                  <option key={p.product_id} value={p.code}>
+                    {p.name || p.code}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         ) : (
           <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-            parcel.usecode === 'SF' ? 'bg-blue-900 text-blue-300' :
-            parcel.usecode === 'MF' ? 'bg-purple-900 text-purple-300' :
-            parcel.usecode === 'RET' ? 'bg-orange-900 text-orange-300' :
+            selectedFamily === '1' ? 'bg-blue-900 text-blue-300' :
+            selectedFamily === '2' ? 'bg-purple-900 text-purple-300' :
             'bg-indigo-900 text-indigo-300'
           }`}>
-            {parcel.usecode}
+            {parcel.product || 'No Type'}
           </span>
         )}
       </td>
       <td className="px-2 py-1.5 text-center text-gray-300">
         {editing ? (
-          <input className="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
-            value={draft.product} onChange={e => setDraft(d => ({ ...d, product: e.target.value }))}
-          />
+          <div className="text-center text-gray-400 text-xs">
+            {draft.product || 'Select Type first'}
+          </div>
         ) : (
-          parcel.product
+          parcel.product || 'None'
         )}
       </td>
       <td className="px-2 py-1.5 text-center text-gray-300">
@@ -588,12 +701,11 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
           new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parcel.units)
         )}
       </td>
-      <td className="px-2 py-1.5 text-center text-gray-300">{(parcel.efficiency * 100).toFixed(0)}%</td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <div className="flex items-center gap-2 justify-center">
             <button className="px-1.5 py-0.5 text-xs bg-blue-700 text-white rounded" onClick={save}>Save</button>
-            <button className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-200 rounded" onClick={() => { setEditing(false); setDraft({ usecode: parcel.usecode, product: parcel.product, acres: parcel.acres, units: parcel.units, efficiency: parcel.efficiency, frontfeet: parcel.frontfeet ?? 0 }) }}>Cancel</button>
+            <button className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-200 rounded" onClick={() => { setEditing(false); setDraft({ product: parcel.product, acres: parcel.acres, units: parcel.units, frontfeet: parcel.frontfeet ?? 0 }) }}>Cancel</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 justify-center">

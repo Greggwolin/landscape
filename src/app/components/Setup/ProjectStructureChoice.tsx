@@ -7,6 +7,19 @@ interface ProjectStructureChoiceProps {
   onStructureSelected: (structureType: 'simple' | 'master_plan') => void
   onCancel?: () => void
   initialChoice?: 'simple' | 'master_plan'
+  extractedData?: {
+    development_info?: {
+      units_planned?: number
+      land_uses: string[]
+      phases: string[]
+    }
+    total_acres?: number
+    parcel_data?: Array<{
+      parcel_id: string
+      acres: number
+      land_use?: string
+    }>
+  }
 }
 
 interface StructureOption {
@@ -23,11 +36,42 @@ const ProjectStructureChoice: React.FC<ProjectStructureChoiceProps> = ({
   projectId,
   onStructureSelected,
   onCancel,
-  initialChoice
+  initialChoice,
+  extractedData
 }) => {
   const [selectedType, setSelectedType] = useState<'simple' | 'master_plan' | null>(initialChoice || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Smart recommendation based on extracted data
+  const getRecommendation = (): 'simple' | 'master_plan' | null => {
+    if (!extractedData) return null
+
+    const { development_info, total_acres, parcel_data } = extractedData
+
+    // Recommend master plan if:
+    // - More than 100 units planned
+    // - More than 50 acres
+    // - Multiple phases identified
+    // - More than 20 individual parcels
+    const unitsPlanned = development_info?.units_planned || 0
+    const acres = total_acres || 0
+    const phases = development_info?.phases?.length || 0
+    const parcelCount = parcel_data?.length || 0
+
+    if (unitsPlanned > 100 || acres > 50 || phases > 2 || parcelCount > 20) {
+      return 'master_plan'
+    }
+
+    // Recommend simple for smaller projects
+    if (unitsPlanned <= 50 && acres <= 25 && phases <= 1 && parcelCount <= 10) {
+      return 'simple'
+    }
+
+    return null
+  }
+
+  const recommendation = getRecommendation()
 
   const structureOptions: StructureOption[] = [
     {
@@ -128,17 +172,58 @@ const ProjectStructureChoice: React.FC<ProjectStructureChoiceProps> = ({
             </div>
           )}
 
+          {/* AI Recommendation */}
+          {extractedData && recommendation && (
+            <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="text-blue-400 mt-1">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="text-blue-300 font-medium text-sm mb-1">
+                    AI Recommendation: {recommendation === 'simple' ? 'Simple Project' : 'Master Planned Community'}
+                  </div>
+                  <div className="text-blue-200 text-xs">
+                    Based on your uploaded documents:
+                    {extractedData.development_info?.units_planned && (
+                      <span className="ml-1">{extractedData.development_info.units_planned} units planned</span>
+                    )}
+                    {extractedData.total_acres && (
+                      <span className="ml-1">• {extractedData.total_acres} acres</span>
+                    )}
+                    {extractedData.development_info?.phases && extractedData.development_info.phases.length > 0 && (
+                      <span className="ml-1">• {extractedData.development_info.phases.length} phases</span>
+                    )}
+                    {extractedData.parcel_data && extractedData.parcel_data.length > 0 && (
+                      <span className="ml-1">• {extractedData.parcel_data.length} parcels</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
             {structureOptions.map((option) => (
               <div
                 key={option.type}
                 onClick={() => setSelectedType(option.type)}
-                className={`p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                className={`relative p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                   selectedType === option.type
                     ? 'border-blue-500 bg-blue-900/20'
+                    : recommendation === option.type
+                    ? 'border-green-500 bg-green-900/10'
                     : 'border-gray-600 bg-gray-700/50 hover:border-gray-500'
                 }`}
               >
+                {/* Recommendation Badge */}
+                {recommendation === option.type && (
+                  <div className="absolute -top-2 -right-2 bg-green-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    AI Recommended
+                  </div>
+                )}
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
                     {option.icon}

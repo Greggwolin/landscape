@@ -337,14 +337,26 @@ export async function POST(request: Request) {
     `
 
     const result = rows[0]
-    const resultValue = typeof result.ruleValue === 'string'
-      ? JSON.parse(result.ruleValue)
-      : result.ruleValue
+    console.log('Database result:', result)
+
+    // Handle both camelCase and snake_case field names
+    const rawValue = result.rule_value || result.ruleValue
+    console.log('Raw rule value:', rawValue)
+
+    const resultValue = typeof rawValue === 'string'
+      ? JSON.parse(rawValue)
+      : rawValue
+
+    console.log('Parsed rule value:', resultValue)
+
+    if (!resultValue) {
+      throw new Error('Rule value is null or undefined after parsing')
+    }
 
     return NextResponse.json({
-      id: result.ruleId,
-      name: getCategoryDisplayName(result.ruleCategory || ''),
-      category: result.ruleCategory,
+      id: result.rule_id || result.ruleId,
+      name: getCategoryDisplayName(result.rule_category || result.ruleCategory || ''),
+      category: result.rule_category || result.ruleCategory,
       globalRate: resultValue.globalRate,
       steps: resultValue.steps,
       impact: resultValue.impact,

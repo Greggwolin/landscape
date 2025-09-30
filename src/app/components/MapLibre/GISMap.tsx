@@ -10,6 +10,7 @@ interface GISMapProps {
   mode: 'parcel-select' | 'navigation'
   onParcelSelect?: (features: Record<string, unknown>[]) => void
   onParcelClick?: (parcel: Record<string, unknown>) => void
+  onMapClick?: (coordinates: { lat: number, lng: number }) => void
   onBoundaryConfirmed?: () => void
   projectLocation?: {
     description: string
@@ -49,6 +50,7 @@ const GISMap: React.FC<GISMapProps> = ({
   mode,
   onParcelSelect,
   onParcelClick,
+  onMapClick,
   onBoundaryConfirmed,
   projectLocation,
   className = ''
@@ -414,13 +416,16 @@ const GISMap: React.FC<GISMapProps> = ({
 
           map.current!.on('click', (e) => {
             console.log('🖱️ MAP CLICKED! Mode:', selectionModeRef.current, 'Position:', e.lngLat)
-            console.log('🚨 NEW CODE IS RUNNING! 🚨')
-            alert('NEW CODE IS RUNNING!')
             document.title = `MAP CLICKED - MODE: ${selectionModeRef.current} - ${new Date().getTime()}`
 
-            // Only handle clicks in selection mode
+            // Always call onMapClick if provided for reverse geocoding
+            if (onMapClick) {
+              onMapClick({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+            }
+
+            // Only handle parcel selection clicks in selection mode
             if (selectionModeRef.current !== 'select') {
-              console.log('❌ Not in select mode, ignoring click')
+              console.log('❌ Not in select mode, ignoring parcel selection')
               return
             }
 
@@ -1038,7 +1043,7 @@ const GISMap: React.FC<GISMapProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t border-gray-600">
+            <div className="pt-2 border-t border-gray-600">
               <button
                 onClick={() => {
                   // Clear selection
@@ -1046,59 +1051,14 @@ const GISMap: React.FC<GISMapProps> = ({
                   setSelectedParcelDetails([])
                   map.current?.setFilter('tax-parcels-selected-fill', ['in', 'grossac', ''])
                   map.current?.setFilter('tax-parcels-selected-stroke', ['in', 'grossac', ''])
-                }}
-                className="flex-1 px-3 py-2 text-xs bg-gray-600 hover:bg-gray-500 rounded text-white"
-              >
-                Clear
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const dissolvedBoundary = selectedParcelDetails.length > 1 ?
-                      await dissolveParcelBoundaries(selectedParcelDetails) :
-                      selectedParcelDetails[0]?.geometry
-
-                    const response = await fetch(`/api/projects/${projectId}/boundaries`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        parcels: selectedParcelDetails.map(parcel => ({
-                          parcelId: parcel.PARCELID,
-                          geometry: parcel.geometry,
-                          grossAcres: parcel.GROSSAC || 0,
-                          ownerName: parcel.OWNERNME1,
-                          siteAddress: parcel.SITEADDRESS
-                        })),
-                        dissolvedBoundary
-                      })
-                    })
-
-                    if (!response.ok) {
-                      throw new Error('Failed to save boundaries')
-                    }
-
-                    const result = await response.json()
-                    alert(`Successfully saved ${result.parcelCount} parcels (${result.totalAcres.toFixed(2)} acres) to project ${projectId}`)
-
-                    // Clear selection after save
-                    setSelectedParcels(new Set())
-                    setSelectedParcelDetails([])
-                    map.current?.setFilter('tax-parcels-selected-fill', ['in', 'grossac', ''])
-                    map.current?.setFilter('tax-parcels-selected-stroke', ['in', 'grossac', ''])
-
-                    // Notify parent component that boundary was confirmed
-                    if (onBoundaryConfirmed) {
-                      onBoundaryConfirmed()
-                    }
-
-                  } catch (error) {
-                    console.error('Error saving boundaries:', error)
-                    alert('Failed to save parcel boundaries: ' + (error instanceof Error ? error.message : 'Unknown error'))
+                  // Clear parcel selection in parent component
+                  if (onParcelSelect) {
+                    onParcelSelect([])
                   }
                 }}
-                className="flex-1 px-3 py-2 text-xs bg-blue-600 hover:bg-blue-500 rounded text-white font-medium"
+                className="w-full px-3 py-2 text-xs bg-gray-600 hover:bg-gray-500 rounded text-white"
               >
-                Confirm Selection
+                Clear Selection
               </button>
             </div>
           </div>
