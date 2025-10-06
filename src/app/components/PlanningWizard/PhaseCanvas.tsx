@@ -110,7 +110,7 @@ const PhaseCanvas: React.FC<PhaseCanvasProps> = ({
               onDrop={handleDropParcel}
               className="w-full h-96 bg-gray-700 border-2 border-solid border-gray-600 rounded-lg"
             >
-              <div className="p-4 grid grid-cols-3 gap-4 h-full overflow-y-auto">
+              <div className="p-4 grid gap-4 h-full overflow-y-auto" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 {phase.parcels.map((parcel) => (
                   <ParcelTile
                     key={parcel.id}

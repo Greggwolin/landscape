@@ -699,13 +699,13 @@ const DevStatus: React.FC = () => {
         <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">📋 Quick Actions</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button 
-              onClick={() => window.open('/Documentation/App-Development-Status.md', '_blank')}
+            <button
+              onClick={() => window.location.href = '/documentation'}
               className="p-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-left transition-colors"
             >
               <FileText className="w-5 h-5 mb-2" />
-              <div className="font-medium">View Full Documentation</div>
-              <div className="text-sm text-blue-100">Open complete status markdown file</div>
+              <div className="font-medium">Full Documentation Center</div>
+              <div className="text-sm text-blue-100">View all status reports and technical docs</div>
             </button>
             
             <button 

@@ -18,7 +18,11 @@ import DevStatus from './components/DevStatus/DevStatus';
 import { ProjectProvider, useProjectContext } from './components/ProjectProvider';
 import DocumentManagement from './components/Documents/DocumentManagement';
 import HomeOverview from './components/Home/HomeOverview';
+import UnderConstruction from './components/Home/UnderConstruction';
+import DocumentationIndex from './documentation/page';
 import GrowthRates from './components/GrowthRates';
+import BudgetGridLight from './components/Budget/BudgetGridLight';
+import BudgetGridDarkWrapper from './components/Budget/BudgetGridDarkWrapper';
 
 const LandscapeAppInner: React.FC = () => {
   const [activeView, setActiveView] = useState('home');
@@ -41,6 +45,12 @@ const LandscapeAppInner: React.FC = () => {
       case 'home':
       case 'dashboard':
         return <DashboardContent />;
+
+      case 'under-construction':
+        return <UnderConstruction />;
+
+      case 'documentation':
+        return <DocumentationIndex />;
 
       case 'planning-overview':
         return <PlanningContent projectId={activeProject?.project_id ?? null} />;
@@ -67,15 +77,12 @@ const LandscapeAppInner: React.FC = () => {
         return <GrowthRates projectId={activeProject?.project_id ?? null} />;
       case 'project-costs':
         return <BudgetContent projectId={activeProject?.project_id ?? null} />;
+      case 'budget-grid-light':
+        return <BudgetGridLight projectId={activeProject?.project_id ?? 7} />;
+      case 'budget-grid-dark':
+        return <BudgetGridDarkWrapper projectId={activeProject?.project_id ?? 7} />;
       case 'project-revenues':
         return <ComingSoonContent title="Project Revenues" />;
-
-      case 'entitlements':
-        return <ComingSoonContent title="Stage 1 - Entitlements" />;
-      case 'engineering':
-        return <ComingSoonContent title="Stage 2 - Engineering" />;
-      case 'development':
-        return <ComingSoonContent title="Stage 3 - Development" />;
       case 'disposition':
         return <ComingSoonContent title="Project Disposition" />;
 

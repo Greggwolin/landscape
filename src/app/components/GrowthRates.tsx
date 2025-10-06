@@ -90,7 +90,7 @@ const materioTheme = createTheme({
   }
 });
 
-// Enhanced styled components for ARGUS-style tables
+// Enhanced styled components for financial tables
 const CompactTable = styled(TableContainer)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
@@ -1717,7 +1717,7 @@ const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Reco
                           )}
                         </Stack>
 
-                        {/* ARGUS-Style Steps Table */}
+                        {/* Steps Table */}
                         <CompactTable component={Paper} variant="outlined">
                           <Table size="small">
                             <TableHead>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import ProjectStructureChoice from '../setup/ProjectStructureChoice'
 import ProjectBoundarySetup from './ProjectBoundarySetup'
-import PropertyPackageUpload from './PropertyPackageUpload'
+import ProjectDocumentUploads from './ProjectDocumentUploads'
 import PlanNavigation from './PlanNavigation'
 
 interface GISSetupWorkflowProps {
@@ -346,12 +346,12 @@ const GISSetupWorkflow: React.FC<GISSetupWorkflowProps> = ({
 
         {workflowState.currentStep === 'upload' && (
           <div className="h-full">
-            <PropertyPackageUpload
+            <ProjectDocumentUploads
               projectId={projectId}
               structureType="simple" // Default, will be changed after upload
               onUploadComplete={(results) => {
                 const uploadData: UploadData = {
-                  packageName: results.package_name || 'Property Package',
+                  packageName: results.package_name || 'Document Package',
                   documentsProcessed: results.documents_processed || 0,
                   extractedData: results.extractedData
                 }

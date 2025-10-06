@@ -1,0 +1,66 @@
+/* Nuclear option - highest specificity possible with !important */
+.parcel-tile-container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+
+.parcel-tile {
+  background-color: #16a34a !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  min-width: 220px !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  overflow: visible !important;
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
+  flex-shrink: 0 !important;
+}
+
+.parcel-tile * {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
+  max-width: 100% !important;
+}
+
+.parcel-tile-commercial {
+  background-color: #ea580c !important;
+}
+
+.parcel-tile-residential {
+  background-color: #16a34a !important;
+}
+
+.parcel-tile-other {
+  background-color: #6366f1 !important;
+}
+
+.parcel-text {
+  font-size: 13px !important;
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  max-width: 100% !important;
+  text-overflow: clip !important;
+}
+
+.parcel-title {
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  margin-bottom: 4px !important;
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}

@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature>
+  <name>Budget Grid UI - Hybrid ARGUS-Style Spreadsheet Interface</name>
+  
+  <goal>
+    Build a spreadsheet-like budget management interface that combines:
+    - ARGUS Developer's structured semantic organization (Definition → Cash Flow → Budget Control)
+    - ARGUS EstateMaster's inline editing with color-coded cells
+    - Progressive disclosure via tile/chip-based field group toggles
+    - Context-aware column visibility (Acquisition vs Stage 1-3 shows different fields)
+    
+    User can create, edit, view budget line items in a dense, information-rich grid with:
+    - Inline editing (click cell to edit)
+    - Hierarchical grouping (Scope → Category → Detail with expand/collapse)
+    - Cost code assignment via dropdown
+    - Timing specification (Period Start + Span model from EstateMaster)
+    - Quantity/UOM/Rate inputs for construction-phase items
+    - Escalation and contingency controls
+    - Budget versioning (Original → Revised → Forecast)
+  </goal>
+  
+  <context>
+    <excel_reference>
+      Reference: PeoriaLakes MPC_2023.xlsm - "DATABASE" sheet
+      
+      Excel Structure:
+      - Rows organized by: Acquisition → Stage 1 → Stage 2 → Stage 3 → Other
+      - Each scope has categories (Entitlements, Engineering, Development-Offsite, etc.)
+      - Some items have Quantity × $/Unit calculations
+      - Period-based timing (Start Month, Months to Complete, Thru Month)
+      - Inflation multipliers applied to base costs
+      - Contingency as percentage of category subtotals
+      
+      Key Excel Patterns to Replicate:
+      1. Hierarchical grouping with subtotals
+      2. Color-coded cells: Blue = input, Yellow = calculation, Gray = section header
+      3. Conditional field visibility (construction items show Qty/UOM, acquisition doesn't)
+      4. Period-based timing model (not date-based initially)
+    </excel_reference>
+    
+    <database_schema>
+      Primary Tables (NEW system - use these exclusively):
+      
+      1. core_fin_budget_version
+         - budget_id (PK)
+         - name (Original/Revised/Forecast)
+         - as_of (date)
+         - status (draft/active/archived)
+         
+      2. core_fin_category (hierarchical cost codes)
+         - category_id (PK)
+         - parent_id (FK self-reference for hierarchy)
+         - code (display code like "ACQ-001", "STG1-ENG")
+         - kind (cost/revenue)
+         - scope (Acquisition, Stage 1, Stage 2, Stage 3, Other)
+         - detail (category name)
+         - is_active
+         
+      3. core_fin_fact_budget (main fact table)
+         - fact_id (PK)
+         - budget_id (FK to core_fin_budget_version)
+         - pe_level (enum: project/area/phase/parcel) - polymorphic entity
+         - pe_id (text) - entity ID
+         - category_id (FK to core_fin_category)
+         - funding_id (FK to core_fin_funding_source) - optional
+         - uom_code (text FK to units of measure)
+         - qty (numeric)
+         - rate (numeric - $/unit)
+         - amount (numeric - calculated or direct)
+         - start_date (date)
+         - end_date (date)
+         - curve_id (FK for distribution curves) - optional
+         - escalation_rate (numeric - percentage)
+         - contingency_pct (numeric - percentage)
+         - timing_method (distributed/milestone/curve)
+         - contract_number (varchar) - optional
+         - purchase_order (varchar) - optional
+         - is_committed (boolean)
+         - confidence_level (varchar: high/medium/low)
+         - vendor_contact_id (int FK) - optional
+         - notes (text)
+         
+      4. tbl_budget_timing (period allocation)
+         - timing_id (PK)
+         - fact_id (FK to core_fin_fact_budget)
+         - period_id (FK to tbl_calculation_period)
+         - amount (numeric - allocated to this period)
+         - timing_method (distributed/milestone/curve)
+         
+      5. tbl_calculation_period (period definitions)
+         - period_id (PK)
+         - project_id (FK)
+         - period_start_date (date)
+         - period_end_date (date)
+         - period_type (monthly/quarterly/yearly)
+         - period_sequence (integer - 1, 2, 3...)
+         
+      Supporting Tables:
+      - core_fin_funding_source (debt/equity sources)
+      - tbl_measures (units of measure: AC, SF, EA, $/MO, etc.)
+      - tbl_contacts (vendor contacts)
+      
+      Critical Notes:
+      - Do NOT use tbl_budget_structure or tbl_budget_items (legacy, backed up)
+      - Use core_fin_* tables exclusively for new development
+      - Polymorphic entity reference (pe_level + pe_id) allows attaching budget to any hierarchy level
+    </database_schema>
+    
+    <ui_pattern>
+      ARGUS Developer Reference (see uploaded screenshots):
+      - Definition Tab: Semantic grouping in logical boxes with ellipsis buttons for detail editors
+      - Budget Cash Flow Tab: Tracking with Original vs Actual/Forecast comparison, organized by Cost Code
+      - Three-tier workflow: Definition (input) → Project Cash Flow (calculation) → Budget Cash Flow (tracking)
+      
+      EstateMaster Reference:
+      - Color coding: Blue font = main input, Green = calculated, Purple = dropdown, Red = locked
+      - Direct cell editing (not popup forms)
+      - Period Start + Span timing model (simple numeric inputs)
+      - Row-based structure: Code | Stage | Description | Amount | Period Start | Span | ...
+      
+      Your Hybrid Approach (from design document):
+      
+      TOP NAVIGATION:
+      ┌─────────────────────────────────────────────────────────────────┐
+      │ [Project] [Areas] [Phases]  ← Hierarchy context breadcrumbs    │
+      │                                                                  │
+      │ [Financial] [Schedule] [Cost Controls] [Construction]           │
+      │           ↑ Field Group Chips (toggle column visibility)        │
+      │                                                                  │
+      │ [Acquisition] [Stage 1] [Stage 2] [Stage 3] [Other]            │
+      │           ↑ Scope Filter Chips                                  │
+      └─────────────────────────────────────────────────────────────────┘
+      
+      MAIN GRID:
+      ┌──────────────────────────────────────────────────────────────────┐
+      │ Header Row (sortable, show/hide columns, right-click menu)      │
+      ├──────────────────────────────────────────────────────────────────┤
+      │ ▼ Acquisition [Subtotal: $1,250,000]                           │
+      │   ├─ ▼ Entitlements [Subtotal: $211,500]                       │
+      │   │    Purchase Option Fee    | $50,000  | ...                  │
+      │   │    Title/Escrow           | $25,000  | ...                  │
+      │   └─ ▼ Engineering [Subtotal: $475,000]                        │
+      │        Civil                  | $225,000 | ...                  │
+      │                                                                  │
+      │ ▼ Stage 1 Infrastructure [Subtotal: $8,500,000]                │
+      │   ├─ ▼ Earthwork [Subtotal: $1,200,000]                        │
+      │   │    Mass Grading          | 450,000 CY | $2.50/CY | $1,125,000│
+      │   └─ ▼ Utilities [Subtotal: $3,250,000]                        │
+      └──────────────────────────────────────────────────────────────────┘
+      
+      COLUMN VISIBILITY RULES:
+      - Always visible: Item, Description, Budget, Actual, Variance
+      - [Financial] chip active → Show: Budget, Actual, Variance, Funding Source
+      - [Schedule] chip active → Show: Start Period, Duration, Complete Period
+      - [Cost Controls] chip active → Show: Escalation %, Contingency %, Confidence
+      - [Construction] chip active → Show: Quantity, UOM, $/Unit, Contract #
+      
+      STAGE-SPECIFIC DEFAULTS:
+      - Acquisition: Hide Construction fields (no qty/uom needed)
+      - Stage 1-3: Show Schedule + Cost Controls by default
+      - Stage 3: Show ALL groups including Construction
+      
+      CELL COLOR CODING:
+      - Blue text = editable input field
+      - Green text = calculated value (Qty × Rate = Amount)
+      - Purple text = dropdown selector (Cost Code, UOM, Funding Source)
+      - Red outline = missing/required field
+      - Yellow background = changed from original budget
+      - Gray background = group header row
+      
+      INTERACTION PATTERNS:
+      - Click cell → enters edit mode (blue border, cursor appears)
+      - Tab/Enter → moves to next editable cell
+      - Escape → cancels edit
+      - Auto-save on blur (debounced 500ms)
+      - Undo/Redo support (Ctrl+Z / Ctrl+Y)
+      - Right-click header → show/hide columns menu
+      - Drag column header → reorder columns
+      - Click group header → expand/collapse section
+    </ui_pattern>
+  </context>
+  
+  <requirements>
+    <must_have>
+      CRITICAL REQUIREMENTS (Phase 1 - MVP):
+      
+      1. Grid Component Architecture
+         - Use React with hooks (useState, useEffect, useMemo, useCallback)
+         - Virtual scrolling for performance (react-window or similar)
+         - Memoize rows to prevent unnecessary re-renders
+         - Debounced auto-save (500ms after last edit)
+         
+      2. Data Structure
+         - Fetch budget items grouped by category hierarchy
+         - Build tree structure: Scope → Category → Line Items
+         - Calculate subtotals at each group level
+         - Track Original vs Current for variance calculation
+         
+      3. Field Group Chips (Progressive Disclosure)
+         - Four chips: Financial, Schedule, Cost Controls, Construction
+         - Toggle column visibility on click
+         - Persist user preferences in localStorage
+         - Visual indicator when chip is active (blue background)
+         
+      4. Scope Filter Chips
+         - Five chips: Acquisition, Stage 1, Stage 2, Stage 3, Other
+         - Filter visible rows by scope
+         - "All" chip shows everything
+         - Multiple selection support (Ctrl+click)
+         
+      5. Inline Editing
+         - Click cell → edit mode
+         - Blue border indicates editable
+         - Tab/Enter navigation between cells
+         - Escape to cancel
+         - Auto-save on blur (with visual feedback - spinner icon)
+         - Validation before save (required fields, numeric ranges)
+         
+      6. Hierarchical Grouping
+         - Expand/collapse icons (▼/►) on group rows
+         - Bold text for group headers
+         - Indentation for visual hierarchy
+         - Subtotals on group rows
+         - Grand total at bottom
+         
+      7. Cost Code Selector (Purple Dropdown)
+         - Searchable dropdown
+         - Hierarchical display (Scope → Category)
+         - Recently used codes at top
+         - Quick search by code or description
+         - Arrow keys for navigation
+         
+      8. Timing Model (EstateMaster Style)
+         - Start Period: Numeric input (1-240)
+         - Span: Numeric input (1-120)
+         - Complete Period: Calculated (Start + Span)
+         - Visual timeline preview on hover
+         - Validation: Start + Span must be within project bounds
+         
+      9. Construction Fields (Stage 3 emphasis)
+         - Quantity: Numeric input with precision (2 decimals)
+         - UOM: Dropdown (AC, SF, CY, EA, LF, etc.)
+         - $/Unit: Numeric input (currency format)
+         - Amount: Calculated (Qty × Rate) with green text
+         - Manual override allowed (turns blue)
+         
+      10. Variance Tracking
+          - Original column (locked, gray background)
+          - Current column (editable)
+          - Variance column: Current - Original with color coding:
+            * Green = under budget
+            * Red = over budget
+            * Gray = on budget
+          - Variance %: (Variance / Original) × 100
+          
+      11. Context-Aware Visibility
+          - Acquisition scope → hide Qty/UOM/Rate columns
+          - Stage 1-2 → show Schedule, hide Construction details
+          - Stage 3 → show ALL field groups by default
+          - Empty columns auto-hide unless chip is active
+    </must_have>
+    
+    <should_have>
+      NICE-TO-HAVE (Phase 2 - Enhancements):
+      
+      1. Bulk Operations
+         - Select multiple rows (checkbox column)
+         - Bulk edit (change cost code, escalation, etc.)
+         - Bulk delete with confirmation
+         - Copy/paste from Excel
+         
+      2. Smart Features
+         - Auto-suggest cost codes based on description
+         - Copy row with template
+         - Duplicate line item
+         - Apply percentage increase to selected items
+         
+      3. Export/Import
+         - Export to Excel with formatting preserved
+         - Import from Excel template
+         - CSV export for analysis
+         
+      4. Advanced Filtering
+         - Filter by cost code
+         - Filter by confidence level
+         - Filter by committed vs uncommitted
+         - Show only items with variance > X%
+         
+      5. Visual Enhancements
+         - Conditional formatting rules (user-defined)
+         - Cell comments (notes icon, hover to view)
+         - Sparklines for period allocation
+         - Mini charts in group headers
+    </should_have>
+    
+    <constraints>
+      TECHNICAL CONSTRAINTS:
+      
+      1. Database
+         - PostgreSQL 14+ (Neon hosted)
+         - Must use core_fin_* tables (NOT legacy tbl_budget_*)
+         - Polymorphic entity references (pe_level + pe_id)
+         - All monetary values: NUMERIC(12,2)
+         - All percentages: NUMERIC(5,2)
+         
+      2. Performance
+         - Must handle 1000+ line items without lag
+         - Virtual scrolling required for >100 rows
+         - Debounced saves (500ms)
+         - Optimistic updates (show change immediately, save async)
+         - Loading states for long operations
+         
+      3. Browser Support
+         - Chrome/Edge (primary)
+         - Firefox, Safari (secondary)
+         - No IE11 support required
+         
+      4. Responsive Design
+         - Desktop-first (1920×1080 primary)
+         - Tablet support (1024×768 minimum)
+         - No mobile phone support required
+         
+      5. Validation Rules
+         - Required fields: category_id, amount OR (qty + rate)
+         - Quantity: Must be > 0 if provided
+         - Rate: Must be > 0 if provided
+         - Amount: If qty and rate provided, amount = qty × rate (±$0.01 tolerance)
+         - Escalation: 0-100%
+         - Contingency: 0-50%
+         - Start Period: 1 to project.total_periods
+         - Span: 1 to (project.total_periods - start_period + 1)
+         
+      6. Business Rules
+         - Cannot delete line items with actuals posted
+         - Cannot edit original budget once locked
+         - Changes create new forecast version automatically
+         - Subtotals must equal sum of children (validation check)
+         - Cost codes must be active to be assigned
+    </constraints>
+  </requirements>
+  
+  <acceptance_criteria>
+    <test_case_1>
+      Given: User opens Budget Grid for a project with 250 line items
+      When: Page loads
+      Then: 
+        - Grid displays within 2 seconds
+        - Virtual scrolling enables smooth navigation
+        - Initial view shows Acquisition + Stage 1 expanded
+        - Stage 2, 3, Other collapsed by default
+        - Default columns visible: Item, Description, Budget, Actual, Variance
+        - Financial chip is active (blue background)
+    </test_case_1>
+    
+    <test_case_2>
+      Given: User clicks [Construction] chip
+      When: Chip activates
+      Then:
+        - Chip background turns blue
+        - Grid columns update to show: Quantity, UOM, $/Unit
+        - Transition is smooth (no flicker)
+        - Column widths auto-adjust
+        - Preference saved to localStorage
+    </test_case_2>
+    
+    <test_case_3>
+      Given: User clicks on "Amount" cell for a line item in Stage 3
+      When: Cell enters edit mode
+      Then:
+        - Blue border appears around cell
+        - Cursor appears in cell
+        - Current value is selected (ready to overwrite)
+        - Pressing Tab moves to next editable cell
+        - Pressing Escape cancels edit and restores original value
+    </test_case_3>
+    
+    <test_case_4>
+      Given: User edits Quantity = 1000, Rate = 25.50 for "Mass Grading" line item
+      When: User tabs to next cell (triggering save)
+      Then:
+        - Amount cell updates to $25,500.00 (green text = calculated)
+        - Spinner icon appears briefly (saving indicator)
+        - Success checkmark appears when saved
+        - If save fails, red X appears with error message
+        - Original value preserved for variance calculation
+    </test_case_4>
+    
+    <test_case_5>
+      Given: Budget line item has Original = $100,000, Current = $125,000
+      When: Grid displays variance column
+      Then:
+        - Variance shows $25,000 in red text
+        - Variance % shows +25% in red text
+        - Tooltip on hover: "Over budget by $25,000 (25%)"
+    </test_case_5>
+    
+    <test_case_6>
+      Given: User clicks cost code dropdown for new line item
+      When: Dropdown opens
+      Then:
+        - Searchable input appears at top
+        - Recently used codes show first (max 5)
+        - Hierarchical display: "Stage 1 → Engineering → Civil"
+        - Typing filters list in real-time
+        - Arrow keys navigate filtered results
+        - Enter selects highlighted item
+    </test_case_6>
+    
+    <test_case_7>
+      Given: User clicks on group header "▼ Earthwork [Subtotal: $1,200,000]"
+      When: Group collapses
+      Then:
+        - Icon changes to ►
+        - Child rows hide (smooth animation)
+        - Subtotal remains visible
+        - URL updates with collapsed state (for permalink)
+        - State persists on page refresh
+    </test_case_7>
+    
+    <test_case_8>
+      Given: User is viewing Stage 1 items
+      When: User clicks [Acquisition] scope chip
+      Then:
+        - Stage 1 items fade out
+        - Acquisition items fade in
+        - Scroll position resets to top
+        - Chip becomes active (blue background)
+        - Previous chip (Stage 1) deactivates
+    </test_case_8>
+    
+    <test_case_9>
+      Given: User enters Start Period = 12, Span = 6
+      When: Values are saved
+      Then:
+        - Complete Period calculates to 17 (12 + 6 - 1)
+        - If Complete Period > project.total_periods, show error
+        - Error message: "Complete period (17) exceeds project duration (15)"
+        - Cell borders turn red
+        - Save is blocked until corrected
+    </test_case_9>
+    
+    <test_case_10>
+      Given: User has edited 5 different line items without saving
+      When: User presses Ctrl+Z (Undo)
+      Then:
+        - Last edit reverts to previous value
+        - Cell flashes yellow briefly to indicate change
+        - Pressing Ctrl+Z again reverts next edit
+        - Pressing Ctrl+Y (Redo) reapplies the change
+        - Undo stack persists up to 50 actions
+    </test_case_10>
+    
+    <test_case_11>
+      Given: Grid has 500 rows loaded
+      When: User scrolls rapidly to bottom
+      Then:
+        - Smooth scrolling with no lag
+        - Rows render on-demand (virtual scrolling)
+        - Subtotal rows remain sticky during scroll
+        - Scroll position indicator shows "Row 450 of 500"
+    </test_case_11>
+    
+    <test_case_12>
+      Given: User right-clicks on column header "Contingency %"
+      When: Context menu appears
+      Then:
+        - Options shown: Hide Column, Sort Ascending, Sort Descending, Freeze Column
+        - Selecting "Hide Column" removes column and updates chip state
+        - Selecting "Sort Descending" sorts all rows by contingency (high to low)
+        - Grouped rows respect sort within their group
+    </test_case_12>
+  </acceptance_criteria>
+  
+  <component_architecture>
+    REACT COMPONENT STRUCTURE:
+    
+    src/components/budget/
+    │
+    ├── BudgetGridPage.jsx              (Top-level page component)
+    │   ├── State: budgetItems, visibleColumns, activeFilters, expandedGroups
+    │   ├── API calls: fetchBudgetItems, saveBudgetItem
+    │   └── Child components: BudgetToolbar, BudgetGrid, BudgetSidebar
+    │
+    ├── BudgetToolbar.jsx               (Top navigation controls)
+    │   ├── ScopeChips.jsx              (Acquisition, Stage 1-3, Other)
+    │   ├── FieldGroupChips.jsx         (Financial, Schedule, Cost Controls, Construction)
+    │   ├── VersionSelector.jsx         (Original/Revised/Forecast dropdown)
+    │   └── BulkActions.jsx             (Export, Import, Delete selected)
+    │
+    ├── BudgetGrid.jsx                  (Main spreadsheet component)
+    │   ├── Props: items, columns, onEdit, onDelete
+    │   ├── State: sortColumn, sortDirection, selectedRows
+    │   ├── Virtual scrolling: react-window FixedSizeList
+    │   └── Children: GridHeader, GridBody, GridFooter
+    │
+    ├── GridHeader.jsx                  (Column headers)
+    │   ├── Props: columns, sortColumn, sortDirection, onSort, onColumnToggle
+    │   ├── Features: Sortable, right-click menu, drag-to-reorder
+    │   └── Child: ColumnHeaderCell.jsx
+    │
+    ├── GridBody.jsx                    (Data rows with grouping)
+    │   ├── Props: items, columns, expandedGroups, onToggleGroup, onEdit
+    │   ├── Renders: GroupRow + DataRow components
+    │   └── Memoization: React.memo for performance
+    │
+    ├── GroupRow.jsx                    (Collapsible category headers)
+    │   ├── Props: group, isExpanded, onToggle, subtotal
+    │   ├── Displays: ▼/► icon, group name, subtotal
+    │   └── Styling: Bold text, gray background
+    │
+    ├── DataRow.jsx                     (Individual budget line items)
+    │   ├── Props: item, columns, onEdit, onDelete
+    │   ├── Renders: EditableCell for each visible column
+    │   └── Memoization: Only re-renders if item or columns change
+    │
+    ├── EditableCell.jsx                (Generic editable cell)
+    │   ├── Props: value, type, options, onChange, validation
+    │   ├── Types: text, number, currency, percentage, dropdown
+    │   ├── State: isEditing, tempValue, error
+    │   ├── Features: Click to edit, tab navigation, validation, auto-save
+    │   └── Color coding: Blue (input), green (calculated), purple (dropdown)
+    │
+    ├── DropdownCell.jsx                (Cost code, UOM, funding source selectors)
+    │   ├── Props: value, options, onSelect, searchable
+    │   ├── Features: Search/filter, keyboard navigation, recently used
+    │   └── Styling: Purple text when selected
+    │
+    ├── CalculatedCell.jsx              (Read-only calculated values)
+    │   ├── Props: formula, dependencies, format
+    │   ├── Example: Amount = Qty × Rate
+    │   └── Styling: Green text, gray background if locked
+    │
+    └── GridFooter.jsx                  (Grand totals)
+        ├── Props: items, columns
+        ├── Displays: Sum of all line items by column
+        └── Styling: Bold, top border
+    
+    src/hooks/
+    ├── useBudgetData.js                (Fetch and manage budget data)
+    ├── useColumnConfig.js              (Manage visible columns based on chips)
+    ├── useGrouping.js                  (Build hierarchical tree structure)
+    ├── useAutoSave.js                  (Debounced save with optimistic updates)
+    └── useUndoRedo.js                  (Undo/redo stack management)
+    
+    src/utils/
+    ├── budgetCalculations.js           (Amount = Qty × Rate, subtotals, variance)
+    ├── columnDefinitions.js            (Define all possible columns with metadata)
+    ├── validation.js                   (Field validation rules)
+    └── formatters.js                   (Currency, percentage, number formatting)
+    
+    STATE MANAGEMENT STRATEGY:
+    - Use React Context for global state (active chips, user preferences)
+    - Component-level useState for local UI state (edit mode, temp values)
+    - React Query for server state (fetching, caching, mutations)
+    - localStorage for persistence (column preferences, expanded groups)
+    
+    DATA FLOW:
+    1. BudgetGridPage fetches data via useBudgetData hook
+    2. Data transformed into tree structure via useGrouping hook
+    3. useColumnConfig determines visible columns based on active chips
+    4. BudgetGrid receives items + columns as props
+    5. User edits cell → DataRow.onEdit callback
+    6. useAutoSave hook debounces and saves to API
+    7. Optimistic update: UI shows change immediately
+    8. On success: Update cache, show checkmark
+    9. On error: Revert change, show error message
+    
+    PERFORMANCE OPTIMIZATIONS:
+    - Virtual scrolling (react-window) for 1000+ rows
+    - React.memo on DataRow to prevent re-renders
+    - useMemo for expensive calculations (subtotals, variance)
+    - useCallback for stable function references
+    - Debounced auto-save (500ms)
+    - Lazy load dropdowns (only fetch on open)
+  </component_architecture>
+  
+  <api_endpoints>
+    REQUIRED API ENDPOINTS:
+    
+    1. GET /api/budget/items/:projectId
+       Query params: ?scope=Stage1&version=current
+       Response: Array of budget items with category hierarchy
+       
+    2. POST /api/budget/items
+       Body: { project_id, category_id, qty, rate, amount, ... }
+       Response: Created item with generated fact_id
+       
+    3. PUT /api/budget/items/:factId
+       Body: Partial update object
+       Response: Updated item
+       
+    4. DELETE /api/budget/items/:factId
+       Response: 204 No Content
+       
+    5. GET /api/budget/categories
+       Query params: ?scope=Acquisition&active_only=true
+       Response: Hierarchical category tree
+       
+    6. GET /api/budget/versions/:projectId
+       Response: List of budget versions (Original, Revised, Forecast)
+       
+    7. POST /api/budget/versions/:projectId
+       Body: { name, as_of }
+       Response: Created budget version
+       
+    8. GET /api/measures
+       Response: List of UOM codes (AC, SF, CY, EA, etc.)
+       
+    9. GET /api/calculation-periods/:projectId
+       Response: List of project periods for timing dropdowns
+  </api_endpoints>
+  
+  <files_needed>
+    REFERENCE FILES:
+    - PeoriaLakes MPC_2023.xlsm (DATABASE sheet) - for Excel logic
+    - ARGUS Developer screenshots - for UI patterns
+    - neon_2025-10-02.json - for complete database schema
+    - Hybrid Budget UI design document - for detailed requirements
+  </files_needed>
+  
+  <implementation_notes>
+    SUGGESTED IMPLEMENTATION ORDER:
+    
+    Phase 1 (Week 1): Core Grid
+    1. Set up component structure (BudgetGridPage → BudgetGrid → DataRow)
+    2. Implement basic data fetching (useBudgetData hook)
+    3. Build static grid with mock data
+    4. Add virtual scrolling (react-window)
+    5. Implement hierarchical grouping (useGrouping hook)
+    
+    Phase 2 (Week 1): Inline Editing
+    6. Build EditableCell component
+    7. Add click-to-edit functionality
+    8. Implement tab navigation
+    9. Add validation and error display
+    10. Build useAutoSave hook with debouncing
+    
+    Phase 3 (Week 2): Field Groups & Filters
+    11. Build FieldGroupChips component
+    12. Implement useColumnConfig hook
+    13. Add ScopeChips filter
+    14. Connect chips to column visibility
+    15. Persist preferences to localStorage
+    
+    Phase 4 (Week 2): Advanced Features
+    16. Build DropdownCell (cost code selector)
+    17. Add CalculatedCell (Qty × Rate = Amount)
+    18. Implement variance tracking
+    19. Add context-aware visibility rules
+    20. Build timing model (Start + Span)
+    
+    Phase 5 (Week 3): Polish & Testing
+    21. Add undo/redo functionality
+    22. Implement GridHeader sorting
+    23. Build right-click context menu
+    24. Add loading states and error handling
+    25. Write unit tests for calculations
+    
+    CRITICAL PATTERNS:
+    - Always use React.memo for row components
+    - Always use useCallback for event handlers passed as props
+    - Always use useMemo for derived data (subtotals, filtered lists)
+    - Always validate before save (client-side + server-side)
+    - Always provide loading/error states
+    - Always show optimistic updates for better UX
+    
+    TESTING CHECKLIST:
+    - □ Grid loads with 1000+ items in <2 seconds
+    - □ Smooth scrolling with no lag
+    - □ All field group chips toggle columns correctly
+    - □ Inline editing works with tab navigation
+    - □ Auto-save fires after 500ms with visual feedback
+    - □ Calculations (Qty × Rate) update correctly
+    - □ Variance displays with correct color coding
+    - □ Group expand/collapse persists on refresh
+    - □ Undo/redo works for last 50 actions
+    - □ Cost code dropdown is searchable and fast
+  </implementation_notes>
+</feature>

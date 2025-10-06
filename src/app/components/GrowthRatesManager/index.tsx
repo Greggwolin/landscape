@@ -58,7 +58,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(0)
 
-  // Default step structure matching ARGUS pattern
+  // Default step structure for growth rates
   const defaultSteps: GrowthRateStep[] = [
     { step_number: 1, from_period: 1, periods: 16, rate: 2.0 },
     { step_number: 2, from_period: 17, periods: 24, rate: 3.0 },

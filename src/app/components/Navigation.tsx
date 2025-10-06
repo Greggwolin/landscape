@@ -37,14 +37,16 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       title: 'Home',
       items: [
         { id: 'home', label: 'Home', icon: '🏠' },
-        { id: 'dev-status', label: 'Development Status', icon: '📊' }
+        { id: 'dev-status', label: 'Development Status', icon: '📊' },
+        { id: 'documentation', label: 'Documentation', icon: '📚' },
+        { id: 'under-construction', label: 'Under Construction', icon: '🚧' }
       ]
     },
     {
       title: 'Planning',
       items: [
-        { id: 'planning-overview', label: `${level1LabelPlural} Overview`, icon: '🗺️' },
         { id: 'planning-inline', label: 'Planning', icon: '✏️' },
+        { id: 'planning-overview', label: 'Overview', icon: '🗺️' },
         { id: 'documents', label: 'Documents', icon: '📄' }
       ],
       isCollapsible: true
@@ -63,9 +65,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       items: [
         { id: 'acquisition', label: 'Acquisition', icon: '🏡' },
         { id: 'project-costs', label: 'Project Costs', icon: '💰' },
-        { id: 'entitlements', label: 'Stage 1 - Entitlements', icon: '📋' },
-        { id: 'engineering', label: 'Stage 2 - Engineering', icon: '⚙️' },
-        { id: 'development', label: 'Stage 3 - Development', icon: '🏗️' },
+        { id: 'budget-grid-light', label: 'Budget Grid (Light)', icon: '☀️' },
+        { id: 'budget-grid-dark', label: 'Budget Grid (Dark)', icon: '🌙' },
         { id: 'disposition', label: 'Project Disposition', icon: '🎯' }
       ],
       isCollapsible: true

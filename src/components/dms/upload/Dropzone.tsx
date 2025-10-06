@@ -39,16 +39,12 @@ export default function Dropzone({
       ...(parcelId && { 'x-parcel-id': parcelId.toString() })
     },
     onClientUploadComplete: (res) => {
-      console.log('Upload completed:', res);
+      console.log('Upload completed (UploadThing):', res);
       setIsUploading(false);
       setUploadProgress({});
-      
-      // Clear progress
-      Object.keys(uploadProgress).forEach(key => {
-        setUploadProgress(prev => ({ ...prev, [key]: 100 }));
-      });
-      
-      onUploadComplete?.(res);
+
+      // Note: actual onUploadComplete callback is handled in onDrop
+      // to include the original File objects
     },
     onUploadError: (error) => {
       console.error('Upload error:', error);
@@ -67,9 +63,9 @@ export default function Dropzone({
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
-    
+
     setIsUploading(true);
-    
+
     // Initialize progress tracking
     const progressMap: Record<string, number> = {};
     acceptedFiles.forEach((file, index) => {
@@ -78,7 +74,21 @@ export default function Dropzone({
     setUploadProgress(progressMap);
 
     try {
-      await startUpload(acceptedFiles);
+      const results = await startUpload(acceptedFiles);
+
+      // Enhance results with original File objects for immediate processing
+      const enhancedResults = results?.map((result: any, index: number) => ({
+        ...result,
+        file: acceptedFiles[index],
+        name: acceptedFiles[index].name,
+        size: acceptedFiles[index].size,
+        type: acceptedFiles[index].type
+      })) || [];
+
+      // Call onUploadComplete manually with enhanced results
+      if (enhancedResults.length > 0) {
+        onUploadComplete?.(enhancedResults);
+      }
     } catch (error) {
       console.error('Upload failed:', error);
       setIsUploading(false);
