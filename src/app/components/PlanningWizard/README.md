@@ -1,6 +1,6 @@
 # Planning Wizard
 
-A visual drag-and-drop land development planning interface that replicates ARGUS Developer functionality for master planned communities.
+A visual drag-and-drop land development planning interface for master planned communities.
 
 ## Features
 
@@ -127,7 +127,7 @@ Navigate to the "Planning Wizard" section in the main application navigation.
 
 ### Responsive Design
 - Works on desktop and tablet
-- Clean, professional ARGUS Developer aesthetic
+- Clean, professional aesthetic
 - Modern flat design with subtle shadows
 
 ## Integration Points

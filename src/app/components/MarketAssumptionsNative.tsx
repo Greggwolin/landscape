@@ -69,7 +69,7 @@ const materioTheme = createTheme({
   }
 });
 
-// Enhanced styled components for ARGUS-style tables
+// Enhanced styled components for financial tables
 const CompactTable = styled(TableContainer)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
@@ -646,7 +646,7 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
                 </Button>
               </Stack>
 
-              {/* ARGUS-Style Steps Table */}
+              {/* Steps Table */}
               <CompactTable component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead>
@@ -1851,7 +1851,7 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
               <CardHeader title="Growth Rates / Inflation" />
               <CardContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.875rem' }}>
-                  ARGUS-style step-based growth assumptions driving project economics.
+                  Step-based growth assumptions driving project economics.
                 </Typography>
 
                 {/* Interactive Growth Rate Cards - Vertically Stacked */}

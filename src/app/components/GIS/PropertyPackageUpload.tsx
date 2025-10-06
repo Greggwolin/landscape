@@ -2,6 +2,301 @@
 
 import React, { useState, useRef } from 'react'
 
+// Inline Field Control Component
+interface InlineFieldControlProps {
+  label: string
+  aiValue: string | number | null
+  confidence: number
+  fieldType?: 'text' | 'number' | 'percentage' | 'area'
+  unit?: string
+  placeholder?: string
+  onValueChange: (choice: 'ai' | 'custom' | 'skip', customValue?: string) => void
+  onCommit?: (finalValue: string | null) => void
+  onChatWithAI?: (fieldContext: string, question: string) => void
+  initialChoice?: 'ai' | 'custom' | 'skip'
+  initialCustomValue?: string
+  fieldContext?: string
+  isCommitted?: boolean
+}
+
+const InlineFieldControl: React.FC<InlineFieldControlProps> = ({
+  label,
+  aiValue,
+  confidence,
+  fieldType = 'text',
+  unit = '',
+  placeholder,
+  onValueChange,
+  onCommit,
+  onChatWithAI,
+  initialChoice = 'ai',
+  initialCustomValue = '',
+  fieldContext = '',
+  isCommitted = false
+}) => {
+  const [choice, setChoice] = useState<'ai' | 'custom' | 'skip'>(initialChoice)
+  const [customValue, setCustomValue] = useState(initialCustomValue)
+  const [showChatDialog, setShowChatDialog] = useState(false)
+  const [chatQuestion, setChatQuestion] = useState('')
+  const [isCommittedState, setIsCommittedState] = useState(isCommitted)
+
+  const handleChoiceChange = (newChoice: 'ai' | 'custom' | 'skip') => {
+    setChoice(newChoice)
+    onValueChange(newChoice, newChoice === 'custom' ? customValue : undefined)
+  }
+
+  const handleCustomValueChange = (value: string) => {
+    setCustomValue(value)
+    if (choice === 'custom') {
+      onValueChange('custom', value)
+    }
+  }
+
+  const handleCommit = () => {
+    let finalValue: string | null = null
+
+    if (choice === 'ai' && aiValue !== null) {
+      finalValue = aiValue.toString()
+    } else if (choice === 'custom' && customValue.trim()) {
+      finalValue = customValue.trim()
+    }
+    // Skip choice results in null
+
+    setIsCommittedState(true)
+    onCommit?.(finalValue)
+  }
+
+  const handleChatWithAI = () => {
+    if (chatQuestion.trim() && onChatWithAI) {
+      onChatWithAI(fieldContext, chatQuestion.trim())
+      setChatQuestion('')
+      setShowChatDialog(false)
+    }
+  }
+
+  const getCurrentValue = () => {
+    if (choice === 'ai') return formatValue(aiValue)
+    if (choice === 'custom') return customValue || ''
+    return 'Skipped'
+  }
+
+  const formatValue = (value: string | number | null): string => {
+    if (value === null || value === undefined || value === '') return 'Not found'
+
+    if (fieldType === 'number' && typeof value === 'number') {
+      return value.toString() + (unit ? ` ${unit}` : '')
+    }
+    if (fieldType === 'percentage' && typeof value === 'number') {
+      return `${value}%`
+    }
+    if (fieldType === 'area' && typeof value === 'number') {
+      return `${value} ${unit || 'acres'}`
+    }
+    return String(value) + (unit ? ` ${unit}` : '')
+  }
+
+  const getConfidenceColor = (conf: number) => {
+    if (conf > 0.9) return 'text-green-400'
+    if (conf > 0.7) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const hasValue = aiValue !== null && aiValue !== undefined && aiValue !== ''
+
+  return (
+    <div className={`border rounded-lg p-3 ${isCommittedState ? 'border-green-500 bg-green-900/10' : 'border-gray-600'}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          {label && <div className="text-xs text-gray-400 mb-2">{label}</div>}
+
+          {isCommittedState ? (
+            // Committed state display
+            <div className="flex items-center gap-2">
+              <span className="text-green-400">✓</span>
+              <span className="text-white font-medium">Committed:</span>
+              <span className="text-gray-300">{getCurrentValue()}</span>
+            </div>
+          ) : (
+            // Edit state
+            <>
+              {hasValue ? (
+                <div className="space-y-3">
+                  {/* AI Value Option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`field_${label.replace(/\s/g, '_')}`}
+                      value="ai"
+                      checked={choice === 'ai'}
+                      onChange={() => handleChoiceChange('ai')}
+                      className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 focus:ring-blue-500"
+                    />
+                    <div className="flex-1 flex items-center gap-2">
+                      <div className={`text-sm ${choice === 'ai' ? 'text-green-400 font-medium' : 'text-white'}`}>
+                        Accept AI: {formatValue(aiValue)}
+                      </div>
+                      <div className={`text-xs ${getConfidenceColor(confidence)}`}>
+                        {Math.round(confidence * 100)}%
+                      </div>
+                      {onChatWithAI && (
+                        <button
+                          onClick={() => setShowChatDialog(true)}
+                          className="text-xs text-blue-400 hover:text-blue-300 ml-2"
+                          title="Chat with AI about this field"
+                        >
+                          💬 Ask AI
+                        </button>
+                      )}
+                    </div>
+                  </label>
+
+                  {/* Custom Value Option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`field_${label.replace(/\s/g, '_')}`}
+                      value="custom"
+                      checked={choice === 'custom'}
+                      onChange={() => handleChoiceChange('custom')}
+                      className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm text-blue-400 mb-1">Enter custom value:</div>
+                      <input
+                        type={fieldType === 'number' || fieldType === 'percentage' || fieldType === 'area' ? 'number' : 'text'}
+                        value={customValue}
+                        onChange={(e) => handleCustomValueChange(e.target.value)}
+                        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+                        disabled={choice !== 'custom'}
+                        className={`w-full text-sm bg-gray-700 border border-gray-500 rounded px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          choice !== 'custom' ? 'opacity-50' : ''
+                        }`}
+                      />
+                    </div>
+                  </label>
+
+                  {/* Skip Option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`field_${label.replace(/\s/g, '_')}`}
+                      value="skip"
+                      checked={choice === 'skip'}
+                      onChange={() => handleChoiceChange('skip')}
+                      className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 focus:ring-blue-500"
+                    />
+                    <div className="text-sm text-orange-400">
+                      Skip this field (don't populate)
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                // No AI value found - show custom and skip options
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`field_${label.replace(/\s/g, '_')}`}
+                      value="custom"
+                      checked={choice === 'custom'}
+                      onChange={() => handleChoiceChange('custom')}
+                      className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm text-blue-400 mb-1">Enter manual value:</div>
+                      <input
+                        type={fieldType === 'number' || fieldType === 'percentage' || fieldType === 'area' ? 'number' : 'text'}
+                        value={customValue}
+                        onChange={(e) => handleCustomValueChange(e.target.value)}
+                        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+                        className="w-full text-sm bg-gray-700 border border-gray-500 rounded px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`field_${label.replace(/\s/g, '_')}`}
+                      value="skip"
+                      checked={choice === 'skip'}
+                      onChange={() => handleChoiceChange('skip')}
+                      className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 focus:ring-blue-500"
+                    />
+                    <div className="text-sm text-orange-400">
+                      Skip this field (AI found no value)
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Commit Button */}
+              {onCommit && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={handleCommit}
+                    disabled={choice === 'custom' && !customValue.trim()}
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✓ Commit Field
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* AI Chat Dialog */}
+      {showChatDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-w-md">
+            <div className="border-b border-gray-700 px-4 py-3">
+              <h3 className="text-lg font-medium text-white">💬 Chat with AI</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Ask AI to clarify or improve the suggested value for this field
+              </p>
+            </div>
+            <div className="p-4">
+              <div className="mb-3">
+                <div className="text-sm text-gray-400 mb-1">Current AI suggestion:</div>
+                <div className="text-white bg-gray-700 rounded px-3 py-2 text-sm">
+                  {formatValue(aiValue)} ({Math.round(confidence * 100)}% confidence)
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm text-gray-400 mb-2">Your question or additional context:</label>
+                <textarea
+                  value={chatQuestion}
+                  onChange={(e) => setChatQuestion(e.target.value)}
+                  placeholder="e.g., 'Can you double-check this value?', 'What part of the document did this come from?', 'I think this should be higher...'"
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowChatDialog(false)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChatWithAI}
+                  disabled={!chatQuestion.trim()}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Ask AI
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface PropertyPackageUploadProps {
   projectId: number
   structureType: 'simple' | 'master_plan'
@@ -32,6 +327,9 @@ interface DocumentAnalysisResult {
       addresses: string[]
       coordinates?: { latitude: number; longitude: number }
       legal_descriptions: string[]
+      city?: string
+      county?: string
+      state?: string
       confidence: number
     }
     parcels: {
@@ -41,6 +339,7 @@ interface DocumentAnalysisResult {
     }
     land_area: {
       total_acres?: number
+      net_acres?: number
       individual_parcels: Array<{
         parcel_id: string
         acres: number
@@ -50,10 +349,37 @@ interface DocumentAnalysisResult {
     }
     development_data?: {
       units_planned?: number
+      density?: number
       land_uses: string[]
-      phases: string[]
+      phases: Array<{
+        name: string
+        units: number
+      }>
+      product_types: Array<{
+        name: string
+        lot_size: string
+        units: number
+      }>
       confidence: number
     }
+    zoning_standards?: {
+      setback_front?: number
+      setback_side?: number
+      setback_rear?: number
+      max_height?: number
+      site_coverage?: number
+      min_lot_area?: number
+      floor_area_ratio?: number
+      confidence: number
+    }
+    contacts?: Array<{
+      name: string
+      title?: string
+      company?: string
+      email?: string
+      phone?: string
+      type: string
+    }>
   }
   field_mappings: Array<{
     source_text: string
@@ -83,6 +409,14 @@ interface ExtractedProjectData {
     land_uses: string[]
     phases: string[]
   }
+  contacts?: Array<{
+    name: string
+    title?: string
+    company?: string
+    email?: string
+    phone?: string
+    type: 'attorney' | 'engineer' | 'consultant' | 'manager' | 'planner' | 'surveyor' | 'architect' | 'contact'
+  }>
   field_mappings: Array<{
     source_text: string
     suggested_field: string
@@ -90,6 +424,23 @@ interface ExtractedProjectData {
     confidence: number
     confirmed: boolean
   }>
+}
+
+interface FieldConfirmation {
+  field: string
+  aiValue: string
+  userChoice: 'accept' | 'custom'
+  customValue: string
+  confidence: number
+}
+
+interface InlineFieldValue {
+  fieldId: string
+  choice: 'ai' | 'custom' | 'skip'
+  customValue?: string
+  aiValue: string | number | null
+  confidence: number
+  isCommitted: boolean
 }
 
 interface IngestionResults {
@@ -134,13 +485,16 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
 
   const [extractedData, setExtractedData] = useState<ExtractedProjectData | null>(null)
   const [showFieldMappings, setShowFieldMappings] = useState(false)
+  const [inlineFieldValues, setInlineFieldValues] = useState<Record<string, InlineFieldValue>>({})
+  const [committedFields, setCommittedFields] = useState<Set<string>>(new Set())
+  const [chatDialogs, setChatDialogs] = useState<Record<string, boolean>>({})
 
   const initializeProcessingSteps = (docCount: number) => [
     { id: 'upload', label: 'Uploading documents', status: 'pending' as const },
     { id: 'analyze', label: `Analyzing ${docCount} document(s) with AI`, status: 'pending' as const },
     { id: 'extract', label: 'Extracting parcel data', status: 'pending' as const },
     { id: 'validate', label: 'Validating geometry and attributes', status: 'pending' as const },
-    { id: 'create', label: `Creating ${structureType === 'master_plan' ? 'areas, phases, and ' : ''}parcels`, status: 'pending' as const },
+    { id: 'create', label: 'Processing contacts and creating parcels', status: 'pending' as const },
     { id: 'finalize', label: 'Finalizing project structure', status: 'pending' as const }
   ]
 
@@ -218,6 +572,8 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
 
       // Update extracted data
       updateExtractedData(analysis)
+
+      // Field confirmations now handled inline during display
 
       // Auto-suggest document name if this is the first document
       if (!packageName && analysis.success && documents.length === 0) {
@@ -314,6 +670,18 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
         }
       }
 
+      // Merge contacts data
+      if (analysis.extracted_data.contacts && analysis.extracted_data.contacts.length > 0) {
+        updated.contacts = updated.contacts || []
+        const existingEmails = new Set(updated.contacts.map(c => c.email).filter(Boolean))
+
+        // Add new contacts that don't already exist (based on email)
+        const newContacts = analysis.extracted_data.contacts.filter(contact =>
+          !contact.email || !existingEmails.has(contact.email)
+        )
+        updated.contacts = [...updated.contacts, ...newContacts]
+      }
+
       // Add field mappings
       const newMappings = analysis.field_mappings.map(mapping => ({
         ...mapping,
@@ -348,6 +716,101 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
       )
       return updated
     })
+  }
+
+
+
+  const handleInlineFieldChange = (fieldId: string, choice: 'ai' | 'custom' | 'skip', customValue?: string) => {
+    setInlineFieldValues(prev => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        fieldId,
+        choice,
+        customValue: customValue || prev[fieldId]?.customValue || '',
+        aiValue: prev[fieldId]?.aiValue || null,
+        confidence: prev[fieldId]?.confidence || 0,
+        isCommitted: false // Reset commit status when field changes
+      }
+    }))
+
+    // Remove from committed fields if it was committed
+    setCommittedFields(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(fieldId)
+      return newSet
+    })
+  }
+
+  const initializeInlineField = (fieldId: string, aiValue: string | number | null, confidence: number) => {
+    if (!inlineFieldValues[fieldId]) {
+      setInlineFieldValues(prev => ({
+        ...prev,
+        [fieldId]: {
+          fieldId,
+          choice: 'ai',
+          customValue: '',
+          aiValue,
+          confidence,
+          isCommitted: false
+        }
+      }))
+    }
+  }
+
+  const handleFieldCommit = (fieldId: string) => {
+    const field = inlineFieldValues[fieldId]
+    if (!field) return
+
+    // Mark field as committed
+    setInlineFieldValues(prev => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        isCommitted: true
+      }
+    }))
+
+    // Add to committed fields set
+    setCommittedFields(prev => new Set([...prev, fieldId]))
+
+    // Get the final value based on choice
+    let finalValue: string | null = null
+    if (field.choice === 'ai') {
+      finalValue = String(field.aiValue || '')
+    } else if (field.choice === 'custom') {
+      finalValue = field.customValue || ''
+    } // skip means finalValue stays null
+
+    console.log(`Field ${fieldId} committed with value:`, finalValue)
+    // TODO: Integrate with backend to save individual field
+  }
+
+  const handleChatWithAI = async (fieldId: string, fieldContext: string, question: string) => {
+    try {
+      // Close chat dialog
+      setChatDialogs(prev => ({ ...prev, [fieldId]: false }))
+
+      console.log(`AI Chat for ${fieldId}:`, { fieldContext, question })
+
+      // TODO: Implement AI chat API call
+      // For now, just show a placeholder response
+      const response = `Based on the context "${fieldContext}", I understand your question: "${question}". Let me analyze this field more carefully...`
+
+      // Update the AI value with refined response
+      setInlineFieldValues(prev => ({
+        ...prev,
+        [fieldId]: {
+          ...prev[fieldId],
+          aiValue: response,
+          confidence: Math.min((prev[fieldId]?.confidence || 0) + 0.1, 1.0) // Slight confidence boost
+        }
+      }))
+
+    } catch (error) {
+      console.error('Error in AI chat:', error)
+      setChatDialogs(prev => ({ ...prev, [fieldId]: false }))
+    }
   }
 
   const getConfirmedFieldMappings = () => {
@@ -476,15 +939,37 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
       await new Promise(resolve => setTimeout(resolve, 600))
       updateProcessingStep('validate', 'completed', 'Data validation passed')
 
-      // Step 5: Create project structure
+      // Step 5: Process contacts
       updateProcessingStep('create', 'processing')
 
-      // Prepare final payload with confirmed field mappings
+      let contactResults = null;
+      if (extractedData?.contacts && extractedData.contacts.length > 0) {
+        try {
+          const contactResponse = await fetch('/api/contacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contacts: extractedData.contacts,
+              project_id: projectId
+            })
+          });
+
+          if (contactResponse.ok) {
+            contactResults = await contactResponse.json();
+            console.log('Contact processing results:', contactResults);
+          }
+        } catch (contactError) {
+          console.error('Contact processing failed:', contactError);
+        }
+      }
+
+      // Prepare final payload with confirmed field mappings and contact results
       const finalDocuments = analyzedDocuments.map(doc => ({
         ...doc,
         ai_analysis: {
           ...doc.ai_analysis,
-          field_mappings: getConfirmedFieldMappings()
+          field_mappings: getConfirmedFieldMappings(),
+          contact_results: contactResults
         }
       }))
 
@@ -507,8 +992,11 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
       }
 
       const results = await response.json()
+      const contactSummary = contactResults
+        ? `${contactResults.results?.matched?.length || 0} matched, ${contactResults.results?.new?.length || 0} new contacts`
+        : 'No contacts processed'
       updateProcessingStep('create', 'completed',
-        `${results.results?.parcels_created || 0} parcels created`)
+        `${results.results?.parcels_created || 0} parcels created, ${contactSummary}`)
 
       // Step 6: Finalize
       updateProcessingStep('finalize', 'processing')
@@ -734,32 +1222,88 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
                           </div>
                         </div>
 
-                        {/* Analysis Results */}
+                        {/* Analysis Results Summary */}
                         {document.analysis && (
                           <div className="bg-gray-800 rounded p-3 text-xs">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                              {/* Geographic Information */}
                               <div>
-                                <div className="text-gray-400 mb-1">Location Data:</div>
-                                <div className="text-white">
+                                <div className="text-gray-400 mb-1">📍 Geographic Data:</div>
+                                <div className="text-white space-y-1">
+                                  {document.analysis.extracted_data.location.city && (
+                                    <div>City: {document.analysis.extracted_data.location.city}</div>
+                                  )}
+                                  {document.analysis.extracted_data.location.county && (
+                                    <div>County: {document.analysis.extracted_data.location.county}</div>
+                                  )}
                                   {document.analysis.extracted_data.location.addresses.length > 0 ? (
-                                    <div>{document.analysis.extracted_data.location.addresses[0]}</div>
+                                    <div className="truncate" title={document.analysis.extracted_data.location.addresses[0]}>
+                                      {document.analysis.extracted_data.location.addresses[0].length > 50
+                                        ? document.analysis.extracted_data.location.addresses[0].substring(0, 47) + '...'
+                                        : document.analysis.extracted_data.location.addresses[0]
+                                      }
+                                    </div>
                                   ) : (
-                                    <div className="text-gray-500">None found</div>
+                                    <div className="text-gray-500">No location found</div>
                                   )}
                                 </div>
                               </div>
+
+                              {/* Land Area & Development */}
                               <div>
-                                <div className="text-gray-400 mb-1">Land Area:</div>
-                                <div className="text-white">
+                                <div className="text-gray-400 mb-1">🏞️ Land Area:</div>
+                                <div className="text-white space-y-1">
                                   {document.analysis.extracted_data.land_area.total_acres ? (
-                                    <div>{document.analysis.extracted_data.land_area.total_acres} acres</div>
+                                    <div>Total: {document.analysis.extracted_data.land_area.total_acres} acres</div>
+                                  ) : null}
+                                  {document.analysis.extracted_data.land_area.net_acres ? (
+                                    <div>Net: {document.analysis.extracted_data.land_area.net_acres} acres</div>
+                                  ) : null}
+                                  {document.analysis.extracted_data.development_data?.units_planned ? (
+                                    <div>Units: {document.analysis.extracted_data.development_data.units_planned}</div>
+                                  ) : null}
+                                  {document.analysis.extracted_data.development_data?.density ? (
+                                    <div>Density: {document.analysis.extracted_data.development_data.density} u/ac</div>
+                                  ) : null}
+                                  {!document.analysis.extracted_data.land_area.total_acres && !document.analysis.extracted_data.development_data?.units_planned && (
+                                    <div className="text-gray-500">No land data found</div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Zoning Standards */}
+                              <div>
+                                <div className="text-gray-400 mb-1">📏 Zoning Standards:</div>
+                                <div className="text-white space-y-1">
+                                  {document.analysis.extracted_data.zoning_standards ? (
+                                    <>
+                                      {document.analysis.extracted_data.zoning_standards.setback_front && (
+                                        <div>Front: {document.analysis.extracted_data.zoning_standards.setback_front}ft</div>
+                                      )}
+                                      {document.analysis.extracted_data.zoning_standards.max_height && (
+                                        <div>Height: {document.analysis.extracted_data.zoning_standards.max_height}ft</div>
+                                      )}
+                                      {document.analysis.extracted_data.zoning_standards.site_coverage && (
+                                        <div>Coverage: {document.analysis.extracted_data.zoning_standards.site_coverage}%</div>
+                                      )}
+                                      {document.analysis.extracted_data.zoning_standards.min_lot_area && (
+                                        <div>Min Lot: {document.analysis.extracted_data.zoning_standards.min_lot_area} sqft</div>
+                                      )}
+                                      {!document.analysis.extracted_data.zoning_standards.setback_front &&
+                                       !document.analysis.extracted_data.zoning_standards.max_height &&
+                                       !document.analysis.extracted_data.zoning_standards.site_coverage &&
+                                       !document.analysis.extracted_data.zoning_standards.min_lot_area && (
+                                        <div className="text-gray-500">No zoning data found</div>
+                                      )}
+                                    </>
                                   ) : (
-                                    <div className="text-gray-500">None found</div>
+                                    <div className="text-gray-500">No zoning data found</div>
                                   )}
                                 </div>
                               </div>
                             </div>
 
+                            {/* Processing Notes */}
                             {document.analysis.processing_notes.length > 0 && (
                               <div className="mt-2 pt-2 border-t border-gray-700">
                                 <div className="text-gray-400 mb-1">Processing Notes:</div>
@@ -798,53 +1342,97 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
           {showFieldMappings && extractedData && extractedData.field_mappings.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-medium text-white mb-4">
-                Confirm Field Population
+                📋 Confirm Field Population
                 <span className="text-sm text-gray-400 ml-2">
-                  ({getConfirmedFieldMappings().length} of {extractedData.field_mappings.length} confirmed)
+                  AI extracted data for confirmation
                 </span>
               </h3>
               <div className="bg-gray-700 rounded-lg p-4">
                 <div className="text-sm text-gray-300 mb-4">
-                  AI found the following data in your documents. Select which fields you want to populate:
+                  AI found the following data in your documents. For each field, choose to accept the AI suggestion or enter your own value:
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {extractedData.field_mappings.map((mapping, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-center justify-between p-3 rounded border-2 cursor-pointer transition-colors ${
-                        mapping.confirmed
-                          ? 'border-green-500 bg-green-900/20'
-                          : 'border-gray-600 hover:border-gray-500'
-                      }`}
-                      onClick={() => toggleFieldMapping(index)}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={mapping.confirmed}
-                            onChange={() => toggleFieldMapping(index)}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                          />
-                          <div>
-                            <div className="text-white text-sm font-medium">
-                              {mapping.suggested_field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </div>
-                            <div className="text-gray-400 text-xs">
-                              Found: "{mapping.source_text}"
-                            </div>
-                          </div>
+                    <div key={index} className="bg-gray-800 rounded-lg p-4 border border-gray-600">
+                      <div className="mb-3">
+                        <div className="text-white text-sm font-medium mb-1">
+                          {mapping.suggested_field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          Found in document: "{mapping.source_text.length > 100 ? mapping.source_text.substring(0, 100) + '...' : mapping.source_text}"
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="text-white text-sm">{mapping.suggested_value}</div>
-                        <div className={`text-xs ${
-                          mapping.confidence > 0.9 ? 'text-green-400' :
-                          mapping.confidence > 0.7 ? 'text-yellow-400' :
-                          'text-red-400'
-                        }`}>
-                          {Math.round(mapping.confidence * 100)}% confidence
+                      <InlineFieldControl
+                        label={`field_${index}_${mapping.suggested_field}`}
+                        aiValue={mapping.suggested_value}
+                        confidence={mapping.confidence}
+                        fieldType="text"
+                        fieldContext={`Field: ${mapping.suggested_field}, Source: ${mapping.source_text}`}
+                        onValueChange={(choice, customValue) => {
+                          const fieldId = `mapping_${index}`
+                          handleInlineFieldChange(fieldId, choice, customValue)
+                          initializeInlineField(fieldId, mapping.suggested_value, mapping.confidence)
+                          // Also toggle the field mapping confirmation
+                          if (choice === 'ai' || (choice === 'custom' && customValue)) {
+                            if (!mapping.confirmed) {
+                              toggleFieldMapping(index)
+                            }
+                          } else {
+                            if (mapping.confirmed) {
+                              toggleFieldMapping(index)
+                            }
+                          }
+                        }}
+                        onCommit={() => handleFieldCommit(`mapping_${index}`)}
+                        onChatWithAI={(fieldContext, question) => handleChatWithAI(`mapping_${index}`, fieldContext, question)}
+                        initialChoice={inlineFieldValues[`mapping_${index}`]?.choice}
+                        initialCustomValue={inlineFieldValues[`mapping_${index}`]?.customValue}
+                        isCommitted={inlineFieldValues[`mapping_${index}`]?.isCommitted || false}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* Contact Processing Display */}
+          {extractedData && extractedData.contacts && extractedData.contacts.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-medium text-white mb-4">Contacts Found in Documents</h3>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-300 mb-4">
+                  AI found {extractedData.contacts.length} contact(s) in your documents. These will be added to your contact database:
+                </div>
+                <div className="space-y-3">
+                  {extractedData.contacts.map((contact, index) => (
+                    <div key={index} className="bg-gray-800 rounded-lg p-3 border border-gray-600">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="text-white font-medium">{contact.name}</div>
+                          {contact.title && (
+                            <div className="text-blue-400 text-sm">{contact.title}</div>
+                          )}
+                          {contact.company && (
+                            <div className="text-gray-300 text-sm">{contact.company}</div>
+                          )}
+                          <div className="flex gap-4 mt-2 text-xs">
+                            {contact.email && (
+                              <div className="text-gray-400">
+                                📧 {contact.email}
+                              </div>
+                            )}
+                            {contact.phone && (
+                              <div className="text-gray-400">
+                                📞 {contact.phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 capitalize">
+                          {contact.type}
                         </div>
                       </div>
                     </div>
@@ -877,6 +1465,18 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
                   <div className="bg-gray-700 rounded p-3">
                     <div className="text-gray-400 mb-1">Planned Units:</div>
                     <div className="text-white">{extractedData.development_info.units_planned} units</div>
+                    {extractedData.total_acres && (
+                      <div className="text-gray-400 text-xs mt-1">
+                        Density: {(extractedData.development_info.units_planned / extractedData.total_acres).toFixed(2)} units/acre
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {extractedData.contacts && extractedData.contacts.length > 0 && (
+                  <div className="bg-gray-700 rounded p-3">
+                    <div className="text-gray-400 mb-1">Contacts Found:</div>
+                    <div className="text-white">{extractedData.contacts.length} contacts identified</div>
                   </div>
                 )}
 

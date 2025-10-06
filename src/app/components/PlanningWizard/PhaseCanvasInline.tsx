@@ -326,9 +326,9 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
   }
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 p-6 bg-gray-950">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg h-full">
+    <div className="flex h-full" style={{ minWidth: 0, overflow: 'visible' }}>
+      <div className="flex-1 p-6 bg-gray-950" style={{ minWidth: 0, overflow: 'visible' }}>
+        <div className="bg-gray-800 border border-gray-700 rounded-lg h-full" style={{ minWidth: 0, overflow: 'visible' }}>
           {/* Header with Navigation Tiles */}
           <div className="border-b border-gray-700 p-4">
             <NavigationTiles
@@ -344,7 +344,7 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
           </div>
 
           {/* Phase Canvas */}
-          <div className="p-6 h-full bg-gray-900">
+          <div className="p-6 h-full bg-gray-900" style={{ minWidth: 0, overflow: 'visible' }}>
             {/* Phase Header */}
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-white">{phase.name}</h2>
@@ -356,98 +356,144 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
             <DropZone
               accepts={['parcel']}
               onDrop={handleDropParcel}
-              className="w-full h-96 bg-gray-700 border-2 border-solid border-gray-600 rounded-lg"
+              className="bg-gray-700 border-2 border-solid border-gray-600 rounded-lg"
+              style={{ width: '100%', minWidth: '400px', height: '384px', overflow: 'visible' }}
             >
-              <div className="p-4 grid grid-cols-1 gap-4 h-full overflow-y-auto">
+              <div style={{
+                padding: '16px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '16px',
+                height: '100%',
+                overflowY: 'auto',
+                width: '100%'
+              }}>
                 {phase.parcels.map((parcel) => {
+                  console.log('🔴 RENDERING FROM PhaseCanvasInline.tsx - Parcel:', parcel.name)
                   const isEditing = editingParcel === parcel.id
+                  const bgColor = parcel.landUse === 'C' ? '#ea580c' : '#16a34a'
 
                   return (
                     <div
                       key={parcel.id}
-                      className={`${getLandUseColor(parcel.landUse)} ${getLandUseBorderColor(parcel.landUse)} text-white border-2 rounded-lg p-3 ${isEditing ? 'ring-2 ring-blue-400' : 'cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-white'} transition-all duration-200 h-fit`}
-                    onClick={() => {
-                      if (onOpenParcel) {
-                        onOpenParcel(area.id, phase.id, parcel.id)
-                        return
-                      }
-                      if (!isEditing) {
-                        handleEditParcel(parcel.id, parcel)
-                      }
-                    }}
+                      style={{
+                        backgroundColor: bgColor,
+                        color: 'white',
+                        border: isEditing ? '2px solid #60a5fa' : '2px solid rgba(255,255,255,0.2)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        minWidth: '200px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        cursor: isEditing ? 'default' : 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => {
+                        if (onOpenParcel) {
+                          onOpenParcel(area.id, phase.id, parcel.id)
+                          return
+                        }
+                        if (!isEditing) {
+                          handleEditParcel(parcel.id, parcel)
+                        }
+                      }}
                     >
-                      <div className="text-center mb-3">
-                        <div className="font-bold text-sm mb-1 leading-tight">
+                      <div style={{
+                        backgroundColor: 'yellow',
+                        color: 'black',
+                        padding: '4px',
+                        fontWeight: 'bold'
+                      }}>
+                        TEST - CODE IS UPDATING
+                      </div>
+                      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>
                           Parcel {parcel.name.replace('Parcel: ', '')}
                         </div>
                         {(parcel as any).description && (
-                          <p className="text-xs text-gray-100 opacity-90 mb-2">{(parcel as any).description}</p>
+                          <p style={{ fontSize: '12px', opacity: 0.9, marginBottom: '8px' }}>{(parcel as any).description}</p>
                         )}
                         {parcel.notes && (
-                          <p className="text-xs text-gray-200 opacity-80 italic">{parcel.notes}</p>
+                          <p style={{ fontSize: '12px', opacity: 0.8, fontStyle: 'italic' }}>{parcel.notes}</p>
                         )}
                       </div>
 
-                      <div className="w-full text-xs mb-3 space-y-1">
-                        <div className="flex items-center">
-                          <span className="opacity-90 w-16 text-left">Family:</span>
-                          <div className="flex-1">
+                      <div style={{ width: '100%', fontSize: '13px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ opacity: 0.9, minWidth: '64px', flexShrink: 0 }}>Family:</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             {isEditing ?
                               renderInlineInput('family', '', 'text', parcel.id) :
-                              <span className="font-semibold">-</span>
+                              <span style={{ fontWeight: 600, wordWrap: 'break-word', overflowWrap: 'anywhere' }}>-</span>
                             }
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className="opacity-90 w-16 text-left">Subtype:</span>
-                          <div className="flex-1">
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ opacity: 0.9, minWidth: '64px', flexShrink: 0 }}>Type:</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             {isEditing ?
                               renderInlineInput('subtype', '', 'text', parcel.id) :
-                              <span className="font-semibold">-</span>
+                              <span style={{ fontWeight: 600, wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.landUse || '-'}</span>
                             }
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className="opacity-90 w-14 text-left">Product:</span>
-                          <div className="flex-1 min-w-[7.5rem]">
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ opacity: 0.9, minWidth: '64px', flexShrink: 0 }}>Product:</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             {isEditing ?
                               renderInlineInput('product', parcel.product, 'text', parcel.id) :
-                              <span className="font-semibold">{parcel.product || '-'}</span>
+                              <span style={{ fontWeight: 600, wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.product || '-'}</span>
                             }
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className="opacity-90 w-16 text-left">Acres:</span>
-                          <div className="flex-1">
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ opacity: 0.9, minWidth: '64px', flexShrink: 0 }}>Acres:</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             {isEditing ?
                               renderInlineInput('acres', parcel.acres, 'number', parcel.id) :
-                              <span className="font-semibold">{parcel.acres || 0}</span>
+                              <span style={{ fontWeight: 600, wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.acres || 0}</span>
                             }
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className="opacity-90 w-16 text-left">Units:</span>
-                          <div className="flex-1">
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ opacity: 0.9, minWidth: '64px', flexShrink: 0 }}>Units:</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             {isEditing ?
                               renderInlineInput('units', parcel.units, 'number', parcel.id) :
-                              <span className="font-semibold">{parcel.units || 0}</span>
+                              <span style={{ fontWeight: 600, wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.units || 0}</span>
                             }
                           </div>
                         </div>
                       </div>
 
-                      {/* Action buttons - only show when editing */}
                       {isEditing && (
-                        <div className="flex gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleSaveParcel(parcel.id)}
-                            className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#16a34a',
+                              color: 'white',
+                              fontSize: '12px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
                           >
                             Save
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors"
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#4b5563',
+                              color: 'white',
+                              fontSize: '12px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
                           >
                             Cancel
                           </button>

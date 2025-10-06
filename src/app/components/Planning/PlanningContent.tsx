@@ -12,6 +12,7 @@ interface Parcel {
   phase_name: string;
   parcel_name: string;
   usecode: string;
+  type_code?: string;
   product: string;
   acres: number;
   units: number;
@@ -52,14 +53,30 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
   const fetcher = (url: string) => fetchJson(url)
-  const { data: parcelsData, error: parcelsError, mutate: mutateParcels } = useSWR(projectId ? `/api/parcels?project_id=${projectId}` : null, fetcher)
-  const { data: phasesData, error: phasesError, mutate: mutatePhases } = useSWR(projectId ? `/api/phases?project_id=${projectId}` : null, fetcher)
+  const { data: parcelsData, error: parcelsError, mutate: mutateParcels } = useSWR(
+    projectId ? `/api/parcels?project_id=${projectId}` : null,
+    fetcher,
+    { revalidateOnFocus: true, refreshInterval: 0 }
+  )
+  const { data: phasesData, error: phasesError, mutate: mutatePhases } = useSWR(
+    projectId ? `/api/phases?project_id=${projectId}` : null,
+    fetcher,
+    { revalidateOnFocus: true, refreshInterval: 0 }
+  )
 
   useEffect(() => {
     if (parcelsData) setParcels(Array.isArray(parcelsData) ? parcelsData : [])
     if (phasesData) setPhases(Array.isArray(phasesData) ? phasesData : [])
     if (projectId != null) setLoading(false)
   }, [parcelsData, phasesData, projectId])
+
+  // Refresh data when component mounts
+  useEffect(() => {
+    if (projectId) {
+      mutateParcels()
+      mutatePhases()
+    }
+  }, [projectId, mutateParcels, mutatePhases])
 
   // Listen for data changes from other components
   useEffect(() => {
@@ -69,11 +86,15 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         // Refresh parcel data when changes occur
         mutateParcels()
       }
+      if (entity === 'phase' && changedProjectId === projectId) {
+        // Refresh phase data when changes occur
+        mutatePhases()
+      }
     }
 
     window.addEventListener('dataChanged', handleDataChange as EventListener)
     return () => window.removeEventListener('dataChanged', handleDataChange as EventListener)
-  }, [projectId, mutateParcels])
+  }, [projectId, mutateParcels, mutatePhases])
 
   const {
     labels,
@@ -227,11 +248,11 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             <h3 className="text-lg font-semibold text-white">{level1LabelPlural}</h3>
           </div>
           <div className="p-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
               {areaCards.map(({ key, title, stats }) => (
-                <div key={key} className="bg-gray-700 rounded p-3 border border-gray-600">
+                <div key={key} className="bg-gray-700 rounded p-3 border border-gray-600 min-w-[200px]">
                   <div className="text-center">
-                    <div className="text-lg font-bold text-white mb-1">{title}</div>
+                    <div className="text-lg font-bold text-white mb-1 truncate" title={title}>{title}</div>
                     <div className="space-y-1 text-xs text-gray-300">
                       <div>{stats.grossAcres} acres</div>
                       <div>{stats.phases} {level2LabelPlural}</div>
@@ -670,7 +691,7 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
             selectedFamily === '2' ? 'bg-purple-900 text-purple-300' :
             'bg-indigo-900 text-indigo-300'
           }`}>
-            {parcel.product || 'No Type'}
+            {parcel.type_code || 'No Type'}
           </span>
         )}
       </td>
@@ -727,8 +748,8 @@ const PhaseRow: React.FC<{ phase: Phase; index: number; selectedFilters: string[
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Get unique use codes for this phase
-  const phaseUseCodes = [...new Set(parcels.filter(p => p.phase_name === phase.phase_name).map(p => p.usecode))].filter(Boolean)
+  // Get unique type codes for this phase
+  const phaseUseCodes = [...new Set(parcels.filter(p => p.phase_name === phase.phase_name).map(p => p.type_code))].filter(Boolean)
 
   useEffect(() => {
     // no-op defaults; label/description come from DB if/when added to GET

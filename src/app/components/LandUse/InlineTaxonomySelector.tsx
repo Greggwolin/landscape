@@ -178,17 +178,18 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
   };
 
   return (
-    <table className="w-full text-xs">
+    <table className="text-xs">
       <tbody>
         {/* Family Selector */}
         <tr>
-          <td className="opacity-90 align-top pr-1 w-12">Family:</td>
-          <td className="font-medium w-16">
+          <td className="opacity-90 align-top pr-2 whitespace-nowrap">Family:</td>
+          <td className="font-medium">
             <select
               value={value.family_name || ''}
               onChange={(e) => handleFamilyChange(e.target.value)}
               disabled={disabled}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+              className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+              style={{ width: '133px' }}
             >
               <option value="">Select...</option>
               {families.map((family) => (
@@ -203,13 +204,14 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
         {/* Type Selector */}
         {value.family_name && (
           <tr>
-            <td className="opacity-90 align-top pr-1">Type:</td>
+            <td className="opacity-90 align-top pr-2 whitespace-nowrap">Type:</td>
             <td className="font-medium">
               <select
                 value={value.type_code || ''}
                 onChange={(e) => handleTypeChange(e.target.value)}
                 disabled={disabled || !value.family_name}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                style={{ width: '133px' }}
               >
                 <option value="">Select...</option>
                 {types.map((type) => (
@@ -225,13 +227,14 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
         {/* Product Selector */}
         {value.type_code && (
           <tr>
-            <td className="opacity-90 align-top pr-1">Product:</td>
+            <td className="opacity-90 align-top pr-2 whitespace-nowrap">Product:</td>
             <td className="font-medium">
               <select
                 value={value.product_code || ''}
                 onChange={(e) => handleProductChange(e.target.value)}
                 disabled={disabled || !value.type_code}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                style={{ width: '133px' }}
               >
                 <option value="">Select...</option>
                 {products.map((product) => (

@@ -357,7 +357,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                   )}
                                 </div>
                                 {phase.parcels.length > 0 && (
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 auto-rows-max">
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '4px' }}>
                                     {phase.parcels.map((parcel) => {
                                       const isEditing =
                                         editing && editing.areaId === area.id && editing.phaseId === phase.id && editing.parcelId === parcel.id
@@ -368,8 +368,8 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                       return (
                                         <div
                                           key={parcel.id}
-                                          className={`${tileColor} ${borderColor} text-white rounded text-xs cursor-pointer border hover:outline hover:outline-2 transition-all duration-200 overflow-hidden ${isEditing ? 'col-span-2 p-2 min-h-48' : 'p-1.5'}`}
-                                          style={{outlineColor: 'rgb(33,88,226)'}}
+                                          className={`${tileColor} ${borderColor} text-white rounded text-sm cursor-pointer border hover:outline hover:outline-2 transition-all duration-200 ${isEditing ? 'p-2 min-h-48' : 'p-1.5'}`}
+                                          style={{outlineColor: 'rgb(33,88,226)', minWidth: '220px', overflow: 'visible'}}
                                           onClick={(e) => {
                                             if (!isEditing) {
                                               e.stopPropagation()
@@ -397,30 +397,32 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                 }}
                                                 onChange={(values) => setDraft((prev) => ({ ...prev, ...values }))}
                                               />
-                                              <table className="w-full text-xs">
+                                              <table className="text-xs mt-2">
                                                 <tbody>
                                                   <tr>
-                                                    <td className="opacity-90 align-top pr-1 w-12">Acres:</td>
-                                                    <td className="font-medium w-16">
+                                                    <td className="opacity-90 align-top pr-2 whitespace-nowrap">Acres:</td>
+                                                    <td className="font-medium">
                                                       <input
                                                         type="number"
                                                         step="0.1"
                                                         value={draft.acres || ''}
                                                         onChange={(e) => setDraft((prev) => ({ ...prev, acres: parseFloat(e.target.value) || 0 }))}
-                                                        className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                        className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                        style={{ width: '70px' }}
                                                         placeholder="Acres"
                                                       />
                                                     </td>
                                                   </tr>
                                                   {draft.family_name !== 'Commercial' && (
                                                     <tr>
-                                                      <td className="opacity-90 align-top pr-1">Units:</td>
+                                                      <td className="opacity-90 align-top pr-2 whitespace-nowrap">Units:</td>
                                                       <td className="font-medium">
                                                         <input
                                                           type="text"
                                                           value={draft.units}
                                                           onChange={(e) => setDraft((prev) => ({ ...prev, units: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                                                          className="w-full bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                          className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
+                                                          style={{ width: '70px' }}
                                                         />
                                                       </td>
                                                     </tr>
@@ -456,33 +458,33 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                   Parcel {parcel.name.replace('Parcel: ', '')}
                                                 </div>
                                               </div>
-                                              <table className="w-full text-xs">
+                                              <table className="w-full text-sm">
                                                 <tbody>
                                                   <tr>
-                                                    <td className="opacity-90 align-top pr-1 w-12">Family:</td>
-                                                    <td className="font-medium w-16">{parcel.family_name || parcel.landUse}</td>
+                                                    <td className="opacity-90 align-top pr-1 whitespace-nowrap">Family:</td>
+                                                    <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.family_name || parcel.landUse}</td>
                                                   </tr>
                                                   {parcel.type_code && (
                                                     <tr>
-                                                      <td className="opacity-90 align-top pr-1">Type:</td>
-                                                      <td className="font-medium">{parcel.type_code}</td>
+                                                      <td className="opacity-90 align-top pr-1 whitespace-nowrap">Type:</td>
+                                                      <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.type_code}</td>
                                                     </tr>
                                                   )}
                                                   {/* Product row - now positioned after Type */}
                                                   {parcel.product_code && (
                                                     <tr>
-                                                      <td className="opacity-90 align-top pr-1">Product:</td>
-                                                      <td className="font-medium">{parcel.product_code}</td>
+                                                      <td className="opacity-90 align-top pr-1 whitespace-nowrap">Product:</td>
+                                                      <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.product_code}</td>
                                                     </tr>
                                                   )}
                                                   <tr>
-                                                    <td className="opacity-90 align-top pr-1">Acres:</td>
-                                                    <td className="font-medium">{parcel.acres}</td>
+                                                    <td className="opacity-90 align-top pr-1 whitespace-nowrap">Acres:</td>
+                                                    <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.acres}</td>
                                                   </tr>
                                                   {parcel.family_name !== 'Commercial' && (
                                                     <tr>
-                                                      <td className="opacity-90 align-top pr-1">Units:</td>
-                                                      <td className="font-medium">{parcel.units || 0}</td>
+                                                      <td className="opacity-90 align-top pr-1 whitespace-nowrap">Units:</td>
+                                                      <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.units || 0}</td>
                                                     </tr>
                                                   )}
                                                 </tbody>
