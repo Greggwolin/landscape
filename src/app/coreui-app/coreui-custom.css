@@ -1,0 +1,613 @@
+/* CoreUI Default Theme - Dark Sidebar + Light Content */
+
+:root {
+  --cui-body-font-size: 0.875rem;
+  --cui-font-size-sm: 0.75rem;
+  --cui-font-size-base: 0.875rem;
+}
+
+/* Light theme for main content */
+body {
+  background-color: #ebedef !important;
+  font-size: 0.875rem;
+  color: #4f5d73 !important;
+}
+
+/* Main wrapper - controlled offset so content tracks sidebar */
+.coreui-app__wrapper {
+  background-color: #ebedef !important;
+  min-height: 100vh;
+  position: relative !important;
+  margin-left: 280px !important;
+  width: calc(100% - 280px) !important;
+  transition: margin-left 0.15s ease-in-out, width 0.15s ease-in-out !important;
+}
+
+/* When sidebar is hidden, remove offset */
+.coreui-app.sidebar-hidden .coreui-app__wrapper {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
+
+/* Sidebar - DARK theme (CoreUI default) */
+.sidebar,
+.sidebar-dark {
+  width: 280px !important;
+  font-size: 0.875rem;
+  background: #3c4b64 !important;
+  border-right: none !important;
+}
+
+/* Ensure nav items don't wrap and align left - FORCE OVERRIDE */
+.sidebar .sidebar-nav .nav-link,
+.sidebar .sidebar-nav .nav-group-toggle,
+.sidebar-nav .nav-link,
+.sidebar-nav .nav-group-toggle,
+a.nav-link,
+button.nav-group-toggle {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.625rem 0.5rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  justify-content: flex-start !important;
+}
+
+/* Nested items under groups - indented */
+.sidebar-dark .sidebar-nav .nav-group .nav-link,
+.sidebar.sidebar-dark .nav-group .nav-link,
+.sidebar .nav-group .nav-link {
+  padding-left: 2.5rem !important;
+}
+
+.sidebar-brand {
+  padding: 0.75rem 1rem !important;
+  font-size: 1.125rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: #303c54 !important;
+}
+
+.sidebar-brand img {
+  margin-left: 0 !important;
+  display: block !important;
+}
+
+/* CoreUI dark sidebar styling - Override default padding */
+.sidebar-dark .sidebar-nav .nav-link,
+.sidebar.sidebar-dark .nav-link,
+.nav-link {
+  padding: 0.625rem 0.5rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  font-size: 0.875rem !important;
+  color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-link:hover,
+.sidebar.sidebar-dark .nav-link:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-link.active,
+.sidebar.sidebar-dark .nav-link.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-icon,
+.sidebar.sidebar-dark .nav-icon,
+.nav-icon {
+  width: 1.125rem !important;
+  height: 1.125rem !important;
+  margin-right: 0.5rem !important;
+  margin-left: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-group-toggle,
+.sidebar.sidebar-dark .nav-group-toggle,
+.nav-group-toggle {
+  padding: 0.625rem 0.5rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  font-size: 0.875rem !important;
+  color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-group-toggle:hover,
+.sidebar.sidebar-dark .nav-group-toggle:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+}
+
+.sidebar-dark .sidebar-nav .nav-title,
+.sidebar.sidebar-dark .nav-title,
+.nav-title {
+  padding: 0.75rem 0.5rem 0.25rem !important;
+  padding-left: 0.5rem !important;
+  font-size: 0.6875rem !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+/* Header - Light theme */
+.header {
+  min-height: 56px !important;
+  padding: 0.5rem 1rem !important;
+  background: #fff !important;
+  border-bottom: 1px solid #d8dbe0 !important;
+}
+
+.header .btn {
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+.header .dropdown-toggle {
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+.header img {
+  max-height: 40px !important;
+}
+
+/* Dropdowns - Light theme */
+.dropdown-menu {
+  font-size: 0.875rem !important;
+  background: #fff !important;
+  border: 1px solid #d8dbe0 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.dropdown-item {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.875rem !important;
+  color: #4f5d73 !important;
+}
+
+.dropdown-item:hover {
+  background: #ebedef !important;
+  color: #321fdb !important;
+}
+
+.dropdown-divider {
+  border-color: #d8dbe0 !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Main content area */
+.body {
+  padding: 1.5rem !important;
+  background: #ebedef !important;
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  width: 100% !important;
+}
+
+/* Cards - Light theme with subtle shadows */
+.card {
+  font-size: 0.875rem;
+  background: #fff !important;
+  border: 1px solid #d8dbe0 !important;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+  border-radius: 0.375rem !important;
+}
+
+.card-header {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 1rem !important;
+  font-weight: 600;
+  background: #f0f0f1 !important;
+  border-bottom: 1px solid #d8dbe0 !important;
+  color: #4f5d73 !important;
+}
+
+.card-body {
+  padding: 1.25rem !important;
+}
+
+.card-title {
+  font-size: 1.125rem !important;
+  margin-bottom: 0.5rem !important;
+  color: #321fdb !important;
+  font-weight: 600;
+}
+
+/* Buttons - CoreUI primary colors */
+.btn {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.875rem !important;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.8125rem !important;
+}
+
+.btn-primary {
+  background-color: #321fdb !important;
+  border-color: #321fdb !important;
+}
+
+.btn-primary:hover {
+  background-color: #2819b0 !important;
+  border-color: #2819b0 !important;
+}
+
+.btn-secondary {
+  background-color: #9da5b1 !important;
+  border-color: #9da5b1 !important;
+}
+
+/* Forms - Light theme */
+.form-label {
+  margin-bottom: 0.5rem !important;
+  font-size: 0.875rem !important;
+  color: #4f5d73 !important;
+  font-weight: 500;
+}
+
+.form-control,
+.form-select {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  background: #fff !important;
+  border: 1px solid #b1b7c1 !important;
+  color: #4f5d73 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #321fdb !important;
+  box-shadow: 0 0 0 0.2rem rgba(50, 31, 219, 0.25) !important;
+}
+
+/* Tables - Light theme */
+.table {
+  font-size: 0.875rem !important;
+  color: #4f5d73 !important;
+  background: #fff !important;
+}
+
+.table td,
+.table th {
+  padding: 0.75rem !important;
+  border-color: #d8dbe0 !important;
+}
+
+.table thead th {
+  background-color: #f0f0f1 !important;
+  font-weight: 600;
+  color: #4f5d73 !important;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f8f9fa !important;
+}
+
+/* Badges - Colorful */
+.badge {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500;
+}
+
+/* Alerts - Light theme */
+.alert {
+  padding: 1rem !important;
+  font-size: 0.875rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Footer - Light theme */
+.footer {
+  padding: 0.75rem 1.5rem !important;
+  font-size: 0.75rem !important;
+  background: #fff !important;
+  border-top: 1px solid #d8dbe0 !important;
+  color: #768192 !important;
+}
+
+/* Avatar */
+.avatar {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.875rem !important;
+}
+
+/* Container */
+.container-fluid {
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+/* Text colors */
+.text-muted {
+  color: #768192 !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #4f5d73 !important;
+}
+
+/* Ensure no overflow */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Make sidebar toggler more visible */
+.sidebar-toggler {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.87) !important;
+}
+
+/* ========================================
+   FORCE LIGHT THEME ON PAGE CONTENT
+   Override dark theme from existing components
+   ======================================== */
+
+/* Force light backgrounds on all dark Tailwind classes */
+.bg-gray-950,
+.bg-gray-900,
+.bg-gray-800,
+.bg-gray-700 {
+  background-color: #fff !important;
+}
+
+/* Force light text colors */
+.text-white,
+.text-gray-100,
+.text-gray-200,
+.text-gray-300 {
+  color: #4f5d73 !important;
+}
+
+/* Fix dark borders */
+.border-gray-700,
+.border-gray-600 {
+  border-color: #d8dbe0 !important;
+}
+
+/* Fix muted/secondary text */
+.text-gray-400,
+.text-gray-500,
+.text-gray-600 {
+  color: #768192 !important;
+}
+
+/* Keep main content area light */
+main {
+  background-color: #ebedef !important;
+  color: #4f5d73 !important;
+}
+
+/* Fix any dark containers in content */
+.body nav,
+.body aside,
+.body section,
+.body article {
+  background-color: #fff !important;
+}
+
+/* Override component-specific dark styles */
+.body .border {
+  border-color: #d8dbe0 !important;
+}
+
+/* Ensure content within body is light */
+.body > * {
+  color: #4f5d73 !important;
+}
+
+/* Fix any embedded dark cards */
+.body .card,
+.body div[class*="bg-gray"] {
+  background-color: #fff !important;
+  border: 1px solid #d8dbe0 !important;
+  color: #4f5d73 !important;
+}
+
+/* Override existing page component styles */
+.body div {
+  color: #4f5d73 !important;
+}
+
+.body p,
+.body span,
+.body label {
+  color: #4f5d73 !important;
+}
+
+/* Fix stat/metric displays */
+.text-4xl,
+.text-3xl,
+.text-5xl {
+  color: #321fdb !important;
+  font-weight: 700 !important;
+}
+
+/* Logo in sidebar - invert for dark background */
+.sidebar-brand img {
+  filter: brightness(0) invert(1) !important;
+}
+
+/* ========================================
+   PLANNING & OVERVIEW PAGE STYLING
+   Colored tiles, chips, and metric cards
+   ======================================== */
+
+/* Metric cards/tiles with different colors */
+.body > div > div[class*="grid"] > div,
+.body > div > div[class*="flex"] > div {
+  background-color: #fff !important;
+  border: 1px solid #d8dbe0 !important;
+  border-radius: 0.5rem !important;
+  padding: 1.5rem !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+}
+
+/* Colored accent borders for tiles */
+.body > div > div[class*="grid"] > div:nth-child(1),
+.body > div > div[class*="grid"] > div:nth-child(4n+1) {
+  border-left: 4px solid #321fdb !important;
+}
+
+.body > div > div[class*="grid"] > div:nth-child(2),
+.body > div > div[class*="grid"] > div:nth-child(4n+2) {
+  border-left: 4px solid #2eb85c !important;
+}
+
+.body > div > div[class*="grid"] > div:nth-child(3),
+.body > div > div[class*="grid"] > div:nth-child(4n+3) {
+  border-left: 4px solid #39f !important;
+}
+
+.body > div > div[class*="grid"] > div:nth-child(4),
+.body > div > div[class*="grid"] > div:nth-child(4n+4) {
+  border-left: 4px solid #f9b115 !important;
+}
+
+/* Table styling for overview pages */
+.body table {
+  background-color: #fff !important;
+  border: 1px solid #d8dbe0 !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden !important;
+}
+
+.body table thead {
+  background-color: #f0f0f1 !important;
+}
+
+.body table thead th {
+  color: #4f5d73 !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid #d8dbe0 !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.body table tbody td {
+  color: #4f5d73 !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid #e9ecef !important;
+}
+
+.body table tbody tr:hover {
+  background-color: #f8f9fa !important;
+}
+
+/* Stat numbers - make them prominent */
+.body div[class*="text-4xl"],
+.body div[class*="text-3xl"],
+.body div[class*="text-5xl"] {
+  color: #321fdb !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+/* Small labels above stats */
+.body div[class*="text-xs"],
+.body div[class*="text-sm"] {
+  color: #768192 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+}
+
+/* Color-coded status indicators */
+.body span[class*="text-green"],
+.body div[class*="text-green"] {
+  color: #2eb85c !important;
+}
+
+.body span[class*="text-blue"],
+.body div[class*="text-blue"] {
+  color: #321fdb !important;
+}
+
+.body span[class*="text-red"],
+.body div[class*="text-red"] {
+  color: #e55353 !important;
+}
+
+.body span[class*="text-yellow"],
+.body div[class*="text-yellow"],
+.body span[class*="text-orange"],
+.body div[class*="text-orange"] {
+  color: #f9b115 !important;
+}
+
+/* Planning page specific - phase/area tiles */
+.body button[class*="border-r-2"] {
+  border-right: 3px solid #321fdb !important;
+  background-color: #f0f0f1 !important;
+}
+
+/* Override any dark chip backgrounds */
+.body span[class*="rounded"] {
+  background-color: #ebedef !important;
+  color: #4f5d73 !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+}
+
+/* Icon colors in tiles */
+.body svg {
+  color: #768192 !important;
+}
+
+/* Ensure metric containers have proper spacing */
+.body > div[class*="space-y"] > div {
+  margin-bottom: 1.5rem !important;
+}
+
+/* ========================================
+   CRITICAL OVERRIDES - Must be last
+   Force navigation alignment to match logo
+   ======================================== */
+
+/* Reset ALL padding on sidebar nav container */
+.sidebar-nav {
+  padding: 0 !important;
+}
+
+/* CoreUI nav items - remove ALL default padding */
+.sidebar-nav .nav-link,
+.sidebar-nav .nav-group-toggle,
+.sidebar-nav .nav-title,
+.sidebar-nav > div,
+.sidebar-nav li,
+.sidebar-nav ul {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Force icon alignment - no left margin */
+.sidebar-nav .nav-icon {
+  margin-left: 0 !important;
+  margin-right: 0.5rem !important;
+}
+
+/* Custom padding classes that will work */
+.nav-item-wrapper {
+  padding-left: 1rem !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+}
+
+.nav-item-nested {
+  padding-left: 2.5rem !important;
+}
