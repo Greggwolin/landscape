@@ -32,14 +32,14 @@ export async function POST(
       WHERE doc_id = ${docId}
     `;
 
-    if (docCheck.rows.length === 0) {
+    if (docCheck.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Document not found' },
         { status: 404 }
       );
     }
 
-    const currentProfile = docCheck.rows[0].profile_json || {};
+    const currentProfile = docCheck[0].profile_json || {};
 
     // If folder_id is null, remove from folder
     if (data.folder_id === null) {
@@ -64,14 +64,14 @@ export async function POST(
       WHERE folder_id = ${data.folder_id} AND is_active = true
     `;
 
-    if (folderCheck.rows.length === 0) {
+    if (folderCheck.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Folder not found' },
         { status: 404 }
       );
     }
 
-    const folderProfile = folderCheck.rows[0].default_profile || {};
+    const folderProfile = folderCheck[0].default_profile || {};
 
     // Apply inheritance if requested
     let newProfile = currentProfile;
@@ -91,7 +91,7 @@ export async function POST(
           ) as new_profile
         `;
 
-        newProfile = inheritResult.rows[0].new_profile;
+        newProfile = inheritResult[0].new_profile;
         inherited = true;
       }
     }
@@ -174,7 +174,7 @@ export async function GET(
       WHERE fl.doc_id = ${docId}
     `;
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return NextResponse.json({
         success: true,
         doc_id: docId,
@@ -184,7 +184,7 @@ export async function GET(
       });
     }
 
-    const link = result.rows[0];
+    const link = result[0];
 
     return NextResponse.json({
       success: true,
@@ -192,7 +192,7 @@ export async function GET(
       folder_id: link.folder_id,
       folder_name: link.folder_name,
       folder_path: link.folder_path,
-      linked_at: link.linked_at.toISOString(),
+      linked_at: link.linked_at,
       inherited: link.inherited,
       default_profile: link.default_profile,
     });

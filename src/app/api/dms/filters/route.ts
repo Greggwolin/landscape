@@ -12,26 +12,30 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const includeInactive = searchParams.get('include_inactive') === 'true';
 
-    const whereClause = includeInactive ? '' : 'WHERE is_active = true';
-
-    const result = await sql.query(
-      `SELECT
-        filter_id,
-        name,
-        query,
-        is_active,
-        created_at,
-        updated_at
-       FROM landscape.core_doc_smartfilter
-       ${whereClause}
-       ORDER BY name`
-    );
-
-    const filters = result.rows.map(row => ({
-      ...row,
-      created_at: row.created_at.toISOString(),
-      updated_at: row.updated_at.toISOString(),
-    }));
+    const filters = includeInactive
+      ? await sql`
+          SELECT
+            filter_id,
+            name,
+            query,
+            is_active,
+            created_at,
+            updated_at
+          FROM landscape.core_doc_smartfilter
+          ORDER BY name
+        `
+      : await sql`
+          SELECT
+            filter_id,
+            name,
+            query,
+            is_active,
+            created_at,
+            updated_at
+          FROM landscape.core_doc_smartfilter
+          WHERE is_active = true
+          ORDER BY name
+        `;
 
     return NextResponse.json({
       success: true,
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = CreateSmartFilterZ.parse(body);
 
-    const result = await sql`
+    const filters = await sql`
       INSERT INTO landscape.core_doc_smartfilter (
         name,
         query
@@ -78,15 +82,11 @@ export async function POST(request: NextRequest) {
         updated_at
     `;
 
-    const filter = result.rows[0];
+    const filter = filters[0];
 
     return NextResponse.json({
       success: true,
-      filter: {
-        ...filter,
-        created_at: filter.created_at.toISOString(),
-        updated_at: filter.updated_at.toISOString(),
-      },
+      filter,
     }, { status: 201 });
 
   } catch (error) {
@@ -129,66 +129,46 @@ export async function PATCH(request: NextRequest) {
       WHERE filter_id = ${data.filter_id}
     `;
 
-    if (filterCheck.rows.length === 0) {
+    if (filterCheck.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Smart filter not found' },
         { status: 404 }
       );
     }
 
-    // Build UPDATE query
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
+    // Build field list for validation
+    const hasUpdates = data.name !== undefined || data.query !== undefined || data.is_active !== undefined;
 
-    if (data.name !== undefined) {
-      updates.push(`name = $${paramIndex++}`);
-      values.push(data.name);
-    }
-
-    if (data.query !== undefined) {
-      updates.push(`query = $${paramIndex++}`);
-      values.push(JSON.stringify(data.query));
-    }
-
-    if (data.is_active !== undefined) {
-      updates.push(`is_active = $${paramIndex++}`);
-      values.push(data.is_active);
-    }
-
-    if (updates.length === 0) {
+    if (!hasUpdates) {
       return NextResponse.json(
         { success: false, error: 'No fields to update' },
         { status: 400 }
       );
     }
 
-    // Add filter_id to values
-    values.push(data.filter_id);
+    // Execute update with conditional fragments
+    const filters = await sql`
+      UPDATE landscape.core_doc_smartfilter
+      SET
+        ${data.name !== undefined ? sql`name = ${data.name},` : sql``}
+        ${data.query !== undefined ? sql`query = ${JSON.stringify(data.query)},` : sql``}
+        ${data.is_active !== undefined ? sql`is_active = ${data.is_active},` : sql``}
+        updated_at = NOW()
+      WHERE filter_id = ${data.filter_id}
+      RETURNING
+        filter_id,
+        name,
+        query,
+        is_active,
+        created_at,
+        updated_at
+    `;
 
-    const result = await sql.query(
-      `UPDATE landscape.core_doc_smartfilter
-       SET ${updates.join(', ')}, updated_at = NOW()
-       WHERE filter_id = $${paramIndex}
-       RETURNING
-         filter_id,
-         name,
-         query,
-         is_active,
-         created_at,
-         updated_at`,
-      values
-    );
-
-    const filter = result.rows[0];
+    const filter = filters[0];
 
     return NextResponse.json({
       success: true,
-      filter: {
-        ...filter,
-        created_at: filter.created_at.toISOString(),
-        updated_at: filter.updated_at.toISOString(),
-      },
+      filter,
     });
 
   } catch (error) {
@@ -239,7 +219,7 @@ export async function DELETE(request: NextRequest) {
       RETURNING filter_id
     `;
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Smart filter not found' },
         { status: 404 }
