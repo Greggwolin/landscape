@@ -83,12 +83,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Documents (DMS)',
       items: [
-        { id: 'dms-upload', label: 'Upload Documents', icon: '📤', href: '/dms/upload' },
-        { id: 'dms-documents', label: 'Browse Documents', icon: '📚', href: '/dms/documents' },
-        { id: 'dms-attributes', label: 'Manage Attributes', icon: '🏷️', href: '/admin/dms/attributes' },
-        { id: 'dms-templates', label: 'Document Templates', icon: '📋', href: '/admin/dms/templates' }
+        { id: 'dms', label: 'Document Management', icon: '📚', href: '/dms' }
       ],
-      isCollapsible: true
+      isCollapsible: false
     },
     {
       title: 'Settings',
