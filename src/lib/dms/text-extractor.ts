@@ -3,7 +3,7 @@
  * Supports both client and server-side extraction
  */
 
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/dms/db';
 
 // Type definitions for pdf.js
 interface PDFDocumentProxy {
