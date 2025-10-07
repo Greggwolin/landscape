@@ -19,11 +19,8 @@ async function databaseSearch(params: any) {
     if (filters?.workspace_id) {
       conditions.push(sql`workspace_id = ${filters.workspace_id}`);
     }
-    if (filters?.phase_id) {
-      conditions.push(sql`phase_id = ${filters.phase_id}`);
-    }
-    if (filters?.parcel_id) {
-      conditions.push(sql`parcel_id = ${filters.parcel_id}`);
+    if (filters?.folder_id) {
+      conditions.push(sql`folder_id = ${filters.folder_id}`);
     }
     if (filters?.doc_type) {
       conditions.push(sql`doc_type = ${filters.doc_type}`);
@@ -71,8 +68,6 @@ async function databaseSearch(params: any) {
         doc_id,
         project_id,
         workspace_id,
-        phase_id,
-        parcel_id,
         doc_name,
         doc_type,
         discipline,
@@ -85,9 +80,12 @@ async function databaseSearch(params: any) {
         created_at,
         updated_at,
         project_name,
-        workspace_name,
         phase_name,
-        parcel_name,
+        folder_id,
+        folder_path,
+        folder_name,
+        extracted_text,
+        word_count,
         searchable_text
       FROM landscape.mv_doc_search
       ${whereClause}

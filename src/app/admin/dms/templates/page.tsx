@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useProject } from '@/app/components/ProjectContext';
+import { useProjectContext } from '@/app/components/ProjectProvider';
 import TemplateDesigner from '@/components/dms/admin/TemplateDesigner';
 import type { DMSTemplate } from '@/lib/dms/db';
 
 export default function DMSTemplatesAdminPage() {
-  const { currentProject } = useProject();
+  const { activeProject: currentProject } = useProjectContext();
   const [templates, setTemplates] = useState<DMSTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<DMSTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);

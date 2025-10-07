@@ -46,7 +46,9 @@ export default function DMSDocumentsPage() {
       const response = await fetch(`/api/dms/search?${params.toString()}`);
 
       if (!response.ok) {
-        throw new Error('Search failed');
+        const errorText = await response.text();
+        console.error('Search API error:', response.status, errorText);
+        throw new Error(`Search failed: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
@@ -58,6 +60,7 @@ export default function DMSDocumentsPage() {
       console.error('Search error:', error);
       setDocuments([]);
       setFacets({});
+      setTotalHits(0);
     } finally {
       setIsLoading(false);
     }
