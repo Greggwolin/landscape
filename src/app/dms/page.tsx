@@ -334,7 +334,7 @@ export default function DMSPage() {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {isLoading ? (
