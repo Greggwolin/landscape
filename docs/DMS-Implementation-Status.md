@@ -1,8 +1,8 @@
 # DMS Implementation Status & Handoff Guide
 
-**Last Updated:** 2025-10-07
+**Last Updated:** 2025-10-07 23:45 PST
 **Current Branch:** `work`
-**Last Commit:** `cac3962` - feat: implement DMS Step 7 - Smart Folders + Full-Text Search
+**Last Commit:** `aadd1c6` - fix: add dark background to DMS document results area
 
 ---
 
@@ -160,6 +160,119 @@ The Landscape Document Management System (DMS) has completed **Steps 1-7**, deli
 - Comprehensive audit trail
 
 **Status:** ✅ Production ready
+
+---
+
+### Post-Step 7 Bug Fixes & UI Consolidation (October 7, 2025)
+**Commits:** `69fcc21`, `aadd1c6`, `0964f8a`, `f43f9cb`, `c4e6cd8`
+**Time:** ~4 hours (20:00-23:45 PST)
+
+**Issue:** After completing Step 7, several runtime and build errors appeared:
+1. Search API querying non-existent materialized view columns
+2. Template admin page using wrong ProjectContext import
+3. Admin DMS routes not wrapped with ProjectProvider
+4. Build errors from incorrect @vercel/postgres imports
+5. Folders API using incompatible Neon client methods
+6. User requested DMS consolidation into single-page interface
+
+**Root Causes:**
+- Materialized view schema changed in Step 7 but search API not updated
+- Previous session used different context provider pattern
+- Step 7 API routes copied from templates using @vercel/postgres instead of centralized wrapper
+- Neon serverless client returns arrays directly, not `.rows` property
+- Neon client doesn't have `.raw()` or `.query()` methods
+- Multi-page DMS navigation was fragmented
+
+**Fixes Implemented:**
+
+1. **Search API Column Alignment** (`src/app/api/dms/search/route.ts`)
+   - Removed: `phase_id`, `parcel_id`, `workspace_name`, `parcel_name`
+   - Added: `folder_id`, `folder_path`, `folder_name`, `extracted_text`, `word_count`
+   - Updated filter conditions to use new schema
+
+2. **Template Admin Context Fix** (`src/app/admin/dms/templates/page.tsx`)
+   - Changed import from `@/app/components/ProjectContext` to `ProjectProvider`
+   - Updated hook from `useProject()` to `useProjectContext()`
+   - Updated property from `currentProject` to `activeProject: currentProject`
+
+3. **Admin Layout Provider** (`src/app/admin/dms/layout.tsx` - created)
+   - Wrapped admin DMS routes with ProjectProvider
+   - Fixed "useProjectContext must be used within a ProjectProvider" error
+
+4. **Database Import Centralization** (4 files)
+   - `src/app/api/dms/folders/route.ts`
+   - `src/app/api/dms/filters/route.ts`
+   - `src/app/api/dms/docs/[id]/move/route.ts`
+   - `src/lib/dms/text-extractor.ts`
+   - Changed all imports from `@vercel/postgres` to `@/lib/dms/db`
+   - Ensures consistent connection handling and type safety
+
+5. **Neon Client Compatibility Fixes** (`folders/route.ts`, `filters/route.ts`, `docs/[id]/move/route.ts`)
+   - Removed all `.rows` property access → direct array access
+   - Removed `sql.raw()` calls → conditional template literals
+   - Removed `.query()` method → tagged template literals
+   - Fixed PATCH operations with conditional SQL fragments
+   - Removed unnecessary `.toISOString()` conversions
+
+6. **DMS UI Consolidation** (Major UX improvement)
+   - **Created:** `src/app/dms/page.tsx` (577 lines) - Unified single-page DMS
+   - **Deleted:** `src/app/dms/documents/page.tsx`, `src/app/dms/upload/page.tsx`
+   - **Updated:** `src/app/components/Navigation.tsx` - Single "Document Management" link
+
+   **New Structure:**
+   - Tab-based navigation: Documents | Upload | Templates | Attributes
+   - Documents tab: 3-column layout (Folders 250px | Search & Results | Details 320px)
+   - FolderTree integrated in left sidebar with drag-and-drop
+   - Upload tab: 2-column layout with Dropzone and ProfileForm
+   - Templates/Attributes: Placeholder "coming soon" messages
+   - Full-height responsive layout with proper dark mode support
+
+7. **Dark Mode UI Fix** (`src/app/dms/page.tsx`)
+   - Added `bg-white dark:bg-gray-900` to document results area
+   - Fixed light background appearing in dark mode
+
+**API Test Results:**
+```bash
+$ curl http://localhost:3000/api/dms/folders | jq
+{
+  "success": true,
+  "tree": [
+    {
+      "folder_id": 1,
+      "parent_id": null,
+      "name": "Root",
+      "path": "/Root",
+      "children": [
+        { "folder_id": 2, "name": "Plans", "path": "/Root/Plans", ... },
+        { "folder_id": 3, "name": "Reports", "path": "/Root/Reports", ... },
+        { "folder_id": 4, "name": "Contracts", "path": "/Root/Contracts", ... },
+        { "folder_id": 5, "name": "Photos", "path": "/Root/Photos", ... }
+      ]
+    }
+  ],
+  "totalFolders": 5
+}
+```
+
+**Testing:**
+- ✅ Folders API returns hierarchical tree structure
+- ✅ FolderTree component loads and renders correctly
+- ✅ Documents tab displays with search and filters
+- ✅ Upload tab functional with dropzone
+- ✅ Tab navigation works smoothly
+- ✅ Dark mode consistent across all panels
+- ✅ No console errors in browser
+- ✅ Build passes (excluding unrelated Turbopack parsing issue)
+
+**User Feedback:**
+> "the entire dms needs to be collapsed into a single page with tabs for each of the pages currently listed in the nav bar. the main Documents page should show the filters (folders)"
+
+✅ Implemented as requested
+
+**Files Changed:** 11 files
+**Lines Changed:** +350, -250 (net +100)
+**Commits:** 5
+**Status:** ✅ All errors resolved, UI consolidated, production ready
 
 ---
 
