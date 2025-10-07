@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/dms/db';
 import { MoveDocumentZ } from '@/app/api/dms/folders/schema';
 import { z } from 'zod';
 

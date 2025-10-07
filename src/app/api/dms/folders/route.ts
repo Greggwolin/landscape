@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/dms/db';
 import { CreateFolderZ, UpdateFolderZ, FolderZ, FolderTreeNodeZ } from './schema';
+import { z } from 'zod';
 
 /**
  * GET /api/dms/folders

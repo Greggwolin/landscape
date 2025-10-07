@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/dms/db';
 import { CreateSmartFilterZ, UpdateSmartFilterZ } from './schema';
 import { z } from 'zod';
 
