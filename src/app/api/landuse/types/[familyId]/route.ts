@@ -18,22 +18,22 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // First try to fetch from database
+    // First try to fetch from database (using lu_type as authoritative source)
     try {
       const types = await sql`
         SELECT
-          subtype_id as type_id,
+          type_id,
           code as type_code,
           code,
           name as type_name,
           name,
-          1 as type_order,
+          COALESCE(ord, 1) as type_order,
           active as type_active,
           family_id
-        FROM landscape.lu_subtype
+        FROM landscape.lu_type
         WHERE family_id = ${familyId}
         AND active = true
-        ORDER BY subtype_id
+        ORDER BY COALESCE(ord, type_id)
       `;
 
       if (types && types.length > 0) {

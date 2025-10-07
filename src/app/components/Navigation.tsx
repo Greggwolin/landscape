@@ -1,5 +1,6 @@
 // app/components/Navigation.tsx
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { useProjectContext } from './ProjectProvider'
 
@@ -18,6 +19,8 @@ interface NavItem {
   id: string;
   label: string;
   icon: string;
+  href?: string;
+  target?: string;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
@@ -26,11 +29,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
   const projectId = activeProject?.project_id
   const { config: projectConfig } = useProjectConfig(projectId ?? undefined)
 
-  const pluralize = (label: string) => (label.endsWith('s') ? label : `${label}s`)
-
-  const level1Label = projectConfig?.level1_label ?? 'Area'
   const level2Label = projectConfig?.level2_label ?? 'Phase'
-  const level1LabelPlural = pluralize(level1Label)
 
   const navSections: NavSection[] = useMemo(() => [
     {
@@ -39,7 +38,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         { id: 'home', label: 'Home', icon: '🏠' },
         { id: 'dev-status', label: 'Development Status', icon: '📊' },
         { id: 'documentation', label: 'Documentation', icon: '📚' },
-        { id: 'under-construction', label: 'Under Construction', icon: '🚧' }
+        { id: 'under-construction', label: 'Under Construction', icon: '🚧' },
+        { id: 'prototype-lab', label: 'Prototype Lab', icon: '🧪', href: '/prototypes' }
       ]
     },
     {
@@ -81,6 +81,16 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       isCollapsible: true
     },
     {
+      title: 'Documents (DMS)',
+      items: [
+        { id: 'dms-upload', label: 'Upload Documents', icon: '📤', href: '/dms/upload' },
+        { id: 'dms-documents', label: 'Browse Documents', icon: '📚', href: '/dms/documents' },
+        { id: 'dms-attributes', label: 'Manage Attributes', icon: '🏷️', href: '/admin/dms/attributes' },
+        { id: 'dms-templates', label: 'Document Templates', icon: '📋', href: '/admin/dms/templates' }
+      ],
+      isCollapsible: true
+    },
+    {
       title: 'Settings',
       items: [
         { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -88,7 +98,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         { id: 'planning', label: `${level2Label} Planner (Legacy)`, icon: '🪄' }
       ]
     }
-  ], [level1LabelPlural, level2Label])
+  ], [level2Label])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({
@@ -129,20 +139,35 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
             
             {(!section.isCollapsible || !collapsedSections[section.title]) && (
               <div className="space-y-0.5">
-                {section.items.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveView(item.id)}
-                    className={`w-full text-left px-6 py-2 text-sm flex items-center space-x-3 hover:bg-gray-700 transition-colors ${
-                      activeView === item.id
-                        ? 'bg-gray-700 text-white border-r-2 border-blue-500'
-                        : 'text-gray-300'
-                    }`}
-                  >
-                    <span className="text-base">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
-                ))}
+                {section.items.map((item) => {
+                  const isActive = activeView === item.id;
+                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center space-x-3 hover:bg-gray-700 transition-colors ${isActive ? 'bg-gray-700 text-white border-r-2 border-blue-500' : 'text-gray-300'}`;
+
+                  if (item.href) {
+                    return (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        target={item.target}
+                        className={baseClasses}
+                      >
+                        <span className="text-base">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveView(item.id)}
+                      className={baseClasses}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

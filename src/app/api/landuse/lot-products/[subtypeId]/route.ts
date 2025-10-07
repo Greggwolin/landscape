@@ -18,44 +18,76 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Get subtype info to construct product codes
-    const subtype = await sql`
-      SELECT code, family_id FROM landscape.lu_subtype WHERE subtype_id = ${subtypeId}
+    // Get type info to construct product codes
+    // Note: Parameter is called subtypeId but now receives type_id from lu_type
+    const type = await sql`
+      SELECT code, family_id FROM landscape.lu_type WHERE type_id = ${subtypeId}
     `;
 
-    if (!subtype || subtype.length === 0) {
+    if (!type || type.length === 0) {
       return NextResponse.json({
-        error: 'Subtype not found'
+        error: 'Type not found'
       }, { status: 404 });
     }
 
-    const subtypeCode = subtype[0].code;
-    const familyId = subtype[0].family_id;
+    const typeCode = type[0].code;
+    const familyId = Number(type[0].family_id); // Convert to number for comparison
+
+    console.log('🔍 Lot Products API - type_id:', subtypeId, 'typeCode:', typeCode, 'familyId:', familyId, 'familyId type:', typeof familyId);
 
     let products: any[] = [];
 
     if (familyId === 1) {
-      // Residential - use lot products from res_lot_product (just the lot dimensions)
-      const lotProducts = await sql`
-        SELECT
-          product_id,
-          code,
-          lot_w_ft,
-          lot_d_ft,
-          lot_area_sf
-        FROM landscape.res_lot_product
-        ORDER BY lot_area_sf ASC
-      `;
+      // Residential family
+      if (typeCode === 'SFD' || typeCode === 'BTR') {
+        // Single Family Detached and Build-to-Rent share lot products
+        if (typeCode === 'BTR') {
+          // Build-to-Rent - placeholder product for now
+          products = [{
+            product_id: 'btr_1',
+            code: 'Product List Pending',
+            name: 'Product List Pending',
+            subtype_id: subtypeId
+          }];
+        } else {
+          // Single Family Detached - use lot products from res_lot_product
+          const lotProducts = await sql`
+            SELECT
+              product_id,
+              code,
+              lot_w_ft,
+              lot_d_ft,
+              lot_area_sf
+            FROM landscape.res_lot_product
+            ORDER BY lot_area_sf ASC
+          `;
 
-      products = lotProducts.map(product => ({
-        product_id: product.product_id,
-        code: product.code,
-        name: product.code,
-        lot_width: product.lot_w_ft,
-        lot_depth: product.lot_d_ft,
-        lot_area: product.lot_area_sf,
-        subtype_id: subtypeId
-      }));
+          products = lotProducts.map(product => ({
+            product_id: product.product_id,
+            code: product.code,
+            name: product.code,
+            lot_width: product.lot_w_ft,
+            lot_depth: product.lot_d_ft,
+            lot_area: product.lot_area_sf,
+            subtype_id: subtypeId
+          }));
+        }
+      } else if (typeCode === 'SFA') {
+        // Single Family Attached - Townhomes and Condos
+        const sfaProducts = [
+          { code: 'Townhomes', name: 'Townhomes' },
+          { code: 'Condos', name: 'Condos' }
+        ];
+        products = sfaProducts.map((product, index) => ({
+          product_id: `sfa_${index + 1}`,
+          code: product.code,
+          name: product.name,
+          subtype_id: subtypeId
+        }));
+      } else {
+        // Other residential types (Condo, MF) - no products
+        products = [];
+      }
     } else if (familyId === 2) {
       // Commercial - provide predefined commercial products
       const commercialProducts = [
@@ -67,7 +99,7 @@ export async function GET(
         { code: 'Standalone', name: 'Standalone' }
       ];
 
-      if (subtypeCode === 'RET') {
+      if (typeCode === 'RET') {
         // Retail gets shopping centers
         products = commercialProducts.filter(p => p.code.includes('Shopping') || p.code.includes('Center') || p.code.includes('Mall')).map((product, index) => ({
           product_id: `ret_${index + 1}`,
@@ -75,7 +107,7 @@ export async function GET(
           name: product.name,
           subtype_id: subtypeId
         }));
-      } else if (subtypeCode === 'OFC') {
+      } else if (typeCode === 'OFC' || typeCode === 'OFF') {
         // Office gets office types
         const officeProducts = [
           { code: 'Class A Office', name: 'Class A Office' },
@@ -104,14 +136,26 @@ export async function GET(
           subtype_id: subtypeId
         }));
       }
+    } else if (familyId === 8) {
+      // Institutional - provide school products for Schools type
+      if (typeCode === 'SCHOOLS' || typeCode === 'SCHOOL-K12' || typeCode === 'SCHOOL-HE') {
+        const schoolProducts = [
+          { code: 'Preschool', name: 'Preschool' },
+          { code: 'K-12 Public', name: 'K-12 Public' },
+          { code: 'K-12 Private', name: 'K-12 Private' },
+          { code: 'K-12 Charter', name: 'K-12 Charter' },
+          { code: 'Higher Ed', name: 'Higher Ed' }
+        ];
+        products = schoolProducts.map((product, index) => ({
+          product_id: `school_${index + 1}`,
+          code: product.code,
+          name: product.name,
+          subtype_id: subtypeId
+        }));
+      }
     } else {
-      // Other families - provide generic products
-      products = [{
-        product_id: `gen_1`,
-        code: 'Standard',
-        name: 'Standard',
-        subtype_id: subtypeId
-      }];
+      // Other families - no products available
+      products = [];
     }
 
     return NextResponse.json(products);

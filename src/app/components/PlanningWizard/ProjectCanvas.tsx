@@ -59,30 +59,30 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
     }
   }
 
-  const getLandUseColor = (landUse?: string) => {
-    if (!landUse) return 'bg-slate-600'
-    switch (landUse) {
-      case 'LDR': return 'bg-emerald-600'
-      case 'MDR': return 'bg-green-600'
-      case 'HDR': return 'bg-teal-600'
-      case 'MHDR': return 'bg-cyan-600'
-      case 'C': return 'bg-orange-600'
-      case 'MU': return 'bg-amber-600'
-      case 'OS': return 'bg-blue-600'
+  const getFamilyColor = (familyName?: string) => {
+    if (!familyName) return 'bg-slate-600'
+    switch (familyName) {
+      case 'Residential': return 'bg-blue-700'
+      case 'Commercial': return 'bg-purple-700'
+      case 'Industrial': return 'bg-orange-700'
+      case 'Institutional': return 'bg-indigo-700'
+      case 'Common Areas': return 'bg-teal-700'
+      case 'Open Space': return 'bg-green-700'
+      case 'Public': return 'bg-cyan-700'
       default: return 'bg-slate-600'
     }
   }
 
-  const getLandUseBorderColor = (landUse?: string) => {
-    if (!landUse) return 'border-slate-500'
-    switch (landUse) {
-      case 'LDR': return 'border-emerald-500'
-      case 'MDR': return 'border-green-500'
-      case 'HDR': return 'border-teal-500'
-      case 'MHDR': return 'border-cyan-500'
-      case 'C': return 'border-orange-500'
-      case 'MU': return 'border-amber-500'
-      case 'OS': return 'border-blue-500'
+  const getFamilyBorderColor = (familyName?: string) => {
+    if (!familyName) return 'border-slate-500'
+    switch (familyName) {
+      case 'Residential': return 'border-blue-500'
+      case 'Commercial': return 'border-purple-500'
+      case 'Industrial': return 'border-orange-500'
+      case 'Institutional': return 'border-indigo-500'
+      case 'Common Areas': return 'border-teal-500'
+      case 'Open Space': return 'border-green-500'
+      case 'Public': return 'border-cyan-500'
       default: return 'border-slate-500'
     }
   }
@@ -182,13 +182,27 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
       return
     }
 
-    const payload = {
+    if (draft.family_name && !draft.type_code) {
+      alert('Please select a Use Type for the selected Family')
+      return
+    }
+
+    // Note: Product validation would require checking if products exist for this type
+    // For now we'll skip product validation since it's optional for many types
+
+    const payload: any = {
       acres: Number(draft.acres),
-      units: Number(draft.units),
       family_name: draft.family_name,
       density_code: draft.density_code || null,
       type_code: draft.type_code || null,
       product_code: draft.product_code || null,
+    }
+
+    // Only include units for Residential family
+    if (draft.family_name === 'Residential') {
+      payload.units = Number(draft.units)
+    } else {
+      payload.units = null
     }
 
     try {
@@ -205,7 +219,11 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
 
       cancelEdit()
       await onRefresh?.()
-      window.dispatchEvent(new CustomEvent('dataChanged'))
+
+      // Dispatch event with proper structure for PlanningContent to pick up
+      window.dispatchEvent(new CustomEvent('dataChanged', {
+        detail: { entity: 'parcel', id: editingParcel.dbId }
+      }))
     } catch (err) {
       console.error('Save error:', err)
       alert(`Failed to save parcel changes: ${err instanceof Error ? err.message : String(err)}`)
@@ -260,9 +278,16 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
         throw new Error(errorText)
       }
 
+      const result = await res.json()
+      const newParcelId = result.parcel_id
+
       cancelAddParcel()
       await onRefresh?.()
-      window.dispatchEvent(new CustomEvent('dataChanged'))
+
+      // Dispatch event with proper structure for PlanningContent to pick up
+      window.dispatchEvent(new CustomEvent('dataChanged', {
+        detail: { entity: 'parcel', id: newParcelId }
+      }))
     } catch (err) {
       console.error('Failed to create parcel', err)
       alert('Failed to create parcel: ' + (err instanceof Error ? err.message : String(err)))
@@ -361,8 +386,8 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                     {phase.parcels.map((parcel) => {
                                       const isEditing =
                                         editing && editing.areaId === area.id && editing.phaseId === phase.id && editing.parcelId === parcel.id
-                                      const tileColor = getLandUseColor(parcel.landUse)
-                                      const borderColor = getLandUseBorderColor(parcel.landUse)
+                                      const tileColor = getFamilyColor(parcel.family_name)
+                                      const borderColor = getFamilyBorderColor(parcel.family_name)
                                       const tileDisplayCode = parcel.family_name || parcel.landuseCode || parcel.landUse
 
                                       return (
@@ -413,7 +438,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                       />
                                                     </td>
                                                   </tr>
-                                                  {draft.family_name !== 'Commercial' && (
+                                                  {draft.family_name === 'Residential' && (
                                                     <tr>
                                                       <td className="opacity-90 align-top pr-2 whitespace-nowrap">Units:</td>
                                                       <td className="font-medium">
@@ -481,7 +506,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                     <td className="opacity-90 align-top pr-1 whitespace-nowrap">Acres:</td>
                                                     <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.acres}</td>
                                                   </tr>
-                                                  {parcel.family_name !== 'Commercial' && (
+                                                  {parcel.family_name === 'Residential' && (
                                                     <tr>
                                                       <td className="opacity-90 align-top pr-1 whitespace-nowrap">Units:</td>
                                                       <td className="font-medium break-words" style={{ wordWrap: 'break-word', overflowWrap: 'anywhere' }}>{parcel.units || 0}</td>

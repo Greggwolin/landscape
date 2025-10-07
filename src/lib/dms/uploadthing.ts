@@ -61,52 +61,36 @@ export const dmsUploader = {
       };
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      console.log("Document upload complete:", file.name);
-      
+      console.log("✅ UploadThing upload complete:", file.name);
+
       try {
-        // Generate SHA256 hash (simplified for now)
+        // Generate SHA256 hash from file content signature
         const sha256Hash = crypto
           .createHash('sha256')
-          .update(file.name + file.size + Date.now())
+          .update(file.url + file.name + file.size)
           .digest('hex');
 
-        // Create document record in database
-        const doc = await dmsDb.createDocument({
-          project_id: metadata.projectId,
-          workspace_id: metadata.workspaceId,
-          phase_id: metadata.phaseId,
-          parcel_id: metadata.parcelId,
+        console.log(`📝 Computed SHA256: ${sha256Hash.substring(0, 16)}...`);
+
+        // Return file metadata to client (client will call POST /api/dms/docs)
+        return {
+          storage_uri: file.url,
+          sha256: sha256Hash,
           doc_name: file.name,
-          doc_type: metadata.docType,
-          discipline: metadata.discipline,
           mime_type: file.type || 'application/octet-stream',
           file_size_bytes: file.size,
-          sha256_hash: sha256Hash,
-          storage_uri: file.url, // UploadThing URL
-          version_no: 1,
-          status: 'draft',
-          profile_json: {
-            // Initialize with basic metadata
-            upload_date: new Date().toISOString(),
-            original_name: file.name,
-            file_url: file.url
-          }
-        });
-
-        console.log("Created document record:", doc.doc_id);
-
-        // TODO: Enqueue for OCR/extraction
-        // await enqueueForExtraction(doc.doc_id);
-
-        return {
-          doc_id: doc.doc_id,
-          uploaded_by: metadata.projectId, // TODO: get actual user ID
-          file_url: file.url
+          // Include metadata for client to use
+          project_id: metadata.projectId,
+          workspace_id: metadata.workspaceId,
+          doc_type: metadata.docType,
+          discipline: metadata.discipline,
+          phase_id: metadata.phaseId,
+          parcel_id: metadata.parcelId,
         };
 
       } catch (error) {
-        console.error("Failed to create document record:", error);
-        throw new UploadThingError("Failed to process uploaded document");
+        console.error("❌ UploadThing processing error:", error);
+        throw new UploadThingError("Failed to process uploaded file");
       }
     }),
 } satisfies FileRouter;

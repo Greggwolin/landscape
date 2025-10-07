@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1759793740836-ffb6a3bde4a04",
+    "prototypeId": "coreui-lease-input",
+    "note": "Way too much white space. need alternative field layout that is tighter and more table-like (look into https://github.com/glideapps/glide-data-grid)",
+    "timestamp": "2025-10-06T23:35:40.836Z"
+  },
+  {
+    "id": "1759795127941-f81116bbba404",
+    "prototypeId": "glide-parcel-grid",
+    "note": "Very plain. would need to add a mechanism for editing and saving changes as well as using chips instead of text.",
+    "timestamp": "2025-10-06T23:58:47.941Z"
+  },
+  {
+    "id": "1759795614189-f077cbec738b8",
+    "prototypeId": "glide-parcel-grid",
+    "note": "I think https://github.com/GoLabra/MosaicDataTable might be better.",
+    "timestamp": "2025-10-07T00:06:54.189Z"
+  }
+]

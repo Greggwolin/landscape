@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lease Input - ARGUS Enterprise Style</title>
+    <link href="https://cdn.jsdelivr.net/npm/@coreui/coreui@5.0.0/dist/css/coreui.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@coreui/icons@3.0.1/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .main-container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .page-header {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .lease-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .section-header {
+            background: #f8f9fa;
+            padding: 12px 20px;
+            border-bottom: 1px solid #dee2e6;
+            font-weight: 600;
+            font-size: 14px;
+            color: #495057;
+        }
+        .form-section {
+            padding: 20px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .form-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .form-group {
+            margin-bottom: 0;
+        }
+        .form-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 6px;
+        }
+        .form-control, .form-select {
+            font-size: 13px;
+            height: 36px;
+        }
+        textarea.form-control {
+            height: auto;
+        }
+        .btn-toolbar {
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+            font-size: 13px;
+            padding: 10px 16px;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: 600;
+        }
+        .table-responsive {
+            margin-top: 15px;
+        }
+        .table {
+            font-size: 13px;
+        }
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            padding: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .table td {
+            padding: 8px 10px;
+            vertical-align: middle;
+        }
+        .input-group-text {
+            font-size: 13px;
+            background-color: #e9ecef;
+        }
+        .badge {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        .subsection-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .checkbox-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">Lease Input</h4>
+                    <p class="mb-0 text-muted" style="font-size: 13px;">Property: Office Building - Suite 200</p>
+                </div>
+                <div class="btn-toolbar">
+                    <button class="btn btn-sm btn-outline-secondary">
+                        <i class="cil-arrow-left"></i> Back to Rent Roll
+                    </button>
+                    <button class="btn btn-sm btn-primary">
+                        <i class="cil-save"></i> Save
+                    </button>
+                    <button class="btn btn-sm btn-success">
+                        <i class="cil-check"></i> Save & Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="lease-card">
+            <ul class="nav nav-tabs" id="leaseTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="general-tab" data-coreui-toggle="tab" data-coreui-target="#general" type="button" role="tab">General</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="rental-tab" data-coreui-toggle="tab" data-coreui-target="#rental" type="button" role="tab">Rental Income</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="cpi-tab" data-coreui-toggle="tab" data-coreui-target="#cpi" type="button" role="tab">CPI</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="percentage-tab" data-coreui-toggle="tab" data-coreui-target="#percentage" type="button" role="tab">Percentage Rent</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="recoveries-tab" data-coreui-toggle="tab" data-coreui-target="#recoveries" type="button" role="tab">Recoveries</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="misc-tab" data-coreui-toggle="tab" data-coreui-target="#misc" type="button" role="tab">Miscellaneous</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="leasing-tab" data-coreui-toggle="tab" data-coreui-target="#leasing" type="button" role="tab">Leasing Costs</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="security-tab" data-coreui-toggle="tab" data-coreui-target="#security" type="button" role="tab">Security Deposits</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="market-tab" data-coreui-toggle="tab" data-coreui-target="#market" type="button" role="tab">Market Leasing</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="notes-tab" data-coreui-toggle="tab" data-coreui-target="#notes" type="button" role="tab">Notes</button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="leaseTabContent">
+                <!-- GENERAL TAB -->
+                <div class="tab-pane fade show active" id="general" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Lease Information</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Tenant Name</label>
+                                <input type="text" class="form-control" placeholder="Enter tenant name">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Suite/Space Number</label>
+                                <input type="text" class="form-control" placeholder="e.g., Suite 200">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Lease ID</label>
+                                <input type="text" class="form-control" placeholder="Optional lease ID">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">External ID</label>
+                                <input type="text" class="form-control" placeholder="External reference">
+                            </div>
+                        </div>
+
+                        <div class="form-grid mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Lease Status</label>
+                                <select class="form-select">
+                                    <option selected>Contract</option>
+                                    <option>Speculative</option>
+                                    <option>Month-to-Month</option>
+                                    <option>Holdover</option>
+                                    <option>Option</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Lease Type</label>
+                                <select class="form-select">
+                                    <option selected>Office</option>
+                                    <option>Retail</option>
+                                    <option>Industrial</option>
+                                    <option>Storage</option>
+                                    <option>Residential</option>
+                                    <option>Antenna</option>
+                                    <option>Billboard</option>
+                                    <option>ATM</option>
+                                    <option>Drop-box</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tenure</label>
+                                <select class="form-select">
+                                    <option selected>Freehold</option>
+                                    <option>Ground Lease 1</option>
+                                    <option>Ground Lease 2</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tenant Classification</label>
+                                <select class="form-select">
+                                    <option>None</option>
+                                    <option selected>Class A</option>
+                                    <option>Class B</option>
+                                    <option>Class C</option>
+                                    <option>Credit Tenant</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Space & Area</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Area Type</label>
+                                <select class="form-select">
+                                    <option selected>Area (SF)</option>
+                                    <option>Units</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rentable Area</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                    <span class="input-group-text">SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Usable Area</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                    <span class="input-group-text">SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Alternate Area</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                    <span class="input-group-text">SF</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Floor Number</label>
+                                <input type="number" class="form-control" placeholder="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox" checked> Affects Occupancy
+                                </label>
+                                <div class="info-text">Include in occupancy calculations</div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Lease Term</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Lease Start Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rent Commencement Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Lease Expiration Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Term (Months)</label>
+                                <input type="number" class="form-control" placeholder="60">
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Options & Renewals</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Number of Options</label>
+                                <input type="number" class="form-control" placeholder="0" value="2">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Option Term (Months)</label>
+                                <input type="number" class="form-control" placeholder="60">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Renewal Probability</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="75">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RENTAL INCOME TAB -->
+                <div class="tab-pane fade" id="rental" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Base Rent</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Base Rent Type</label>
+                                <select class="form-select">
+                                    <option selected>Amount/SF</option>
+                                    <option>Annual Amount</option>
+                                    <option>Monthly Amount</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Starting Rent</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF/Year</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Annual Base Rent</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                                <div class="info-text">Calculated automatically</div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Rent Steps / Escalations</div>
+                        <div class="form-grid-3 mb-3">
+                            <div class="form-group">
+                                <label class="form-label">Step Type</label>
+                                <select class="form-select">
+                                    <option>None</option>
+                                    <option selected>Fixed Steps</option>
+                                    <option>Percentage Steps</option>
+                                    <option>Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Step Frequency</label>
+                                <select class="form-select">
+                                    <option>Each Month</option>
+                                    <option selected>Each Year</option>
+                                    <option>Each Lease Anniversary</option>
+                                    <option>Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Annual Increase</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="3.0" step="0.1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Year</th>
+                                        <th>Start Date</th>
+                                        <th>End Date</th>
+                                        <th>Rate/SF/Year</th>
+                                        <th>Annual Rent</th>
+                                        <th>Monthly Rent</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>01/01/2025</td>
+                                        <td>12/31/2025</td>
+                                        <td>$20.00</td>
+                                        <td>$100,000</td>
+                                        <td>$8,333</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Edit</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>01/01/2026</td>
+                                        <td>12/31/2026</td>
+                                        <td>$20.60</td>
+                                        <td>$103,000</td>
+                                        <td>$8,583</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Edit</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>3</td>
+                                        <td>01/01/2027</td>
+                                        <td>12/31/2027</td>
+                                        <td>$21.22</td>
+                                        <td>$106,090</td>
+                                        <td>$8,841</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Edit</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <button class="btn btn-sm btn-success"><i class="cil-plus"></i> Add Rent Period</button>
+                        </div>
+
+                        <div class="subsection-title mt-4">Free Rent</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Free Rent Months</label>
+                                <input type="number" class="form-control" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Free Rent Start</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Base Rent %</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" value="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Total Free Rent</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">GAAP / Straight-Line Rent</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Use Straight-Line GAAP Rent
+                                </label>
+                                <div class="info-text">Average rent across lease term</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">GAAP Rent Basis</label>
+                                <select class="form-select">
+                                    <option selected>Calculate</option>
+                                    <option>Amount/SF</option>
+                                    <option>Annual Amount</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Override Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CPI TAB -->
+                <div class="tab-pane fade" id="cpi" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">CPI Increases</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">CPI Timing</label>
+                                <select class="form-select">
+                                    <option selected>None</option>
+                                    <option>Each Calendar Year</option>
+                                    <option>Each Lease Anniversary</option>
+                                    <option>At Mid-Lease</option>
+                                    <option>Indexation/Index Review</option>
+                                    <option>Specified Interval</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Inflation Rate/Index</label>
+                                <select class="form-select">
+                                    <option>No Inflation Rate</option>
+                                    <option>General Inflation Rate</option>
+                                    <option>Market Inflation Rate</option>
+                                    <option>Expense Inflation Rate</option>
+                                    <option selected>CPI Inflation Rate</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tenant's Share of CPI</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="100" value="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">First Increase Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Months Between Increases</label>
+                                <input type="number" class="form-control" placeholder="12">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Current Monthly CPI</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">CPI Caps & Floors</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Minimum Increase</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Maximum Increase</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="5">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Cumulative Cap</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Compounding
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">CPI Index Value Override</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Override Type</label>
+                                <select class="form-select">
+                                    <option selected>None</option>
+                                    <option>Use Value on a Date</option>
+                                    <option>Use Specified Value</option>
+                                    <option>Use Months Offset Value</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">CPI Start Value Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">CPI Specified Start Value</label>
+                                <input type="number" class="form-control" placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Reset CPI Options</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Reset CPI on Changes to Base Rent</label>
+                                <select class="form-select">
+                                    <option selected>None</option>
+                                    <option>Rent Review</option>
+                                    <option>Outstanding Review</option>
+                                    <option>Base Rent Change</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rent for CPI Increases</label>
+                                <select class="form-select">
+                                    <option selected>Rent in Prior 12 Months</option>
+                                    <option>Rent at Time of Increase</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PERCENTAGE RENT TAB -->
+                <div class="tab-pane fade" id="percentage" role="tabpanel">
+                    <div class="form-section">
+                        <div class="alert alert-info" role="alert">
+                            <strong>Note:</strong> Percentage rent is typically used for retail properties where rent is based on tenant sales.
+                        </div>
+
+                        <div class="subsection-title">Percentage Rent</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Sales % Basis</label>
+                                <select class="form-select">
+                                    <option selected>None</option>
+                                    <option>Percent</option>
+                                    <option>Continue Prior</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Sales Percentage</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Breakpoint Type</label>
+                                <select class="form-select">
+                                    <option selected>Natural</option>
+                                    <option>Artificial</option>
+                                    <option>None</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-4 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Annual Breakpoint</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Sales Growth Rate</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="3.0" step="0.1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">First Year Sales</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Override Sales
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Sales Schedule</div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Year</th>
+                                        <th>Projected Sales</th>
+                                        <th>Breakpoint</th>
+                                        <th>Sales Above Breakpoint</th>
+                                        <th>Percentage Rent</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">No percentage rent configured</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RECOVERIES TAB -->
+                <div class="tab-pane fade" id="recoveries" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Recovery Structure</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Recovery Structure</label>
+                                <select class="form-select">
+                                    <option>None</option>
+                                    <option selected>Net</option>
+                                    <option>Base Year Stop</option>
+                                    <option>Base Year Stop -1</option>
+                                    <option>Base Year Stop +1</option>
+                                    <option>Stop Amount</option>
+                                    <option>Stop Amount/Area</option>
+                                    <option>Fixed Amount</option>
+                                    <option>Fixed Amount/Area</option>
+                                    <option>Market</option>
+                                    <option>Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tenant's Pro Rata Share</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="8.50" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <div class="info-text">Based on rentable area</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Base Year</label>
+                                <input type="number" class="form-control" placeholder="2025">
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Recoverable Expenses</div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40%">Expense Category</th>
+                                        <th>Recoverable</th>
+                                        <th>Tenant %</th>
+                                        <th>Cap Amount</th>
+                                        <th>Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Property Taxes</td>
+                                        <td><input class="form-check-input" type="checkbox" checked></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="100"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Property Insurance</td>
+                                        <td><input class="form-check-input" type="checkbox" checked></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="100"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Common Area Maintenance (CAM)</td>
+                                        <td><input class="form-check-input" type="checkbox" checked></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="100"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Utilities</td>
+                                        <td><input class="form-check-input" type="checkbox"></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="0"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Management Fees</td>
+                                        <td><input class="form-check-input" type="checkbox" checked></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="100"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Repairs & Maintenance</td>
+                                        <td><input class="form-check-input" type="checkbox" checked></td>
+                                        <td><input type="number" class="form-control form-control-sm" value="100"></td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="None"></td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Pro Rata</option>
+                                                <option>Fixed Amount</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="subsection-title mt-4">Stop Amounts</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Expense Stop ($/SF)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Total Stop Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Escalate Stop
+                                </label>
+                                <div class="info-text">Inflate stop with expenses</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MISCELLANEOUS TAB -->
+                <div class="tab-pane fade" id="misc" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Miscellaneous Rent Items</div>
+                        
+                        <div class="alert alert-info" role="alert">
+                            Add additional revenue items beyond base rent, such as parking, storage, signage, etc.
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%">Item Name</th>
+                                        <th>Type</th>
+                                        <th>Amount Type</th>
+                                        <th>Amount</th>
+                                        <th>Start Date</th>
+                                        <th>End Date</th>
+                                        <th>Escalation</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Parking</td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option selected>Parking</option>
+                                                <option>Storage</option>
+                                                <option>Signage</option>
+                                                <option>Other</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm">
+                                                <option>Monthly</option>
+                                                <option selected>Annual</option>
+                                                <option>Per Unit</option>
+                                            </select>
+                                        </td>
+                                        <td><input type="number" class="form-control form-control-sm" placeholder="0.00"></td>
+                                        <td><input type="date" class="form-control form-control-sm"></td>
+                                        <td><input type="date" class="form-control form-control-sm"></td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control" placeholder="0">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger">
+                                                <i class="cil-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <button class="btn btn-sm btn-success">
+                                <i class="cil-plus"></i> Add Miscellaneous Item
+                            </button>
+                        </div>
+
+                        <div class="subsection-title mt-4">Parking Details</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Number of Spaces</label>
+                                <input type="number" class="form-control" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Monthly Rate per Space</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Annual Parking Revenue</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Reserved Parking
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Storage Details</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Storage Area (SF)</label>
+                                <input type="number" class="form-control" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rate per SF</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Annual Storage Revenue</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEASING COSTS TAB -->
+                <div class="tab-pane fade" id="leasing" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Tenant Improvements (TI)</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">TI Allowance Type</label>
+                                <select class="form-select">
+                                    <option selected>$/SF</option>
+                                    <option>Total Amount</option>
+                                    <option>None</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">TI Allowance ($/SF)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Total TI Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">TI Timing</label>
+                                <select class="form-select">
+                                    <option selected>At Lease Start</option>
+                                    <option>At Rent Commencement</option>
+                                    <option>Custom Date</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">TI Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Calculate TI As</label>
+                                <select class="form-select">
+                                    <option selected>Capital Expense</option>
+                                    <option>Operating Expense</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Leasing Commissions</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Commission Type</label>
+                                <select class="form-select">
+                                    <option selected>% of Total Contract Rent</option>
+                                    <option>% of First Year Rent</option>
+                                    <option>$/SF</option>
+                                    <option>Fixed Amount</option>
+                                    <option>None</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Commission Rate</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Total Commission</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Commission Timing</label>
+                                <select class="form-select">
+                                    <option selected>At Lease Start</option>
+                                    <option>At Rent Commencement</option>
+                                    <option>Custom Schedule</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Commission Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Calculate Commission As</label>
+                                <select class="form-select">
+                                    <option selected>Capital Expense</option>
+                                    <option>Operating Expense</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Renewal Assumptions</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Renewal TI ($/SF)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Renewal Commission</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Downtime (Months)</label>
+                                <input type="number" class="form-control" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Free Rent (Months)</label>
+                                <input type="number" class="form-control" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Legal & Other Costs</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Legal Fees</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Other Costs</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Total Leasing Costs</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECURITY DEPOSITS TAB -->
+                <div class="tab-pane fade" id="security" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Security Deposit</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Deposit Type</label>
+                                <select class="form-select">
+                                    <option>None</option>
+                                    <option selected>Months of Rent</option>
+                                    <option>Fixed Amount</option>
+                                    <option>$/SF</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Number of Months</label>
+                                <input type="number" class="form-control" placeholder="2" value="2">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deposit Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Deposit Received</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deposit Returned</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox" checked> Return at Lease End
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Interest on Deposit</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Calculate Interest</label>
+                                <select class="form-select">
+                                    <option selected>None</option>
+                                    <option>Simple Interest</option>
+                                    <option>Compound Interest</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Interest Rate</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Interest Treatment</label>
+                                <select class="form-select">
+                                    <option selected>Operating Revenue</option>
+                                    <option>Capital Receipt</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Interest Paid To</label>
+                                <select class="form-select">
+                                    <option selected>Tenant</option>
+                                    <option>Landlord</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Letter of Credit</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Letter of Credit in Lieu of Deposit
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">LC Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">LC Expiration</label>
+                                <input type="date" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MARKET LEASING TAB -->
+                <div class="tab-pane fade" id="market" role="tabpanel">
+                    <div class="form-section">
+                        <div class="alert alert-info" role="alert">
+                            <strong>Market Leasing:</strong> Define assumptions for how vacant space or renewals will be leased in the future.
+                        </div>
+
+                        <div class="subsection-title">Market Rent Assumptions</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Market Leasing Profile</label>
+                                <select class="form-select">
+                                    <option>None</option>
+                                    <option selected>Office Market Profile</option>
+                                    <option>Create New Profile</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Market Rent ($/SF/Year)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Market Rent Growth</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="3.0" step="0.1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Renewal vs. New Tenant Assumptions</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Renewal Probability</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="75" value="75">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">New Tenant Market Rent</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Renewal Market Rent</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">/SF</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Absorption & Turnover</div>
+                        <div class="form-grid-4">
+                            <div class="form-group">
+                                <label class="form-label">Months of Downtime</label>
+                                <input type="number" class="form-control" placeholder="6">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Free Rent (Months)</label>
+                                <input type="number" class="form-control" placeholder="2">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Market TI ($/SF)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Market Commission (%)</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="0.00" step="0.01">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Space Absorption (For Vacant Space)</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" type="checkbox"> Auto Generate Absorption Leases
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Average Lease Size (SF)</label>
+                                <input type="number" class="form-control" placeholder="5000">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Months Between Leases</label>
+                                <input type="number" class="form-control" placeholder="3">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3 mt-3">
+                            <div class="form-group">
+                                <label class="form-label">Absorption Start Date</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Absorption Period (Months)</label>
+                                <input type="number" class="form-control" placeholder="24">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Stabilized Occupancy</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="95" value="95">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOTES TAB -->
+                <div class="tab-pane fade" id="notes" role="tabpanel">
+                    <div class="form-section">
+                        <div class="subsection-title">Lease Notes</div>
+                        <div class="form-group">
+                            <label class="form-label">General Notes</label>
+                            <textarea class="form-control" rows="8" placeholder="Enter any notes about this lease..."></textarea>
+                        </div>
+
+                        <div class="subsection-title mt-4">Lease Clauses & Special Terms</div>
+                        <div class="form-group">
+                            <label class="form-label">Special Clauses</label>
+                            <textarea class="form-control" rows="6" placeholder="Early termination rights, expansion options, co-tenancy clauses, exclusivity provisions, etc."></textarea>
+                        </div>
+
+                        <div class="subsection-title mt-4">Contact Information</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Tenant Contact</label>
+                                <input type="text" class="form-control" placeholder="Contact name">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" class="form-control" placeholder="email@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Contact Phone</label>
+                                <input type="tel" class="form-control" placeholder="(555) 123-4567">
+                            </div>
+                        </div>
+
+                        <div class="subsection-title mt-4">Document Attachments</div>
+                        <div class="form-group">
+                            <label class="form-label">Attached Files</label>
+                            <div class="alert alert-light">
+                                <ul class="mb-0">
+                                    <li>Lease_Agreement_Suite200.pdf <button class="btn btn-sm btn-link">Remove</button></li>
+                                    <li>Tenant_Financials.xlsx <button class="btn btn-sm btn-link">Remove</button></li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="cil-paperclip"></i> Attach File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Bar (Fixed at Bottom) -->
+        <div class="d-flex justify-content-between align-items-center mt-3 p-3 bg-white rounded shadow-sm">
+            <div>
+                <button class="btn btn-outline-secondary">
+                    <i class="cil-arrow-left"></i> Previous Tenant
+                </button>
+                <button class="btn btn-outline-secondary ms-2">
+                    Next Tenant <i class="cil-arrow-right"></i>
+                </button>
+            </div>
+            <div>
+                <button class="btn btn-outline-danger me-2">
+                    <i class="cil-trash"></i> Delete Lease
+                </button>
+                <button class="btn btn-outline-secondary me-2">Cancel</button>
+                <button class="btn btn-primary me-2">
+                    <i class="cil-save"></i> Save
+                </button>
+                <button class="btn btn-success">
+                    <i class="cil-check"></i> Save & Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@coreui/coreui@5.0.0/dist/js/coreui.bundle.min.js"></script>
+</body>
+</html>

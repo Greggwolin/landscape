@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import BudgetContent from './components/Budget/BudgetContent';
@@ -99,6 +100,8 @@ const LandscapeAppInner: React.FC = () => {
         return <ZoningGlossaryAdmin />;
       case 'dev-status':
         return <DevStatus />;
+      case 'prototype-lab':
+        return <PrototypeLabRedirect />;
 
       default:
         return <ComingSoonContent title={activeView.charAt(0).toUpperCase() + activeView.slice(1)} />;
@@ -129,6 +132,23 @@ const LandscapeAppInner: React.FC = () => {
         <main className="flex-1 overflow-visible bg-gray-950">
           {renderContent()}
         </main>
+      </div>
+    </div>
+  );
+};
+
+const PrototypeLabRedirect: React.FC = () => {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push('/prototypes');
+  }, [router]);
+
+  return (
+    <div className='p-4'>
+      <div className='bg-gray-800 rounded border border-gray-700 p-6 text-center'>
+        <div className='text-gray-400 mb-1 text-sm'>Navigating</div>
+        <div className='text-lg font-medium text-white'>Opening Prototype Lab…</div>
       </div>
     </div>
   );

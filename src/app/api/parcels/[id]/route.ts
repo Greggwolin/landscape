@@ -86,6 +86,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       hasUpdates = true
     }
 
+    if (body.subtype_id !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET subtype_id = ${body.subtype_id}::bigint WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    // Accept type_id as well (from lu_type table) - maps to same subtype_id column
+    if (body.type_id !== undefined) {
+      await sql`UPDATE landscape.tbl_parcel SET subtype_id = ${body.type_id}::bigint WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
     if (!hasUpdates) {
       return NextResponse.json({ ok: true, message: 'No fields to update' })
     }

@@ -43,13 +43,22 @@ export interface SearchableDocument {
   profile_json: Record<string, any>;
   created_at: string;
   updated_at: string;
-  
+
   // Derived fields for search
   project_name?: string;
   workspace_name?: string;
-  phase_no?: string;
+  phase_name?: string;
+  parcel_name?: string;
   searchable_text: string;
-  extracted_text?: string;
+
+  // Folder fields (Step 7)
+  folder_id?: number;
+  folder_path?: string;
+  folder_name?: string;
+
+  // Full-text fields (Step 7)
+  fulltext?: string; // Extracted text content (truncated for Meili)
+  word_count?: number;
 }
 
 // Search facets configuration
@@ -71,31 +80,34 @@ export async function initializeDocsIndex() {
     // Create index if it doesn't exist
     const index = client.index(DOCS_INDEX);
     
-    // Configure searchable attributes
+    // Configure searchable attributes (Step 7: added folder_name, fulltext)
     await index.updateSearchableAttributes([
       'doc_name',
       'searchable_text',
-      'extracted_text',
+      'fulltext', // Full extracted text
       'doc_type',
       'discipline',
-      'tags'
+      'tags',
+      'folder_name'
     ]);
 
-    // Configure filterable attributes for faceting
+    // Configure filterable attributes for faceting (Step 7: added folder fields)
     await index.updateFilterableAttributes([
       'project_id',
       'workspace_id',
       'phase_id',
       'parcel_id',
       'doc_type',
-      'discipline', 
+      'discipline',
       'status',
       'priority',
       'tags',
       'doc_date',
       'contract_value',
       'project_name',
-      'workspace_name'
+      'workspace_name',
+      'folder_id', // Step 7
+      'folder_path' // Step 7
     ]);
 
     // Configure sortable attributes

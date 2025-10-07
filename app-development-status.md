@@ -2,6 +2,110 @@
 
 ## Latest Updates
 
+### Planning Overview Page Enhancements (January 2025)
+
+#### Summary
+Enhanced the Planning Overview page with improved filtering capabilities, cleaner description UI, header improvements, and Reports selector placeholder.
+
+#### Key Features Implemented
+
+**1. Multi-Select Area Filtering**
+- **Multi-Selection:** Plan Area tiles now support multi-select functionality like Phase filters
+- **Toggle Behavior:** Click tiles to toggle selection on/off, multiple areas can be selected simultaneously
+- **Visual Feedback:** Selected tiles show blue background and border to indicate active filter
+- **Filter Count:** Clear Filters button now accurately counts all selected area and phase filters
+- **Cascading Updates:** Phase table filters based on selected areas
+
+**2. Phase Description UI Improvements**
+- **Column Rename:** Changed "Detail" column header to "Description" with left-alignment
+- **Icon Replacement:** Replaced circular chip with simple chevron icon (right-pointing collapsed, down-pointing expanded)
+- **Cleaner Look:** Removed solid/transparent chip styling in favor of subtle icon indicator
+- **Text Preview:** Description text truncated and displayed next to chevron icon
+- **Accordion Behavior:** Click chevron to expand/collapse full description text
+
+**3. Header Component Updates**
+- **Project Selector:** Reduced width by 60% (from `flex-1 max-w-2xl` to fixed `w-64`)
+- **Reports Selector:** Added placeholder Reports dropdown (disabled state) for future printing wizard integration
+- **Layout:** Reports selector positioned next to project selector with matching styling
+
+**4. Column Organization**
+- **Phase Table:** Reordered columns to: Phase | Uses | Description | Acres | Units | Actions
+- **Description Position:** Description column moved after Uses, before Acres
+- **Text Display:** Shows truncated description preview text between Uses and Acres columns
+
+#### Technical Implementation
+
+**Frontend Architecture:**
+- **State Management:** Changed `selectedAreaFilter` (single) to `selectedAreaFilters` (array)
+- **Filter Logic:** Updated useMemo hooks to support array-based area filtering
+- **Toggle Function:** Implemented array-based toggle with includes/filter pattern
+- **Clear Filters:** Updated to reset both area and phase filter arrays
+
+**UI Components Modified:**
+```typescript
+// Area filtering - before
+const [selectedAreaFilter, setSelectedAreaFilter] = useState<number | null>(null)
+if (selectedAreaFilter !== null) {
+  filtered = filtered.filter(parcel => parcel.area_no === selectedAreaFilter)
+}
+
+// Area filtering - after
+const [selectedAreaFilters, setSelectedAreaFilters] = useState<number[]>([])
+if (selectedAreaFilters.length > 0) {
+  filtered = filtered.filter(parcel => selectedAreaFilters.includes(parcel.area_no))
+}
+```
+
+**Icon Implementation:**
+```typescript
+// Replaced chip with chevron
+<button className="text-gray-400 hover:text-white transition-colors">
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    {expanded ? (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    ) : (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    )}
+  </svg>
+</button>
+```
+
+#### Components Modified
+
+**Updated Components:**
+```
+src/app/components/Planning/PlanningContent.tsx - Area filtering, description UI, column layout
+src/app/components/Header.tsx - Project selector width, Reports dropdown placeholder
+```
+
+#### User Experience Improvements
+
+**Before:**
+- ❌ Single area selection limited filtering flexibility
+- ❌ Circular chip styling felt heavy/cluttered
+- ❌ Project selector took too much header space
+- ❌ No Reports access point in interface
+
+**After:**
+- ✅ Multi-select area filtering enables complex queries
+- ✅ Clean chevron icon provides subtle, clear indicator
+- ✅ Compact project selector leaves more header space
+- ✅ Reports selector placeholder ready for wizard integration
+
+#### Future Enhancements
+- Implement printing wizard functionality for Reports selector
+- Consider adding "Select All Areas" quick action
+- Add keyboard shortcuts for area/phase filter toggling
+- Implement filter presets/saved views
+
+#### Files Modified in This Update
+```
+src/app/components/Planning/PlanningContent.tsx (filtering logic, description UI)
+src/app/components/Header.tsx (project selector, reports dropdown)
+```
+
+---
+
 ### Market Assumptions Global Page Integration (September 23, 2025)
 
 #### Summary

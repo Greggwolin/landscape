@@ -52,9 +52,9 @@ const Header: React.FC<HeaderProps> = ({ onEditClick, isEditing, onSave, onCance
         />
       </div>
 
-      {/* Project Selector - Much Wider */}
-      <div className="flex items-center space-x-4 ml-6 flex-1 max-w-2xl">
-        <div className="relative flex-1">
+      {/* Project Selector - Narrower */}
+      <div className="flex items-center space-x-4 ml-6">
+        <div className="relative w-64">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center justify-between w-full px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
@@ -99,6 +99,19 @@ const Header: React.FC<HeaderProps> = ({ onEditClick, isEditing, onSave, onCance
               </div>
             </div>
           )}
+        </div>
+
+        {/* Reports Selector */}
+        <div className="relative w-48">
+          <button
+            className="flex items-center justify-between w-full px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors cursor-not-allowed opacity-60"
+            disabled
+          >
+            <span className="text-sm">Reports</span>
+            <svg className="w-4 h-4 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
         {/* Edit Controls */}

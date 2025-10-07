@@ -113,43 +113,33 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
 
   const loadProducts = async (typeCode: string) => {
     try {
-      // For residential lot products, use the specific endpoint
-      if (typeCode === 'SFD' || typeCode === 'SFA') {
-        const response = await fetch('/api/landuse/res-lot-products');
+      // Find the type_id for the selected type
+      let type = types.find(t => t.type_code === typeCode);
+      if (!type && typeCode.length >= 3) {
+        type = types.find(t => t.type_code.startsWith(typeCode));
+      }
+
+      if (type) {
+        // Use the lot-products endpoint which handles all product types
+        const response = await fetch(`/api/landuse/lot-products/${type.type_id}`);
         if (response.ok) {
           const data = await response.json();
-          // Remove duplicates by product_code and ensure unique products
-          const uniqueProducts = data.reduce((acc: Product[], product: any) => {
-            const exists = acc.find(p => p.code === product.product_code);
-            if (!exists) {
-              acc.push({
-                product_id: product.product_id,
-                product_name: product.product_code, // Just use the code, no dimensions
-                code: product.product_code,
-                lot_width: product.lot_width,
-                lot_depth: product.lot_depth,
-              });
-            }
-            return acc;
-          }, []);
-          setProducts(uniqueProducts);
-        }
-      } else {
-        // For other types, find the type_id and use the generic products endpoint
-        let type = types.find(t => t.type_code === typeCode);
-        if (!type && typeCode.length >= 3) {
-          type = types.find(t => t.type_code.startsWith(typeCode));
-        }
-        if (type) {
-          const response = await fetch(`/api/landuse/products/${type.type_id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setProducts(data);
-          }
+          // Map the response to Product format
+          const mappedProducts = data.map((p: any) => ({
+            product_id: p.product_id || p.code,
+            product_name: p.name || p.code,
+            code: p.code,
+            lot_width: p.lot_width,
+            lot_depth: p.lot_depth,
+          }));
+          setProducts(mappedProducts);
+        } else {
+          setProducts([]);
         }
       }
     } catch (error) {
       console.error('Failed to load products:', error);
+      setProducts([]);
     }
   };
 
@@ -224,8 +214,8 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
           </tr>
         )}
 
-        {/* Product Selector */}
-        {value.type_code && (
+        {/* Product Selector - only show if products are available */}
+        {value.type_code && products.length > 0 && (
           <tr>
             <td className="opacity-90 align-top pr-2 whitespace-nowrap">Product:</td>
             <td className="font-medium">

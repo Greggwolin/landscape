@@ -49,28 +49,30 @@ const getCombinedSetbacks = (parcel: Parcel): string => {
   return '';
 };
 
-const getLandUseColor = (landUse: LandUseType) => {
-  switch (landUse) {
-    case 'LDR': return 'bg-emerald-600'
-    case 'MDR': return 'bg-green-600'
-    case 'HDR': return 'bg-teal-600'
-    case 'MHDR': return 'bg-cyan-600'
-    case 'C': return 'bg-orange-600'
-    case 'MU': return 'bg-amber-600'
-    case 'OS': return 'bg-blue-600'
+const getFamilyColor = (familyName?: string) => {
+  if (!familyName) return 'bg-slate-600'
+  switch (familyName) {
+    case 'Residential': return 'bg-blue-700'
+    case 'Commercial': return 'bg-purple-700'
+    case 'Industrial': return 'bg-orange-700'
+    case 'Institutional': return 'bg-indigo-700'
+    case 'Common Areas': return 'bg-teal-700'
+    case 'Open Space': return 'bg-green-700'
+    case 'Public': return 'bg-cyan-700'
     default: return 'bg-slate-600'
   }
 }
 
-const getLandUseBorderColor = (landUse: LandUseType) => {
-  switch (landUse) {
-    case 'LDR': return 'border-emerald-500'
-    case 'MDR': return 'border-green-500'
-    case 'HDR': return 'border-teal-500'
-    case 'MHDR': return 'border-cyan-500'
-    case 'C': return 'border-orange-500'
-    case 'MU': return 'border-amber-500'
-    case 'OS': return 'border-blue-500'
+const getFamilyBorderColor = (familyName?: string) => {
+  if (!familyName) return 'border-slate-500'
+  switch (familyName) {
+    case 'Residential': return 'border-blue-500'
+    case 'Commercial': return 'border-purple-500'
+    case 'Industrial': return 'border-orange-500'
+    case 'Institutional': return 'border-indigo-500'
+    case 'Common Areas': return 'border-teal-500'
+    case 'Open Space': return 'border-green-500'
+    case 'Public': return 'border-cyan-500'
     default: return 'border-slate-500'
   }
 }
@@ -98,7 +100,7 @@ const ParcelTile: React.FC<ParcelTileProps> = ({
 
   const renderViewMode = () => (
     <div
-      className={`${getLandUseColor(parcel.landUse)} ${getLandUseBorderColor(parcel.landUse)} text-white border-2 rounded-lg p-3 cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-white transition-all duration-200 h-fit`}
+      className={`${getFamilyColor(familyName)} ${getFamilyBorderColor(familyName)} text-white border-2 rounded-lg p-3 cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-white transition-all duration-200 h-fit`}
       onClick={onClick}
     >
       <div className="text-center mb-2">
@@ -228,7 +230,7 @@ const ParcelTile: React.FC<ParcelTileProps> = ({
   );
 
   const renderEditMode = () => (
-    <div className={`${getLandUseColor(parcel.landUse)} ${getLandUseBorderColor(parcel.landUse)} text-white border-2 rounded-lg p-3 h-fit`}>
+    <div className={`${getFamilyColor(familyName)} ${getFamilyBorderColor(familyName)} text-white border-2 rounded-lg p-3 h-fit`}>
       <div className="text-center mb-2">
         <div className="font-bold text-sm mb-1 leading-tight">
           Editing: Parcel {parcel.name.replace('Parcel: ', '')}
