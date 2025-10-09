@@ -1,0 +1,45 @@
+series_code,series_name,category,subcategory,units,frequency,seasonal,source,coverage_level,notes
+CPIAUCSL,Consumer Price Index: All Urban Consumers (SA),PRICES_RATES,CPI,Index 1982-1984=100,M,SA,FRED,US,Headline CPI (seasonally adjusted)
+CPIAUCNS,Consumer Price Index: All Urban Consumers (NSA),PRICES_RATES,CPI,Index 1982-1984=100,M,NSA,FRED,US,Headline CPI (not seasonally adjusted)
+PPIACO,Producer Price Index: All Commodities,PRICES_RATES,PPI,Index 1982=100,M,NSA,FRED,US,
+FEDFUNDS,Effective Federal Funds Rate,PRICES_RATES,RATES,Percent,M,NSA,FRED,US,
+MORTGAGE30US,30-Year Fixed Rate Mortgage Average,PRICES_RATES,MORTGAGE,Percent,W,NSA,FRED,US,
+MORTGAGE15US,15-Year Fixed Rate Mortgage Average,PRICES_RATES,MORTGAGE,Percent,W,NSA,FRED,US,
+PAYEMS,Total Nonfarm Payroll Employment,LABOR,EMPLOYMENT,Thousands,M,SA,FRED,US,
+CES_STATE_TOTAL,State Total Nonfarm Payroll Employment,LABOR,EMPLOYMENT,Thousands,M,SA,FRED,STATE,Derived from SMU state employment series
+LAUS_UNRATE,Unemployment Rate,LABOR,UNEMPLOYMENT,Percent,M,SA,BLS,US,Headline unemployment rate (seasonally adjusted)
+LAUS_STATE_UNRATE,State Unemployment Rate,LABOR,UNEMPLOYMENT,Percent,M,SA,BLS,STATE,Computed from LAUS state series
+LAUS_MSA_UNRATE,MSA Unemployment Rate,LABOR,UNEMPLOYMENT,Percent,M,SA,BLS,MSA,Computed from LAUS metro series
+LAUS_PLACE_UNRATE,City/Place Unemployment Rate,LABOR,UNEMPLOYMENT,Percent,M,NSA,BLS,CITY,LAUS place-level unemployment rate
+CES_SUPERSECTOR,Total Nonfarm Payroll by Supersector,LABOR,EMPLOYMENT,Thousands,M,SA,FRED,STATE|MSA,Aggregate of CES supersector codes
+PERSONAL_INCOME_PC_US,Per Capita Personal Income (US),INCOME,PERSONAL_INCOME,Chains 2017 Dollars,A,NSA,BEA,US,
+PERSONAL_INCOME_PC_STATE,Per Capita Personal Income (State),INCOME,PERSONAL_INCOME,Chains 2017 Dollars,A,NSA,BEA,STATE,Uses BEA SAINC tables
+PERSONAL_INCOME_PC_MSA,Per Capita Personal Income (MSA),INCOME,PERSONAL_INCOME,Chains 2017 Dollars,A,NSA,BEA,MSA,
+FHFA_HPI_US_SA,"FHFA House Price Index (US, SA)",HOUSING,HPI,Index 1991=100,Q,SA,FHFA,US,
+FHFA_HPI_US_NSA,"FHFA House Price Index (US, NSA)",HOUSING,HPI,Index 1991=100,Q,NSA,FHFA,US,
+FHFA_HPI_STATE_SA,"FHFA House Price Index (State, SA)",HOUSING,HPI,Index 1991=100,Q,SA,FHFA,STATE,
+FHFA_HPI_STATE_NSA,"FHFA House Price Index (State, NSA)",HOUSING,HPI,Index 1991=100,Q,NSA,FHFA,STATE,
+FHFA_HPI_MSA_SA,"FHFA House Price Index (MSA, SA)",HOUSING,HPI,Index 1991=100,Q,SA,FHFA,MSA,
+FHFA_HPI_MSA_NSA,"FHFA House Price Index (MSA, NSA)",HOUSING,HPI,Index 1991=100,Q,NSA,FHFA,MSA,
+SPCSUSHPISA,S&P/Case-Shiller U.S. National Home Price Index (SA),HOUSING,HPI,Index Jan 2000=100,M,SA,SPCS,US,
+SPCS20RSA,S&P/Case-Shiller 20-Metro Composite Home Price Index (SA),HOUSING,HPI,Index Jan 2000=100,M,SA,SPCS,US,
+SPCS20RNSA,S&P/Case-Shiller 20-Metro Composite Home Price Index (NSA),HOUSING,HPI,Index Jan 2000=100,M,NSA,SPCS,US,
+HSN1F,New One Family Houses Sold: United States (SA),HOUSING,SALES,Thousands,M,SA,FRED,US,
+HSN1FNSA,New One Family Houses Sold: United States (NSA),HOUSING,SALES,Thousands,M,NSA,FRED,US,
+MSPNHSUS,Median Sales Price of New Houses Sold,HOUSING,PRICES,Thousands of Dollars,M,SA,FRED,US,
+MSPNHSUSNSA,Median Sales Price of New Houses Sold (NSA),HOUSING,PRICES,Thousands of Dollars,M,NSA,FRED,US,
+EXHOSLUSM495S,Existing Single-Family Home Sales (SA),HOUSING,SALES,Millions,M,SA,FRED,US,
+EXHOSLUSM495SNSA,Existing Single-Family Home Sales (NSA),HOUSING,SALES,Millions,M,NSA,FRED,US,
+HOSMEDUSM052N,Median Sales Price of Existing Homes,HOUSING,PRICES,Thousands of Dollars,M,NSA,FRED,US,
+PERMIT_TOTAL,Building Permits - Total Units,HOUSING,PERMITS,Units,M,NSA,BPS,US|STATE|MSA|COUNTY|CITY,Published via Census Building Permits Survey
+PERMIT_1UNIT,Building Permits - 1 Unit,HOUSING,PERMITS,Units,M,NSA,BPS,US|STATE|MSA|COUNTY|CITY,
+PERMIT_5PLUS,Building Permits - 5 Units or More,HOUSING,PERMITS,Units,M,NSA,BPS,US|STATE|MSA|COUNTY|CITY,
+ACS_POPULATION,ACS Total Population,CITY,ACS,Persons,A,NSA,ACS,CITY,1-year if population >=65k else 5-year estimate
+ACS_HOUSEHOLDS,ACS Total Households,CITY,ACS,Households,A,NSA,ACS,CITY,1-year if population >=65k else 5-year estimate
+ACS_MEDIAN_HH_INC,ACS Median Household Income,CITY,ACS,2017 USD,A,NSA,ACS,CITY,Inflation-adjusted median household income
+LAUS_PLACE_EMPLOYED,City/Place Employment Level,LABOR,EMPLOYMENT,Persons,M,NSA,BLS,CITY,Sourced from LAUS place employment
+ACS_STATE_POPULATION,ACS Total Population (State),CITY,ACS,Persons,A,NSA,ACS,STATE,ACS control for state rollups
+ACS_COUNTY_POPULATION,ACS Total Population (County),CITY,ACS,Persons,A,NSA,ACS,COUNTY,
+PERMIT_PLACE_TOTAL,Building Permits - Place Level Total Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,Direct place-level permits
+PERMIT_PLACE_1UNIT,Building Permits - Place Level 1 Unit,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,
+PERMIT_PLACE_5PLUS,Building Permits - Place Level 5+ Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,

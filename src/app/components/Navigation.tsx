@@ -18,7 +18,6 @@ interface NavSection {
 interface NavItem {
   id: string;
   label: string;
-  icon: string;
   href?: string;
   target?: string;
 }
@@ -35,64 +34,52 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Home',
       items: [
-        { id: 'home', label: 'Home', icon: '🏠' },
-        { id: 'dev-status', label: 'Development Status', icon: '📊' },
-        { id: 'documentation', label: 'Documentation', icon: '📚' },
-        { id: 'under-construction', label: 'Under Construction', icon: '🚧' },
-        { id: 'prototype-lab', label: 'Prototype Lab', icon: '🧪', href: '/prototypes' }
+        { id: 'home', label: 'Home' },
+        { id: 'dev-status', label: 'Development Status' },
+        { id: 'documentation', label: 'Documentation' },
+        { id: 'prototype-lab', label: 'Prototype Lab', href: '/prototypes' }
       ]
     },
     {
       title: 'Planning',
       items: [
-        { id: 'planning-inline', label: 'Planning', icon: '✏️' },
-        { id: 'planning-overview', label: 'Overview', icon: '🗺️' },
-        { id: 'documents', label: 'Documents', icon: '📄' }
+        { id: 'planning-inline', label: 'Planning' },
+        { id: 'planning-overview', label: 'Overview' },
+        { id: 'documents', label: 'Documents' }
       ],
       isCollapsible: true
     },
     {
       title: 'Assumptions',
       items: [
-        { id: 'market', label: 'Global', icon: '🧮' },
-        { id: 'growth-rates', label: 'Market Rates & Prices', icon: '📊' },
-        { id: 'project-revenues', label: 'Project Revenues', icon: '📈' }
+        { id: 'market', label: 'Global' },
+        { id: 'market-page', label: 'Market', href: '/market' },
+        { id: 'growth-rates', label: 'Market Rates & Prices' }
       ],
       isCollapsible: true
     },
     {
       title: 'Budgets',
       items: [
-        { id: 'acquisition', label: 'Acquisition', icon: '🏡' },
-        { id: 'project-costs', label: 'Project Costs', icon: '💰' },
-        { id: 'budget-grid-light', label: 'Budget Grid (Light)', icon: '☀️' },
-        { id: 'budget-grid-dark', label: 'Budget Grid (Dark)', icon: '🌙' },
-        { id: 'disposition', label: 'Project Disposition', icon: '🎯' }
-      ],
-      isCollapsible: true
-    },
-    {
-      title: 'Ownership',
-      items: [
-        { id: 'debt', label: 'Debt', icon: '🏦' },
-        { id: 'equity', label: 'Equity', icon: '📊' },
-        { id: 'muni-district', label: 'Muni / District', icon: '🏛️' }
+        { id: 'project-costs', label: 'Project Costs' },
+        { id: 'budget-grid-light', label: 'Budget Grid (Light)' },
+        { id: 'budget-grid-dark', label: 'Budget Grid (Dark)' }
       ],
       isCollapsible: true
     },
     {
       title: 'Documents (DMS)',
       items: [
-        { id: 'dms', label: 'Document Management', icon: '📚', href: '/dms' }
+        { id: 'dms', label: 'Document Management', href: '/dms' }
       ],
       isCollapsible: false
     },
     {
       title: 'Settings',
       items: [
-        { id: 'settings', label: 'Settings', icon: '⚙️' },
-        { id: 'zoning-glossary', label: 'Zoning Glossary', icon: '🏷️' },
-        { id: 'planning', label: `${level2Label} Planner (Legacy)`, icon: '🪄' }
+        { id: 'settings', label: 'Settings' },
+        { id: 'zoning-glossary', label: 'Zoning Glossary' },
+        { id: 'planning', label: `${level2Label} Planner (Legacy)` }
       ]
     }
   ], [level2Label])
@@ -138,7 +125,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const isActive = activeView === item.id;
-                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center space-x-3 hover:bg-gray-700 transition-colors ${isActive ? 'bg-gray-700 text-white border-r-2 border-blue-500' : 'text-gray-300'}`;
+                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center gap-3 hover:bg-gray-700 transition-colors ${isActive ? 'bg-gray-700 text-white border-r-2 border-blue-500' : 'text-gray-300'}`;
 
                   if (item.href) {
                     return (
@@ -148,7 +135,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                         target={item.target}
                         className={baseClasses}
                       >
-                        <span className="text-base">{item.icon}</span>
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
                         <span>{item.label}</span>
                       </Link>
                     );
@@ -160,7 +147,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                       onClick={() => setActiveView(item.id)}
                       className={baseClasses}
                     >
-                      <span className="text-base">{item.icon}</span>
+                      <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
                       <span>{item.label}</span>
                     </button>
                   );

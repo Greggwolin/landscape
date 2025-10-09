@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import './globals.css';
+import { IssueReporterProvider } from "@/components/IssueReporter";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        {children}
+        <IssueReporterProvider>
+          {children}
+        </IssueReporterProvider>
       </body>
     </html>
   );

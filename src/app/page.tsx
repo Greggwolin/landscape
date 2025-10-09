@@ -19,7 +19,6 @@ import DevStatus from './components/DevStatus/DevStatus';
 import { ProjectProvider, useProjectContext } from './components/ProjectProvider';
 import DocumentManagement from './components/Documents/DocumentManagement';
 import HomeOverview from './components/Home/HomeOverview';
-import UnderConstruction from './components/Home/UnderConstruction';
 import DocumentationIndex from './documentation/page';
 import GrowthRates from './components/GrowthRates';
 import BudgetGridLight from './components/Budget/BudgetGridLight';
@@ -47,9 +46,6 @@ const LandscapeAppInner: React.FC = () => {
       case 'dashboard':
         return <DashboardContent />;
 
-      case 'under-construction':
-        return <UnderConstruction />;
-
       case 'documentation':
         return <DocumentationIndex />;
 
@@ -70,8 +66,6 @@ const LandscapeAppInner: React.FC = () => {
       case 'mapping-gis':
         return <ComingSoonContent title="Mapping / GIS" />;
 
-      case 'acquisition':
-        return <ComingSoonContent title="Acquisition" />;
       case 'market':
         return <MarketAssumptionsNative projectId={activeProject?.project_id ?? null} />;
       case 'growth-rates':
@@ -82,17 +76,6 @@ const LandscapeAppInner: React.FC = () => {
         return <BudgetGridLight projectId={activeProject?.project_id ?? 7} />;
       case 'budget-grid-dark':
         return <BudgetGridDarkWrapper projectId={activeProject?.project_id ?? 7} />;
-      case 'project-revenues':
-        return <ComingSoonContent title="Project Revenues" />;
-      case 'disposition':
-        return <ComingSoonContent title="Project Disposition" />;
-
-      case 'debt':
-        return <ComingSoonContent title="Debt" />;
-      case 'equity':
-        return <ComingSoonContent title="Equity" />;
-      case 'muni-district':
-        return <ComingSoonContent title="Muni / District" />;
 
       case 'settings':
         return <CategoryTree />;
