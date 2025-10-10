@@ -344,30 +344,15 @@ const MarketPage: React.FC = () => {
     return result;
   };
 
-  // const employmentSeries = primarySeries('PAYEMS');
-  // const unemploymentSeries = primarySeries('LAUS_PLACE_UNRATE') ?? primarySeries('LAUS_STATE_UNRATE');
-  // const permitsSeries = primarySeries('PERMIT_PLACE_TOTAL') ?? primarySeries('PERMIT_TOTAL');
-  // const householdsSeries = primarySeries('ACS_HOUSEHOLDS');
-  // const incomeSeries = primarySeries('ACS_MEDIAN_HH_INC') ?? primarySeries('PERSONAL_INCOME_PC_STATE');
-  // const hpiSeries = primarySeries('FHFA_HPI_STATE_SA') ?? primarySeries('FHFA_HPI_US_SA');
-  // const mortgageSeries = primarySeries('MORTGAGE30US');
-  // const populationSeries = primarySeries('ACS_POPULATION');
+  const householdsSeries = primarySeries('ACS_HOUSEHOLDS');
+  const incomeSeries = primarySeries('ACS_MEDIAN_HH_INC') ?? primarySeries('PERSONAL_INCOME_PC_STATE');
+  const populationSeries = primarySeries('ACS_POPULATION');
 
-  // const population = latestPoint(populationSeries);
-  // const employment = latestPoint(employmentSeries);
-  // const unemployment = latestPoint(unemploymentSeries);
-  // const income = latestPoint(incomeSeries);
-  // const permits = latestPoint(permitsSeries);
-  // const hpi = latestPoint(hpiSeries);
-  // const households = latestPoint(householdsSeries);
-  // const mortgage = latestPoint(mortgageSeries);
+  const population = latestPoint(populationSeries);
+  const income = latestPoint(incomeSeries);
+  const households = latestPoint(householdsSeries);
 
-  // const employmentYoY = latestYoY(employmentSeries);
-  // const unemploymentYoY = latestYoY(unemploymentSeries);
-  // const permitsYoY = latestYoY(permitsSeries);
-  // const hpiYoY = latestYoY(hpiSeries);
-  // const populationYoY = latestYoY(populationSeries);
-  // const incomeYoY = latestYoY(incomeSeries);
+  const populationYoY = latestYoY(populationSeries);
 
   /* Unused for now - keeping for future multi-geo toggle feature
   const handleToggleGeo = (geoId: string) => {
