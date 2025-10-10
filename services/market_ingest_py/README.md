@@ -89,3 +89,76 @@ parent level with `coverage_note` annotations for downstream UI display.
 - The ingestion engine assumes the geo spine from `public.geo_xwalk` is populated.
   Use the city resolver (`--project "City,ST"`) to verify the hierarchy and parent links.
 - Extend bundles by editing `DEFAULT_BUNDLES` in `config.py`.
+
+## Common Issues & Troubleshooting
+
+### Census API Returns 404
+
+**Symptom**: Warnings like `ACS data missing for series ACS_POPULATION geo 04-57630 year 2023`
+
+**Causes**:
+1. **Missing or incorrect FIPS codes** in `geo_xwalk`:
+   - City data requires: `state_fips`, `place_fips`
+   - County data requires: `state_fips`, `county_fips`
+   - Tract data requires: `state_fips`, `county_fips`, `tract_fips` (11-digit)
+
+2. **Population below threshold**: ACS 1-year estimates only available for places with population ≥65,000
+
+**Fix**:
+```sql
+-- Verify FIPS codes
+SELECT geo_id, geo_name, state_fips, county_fips, place_fips, tract_fips
+FROM public.geo_xwalk
+WHERE geo_id = 'XX-XXXXX';
+
+-- Update missing codes
+UPDATE public.geo_xwalk
+SET state_fips = '04', place_fips = '54050'
+WHERE geo_id = '04-57630';
+```
+
+### Series Not Fetching for Certain Geo Levels
+
+**Symptom**: County data not showing up even though series exists
+
+**Cause**: Series `coverage_level` mismatch. Each series has a specific coverage level (CITY, COUNTY, MSA, STATE, TRACT, US).
+
+**Fix**: Use the geo-level specific series codes:
+- City: `ACS_POPULATION`, `ACS_MEDIAN_HH_INC`
+- County: `ACS_COUNTY_POPULATION`, `ACS_COUNTY_MEDIAN_HH_INC`
+- Tract: `ACS_TRACT_MEDIAN_HH_INC`
+
+```bash
+# For county-level data
+.venv/bin/market-ingest --geo-id 04021 \
+  --series ACS_COUNTY_POPULATION ACS_COUNTY_MEDIAN_HH_INC \
+  --start 2019-01-01 --end 2024-12-31
+```
+
+### Data Ingested But Not Showing in UI
+
+**Cause**: Series category mismatch. The UI queries by category (DEMOGRAPHICS, INCOME, etc.).
+
+**Fix**: Verify series categories match UI expectations:
+```sql
+SELECT series_code, category, subcategory, coverage_level
+FROM public.market_series
+WHERE source = 'ACS';
+
+-- Update if needed
+UPDATE public.market_series
+SET category = 'DEMOGRAPHICS', subcategory = 'Population'
+WHERE series_code IN ('ACS_POPULATION', 'ACS_COUNTY_POPULATION');
+```
+
+## Session Notes: October 10, 2025
+
+Successfully ingested ACS data for Arizona projects:
+- **Maricopa city** (geo_id: 04-44410): 18 data points across 3 series (2019-2024)
+- **Peoria city** (geo_id: 04-57630): 18 data points across 3 series (2019-2024)
+- **Pinal County** (geo_id: 04021): 12 data points across 2 series (2019-2024)
+
+Key learnings:
+1. Peoria had wrong place_fips (57630 vs correct 54050) - Census API was failing silently
+2. geo_id format (04-57630) doesn't need to match place_fips - it's an arbitrary identifier
+3. Always verify FIPS codes before running ingestion to avoid wasted API calls

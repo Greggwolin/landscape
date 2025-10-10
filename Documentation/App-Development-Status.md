@@ -1,6 +1,6 @@
 # Landscape App - Comprehensive Development Documentation
 
-*Last Updated: October 7, 2025 23:45 PST*
+*Last Updated: October 10, 2025 14:30 PST*
 *Purpose: Complete reference document for Claude Project context*
 
 ---
@@ -53,6 +53,11 @@
   - DOCX: mammoth
 - **File Uploads**: UploadThing 7.7.4
 - **Search**: MeiliSearch 0.53.0
+- **Python Services**:
+  - Market Ingestion Engine v1 (Python 3.12 with Poetry)
+  - Data sources: Census ACS, FRED, FHFA, BLS
+  - CLI tool for batch data ingestion
+  - Database-only integration (loosely coupled)
 
 ### Development
 - **Dev Server**: Running on port 3007 (http://localhost:3007)
@@ -1559,6 +1564,62 @@ import { DataGrid } from '@mui/x-data-grid'
 ---
 
 ## 📝 Recent Development Activity
+
+### Session: October 10, 2025 - Market Intelligence Data Ingestion & UI Improvements
+
+**Problem**: Market page showing NAV (not available) for city and county-level data
+
+**Root Cause**:
+1. Peoria city had incorrect `place_fips` code in `geo_xwalk` (57630 instead of 54050)
+2. Maricopa city missing FIPS codes entirely
+3. County-level ACS series had wrong category assignments
+4. UI issues: TRACT label showing as "TRACT" instead of "Tract", row spacing too wide, YoY calculations wrong for percentage stats
+
+**Changes Made**:
+
+1. **Database Fixes**:
+   - Fixed Peoria place_fips: 57630 → 54050 (population 198,753)
+   - Added Maricopa FIPS codes: state_fips=04, county_fips=021, place_fips=44410, cbsa_code=38060
+   - Updated Peoria county_fips=013, cbsa_code=38060
+   - Fixed ACS series categories:
+     - `ACS_POPULATION`, `ACS_COUNTY_POPULATION` → category=DEMOGRAPHICS
+     - `ACS_MEDIAN_HH_INC`, `ACS_COUNTY_MEDIAN_HH_INC` → category=INCOME
+     - `ACS_HOUSEHOLDS` → category=DEMOGRAPHICS
+
+2. **Data Ingestion** (via Python CLI):
+   - Maricopa city (04-44410): 18 data points (3 series × 6 years 2019-2024)
+     - ACS_POPULATION, ACS_HOUSEHOLDS, ACS_MEDIAN_HH_INC
+   - Peoria city (04-57630): 18 data points (same series)
+   - Pinal County (04021): 12 data points (ACS_COUNTY_POPULATION, ACS_COUNTY_MEDIAN_HH_INC)
+
+3. **UI Improvements** ([src/app/market/page.tsx](src/app/market/page.tsx)):
+   - Fixed TRACT label: "TRACT" → "Tract" (lines 298-305)
+   - Added county-level series codes to tiles (lines 435-457):
+     - Population tile: Added `ACS_COUNTY_POPULATION`
+     - Median Income tile: Added `ACS_COUNTY_MEDIAN_HH_INC`
+   - Fixed YoY calculation for percentage stats (lines 271-324):
+     - Percentage series (units="Percent"): Show incremental change as "±X.X pp" (percentage points)
+     - Non-percentage series: Show percentage change as "X.X% YoY"
+     - Example: Unemployment 5% → 6% shows "+1.0 pp" not "+20.0% YoY"
+
+4. **Component Updates** ([src/app/market/components/CombinedTile.tsx](src/app/market/components/CombinedTile.tsx)):
+   - Tightened row spacing: `space-y-1` → `space-y-0.5`, `py-1` → `py-0.5` (lines 198-202)
+
+**Python Integration Discovery**:
+- Market Ingestion Engine (`/services/market_ingest_py`) is currently the only Python service
+- Standalone CLI tool with database-only integration
+- Future potential: automated background workers, scheduled data refresh, ML/analytics
+
+**Files Modified**:
+```
+M src/app/market/page.tsx
+M src/app/market/components/CombinedTile.tsx
+M services/market_ingest_py/ (database updates via CLI)
+```
+
+**Status**: ✅ Market data now populating correctly for Red Valley (Maricopa) and other projects
+
+---
 
 ### Session: October 3, 2025 - Parcel Tile Layout Fixes
 
