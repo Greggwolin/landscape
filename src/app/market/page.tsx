@@ -454,7 +454,7 @@ const MarketPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <CombinedTile
             title="Population"
             multiGeoKPIs={getMultiGeoKPIData(['ACS_POPULATION', 'ACS_COUNTY_POPULATION', 'POP_COUNTY', 'POP_MSA', 'POP_STATE', 'POP_US'], (value) => formatNumber(value, 0))}
@@ -524,7 +524,7 @@ const MarketPage: React.FC = () => {
           </TabsPrimitive.List>
 
           <TabsPrimitive.Content value="macro" className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <CombinedTile
                 title="Inflation"
                 singleKPI={true}
