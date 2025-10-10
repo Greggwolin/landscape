@@ -201,7 +201,7 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
               key={`${geoKPI.geoCode ?? geoKPI.geoLevel}-${idx}`}
               className="flex items-center gap-2 rounded px-2 py-0.5 hover:bg-gray-800/50"
             >
-              <div className="flex-1 min-w-0" title={geoKPI.geoName}>
+              <div className="flex-1 min-w-[100px]" title={geoKPI.geoName}>
                 <div className="text-sm text-gray-200 truncate">
                   {geoKPI.geoName !== '-' ? geoKPI.geoName : geoKPI.geoLevel}
                 </div>
