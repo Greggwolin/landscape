@@ -74,17 +74,32 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
   miniBarChart = false
 }) => {
   const [activeToggle, setActiveToggle] = useState(defaultToggle || toggleOptions?.[0]?.value || '');
+  const [yearsBack, setYearsBack] = useState(5); // Default to 5 years back
 
   const filteredSeries = useMemo(() => {
-    if (!toggleOptions || !activeToggle) {
-      return series.filter((serie) => serie.data && serie.data.length > 0);
+    // First filter by toggle if applicable
+    let filtered = series;
+    if (toggleOptions && activeToggle) {
+      filtered = series.filter((serie) => {
+        const matchesSeasonal = serie.seasonal === activeToggle;
+        return serie.data && serie.data.length > 0 && matchesSeasonal;
+      });
+    } else {
+      filtered = series.filter((serie) => serie.data && serie.data.length > 0);
     }
-    // Filter series based on active toggle (e.g., show only SA or NSA)
-    return series.filter((serie) => {
-      const matchesSeasonal = serie.seasonal === activeToggle;
-      return serie.data && serie.data.length > 0 && matchesSeasonal;
-    });
-  }, [series, toggleOptions, activeToggle]);
+
+    // Then filter by date range
+    if (yearsBack === 20) return filtered; // Show all data at max slider value
+
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - yearsBack);
+    const cutoffStr = cutoffDate.toISOString().slice(0, 7); // YYYY-MM format
+
+    return filtered.map(serie => ({
+      ...serie,
+      data: serie.data.filter(point => point.date >= cutoffStr)
+    }));
+  }, [series, toggleOptions, activeToggle, yearsBack]);
 
   const activeKPI = useMemo(() => {
     if (!singleKPI || !toggleOptions || !activeToggle) return kpis[0];
@@ -196,17 +211,32 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
       {multiGeoKPIs ? (
         // Stacked multi-geo layout
         <div className="mb-4 space-y-0.5">
-          {multiGeoKPIs.map((geoKPI, idx) => (
-            <div
-              key={`${geoKPI.geoCode ?? geoKPI.geoLevel}-${idx}`}
-              className="flex items-center gap-2 rounded px-2 py-0.5 hover:bg-gray-800/50"
-            >
-              <div className="flex-1 min-w-0" title={geoKPI.geoName}>
-                <div className="text-sm text-gray-200 truncate">
-                  {geoKPI.geoName !== '-' ? geoKPI.geoName : geoKPI.geoLevel}
+          {multiGeoKPIs.map((geoKPI, idx) => {
+            // Find the corresponding series to get the color index
+            const seriesIndex = filteredSeries.findIndex(serie =>
+              serie.geo_level === geoKPI.geoLevel ||
+              serie.geo_name === geoKPI.geoName
+            );
+            const colorIndex = seriesIndex >= 0 ? seriesIndex : idx;
+            const color = COLORS[colorIndex % COLORS.length];
+
+            return (
+              <div
+                key={`${geoKPI.geoCode ?? geoKPI.geoLevel}-${idx}`}
+                className="flex items-center gap-2 rounded px-2 py-0.5 hover:bg-gray-800/50"
+              >
+                {/* Color chip matching chart line */}
+                <div
+                  className="w-3 h-3 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: color }}
+                  title={`Chart color for ${geoKPI.geoName}`}
+                />
+                <div className="w-48 flex-shrink-0" title={geoKPI.geoName}>
+                  <div className="text-sm text-gray-200 whitespace-nowrap">
+                    {geoKPI.geoName !== '-' ? geoKPI.geoName : geoKPI.geoLevel}
+                  </div>
                 </div>
-              </div>
-              <div className="w-28 flex-shrink-0 text-right">
+              <div className="w-24 flex-shrink-0 text-right">
                 {geoKPI.value === 'NAV' ? (
                   <button
                     className="px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded border border-gray-600 transition-colors cursor-pointer inline-block"
@@ -222,7 +252,7 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
                   <span className="text-sm font-medium text-white">{geoKPI.value ?? '—'}</span>
                 )}
               </div>
-              <div className="w-24 flex-shrink-0 text-right">
+              <div className="w-20 flex-shrink-0 text-right">
                 <span
                   className={`text-xs whitespace-nowrap ${
                     geoKPI.yoy != null
@@ -236,7 +266,8 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
                 </span>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         // Original KPI layout
@@ -285,6 +316,25 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
           </div>
         </div>
       )}
+
+      {/* Date Range Slider */}
+      <div className="flex items-center gap-3 mb-3 px-2">
+        <label className="text-xs text-gray-400 whitespace-nowrap">Time Range:</label>
+        <input
+          type="range"
+          min="1"
+          max="20"
+          value={yearsBack}
+          onChange={(e) => setYearsBack(Number(e.target.value))}
+          className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(yearsBack / 20) * 100}%, #374151 ${(yearsBack / 20) * 100}%, #374151 100%)`
+          }}
+        />
+        <span className="text-xs font-medium text-gray-300 min-w-[60px] text-right">
+          {yearsBack === 20 ? 'All' : `${yearsBack}yr${yearsBack > 1 ? 's' : ''}`}
+        </span>
+      </div>
 
       {/* Chart - Centered */}
       {series.length > 0 && filteredSeries.length > 0 && (

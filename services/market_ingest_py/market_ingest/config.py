@@ -83,17 +83,41 @@ class Settings(BaseModel):
 
 @lru_cache()
 def get_settings() -> "Settings":
-    import os, json
-    env = dict(os.environ)
-    # Allow JSON strings in env for nested fields
-    for k in ("neon", "providers"):
-        if k in env and isinstance(env[k], str):
-            try:
-                env[k] = json.loads(env[k])
-            except Exception:
-                pass
-    try:
-        return Settings.model_validate(env)
-    except Exception as exc:
-        raise RuntimeError(f"Invalid ingestion configuration: {exc}") from exc
+    import os
+    from pathlib import Path
 
+    # Load .env file if it exists
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    # Remove quotes if present
+                    value = value.strip('"').strip("'")
+                    os.environ[key] = value
+
+    env = dict(os.environ)
+
+    # Build nested config from flat env vars
+    if "NEON_DB_URL" not in env:
+        raise RuntimeError("NEON_DB_URL environment variable is required")
+
+    neon_cfg = {"NEON_DB_URL": env["NEON_DB_URL"]}
+
+    provider_keys = {
+        "FRED_API_KEY": env.get("FRED_API_KEY"),
+        "CENSUS_API_KEY": env.get("CENSUS_API_KEY"),
+        "BLS_API_KEY": env.get("BLS_API_KEY"),
+    }
+
+    config = {
+        "neon": neon_cfg,
+        "providers": provider_keys,
+    }
+
+    try:
+        return Settings.model_validate(config)
+    except ValidationError as exc:
+        raise RuntimeError(f"Invalid ingestion configuration: {exc}") from exc

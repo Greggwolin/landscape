@@ -17,8 +17,6 @@ from .normalize import NormalizedObservation, build_revision_tag, parse_date, pa
 class FredClient:
     BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 
-    # Map canonical series codes to their SA/NSA twin IDs when the provider uses
-    # separate identifiers. The ingestion layer can use this to auto-pull both.
     SEASONAL_TWIN_LOOKUP = {
         "CPIAUCSL": "CPIAUCNS",
         "CPIAUCNS": "CPIAUCSL",
@@ -43,6 +41,10 @@ class FredClient:
     def _request(self, params: dict) -> dict:
         logger.debug("FRED request params={}", params)
         response = self.session.get(self.BASE_URL, params=params, timeout=30)
+        # 400 errors typically mean bad series or frequency - treat as empty result
+        if response.status_code == 400:
+            logger.warning("FRED API returned 400 for series_id={}, possibly invalid series or frequency", params.get('series_id'))
+            return {"observations": []}
         response.raise_for_status()
         payload = response.json()
         if "error_code" in payload:
@@ -61,9 +63,7 @@ class FredClient:
         seasonal: Optional[str],
         frequency: Optional[str] = None,
     ) -> List[NormalizedObservation]:
-        """
-        Fetch observations for a single FRED series between two dates.
-        """
+        """Fetch observations for a single FRED series between two dates."""
 
         params = {
             "series_id": provider_series_code,
@@ -73,7 +73,7 @@ class FredClient:
             "observation_end": end.isoformat(),
         }
         if frequency:
-            params["frequency"] = frequency
+            params["frequency"] = str(frequency).lower()
 
         payload = self._request(params)
 
@@ -116,9 +116,7 @@ class FredClient:
         frequency: Optional[str],
         include_twins: bool,
     ) -> List[NormalizedObservation]:
-        """
-        Convenience helper to fetch both the requested series and its seasonal twin.
-        """
+        """Convenience helper to fetch both the requested series and its seasonal twin."""
 
         series_list: List[tuple[str, str, Optional[str]]] = [
             (series_code, provider_series_code, seasonal)

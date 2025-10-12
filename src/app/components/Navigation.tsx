@@ -1,6 +1,7 @@
 // app/components/Navigation.tsx
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { useProjectContext } from './ProjectProvider'
 
@@ -27,6 +28,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
   const { activeProject } = useProjectContext()
   const projectId = activeProject?.project_id
   const { config: projectConfig } = useProjectConfig(projectId ?? undefined)
+  const router = useRouter();
+  const pathname = usePathname();
 
   const level2Label = projectConfig?.level2_label ?? 'Phase'
 
@@ -124,7 +127,10 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
             {(!section.isCollapsible || !collapsedSections[section.title]) && (
               <div className="space-y-0.5">
                 {section.items.map((item) => {
-                  const isActive = activeView === item.id;
+                  // Determine if this item is active based on href or activeView
+                  const isActive = item.href
+                    ? pathname === item.href
+                    : activeView === item.id;
                   const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center gap-3 hover:bg-gray-700 transition-colors ${isActive ? 'bg-gray-700 text-white border-r-2 border-blue-500' : 'text-gray-300'}`;
 
                   if (item.href) {
@@ -141,10 +147,22 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                     );
                   }
 
+                  // For items without href, navigate to root with state-based view
+                  const handleClick = () => {
+                    if (pathname !== '/') {
+                      // Navigate to root first, then set the view
+                      router.push('/');
+                      // Use setTimeout to ensure navigation completes before setting view
+                      setTimeout(() => setActiveView(item.id), 100);
+                    } else {
+                      setActiveView(item.id);
+                    }
+                  };
+
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveView(item.id)}
+                      onClick={handleClick}
                       className={baseClasses}
                     >
                       <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />

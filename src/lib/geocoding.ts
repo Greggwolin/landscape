@@ -26,6 +26,15 @@ export interface ReverseGeocodingResult {
   }
 }
 
+export interface CensusTractResult {
+  stateFips: string
+  countyFips: string
+  tractFips: string
+  blockFips: string
+  fullTractFips: string // state+county+tract (11 digits)
+  source: 'census-geocoder'
+}
+
 // Known locations for faster lookup (can be expanded)
 const KNOWN_LOCATIONS: Record<string, GeocodingResult> = {
   // Red Valley area - Anderson and Farrell Roads intersection in Maricopa, AZ
@@ -215,6 +224,57 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     return null
   } catch (error) {
     console.error('Reverse geocoding error:', error)
+    return null
+  }
+}
+
+/**
+ * Gets Census tract FIPS code from coordinates using Census Geocoding API
+ */
+export async function getCensusTract(latitude: number, longitude: number): Promise<CensusTractResult | null> {
+  console.log(`🏛️ Getting Census tract for coordinates: ${latitude}, ${longitude}`)
+
+  try {
+    // Census Geocoding API endpoint
+    const url = `https://geocoding.census.gov/geocoder/geographies/coordinates?x=${longitude}&y=${latitude}&benchmark=Public_AR_Current&vintage=Current_Current&format=json`
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Landscape-GIS-App/1.0'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Census Geocoding API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.result?.geographies?.['Census Tracts']?.[0]) {
+      const tract = data.result.geographies['Census Tracts'][0]
+
+      const stateFips = tract.STATE
+      const countyFips = tract.COUNTY
+      const tractFips = tract.TRACT
+      const blockFips = tract.BLOCK || ''
+      const fullTractFips = `${stateFips}${countyFips}${tractFips}`
+
+      console.log(`✅ Census tract result: ${fullTractFips}`)
+
+      return {
+        stateFips,
+        countyFips,
+        tractFips,
+        blockFips,
+        fullTractFips,
+        source: 'census-geocoder'
+      }
+    }
+
+    console.log('❌ No Census tract found')
+    return null
+  } catch (error) {
+    console.error('Census tract lookup error:', error)
     return null
   }
 }

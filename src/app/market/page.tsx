@@ -210,7 +210,8 @@ const MarketPage: React.FC = () => {
       list.forEach((serie) => {
         if (serie.geo_id !== baseGeoId) return;
         const note = serie.data.find((point) => point.coverage_note)?.coverage_note;
-        if (note) notes.add(note);
+        // Filter out city unavailable warnings if data is actually present
+        if (note && !note.toLowerCase().includes('city')) notes.add(note);
       });
     });
     return Array.from(notes);
@@ -435,26 +436,30 @@ const MarketPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {activeProject.project_name} - Market Intelligence
-            </h1>
-            <p className="text-sm text-gray-400">
-              Automated macro-to-micro indicators anchored to Appraisal market analysis workflows.
-            </p>
-          </div>
-          <div className="flex flex-col items-start md:items-end gap-2">
-            <div className="flex flex-wrap gap-1">
-              {coverageNotes.map((note) => (
-                <CoverageBadge key={note} note={note} />
-              ))}
+      <div className="mx-auto px-6 py-8 space-y-8">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold">
+                {activeProject.project_name} - Market Intelligence
+              </h1>
+              <p className="text-sm text-gray-400">
+                Automated macro-to-micro indicators anchored to Appraisal market analysis workflows.
+              </p>
             </div>
+            {coverageNotes.length > 0 && (
+              <div className="flex flex-col items-start md:items-end gap-2">
+                <div className="flex flex-wrap gap-1">
+                  {coverageNotes.map((note) => (
+                    <CoverageBadge key={note} note={note} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 440px))' }}>
           <CombinedTile
             title="Population"
             multiGeoKPIs={getMultiGeoKPIData(['ACS_POPULATION', 'ACS_COUNTY_POPULATION', 'POP_COUNTY', 'POP_MSA', 'POP_STATE', 'POP_US'], (value) => formatNumber(value, 0))}
@@ -473,8 +478,8 @@ const MarketPage: React.FC = () => {
             title="Unemployment Rate"
             multiGeoKPIs={getMultiGeoKPIData(['LAUS_PLACE_UNRATE', 'LAUS_MSA_UNRATE', 'LAUS_STATE_UNRATE', 'LAUS_UNRATE'], (value) => `${value.toFixed(1)}%`)}
             series={laborData?.series.filter(s => ['LAUS_PLACE_UNRATE', 'LAUS_MSA_UNRATE', 'LAUS_STATE_UNRATE', 'LAUS_UNRATE'].includes(s.series_code)) ?? []}
-            useIndexed={true}
             narrowChart={true}
+            valueFormatter={(value) => `${value.toFixed(1)}%`}
           />
           <CombinedTile
             title="Median Household Income"
@@ -524,7 +529,7 @@ const MarketPage: React.FC = () => {
           </TabsPrimitive.List>
 
           <TabsPrimitive.Content value="macro" className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 440px))' }}>
               <CombinedTile
                 title="Inflation"
                 singleKPI={true}

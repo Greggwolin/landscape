@@ -21,7 +21,11 @@ export interface MarketSeries {
   series_name: string;
   geo_id: string;
   geo_name: string;
+  geo_level?: string;
   units?: string | null;
+  seasonal?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
   data: SeriesPoint[];
 }
 
@@ -30,16 +34,32 @@ interface MarketChartProps {
   series: MarketSeries[];
   yLabel?: string;
   valueFormatter?: (value: number) => string;
+  subtitle?: string;
+  footnote?: string;
+  tooltipValueFormatter?: (value: number) => string;
 }
 
 const COLORS = ['#60a5fa', '#facc15', '#f97316', '#34d399', '#f472b6'];
 
-const MarketChart: React.FC<MarketChartProps> = ({ title, series, yLabel, valueFormatter }) => {
+const MarketChart: React.FC<MarketChartProps> = ({
+  title,
+  series,
+  yLabel,
+  valueFormatter,
+  subtitle,
+  footnote,
+  tooltipValueFormatter,
+}) => {
+  // Filter out series with no data
+  const seriesWithData = useMemo(() => {
+    return series.filter((serie) => serie.data && serie.data.length > 0);
+  }, [series]);
+
   const chartData = useMemo(() => {
-    if (!series.length) return [];
+    if (!seriesWithData.length) return [];
     const merged = new Map<string, Record<string, number | null>>();
 
-    series.forEach((serie) => {
+    seriesWithData.forEach((serie) => {
       serie.data.forEach((point) => {
         const value = point.value != null ? Number(point.value) : null;
         if (!merged.has(point.date)) {
@@ -49,10 +69,19 @@ const MarketChart: React.FC<MarketChartProps> = ({ title, series, yLabel, valueF
       });
     });
 
-    return Array.from(merged.values()).sort((a, b) => (a.date as string).localeCompare(b.date as string));
-  }, [series]);
+  return Array.from(merged.values()).sort((a, b) => (a.date as string).localeCompare(b.date as string));
+}, [seriesWithData]);
 
-  if (!series.length) {
+  const resolveTooltipValue = (value: unknown) => {
+    if (typeof value !== 'number') {
+      return value ?? 'n/a';
+    }
+    return tooltipValueFormatter
+      ? tooltipValueFormatter(value)
+      : value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  };
+
+  if (!seriesWithData.length) {
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
         <div className="text-sm text-gray-400">{title}</div>
@@ -63,15 +92,26 @@ const MarketChart: React.FC<MarketChartProps> = ({ title, series, yLabel, valueF
 
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-      <div className="text-sm text-gray-300 mb-2">{title}</div>
+      <div className="mb-2">
+        <div className="text-sm text-gray-300">{title}</div>
+        {subtitle ? <div className="mt-0.5 text-xs text-gray-500">{subtitle}</div> : null}
+      </div>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#282c34" />
             <XAxis
               dataKey="date"
-              tick={{ fill: '#9ca3af', fontSize: 12 }}
-              tickFormatter={(value) => value.slice(0, 7)}
+              tick={{ fill: '#9ca3af', fontSize: 11 }}
+              tickFormatter={(value) => {
+                if (!value) return '';
+                const date = value.toString();
+                // Format: 2024-01 -> Jan '24
+                const [year, month] = date.split('-');
+                if (!year || !month) return date;
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${monthNames[parseInt(month) - 1]} '${year.slice(2)}`;
+              }}
             />
             <YAxis
               tick={{ fill: '#9ca3af', fontSize: 12 }}
@@ -84,12 +124,18 @@ const MarketChart: React.FC<MarketChartProps> = ({ title, series, yLabel, valueF
             />
             <Tooltip
               contentStyle={{ backgroundColor: '#111827', borderColor: '#1f2937' }}
-              formatter={(value: unknown) =>
-                typeof value === 'number' && valueFormatter ? valueFormatter(value) : value ?? 'n/a'
-              }
+              formatter={(value: unknown, name: string) => [resolveTooltipValue(value), name]}
+              labelFormatter={(label) => {
+                if (!label) return '';
+                const date = label.toString();
+                const [year, month] = date.split('-');
+                if (!year || !month) return date;
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+              }}
             />
             <Legend wrapperStyle={{ color: '#d1d5db' }} />
-            {series.map((serie, index) => (
+            {seriesWithData.map((serie, index) => (
               <Line
                 key={`${serie.series_code}-${serie.geo_id}`}
                 type="monotone"
@@ -99,11 +145,15 @@ const MarketChart: React.FC<MarketChartProps> = ({ title, series, yLabel, valueF
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
+                connectNulls={true}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {footnote ? <div className="mt-3 text-xs text-gray-500">{footnote}</div> : null}
     </div>
   );
 };

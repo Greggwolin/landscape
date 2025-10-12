@@ -62,6 +62,33 @@ def group_series_by_source(series_map: Dict[str, SeriesMeta]) -> Dict[str, List[
     return grouped
 
 
+def interpolate_provider_code(template: str, geo: GeoRecord) -> str:
+    """Replace placeholders like {STATE_FIPS} with actual values from geo record."""
+    result = template
+    if "{STATE_FIPS}" in result and geo.state_fips:
+        result = result.replace("{STATE_FIPS}", geo.state_fips)
+    if "{STATE_ABBR}" in result and geo.geo_level == "STATE":
+        # For STATE level, geo_id is the state FIPS
+        state_abbr_map = {
+            "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE",
+            "11": "DC", "12": "FL", "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA",
+            "20": "KS", "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
+            "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH", "34": "NJ", "35": "NM",
+            "36": "NY", "37": "NC", "38": "ND", "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
+            "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA", "53": "WA",
+            "54": "WV", "55": "WI", "56": "WY", "72": "PR"
+        }
+        abbr = state_abbr_map.get(geo.state_fips or geo.geo_id, "")
+        result = result.replace("{STATE_ABBR}", abbr)
+    if "{COUNTY_FIPS}" in result and geo.county_fips:
+        result = result.replace("{COUNTY_FIPS}", geo.county_fips)
+    if "{PLACE_FIPS}" in result and geo.place_fips:
+        result = result.replace("{PLACE_FIPS}", geo.place_fips)
+    if "{CBSA_CODE}" in result and geo.cbsa_code:
+        result = result.replace("{CBSA_CODE}", geo.cbsa_code)
+    return result
+
+
 def main(argv: Optional[Sequence[str]] = None) -> None:
     args = parse_args(argv)
     settings = get_settings()
@@ -124,7 +151,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         for target in targets:
             target_geo = db.get_geo(target.geo_id)
             for source, metas in providers.items():
-                if target.geo_level not in {"CITY", "COUNTY", "MSA", "STATE", "US"}:
+                if target.geo_level not in {"CITY", "COUNTY", "MSA", "STATE", "US", "TRACT"}:
                     continue
 
                 eligible_metas = [
@@ -140,6 +167,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                         raise RuntimeError("FRED client unavailable")
                     for meta in eligible_metas:
                         provider_code = meta.provider_code("FRED") or meta.series_code
+                        provider_code = interpolate_provider_code(provider_code, target_geo)
                         frequency = args.freq or meta.frequency
                         observations = fred_client.fetch_series(
                             meta.series_code,
@@ -185,6 +213,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 elif source == "BLS":
                     for meta in eligible_metas:
                         provider_code = meta.provider_code("BLS") or meta.series_code
+                        provider_code = interpolate_provider_code(provider_code, target_geo)
                         freq = args.freq or meta.frequency
                         observations = bls_client.fetch_series(
                             meta.series_code,

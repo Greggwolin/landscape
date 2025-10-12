@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis } from 'recharts';
 
 interface DataPoint {
   date: string;
@@ -13,6 +13,8 @@ interface KPIStatProps {
   deltaColor?: 'up' | 'down' | 'flat';
   data?: DataPoint[];
   footnote?: string;
+  chartType?: 'line' | 'bar';
+  barColor?: string;
 }
 
 const DeltaPill: React.FC<{ label: string; tone: KPIStatProps['deltaColor'] }> = ({ label, tone }) => {
@@ -29,7 +31,16 @@ const DeltaPill: React.FC<{ label: string; tone: KPIStatProps['deltaColor'] }> =
   );
 };
 
-const KPIStat: React.FC<KPIStatProps> = ({ title, value, deltaLabel, deltaColor = 'flat', data, footnote }) => (
+const KPIStat: React.FC<KPIStatProps> = ({
+  title,
+  value,
+  deltaLabel,
+  deltaColor = 'flat',
+  data,
+  footnote,
+  chartType = 'line',
+  barColor = '#60a5fa',
+}) => (
   <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 flex flex-col gap-2">
     <div className="flex items-center justify-between">
       <span className="text-sm text-gray-400">{title}</span>
@@ -39,16 +50,24 @@ const KPIStat: React.FC<KPIStatProps> = ({ title, value, deltaLabel, deltaColor 
     {data && data.length > 1 ? (
       <div className="h-16">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="#60a5fa"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
+          {chartType === 'bar' ? (
+            <BarChart data={data} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
+              <XAxis dataKey="date" hide />
+              <YAxis hide domain={['auto', 'auto']} />
+              <Bar dataKey="value" fill={barColor} isAnimationActive={false} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          ) : (
+            <LineChart data={data}>
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#60a5fa"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          )}
         </ResponsiveContainer>
       </div>
     ) : null}

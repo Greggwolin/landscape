@@ -60,7 +60,7 @@ const YoYBar: React.FC<YoYBarProps> = ({ title, series, barColor = '#f97316' }) 
             <Tooltip
               contentStyle={{ backgroundColor: '#111827', borderColor: '#1f2937' }}
               formatter={(value: unknown) =>
-                typeof value === 'number' ? `${value.toFixed(2)}%` : value ?? 'n/a'
+                typeof value === 'number' ? `${value.toFixed(1)}%` : value ?? 'n/a'
               }
             />
             <Bar dataKey="yoy" fill={barColor} radius={[6, 6, 0, 0]} />

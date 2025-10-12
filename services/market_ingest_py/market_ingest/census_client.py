@@ -26,10 +26,16 @@ ACS_SERIES_VARIABLES: Dict[str, str] = {
     "ACS_MEDIAN_HH_INC": "B19013_001E",
     "ACS_STATE_POPULATION": "B01001_001E",
     "ACS_COUNTY_POPULATION": "B01001_001E",
+    "ACS_MSA_MEDIAN_HH_INC": "B19013_001E",
+    "ACS_COUNTY_MEDIAN_HH_INC": "B19013_001E",
+    "ACS_TRACT_MEDIAN_HH_INC": "B19013_001E",
 }
 
 
 BPS_SERIES_VARIABLES: Dict[str, str] = {
+    "BPS_TOTAL": "TOTAL",
+    "BPS_ONEUNIT": "ONEUNIT",
+    "BPS_FIVEPLUS": "FIVEPLUS",
     "PERMIT_TOTAL": "TOTAL",
     "PERMIT_1UNIT": "ONEUNIT",
     "PERMIT_5PLUS": "FIVEPLUS",
@@ -61,6 +67,8 @@ class CensusClient:
         dataset_priority = {
             "CITY": ["acs/acs1", "acs/acs5"],
             "COUNTY": ["acs/acs1", "acs/acs5"],
+            "MSA": ["acs/acs1", "acs/acs5"],
+            "TRACT": ["acs/acs5"],  # Tracts only in 5-year estimates
             "STATE": ["acs/acs1"],
             "US": ["acs/acs1"],
         }
@@ -77,6 +85,14 @@ class CensusClient:
             elif geo.geo_level == "COUNTY":
                 params["for"] = f"county:{geo.county_fips}"
                 params["in"] = f"state:{geo.state_fips}"
+            elif geo.geo_level == "MSA":
+                params["for"] = f"metropolitan statistical area/micropolitan statistical area:{geo.cbsa_code}"
+            elif geo.geo_level == "TRACT":
+                # Extract the 6-digit tract code from the full 11-digit FIPS
+                # Format: SSCCCTTTTTT where SS=state, CCC=county, TTTTTT=tract
+                tract_code = geo.tract_fips[-6:] if geo.tract_fips and len(geo.tract_fips) == 11 else geo.tract_fips
+                params["for"] = f"tract:{tract_code}"
+                params["in"] = f"state:{geo.state_fips}+county:{geo.county_fips}"
             elif geo.geo_level == "STATE":
                 params["for"] = f"state:{geo.state_fips}"
             else:
@@ -90,7 +106,8 @@ class CensusClient:
         url = f"{self.BASE_URL}/timeseries/bps/permits"
         params = {
             "get": "NAME,TOTAL,ONEUNIT,FIVEPLUS",
-            "time": f"from {start.strftime('%Y-%m')}",
+            # BPS at place-level supports ANNUAL time only
+            "time": f"from {start.strftime('%Y')}",
         }
         if geo.geo_level == "CITY":
             params["for"] = f"place:{geo.place_fips}"
@@ -111,6 +128,10 @@ class CensusClient:
         logger.debug("Census request url={} params={}", query.url, query.params)
         response = self.session.get(query.url, params=query.params, timeout=30)
         if response.status_code == 204:
+            return []
+        # 404 means data not available for this geography/time period - treat as empty
+        if response.status_code == 404:
+            logger.debug("Census API returned 404 (data not available) for query: {}", query.params)
             return []
         if response.status_code >= 400:
             raise CensusError(f"Census API error {response.status_code}: {response.text}")

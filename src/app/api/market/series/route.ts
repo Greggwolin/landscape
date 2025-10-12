@@ -75,8 +75,10 @@ export async function GET(request: NextRequest) {
       data: SeriesPoint[];
     }>();
 
+    const categories = category ? category.split(',').map(c => c.trim()) : null;
+
     for (const row of result) {
-      if (category && row.category !== category) continue;
+      if (categories && !categories.includes(row.category)) continue;
       if (seasonal && row.seasonal && row.seasonal !== seasonal) continue;
       if (codes && !codes.includes(row.series_code)) continue;
       const key = `${row.series_code}__${row.geo_id}`;

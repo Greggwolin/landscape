@@ -43,3 +43,6 @@ ACS_COUNTY_POPULATION,ACS Total Population (County),CITY,ACS,Persons,A,NSA,ACS,C
 PERMIT_PLACE_TOTAL,Building Permits - Place Level Total Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,Direct place-level permits
 PERMIT_PLACE_1UNIT,Building Permits - Place Level 1 Unit,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,
 PERMIT_PLACE_5PLUS,Building Permits - Place Level 5+ Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,
+BPS_TOTAL,Building Permits Survey: Total Units,BPS,Permits,Count,ANNUAL,NSA,BPS,CITY,Annual permits for all residential units
+BPS_ONEUNIT,Building Permits Survey: One-Unit Units,BPS,Permits,Count,ANNUAL,NSA,BPS,CITY,Annual permits for single-family units
+BPS_FIVEPLUS,Building Permits Survey: 5+ Unit Units,BPS,Permits,Count,ANNUAL,NSA,BPS,CITY,Annual permits for multifamily 5+ units

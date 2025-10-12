@@ -43,6 +43,7 @@ class GeoRecord:
     county_fips: Optional[str]
     place_fips: Optional[str]
     cbsa_code: Optional[str]
+    tract_fips: Optional[str]
     parent_geo_id: Optional[str]
     hierarchy: Dict[str, str]
 
@@ -142,7 +143,7 @@ class Database:
             cur.execute(
                 """
                 SELECT geo_id, geo_level, geo_name, state_fips, county_fips,
-                       place_fips, cbsa_code, parent_geo_id, hierarchy
+                       place_fips, cbsa_code, tract_fips, parent_geo_id, hierarchy
                 FROM public.geo_xwalk
                 WHERE geo_id = %s
                 """,
@@ -159,6 +160,7 @@ class Database:
             county_fips=row.get("county_fips"),
             place_fips=row.get("place_fips"),
             cbsa_code=row.get("cbsa_code"),
+            tract_fips=row.get("tract_fips"),
             parent_geo_id=row.get("parent_geo_id"),
             hierarchy=row.get("hierarchy") or {},
         )
@@ -199,22 +201,30 @@ class Database:
         """
 
         chain_ids: List[str] = [base_geo.geo_id]
-        order = ["county", "msa", "state", "us"]
         hierarchy = base_geo.hierarchy or {}
 
-        for key in order:
-            candidate = hierarchy.get(key)
-            if isinstance(candidate, dict):
-                candidate = candidate.get("geo_id") or candidate.get("id")
-            if candidate and candidate not in chain_ids:
-                chain_ids.append(candidate)
+        # Check if hierarchy uses "chain" array format (new format)
+        if "chain" in hierarchy and isinstance(hierarchy["chain"], list):
+            # Skip the base_geo.geo_id if it's already in chain_ids
+            for geo_id in hierarchy["chain"]:
+                if geo_id not in chain_ids:
+                    chain_ids.append(geo_id)
+        else:
+            # Fall back to old dict-based hierarchy format
+            order = ["county", "msa", "state", "us"]
+            for key in order:
+                candidate = hierarchy.get(key)
+                if isinstance(candidate, dict):
+                    candidate = candidate.get("geo_id") or candidate.get("id")
+                if candidate and candidate not in chain_ids:
+                    chain_ids.append(candidate)
 
         records: List[GeoRecord] = []
         with self.connection() as conn, conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
             cur.execute(
                 """
                 SELECT geo_id, geo_level, geo_name, state_fips, county_fips,
-                       place_fips, cbsa_code, parent_geo_id, hierarchy
+                       place_fips, cbsa_code, tract_fips, parent_geo_id, hierarchy
                 FROM public.geo_xwalk
                 WHERE geo_id = ANY(%s)
                 """,
@@ -237,6 +247,7 @@ class Database:
                     county_fips=row.get("county_fips"),
                     place_fips=row.get("place_fips"),
                     cbsa_code=row.get("cbsa_code"),
+                    tract_fips=row.get("tract_fips"),
                     parent_geo_id=row.get("parent_geo_id"),
                     hierarchy=row.get("hierarchy") or {},
                 )
