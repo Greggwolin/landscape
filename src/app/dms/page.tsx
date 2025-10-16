@@ -5,7 +5,6 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import FolderTree from '@/components/dms/folders/FolderTree';
 import FolderEditor from '@/components/dms/folders/FolderEditor';
 import SearchBox from '@/components/dms/search/SearchBox';
-import Facets from '@/components/dms/search/Facets';
 import ResultsTable from '@/components/dms/search/ResultsTable';
 import DocCard from '@/components/dms/profile/DocCard';
 import Dropzone from '@/components/dms/upload/Dropzone';
@@ -21,7 +20,7 @@ interface FolderNode {
   name: string;
   path: string;
   sort_order: number;
-  default_profile: Record<string, any>;
+  default_profile: Record<string, unknown>;
   is_active: boolean;
   children: FolderNode[];
   doc_count?: number;
@@ -29,14 +28,24 @@ interface FolderNode {
 
 export default function DMSPage() {
   const { activeProject: currentProject } = useProjectContext();
-  const [activeTab, setActiveTab] = useState<TabType>('documents');
+
+  // Read tab from URL parameter on mount
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'upload' || tab === 'documents' || tab === 'templates' || tab === 'attributes') {
+        return tab as TabType;
+      }
+    }
+    return 'documents';
+  });
+
   const defaultWorkspaceId = 1;
 
   // Documents tab state
   const [searchQuery, setSearchQuery] = useState('');
   const [documents, setDocuments] = useState<DMSDocument[]>([]);
-  const [facets, setFacets] = useState<Record<string, Record<string, number>>>({});
-  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [selectedDoc, setSelectedDoc] = useState<DMSDocument | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [totalHits, setTotalHits] = useState(0);
@@ -44,8 +53,16 @@ export default function DMSPage() {
   const [showFolderEditor, setShowFolderEditor] = useState(false);
 
   // Upload tab state
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
-  const [selectedUploadFile, setSelectedUploadFile] = useState<any | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    id: string;
+    filename: string;
+    size: number;
+    status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    error?: string;
+    doc_id?: number;
+  }>>([]);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<typeof uploadedFiles[number] | null>(null);
 
   // Fetch documents with search and filters
   const fetchDocuments = useCallback(async () => {
@@ -69,13 +86,6 @@ export default function DMSPage() {
         params.append('folder_id', selectedFolder.folder_id.toString());
       }
 
-      // Add other filters
-      Object.entries(selectedFilters).forEach(([key, values]) => {
-        if (values.length > 0) {
-          params.append(key, values.join(','));
-        }
-      });
-
       const response = await fetch(`/api/dms/search?${params.toString()}`);
 
       if (!response.ok) {
@@ -87,17 +97,15 @@ export default function DMSPage() {
       const data = await response.json();
 
       setDocuments(data.results || []);
-      setFacets(data.facets || {});
       setTotalHits(data.totalHits || 0);
     } catch (error) {
       console.error('Search error:', error);
       setDocuments([]);
-      setFacets({});
       setTotalHits(0);
     } finally {
       setIsLoading(false);
     }
-  }, [currentProject, searchQuery, selectedFilters, selectedFolder]);
+  }, [currentProject, searchQuery, selectedFolder]);
 
   // Fetch on mount and when dependencies change
   useEffect(() => {
@@ -108,13 +116,6 @@ export default function DMSPage() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-  };
-
-  const handleFilterChange = (facetKey: string, values: string[]) => {
-    setSelectedFilters((prev) => ({
-      ...prev,
-      [facetKey]: values,
-    }));
   };
 
   const handleDocumentSelect = (doc: DMSDocument) => {
@@ -150,9 +151,18 @@ export default function DMSPage() {
   };
 
   // Upload handlers
-  const handleUploadComplete = (results: any[]) => {
+  const handleUploadComplete = (results: Array<Record<string, unknown>>) => {
     console.log('Upload complete:', results);
-    setUploadedFiles((prev) => [...prev, ...results]);
+    // Transform results to match Queue component's expected structure
+    const queueItems = results.map((result, index) => ({
+      id: (result.key as string) || (result.fileKey as string) || `upload-${Date.now()}-${index}`,
+      filename: (result.name as string) || (result.fileName as string) || 'Unknown',
+      size: (result.size as number) || 0,
+      status: 'completed' as const,
+      progress: 100,
+      doc_id: result.doc_id as number | undefined
+    }));
+    setUploadedFiles((prev) => [...prev, ...queueItems]);
   };
 
   const handleUploadError = (error: Error) => {
@@ -160,7 +170,7 @@ export default function DMSPage() {
     alert(`Upload failed: ${error.message}`);
   };
 
-  const handleProfileSave = async (docId: number, profile: Record<string, any>) => {
+  const handleProfileSave = async (docId: number, profile: Record<string, unknown>) => {
     try {
       const response = await fetch(`/api/dms/documents/${docId}/profile`, {
         method: 'PATCH',
@@ -244,12 +254,8 @@ export default function DMSPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('templates')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'templates'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              onClick={() => window.location.href = '/admin/dms/templates'}
+              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium text-sm"
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -260,12 +266,8 @@ export default function DMSPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('attributes')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'attributes'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              onClick={() => window.location.href = '/admin/dms/attributes'}
+              className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 font-medium text-sm"
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -458,8 +460,9 @@ export default function DMSPage() {
                         Uploaded Files ({uploadedFiles.length})
                       </h3>
                       <Queue
-                        files={uploadedFiles}
-                        onFileSelect={(file) => setSelectedUploadFile(file)}
+                        items={uploadedFiles}
+                        onRetry={(id) => console.log('Retry upload:', id)}
+                        onRemove={(id) => setUploadedFiles(prev => prev.filter(f => f.id !== id))}
                       />
                     </div>
                   )}
@@ -560,7 +563,7 @@ export default function DMSPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <FolderEditor
               parentId={selectedFolder?.folder_id}
-              onSave={(folderId) => {
+              onSave={() => {
                 setShowFolderEditor(false);
                 // Refresh folder tree
                 window.location.reload();

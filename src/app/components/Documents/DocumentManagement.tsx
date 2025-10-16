@@ -175,7 +175,7 @@ const DocumentManagement: React.FC<DocumentManagementProps> = ({ projectId }) =>
   if (!projectId) {
     return (
       <div className="p-6 text-center">
-        <div className="text-gray-500 dark:text-gray-400">
+        <div className="text-gray-400">
           Please select a project to manage documents.
         </div>
       </div>
@@ -183,12 +183,12 @@ const DocumentManagement: React.FC<DocumentManagementProps> = ({ projectId }) =>
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Document Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">NetDocs-like document ingestion and profiling system</p>
+          <h1 className="text-2xl font-bold text-white">Document Management</h1>
+          <p className="text-gray-400">Upload, search, and manage project documents</p>
         </div>
       </div>
 

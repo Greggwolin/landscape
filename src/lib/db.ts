@@ -13,9 +13,13 @@ function getSql(): NeonQueryFunction<false, false> {
   return _sql
 }
 
-// Expose a stable tagged-template function that delegates to the singleton.
-// Consumers can still use `sql<RowType>\`...\`` with generics at call sites.
-export const sql: NeonQueryFunction<false, false> = ((strings: TemplateStringsArray, ...values: unknown[]) =>
-  getSql()(strings, ...values)) as unknown as NeonQueryFunction<false, false>
+// Create a proper proxy that exposes both tagged template and .query() method
+export const sql: NeonQueryFunction<false, false> = Object.assign(
+  (strings: TemplateStringsArray, ...values: unknown[]) => getSql()(strings, ...values),
+  {
+    query: (queryWithPlaceholders: string, params?: unknown[], queryOpts?: unknown) =>
+      getSql().query(queryWithPlaceholders, params, queryOpts)
+  }
+) as NeonQueryFunction<false, false>
 
 export type Sql = NeonQueryFunction<false, false>

@@ -48,8 +48,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       title: 'Planning',
       items: [
         { id: 'planning-inline', label: 'Planning' },
-        { id: 'planning-overview', label: 'Overview' },
-        { id: 'documents', label: 'Documents' }
+        { id: 'planning-overview', label: 'Overview' }
       ],
       isCollapsible: true
     },
@@ -76,7 +75,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Documents (DMS)',
       items: [
-        { id: 'dms', label: 'Document Management', href: '/dms' }
+        { id: 'dms', label: 'Document Management', href: '/dms' },
+        { id: 'admin-dms-attributes', label: 'DMS Attributes', href: '/admin/dms/attributes' },
+        { id: 'admin-dms-templates', label: 'DMS Templates', href: '/admin/dms/templates' }
       ],
       isCollapsible: false
     },
@@ -91,9 +92,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Admin',
       items: [
-        { id: 'project-setup', label: 'New Project Setup', href: '/projects/setup' },
-        { id: 'admin-dms-attributes', label: 'DMS Attributes', href: '/admin/dms/attributes' },
-        { id: 'admin-dms-templates', label: 'DMS Templates', href: '/admin/dms/templates' }
+        { id: 'project-setup', label: 'New Project Setup', href: '/projects/setup' }
       ],
       isCollapsible: true
     },
