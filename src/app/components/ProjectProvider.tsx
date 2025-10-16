@@ -7,13 +7,16 @@ import { fetchJson } from '@/lib/fetchJson'
 interface ProjectSummary {
   project_id: number
   project_name: string
-  acres_gross: number
-  location_lat?: number
-  location_lon?: number
-  start_date?: string
-  jurisdiction_city?: string
-  jurisdiction_county?: string
-  jurisdiction_state?: string
+  acres_gross: number | null
+  location_lat?: number | null
+  location_lon?: number | null
+  start_date?: string | null
+  jurisdiction_city?: string | null
+  jurisdiction_county?: string | null
+  jurisdiction_state?: string | null
+  property_type_code?: string | null
+  project_type?: string | null
+  is_active?: boolean
 }
 
 interface ProjectContextValue {
@@ -37,11 +40,32 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetcher,
     { revalidateOnFocus: false }
   )
-  const [activeProjectId, setActiveProjectId] = useState<number | null>(null)
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(() => {
+    // Initialize from localStorage if available
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('activeProjectId')
+      return stored ? parseInt(stored, 10) : null
+    }
+    return null
+  })
+
+  // Persist to localStorage whenever activeProjectId changes
+  useEffect(() => {
+    if (activeProjectId !== null && typeof window !== 'undefined') {
+      localStorage.setItem('activeProjectId', activeProjectId.toString())
+    }
+  }, [activeProjectId])
 
   useEffect(() => {
     if (!isLoading && Array.isArray(data) && data.length > 0) {
-      setActiveProjectId(prev => (prev == null ? data[0].project_id : prev))
+      setActiveProjectId(prev => {
+        // If we have a stored project ID, verify it still exists in the projects list
+        if (prev !== null && data.some(p => p.project_id === prev)) {
+          return prev
+        }
+        // Otherwise default to first project
+        return data[0].project_id
+      })
     }
   }, [data, isLoading])
 

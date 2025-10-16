@@ -1,0 +1,76 @@
+{
+  "project_id": 7,
+  "source": "pinal_county_assessor_test",
+  "features": [
+    {
+      "parcelId": "5071234001",
+      "geom": "{\"type\":\"Polygon\",\"coordinates\":[[[-112.237,33.582],[-112.235,33.582],[-112.235,33.580],[-112.237,33.580],[-112.237,33.582]]]}",
+      "properties": {
+        "PARCELID": "5071234001",
+        "APN": "507-12-340-01",
+        "OWNERNME1": "Sample Owner LLC",
+        "SITEADDRESS": "1234 Main St",
+        "USEDSCRP": "Residential",
+        "GROSSAC": 5.25,
+        "APPRAISEDVALUE": 125000,
+        "CNVYNAME": "Lot 1 Block 34 Peoria Lakes"
+      }
+    },
+    {
+      "parcelId": "5071234002",
+      "geom": "{\"type\":\"Polygon\",\"coordinates\":[[[-112.235,33.582],[-112.233,33.582],[-112.233,33.580],[-112.235,33.580],[-112.235,33.582]]]}",
+      "properties": {
+        "PARCELID": "5071234002",
+        "APN": "507-12-340-02",
+        "OWNERNME1": "Another Owner Inc",
+        "SITEADDRESS": "1236 Main St",
+        "USEDSCRP": "Residential",
+        "GROSSAC": 4.80,
+        "APPRAISEDVALUE": 118000,
+        "CNVYNAME": "Lot 2 Block 34 Peoria Lakes"
+      }
+    },
+    {
+      "parcelId": "5071234003",
+      "geom": "{\"type\":\"Polygon\",\"coordinates\":[[[-112.233,33.582],[-112.231,33.582],[-112.231,33.580],[-112.233,33.580],[-112.233,33.582]]]}",
+      "properties": {
+        "PARCELID": "5071234003",
+        "APN": "507-12-340-03",
+        "OWNERNME1": "Third Parcel Trust",
+        "SITEADDRESS": "1238 Main St",
+        "USEDSCRP": "Residential",
+        "GROSSAC": 6.10,
+        "APPRAISEDVALUE": 142000,
+        "CNVYNAME": "Lot 3 Block 34 Peoria Lakes"
+      }
+    },
+    {
+      "parcelId": "5071234004",
+      "geom": "{\"type\":\"Polygon\",\"coordinates\":[[[-112.231,33.582],[-112.229,33.582],[-112.229,33.580],[-112.231,33.580],[-112.231,33.582]]]}",
+      "properties": {
+        "PARCELID": "5071234004",
+        "APN": "507-12-340-04",
+        "OWNERNME1": "Fourth Owner Co",
+        "SITEADDRESS": "1240 Main St",
+        "USEDSCRP": "Commercial",
+        "GROSSAC": 3.25,
+        "APPRAISEDVALUE": 185000,
+        "CNVYNAME": "Lot 4 Block 34 Peoria Lakes"
+      }
+    },
+    {
+      "parcelId": "5071234005",
+      "geom": "{\"type\":\"Polygon\",\"coordinates\":[[[-112.229,33.582],[-112.227,33.582],[-112.227,33.580],[-112.229,33.580],[-112.229,33.582]]]}",
+      "properties": {
+        "PARCELID": "5071234005",
+        "APN": "507-12-340-05",
+        "OWNERNME1": "Fifth Property Partners",
+        "SITEADDRESS": "1242 Main St",
+        "USEDSCRP": "Open Space",
+        "GROSSAC": 8.50,
+        "APPRAISEDVALUE": 95000,
+        "CNVYNAME": "Lot 5 Block 34 Peoria Lakes"
+      }
+    }
+  ]
+}

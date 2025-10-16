@@ -5,7 +5,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
-    const { code, kind, class: cls, event, scope, detail, is_active, uoms, pe_levels } = body
+    const {
+      code,
+      kind,
+      class: cls,
+      event,
+      scope,
+      detail,
+      is_active,
+      uoms,
+      pe_levels,
+      container_levels = []
+    } = body
 
     await sql`
       UPDATE landscape.core_fin_category SET
@@ -23,9 +34,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await sql`DELETE FROM landscape.core_fin_category_uom WHERE category_id = ${id}::bigint`
       for (const u of uoms) await sql`INSERT INTO landscape.core_fin_category_uom (category_id, uom_code) VALUES (${id}::bigint, ${u})`
     }
-    if (Array.isArray(pe_levels)) {
-      await sql`DELETE FROM landscape.core_fin_pe_applicability WHERE category_id = ${id}::bigint`
-      for (const p of pe_levels) await sql`INSERT INTO landscape.core_fin_pe_applicability (category_id, pe_level) VALUES (${id}::bigint, ${p}::landscape.pe_level)`
+    if (Array.isArray(pe_levels) || Array.isArray(container_levels)) {
+      await sql`DELETE FROM landscape.core_fin_container_applicability WHERE category_id = ${id}::bigint`
+      const normalized =
+        Array.isArray(container_levels) && container_levels.length > 0
+          ? container_levels
+          : Array.isArray(pe_levels)
+            ? pe_levels.map((lvl: string) =>
+                lvl === 'project'
+                  ? 0
+                  : lvl === 'area'
+                    ? 1
+                    : lvl === 'phase'
+                      ? 2
+                      : 3
+              )
+            : []
+      for (const level of normalized) {
+        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, container_level) VALUES (${id}::bigint, ${level})`
+      }
     }
 
     return NextResponse.json({ ok: true })

@@ -178,6 +178,7 @@ export interface FinBudgetVersion {
   status: string;
   /** Default: now() */
   createdAt: string;
+  projectId: number | null;
 }
 
 // Insert type for landscape.core_fin_budget_version (excludes auto-generated fields)
@@ -185,6 +186,7 @@ export type FinBudgetVersionInsert = {
   name: string;
   asOf: string;
   status?: string;
+  projectId?: number | null;
 };
 
 // landscape.core_fin_category
@@ -267,8 +269,6 @@ export type FinCurveInsert = {
 export interface FinFactActual {
   /** Default: nextval('core_fin_fact_actual_fact_id_seq'::regclass) */
   factId: number;
-  peLevel: string /* pe_level enum */;
-  peId: string;
   categoryId: number;
   uomCode: string;
   /** Default: 1 */
@@ -280,12 +280,11 @@ export interface FinFactActual {
   /** Default: now() */
   createdAt: string;
   containerId: number | null;
+  projectId: number | null;
 }
 
 // Insert type for landscape.core_fin_fact_actual (excludes auto-generated fields)
 export type FinFactActualInsert = {
-  peLevel: string /* pe_level enum */;
-  peId: string;
   categoryId: number;
   uomCode: string;
   qty?: number | null;
@@ -294,6 +293,7 @@ export type FinFactActualInsert = {
   txnDate: string;
   sourceDoc?: string | null;
   containerId?: number | null;
+  projectId?: number | null;
 };
 
 // landscape.core_fin_fact_budget
@@ -303,8 +303,6 @@ export interface FinFactBudget {
   /** Default: nextval('core_fin_fact_budget_fact_id_seq'::regclass) */
   factId: number;
   budgetId: number;
-  peLevel: string /* pe_level enum */;
-  peId: string;
   categoryId: number;
   fundingId: number | null;
   uomCode: string;
@@ -319,6 +317,7 @@ export interface FinFactBudget {
   /** Default: now() */
   createdAt: string;
   containerId: number | null;
+  projectId: number | null;
   confidenceLevel: string | null;
   vendorContactId: number | null;
   escalationRate: number | null;
@@ -334,8 +333,6 @@ export interface FinFactBudget {
 // Insert type for landscape.core_fin_fact_budget (excludes auto-generated fields)
 export type FinFactBudgetInsert = {
   budgetId: number;
-  peLevel: string /* pe_level enum */;
-  peId: string;
   categoryId: number;
   fundingId?: number | null;
   uomCode: string;
@@ -347,6 +344,7 @@ export type FinFactBudgetInsert = {
   curveId?: number | null;
   notes?: string | null;
   containerId?: number | null;
+  projectId?: number | null;
   confidenceLevel?: string | null;
   vendorContactId?: number | null;
   escalationRate?: number | null;
@@ -461,12 +459,12 @@ export type FinGrowthRateStepsInsert = {
   thruPeriod?: number | null;
 };
 
-// landscape.core_fin_pe_applicability
-// Primary Key: category_id, pe_level
+// landscape.core_fin_container_applicability
+// Primary Key: category_id, container_level
 // Foreign Keys: category_id -> landscape.core_fin_category.category_id
-export interface FinPeApplicability {
+export interface FinContainerApplicability {
   categoryId: number;
-  peLevel: string /* pe_level enum */;
+  containerLevel: number;
 }
 
 // landscape.core_fin_uom
@@ -1733,7 +1731,7 @@ export namespace LandscapeSchema {
   export type CoreFinFundingSource = FinFundingSource;
   export type CoreFinGrowthRateSets = FinGrowthRateSets;
   export type CoreFinGrowthRateSteps = FinGrowthRateSteps;
-  export type CoreFinPeApplicability = FinPeApplicability;
+  export type CoreFinContainerApplicability = FinContainerApplicability;
   export type CoreFinUom = FinUom;
   export type CoreLookupItem = LookupItem;
   export type CoreLookupList = LookupList;
@@ -1810,7 +1808,7 @@ export const TABLE_NAMES = {
   CORE_FIN_FUNDING_SOURCE: 'landscape.core_fin_funding_source' as const,
   CORE_FIN_GROWTH_RATE_SETS: 'landscape.core_fin_growth_rate_sets' as const,
   CORE_FIN_GROWTH_RATE_STEPS: 'landscape.core_fin_growth_rate_steps' as const,
-  CORE_FIN_PE_APPLICABILITY: 'landscape.core_fin_pe_applicability' as const,
+  CORE_FIN_CONTAINER_APPLICABILITY: 'landscape.core_fin_container_applicability' as const,
   CORE_FIN_UOM: 'landscape.core_fin_uom' as const,
   CORE_LOOKUP_ITEM: 'landscape.core_lookup_item' as const,
   CORE_LOOKUP_LIST: 'landscape.core_lookup_list' as const,

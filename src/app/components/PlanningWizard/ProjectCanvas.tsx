@@ -5,6 +5,7 @@ import { Project } from './PlanningWizard'
 import DropZone from './DropZone'
 import SimpleTaxonomySelector from '../LandUse/SimpleTaxonomySelector'
 import InlineTaxonomySelector from '../LandUse/InlineTaxonomySelector'
+import { useProjectConfig } from '@/hooks/useProjectConfig'
 
 interface ProjectCanvasProps {
   project: Project
@@ -33,6 +34,10 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
     const parsed = Number(last)
     return Number.isFinite(parsed) ? parsed : null
   }
+
+  // Get dynamic labels for this project
+  const projectId = projectIdFromId(project.id)
+  const { labels } = useProjectConfig(projectId ?? undefined)
 
   const [editing, setEditing] = useState<{ areaId: string; phaseId: string; parcelId: string } | null>(null)
   const [addingParcel, setAddingParcel] = useState<{ areaId: string; phaseId: string } | null>(null)
@@ -311,7 +316,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                 }`}
                 style={onAddArea ? { outlineColor: 'rgb(33,88,226)' } : undefined}
               >
-                Add Area
+                Add {labels.level1Label}
               </button>
             </div>
           </div>
@@ -352,7 +357,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                             }`}
                             style={onAddPhase ? { outlineColor: 'rgb(33,88,226)' } : undefined}
                           >
-                            Add Phase
+                            Add {labels.level2Label}
                           </button>
                         </div>
                       ) : (
@@ -410,7 +415,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                             >
                                               <div className="text-center mb-2">
                                                 <div className="font-semibold text-xs leading-tight mb-0.5">
-                                                  Parcel {parcel.name.replace('Parcel: ', '')}
+                                                  {labels.level3Label} {parcel.name.replace(`${labels.level3Label}: `, '').replace('Parcel: ', '')}
                                                 </div>
                                               </div>
                                               <InlineTaxonomySelector
@@ -480,7 +485,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                             <>
                                               <div className="text-center mb-2">
                                                 <div className="font-semibold text-xs leading-tight mb-0.5">
-                                                  Parcel {parcel.name.replace('Parcel: ', '')}
+                                                  {labels.level3Label} {parcel.name.replace(`${labels.level3Label}: `, '').replace('Parcel: ', '')}
                                                 </div>
                                               </div>
                                               <table className="w-full text-sm">
@@ -536,7 +541,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                       onMouseDown={(e) => e.stopPropagation()}
                                     >
                                       <div className="flex items-center justify-between text-sm font-semibold mb-3">
-                                        <span>New Parcel</span>
+                                        <span>New {labels.level3Label}</span>
                                         <span className="text-xs uppercase tracking-wide opacity-80">NEW</span>
                                       </div>
                                       <div className="space-y-4">
@@ -613,7 +618,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                     className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-medium py-2 px-3 rounded transition-colors duration-200 flex items-center justify-center gap-1"
                                   >
                                     <span className="text-sm">+</span>
-                                    Add Parcel
+                                    Add {labels.level3Label}
                                   </button>
                                 </div>
                               </div>

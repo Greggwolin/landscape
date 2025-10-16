@@ -8,11 +8,11 @@ export const dynamic = 'force-dynamic';
  *
  * Create a new budget line item
  *
- * Request Body:
+ * Request Body (Option 1 - New container-based):
  * {
  *   budgetId: number,
- *   peLevel: string (e.g., "project"),
- *   peId: string (e.g., "7"),
+ *   projectId: number,
+ *   containerId?: number (null for project-level),
  *   categoryId: number,
  *   uomCode?: string (default: "EA"),
  *   qty?: number,
@@ -26,6 +26,9 @@ export const dynamic = 'force-dynamic';
  *   notes?: string
  * }
  *
+ * Legacy pe_level inputs are accepted for backward compatibility but are only used to
+ * resolve the appropriate container/project identifiers.
+ *
  * Returns:
  * - item: BudgetGridItem - The newly created budget item with all calculated fields
  */
@@ -35,8 +38,13 @@ export async function POST(request: Request) {
 
     const {
       budgetId,
+      // New container-based approach
+      containerId,
+      // Legacy pe_level approach (still supported)
       peLevel,
       peId,
+      projectId: projectIdInput,
+      // Common fields
       categoryId,
       uomCode = 'EA',
       qty,
@@ -50,13 +58,13 @@ export async function POST(request: Request) {
       notes = ''
     } = body;
 
-    // Validate required fields
-    if (!budgetId || !peLevel || !peId || !categoryId) {
+    // Validate required fields - now more flexible
+    if (!budgetId || !categoryId) {
       return NextResponse.json(
         {
           success: false,
           error: 'Missing required fields',
-          details: 'budgetId, peLevel, peId, and categoryId are required'
+          details: 'budgetId and categoryId are required'
         },
         { status: 400 }
       );
@@ -74,15 +82,80 @@ export async function POST(request: Request) {
       );
     }
 
+    let projectId =
+      typeof projectIdInput === 'number' && Number.isFinite(projectIdInput)
+        ? projectIdInput
+        : null;
+
+    let resolvedContainerId =
+      typeof containerId === 'number' && Number.isFinite(containerId)
+        ? containerId
+        : null;
+
+    if (!resolvedContainerId && peLevel && peId && peLevel !== 'project') {
+      const column =
+        peLevel === 'area'
+          ? 'area_id'
+          : peLevel === 'phase'
+            ? 'phase_id'
+            : 'parcel_id';
+      const [containerRow] =
+        peLevel === 'project'
+          ? []
+          : await sql`
+              SELECT container_id, project_id
+              FROM landscape.tbl_container
+              WHERE container_level = ${
+                peLevel === 'area' ? 1 : peLevel === 'phase' ? 2 : 3
+              }
+                AND attributes->>${column} = ${peId}
+              LIMIT 1
+            `;
+      if (containerRow?.container_id != null) {
+        resolvedContainerId = Number(containerRow.container_id);
+        if (projectId == null && containerRow.project_id != null) {
+          projectId = Number(containerRow.project_id);
+        }
+      }
+    }
+
+    if (resolvedContainerId != null && projectId == null) {
+      const [row] = await sql`
+        SELECT project_id FROM landscape.tbl_container WHERE container_id = ${resolvedContainerId}
+      `;
+      if (row?.project_id != null) {
+        projectId = Number(row.project_id);
+      }
+    }
+
+    if (projectId == null && peLevel === 'project' && peId) {
+      const numericPe = Number(peId);
+      if (Number.isFinite(numericPe)) {
+        projectId = numericPe;
+      }
+    }
+
+    if (projectId == null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing project context',
+          details: 'projectId is required when creating budget items'
+        },
+        { status: 400 }
+      );
+    }
+
     // Calculate amount if not provided
     const finalAmount = amount || (qty * rate);
 
     // Insert the new budget item
+    // Hierarchy is now determined by project/container identifiers only
     const result = await sql`
       INSERT INTO landscape.core_fin_fact_budget (
         budget_id,
-        pe_level,
-        pe_id,
+        container_id,
+        project_id,
         category_id,
         uom_code,
         qty,
@@ -97,8 +170,8 @@ export async function POST(request: Request) {
         created_at
       ) VALUES (
         ${budgetId},
-        ${peLevel},
-        ${peId},
+        ${resolvedContainerId},
+        ${projectId},
         ${categoryId},
         ${uomCode},
         ${qty || null},

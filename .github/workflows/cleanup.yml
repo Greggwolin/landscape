@@ -1,0 +1,54 @@
+# GitHub Actions: Cleanup Preview Environment
+# Version: v1.0 (2025-10-13)
+#
+# Triggers on PR close/merge
+# - Deletes Neon database branch
+# - Cleans up Vercel preview deployment
+
+name: Cleanup Preview
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - work
+
+env:
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
+jobs:
+  cleanup:
+    name: Delete Preview Resources
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Neon CLI
+        run: |
+          npm install -g neonctl
+          neonctl --version
+
+      - name: Delete Neon branch
+        run: |
+          chmod +x ./scripts/neon-branch-delete.sh
+          ./scripts/neon-branch-delete.sh ${{ github.event.pull_request.number }}
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🗑️ **Preview Environment Cleaned Up**
+
+              - Database branch \`pr-${{ github.event.pull_request.number }}\` has been deleted
+              - Vercel preview deployment will be removed automatically
+
+              All preview resources have been released.`
+            })

@@ -1,0 +1,292 @@
+import { NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * GET /api/budget/containers
+ *
+ * Fetch budget items with container-based filtering
+ *
+ * Query Parameters:
+ * - container_id?: number - Filter by specific container
+ * - container_level?: number (1|2|3) - Filter by hierarchy level
+ * - project_id?: number - Filter by project (returns all containers + project-level)
+ * - include_children?: boolean - Include child container budgets (default: false)
+ * - pe_level?: string - Legacy: Filter by pe_level (backward compatibility)
+ * - pe_id?: string - Legacy: Filter by pe_id (backward compatibility)
+ *
+ * Returns:
+ * - items: BudgetItem[] - Array of budget items with container details
+ * - summary: { totalAmount, itemCount, byLevel } - Aggregated summary
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+
+    // New container-based parameters
+    const containerId = searchParams.get('container_id')
+    const containerLevel = searchParams.get('container_level')
+    const projectId = searchParams.get('project_id')
+    const includeChildren = searchParams.get('include_children') === 'true'
+
+    // Legacy parameters (backward compatibility)
+    const peLevel = searchParams.get('pe_level')
+    const peId = searchParams.get('pe_id')
+
+    let items
+
+    // Priority: container_id > project_id + container_level > pe_level + pe_id
+    if (containerId) {
+      // Query by specific container
+      if (includeChildren) {
+        // Include all child containers
+        items = await sql`
+          WITH RECURSIVE container_tree AS (
+            -- Start with the specified container
+            SELECT container_id, container_level, project_id
+            FROM landscape.tbl_container
+            WHERE container_id = ${containerId}
+
+            UNION ALL
+
+            -- Recursively get all children
+            SELECT c.container_id, c.container_level, c.project_id
+            FROM landscape.tbl_container c
+            INNER JOIN container_tree ct ON c.parent_container_id = ct.container_id
+          )
+          SELECT
+            b.fact_id,
+            b.budget_id,
+            b.pe_level,
+            b.pe_id,
+            b.container_id,
+            b.category_id,
+            b.uom_code,
+            b.qty,
+            b.rate,
+            b.amount,
+            b.confidence_level,
+            b.is_committed,
+            -- Container details
+            c.container_level,
+            c.container_code,
+            c.display_name as container_name,
+            c.project_id,
+            c.sort_order as container_sort_order,
+            -- Category details
+            cat.code as category_code,
+            cat.detail as category_name,
+            cat.scope as category_scope
+          FROM landscape.core_fin_fact_budget b
+          LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+          LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
+          WHERE b.container_id IN (SELECT container_id FROM container_tree)
+          ORDER BY c.container_level, c.sort_order, cat.depth, cat.code
+        `
+      } else {
+        // Just this container
+        items = await sql`
+          SELECT
+            b.fact_id,
+            b.budget_id,
+            b.pe_level,
+            b.pe_id,
+            b.container_id,
+            b.category_id,
+            b.uom_code,
+            b.qty,
+            b.rate,
+            b.amount,
+            b.confidence_level,
+            b.is_committed,
+            -- Container details
+            c.container_level,
+            c.container_code,
+            c.display_name as container_name,
+            c.project_id,
+            c.sort_order as container_sort_order,
+            -- Category details
+            cat.code as category_code,
+            cat.detail as category_name,
+            cat.scope as category_scope
+          FROM landscape.core_fin_fact_budget b
+          LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+          LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
+          WHERE b.container_id = ${containerId}
+          ORDER BY cat.depth, cat.code
+        `
+      }
+    } else if (projectId && containerLevel) {
+      // Query by project + container level
+      items = await sql`
+        SELECT
+          b.fact_id,
+          b.budget_id,
+          b.pe_level,
+          b.pe_id,
+          b.container_id,
+          b.category_id,
+          b.uom_code,
+          b.qty,
+          b.rate,
+          b.amount,
+          b.confidence_level,
+          b.is_committed,
+          -- Container details
+          c.container_level,
+          c.container_code,
+          c.display_name as container_name,
+          c.project_id,
+          c.sort_order as container_sort_order,
+          -- Category details
+          cat.code as category_code,
+          cat.detail as category_name,
+          cat.scope as category_scope
+        FROM landscape.core_fin_fact_budget b
+        INNER JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
+        WHERE c.project_id = ${projectId}
+          AND c.container_level = ${containerLevel}
+        ORDER BY c.sort_order, cat.depth, cat.code
+      `
+    } else if (projectId) {
+      // Query all budget items for a project (project-level + all containers)
+      items = await sql`
+        SELECT
+          b.fact_id,
+          b.budget_id,
+          b.pe_level,
+          b.pe_id,
+          b.container_id,
+          b.category_id,
+          b.uom_code,
+          b.qty,
+          b.rate,
+          b.amount,
+          b.confidence_level,
+          b.is_committed,
+          -- Container details (NULL for project-level items)
+          c.container_level,
+          c.container_code,
+          c.display_name as container_name,
+          COALESCE(c.project_id, CAST(b.pe_id AS INTEGER)) as project_id,
+          c.sort_order as container_sort_order,
+          -- Category details
+          cat.code as category_code,
+          cat.detail as category_name,
+          cat.scope as category_scope
+        FROM landscape.core_fin_fact_budget b
+        LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
+        WHERE (b.pe_level = 'project' AND b.pe_id = ${projectId})
+           OR (c.project_id = ${projectId})
+        ORDER BY
+          COALESCE(c.container_level, 0),
+          c.sort_order,
+          cat.depth,
+          cat.code
+      `
+    } else if (peLevel && peId) {
+      // Legacy query (backward compatibility)
+      items = await sql`
+        SELECT
+          b.fact_id,
+          b.budget_id,
+          b.pe_level,
+          b.pe_id,
+          b.container_id,
+          b.category_id,
+          b.uom_code,
+          b.qty,
+          b.rate,
+          b.amount,
+          b.confidence_level,
+          b.is_committed,
+          -- Container details
+          c.container_level,
+          c.container_code,
+          c.display_name as container_name,
+          c.project_id,
+          c.sort_order as container_sort_order,
+          -- Category details
+          cat.code as category_code,
+          cat.detail as category_name,
+          cat.scope as category_scope
+        FROM landscape.core_fin_fact_budget b
+        LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
+        WHERE b.pe_level = ${peLevel}
+          AND b.pe_id = ${peId}
+        ORDER BY
+          COALESCE(c.container_level, 0),
+          c.sort_order,
+          cat.depth,
+          cat.code
+      `
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing required parameters',
+          details:
+            'Provide one of: container_id, project_id, or pe_level + pe_id'
+        },
+        { status: 400 }
+      )
+    }
+
+    // Calculate summary
+    const totalAmount = items.reduce(
+      (sum: number, item: any) => sum + (Number(item.amount) || 0),
+      0
+    )
+
+    // Group by container level
+    const byLevel = items.reduce((groups: Record<string, any>, item: any) => {
+      const level = item.container_level || 0 // 0 = project level
+      if (!groups[level]) {
+        groups[level] = {
+          level,
+          levelName:
+            level === 0
+              ? 'Project'
+              : level === 1
+                ? 'Level 1'
+                : level === 2
+                  ? 'Level 2'
+                  : 'Level 3',
+          count: 0,
+          total: 0
+        }
+      }
+      groups[level].count++
+      groups[level].total += Number(item.amount) || 0
+      return groups
+    }, {})
+
+    const summary = {
+      totalAmount,
+      itemCount: items.length,
+      byLevel: Object.values(byLevel)
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        items,
+        summary
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching container budget items:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch budget items',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}

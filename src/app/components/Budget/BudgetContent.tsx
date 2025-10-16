@@ -1,5 +1,7 @@
 // Budget UI refactor to Neon core_fin schema
 import React, { useEffect, useMemo, useState } from 'react'
+import { useProjectConfig } from '@/hooks/useProjectConfig'
+import { flattenContainers } from '@/lib/containerHelpers'
 
 type Budget = { budget_id: number; name: string; as_of: string; status: string }
 type Category = {
@@ -11,12 +13,11 @@ type Category = {
   scope: string | null
   detail: string | null
   uoms: { code: string; label: string }[]
+  container_levels?: number[]
 }
 type Line = {
   fact_id: number
   budget_id: number
-  pe_level: string
-  pe_id: string
   category_id: number
   category_code: string
   uom_code: string
@@ -37,14 +38,76 @@ const currency = (n: number | null | undefined) =>
 
 type Props = { projectId?: number | null }
 const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
+  const {
+    containers,
+    labels,
+    isLoading: configLoading
+  } = useProjectConfig(projectId ?? undefined)
+  const flatContainers = useMemo(() => flattenContainers(containers), [containers])
+
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [activeBudgetId, setActiveBudgetId] = useState<number | null>(null)
-  const [peLevel, setPeLevel] = useState<'project'|'area'|'phase'|'parcel'|'lot'>('project')
-  const [peId, setPeId] = useState<string>(projectId ? String(projectId) : '1')
+  type ScopeSelection =
+    | { kind: 'project'; projectId: number }
+    | { kind: 'container'; projectId: number; containerId: number; containerLevel: 1 | 2 | 3 }
+  const [scopeSelection, setScopeSelection] = useState<ScopeSelection | null>(
+    projectId ? { kind: 'project', projectId } : null
+  )
   const [categories, setCategories] = useState<Category[]>([])
   const [lines, setLines] = useState<Line[]>([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const selectionLevel = scopeSelection?.kind === 'container' ? scopeSelection.containerLevel : 0
+  const scopeOptions = useMemo(() => {
+    const opts: { key: string; label: string; selection: ScopeSelection }[] = []
+    if (projectId) {
+      opts.push({
+        key: 'project',
+        label: 'Project Total',
+        selection: { kind: 'project', projectId }
+      })
+    }
+    const sortedContainers = [...flatContainers].sort((a, b) => {
+      if (a.container_level !== b.container_level) {
+        return a.container_level - b.container_level
+      }
+      const orderA = a.sort_order ?? 0
+      const orderB = b.sort_order ?? 0
+      if (orderA !== orderB) return orderA - orderB
+      return a.container_id - b.container_id
+    })
+    sortedContainers.forEach((container) => {
+      const levelLabel =
+        container.container_level === 1
+          ? labels.level1Label
+          : container.container_level === 2
+            ? labels.level2Label
+            : labels.level3Label
+      opts.push({
+        key: `container-${container.container_id}`,
+        label: `${levelLabel}: ${container.display_name}`,
+        selection: {
+          kind: 'container',
+          projectId: container.project_id,
+          containerId: container.container_id,
+          containerLevel: container.container_level as 1 | 2 | 3
+        }
+      })
+    })
+    return opts
+  }, [flatContainers, labels, projectId])
+
+  const selectedScopeKey = scopeSelection
+    ? scopeSelection.kind === 'project'
+      ? 'project'
+      : `container-${scopeSelection.containerId}`
+    : ''
+
+  useEffect(() => {
+    if (!scopeSelection && scopeOptions.length > 0) {
+      setScopeSelection(scopeOptions[0].selection)
+    }
+  }, [scopeOptions, scopeSelection])
 
   // Init: load budgets then categories and lines
   useEffect(() => {
@@ -63,47 +126,80 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
 
   // Update default pe_id when incoming projectId changes and scope is project
   useEffect(() => {
-    if (projectId && peLevel === 'project') setPeId(String(projectId))
-  }, [projectId, peLevel])
+    if (projectId) {
+      setScopeSelection((current) => {
+        if (!current || current.kind === 'project') {
+          return { kind: 'project', projectId }
+        }
+        return current
+      })
+    } else {
+      setScopeSelection(null)
+    }
+  }, [projectId])
 
-  // Load categories whenever peLevel changes
+  // Load categories whenever the selected scope changes
   useEffect(() => {
     (async () => {
+      if (!scopeSelection) {
+        setCategories([])
+        return
+      }
       try {
-        const cats = await fetch(`/api/fin/categories?pe_level=${peLevel}`).then(r => r.json())
+        const cats = await fetch(`/api/fin/categories?container_level=${selectionLevel}`).then(r => r.json())
         setCategories(cats)
       } catch (e) {
         console.error('Failed to load categories', e)
       }
     })()
-  }, [peLevel])
+  }, [scopeSelection])
 
   // Load lines when budget/pe changes
   useEffect(() => {
     (async () => {
-      if (!activeBudgetId) return
+      if (!activeBudgetId || !scopeSelection) return
+      const params = new URLSearchParams({ budget_id: String(activeBudgetId) })
+      if (scopeSelection.kind === 'container') {
+        params.set('container_id', String(scopeSelection.containerId))
+      } else {
+        params.set('project_id', String(scopeSelection.projectId))
+      }
       try {
-        const data = await fetch(`/api/fin/lines?budget_id=${activeBudgetId}&pe_level=${peLevel}&pe_id=${encodeURIComponent(peId)}`).then(r => r.json())
+        const data = await fetch(`/api/fin/lines?${params.toString()}`).then(r => r.json())
         setLines(Array.isArray(data) ? data : [])
       } catch (e) { console.error('Failed to load lines', e) }
     })()
-  }, [activeBudgetId, peLevel, peId])
+  }, [activeBudgetId, scopeSelection])
 
   const addLine = async () => {
-    if (!activeBudgetId) return
-    // pick first category in list as default
+    if (!activeBudgetId || !scopeSelection) return
     const c = categories[0]
     if (!c) return
     const uom = c.uoms?.[0]?.code ?? '$$$'
     try {
+      const payload = {
+        budget_id: activeBudgetId,
+        project_id: scopeSelection.projectId,
+        container_id: scopeSelection.kind === 'container' ? scopeSelection.containerId : null,
+        category_id: c.category_id,
+        uom_code: uom,
+        qty: 1,
+        rate: 0
+      }
       const res = await fetch('/api/fin/lines', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ budget_id: activeBudgetId, pe_level: peLevel, pe_id: peId, category_id: c.category_id, uom_code: uom, qty: 1, rate: 0 })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
       const j = await res.json()
       if (j?.fact_id) {
-        // reload
-        const data = await fetch(`/api/fin/lines?budget_id=${activeBudgetId}&pe_level=${peLevel}&pe_id=${encodeURIComponent(peId)}`).then(r => r.json())
+        const params = new URLSearchParams({ budget_id: String(activeBudgetId) })
+        if (scopeSelection.kind === 'container') {
+          params.set('container_id', String(scopeSelection.containerId))
+        } else {
+          params.set('project_id', String(scopeSelection.projectId))
+        }
+        const data = await fetch(`/api/fin/lines?${params.toString()}`).then(r => r.json())
         setLines(Array.isArray(data) ? data : [])
       }
     } catch (e) { console.error('Add line failed', e) }
@@ -200,7 +296,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
     } catch {}
   }
 
-  if (loading) return (
+  if (loading || configLoading) return (
     <div className="p-4 flex items-center justify-center"><div className="text-gray-400">Loading budget…</div></div>
   )
 
@@ -216,19 +312,25 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
             <option key={b.budget_id} value={b.budget_id}>{b.name} · {b.as_of}</option>
           ))}
         </select>
-        <div className="text-gray-300 ml-4">PE</div>
-        <select className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white" value={peLevel} onChange={e => setPeLevel(e.target.value as any)}>
-          <option value="project">project</option>
-          <option value="area">area</option>
-          <option value="phase">phase</option>
-          <option value="parcel">parcel</option>
-          <option value="lot">lot</option>
+        <div className="text-gray-300 ml-4">Scope</div>
+        <select
+          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white min-w-[14rem]"
+          value={selectedScopeKey}
+          onChange={(e) => {
+            const selected = scopeOptions.find((opt) => opt.key === e.target.value)
+            if (selected) setScopeSelection(selected.selection)
+          }}
+        >
+          {scopeOptions.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}
+            </option>
+          ))}
         </select>
-        <input className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white w-28" value={peId} onChange={e => setPeId(e.target.value)} placeholder="pe_id" />
         <div className="flex-1" />
         <div className="text-gray-300">Total:</div>
         <div className="text-white font-medium">{currency(total)}</div>
-        <button onClick={addLine} disabled={(categories ?? []).length === 0} className="ml-3 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">Add Line</button>
+        <button onClick={addLine} disabled={(categories ?? []).length === 0 || !scopeSelection} className="ml-3 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">Add Line</button>
       </div>
 
       <div className="bg-gray-800 rounded border border-gray-700 overflow-hidden">
@@ -252,7 +354,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
               <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={async () => {
                 try {
                   await fetch('/api/fin/seed', { method: 'POST' })
-                  const cats = await fetch(`/api/fin/categories?pe_level=${peLevel}`).then(r => r.json())
+                  const cats = await fetch(`/api/fin/categories?container_level=${selectionLevel}`).then(r => r.json())
                   setCategories(Array.isArray(cats) ? cats : [])
                 } catch (e) { console.error('Seed failed', e) }
               }}>Seed</button>

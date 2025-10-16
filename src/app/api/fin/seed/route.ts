@@ -39,8 +39,12 @@ export async function POST() {
       created++
       await sql`DELETE FROM landscape.core_fin_category_uom WHERE category_id = ${id}`
       for (const u of s.uoms) await sql`INSERT INTO landscape.core_fin_category_uom (category_id, uom_code) VALUES (${id}, ${u}) ON CONFLICT DO NOTHING`
-      await sql`DELETE FROM landscape.core_fin_pe_applicability WHERE category_id = ${id}`
-      for (const p of s.entities) await sql`INSERT INTO landscape.core_fin_pe_applicability (category_id, pe_level) VALUES (${id}, ${p}::landscape.pe_level) ON CONFLICT DO NOTHING`
+      await sql`DELETE FROM landscape.core_fin_container_applicability WHERE category_id = ${id}`
+      for (const p of s.entities) {
+        const level =
+          p === 'project' ? 0 : p === 'area' ? 1 : p === 'phase' ? 2 : 3
+        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, container_level) VALUES (${id}, ${level}) ON CONFLICT DO NOTHING`
+      }
     }
 
     return NextResponse.json({ ok: true, uoms: uoms.length, categories: created })

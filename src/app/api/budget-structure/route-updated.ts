@@ -25,8 +25,8 @@ export async function GET() {
       FROM landscape.core_fin_category fc
       LEFT JOIN landscape.core_fin_fact_budget fb
         ON fc.category_id = fb.category_id
-        AND fb.pe_level = 'project'
-        AND fb.pe_id = '7'
+        AND fb.project_id = 7
+        AND fb.container_id IS NULL
         AND fb.budget_id = (
           SELECT budget_id
           FROM landscape.core_fin_budget_version
@@ -103,8 +103,8 @@ export async function POST(request: Request) {
       const result = await sql`
         INSERT INTO landscape.core_fin_fact_budget (
           budget_id,
-          pe_level,
-          pe_id,
+          project_id,
+          container_id,
           category_id,
           uom_code,
           qty,
@@ -115,8 +115,8 @@ export async function POST(request: Request) {
           is_committed
         ) VALUES (
           ${budgetId},
-          'project',
-          ${data.project_id || '7'},
+          ${data.project_id || 7},
+          NULL,
           ${data.category_id},
           ${defaultUom[0]?.uom_code || 'EA'},
           ${data.quantity || 1},

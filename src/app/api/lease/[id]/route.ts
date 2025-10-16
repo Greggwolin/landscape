@@ -1,18 +1,108 @@
 import { NextResponse } from 'next/server';
 
-import { getLeaseData, setLease } from '@/app/api/lease/mock-data';
+import { getFullLeaseData, updateLease, deleteLease } from '@/lib/financial-engine/db';
+import type { LeaseUpdate } from '@/types/financial-engine';
 
+/**
+ * GET /api/lease/[id]
+ * Retrieve full lease data including all related tables
+ */
 export const GET = async (_request: Request, { params }: { params: { id: string } }) => {
-  const data = getLeaseData(params.id);
-  return NextResponse.json(data);
+  try {
+    const leaseId = parseInt(params.id, 10);
+
+    if (isNaN(leaseId)) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid lease ID' },
+        { status: 400 }
+      );
+    }
+
+    const data = await getFullLeaseData(leaseId);
+
+    if (!data) {
+      return NextResponse.json(
+        { ok: false, error: 'Lease not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, data });
+  } catch (error) {
+    console.error('Error fetching lease:', error);
+    return NextResponse.json(
+      { ok: false, error: 'Failed to fetch lease data' },
+      { status: 500 }
+    );
+  }
 };
 
+/**
+ * PUT /api/lease/[id]
+ * Update lease master record
+ */
 export const PUT = async (request: Request, { params }: { params: { id: string } }) => {
-  const payload = await request.json();
-  setLease(payload);
-  return NextResponse.json({ ok: true, leaseId: params.id });
+  try {
+    const leaseId = parseInt(params.id, 10);
+
+    if (isNaN(leaseId)) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid lease ID' },
+        { status: 400 }
+      );
+    }
+
+    const payload: LeaseUpdate = await request.json();
+
+    const updated = await updateLease(leaseId, payload);
+
+    if (!updated) {
+      return NextResponse.json(
+        { ok: false, error: 'Lease not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, data: updated });
+  } catch (error) {
+    console.error('Error updating lease:', error);
+    return NextResponse.json(
+      { ok: false, error: 'Failed to update lease' },
+      { status: 500 }
+    );
+  }
 };
 
+/**
+ * DELETE /api/lease/[id]
+ * Delete a lease and all related records (cascading)
+ */
 export const DELETE = async (_request: Request, { params }: { params: { id: string } }) => {
-  return NextResponse.json({ ok: true, leaseId: params.id });
+  try {
+    const leaseId = parseInt(params.id, 10);
+
+    if (isNaN(leaseId)) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid lease ID' },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await deleteLease(leaseId);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { ok: false, error: 'Lease not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, message: 'Lease deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting lease:', error);
+    return NextResponse.json(
+      { ok: false, error: 'Failed to delete lease' },
+      { status: 500 }
+    );
+  }
 };

@@ -10,7 +10,11 @@ const loaderMap: Record<string, () => Promise<{ default: ComponentType<Record<st
   'coreui-lease-react': () => import('@/prototypes/coreui/LeaseInputReactPrototype'),
   // The CoreUI shell is optional because it lives on another branch.
   'coreui-shell': () => import('@/prototypes/remote/CoreUIShellPlaceholder'),
-  'glide-parcel-grid': () => import('@/prototypes/glide/ParcelGridPrototype')
+  'glide-parcel-grid': () => import('@/prototypes/glide/ParcelGridPrototype'),
+  'gis-test': () => import('@/prototypes/gis/GISTestPrototype'),
+  'gis-simple-test': () => import('@/prototypes/gis/GISSimpleTestPrototype'),
+  'map-debug': () => import('@/prototypes/gis/MapDebugPrototype'),
+  'parcel-test': () => import('@/prototypes/gis/ParcelTestPrototype')
 };
 
 export const loadPrototypeComponent = (id: string) => {

@@ -24,6 +24,13 @@ export async function GET(
   try {
     const { searchParams } = new URL(request.url);
     const { projectId } = await params;
+    const numericProjectId = Number(projectId);
+    if (!Number.isFinite(numericProjectId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid projectId', details: 'projectId must be numeric' },
+        { status: 400 }
+      );
+    }
     const scopeFilter = searchParams.get('scope');
     const versionFilter = searchParams.get('version') || 'Forecast'; // Default to Forecast
     const includeVariance = searchParams.get('includeVariance') !== 'false';
@@ -46,8 +53,7 @@ export async function GET(
         LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
           SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
         )
-        WHERE vbgi.pe_level = 'project'
-          AND vbgi.pe_id = ${projectId}
+        WHERE vbgi.project_id = ${numericProjectId}
           AND (${scopeFilter}::text IS NULL OR vbgi.scope = ${scopeFilter})
           AND vbgi.budget_version = ${versionFilter}
         ORDER BY
@@ -66,8 +72,7 @@ export async function GET(
         LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
           SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
         )
-        WHERE vbgi.pe_level = 'project'
-          AND vbgi.pe_id = ${projectId}
+        WHERE vbgi.project_id = ${numericProjectId}
           AND (${scopeFilter}::text IS NULL OR vbgi.scope = ${scopeFilter})
           AND vbgi.budget_version = ${versionFilter}
         ORDER BY

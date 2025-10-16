@@ -8,6 +8,7 @@ type Category = {
   event: string | null
   uoms: { code: string; label: string }[]
   pe_levels?: string[]
+  container_levels?: number[]
 }
 
 type Uom = { uom_code: string; name: string; uom_type: string }
@@ -16,7 +17,7 @@ const CategoryTree: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([])
   const [uoms, setUoms] = useState<Uom[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [form, setForm] = useState<any>({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], pe_levels: [] })
+  const [form, setForm] = useState<any>({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] })
   const [saving, setSaving] = useState(false)
 
   const reload = async () => {
@@ -35,7 +36,8 @@ const CategoryTree: React.FC = () => {
       const c = categories.find(x => x.category_id === selectedId)
       if (c) setForm({
         code: c.code, kind: c.kind, class: c.class ?? '', event: c.event ?? '', is_active: true,
-        uoms: (c.uoms ?? []).map(u => u.code), pe_levels: c.pe_levels ?? []
+        uoms: (c.uoms ?? []).map(u => u.code),
+        container_levels: c.container_levels ?? (c.pe_levels ?? []).map((level) => level === 'project' ? 0 : level === 'area' ? 1 : level === 'phase' ? 2 : 3)
       })
     }
   }, [selectedId, categories])
@@ -64,7 +66,7 @@ const CategoryTree: React.FC = () => {
     try {
       await fetch(`/api/fin/categories/${selectedId}`, { method: 'DELETE' })
       setSelectedId(null)
-      setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], pe_levels: [] })
+      setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] })
       await reload()
     } catch (e) { console.error('Delete failed', e) } finally { setSaving(false) }
   }
@@ -82,7 +84,7 @@ const CategoryTree: React.FC = () => {
               </button>
             ))}
             <div className="mt-2">
-              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], pe_levels: [] }) }}>New Category</button>
+              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] }) }}>New Category</button>
             </div>
           </div>
           <div className="md:col-span-2 border border-gray-700 rounded p-3 bg-gray-900 space-y-3">
@@ -119,10 +121,19 @@ const CategoryTree: React.FC = () => {
             <div className="border-t border-gray-700 pt-2">
               <div className="text-gray-300 mb-1">Entity Applicability</div>
               <div className="grid grid-cols-5 gap-2 text-gray-300">
-                {['project','area','phase','parcel','lot'].map(p => (
-                  <label key={p} className="flex items-center gap-2">
-                    <input type="checkbox" checked={form.pe_levels.includes(p)} onChange={e => setForm((f: any) => ({ ...f, pe_levels: e.target.checked ? [...f.pe_levels, p] : f.pe_levels.filter((x: string) => x !== p) }))} />
-                    <span>{p}</span>
+                {[{ value: 0, label: 'Project' }, { value: 1, label: 'Level 1' }, { value: 2, label: 'Level 2' }, { value: 3, label: 'Level 3' }].map(({ value, label }) => (
+                  <label key={value} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.container_levels.includes(value)}
+                      onChange={e => setForm((f: any) => ({
+                        ...f,
+                        container_levels: e.target.checked
+                          ? [...f.container_levels, value]
+                          : f.container_levels.filter((x: number) => x !== value)
+                      }))}
+                    />
+                    <span>{label}</span>
                   </label>
                 ))}
               </div>

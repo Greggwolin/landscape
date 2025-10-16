@@ -1,47 +1,230 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Landscape - Real Estate Development Financial Engine
 
-## Getting Started
+A comprehensive Next.js application for land development and income property financial modeling with **ARGUS-level sophistication**.
 
-First, run the development server:
+## 🎯 Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Landscape provides enterprise-grade financial modeling capabilities for:
+- **Master-Planned Communities (MPCs)** - Land development with phasing, absorption, and lot sales
+- **Income Properties** - Commercial, retail, office, and industrial leasing
+- **Multifamily Properties** - Unit-level tracking with lease management, turns, and occupancy analysis
+- **Mixed-Use Developments** - Combined land + income + multifamily modeling
+
+### Key Features
+
+✅ **Universal Container System** - Production-ready flexible hierarchy (Area/Phase/Parcel OR Property/Building/Unit)
+✅ **Comprehensive Data Layer** - 117 tables + 26 views in PostgreSQL
+✅ **Unit-Level Multifamily** - Lease tracking, turn analysis, occupancy reporting
+✅ **Lease Management** - Escalations, recoveries, percentage rent, rollover analysis
+✅ **Dependency Engine** - Automated timeline calculation with circular detection
+✅ **S-Curve Distribution** - 4 profiles for cost/revenue timing
+✅ **GIS Integration** - Boundary mapping, parcel selection, AI document extraction
+✅ **Market Intelligence** - Census ACS, BLS, FRED, FHFA data integration
+✅ **Budget Grid** - Spreadsheet-like interface with inline editing
+✅ **CI/CD Pipeline** - Neon branching + Vercel deployment automation
+
+## 📚 Documentation
+
+**All documentation is now centralized in the [/docs/](docs/) directory.**
+
+### Quick Links
+
+- **[Complete Documentation Index](docs/README.md)** - Master navigation guide
+- **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
+- **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
+- **[Financial Engine Status](docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md)** ⭐ Best for AI context
+- **[Database Schema](docs/05-database/DATABASE_SCHEMA.md)** - Complete schema reference
+- **[API Reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** - API documentation
+- **[DevOps Guide](docs/06-devops/DEVOPS_GUIDE.md)** - Deployment and operations
+
+### Documentation Structure
+
+```
+docs/
+├── 00-getting-started/      # Developer onboarding
+├── 01-architecture/         # System design
+├── 02-features/             # Feature documentation
+│   ├── financial-engine/    # Financial modeling
+│   ├── rent-roll/           # Rent roll interface
+│   ├── dms/                 # Document management
+│   ├── gis/                 # GIS & mapping
+│   └── land-use/            # Land use management
+├── 03-api-reference/        # API docs
+├── 04-ui-components/        # UI documentation
+├── 05-database/             # Database schema
+├── 06-devops/               # DevOps & CI/CD
+├── 07-testing/              # Testing docs
+├── 08-migration-history/    # Historical records
+└── 09-technical-dd/         # Due diligence
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Quick Start
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
+- Node.js 20+
+- PostgreSQL (Neon serverless)
+- npm or pnpm
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Installation
 
-## Learn More
+```bash
+# Clone the repository
+git clone <repo-url>
+cd landscape
 
-To learn more about Next.js, take a look at the following resources:
+# Install dependencies
+pnpm install  # or npm install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your DATABASE_URL and API keys
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Run database migrations
+./scripts/run-migrations.sh main
 
-## Deploy on Vercel
+# Start development server
+pnpm dev  # or npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Technology Stack
 
-## Database Schema Cheat Sheet
+### Frontend
+- **Next.js 15.5.0** with Turbopack
+- **React 19.1.0** + TypeScript 5.x
+- **Tailwind CSS 3.4.17** for styling
+- **Material-UI 7.3.1** (DataGrid, Charts, DatePickers)
+- **MapLibre GL 5.7.3** for GIS mapping
+- **Handsontable 16.0.0** for budget grids
 
-- Generate live schema markdown: `DATABASE_URL=postgres://... npm run schema:md`
-- Output: `docs/db-schema.md`
-- The schema is introspected from the `landscape` schema using the Neon serverless client.
+### Backend
+- **Neon PostgreSQL** (serverless)
+- **143 tables + 19 views** in `landscape` schema
+- **Direct `pg` 8.13.1** + `@neondatabase/serverless` connections
+- **Next.js App Router** API routes
 
-Note: Prisma is not used by this project. We connect to Neon directly in server-side API routes via `@neondatabase/serverless` (see `src/lib/db.ts`).
+### AI/ML
+- **Claude 3.5 Sonnet** (Anthropic) for document extraction
+- **OpenAI GPT-4** for analysis
+- **Python 3.12** market ingestion engine
+
+## 📁 Project Structure
+
+```
+landscape/
+├── src/
+│   ├── app/
+│   │   ├── api/                       # Next.js API routes
+│   │   │   ├── multifamily/           # Multifamily APIs (NEW - Migration 008)
+│   │   │   │   ├── units/             # Unit CRUD
+│   │   │   │   ├── leases/            # Lease management
+│   │   │   │   ├── turns/             # Turn tracking
+│   │   │   │   └── reports/           # Multifamily reports
+│   │   │   │       ├── occupancy/     # Occupancy report
+│   │   │   │       └── expirations/   # Lease expirations
+│   │   │   ├── leases/                # Income property leases
+│   │   │   ├── parcels/               # Parcel CRUD
+│   │   │   └── projects/              # Project APIs
+│   │   ├── components/                # React components
+│   │   └── market/                    # Market intelligence page
+│   ├── lib/                           # Utilities and libraries
+│   │   ├── financial-engine/          # Calculation engines
+│   │   └── db.ts                      # Database connection
+│   └── types/                         # TypeScript definitions
+├── migrations/                        # Database migrations (001-008)
+├── project-docs/                      # Technical documentation
+├── scripts/                           # Deployment and utility scripts
+└── services/
+    └── market_ingest_py/              # Python market data CLI
+```
+
+> **Note**: For a complete `/src/app` directory tree with all 35+ API routes, 15+ pages, and 25+ component categories, see [App-Development-Status.md](Documentation/App-Development-Status.md#application-file-structure)
+
+## 🗄 Database Architecture
+
+### Schemas
+- **`landscape`** (ACTIVE) - 143 tables, 19 views - All application data
+- **`land_v2`** (LEGACY) - 2 tables - Zoning glossary only (unused)
+
+### Recent Additions (Migration 008 - Oct 14, 2025)
+
+**Multifamily Property Tracking**:
+- `tbl_multifamily_unit` - Unit inventory (8 sample units)
+- `tbl_multifamily_lease` - Lease agreements (4 sample leases)
+- `tbl_multifamily_turn` - Turn tracking (1 sample turn)
+- `tbl_multifamily_unit_type` - Unit type master data (3 types)
+- 5 reporting views for occupancy, expirations, turn metrics
+
+## 📡 API Endpoints
+
+### Multifamily (NEW)
+- `GET/POST /api/multifamily/units` - Unit CRUD
+- `GET/POST /api/multifamily/leases` - Lease management
+- `GET/POST /api/multifamily/turns` - Turn tracking
+- `GET /api/multifamily/reports/occupancy` - Occupancy analysis
+- `GET /api/multifamily/reports/expirations` - Lease expirations
+
+### Projects & Planning
+- `GET /api/projects` - List all projects
+- `GET/POST /api/parcels` - Parcel management
+- `GET /api/phases` - Phase hierarchy
+
+### Financial
+- `GET /api/budget/items` - Budget line items
+- `POST /api/projects/[id]/timeline/calculate` - Timeline calculation
+- `GET /api/leases` - Lease management
+
+See [Documentation/App-Development-Status.md](Documentation/App-Development-Status.md) for complete API reference.
+
+## 🧪 Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run API tests
+npm run test:api
+
+# Load test fixtures
+./scripts/load-fixtures.sh
+```
+
+**Test Data Available**:
+- Project 7 (Peoria Lakes Phase 1) - MPC with dependencies
+- Project 8 (Carney Power Center) - Retail power center
+- Project 9 (Peoria Lakes) - Multifamily sample (8 units, 4 leases)
+
+## 📚 Documentation
+
+- **[App-Development-Status.md](Documentation/App-Development-Status.md)** - Comprehensive development reference (2,300+ lines)
+- **[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)** - Project status and roadmap
+- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Onboarding guide
+- **[DEVOPS_GUIDE.md](project-docs/DEVOPS_GUIDE.md)** - CI/CD and deployment
+- **[API_REFERENCE_PHASE2.md](project-docs/API_REFERENCE_PHASE2.md)** - API documentation
+
+## 🔧 Development
+
+### Database Schema Cheat Sheet
+
+```bash
+# Generate live schema markdown
+DATABASE_URL=postgres://... npm run schema:md
+# Output: docs/db-schema.md
+```
+
+**Database Info**:
+- Host: `ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech`
+- Database: `land_v2`
+- Active Schema: `landscape` (143 tables, 19 views)
+- Legacy Schema: `land_v2` (2 tables - unused)
+
+**Connection Methods**:
+- `@neondatabase/serverless` - Serverless SQL queries (most APIs)
+- `pg` 8.13.1 - Direct PostgreSQL Pool (multifamily APIs)
+- See `src/lib/db.ts` for connection helpers
+
+**Note**: Prisma is not used. All database access is via direct SQL queries.
 
 ### Universal Container System
 

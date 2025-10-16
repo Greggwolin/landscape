@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { useProjectContext } from './ProjectProvider'
+import NewProjectButton from './NewProjectButton'
 
 interface NavigationProps {
   activeView: string;
@@ -57,7 +58,9 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       items: [
         { id: 'market', label: 'Global' },
         { id: 'market-page', label: 'Market', href: '/market' },
-        { id: 'growth-rates', label: 'Market Rates & Prices' }
+        { id: 'growth-rates', label: 'Market Rates & Prices' },
+        { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll' },
+        { id: 'inventory', label: 'Inventory', href: '/inventory' }
       ],
       isCollapsible: true
     },
@@ -84,6 +87,22 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         { id: 'zoning-glossary', label: 'Zoning Glossary' },
         { id: 'planning', label: `${level2Label} Planner (Legacy)` }
       ]
+    },
+    {
+      title: 'Admin',
+      items: [
+        { id: 'project-setup', label: 'New Project Setup', href: '/projects/setup' },
+        { id: 'admin-dms-attributes', label: 'DMS Attributes', href: '/admin/dms/attributes' },
+        { id: 'admin-dms-templates', label: 'DMS Templates', href: '/admin/dms/templates' }
+      ],
+      isCollapsible: true
+    },
+    {
+      title: 'Demos',
+      items: [
+        { id: 'breadcrumb-demo', label: 'Dynamic Breadcrumbs', href: '/breadcrumb-demo' }
+      ],
+      isCollapsible: true
     }
   ], [level2Label])
 
@@ -97,7 +116,10 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
   return (
     <nav className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
       <div className="p-4 border-b border-gray-700">
-        <h2 className="text-gray-300 text-sm font-medium">Project Navigation</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-gray-300 text-sm font-medium">Project Navigation</h2>
+        </div>
+        <NewProjectButton />
       </div>
 
       <div className="flex-1 py-2 overflow-y-auto">

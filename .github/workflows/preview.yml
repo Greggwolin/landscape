@@ -1,0 +1,190 @@
+# GitHub Actions: Preview Environment Workflow
+# Version: v1.0 (2025-10-13)
+#
+# Triggers on PR open/synchronize
+# - Creates Neon database branch
+# - Runs migrations and seeds
+# - Deploys to Vercel preview
+# - Runs tests against preview environment
+
+name: Preview Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - work
+
+env:
+  NODE_VERSION: '20'
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
+jobs:
+  # ==========================================================================
+  # JOB 1: Create Neon Branch
+  # ==========================================================================
+  create-database:
+    name: Create Database Branch
+    runs-on: ubuntu-latest
+    outputs:
+      database_url: ${{ steps.create-branch.outputs.PREVIEW_DATABASE_URL }}
+      branch_id: ${{ steps.create-branch.outputs.NEON_BRANCH_ID }}
+      branch_name: ${{ steps.create-branch.outputs.NEON_BRANCH_NAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Neon CLI
+        run: |
+          npm install -g neonctl
+          neonctl --version
+
+      - name: Create Neon branch
+        id: create-branch
+        run: |
+          chmod +x ./scripts/neon-branch-create.sh
+          ./scripts/neon-branch-create.sh ${{ github.event.pull_request.number }}
+
+  # ==========================================================================
+  # JOB 2: Run Migrations
+  # ==========================================================================
+  migrate-database:
+    name: Run Migrations
+    runs-on: ubuntu-latest
+    needs: create-database
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install Neon CLI
+        run: npm install -g neonctl
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ needs.create-database.outputs.database_url }}
+        run: |
+          chmod +x ./scripts/run-migrations.sh
+          ./scripts/run-migrations.sh ${{ needs.create-database.outputs.branch_name }}
+
+      - name: Run smoke tests
+        env:
+          DATABASE_URL: ${{ needs.create-database.outputs.database_url }}
+        run: |
+          psql "$DATABASE_URL" -f ./tests/data_layer_smoke_test.sql
+
+  # ==========================================================================
+  # JOB 3: Build and Test
+  # ==========================================================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: [create-database, migrate-database]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: |
+          npm run lint
+          npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ needs.create-database.outputs.database_url }}
+
+      - name: Run unit tests
+        run: npm test -- --coverage
+        env:
+          DATABASE_URL: ${{ needs.create-database.outputs.database_url }}
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+
+  # ==========================================================================
+  # JOB 4: Deploy to Vercel Preview
+  # ==========================================================================
+  deploy-preview:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: [create-database, migrate-database, build-and-test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        id: vercel-deploy
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--env DATABASE_URL=${{ needs.create-database.outputs.database_url }}'
+
+      - name: Comment PR with preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Preview Environment Ready!**
+
+              - **Preview URL**: ${{ steps.vercel-deploy.outputs.preview-url }}
+              - **Database Branch**: \`${{ needs.create-database.outputs.branch_name }}\`
+              - **Branch ID**: \`${{ needs.create-database.outputs.branch_id }}\`
+
+              The preview environment is connected to an ephemeral Neon database branch.
+              All changes are isolated from production.`
+            })
+
+  # ==========================================================================
+  # JOB 5: API Contract Tests
+  # ==========================================================================
+  api-tests:
+    name: API Contract Tests
+    runs-on: ubuntu-latest
+    needs: [create-database, migrate-database, deploy-preview]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API tests
+        run: npm run test:api
+        env:
+          APP_ORIGIN: ${{ needs.deploy-preview.outputs.preview-url }}
+          DATABASE_URL: ${{ needs.create-database.outputs.database_url }}

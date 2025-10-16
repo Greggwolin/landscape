@@ -59,6 +59,78 @@ export const prototypeRegistry: PrototypeMetadata[] = [
     owners: ['Gregg'],
     tags: ['glide', 'data', 'layout'],
     notes: 'Testing Glide Data Grid from https://github.com/glideapps/glide-data-grid for Planning Overview parcel table. Uses legacy-peer-deps with React 19.'
+  },
+  {
+    id: 'gis-test',
+    name: 'GIS Test Page',
+    description: 'GIS/mapping functionality test page with MapLibre integration',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['gis', 'maps', 'testing'],
+    notes: 'Testing MapLibre GL JS integration and GIS features'
+  },
+  {
+    id: 'gis-simple-test',
+    name: 'GIS Simple Test',
+    description: 'Simplified GIS test page for basic mapping features',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['gis', 'maps', 'testing'],
+    notes: 'Lightweight GIS testing without full feature set'
+  },
+  {
+    id: 'map-debug',
+    name: 'Map Debug Console',
+    description: 'Debug console for map rendering and layer inspection',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['maps', 'debug', 'testing'],
+    notes: 'Debugging tool for MapLibre layers, sources, and events'
+  },
+  {
+    id: 'parcel-test',
+    name: 'Parcel Test Page',
+    description: 'Test page for parcel CRUD operations and data validation',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['parcels', 'testing', 'crud'],
+    notes: 'Testing parcel API endpoints and data transformations'
+  },
+  {
+    id: 'db-schema',
+    name: 'Database Schema Viewer',
+    description: 'Interactive database schema browser and introspection tool',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['database', 'schema', 'admin'],
+    notes: 'View tables, columns, relationships in landscape schema'
+  },
+  {
+    id: 'ai-document-review',
+    name: 'AI Document Review',
+    description: 'AI-powered document analysis and extraction workflow',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['ai', 'documents', 'extraction'],
+    notes: 'Claude AI document review and field extraction interface'
+  },
+  {
+    id: 'budget-grid',
+    name: 'Budget Grid (Original)',
+    description: 'Original budget grid implementation (legacy)',
+    status: 'archived',
+    owners: ['Dev Team'],
+    tags: ['budget', 'grid', 'legacy'],
+    notes: 'Replaced by budget-grid-dark and budget-grid-light in main nav'
+  },
+  {
+    id: 'budget-grid-v2',
+    name: 'Budget Grid v2',
+    description: 'Second iteration of budget grid component',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['budget', 'grid', 'data'],
+    notes: 'Alternative budget grid implementation - compare with main versions'
   }
 ];
 

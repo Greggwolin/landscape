@@ -8,7 +8,7 @@ export async function GET() {
     const result = await sql`
       SELECT COUNT(*) as count
       FROM landscape.core_fin_fact_budget
-      WHERE pe_level = 'project' AND pe_id = '7'
+      WHERE project_id = 7 AND container_id IS NULL
     `;
 
     return NextResponse.json({

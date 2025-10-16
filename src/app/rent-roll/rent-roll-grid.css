@@ -1,0 +1,30 @@
+/* AG-Grid Dark Theme Overrides */
+.ag-theme-alpine-dark {
+  --ag-background-color: rgb(17 24 39);  /* gray-900 */
+  --ag-header-background-color: rgb(31 41 55);  /* gray-800 */
+  --ag-odd-row-background-color: rgb(17 24 39);
+  --ag-row-hover-color: rgb(31 41 55);
+  --ag-border-color: rgb(55 65 81);  /* gray-700 */
+  --ag-header-foreground-color: rgb(209 213 219);  /* gray-300 */
+  --ag-foreground-color: rgb(243 244 246);  /* gray-100 */
+}
+
+.ag-theme-alpine-dark .ag-header-cell-label {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ag-theme-alpine-dark .ag-cell {
+  border-color: rgb(55 65 81) !important;
+}
+
+/* Fix z-index for cell editors to appear above headers */
+.ag-theme-alpine-dark .ag-popup-editor {
+  z-index: 1000 !important;
+}
+
+.ag-theme-alpine-dark .ag-large-text-input {
+  z-index: 1000 !important;
+}

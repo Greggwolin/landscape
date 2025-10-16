@@ -312,8 +312,8 @@ export default function BudgetGrid({ projectId }: BudgetGridProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             budgetId: 4, // Forecast budget
-            peLevel: 'project',
-            peId: String(projectId),
+            projectId,
+            containerId: null,
             categoryId: mergedItem.category_id,
             uomCode: mergedItem.uom_code,
             qty: mergedItem.qty,

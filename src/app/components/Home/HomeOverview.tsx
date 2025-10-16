@@ -5,6 +5,8 @@ import useSWR from 'swr'
 import { useProjectContext } from '@/app/components/ProjectProvider'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { fetchJson } from '@/lib/fetchJson'
+import { flattenContainers, getContainersByLevel, hasContainerData } from '@/lib/containerHelpers'
+import type { ContainerNode } from '@/lib/containerHelpers'
 
 interface ParcelSummary {
   parcel_id: number
@@ -29,10 +31,71 @@ const HomeOverview: React.FC = () => {
   const { labels } = useProjectConfig(projectId ?? undefined)
 
   const fetcher = (url: string) => fetchJson(url)
-  const { data: parcelsData } = useSWR<ParcelSummary[]>(projectId ? `/api/parcels?project_id=${projectId}` : null, fetcher)
-  const { data: phasesData } = useSWR<PhaseSummary[]>(projectId ? `/api/phases?project_id=${projectId}` : null, fetcher)
 
-  const metrics = useMemo(() => {
+  // Fetch container data (new unified system)
+  const {
+    data: containersResponse,
+    isLoading: containersLoading
+  } = useSWR<{ containers: ContainerNode[] }>(
+    projectId ? `/api/projects/${projectId}/containers` : null,
+    fetcher
+  )
+
+  // Determine if we should use containers or fall back to legacy
+  const useContainers = hasContainerData(containersResponse?.containers)
+  const shouldUseLegacy = !containersLoading && !useContainers
+
+  // Fetch legacy data only if containers don't exist
+  const { data: parcelsData } = useSWR<ParcelSummary[]>(
+    projectId && shouldUseLegacy ? `/api/parcels?project_id=${projectId}` : null,
+    fetcher
+  )
+  const { data: phasesData } = useSWR<PhaseSummary[]>(
+    projectId && shouldUseLegacy ? `/api/phases?project_id=${projectId}` : null,
+    fetcher
+  )
+
+  // Transform container data for metrics
+  const { level1Containers, level2Containers, level3Containers } = useMemo(() => {
+    if (!containersResponse?.containers) {
+      return { level1Containers: [], level2Containers: [], level3Containers: [] }
+    }
+    const flat = flattenContainers(containersResponse.containers)
+    return {
+      level1Containers: getContainersByLevel(flat, 1),
+      level2Containers: getContainersByLevel(flat, 2),
+      level3Containers: getContainersByLevel(flat, 3)
+    }
+  }, [containersResponse])
+
+  // Calculate metrics from containers
+  const metricsFromContainers = useMemo(() => {
+    const totalUnits = level3Containers.reduce((sum, c) => {
+      const units = Number(c.attributes?.units_total || c.attributes?.units || 0)
+      return sum + units
+    }, 0)
+
+    const activePhases = level2Containers.filter(c =>
+      (c.attributes?.status || '').toLowerCase() === 'active'
+    ).length
+
+    const plannedAcreage = level2Containers.reduce((sum, c) => {
+      const acres = Number(c.attributes?.acres_gross || c.attributes?.acres || 0)
+      return sum + acres
+    }, 0)
+
+    return {
+      areas: level1Containers.length,
+      phases: level2Containers.length,
+      parcels: level3Containers.length,
+      totalUnits,
+      activePhases,
+      plannedAcreage
+    }
+  }, [level1Containers, level2Containers, level3Containers])
+
+  // Calculate metrics from legacy data
+  const metricsFromLegacy = useMemo(() => {
     if (!Array.isArray(parcelsData) || !Array.isArray(phasesData)) {
       return {
         areas: 0,
@@ -61,7 +124,28 @@ const HomeOverview: React.FC = () => {
     }
   }, [parcelsData, phasesData])
 
-  const familyBreakdown = useMemo(() => {
+  // Use container metrics if available, otherwise legacy
+  const metrics = useContainers ? metricsFromContainers : metricsFromLegacy
+
+  // Family breakdown from containers
+  const familyBreakdownFromContainers = useMemo(() => {
+    if (level3Containers.length === 0) return [] as { family: string; parcels: number; units: number }[]
+    const map = new Map<string, { parcels: number; units: number }>()
+    level3Containers.forEach(container => {
+      const family = container.attributes?.family_name?.trim() || 'Unclassified'
+      const entry = map.get(family) ?? { parcels: 0, units: 0 }
+      entry.parcels += 1
+      entry.units += Number(container.attributes?.units_total || container.attributes?.units || 0)
+      map.set(family, entry)
+    })
+    return Array.from(map.entries())
+      .map(([family, value]) => ({ family, parcels: value.parcels, units: value.units }))
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 5)
+  }, [level3Containers])
+
+  // Family breakdown from legacy data
+  const familyBreakdownFromLegacy = useMemo(() => {
     if (!Array.isArray(parcelsData) || parcelsData.length === 0) return [] as { family: string; parcels: number; units: number }[]
     const map = new Map<string, { parcels: number; units: number }>()
     parcelsData.forEach(parcel => {
@@ -76,6 +160,9 @@ const HomeOverview: React.FC = () => {
       .sort((a, b) => b.units - a.units)
       .slice(0, 5)
   }, [parcelsData])
+
+  // Use container family breakdown if available, otherwise legacy
+  const familyBreakdown = useContainers ? familyBreakdownFromContainers : familyBreakdownFromLegacy
 
   return (
     <div className="space-y-6">
@@ -123,16 +210,16 @@ const HomeOverview: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Phase Snapshot</h2>
+            <h2 className="text-lg font-semibold text-white">{labels.level2Label} Snapshot</h2>
             <span className="text-xs text-gray-400">{metrics.phases} {labels.level2LabelPlural.toLowerCase()}</span>
           </div>
           <div className="grid sm:grid-cols-3 gap-3 text-sm text-gray-300">
-            <SnapshotStat label="Active Phases" value={metrics.activePhases} />
+            <SnapshotStat label={`Active ${labels.level2LabelPlural}`} value={metrics.activePhases} />
             <SnapshotStat label="Gross Acres" value={metrics.plannedAcreage} formatter="acres" />
-            <SnapshotStat label="Avg Units / Phase" value={metrics.phases ? Math.round(metrics.totalUnits / metrics.phases) : 0} />
+            <SnapshotStat label={`Avg Units / ${labels.level2Label}`} value={metrics.phases ? Math.round(metrics.totalUnits / metrics.phases) : 0} />
           </div>
           <div className="mt-6 bg-gray-900/60 rounded-md border border-gray-700/60 p-4 text-xs text-gray-400">
-            Each phase auto-syncs with the inline planner. Use the Planning Overview to drill into {labels.level3LabelPlural.toLowerCase()} detail and update parcels in place.
+            Each {labels.level2Label.toLowerCase()} auto-syncs with the inline planner. Use the Planning Overview to drill into {labels.level3LabelPlural.toLowerCase()} detail and update them in place.
           </div>
         </div>
 
@@ -140,12 +227,12 @@ const HomeOverview: React.FC = () => {
           <h2 className="text-lg font-semibold text-white mb-4">Top Use Families</h2>
           <div className="space-y-3">
             {familyBreakdown.length === 0 ? (
-              <div className="text-sm text-gray-400">Assign land use families to parcels to populate this chart.</div>
+              <div className="text-sm text-gray-400">Assign land use families to {labels.level3LabelPlural.toLowerCase()} to populate this chart.</div>
             ) : (
               familyBreakdown.map(entry => (
                 <div key={entry.family} className="flex items-center justify-between text-sm text-gray-200">
                   <span className="truncate pr-4">{entry.family}</span>
-                  <span className="text-gray-400">{entry.parcels} parcels • {entry.units.toLocaleString()} units</span>
+                  <span className="text-gray-400">{entry.parcels} {labels.level3LabelPlural.toLowerCase()} • {entry.units.toLocaleString()} units</span>
                 </div>
               ))
             )}

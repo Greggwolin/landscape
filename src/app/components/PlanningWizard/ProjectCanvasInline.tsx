@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import DropZone from './DropZone'
 import type { Project, Area, Phase, Parcel } from './PlanningWizard'
+import { useProjectConfig } from '@/hooks/useProjectConfig'
 
 interface ProjectCanvasInlineProps {
   project: Project
@@ -73,6 +74,18 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
   onUpdateArea,
   onUpdatePhase,
 }) => {
+  // Extract project ID from composite ID
+  const projectIdFromId = (id: string): number | null => {
+    const parts = id.split('-')
+    const last = parts[parts.length - 1]
+    const parsed = Number(last)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  // Get dynamic labels for this project
+  const projectId = projectIdFromId(project.id)
+  const { labels } = useProjectConfig(projectId ?? undefined)
+
   const [editingArea, setEditingArea] = useState<string | null>(null)
   const [areaValues, setAreaValues] = useState<Record<string, { name: string; description: string }>>({})
   const [editingPhase, setEditingPhase] = useState<string | null>(null)
@@ -156,7 +169,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
         </div>
       ))}
       {phase.parcels.length === 0 && (
-        <div className="text-xs text-gray-200 col-span-2 text-center italic">No parcels</div>
+        <div className="text-xs text-gray-200 col-span-2 text-center italic">No {labels.level3LabelPlural.toLowerCase()}</div>
       )}
     </div>
   )
@@ -169,7 +182,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
           onClick={onAddArea}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
         >
-          Add Area
+          Add {labels.level1Label}
         </button>
       </div>
 
@@ -220,7 +233,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
                     ) : (
                       <>
                         <button onClick={() => beginEditArea(area)} className="px-2 py-1 bg-gray-700 text-white rounded">Edit</button>
-                        <button onClick={() => onAddPhase(area.id)} className="px-2 py-1 bg-blue-600 text-white rounded">Add Phase</button>
+                        <button onClick={() => onAddPhase(area.id)} className="px-2 py-1 bg-blue-600 text-white rounded">Add {labels.level2Label}</button>
                       </>
                     )}
                   </div>
@@ -282,7 +295,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
                   })}
 
                   {area.phases.length === 0 && (
-                    <div className="text-xs text-gray-300 italic">No phases yet. Add one to get started.</div>
+                    <div className="text-xs text-gray-300 italic">No {labels.level2LabelPlural.toLowerCase()} yet. Add one to get started.</div>
                   )}
                 </div>
               </div>
