@@ -31,7 +31,8 @@ export default function Header({
             alt="Landscape Logo"
             width={120}
             height={40}
-            className="h-10 w-auto object-contain"
+            className="h-10 object-contain"
+            style={{ width: 'auto' }}
             priority
           />
         </div>

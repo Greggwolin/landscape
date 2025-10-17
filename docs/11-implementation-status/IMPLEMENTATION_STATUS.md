@@ -1,7 +1,7 @@
 # Landscape Implementation Status
 
-**Version:** 4.0
-**Last Updated:** 2025-10-15
+**Version:** 4.1
+**Last Updated:** 2025-10-17
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
@@ -12,12 +12,13 @@
 2. [pe_level Deprecation Status](#pe_level-deprecation-status)
 3. [Financial Engine](#financial-engine)
 4. [Multifamily Features](#multifamily-features)
-5. [GIS & Mapping](#gis--mapping)
-6. [Document Management System](#document-management-system)
-7. [Market Intelligence](#market-intelligence)
-8. [Database Schema](#database-schema)
-9. [API Status](#api-status)
-10. [UI Components](#ui-components)
+5. [Commercial Real Estate (CRE) Features](#commercial-real-estate-cre-features)
+6. [GIS & Mapping](#gis--mapping)
+7. [Document Management System](#document-management-system)
+8. [Market Intelligence](#market-intelligence)
+9. [Database Schema](#database-schema)
+10. [API Status](#api-status)
+11. [UI Components](#ui-components)
 
 ---
 
@@ -420,6 +421,95 @@ core_fin_container_applicability:
 
 ---
 
+## Commercial Real Estate (CRE) Features
+
+### Status: Phase 1 Complete (Property Analysis UI)
+
+**Added:** October 17, 2025
+
+### Database Tables
+
+✅ **Property Management**
+- `tbl_cre_property` - Property master (3 properties loaded)
+- Sample: Scottsdale Promenade (property_id=3, 41 spaces)
+
+✅ **Space & Tenant Tracking**
+- `tbl_cre_space` - Rentable space inventory (41 spaces loaded)
+- `tbl_cre_tenant` - Tenant master (39 tenants loaded)
+- `tbl_cre_lease` - Lease agreements (6 sample leases)
+- `tbl_cre_base_rent` - Annual base rent by lease
+
+✅ **Financial Configuration**
+- `core_fin_confidence_policy` - Confidence levels with default contingencies
+- `core_fin_uom` - Units of measure (added "LS" for Lump Sum)
+
+### API Endpoints
+
+**Property Analysis:**
+- `GET /api/cre/properties/:property_id/rent-roll` - Comprehensive rent roll with tenant details
+  - Returns all spaces with lease status, tenant info, rent PSF, and financial summary
+  - Aggregates total rentable SF, occupied SF, and vacancy rates
+
+**Project Metrics:**
+- `GET /api/projects/:projectId/metrics` - Project-level metrics dashboard
+  - Includes parcel counts, acreage, budget summaries, container hierarchy
+
+**Financial:**
+- `GET /api/fin/confidence` - Confidence policy choices (HIGH, MEDIUM, LOW, CONCEPTUAL)
+
+### UI Components
+
+✅ **Property Analysis Interface** - 7-tab analysis page at `/properties/:id/analysis`
+
+**Input Tabs:**
+1. **Rent Roll** - 41-space rent roll grid with:
+   - Suite number, tenant name, square footage
+   - Lease status (Active/Vacant), lease dates
+   - Monthly base rent and annual rent PSF
+   - Financial summary with occupancy metrics
+
+2. **Market Assumptions** - Market rent and cap rate inputs (UI complete, mock data)
+3. **Operating Assumptions** - OpEx and management inputs (UI complete, mock data)
+4. **Financing Assumptions** - Debt structure inputs (UI complete, mock data)
+
+**Computed Tabs** (locked until inputs complete):
+5. **Cash Flow** - Period-by-period cash flow projection
+6. **Investment Returns** - IRR, equity multiple, yield metrics
+7. **Sensitivity** - Scenario analysis grid
+
+**Features:**
+- Tab locking/unlocking based on input completion
+- Progress indicators for input vs computed tabs
+- Calculation status display with timestamps
+- Real-time data fetching from rent roll API
+- Dark theme consistent with app-wide styling
+
+### Test Data
+
+**Scottsdale Promenade** (property_id=3)
+- 41 rentable spaces (total: 430,400 SF)
+- 39 unique tenants
+- 6 active leases with base rent schedules
+- Mix of retail and commercial tenants
+- Demonstrates full rent roll functionality
+
+### Console Warning Fixes
+
+✅ **Logo Aspect Ratio** - Fixed Image component warnings in Header.tsx
+✅ **Missing Units** - Added "LS" (Lump Sum) to core_fin_uom table (eliminated 14+ warnings)
+✅ **API Errors** - Fixed 500 errors for `/api/fin/confidence` and `/api/fin/lines`
+✅ **Missing Endpoints** - Created `/api/projects/:id/metrics` endpoint
+
+### Next Steps
+
+🚧 **Wire Remaining Tabs** - Connect Market, Operating, Financing tabs to real data
+🚧 **Calculation Engine** - Implement cash flow and returns calculations
+🚧 **Load Remaining Leases** - Add remaining 32 leases (currently 6 of 38 loaded)
+🚧 **Sensitivity Analysis** - Build scenario modeling engine
+🚧 **Export Functionality** - PDF reports and Excel exports
+
+---
+
 ## GIS & Mapping
 
 ### Status: Phase 1 Complete
@@ -457,9 +547,10 @@ core_fin_container_applicability:
 
 ## Document Management System
 
-### Status: Step 7 Complete
+### Status: Step 7 Complete + AI Ingestion Planned
 
 **Implementation Document:** [docs/02-features/dms/DMS-Implementation-Status.md](docs/02-features/dms/DMS-Implementation-Status.md)
+**AI Specification:** [docs/14-specifications/LANDSCAPE_AI_INGESTION_BRIEF.md](docs/14-specifications/LANDSCAPE_AI_INGESTION_BRIEF.md)
 
 ### Features Implemented
 
@@ -476,11 +567,38 @@ core_fin_container_applicability:
 - `tbl_document_template_attribute`
 - `tbl_document_version`
 
+### AI-Powered Document Ingestion (Planned)
+
+**Objective:** Domain-specific document understanding model for extracting structured data from real estate offering memoranda (OMs), rent rolls, appraisals, and market reports.
+
+**Key Features:**
+- 🤖 **Layout-Aware Extraction** - Multimodal transformer (LayoutLMv3/Donut) handles tables, prose, and graphics
+- 📊 **Multi-Stage Pipeline** - Document classification → Section detection → Field extraction → Inference → Validation
+- 🎯 **Confidence Scoring** - Every extracted field tagged with confidence (0.0-1.0) and source method
+- 🔄 **Active Learning** - User corrections feed back into model fine-tuning
+- ✅ **Domain Knowledge Layer** - Enforces real estate logic (cap rate formulas, NOI validation)
+
+**Target Metrics:**
+- Extraction accuracy >85% across test corpus
+- False-positive rate <5%
+- Successful ingestion of 95% of valid fields from 80% of OMs
+- 50% reduction in user correction rate within 6 months
+
+**Architecture:**
+1. Document Classification (confidence threshold 0.85)
+2. Section Detection (Executive Summary, Financials, Rent Roll, Market Analysis)
+3. Field Extraction (pricing, unit mix, financials, comps, parcel data)
+4. Inference & Gap Filling (flag inferred data with confidence <0.7)
+5. Validation & Cross-Checking (internal logic validation)
+
 ### Next Steps
 
 🚧 **Step 8** - File upload and storage integration
 🚧 **Step 9** - Document search and filtering
 🚧 **Step 10** - Permissions and access control
+🤖 **AI Phase 1** - Annotate 50-100 OMs per property type for model training
+🤖 **AI Phase 2** - Deploy layout-aware extraction pipeline
+🤖 **AI Phase 3** - Implement active learning feedback loop
 
 ---
 
@@ -606,6 +724,11 @@ core_fin_container_applicability:
 - Complete CRUD for units, leases, turns
 - Occupancy and expiration reports
 
+**Commercial Real Estate (CRE):**
+- `GET /api/cre/properties/:property_id/rent-roll` - Rent roll with tenant details
+- `GET /api/projects/:projectId/metrics` - Project metrics dashboard
+- `GET /api/fin/confidence` - Confidence policy choices
+
 **Market Intelligence:**
 - `GET /api/market/city/:place_id` - City demographics
 - `GET /api/market/county/:county_id` - County data
@@ -629,6 +752,7 @@ core_fin_container_applicability:
 ✅ **Lease Detail** - Lease analysis with escalations
 ✅ **Project Canvas** - Visual parcel tiles with dynamic labels
 ✅ **Budget Container View** - Container-based budget display
+✅ **Property Analysis** - 7-tab CRE analysis interface with rent roll, assumptions, and projections
 
 ### Component Patterns
 

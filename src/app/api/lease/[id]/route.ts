@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 
 import { getFullLeaseData, updateLease, deleteLease } from '@/lib/financial-engine/db';
 import type { LeaseUpdate } from '@/types/financial-engine';
+import { getLeaseData } from '../mock-data';
 
 /**
  * GET /api/lease/[id]
  * Retrieve full lease data including all related tables
+ * Falls back to mock data if lease not found in database
  */
 export const GET = async (_request: Request, { params }: { params: { id: string } }) => {
   try {
@@ -18,7 +20,13 @@ export const GET = async (_request: Request, { params }: { params: { id: string 
       );
     }
 
-    const data = await getFullLeaseData(leaseId);
+    // Try to get from database first
+    let data = await getFullLeaseData(leaseId);
+
+    // If not found in database, use mock data (for prototype)
+    if (!data) {
+      data = getLeaseData(params.id);
+    }
 
     if (!data) {
       return NextResponse.json(

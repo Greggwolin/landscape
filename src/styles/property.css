@@ -1,0 +1,550 @@
+/* Property App Container */
+.property-app {
+  background-color: #0d0d0d;
+  color: #e0e0e0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.property-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Property Header */
+.property-header {
+  background-color: #1e1e1e;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.property-title h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0 0 8px 0;
+}
+
+.property-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #a0a0a0;
+}
+
+.property-type {
+  padding: 4px 12px;
+  background-color: #0078d4;
+  color: #ffffff;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.save-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0a0a0;
+  font-size: 14px;
+}
+
+.save-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #404040;
+  border-top-color: #0078d4;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Property Layout */
+.property-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Property Card - Main Content Area */
+.property-card {
+  flex: 1;
+  background-color: #1e1e1e;
+  border: 1px solid #404040;
+  border-radius: 0 0 8px 8px;
+  border-top: none;
+  padding: 24px;
+}
+
+.tab-panel {
+  min-height: 500px;
+}
+
+/* Metrics Row */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.metric-card {
+  background-color: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #a0a0a0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Split Metric Card */
+.metric-card-split {
+  padding: 12px;
+}
+
+.metric-split-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.metric-split-item {
+  flex: 1;
+  text-align: center;
+}
+
+.metric-split-divider {
+  width: 1px;
+  height: 40px;
+  background-color: #404040;
+}
+
+.metric-split-item .metric-value {
+  font-size: 20px;
+}
+
+.metric-split-item .metric-label {
+  font-size: 11px;
+}
+
+/* Data Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.data-table thead {
+  background-color: #2a2a2a;
+  border-bottom: 2px solid #404040;
+}
+
+.data-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a0a0a0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 8px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.data-table tbody tr:hover {
+  background-color: #2d2d2d;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+/* Input Fields */
+input[type="number"],
+input[type="text"],
+input[type="date"],
+select {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+}
+
+input[type="number"],
+input.currency,
+input.percentage,
+input.integer {
+  text-align: right;
+}
+
+/* Override for property spec inputs - they should be centered */
+input.property-spec-input {
+  text-align: center !important;
+}
+
+/* Remove spinners from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input:focus,
+select:focus {
+  border-color: #0078d4;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+input:disabled,
+select:disabled {
+  background-color: #2a2a2a;
+  color: #606060;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input::placeholder {
+  color: #606060;
+}
+
+/* Validation States */
+input.valid {
+  border-color: #107c10;
+}
+
+input.invalid {
+  border-color: #d13438;
+}
+
+/* Required Field Indicator */
+label.required::after {
+  content: " *";
+  color: #d13438;
+  margin-left: 2px;
+}
+
+/* Buttons */
+.btn-add,
+.btn-edit,
+.btn-save {
+  background-color: #0078d4;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-weight: 500;
+}
+
+.btn-add:hover,
+.btn-edit:hover,
+.btn-save:hover {
+  background-color: #106ebe;
+}
+
+.btn-add:active,
+.btn-edit:active,
+.btn-save:active {
+  background-color: #005a9e;
+}
+
+.btn-remove {
+  background-color: transparent;
+  color: #d13438;
+  border: 1px solid #d13438;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.btn-remove:hover {
+  background-color: #d13438;
+  color: #ffffff;
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #404040;
+  min-height: 44px;
+}
+
+.section-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+/* Two Column Layout */
+.two-column-layout {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+/* Unit Mix Section */
+.unit-mix-section {
+  flex: 1;
+}
+
+/* Property Sections */
+.property-sections {
+  flex: 1;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: #a0a0a0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Contacts Section */
+.contacts-section {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #2a2a2a;
+  border-radius: 6px;
+  border: 1px solid #404040;
+}
+
+.contacts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.contact-item {
+  padding: 12px;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  border: 1px solid #404040;
+}
+
+.contact-role {
+  font-size: 11px;
+  color: #a0a0a0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.contact-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 8px;
+}
+
+.contact-details {
+  font-size: 12px;
+  color: #a0a0a0;
+}
+
+.contact-details a {
+  color: #0078d4;
+  text-decoration: none;
+}
+
+.contact-details a:hover {
+  text-decoration: underline;
+}
+
+.contact-details span {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid #404040;
+}
+
+/* Tab Sidebar - Horizontal Tabs */
+.property-sidebar {
+  display: flex;
+  background-color: #1e1e1e;
+  border: 1px solid #404040;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  cursor: pointer;
+  color: #a0a0a0;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  position: relative;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tab-item:hover:not(.disabled) {
+  background-color: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.tab-item.active {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border-bottom-color: #0078d4;
+}
+
+.tab-item.disabled {
+  color: #606060;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+.tab-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Tooltip for disabled tabs - using title attribute instead of ::after */
+.tab-item.disabled:hover {
+  opacity: 0.7;
+}
+
+/* Helper Text */
+.helper-text {
+  color: #a0a0a0;
+  font-size: 13px;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* Loading State */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  color: #a0a0a0;
+  font-size: 16px;
+}
+
+/* Tab Content */
+.tab-content {
+  padding: 8px 0;
+}
+
+/* Property Details Content */
+.property-details-content {
+  padding: 8px 0;
+}
+
+/* Text Alignment Utility Classes */
+.text-center {
+  text-align: center !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+/* Multiline Header Styling */
+.multiline-header {
+  line-height: 1.2;
+  padding: 8px 4px;
+}
+
+/* Calculated Value Styling (Read-only display) */
+.calculated-value {
+  display: inline-block;
+  padding: 6px 8px;
+  color: #a0a0a0;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Unit Mix Table Specific Alignment */
+.unit-mix-table th.text-center,
+.unit-mix-table td.text-center {
+  text-align: center;
+}
+
+.unit-mix-table th.text-right,
+.unit-mix-table td.text-right {
+  text-align: right;
+  padding-right: 12px;
+}
+
+/* Property Specification Inputs - uniform sizing */
+.property-spec-input {
+  width: 85px;
+}

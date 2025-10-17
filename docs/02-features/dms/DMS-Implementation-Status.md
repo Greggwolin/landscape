@@ -20,6 +20,8 @@ The Landscape Document Management System (DMS) has completed **Steps 1-7**, deli
 
 **Next Phase:** Step 8 - Folder Security & Setup Page (planning complete, ready for implementation)
 
+**Future Enhancement:** Advanced AI-powered document ingestion model for structured data extraction from real estate offering memoranda. See [AI Ingestion Brief](../../14-specifications/LANDSCAPE_AI_INGESTION_BRIEF.md) for detailed specifications.
+
 ---
 
 ## Completed Steps

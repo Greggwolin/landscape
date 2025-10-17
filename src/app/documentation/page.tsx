@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { FileText, Book, Code, Database, Map, DollarSign, Folder, ExternalLink, Search } from 'lucide-react';
 import MarkdownViewer from '../components/Documentation/MarkdownViewer';
+import Header from '../components/Header';
+import { ProjectProvider } from '../components/ProjectProvider';
 
 interface DocItem {
   title: string;
@@ -21,84 +23,84 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
-      title: 'App Development Status',
-      path: '/Documentation/App-Development-Status.md',
+      title: 'Implementation Status',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete reference document with all 74 database tables, 80+ API routes, architecture, and current development status',
+      description: 'Current implementation status and progress tracking',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-03'
+      lastModified: '2025-10-17'
     },
     {
-      title: 'Main Status Report',
-      path: '/app-development-status.md',
+      title: 'CRE Implementation Summary',
+      path: '/docs/CRE_IMPLEMENTATION_SUMMARY.md',
       category: 'Status',
-      description: 'Root-level status tracking document',
+      description: 'Commercial real estate calculation engine implementation summary',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-09-23'
+      lastModified: '2025-10-17'
+    },
+    {
+      title: 'Assumptions UI Final Status',
+      path: '/docs/ASSUMPTIONS_UI_FINAL_STATUS.md',
+      category: 'Status',
+      description: 'Final status of assumptions UI implementation',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-10-17'
+    },
+    {
+      title: 'Scottsdale Promenade Data Summary',
+      path: '/docs/SCOTTSDALE_DATA_SUMMARY.md',
+      category: 'Status',
+      description: 'Commercial property data loaded with rent roll, lease structures, and CRE calculation testing',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-17'
+    },
+    {
+      title: 'App Development Status (Archive)',
+      path: '/docs/archive/App-Development-Status.md',
+      category: 'Status',
+      description: 'Complete reference document with database tables, API routes, and architecture (archived)',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-10-03'
     },
 
     // Architecture & System Design
     {
-      title: 'Land Use Management System',
-      path: '/Documentation/Land-Use-Management-System.md',
+      title: 'System Architecture',
+      path: '/docs/09-technical-dd/02-architecture/system-architecture.md',
       category: 'Architecture',
-      description: 'Complete 4-level taxonomy system (Family → Density → Type → Product)',
+      description: 'Complete system architecture documentation',
       icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-09-18'
+      lastModified: '2025-10-16'
     },
     {
-      title: 'Unified Land Use System',
-      path: '/docs/unified-landuse-system.md',
+      title: 'Land Use System',
+      path: '/docs/02-features/land-use/land-use-system.md',
       category: 'Architecture',
-      description: 'Unified approach to land use taxonomy and product management',
+      description: 'Complete land use taxonomy system (Family → Density → Type → Product)',
       icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-09-18'
-    },
-    {
-      title: 'Land Use Taxonomy Implementation',
-      path: '/docs/land-use-taxonomy-implementation.md',
-      category: 'Architecture',
-      description: 'Implementation details for cascading land use dropdowns',
-      icon: <Code className="w-5 h-5" />,
-      lastModified: '2025-09-22'
-    },
-    {
-      title: 'Universal Container System',
-      path: '/docs/universal-container-system.md',
-      category: 'Architecture',
-      description: 'Flexible container system for data organization',
-      icon: <Folder className="w-5 h-5" />,
-      lastModified: '2025-09-17'
+      lastModified: '2025-10-16'
     },
     {
       title: 'Database Schema',
-      path: '/docs/db-schema.md',
+      path: '/docs/05-database/schema-overview.md',
       category: 'Architecture',
       description: 'Complete database schema documentation',
       icon: <Database className="w-5 h-5" />,
-      lastModified: '2025-09-18'
+      lastModified: '2025-10-16'
     },
 
     // Migration & Consolidation
     {
       title: 'Budget Consolidation Migration',
-      path: '/project-docs/Budget-Consolidation-Migration-Complete.md',
+      path: '/docs/08-migration-history/Budget-Consolidation-Migration-Complete.md',
       category: 'Migration',
       description: 'Complete migration of budget system consolidation',
       icon: <DollarSign className="w-5 h-5" />,
       lastModified: '2025-10-02'
     },
     {
-      title: 'Migration Summary',
-      path: '/project-docs/MIGRATION-SUMMARY.md',
-      category: 'Migration',
-      description: 'Overview of all system migrations',
-      icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-02'
-    },
-    {
       title: 'Schema Naming Convention Analysis',
-      path: '/project-docs/Schema-Naming-Convention-Analysis.md',
+      path: '/docs/08-migration-history/Schema-Naming-Convention-Analysis.md',
       category: 'Migration',
       description: 'Analysis of database naming conventions',
       icon: <Database className="w-5 h-5" />,
@@ -106,7 +108,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Schema Coverage Analysis',
-      path: '/project-docs/Schema-Coverage-Analysis.md',
+      path: '/docs/08-migration-history/Schema-Coverage-Analysis.md',
       category: 'Migration',
       description: 'Complete schema coverage and gap analysis',
       icon: <Database className="w-5 h-5" />,
@@ -114,7 +116,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Budget-Finance Schema Overlap',
-      path: '/project-docs/Budget-Finance-Schema-Overlap-Analysis.md',
+      path: '/docs/08-migration-history/Budget-Finance-Schema-Overlap-Analysis.md',
       category: 'Migration',
       description: 'Analysis of budget and finance schema overlaps',
       icon: <DollarSign className="w-5 h-5" />,
@@ -122,6 +124,22 @@ const DocumentationIndex: React.FC = () => {
     },
 
     // Component Documentation
+    {
+      title: 'Property Analysis UI Implementation',
+      path: '/docs/PROPERTY_ANALYSIS_UI_IMPLEMENTATION.md',
+      category: 'Component',
+      description: 'Property analysis and CRE calculation UI implementation',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-16'
+    },
+    {
+      title: 'Assumptions UI Implementation',
+      path: '/docs/ASSUMPTIONS_UI_IMPLEMENTATION_SUMMARY.md',
+      category: 'Component',
+      description: 'Progressive disclosure assumptions UI implementation summary',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-17'
+    },
     {
       title: 'Planning Wizard',
       path: '/src/app/components/PlanningWizard/README.md',
@@ -132,7 +150,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Parcel Cleanup Documentation',
-      path: '/Documentation/parcel-cleanup-documentation.md',
+      path: '/docs/archive/parcel-cleanup-documentation.md',
       category: 'Component',
       description: 'Parcel data cleanup and migration procedures',
       icon: <Code className="w-5 h-5" />,
@@ -140,7 +158,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Component Migration Plan',
-      path: '/COMPONENT_MIGRATION_PLAN.md',
+      path: '/docs/archive/COMPONENT_MIGRATION_PLAN.md',
       category: 'Component',
       description: 'Strategy for component architecture migration',
       icon: <Code className="w-5 h-5" />,
@@ -148,7 +166,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Cleanup Completed',
-      path: '/CLEANUP_COMPLETED.md',
+      path: '/docs/archive/CLEANUP_COMPLETED.md',
       category: 'Component',
       description: 'Record of completed cleanup tasks',
       icon: <FileText className="w-5 h-5" />,
@@ -157,62 +175,54 @@ const DocumentationIndex: React.FC = () => {
 
     // Technical Implementation
     {
-      title: 'Budget Grid API Spec',
-      path: '/docs/budget_grid_api_spec.md',
+      title: 'CRE Calculation Engine',
+      path: '/docs/CRE_CALCULATION_ENGINE_DOCUMENTATION.md',
       category: 'Technical',
-      description: 'API specification for budget grid functionality',
+      description: 'Commercial real estate calculation engine technical documentation',
       icon: <Code className="w-5 h-5" />,
-      lastModified: '2025-10-02'
+      lastModified: '2025-10-16'
     },
     {
-      title: 'GIS Implementation (AI-First)',
-      path: '/Documentation/gis_implementation_ai_first.md',
+      title: 'Developer Guide',
+      path: '/docs/00-getting-started/DEVELOPER_GUIDE.md',
       category: 'Technical',
-      description: 'AI-first approach to GIS implementation',
-      icon: <Map className="w-5 h-5" />,
-      lastModified: '2025-09-24'
+      description: 'Complete developer onboarding and setup guide',
+      icon: <Book className="w-5 h-5" />,
+      lastModified: '2025-10-16'
     },
     {
-      title: 'MapLibre Integration (AI-First)',
-      path: '/Documentation/maplibre_integration_ai_first.md',
+      title: 'Financial Engine Quick Start',
+      path: '/docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md',
       category: 'Technical',
-      description: 'MapLibre integration with AI-driven workflows',
-      icon: <Map className="w-5 h-5" />,
-      lastModified: '2025-09-24'
+      description: 'Quick start guide for the financial calculation engine',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-16'
     },
 
-    // AI & Document Processing
+    // AI & Machine Learning
     {
-      title: 'Unified Extractor Integration',
-      path: '/project-docs/Unified-Extractor-Integration-Complete.md',
+      title: 'Landscape AI Ingestion Brief',
+      path: '/docs/14-specifications/LANDSCAPE_AI_INGESTION_BRIEF.md',
       category: 'AI',
-      description: 'Complete AI document extraction system integration',
+      description: 'AI-powered document understanding model for extracting structured data from real estate offering memoranda, rent rolls, and appraisals',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-01'
+      lastModified: '2025-10-17'
     },
     {
-      title: 'GIS Document Analysis OCR',
-      path: '/project-docs/GIS-Document-Analysis-OCR-Issues.md',
+      title: 'Assumptions UI Test Checklist',
+      path: '/docs/ASSUMPTIONS_UI_TEST_CHECKLIST.md',
       category: 'AI',
-      description: 'OCR and document analysis issues and solutions',
+      description: 'Comprehensive testing checklist for assumptions UI',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-01'
+      lastModified: '2025-10-17'
     },
     {
-      title: 'AI Chat Log (2025-09-17)',
-      path: '/docs/ai-chats/2025-09-17-ai-chat.md',
+      title: 'Validation Summary',
+      path: '/docs/07-testing/VALIDATION_SUMMARY.md',
       category: 'AI',
-      description: 'AI-assisted development chat logs',
+      description: 'Testing and validation summary',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-09-18'
-    },
-    {
-      title: 'AI Chat Logs (2025-09-17)',
-      path: '/docs/ai-chats/2025-09-17-ai-chat-logs.md',
-      category: 'AI',
-      description: 'Extended AI development conversation logs',
-      icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-09-17'
+      lastModified: '2025-10-16'
     }
   ];
 
@@ -256,8 +266,10 @@ const DocumentationIndex: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 p-6">
-      <div className="max-w-7xl mx-auto">
+    <ProjectProvider>
+      <Header />
+      <div className="min-h-screen bg-gray-950 p-6">
+        <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
@@ -369,8 +381,9 @@ const DocumentationIndex: React.FC = () => {
             onClose={() => setSelectedDoc(null)}
           />
         )}
+        </div>
       </div>
-    </div>
+    </ProjectProvider>
   );
 };
 

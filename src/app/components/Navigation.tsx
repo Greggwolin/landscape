@@ -55,6 +55,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Assumptions',
       items: [
+        { id: 'assumptions', label: 'Deal Assumptions', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/11/assumptions' },
         { id: 'market', label: 'Global' },
         { id: 'market-page', label: 'Market', href: '/market' },
         { id: 'growth-rates', label: 'Market Rates & Prices' },
@@ -103,7 +104,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       ],
       isCollapsible: true
     }
-  ], [level2Label])
+  ], [level2Label, projectId])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({

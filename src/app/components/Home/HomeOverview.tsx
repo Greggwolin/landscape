@@ -170,24 +170,55 @@ export default function HomeOverview() {
             <div className="flex items-center gap-4 mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400">Type:</span>
-                <span className="px-3 py-1 bg-blue-900/30 border border-blue-700 rounded text-blue-300 text-sm font-medium">
-                  {propertyTypeLabel}
-                </span>
+                {isEditing ? (
+                  <select
+                    value={currentProject.property_type_code || ''}
+                    onChange={(e) => handleFieldChange('property_type_code', e.target.value)}
+                    className="px-3 py-1 bg-gray-900 border border-gray-600 rounded text-white text-sm font-medium focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select Type</option>
+                    <option value="MPC">Master Planned Community</option>
+                    <option value="MULTIFAMILY">Multifamily</option>
+                    <option value="COMMERCIAL">Commercial</option>
+                    <option value="OFFICE">Office</option>
+                    <option value="RETAIL">Retail</option>
+                    <option value="INDUSTRIAL">Industrial</option>
+                    <option value="HOTEL">Hotel</option>
+                    <option value="MIXED_USE">Mixed Use</option>
+                  </select>
+                ) : (
+                  <span className="px-3 py-1 bg-blue-900/30 border border-blue-700 rounded text-blue-300 text-sm font-medium">
+                    {propertyTypeLabel}
+                  </span>
+                )}
               </div>
 
               {/* Template badge - clickable to open wizard */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400">Complexity:</span>
-                <button
-                  onClick={() => {
-                    // Navigate to planning wizard
-                    window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view: 'planning' } }));
-                  }}
-                  className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-gray-300 text-sm hover:bg-gray-600 hover:border-gray-500 transition-colors cursor-pointer"
-                  title="Click to change complexity level"
-                >
-                  Standard
-                </button>
+                {isEditing ? (
+                  <select
+                    value={currentProject.complexity_level || 'STANDARD'}
+                    onChange={(e) => handleFieldChange('complexity_level', e.target.value)}
+                    className="px-3 py-1 bg-gray-900 border border-gray-600 rounded text-white text-sm font-medium focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="BASIC">Basic</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="ADVANCED">Advanced</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                  </select>
+                ) : (
+                  <button
+                    onClick={() => {
+                      // Navigate to planning wizard
+                      window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view: 'planning' } }));
+                    }}
+                    className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-gray-300 text-sm hover:bg-gray-600 hover:border-gray-500 transition-colors cursor-pointer"
+                    title="Click to change complexity level"
+                  >
+                    {currentProject.complexity_level || 'Standard'}
+                  </button>
+                )}
               </div>
             </div>
 

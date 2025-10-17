@@ -36,9 +36,12 @@ const LeasePage = () => {
       if (!response.ok) {
         throw new Error('Failed to load lease');
       }
-      const data = (await response.json()) as LeaseData;
-      setLeaseData(data);
-      setErrors(validateLease(data.lease));
+      const result = await response.json() as { ok: boolean; data: LeaseData };
+      if (!result.ok || !result.data) {
+        throw new Error('Invalid API response');
+      }
+      setLeaseData(result.data);
+      setErrors(validateLease(result.data.lease));
     } catch (error) {
       console.error(error);
     } finally {

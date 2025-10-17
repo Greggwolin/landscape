@@ -96,6 +96,13 @@ const DevStatus: React.FC = () => {
             functionality: 'not-started',
             priority: 'low',
             completion: 0
+          },
+          {
+            name: 'Property Analysis (CRE)',
+            design: 'complete',
+            functionality: 'in-progress',
+            priority: 'high',
+            completion: 75
           }
         ],
         issues: {
@@ -218,6 +225,20 @@ const DevStatus: React.FC = () => {
           'Financial calculation engine',
           'Reporting and analytics features',
           'Multi-scenario modeling capabilities'
+        ]
+      },
+      'Property Analysis (CRE)': {
+        context: '7-tab ARGUS-level property analysis interface. Rent Roll tab complete with real data (41 spaces, 39 tenants, 6 leases). Market, Operating, and Financing assumption tabs have UI complete but use mock data. Computed tabs (Cash Flow, Investment Returns, Sensitivity) are locked until input tabs complete.',
+        outstanding: [
+          'Wire Market Assumptions tab to real API data',
+          'Wire Operating Assumptions tab to real API data',
+          'Wire Financing Assumptions tab to real API data',
+          'Build cash flow calculation engine API',
+          'Build investment returns calculation API',
+          'Build sensitivity analysis engine',
+          'Load remaining 32 leases (currently 6 of 38)',
+          'Add PDF export functionality',
+          'Add Excel export functionality'
         ]
       }
     };

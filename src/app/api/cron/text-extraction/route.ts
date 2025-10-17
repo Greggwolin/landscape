@@ -9,7 +9,7 @@ import { processTextExtractionQueue } from '@/lib/dms/text-extractor';
  * {
  *   "crons": [{
  *     "path": "/api/cron/text-extraction",
- *     "schedule": "*/15 * * * *"
+ *     "schedule": "0,15,30,45 * * * *"
  *   }]
  * }
  */
