@@ -1,8 +1,12 @@
 # GitHub Actions: Weekly Disaster Recovery Drill
-# Version: v1.0 (2025-10-13)
+# Version: v1.1 (2025-10-18)
 #
 # Runs every Sunday at 2:00 AM UTC
 # Tests backup and restore procedures
+#
+# Note: Push trigger with paths-ignore prevents GitHub from sending
+# "No jobs were run" notifications on every commit while still allowing
+# scheduled and manual execution.
 
 name: Disaster Recovery Drill
 
@@ -10,6 +14,9 @@ on:
   schedule:
     - cron: '0 2 * * 0'  # Sunday 2:00 AM UTC
   workflow_dispatch:  # Allow manual trigger
+  push:
+    paths-ignore:
+      - '**'  # Don't run on any file changes (schedule/manual only)
 
 env:
   NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
