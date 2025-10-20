@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, Book, Code, Database, Map, DollarSign, Folder, ExternalLink, Search } from 'lucide-react';
+import { FileText, Book, Code, Database, Map, DollarSign, ExternalLink, Search } from 'lucide-react';
 import MarkdownViewer from '../components/Documentation/MarkdownViewer';
 import Header from '../components/Header';
 import { ProjectProvider } from '../components/ProjectProvider';
@@ -50,9 +50,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Scottsdale Promenade Data Summary',
       path: '/docs/SCOTTSDALE_DATA_SUMMARY.md',
       category: 'Status',
-      description: 'Commercial property data loaded with rent roll, lease structures, and CRE calculation testing',
+      description: 'Complete property data: 41 spaces, 39 tenants, 5 sample leases. Full rent roll with NNN, Modified Gross, and percentage rent structures. Ready for analysis.',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2025-10-17'
+      lastModified: '2025-10-18'
     },
     {
       title: 'App Development Status (Archive)',

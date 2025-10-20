@@ -3,7 +3,12 @@ const nextConfig = {
   reactStrictMode: true, // Re-enable strict mode for better development experience
   experimental: {
     turbo: {
-      // Turbo configuration if needed
+      resolveAlias: {
+        '@/components': './src/components',
+        '@/types': './src/types',
+        '@/lib': './src/lib',
+        '@/themes': './src/themes',
+      },
     },
   },
   // Path mapping for cleaner imports
