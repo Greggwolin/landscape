@@ -26,9 +26,17 @@ const DocumentationIndex: React.FC = () => {
       title: 'Implementation Status',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking',
+      description: 'Current implementation status and progress tracking - Updated with Python Financial Engine Phase 1',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-17'
+      lastModified: '2025-10-21'
+    },
+    {
+      title: 'Financial Engine Status',
+      path: '/docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md',
+      category: 'Status',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement)',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-21'
     },
     {
       title: 'CRE Implementation Summary',
@@ -87,6 +95,22 @@ const DocumentationIndex: React.FC = () => {
       description: 'Complete database schema documentation',
       icon: <Database className="w-5 h-5" />,
       lastModified: '2025-10-16'
+    },
+    {
+      title: 'Database Table Inventory',
+      path: '/docs/05-database/TABLE_INVENTORY.md',
+      category: 'Architecture',
+      description: 'Complete inventory of 151 active + 7 deprecated tables organized by functional area (CRE Analytics, Community Development, DMS, etc.)',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-10-21'
+    },
+    {
+      title: 'Database Documentation Index',
+      path: '/docs/05-database/README.md',
+      category: 'Architecture',
+      description: 'Database documentation navigation hub with links to schema, migrations, and table inventory',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-10-21'
     },
 
     // Migration & Consolidation
@@ -174,6 +198,46 @@ const DocumentationIndex: React.FC = () => {
     },
 
     // Technical Implementation
+    {
+      title: 'Python Financial Engine',
+      path: '/services/financial_engine_py/README.md',
+      category: 'Technical',
+      description: 'Python financial engine with numpy-financial & pandas - 5-10x faster calculations (IRR, NPV, DSCR, cash flow projections)',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-21'
+    },
+    {
+      title: 'Python Engine Migration Status',
+      path: '/services/financial_engine_py/MIGRATION_STATUS.md',
+      category: 'Technical',
+      description: 'Detailed Python migration tracking - Phase 1 complete with 88% test coverage',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-21'
+    },
+    {
+      title: 'Python Engine Installation Guide',
+      path: '/services/financial_engine_py/INSTALLATION_COMPLETE.md',
+      category: 'Technical',
+      description: 'Quick start guide for Python financial engine - CLI usage, TypeScript integration, testing',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-21'
+    },
+    {
+      title: 'Document Management System (DMS)',
+      path: '/docs/02-features/dms/README_DMS_v1.md',
+      category: 'Technical',
+      description: 'Enterprise DMS with custom attributes, templates, full-text search, and audit trail. Hybrid architecture with JSONB profiles.',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-10-07'
+    },
+    {
+      title: 'DMS Implementation Status',
+      path: '/docs/02-features/dms/DMS-Implementation-Status.md',
+      category: 'Technical',
+      description: 'Current DMS implementation status and feature completion',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-10-07'
+    },
     {
       title: 'CRE Calculation Engine',
       path: '/docs/CRE_CALCULATION_ENGINE_DOCUMENTATION.md',
