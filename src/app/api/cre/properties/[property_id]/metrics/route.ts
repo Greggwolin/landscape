@@ -19,6 +19,10 @@ import {
   calculateInvestmentMetrics,
   type DebtAssumptions,
 } from '@/lib/calculations/metrics';
+import {
+  calculateInvestmentMetricsPython,
+  checkPythonEngineAvailable,
+} from '@/lib/python-calculations';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -119,7 +123,7 @@ async function fetchPropertyData(propertyId: number): Promise<PropertyData | nul
         base_rent_psf_annual: parseFloat(r.base_rent_psf_annual || 0),
       })),
       escalation: escalationRows.length > 0 ? {
-        escalation_type: escalationRows[0].escalation_type as any,
+        escalation_type: escalationRows[0].escalation_type as 'Fixed Percentage' | 'CPI' | 'None',
         escalation_pct: parseFloat(escalationRows[0].escalation_pct || 0),
         escalation_frequency: escalationRows[0].escalation_frequency,
         cpi_floor_pct: parseFloat(escalationRows[0].cpi_floor_pct || 0),
@@ -171,6 +175,51 @@ export async function POST(
     }
 
     const body: MetricsRequest = await request.json();
+
+    // ========================================================================
+    // PYTHON ENGINE - Try Python first for 5-10x performance improvement
+    // ========================================================================
+
+    const usePython = process.env.USE_PYTHON_ENGINE !== 'false'; // Default to true
+
+    if (usePython) {
+      try {
+        const pythonAvailable = await checkPythonEngineAvailable();
+
+        if (pythonAvailable) {
+          console.log('[Python] Using Python financial engine for metrics calculation');
+
+          const pythonResult = await calculateInvestmentMetricsPython({
+            property_id: propertyId,
+            hold_period_years: body.hold_period_years,
+            exit_cap_rate: body.exit_cap_rate,
+            discount_rate: body.discount_rate,
+            vacancy_pct: body.vacancy_pct,
+            credit_loss_pct: body.credit_loss_pct,
+            loan_amount: body.loan_amount,
+            interest_rate: body.interest_rate,
+            amortization_years: body.amortization_years,
+          });
+
+          return NextResponse.json({
+            ...pythonResult,
+            calculation_engine: 'python',  // Indicate which engine was used
+          });
+        } else {
+          console.warn('[Python] Python engine not available, falling back to TypeScript');
+        }
+      } catch (pythonError: unknown) {
+        const error = pythonError as Error;
+        console.error('[Python] Error using Python engine, falling back to TypeScript:', error.message);
+        // Fall through to TypeScript implementation
+      }
+    }
+
+    // ========================================================================
+    // TYPESCRIPT ENGINE - Fallback implementation (will be deprecated)
+    // ========================================================================
+
+    console.log('[TypeScript] Using TypeScript financial engine (legacy)');
 
     // Default parameters
     const holdPeriodYears = body.hold_period_years || 10;
@@ -259,6 +308,7 @@ export async function POST(
 
     // Return results
     return NextResponse.json({
+      calculation_engine: 'typescript',  // Indicate TypeScript engine was used
       property: {
         cre_property_id: property.cre_property_id,
         property_name: property.property_name,
@@ -303,10 +353,11 @@ export async function POST(
         total_noi: metrics.total_noi,
       },
     });
-  } catch (error: any) {
-    console.error('Error calculating investment metrics:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error calculating investment metrics:', err);
     return NextResponse.json(
-      { error: 'Failed to calculate metrics', details: error.message },
+      { error: 'Failed to calculate metrics', details: err.message },
       { status: 500 }
     );
   }

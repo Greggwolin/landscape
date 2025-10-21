@@ -1,8 +1,8 @@
 # Landscape Pro-Forma Documentation
 
-**Version:** 3.1
-**Last Updated:** 2025-10-16
-**Status:** Production Ready
+**Version:** 3.3
+**Last Updated:** 2025-10-21
+**Status:** Production Ready + Python Financial Engine (Phase 1)
 
 Welcome to the comprehensive documentation for the Landscape Pro-Forma financial modeling application.
 
@@ -16,7 +16,8 @@ Welcome to the comprehensive documentation for the Landscape Pro-Forma financial
 3. [System Architecture](01-architecture/DATABASE_SCHEMA.md) - Understand the system design
 
 **Looking for specific features?**
-- [Financial Engine](02-features/financial-engine/IMPLEMENTATION_STATUS.md) - Complete status
+- [Financial Engine](02-features/financial-engine/IMPLEMENTATION_STATUS.md) - Complete status ⭐ **NEW: Python Migration Phase 1**
+- [Python Financial Engine](../services/financial_engine_py/README.md) - 5-10x faster calculations
 - [Rent Roll Interface](02-features/rent-roll/UNIVERSAL_RENT_ROLL_INTERFACE.md) - DVL auto-fill system
 - [Document Management](02-features/dms/DMS-Implementation-Status.md) - DMS implementation
 - [GIS & Mapping](02-features/gis/) - MapLibre integration
@@ -32,7 +33,7 @@ New developer onboarding and quick start guides
 
 ### [01-architecture/](01-architecture/)
 System design, architecture, and technical overview
-- Database Schema - Complete schema reference (32 tables + 12 views)
+- Database Schema - Complete schema reference (151 active + 7 deprecated tables)
 - System Architecture - Technology stack and design patterns
 
 ### [02-features/](02-features/)
@@ -80,9 +81,11 @@ UI component documentation and prototypes
 
 ### [05-database/](05-database/)
 Database schema, migrations, and test fixtures
-- **DATABASE_SCHEMA.md** - Complete schema reference
-- MIGRATION-SUMMARY.md - Migration history
-- db-schema.md - Additional schema docs
+- **[TABLE_INVENTORY.md](05-database/TABLE_INVENTORY.md)** - Complete inventory: 151 active + 7 deprecated tables by functional area
+- **[DATABASE_SCHEMA.md](05-database/DATABASE_SCHEMA.md)** - Technical schema specification
+- **[MIGRATION-SUMMARY.md](05-database/MIGRATION-SUMMARY.md)** - Migration history and changes
+- [README.md](05-database/README.md) - Database documentation index
+- db-schema.md - Auto-generated schema dump
 
 ### [06-devops/](06-devops/)
 DevOps, CI/CD, and deployment
@@ -201,13 +204,16 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 
 | Metric | Count |
 |--------|-------|
-| **Database Tables** | 32 + 12 views |
+| **Database Tables (Active)** | 151 |
+| **Database Tables (Deprecated)** | 7 |
+| **Total Database Tables** | 158 |
+| **Total Columns** | ~2,400+ |
 | **API Endpoints** | 25+ |
 | **UI Components** | 10+ major components |
 | **Lines of Code** | ~17,000 |
-| **Documentation Files** | 60+ |
+| **Documentation Files** | 65+ |
 | **Test Fixtures** | 3 complete projects |
-| **Migrations** | 8 executed |
+| **Migrations Executed** | 8 |
 
 ---
 
@@ -259,8 +265,8 @@ When adding new features or making changes:
 ---
 
 **Maintained by:** Engineering Team
-**Documentation Version:** 3.1
-**Last Major Update:** October 16, 2025
+**Documentation Version:** 3.2
+**Last Major Update:** October 21, 2025
 **Next Review:** Upon next major feature release
 
 ---

@@ -1,0 +1,62 @@
+[tool.poetry]
+name = "financial-engine"
+version = "1.0.0"
+description = "Landscape Financial Calculation Engine - ARGUS-equivalent calculations with advanced analytics"
+authors = ["Landscape AI <engineering@landscape.ai>"]
+readme = "README.md"
+packages = [{ include = "financial_engine" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26.0"              # Core numerical computing
+numpy-financial = "^1.0.0"     # Financial functions (IRR, XIRR, NPV, PMT)
+pandas = "^2.2.0"              # Data manipulation & analysis
+scipy = "^1.11.0"              # Optimization & statistical distributions
+pydantic = "^2.9.0"            # Data validation & settings
+pydantic-settings = "^2.5.0"   # Environment variable management
+psycopg2-binary = "^2.9.10"    # PostgreSQL database driver
+fastapi = { version = "^0.115.0", optional = true }  # REST API framework (optional)
+uvicorn = { version = "^0.32.0", optional = true }   # ASGI server (optional)
+python-dateutil = "^2.9.0"     # Date/time utilities
+loguru = "^0.7.2"              # Structured logging
+tenacity = "^8.3.0"            # Retry logic
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"              # Testing framework
+pytest-cov = "^6.0.0"          # Code coverage
+pytest-asyncio = "^0.24.0"     # Async test support
+black = "^24.0.0"              # Code formatter
+mypy = "^1.13.0"               # Static type checker
+ruff = "^0.7.0"                # Fast Python linter
+ipython = "^8.12.0"            # Interactive shell for debugging
+
+[tool.poetry.extras]
+api = ["fastapi", "uvicorn"]   # Install with: poetry install -E api
+
+[tool.poetry.scripts]
+fin-calc = "financial_engine.cli:main"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --cov=financial_engine --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
