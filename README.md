@@ -30,12 +30,14 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 ### Quick Links
 
 - **[Complete Documentation Index](docs/README.md)** - Master navigation guide
+- **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** ⭐ NEW - Django setup & admin panel
 - **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
 - **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
-- **[Financial Engine Status](docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md)** ⭐ Best for AI context
+- **[Financial Engine Status](docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md)** - Financial modeling status
 - **[Database Schema](docs/05-database/DATABASE_SCHEMA.md)** - Complete schema reference
 - **[API Reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** - API documentation
 - **[DevOps Guide](docs/06-devops/DEVOPS_GUIDE.md)** - Deployment and operations
+- **[Django Admin Guide](backend/ADMIN_ACCESS.md)** ⭐ NEW - Admin panel access
 
 ### Documentation Structure
 
@@ -99,10 +101,12 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 - **Handsontable 16.0.0** for budget grids
 
 ### Backend
+- **Django 5.0.1** with Django REST Framework 3.14.0 ⭐ NEW (Oct 22, 2025)
 - **Neon PostgreSQL** (serverless)
-- **143 tables + 19 views** in `landscape` schema
+- **183 tables + 26 views** in `landscape` schema
 - **Direct `pg` 8.13.1** + `@neondatabase/serverless` connections
-- **Next.js App Router** API routes
+- **Next.js App Router** API routes (legacy, being replaced)
+- **Django Admin Panel** with smart dropdown fields
 
 ### AI/ML
 - **Claude 3.5 Sonnet** (Anthropic) for document extraction
@@ -113,16 +117,19 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ```
 landscape/
+├── backend/                           # Django Backend (NEW - Oct 22, 2025) ⭐
+│   ├── config/                        # Django settings
+│   ├── db_backend/                    # Custom PostgreSQL backend
+│   ├── apps/                          # Django applications
+│   │   └── projects/                  # Projects app (Phase 1 COMPLETE)
+│   ├── manage.py                      # Django CLI
+│   ├── requirements.txt               # Python dependencies
+│   ├── README.md                      # Backend documentation
+│   └── ADMIN_ACCESS.md                # Admin panel guide
 ├── src/
 │   ├── app/
-│   │   ├── api/                       # Next.js API routes
-│   │   │   ├── multifamily/           # Multifamily APIs (NEW - Migration 008)
-│   │   │   │   ├── units/             # Unit CRUD
-│   │   │   │   ├── leases/            # Lease management
-│   │   │   │   ├── turns/             # Turn tracking
-│   │   │   │   └── reports/           # Multifamily reports
-│   │   │   │       ├── occupancy/     # Occupancy report
-│   │   │   │       └── expirations/   # Lease expirations
+│   │   ├── api/                       # Next.js API routes (legacy)
+│   │   │   ├── multifamily/           # Multifamily APIs
 │   │   │   ├── leases/                # Income property leases
 │   │   │   ├── parcels/               # Parcel CRUD
 │   │   │   └── projects/              # Project APIs
@@ -132,10 +139,15 @@ landscape/
 │   │   ├── financial-engine/          # Calculation engines
 │   │   └── db.ts                      # Database connection
 │   └── types/                         # TypeScript definitions
+├── docs/                              # Documentation
+│   ├── DJANGO_BACKEND_IMPLEMENTATION.md  # Django backend guide (NEW) ⭐
+│   ├── 00-getting-started/            # Setup guides
+│   ├── 02-features/                   # Feature docs
+│   └── 05-database/                   # Database schema
 ├── migrations/                        # Database migrations (001-008)
-├── project-docs/                      # Technical documentation
 ├── scripts/                           # Deployment and utility scripts
 └── services/
+    ├── financial_engine_py/           # Python calculation engine ⭐
     └── market_ingest_py/              # Python market data CLI
 ```
 

@@ -1,0 +1,33 @@
+# Django Core
+Django==5.0.1
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.0
+psycopg2-binary==2.9.9
+django-cors-headers==4.3.1
+python-decouple==3.8
+gunicorn==21.2.0
+whitenoise==6.6.0
+drf-spectacular==0.27.0
+
+# Python Calculation Engine Dependencies (from financial_engine_py)
+numpy==1.26.0
+numpy-financial==1.0.0
+pandas==2.2.0
+scipy>=1.11.0
+pydantic==2.9.0
+pydantic-settings==2.5.0
+loguru==0.7.0
+python-dateutil==2.9.0
+tenacity==8.3.0
+
+# Development
+pytest>=8.2.0
+pytest-django==4.7.0
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+mypy==1.11.0
+black==23.12.1
+ruff==0.6.0
+flake8==7.0.0
+ipython==8.19.0
+django-extensions==3.2.3
