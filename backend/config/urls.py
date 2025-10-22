@@ -28,8 +28,9 @@ urlpatterns = [
 
     # App URLs
     path("api/", include('apps.projects.urls')),
+    path("api/", include('apps.containers.urls')),
+    path("api/", include('apps.financial.urls')),
+    path("api/", include('apps.calculations.urls')),
     # TODO: Add other app URLs as they're created
-    # path("api/", include('apps.containers.urls')),
-    # path("api/", include('apps.financial.urls')),
     # etc.
 ]

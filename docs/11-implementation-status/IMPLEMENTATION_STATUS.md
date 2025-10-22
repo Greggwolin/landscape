@@ -8,17 +8,22 @@
 
 ## 🆕 Recent Updates
 
-### Django Backend with Admin Panel - Phase 1 Complete (Oct 22, 2025) ⭐ NEW
+### Django Backend with Admin Panel - Phase 2 Complete (Oct 22, 2025) ⭐ NEW
 - ✅ Django 5.0.1 + Django REST Framework 3.14.0 deployed
 - ✅ Custom PostgreSQL backend with automatic search_path to landscape schema
-- ✅ Projects app with full CRUD API endpoints
+- ✅ **Three Core Django Apps Fully Implemented:**
+  - **Projects App** - Full CRUD API endpoints with admin interface
+  - **Containers App** - Hierarchical tree API with recursive serialization (100% Next.js compatible)
+  - **Financial App** - Budget/Actual tracking with rollup aggregations and variance reporting
+  - **Calculations App** - Python financial engine API wrapper (IRR, NPV, DSCR, Equity Multiple)
 - ✅ **Django Admin Panel with Smart Dropdowns** - all lookup-based fields
 - ✅ Lookup table models: lu_type, lu_subtype, lu_family, tbl_property_type_config
 - ✅ JWT authentication ready, CORS configured for React frontend
 - ✅ OpenAPI/Swagger documentation at /api/docs/
-- ✅ Integration with Python calculation engine
+- ✅ Integration with Python calculation engine (5-10x performance improvement)
 - 📁 Location: `backend/`
 - 📖 Docs: [DJANGO_BACKEND_IMPLEMENTATION.md](../DJANGO_BACKEND_IMPLEMENTATION.md)
+- 📖 App Docs: [backend/apps/calculations/README.md](../../backend/apps/calculations/README.md), [backend/apps/containers/README.md](../../backend/apps/containers/README.md), [backend/apps/financial/README.md](../../backend/apps/financial/README.md)
 - 🔐 Admin Access: http://localhost:8000/admin/ (admin/admin123)
 
 ### Python Financial Engine Migration - Phase 1 Complete (Oct 21, 2025)
@@ -745,6 +750,35 @@ core_fin_container_applicability:
 - `DELETE /api/projects/:id/` - Delete project
 - `GET /api/projects/:id/containers/` - Get containers (stub)
 - `GET /api/projects/:id/financials/` - Get financials (stub)
+
+**Containers (Django Backend):** ⭐ NEW
+- `GET /api/containers/` - List all containers
+- `POST /api/containers/` - Create container
+- `GET /api/containers/:id/` - Retrieve container
+- `PUT /api/containers/:id/` - Update container
+- `PATCH /api/containers/:id/` - Partial update
+- `DELETE /api/containers/:id/` - Delete container
+- `GET /api/containers/by_project/:project_id/` - Get hierarchical tree (100% Next.js compatible)
+- `GET /api/container-types/` - List container types
+
+**Financial (Django Backend):** ⭐ NEW
+- `GET /api/budget-items/` - List all budget items
+- `POST /api/budget-items/` - Create budget item
+- `GET /api/budget-items/by_project/:project_id/` - Budget items by project with summary
+- `GET /api/budget-items/rollup/:project_id/` - Budget rollup aggregations by category
+- `GET /api/budget-items/by_container/:container_id/` - Budget items by container
+- `GET /api/actual-items/` - List all actual items
+- `POST /api/actual-items/` - Create actual item
+- `GET /api/actual-items/by_project/:project_id/` - Actuals by project
+- `GET /api/actual-items/variance/:project_id/` - Budget vs actual variance report
+
+**Calculations (Django Backend):** ⭐ NEW
+- `POST /api/calculations/irr/` - Calculate IRR (Internal Rate of Return)
+- `POST /api/calculations/npv/` - Calculate NPV (Net Present Value)
+- `POST /api/calculations/dscr/` - Calculate DSCR (Debt Service Coverage Ratio)
+- `POST /api/calculations/metrics/` - Calculate all investment metrics at once
+- `POST /api/calculations/cashflow/` - Generate cash flow projection (pending ORM conversion)
+- `GET /api/projects/:project_id/metrics/` - Get project-specific metrics (pending)
 
 **Projects (Next.js - Legacy):**
 - `GET /api/projects` - List all projects

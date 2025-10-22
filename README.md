@@ -121,7 +121,10 @@ landscape/
 │   ├── config/                        # Django settings
 │   ├── db_backend/                    # Custom PostgreSQL backend
 │   ├── apps/                          # Django applications
-│   │   └── projects/                  # Projects app (Phase 1 COMPLETE)
+│   │   ├── projects/                  # Projects app (COMPLETE)
+│   │   ├── containers/                # Containers hierarchy app (COMPLETE)
+│   │   ├── financial/                 # Budget/Actuals tracking (COMPLETE)
+│   │   └── calculations/              # Python financial engine wrapper (COMPLETE)
 │   ├── manage.py                      # Django CLI
 │   ├── requirements.txt               # Python dependencies
 │   ├── README.md                      # Backend documentation

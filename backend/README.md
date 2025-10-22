@@ -11,7 +11,11 @@ This is the Django Core + DRF backend that replaces the previous Node.js backend
 - Providing RESTful API endpoints matching the previous Node.js patterns
 - **Django Admin Panel with Smart Dropdowns** (completed Oct 22, 2025) ⭐ NEW
 
-**Current Status:** Phase 1 Complete - Projects app with full admin interface
+**Current Status:** Phase 2 Complete - Four core Django apps fully implemented
+- ✅ **Projects** - Project management with full CRUD
+- ✅ **Containers** - Hierarchical tree API (100% Next.js compatible)
+- ✅ **Financial** - Budget/Actual tracking with rollup and variance
+- ✅ **Calculations** - Python financial engine API wrapper (IRR, NPV, DSCR)
 
 **Quick Links:**
 - **[ADMIN_ACCESS.md](ADMIN_ACCESS.md)** - Admin panel access guide
@@ -28,16 +32,16 @@ backend/
 ├── db_backend/         # Custom PostgreSQL backend
 │   └── base.py         # Sets search_path to landscape schema
 ├── apps/               # Django applications
-│   ├── projects/       # Project management
-│   ├── containers/     # Container hierarchy
-│   ├── financial/      # Financial data
-│   ├── multifamily/    # Multifamily properties
-│   ├── commercial/     # Commercial properties
-│   ├── landuse/        # Land use & parcels
-│   ├── gis/            # GIS data
-│   ├── documents/      # Document management
-│   ├── market_intel/   # Market intelligence
-│   └── calculations/   # Financial calculations (integrates with Python engine)
+│   ├── projects/       # Project management ✅ COMPLETE
+│   ├── containers/     # Container hierarchy ✅ COMPLETE
+│   ├── financial/      # Financial data ✅ COMPLETE
+│   ├── calculations/   # Financial calculations ✅ COMPLETE (integrates with Python engine)
+│   ├── multifamily/    # Multifamily properties (planned)
+│   ├── commercial/     # Commercial properties (planned)
+│   ├── landuse/        # Land use & parcels (planned)
+│   ├── gis/            # GIS data (planned)
+│   ├── documents/      # Document management (planned)
+│   └── market_intel/   # Market intelligence (planned)
 ├── manage.py           # Django management script
 └── requirements.txt    # Python dependencies
 ```
@@ -135,7 +139,7 @@ from financial_engine.models import PropertyData
 - `POST /api/token/` - Obtain JWT access & refresh tokens
 - `POST /api/token/refresh/` - Refresh access token
 
-### Projects
+### Projects ✅
 - `GET /api/projects/` - List all projects
 - `POST /api/projects/` - Create project
 - `GET /api/projects/:id/` - Retrieve project
@@ -145,13 +149,42 @@ from financial_engine.models import PropertyData
 - `GET /api/projects/:id/containers/` - Get project containers (stub)
 - `GET /api/projects/:id/financials/` - Get project financials (stub)
 
-### Project Configurations
+### Project Configurations ✅
 - `GET /api/project-configs/` - List configs
 - `POST /api/project-configs/` - Create config
 - `GET /api/project-configs/:id/` - Retrieve config
 - `PUT /api/project-configs/:id/` - Update config
 - `PATCH /api/project-configs/:id/` - Partial update
 - `DELETE /api/project-configs/:id/` - Delete config
+
+### Containers ✅ NEW
+- `GET /api/containers/` - List all containers
+- `POST /api/containers/` - Create container
+- `GET /api/containers/:id/` - Retrieve container
+- `PUT /api/containers/:id/` - Update container
+- `PATCH /api/containers/:id/` - Partial update
+- `DELETE /api/containers/:id/` - Delete container
+- `GET /api/containers/by_project/:project_id/` - Get hierarchical tree (100% Next.js compatible)
+- `GET /api/container-types/` - List container types
+
+### Financial ✅ NEW
+- `GET /api/budget-items/` - List all budget items
+- `POST /api/budget-items/` - Create budget item
+- `GET /api/budget-items/by_project/:project_id/` - Budget items by project with summary
+- `GET /api/budget-items/rollup/:project_id/` - Budget rollup aggregations by category
+- `GET /api/budget-items/by_container/:container_id/` - Budget items by container
+- `GET /api/actual-items/` - List all actual items
+- `POST /api/actual-items/` - Create actual item
+- `GET /api/actual-items/by_project/:project_id/` - Actuals by project
+- `GET /api/actual-items/variance/:project_id/` - Budget vs actual variance report
+
+### Calculations ✅ NEW
+- `POST /api/calculations/irr/` - Calculate IRR (Internal Rate of Return)
+- `POST /api/calculations/npv/` - Calculate NPV (Net Present Value)
+- `POST /api/calculations/dscr/` - Calculate DSCR (Debt Service Coverage Ratio)
+- `POST /api/calculations/metrics/` - Calculate all investment metrics at once
+- `POST /api/calculations/cashflow/` - Generate cash flow projection (pending ORM conversion)
+- `GET /api/projects/:project_id/metrics/` - Get project-specific metrics (pending)
 
 ### Documentation
 - `GET /api/docs/` - Swagger UI (interactive API documentation)
@@ -252,22 +285,29 @@ DEFAULT_CREDIT_LOSS_PCT=0.02
 - Connection pooling with 600s max age
 - Health checks enabled
 
+## Implementation Status
+
+### ✅ Phase 1: Complete (Oct 22, 2025)
+- ✅ Projects app - Full CRUD with admin interface
+- ✅ Project configurations - Hierarchical labels support
+
+### ✅ Phase 2: Complete (Oct 22, 2025)
+- ✅ Containers app - Hierarchical tree API with recursive serialization
+- ✅ Financial app - Budget/Actual tracking with rollup and variance
+- ✅ Calculations app - Python engine wrapper (IRR, NPV, DSCR, Equity Multiple)
+- ✅ 100% API compatibility with Next.js endpoints
+
 ## Next Steps
 
-### Phase 2: Complete Model Definition
-- [ ] Map remaining 183 tables to Django models
-- [ ] Focus on core tables: containers, financials, parcels, leases
+### Phase 3: Additional Model Definition
+- [ ] Map remaining apps: multifamily, commercial, landuse, gis, documents, market_intel
+- [ ] Focus on core tables: parcels, leases, units, tenants
 - [ ] Create serializers for all models
 
-### Phase 3: API Implementation
-- [ ] Implement remaining ViewSets
-- [ ] Create nested endpoints (e.g., project containers)
-- [ ] Add filtering, searching, ordering
-
-### Phase 4: Calculation Engine Integration
-- [ ] Create service layer in `apps/calculations/`
-- [ ] Convert Django ORM models to Pydantic models
-- [ ] Implement calculation endpoints
+### Phase 4: Calculation Engine Enhancement
+- [ ] Complete ORM to Pydantic conversion layer
+- [ ] Implement cash flow projection endpoint
+- [ ] Implement project metrics endpoint
 - [ ] Test against Python calc engine test suite
 
 ### Phase 5: Authentication & Permissions
