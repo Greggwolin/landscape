@@ -26,9 +26,41 @@ const DocumentationIndex: React.FC = () => {
       title: 'Implementation Status',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Python Financial Engine Phase 1',
+      description: 'Current implementation status and progress tracking - Updated with Django Phase 2 completion and Finance Structure migration',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-10-21'
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Finance Structure Migration Complete',
+      path: '/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md',
+      category: 'Status',
+      description: 'Finance Structure system migration to Django backend - Complete with auto-allocations, cost-to-complete, sale settlements, and participation tracking',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Django Backend Implementation',
+      path: '/docs/DJANGO_BACKEND_IMPLEMENTATION.md',
+      category: 'Status',
+      description: 'Django backend Phase 1 complete - Admin panel with smart dropdowns, JWT auth, and Python engine integration',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Documentation Update System',
+      path: '/docs/DOCUMENTATION_UPDATE_WORKFLOW.md',
+      category: 'Technical',
+      description: 'Automated documentation update workflow - Slash command system with /update-docs for comprehensive doc management',
+      icon: <Book className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Claude Commands Guide',
+      path: '/.claude/commands/README.md',
+      category: 'Technical',
+      description: 'Custom Claude Code slash commands - Documentation update automation and workflow guides',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-22'
     },
     {
       title: 'Financial Engine Status',
@@ -198,6 +230,54 @@ const DocumentationIndex: React.FC = () => {
     },
 
     // Technical Implementation
+    {
+      title: 'Finance Structure API Testing Guide',
+      path: '/backend/TESTING_GUIDE.md',
+      category: 'Technical',
+      description: '3 ways to test Finance Structure APIs - Django Admin, DRF Browsable API, and cURL/HTTP clients with complete examples',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Django Admin Access Guide',
+      path: '/backend/ADMIN_ACCESS.md',
+      category: 'Technical',
+      description: 'Quick start guide for accessing Django admin panel and managing Finance Structure data',
+      icon: <Book className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Django Backend README',
+      path: '/backend/README.md',
+      category: 'Technical',
+      description: 'Django backend setup, installation, and development guide with Python engine integration',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Financial App API Documentation',
+      path: '/backend/apps/financial/README.md',
+      category: 'Technical',
+      description: 'Complete Finance Structure API documentation - Budget items, actuals, finance structures, cost allocations, sale settlements, and participation payments',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Containers App API Documentation',
+      path: '/backend/apps/containers/README.md',
+      category: 'Technical',
+      description: 'Container management API documentation - CRUD operations for projects, phases, parcels, buildings, and units',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
+    {
+      title: 'Calculations App API Documentation',
+      path: '/backend/apps/calculations/README.md',
+      category: 'Technical',
+      description: 'Python financial calculation engine API documentation - Integration with numpy-financial and pandas',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-22'
+    },
     {
       title: 'Python Financial Engine',
       path: '/services/financial_engine_py/README.md',
