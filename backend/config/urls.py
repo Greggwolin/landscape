@@ -26,11 +26,15 @@ urlpatterns = [
     path("api/token/", TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path("api/token/refresh/", TokenRefreshView.as_view(), name='token_refresh'),
 
-    # App URLs
+    # App URLs (Phase 3 Complete - All apps included)
     path("api/", include('apps.projects.urls')),
     path("api/", include('apps.containers.urls')),
     path("api/", include('apps.financial.urls')),
     path("api/", include('apps.calculations.urls')),
-    # TODO: Add other app URLs as they're created
-    # etc.
+    path("api/multifamily/", include('apps.multifamily.urls')),
+    path("api/commercial/", include('apps.commercial.urls')),
+    path("api/landuse/", include('apps.landuse.urls')),
+    path("api/gis/", include('apps.gis.urls')),
+    path("api/dms/", include('apps.documents.urls')),
+    path("api/market-intel/", include('apps.market_intel.urls')),
 ]

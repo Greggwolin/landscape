@@ -53,17 +53,17 @@ INSTALLED_APPS = [
     "django_extensions",
     "drf_spectacular",
 
-    # Project apps
+    # Project apps (Phase 3 Complete - All apps registered)
     "apps.projects",
     "apps.containers",
     "apps.financial",
+    "apps.calculations",
     "apps.multifamily",
     "apps.commercial",
     "apps.landuse",
     "apps.gis",
     "apps.documents",
     "apps.market_intel",
-    "apps.calculations",
 ]
 
 MIDDLEWARE = [
