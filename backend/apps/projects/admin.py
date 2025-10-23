@@ -280,3 +280,6 @@ class ProjectAdmin(admin.ModelAdmin):
             self.message_user(request, f'Project "{obj.project_name}" was updated successfully.')
         else:
             self.message_user(request, f'Project "{obj.project_name}" was created successfully.')
+
+# Import auth admin
+from .admin_auth import UserAdmin, UserProfileAdmin, APIKeyAdmin, PasswordResetTokenAdmin

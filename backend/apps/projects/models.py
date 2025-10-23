@@ -89,3 +89,8 @@ class Project(models.Model):
 
     def __str__(self):
         return self.project_name or f'Project {self.project_id}'
+
+# Phase 5: Import User model to make it available to Django
+from .models_user import User, UserProfile, APIKey, PasswordResetToken
+
+__all__ = ['Project', 'User', 'UserProfile', 'APIKey', 'PasswordResetToken']
