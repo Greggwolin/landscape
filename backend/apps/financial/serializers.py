@@ -6,6 +6,12 @@ Provides serialization for budget and actual financial data with rollup support.
 
 from rest_framework import serializers
 from .models import BudgetItem, ActualItem
+from .models_finance_structure import (
+    FinanceStructure,
+    CostAllocation,
+    SaleSettlement,
+    ParticipationPayment,
+)
 from decimal import Decimal
 
 
@@ -295,3 +301,307 @@ class VarianceReportSerializer(serializers.Serializer):
     actual_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
     variance_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
     variance_pct = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+# ============================================================================
+# Finance Structure Serializers
+# ============================================================================
+
+
+class CostAllocationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for CostAllocation model.
+
+    Represents allocation of a cost pool to a specific container.
+    """
+
+    container_code = serializers.CharField(
+        source='container.container_code',
+        read_only=True
+    )
+    container_name = serializers.CharField(
+        source='container.display_name',
+        read_only=True
+    )
+
+    class Meta:
+        model = CostAllocation
+        fields = [
+            'allocation_id',
+            'finance_structure_id',
+            'container_id',
+            'container_code',
+            'container_name',
+            'allocation_percentage',
+            'allocation_basis',
+            'allocated_budget_amount',
+            'spent_to_date',
+            'cost_to_complete',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'allocation_id',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class FinanceStructureSerializer(serializers.ModelSerializer):
+    """
+    Serializer for FinanceStructure model.
+
+    Supports:
+    - Capital cost pools (one-time infrastructure costs)
+    - Operating obligation pools (recurring costs like ground leases)
+    - Nested cost allocations
+    - Budget tracking and calculations
+    """
+
+    project_id = serializers.IntegerField(source='project.project_id', read_only=True)
+    cost_allocations = CostAllocationSerializer(many=True, read_only=True)
+    total_allocated_percentage = serializers.SerializerMethodField()
+    spent_to_date = serializers.SerializerMethodField()
+    remaining_budget = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FinanceStructure
+        fields = [
+            'finance_structure_id',
+            'project_id',
+            'structure_code',
+            'structure_name',
+            'description',
+            'structure_type',
+            'total_budget_amount',
+            'budget_category',
+            'is_recurring',
+            'recurrence_frequency',
+            'annual_amount',
+            'allocation_method',
+            'is_active',
+            'cost_allocations',
+            'total_allocated_percentage',
+            'spent_to_date',
+            'remaining_budget',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = [
+            'finance_structure_id',
+            'created_at',
+            'updated_at',
+            'cost_allocations',
+            'total_allocated_percentage',
+            'spent_to_date',
+            'remaining_budget',
+        ]
+
+    def get_total_allocated_percentage(self, obj):
+        """Get sum of allocation percentages across all containers."""
+        return float(obj.get_total_allocated_percentage())
+
+    def get_spent_to_date(self, obj):
+        """Get total spent from budget items linked to this structure."""
+        return float(obj.get_spent_to_date())
+
+    def get_remaining_budget(self, obj):
+        """Get unspent budget remaining."""
+        return float(obj.get_remaining_budget())
+
+
+class FinanceStructureCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating finance structures.
+
+    Validates:
+    - Project exists
+    - Structure code is unique within project
+    - Budget amounts are positive
+    - Recurrence fields are required for recurring obligations
+    """
+
+    project_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = FinanceStructure
+        fields = [
+            'project_id',
+            'structure_code',
+            'structure_name',
+            'description',
+            'structure_type',
+            'total_budget_amount',
+            'budget_category',
+            'is_recurring',
+            'recurrence_frequency',
+            'annual_amount',
+            'allocation_method',
+            'created_by',
+        ]
+
+    def validate_structure_code(self, value):
+        """Ensure structure_code is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("structure_code is required")
+        return value.strip()
+
+    def validate_total_budget_amount(self, value):
+        """Ensure budget amount is positive."""
+        if value is not None and value < 0:
+            raise serializers.ValidationError("total_budget_amount must be positive")
+        return value
+
+    def validate_annual_amount(self, value):
+        """Ensure annual amount is positive."""
+        if value is not None and value < 0:
+            raise serializers.ValidationError("annual_amount must be positive")
+        return value
+
+    def validate(self, data):
+        """Cross-field validation."""
+        structure_type = data.get('structure_type')
+        is_recurring = data.get('is_recurring', False)
+
+        # Validate recurring obligation requires frequency and amount
+        if is_recurring:
+            if not data.get('recurrence_frequency'):
+                raise serializers.ValidationError({
+                    'recurrence_frequency': 'Required for recurring obligations'
+                })
+            if not data.get('annual_amount'):
+                raise serializers.ValidationError({
+                    'annual_amount': 'Required for recurring obligations'
+                })
+
+        # Validate capital cost pool requires total budget
+        if structure_type == 'capital_cost_pool' and not data.get('total_budget_amount'):
+            raise serializers.ValidationError({
+                'total_budget_amount': 'Required for capital cost pools'
+            })
+
+        return data
+
+    def create(self, validated_data):
+        """Create finance structure with proper foreign key references."""
+        from apps.projects.models import Project
+
+        project_id = validated_data.pop('project_id')
+        project = Project.objects.get(project_id=project_id)
+
+        finance_structure = FinanceStructure.objects.create(
+            project=project,
+            **validated_data
+        )
+
+        return finance_structure
+
+
+class ParticipationPaymentSerializer(serializers.ModelSerializer):
+    """Serializer for ParticipationPayment model."""
+
+    class Meta:
+        model = ParticipationPayment
+        fields = [
+            'payment_id',
+            'settlement_id',
+            'project_id',
+            'payment_date',
+            'payment_period',
+            'homes_closed_count',
+            'gross_home_sales',
+            'participation_base',
+            'participation_amount',
+            'less_base_allocation',
+            'net_participation_payment',
+            'cumulative_homes_closed',
+            'cumulative_participation_paid',
+            'payment_status',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'payment_id',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class SaleSettlementSerializer(serializers.ModelSerializer):
+    """
+    Serializer for SaleSettlement model.
+
+    Tracks sale transactions with cost-to-complete adjustments
+    and participation structures.
+    """
+
+    container_code = serializers.CharField(
+        source='container.container_code',
+        read_only=True
+    )
+    container_name = serializers.CharField(
+        source='container.display_name',
+        read_only=True
+    )
+    participation_payments = ParticipationPaymentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SaleSettlement
+        fields = [
+            'settlement_id',
+            'project_id',
+            'container_id',
+            'container_code',
+            'container_name',
+            'sale_date',
+            'buyer_name',
+            'buyer_entity',
+            'list_price',
+            'allocated_cost_to_complete',
+            'other_adjustments',
+            'net_proceeds',
+            'settlement_type',
+            'settlement_notes',
+            'cost_allocation_detail',
+            'has_participation',
+            'participation_rate',
+            'participation_basis',
+            'participation_minimum',
+            'participation_target_price',
+            'settlement_status',
+            'participation_payments',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = [
+            'settlement_id',
+            'created_at',
+            'updated_at',
+            'participation_payments',
+        ]
+
+
+class CostAllocationCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating cost allocations."""
+
+    class Meta:
+        model = CostAllocation
+        fields = [
+            'finance_structure_id',
+            'container_id',
+            'allocation_percentage',
+            'allocation_basis',
+            'allocated_budget_amount',
+        ]
+
+    def validate_allocation_percentage(self, value):
+        """Ensure percentage is between 0 and 100."""
+        if not 0 <= value <= 100:
+            raise serializers.ValidationError(
+                "allocation_percentage must be between 0 and 100"
+            )
+        return value

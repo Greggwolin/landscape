@@ -24,7 +24,8 @@
     "auto-commit:stop": "./scripts/start-auto-commit.sh stop",
     "auto-commit:status": "./scripts/start-auto-commit.sh status",
     "auto-commit:setup": "./scripts/setup-auto-start.sh",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
@@ -127,6 +128,7 @@
     "eslint-config-next": "15.5.0",
     "husky": "^9",
     "lint-staged": "^15.2.10",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"

@@ -1,7 +1,7 @@
 """Admin interface for Container models."""
 
 from django.contrib import admin
-from .models import Container, ContainerType
+from .models import Container
 
 
 @admin.register(Container)
@@ -71,17 +71,5 @@ class ContainerAdmin(admin.ModelAdmin):
         return qs.select_related('project', 'parent_container')
 
 
-@admin.register(ContainerType)
-class ContainerTypeAdmin(admin.ModelAdmin):
-    """Admin interface for ContainerType model."""
-
-    list_display = [
-        'container_type_id',
-        'type_code',
-        'type_name',
-        'is_active',
-    ]
-    list_filter = ['is_active']
-    search_fields = ['type_code', 'type_name', 'description']
-    readonly_fields = ['container_type_id']
-    ordering = ['type_name']
+# ContainerType admin removed - table tbl_container_type doesn't exist in database
+# If needed, create the table first with a migration before registering admin

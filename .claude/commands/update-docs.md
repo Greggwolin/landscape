@@ -8,6 +8,56 @@
 
 ## WORKFLOW STEPS
 
+### Step 0: Check/Create Session Notes (ALWAYS RUN FIRST)
+
+**Check current date and session note:**
+
+```bash
+# Get today's date
+TODAY=$(date +%Y-%m-%d)
+
+# Check if session note exists for today
+ls -la /Users/5150east/landscape/docs/session-notes/$TODAY-*.md
+```
+
+**If session note for today EXISTS:**
+- Read the existing file
+- Add new section for current updates
+- Update file modification list
+- Update git activity section
+
+**If session note for today DOES NOT EXIST:**
+- Create new file: `/docs/session-notes/YYYY-MM-DD-[topic].md`
+- Use descriptive topic based on main focus (e.g., "django-backend", "documentation-system", "finance-structure")
+- Follow session notes template (see existing session notes for format)
+
+**Session Note Template:**
+```markdown
+# [Title - Main Focus]
+
+**Date**: Month DD, YYYY
+**Duration**: ~X hours
+**Focus**: Brief description of session focus
+
+---
+
+## Summary
+High-level summary of what was accomplished
+
+## Major Accomplishments
+### 1. [Feature/Task Name] ✅
+Details...
+
+## Files Modified
+### New Files Created:
+### Files Modified:
+
+## Git Activity
+### Commit Information:
+
+## Next Steps
+```
+
 ### Step 1: Scan for Recent Changes (Last 7 Days)
 
 Run these commands to identify what's changed:
@@ -169,6 +219,9 @@ git add docs/
 git add backend/*.md
 git add backend/apps/**/README.md
 git add src/app/documentation/page.tsx
+
+# Stage session note for today
+git add docs/session-notes/$(date +%Y-%m-%d)-*.md
 
 # Verify staging
 git status

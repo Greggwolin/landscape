@@ -20,7 +20,7 @@ from financial_engine.models import (
     OperatingExpenses,
     CapitalItems,
     InvestmentMetricsResult,
-    CashFlowResult,
+    CashFlowPeriod,
     LeaseType,
     EscalationType,
     RecoveryStructure,
