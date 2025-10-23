@@ -1,14 +1,12 @@
-"""URL routing for calculations app."""
+"""URL routing for Calculations application."""
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import CalculationViewSet, ProjectMetricsView
+from .views import CalculationViewSet
 
 router = DefaultRouter()
 router.register(r'calculations', CalculationViewSet, basename='calculation')
 
 urlpatterns = [
     path('', include(router.urls)),
-    # Project-specific metrics endpoint
-    path('projects/<int:project_id>/metrics/', ProjectMetricsView.as_view(), name='project-metrics'),
 ]

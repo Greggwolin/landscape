@@ -1,273 +1,247 @@
 """
-Calculation service layer.
+Service layer for financial calculations using the Python engine.
 
-Wraps the Python financial engine with Django-compatible interfaces.
-Converts Django ORM models to Pydantic models for the calculation engine.
+Bridges Django ORM and the Python financial calculation engine.
 """
 
-from typing import List, Dict, Any, Optional
-from datetime import date
+from typing import Dict, List, Optional
 from decimal import Decimal
+from apps.projects.models import Project
+from apps.financial.models import BudgetItem, ActualItem
+from apps.multifamily.models import MultifamilyUnit, MultifamilyLease
+from .converters import (
+    prepare_irr_calculation_data,
+    prepare_npv_calculation_data,
+    convert_budget_items_to_cashflows,
+    convert_multifamily_to_income_property,
+)
 
 # Import Python financial engine
-from financial_engine.core.metrics import InvestmentMetrics
-from financial_engine.core.cashflow import CashFlowEngine
-from financial_engine.core.leases import LeaseCalculator
-from financial_engine.models import (
-    PropertyData,
-    LeaseData,
-    DebtAssumptions,
-    OperatingExpenses,
-    CapitalItems,
-    InvestmentMetricsResult,
-    CashFlowPeriod,
-    LeaseType,
-    EscalationType,
-    RecoveryStructure,
-)
+try:
+    from financial_engine.core.metrics import InvestmentMetrics
+    from financial_engine.core.cashflow import CashFlowEngine
+    PYTHON_ENGINE_AVAILABLE = True
+except ImportError:
+    PYTHON_ENGINE_AVAILABLE = False
+    print("Warning: Python financial engine not available")
 
 
 class CalculationService:
-    """
-    Service layer for financial calculations.
-
-    Bridges Django ORM models and Python calculation engine.
-    Handles data conversion and validation.
-    """
-
-    def __init__(self):
-        self.metrics_engine = InvestmentMetrics()
-        self.cashflow_engine = CashFlowEngine()
-        self.lease_calculator = LeaseCalculator()
-
-    def calculate_irr(
-        self,
-        initial_investment: float,
-        cash_flows: List[float],
-        reversion_value: float,
-    ) -> float:
+    """Service for performing financial calculations."""
+    
+    @staticmethod
+    def calculate_irr(project_id: int) -> Dict:
         """
-        Calculate Internal Rate of Return.
-
+        Calculate IRR for a project.
+        
         Args:
-            initial_investment: Initial cash outlay
-            cash_flows: List of periodic cash flows
-            reversion_value: Final sale proceeds
-
+            project_id: Project ID
+            
         Returns:
-            IRR as decimal (e.g., 0.0782 = 7.82%)
+            Dictionary with IRR calculation results
         """
-        return self.metrics_engine.calculate_irr(
-            initial_investment=initial_investment,
-            cash_flows=cash_flows,
-            reversion_value=reversion_value,
-        )
-
-    def calculate_npv(
-        self,
-        discount_rate: float,
-        initial_investment: float,
-        cash_flows: List[float],
-        reversion_value: float,
-    ) -> float:
+        project = Project.objects.get(project_id=project_id)
+        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+        
+        data = prepare_irr_calculation_data(project, list(budget_items), list(actual_items))
+        
+        if PYTHON_ENGINE_AVAILABLE:
+            try:
+                metrics = InvestmentMetrics()
+                irr = metrics.calculate_irr(data['cash_flows'])
+                
+                return {
+                    'project_id': project_id,
+                    'project_name': project.project_name,
+                    'irr': float(irr) if irr is not None else None,
+                    'periods': len(data['cash_flows']),
+                    'total_investment': sum(cf for cf in data['cash_flows'] if cf < 0),
+                    'total_return': sum(cf for cf in data['cash_flows'] if cf > 0),
+                    'engine': 'python',
+                }
+            except Exception as e:
+                return {
+                    'error': str(e),
+                    'project_id': project_id,
+                    'engine': 'python',
+                }
+        else:
+            # Fallback calculation
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'irr': None,
+                'error': 'Python calculation engine not available',
+                'engine': 'fallback',
+            }
+    
+    @staticmethod
+    def calculate_npv(project_id: int, discount_rate: Optional[float] = None) -> Dict:
         """
-        Calculate Net Present Value.
-
+        Calculate NPV for a project.
+        
         Args:
-            discount_rate: Discount rate as decimal
-            initial_investment: Initial cash outlay
-            cash_flows: List of periodic cash flows
-            reversion_value: Final sale proceeds
-
+            project_id: Project ID
+            discount_rate: Optional override for discount rate
+            
         Returns:
-            NPV in dollars
+            Dictionary with NPV calculation results
         """
-        return self.metrics_engine.calculate_npv(
-            discount_rate=discount_rate,
-            initial_investment=initial_investment,
-            cash_flows=cash_flows,
-            reversion_value=reversion_value,
-        )
-
-    def calculate_equity_multiple(
-        self,
-        initial_investment: float,
-        cash_flows: List[float],
-        reversion_value: float,
-    ) -> float:
+        project = Project.objects.get(project_id=project_id)
+        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        
+        data = prepare_npv_calculation_data(project, list(budget_items), discount_rate)
+        
+        if PYTHON_ENGINE_AVAILABLE:
+            try:
+                metrics = InvestmentMetrics()
+                npv = metrics.calculate_npv(data['cash_flows'], data['discount_rate'])
+                
+                return {
+                    'project_id': project_id,
+                    'project_name': project.project_name,
+                    'npv': float(npv) if npv is not None else None,
+                    'discount_rate': data['discount_rate'],
+                    'periods': len(data['cash_flows']),
+                    'engine': 'python',
+                }
+            except Exception as e:
+                return {
+                    'error': str(e),
+                    'project_id': project_id,
+                    'engine': 'python',
+                }
+        else:
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'npv': None,
+                'error': 'Python calculation engine not available',
+                'engine': 'fallback',
+            }
+    
+    @staticmethod
+    def calculate_project_metrics(project_id: int) -> Dict:
         """
-        Calculate Equity Multiple.
-
+        Calculate comprehensive metrics for a project.
+        
         Args:
-            initial_investment: Initial equity investment
-            cash_flows: Periodic distributions
-            reversion_value: Final sale proceeds
-
+            project_id: Project ID
+            
         Returns:
-            Equity multiple (e.g., 1.85x)
+            Dictionary with all project metrics
         """
-        return self.metrics_engine.calculate_equity_multiple(
-            initial_investment=initial_investment,
-            cash_flows=cash_flows,
-            reversion_value=reversion_value,
-        )
-
-    def calculate_dscr(
-        self,
-        noi: float,
-        debt_service: float,
-    ) -> float:
-        """
-        Calculate Debt Service Coverage Ratio.
-
-        Args:
-            noi: Net Operating Income
-            debt_service: Annual debt service
-
-        Returns:
-            DSCR (e.g., 1.25)
-        """
-        return self.metrics_engine.calculate_dscr(
-            noi=noi,
-            debt_service=debt_service,
-        )
-
-    def calculate_all_metrics(
-        self,
-        initial_investment: float,
-        cash_flows: List[float],
-        reversion_value: float,
-        discount_rate: float,
-        debt_service: Optional[float] = None,
-    ) -> Dict[str, Any]:
-        """
-        Calculate all investment metrics at once.
-
-        Args:
-            initial_investment: Initial equity investment
-            cash_flows: Periodic cash flows
-            reversion_value: Final sale proceeds
-            discount_rate: Discount rate for NPV
-            debt_service: Annual debt service (for DSCR)
-
-        Returns:
-            Dictionary with all metrics
-        """
-        irr = self.calculate_irr(initial_investment, cash_flows, reversion_value)
-        npv = self.calculate_npv(discount_rate, initial_investment, cash_flows, reversion_value)
-        equity_multiple = self.calculate_equity_multiple(
-            initial_investment, cash_flows, reversion_value
-        )
-
-        metrics = {
-            'irr': float(irr),
-            'irr_pct': float(irr * 100),
-            'npv': float(npv),
-            'equity_multiple': float(equity_multiple),
-            'initial_investment': float(initial_investment),
-            'total_cash_flows': float(sum(cash_flows)),
-            'reversion_value': float(reversion_value),
-            'total_return': float(sum(cash_flows) + reversion_value),
-        }
-
-        if debt_service and debt_service > 0:
-            # Calculate average NOI from cash flows (approximation)
-            avg_noi = sum(cash_flows) / len(cash_flows) if cash_flows else 0
-            dscr = self.calculate_dscr(avg_noi, debt_service)
-            metrics['dscr'] = float(dscr)
-
-        return metrics
-
-    def generate_cashflow_projection(
-        self,
-        property_data: Dict[str, Any],
-        start_date: date,
-        end_date: date,
-        period_type: str = 'annual',
-    ) -> Dict[str, Any]:
-        """
-        Generate cash flow projection for a property.
-
-        Args:
-            property_data: Property data including leases, expenses
-            start_date: Projection start date
-            end_date: Projection end date
-            period_type: 'monthly' or 'annual'
-
-        Returns:
-            Cash flow projection with periods
-        """
-        # This is a simplified wrapper - full implementation would convert
-        # Django models to Pydantic models and call cashflow_engine
-
-        # For now, return structure that matches expected format
+        project = Project.objects.get(project_id=project_id)
+        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+        
+        # Get budget summary
+        total_budget = sum(float(item.budgeted_amount or 0) for item in budget_items)
+        total_actual = sum(float(item.actual_amount or 0) for item in actual_items)
+        variance = total_actual - total_budget
+        
+        # Calculate IRR and NPV
+        irr_result = CalculationService.calculate_irr(project_id)
+        npv_result = CalculationService.calculate_npv(project_id)
+        
         return {
-            'periods': [],
-            'summary': {
-                'total_revenue': 0,
-                'total_expenses': 0,
-                'total_noi': 0,
+            'project_id': project_id,
+            'project_name': project.project_name,
+            'budget_summary': {
+                'total_budget': total_budget,
+                'total_actual': total_actual,
+                'variance': variance,
+                'variance_pct': (variance / total_budget * 100) if total_budget > 0 else 0,
             },
-            'start_date': start_date.isoformat(),
-            'end_date': end_date.isoformat(),
-            'period_type': period_type,
+            'investment_metrics': {
+                'irr': irr_result.get('irr'),
+                'npv': npv_result.get('npv'),
+                'discount_rate': float(project.discount_rate_pct or 0.10),
+            },
+            'status': 'complete',
         }
-
-    def calculate_lease_metrics(
-        self,
-        lease_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    
+    @staticmethod
+    def generate_cashflow_projection(
+        project_id: int,
+        periods: int = 120,
+        include_actuals: bool = True
+    ) -> Dict:
         """
-        Calculate metrics for a single lease.
-
+        Generate period-by-period cash flow projection.
+        
         Args:
-            lease_data: Lease data including rent schedule, escalations
-
+            project_id: Project ID
+            periods: Number of periods to project
+            include_actuals: Include actual data where available
+            
         Returns:
-            Lease metrics (total rent, effective rent, etc.)
+            Dictionary with cash flow projection
         """
-        # Simplified wrapper - full implementation would use LeaseCalculator
-
+        project = Project.objects.get(project_id=project_id)
+        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        
+        cashflows = convert_budget_items_to_cashflows(list(budget_items))
+        
+        if include_actuals:
+            actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+            for item in actual_items:
+                cashflows.append({
+                    'period': item.fiscal_period,
+                    'fiscal_year': item.fiscal_year,
+                    'category': item.category,
+                    'amount': float(item.actual_amount or 0),
+                    'is_actual': True,
+                })
+        
+        # Organize by period
+        period_data = {}
+        for cf in cashflows:
+            period = cf.get('period', 0)
+            if period not in period_data:
+                period_data[period] = {
+                    'period': period,
+                    'fiscal_year': cf.get('fiscal_year'),
+                    'inflows': 0,
+                    'outflows': 0,
+                    'net_cashflow': 0,
+                    'categories': {},
+                }
+            
+            amount = cf['amount']
+            category = cf.get('category', 'Other')
+            
+            if cf.get('is_revenue', False):
+                period_data[period]['inflows'] += amount
+            else:
+                period_data[period]['outflows'] += amount
+            
+            if category not in period_data[period]['categories']:
+                period_data[period]['categories'][category] = 0
+            period_data[period]['categories'][category] += amount
+        
+        # Calculate net cash flow and cumulative
+        cumulative = 0
+        projection = []
+        
+        for period in sorted(period_data.keys()):
+            data = period_data[period]
+            net = data['inflows'] - data['outflows']
+            cumulative += net
+            
+            data['net_cashflow'] = net
+            data['cumulative_cashflow'] = cumulative
+            projection.append(data)
+        
         return {
-            'total_base_rent': 0,
-            'total_percentage_rent': 0,
-            'total_expense_recovery': 0,
-            'total_rent': 0,
-            'effective_rent_psf': 0,
+            'project_id': project_id,
+            'project_name': project.project_name,
+            'total_periods': len(projection),
+            'projection': projection,
+            'summary': {
+                'total_inflows': sum(p['inflows'] for p in projection),
+                'total_outflows': sum(p['outflows'] for p in projection),
+                'net_cashflow': cumulative,
+            },
         }
-
-    def convert_django_to_pydantic_property(
-        self,
-        project,
-        leases_queryset,
-    ) -> PropertyData:
-        """
-        Convert Django ORM models to Pydantic PropertyData model.
-
-        This enables the Python calculation engine to process Django data.
-
-        Args:
-            project: Django Project model instance
-            leases_queryset: QuerySet of Lease models
-
-        Returns:
-            PropertyData Pydantic model
-        """
-        # Convert leases
-        lease_data_list = []
-        for lease in leases_queryset:
-            # This would need full conversion logic
-            # For now, placeholder
-            pass
-
-        # Create PropertyData
-        # property_data = PropertyData(
-        #     cre_property_id=project.project_id,
-        #     property_name=project.project_name,
-        #     rentable_sf=...,
-        #     acquisition_price=...,
-        #     leases=lease_data_list,
-        # )
-
-        # return property_data
-        raise NotImplementedError("Full ORM to Pydantic conversion not yet implemented")
