@@ -1,0 +1,178 @@
+/**
+ * Scenario Management Styles - Dark Theme
+ * Feature: SCENARIO-001 - Revised Integration (LX9)
+ * Updated: 2025-10-24
+ *
+ * CSS styles for scenario chip-based UI integrated with dark multifamily theme.
+ */
+
+/* ============================================================================
+   Chip Base Styles
+   ============================================================================ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 200ms ease;
+  border: none;
+  position: relative;
+}
+
+.chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.chip-label {
+  user-select: none;
+}
+
+.chip-icon {
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.chip-menu-trigger {
+  font-size: 18px;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.chip-menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* ============================================================================
+   Form Controls - Dark Theme
+   ============================================================================ */
+
+.form-control {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #4B5563;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #1F2937;
+  color: white;
+}
+
+.form-control::placeholder {
+  color: #6B7280;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ============================================================================
+   Buttons - Dark Theme
+   ============================================================================ */
+
+.btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  border: none;
+}
+
+.btn-primary {
+  background: #3B82F6;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #2563EB;
+}
+
+.btn-primary:active {
+  background: #1D4ED8;
+}
+
+.btn-secondary {
+  background: #374151;
+  color: #D1D5DB;
+  border: 1px solid #4B5563;
+}
+
+.btn-secondary:hover {
+  background: #4B5563;
+}
+
+.btn-secondary:active {
+  background: #1F2937;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .scenario-manager {
+    padding: 16px 16px;
+  }
+
+  .chip {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  .chip-icon {
+    font-size: 10px;
+  }
+}
+
+/* ============================================================================
+   Accessibility
+   ============================================================================ */
+
+.chip:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+}
+
+.form-control:focus-visible {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* ============================================================================
+   Animations
+   ============================================================================ */
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chip-dropdown-menu {
+  animation: slideDown 150ms ease-out;
+}

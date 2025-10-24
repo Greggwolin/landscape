@@ -6,6 +6,7 @@ Provides:
 - Budget rollup aggregations by project/container
 - Actual item tracking
 - Variance analysis
+- Scenario filtering support (LX9)
 """
 
 from rest_framework import viewsets, status
@@ -15,6 +16,7 @@ from django.db.models import Sum, Count, Q
 from django.db import connection
 from decimal import Decimal
 from .models import BudgetItem, ActualItem
+from .mixins import ScenarioFilterMixin
 from .models_finance_structure import (
     FinanceStructure,
     CostAllocation,
@@ -447,7 +449,7 @@ class ActualItemViewSet(viewsets.ModelViewSet):
 # ============================================================================
 
 
-class FinanceStructureViewSet(viewsets.ModelViewSet):
+class FinanceStructureViewSet(ScenarioFilterMixin, viewsets.ModelViewSet):
     """
     ViewSet for FinanceStructure model.
 
@@ -461,6 +463,10 @@ class FinanceStructureViewSet(viewsets.ModelViewSet):
     - POST /api/finance-structures/:id/calculate_allocations/ - Auto-calculate allocations
     - GET /api/finance-structures/cost_to_complete/:container_id/ - Get cost-to-complete
     - GET /api/finance-structures/by_project/:project_id/ - Get structures by project
+
+    Query Parameters:
+    - project_id: Filter by project
+    - scenario_id: Filter by scenario (NEW - LX9)
     """
 
     queryset = FinanceStructure.objects.select_related('project').prefetch_related(
@@ -638,7 +644,7 @@ class FinanceStructureViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class CostAllocationViewSet(viewsets.ModelViewSet):
+class CostAllocationViewSet(ScenarioFilterMixin, viewsets.ModelViewSet):
     """
     ViewSet for CostAllocation model.
 
@@ -651,6 +657,10 @@ class CostAllocationViewSet(viewsets.ModelViewSet):
     - DELETE /api/cost-allocations/:id/ - Delete cost allocation
     - GET /api/cost-allocations/by_structure/:structure_id/ - Get allocations by structure
     - GET /api/cost-allocations/by_container/:container_id/ - Get allocations by container
+
+    Query Parameters:
+    - project_id: Filter by project
+    - scenario_id: Filter by scenario (NEW - LX9)
     """
 
     queryset = CostAllocation.objects.select_related(

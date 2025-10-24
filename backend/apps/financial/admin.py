@@ -9,6 +9,9 @@ from .models_finance_structure import (
     ParticipationPayment,
 )
 
+# Import scenario admin (registers itself with @admin.register decorators)
+from . import admin_scenario  # noqa: F401
+
 
 # BudgetItem and ActualItem admin temporarily disabled
 # The models have fields that don't match the actual core_fin_fact_budget table schema
