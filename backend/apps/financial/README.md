@@ -2,9 +2,46 @@
 
 ## Overview
 
-Django REST Framework implementation of the Financial/Budget API with hierarchical rollup support.
+Django REST Framework implementation of the Financial/Budget API with hierarchical rollup support and scenario management.
+
+**Latest Update:** October 24, 2025 - Scenario Management System added
+
+## Features
+
+- ✅ Budget and Actual item tracking
+- ✅ Finance structure and cost allocation
+- ✅ Sale settlement and participation payments
+- ✅ **Scenario management** - Create, compare, and switch between multiple financial scenarios
+- ✅ Hierarchical rollup aggregations
+- ✅ Variance analysis
+- ✅ Scenario filtering across all financial data
 
 ## Endpoints
+
+### Scenarios (NEW - Oct 24, 2025)
+
+#### Standard CRUD
+- `GET /api/financial/scenarios/` - List all scenarios
+- `GET /api/financial/scenarios/?project_id=7` - List scenarios for project
+- `POST /api/financial/scenarios/` - Create new scenario
+- `GET /api/financial/scenarios/:id/` - Retrieve scenario
+- `PUT /api/financial/scenarios/:id/` - Update scenario
+- `PATCH /api/financial/scenarios/:id/` - Partial update
+- `DELETE /api/financial/scenarios/:id/` - Delete scenario
+
+#### Custom Actions
+- `POST /api/financial/scenarios/:id/activate/` - Activate scenario (deactivates others)
+- `POST /api/financial/scenarios/:id/clone/` - Clone scenario with all assumptions
+- `POST /api/financial/scenarios/:id/lock/` - Lock scenario to prevent edits
+- `POST /api/financial/scenarios/:id/unlock/` - Unlock scenario
+- `POST /api/financial/scenarios/reorder/` - Reorder scenarios for display
+
+### Scenario Comparisons (NEW - Oct 24, 2025)
+
+- `GET /api/financial/scenario-comparisons/` - List comparisons
+- `POST /api/financial/scenario-comparisons/` - Create comparison
+- `GET /api/financial/scenario-comparisons/:id/` - Get comparison details
+- `POST /api/financial/scenario-comparisons/:id/calculate/` - Calculate comparison results
 
 ### Budget Items
 
