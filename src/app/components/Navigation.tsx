@@ -1,10 +1,14 @@
 // app/components/Navigation.tsx
+'use client';
+
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { useProjectContext } from './ProjectProvider'
 import NewProjectButton from './NewProjectButton'
+import { ThemeToggle } from './ThemeToggle'
 
 interface NavigationProps {
   activeView: string;
@@ -22,89 +26,60 @@ interface NavItem {
   label: string;
   href?: string;
   target?: string;
+  icon?: string;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const { activeProject } = useProjectContext()
+  const { activeProject, projects, selectProject } = useProjectContext()
   const projectId = activeProject?.project_id
-  const { config: projectConfig } = useProjectConfig(projectId ?? undefined)
+  const { config: _projectConfig } = useProjectConfig(projectId ?? undefined)
   const router = useRouter();
   const pathname = usePathname();
 
-  const level2Label = projectConfig?.level2_label ?? 'Phase'
+  // Reserved for future use - project config level2 label
+  // const level2Label = _projectConfig?.level2_label ?? 'Phase';
 
   const navSections: NavSection[] = useMemo(() => [
     {
-      title: 'Home',
+      title: 'Project',
       items: [
-        { id: 'home', label: 'Home' },
-        { id: 'dev-status', label: 'Development Status' },
-        { id: 'documentation', label: 'Documentation' },
-        { id: 'prototype-lab', label: 'Prototype Lab', href: '/prototypes' }
-      ]
-    },
-    {
-      title: 'Planning',
-      items: [
-        { id: 'planning-inline', label: 'Planning' },
-        { id: 'planning-overview', label: 'Overview' }
-      ],
-      isCollapsible: true
-    },
-    {
-      title: 'Assumptions',
-      items: [
-        { id: 'assumptions', label: 'Deal Assumptions', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/11/assumptions' },
-        { id: 'market', label: 'Global' },
-        { id: 'market-page', label: 'Market', href: '/market' },
-        { id: 'growth-rates', label: 'Market Rates & Prices' },
-        { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll' },
-        { id: 'inventory', label: 'Inventory', href: '/inventory' }
-      ],
-      isCollapsible: true
-    },
-    {
-      title: 'Budgets',
-      items: [
-        { id: 'project-costs', label: 'Project Costs' },
-        { id: 'budget-grid-light', label: 'Budget Grid (Light)' },
-        { id: 'budget-grid-dark', label: 'Budget Grid (Dark)' }
-      ],
-      isCollapsible: true
-    },
-    {
-      title: 'Documents (DMS)',
-      items: [
-        { id: 'dms', label: 'Document Management', href: '/dms' },
-        { id: 'admin-dms-attributes', label: 'DMS Attributes', href: '/admin/dms/attributes' },
-        { id: 'admin-dms-templates', label: 'DMS Templates', href: '/admin/dms/templates' }
+        { id: 'project-overview', label: 'Overview', href: projectId ? `/projects/${projectId}/overview` : '/projects/11/overview', icon: '📊' }
       ],
       isCollapsible: false
     },
     {
-      title: 'Settings',
+      title: 'Financial',
       items: [
-        { id: 'settings', label: 'Settings' },
-        { id: 'zoning-glossary', label: 'Zoning Glossary' },
-        { id: 'planning', label: `${level2Label} Planner (Legacy)` }
-      ]
-    },
-    {
-      title: 'Admin',
-      items: [
-        { id: 'project-setup', label: 'New Project Setup', href: '/projects/setup' }
+        { id: 'assumptions', label: 'Assumptions', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/11/assumptions', icon: '💰' },
+        { id: 'opex', label: 'Operating Expenses', href: projectId ? `/projects/${projectId}/opex` : '/projects/11/opex', icon: '💵' }
       ],
-      isCollapsible: true
+      isCollapsible: false
     },
     {
-      title: 'Demos',
+      title: 'Property Data',
       items: [
-        { id: 'breadcrumb-demo', label: 'Dynamic Breadcrumbs', href: '/breadcrumb-demo' }
+        { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll', icon: '🏠' },
+        { id: 'market', label: 'Market Data', href: '/market', icon: '📈' }
+      ],
+      isCollapsible: false
+    },
+    {
+      title: 'Documents',
+      items: [
+        { id: 'dms', label: 'Document Library', href: '/dms', icon: '📁' }
+      ],
+      isCollapsible: false
+    },
+    {
+      title: 'Development',
+      items: [
+        { id: 'test-coreui', label: 'Theme Demo', href: '/test-coreui', icon: '🎨' },
+        { id: 'prototypes', label: 'Prototypes', href: '/prototypes', icon: '🔬' }
       ],
       isCollapsible: true
     }
-  ], [level2Label, projectId])
+  ], [projectId])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({
@@ -114,12 +89,50 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
   };
 
   return (
-    <nav className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-gray-300 text-sm font-medium">Project Navigation</h2>
+    <nav
+      className="w-64 border-r flex flex-col h-screen"
+      style={{
+        backgroundColor: 'var(--cui-sidebar-bg)',
+        borderColor: 'var(--cui-sidebar-border-color)'
+      }}
+    >
+      {/* Logo at very top */}
+      <div className="p-4 border-b" style={{ borderColor: 'var(--cui-sidebar-border-color)' }}>
+        <div className="flex items-center justify-center">
+          <Image
+            src="/logo-invert.png"
+            alt="Landscape Logo"
+            width={150}
+            height={32}
+            className="h-8 object-contain"
+            style={{ width: 'auto' }}
+          />
         </div>
-        <NewProjectButton />
+      </div>
+
+      {/* Project selector below logo */}
+      <div className="p-4 border-b" style={{ borderColor: 'var(--cui-sidebar-border-color)' }}>
+        <select
+          value={activeProject?.project_id || ''}
+          onChange={(e) => selectProject(Number(e.target.value))}
+          className="w-full px-3 py-2 text-sm rounded focus:outline-none"
+          style={{
+            backgroundColor: 'var(--cui-sidebar-nav-link-hover-bg)',
+            borderColor: 'var(--cui-sidebar-border-color)',
+            color: 'var(--cui-sidebar-nav-link-color)',
+            border: '1px solid var(--cui-sidebar-border-color)'
+          }}
+        >
+          <option value="">Select a project</option>
+          {projects.map((project) => (
+            <option key={project.project_id} value={project.project_id}>
+              {project.project_name}
+            </option>
+          ))}
+        </select>
+        <div className="mt-3">
+          <NewProjectButton />
+        </div>
       </div>
 
       <div className="flex-1 py-2 overflow-y-auto">
@@ -128,24 +141,28 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
             {section.isCollapsible ? (
               <button
                 onClick={() => toggleSection(section.title)}
-                className="w-full text-left px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide hover:text-gray-300 flex items-center justify-between transition-colors"
+                className="w-full text-left px-4 py-2 text-xs font-medium uppercase tracking-wide flex items-center justify-between transition-colors"
+                style={{ color: 'var(--cui-tertiary-color)' }}
               >
                 <span>{section.title}</span>
-                <svg 
-                  className={`w-4 h-4 transition-transform ${collapsedSections[section.title] ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className={`w-4 h-4 transition-transform ${collapsedSections[section.title] ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
             ) : (
-              <div className="px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              <div
+                className="px-4 py-2 text-xs font-medium uppercase tracking-wide"
+                style={{ color: 'var(--cui-tertiary-color)' }}
+              >
                 {section.title}
               </div>
             )}
-            
+
             {(!section.isCollapsible || !collapsedSections[section.title]) && (
               <div className="space-y-0.5">
                 {section.items.map((item) => {
@@ -153,7 +170,15 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                   const isActive = item.href
                     ? pathname === item.href
                     : activeView === item.id;
-                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center gap-3 hover:bg-gray-700 transition-colors ${isActive ? 'bg-gray-700 text-white border-r-2 border-blue-500' : 'text-gray-300'}`;
+                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center gap-3 transition-colors`;
+                  const activeStyle = isActive ? {
+                    backgroundColor: 'var(--cui-sidebar-nav-link-active-bg)',
+                    color: 'var(--cui-sidebar-nav-link-active-color)',
+                    borderRight: '2px solid var(--cui-primary)'
+                  } : {
+                    color: 'var(--cui-sidebar-nav-link-color)'
+                  };
+                  const hoverStyle = !isActive ? { cursor: 'pointer' } : {};
 
                   if (item.href) {
                     return (
@@ -162,8 +187,23 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                         href={item.href}
                         target={item.target}
                         className={baseClasses}
+                        style={{ ...activeStyle, ...hoverStyle }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
                       >
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                        {item.icon ? (
+                          <span className="text-base" aria-hidden="true">{item.icon}</span>
+                        ) : (
+                          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                        )}
                         <span>{item.label}</span>
                       </Link>
                     );
@@ -186,8 +226,23 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                       key={item.id}
                       onClick={handleClick}
                       className={baseClasses}
+                      style={{ ...activeStyle, ...hoverStyle }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
                     >
-                      <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                      {item.icon ? (
+                        <span className="text-base" aria-hidden="true">{item.icon}</span>
+                      ) : (
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                      )}
                       <span>{item.label}</span>
                     </button>
                   );
@@ -198,9 +253,10 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         ))}
       </div>
 
-      <div className="p-4 border-t border-gray-700">
-        <div className="text-xs text-gray-500 space-y-1">
-          <div>Project ID: 7</div>
+      <div className="p-4 border-t" style={{ borderColor: 'var(--cui-sidebar-border-color)' }}>
+        <ThemeToggle className="mb-3" />
+        <div className="text-xs space-y-1" style={{ color: 'var(--cui-tertiary-color)' }}>
+          <div>Project ID: {activeProject?.project_id || 'None'}</div>
           <div>Last saved: Just now</div>
         </div>
       </div>

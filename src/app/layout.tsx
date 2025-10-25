@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import './globals.css';
+import '@/styles/coreui-theme.css';
 import { IssueReporterProvider } from "@/components/IssueReporter";
+import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
+import { ProjectProvider } from "@/app/components/ProjectProvider";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
 
 export const metadata: Metadata = {
-  title: "Landscape (Materio Skin)", 
+  title: "Landscape (Materio Skin)",
   description: "UI/UX-first prototype with MUI shell",
   icons: {
     icon: '/favicon.ico',
@@ -16,11 +19,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-gray-950">
-        <IssueReporterProvider>
-          {children}
-        </IssueReporterProvider>
+    <html lang="en">
+      <body>
+        <CoreUIThemeProvider>
+          <ProjectProvider>
+            <IssueReporterProvider>
+              {children}
+            </IssueReporterProvider>
+          </ProjectProvider>
+        </CoreUIThemeProvider>
       </body>
     </html>
   );

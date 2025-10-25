@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { useProjectContext } from './ProjectProvider';
 
 interface HeaderProps {
+  title?: string;
   isEditing?: boolean;
   onEdit?: () => void;
   onSave?: () => void;
@@ -13,45 +13,34 @@ interface HeaderProps {
 }
 
 export default function Header({
+  title = 'Landscape Platform',
   isEditing = false,
   onEdit,
   onSave,
   onCancel,
   isSaving = false
 }: HeaderProps) {
-  const { projects, activeProject, selectProject } = useProjectContext();
+  const { activeProject } = useProjectContext();
 
   return (
-    <header className="bg-gray-900 border-b border-gray-800 px-4 py-3">
-      <div className="flex items-center gap-4">
-        {/* Left: Logo */}
-        <div className="flex items-center flex-shrink-0">
-          <Image
-            src="/logo-invert.png"
-            alt="Landscape Logo"
-            width={120}
-            height={40}
-            className="h-10 object-contain"
-            style={{ width: 'auto' }}
-            priority
-          />
-        </div>
-
-        {/* Project Selector - full width minus logo and controls */}
-        <div className="flex-1">
-          <select
-            value={activeProject?.project_id || ''}
-            onChange={(e) => selectProject(Number(e.target.value))}
-            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-            disabled={isEditing}
-          >
-            <option value="">Select a project</option>
-            {projects.map((project) => (
-              <option key={project.project_id} value={project.project_id}>
-                {project.project_name}
-              </option>
-            ))}
-          </select>
+    <header
+      className="border-b px-6 py-4"
+      style={{
+        backgroundColor: 'var(--cui-header-bg)',
+        borderColor: 'var(--cui-header-border-color)'
+      }}
+    >
+      <div className="flex items-center justify-between">
+        {/* Left: Page Title */}
+        <div>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+            {title}
+          </h1>
+          {activeProject && (
+            <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+              {activeProject.project_name}
+            </p>
+          )}
         </div>
 
         {/* Right: Conditional Edit/Save/Cancel Controls */}
@@ -60,7 +49,8 @@ export default function Header({
             {!isEditing ? (
               <button
                 onClick={onEdit}
-                className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                className="px-4 py-2 transition-colors"
+                style={{ color: 'var(--cui-secondary-color)' }}
               >
                 <i className="ri-edit-line mr-2"></i>
                 Edit
@@ -69,7 +59,8 @@ export default function Header({
               <>
                 <button
                   onClick={onCancel}
-                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                  className="px-4 py-2 transition-colors"
+                  style={{ color: 'var(--cui-secondary-color)' }}
                   disabled={isSaving}
                 >
                   <i className="ri-close-line mr-2"></i>
@@ -77,7 +68,11 @@ export default function Header({
                 </button>
                 <button
                   onClick={onSave}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--cui-primary)',
+                    color: '#ffffff'
+                  }}
                   disabled={isSaving}
                 >
                   <i className="ri-save-line mr-2"></i>
