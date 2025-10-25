@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import Navigation from '@/app/components/Navigation';
-import Header from '@/app/components/Header';
 import { PROPERTY_TYPE_TEMPLATES, PropertyType, getPropertyTypeTemplate } from '@/types/propertyTypes';
 import MapView from '@/app/components/MapView';
 
@@ -56,9 +55,36 @@ export default function ProjectOverviewPage() {
       <Navigation activeView={activeView} setActiveView={setActiveView} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          title={currentProject ? `${currentProject.project_name}` : "Project Overview"}
-        />
+        {/* Project Selector in upper left corner */}
+        <div
+          className="px-6 py-3 border-b flex items-center"
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            borderColor: 'var(--cui-border-color)'
+          }}
+        >
+          <select
+            value={currentProject?.project_id || ''}
+            onChange={(e) => {
+              const newProjectId = Number(e.target.value);
+              window.location.href = `/projects/${newProjectId}/overview`;
+            }}
+            className="px-3 py-2 text-sm font-semibold rounded focus:outline-none cursor-pointer"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)',
+              border: '1px solid var(--cui-border-color)'
+            }}
+          >
+            <option value="">Select a project</option>
+            {projects.map((project) => (
+              <option key={project.project_id} value={project.project_id}>
+                {project.project_name} - {project.property_type_code || 'Unknown Type'}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Tab Navigation */}
         <div
