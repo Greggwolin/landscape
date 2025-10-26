@@ -5,10 +5,41 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { useProjectContext } from './ProjectProvider'
-import NewProjectButton from './NewProjectButton'
 import { ThemeToggle } from './ThemeToggle'
+import CIcon from '@coreui/icons-react';
+import {
+  cilChartPie,
+  cilMoney,
+  cilCash,
+  cilHome,
+  cilGraph,
+  cilFolder,
+  cilPaint,
+  cilBeaker,
+  cilFile,
+  cilNotes,
+  cilSpeedometer,
+  cilSettings,
+  cilDescription
+} from '@coreui/icons';
+
+// Icon map for dynamic icon lookup
+const ICON_MAP: Record<string, any> = {
+  cilChartPie,
+  cilMoney,
+  cilCash,
+  cilHome,
+  cilGraph,
+  cilFolder,
+  cilPaint,
+  cilBeaker,
+  cilFile,
+  cilNotes,
+  cilSpeedometer,
+  cilSettings,
+  cilDescription
+};
 
 interface NavigationProps {
   activeView: string;
@@ -31,9 +62,8 @@ interface NavItem {
 
 const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const { activeProject, projects, selectProject } = useProjectContext()
+  const { activeProject } = useProjectContext()
   const projectId = activeProject?.project_id
-  const { config: _projectConfig } = useProjectConfig(projectId ?? undefined)
   const router = useRouter();
   const pathname = usePathname();
 
@@ -42,44 +72,64 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
 
   const navSections: NavSection[] = useMemo(() => [
     {
+      title: 'Home',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: 'cilSpeedometer' }
+      ],
+      isCollapsible: false
+    },
+    {
       title: 'Project',
       items: [
-        { id: 'project-overview', label: 'Overview', href: projectId ? `/projects/${projectId}/overview` : '/projects/11/overview', icon: '📊' }
+        { id: 'project-overview', label: 'Project', href: projectId ? `/projects/${projectId}` : '/projects/7', icon: 'cilChartPie' }
       ],
       isCollapsible: false
     },
     {
       title: 'Financial',
       items: [
-        { id: 'assumptions', label: 'Assumptions', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/11/assumptions', icon: '💰' },
-        { id: 'opex', label: 'Operating Expenses', href: projectId ? `/projects/${projectId}/opex` : '/projects/11/opex', icon: '💵' }
+        { id: 'opex', label: 'Operating Expenses', href: projectId ? `/projects/${projectId}/opex` : '/projects/11/opex', icon: 'cilCash' }
       ],
       isCollapsible: false
     },
     {
       title: 'Property Data',
       items: [
-        { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll', icon: '🏠' },
-        { id: 'market', label: 'Market Data', href: '/market', icon: '📈' }
+        { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll', icon: 'cilHome' }
+      ],
+      isCollapsible: false
+    },
+    {
+      title: 'Reports',
+      items: [
+        { id: 'reports', label: 'Financial Reports', href: '/reports', icon: 'cilDescription' }
       ],
       isCollapsible: false
     },
     {
       title: 'Documents',
       items: [
-        { id: 'dms', label: 'Document Library', href: '/dms', icon: '📁' }
+        { id: 'dms', label: 'Document Library', href: '/dms', icon: 'cilFolder' },
+        { id: 'dms-admin', label: 'DMS Admin', href: '/admin/dms/templates', icon: 'cilSettings' }
       ],
       isCollapsible: false
-    },
-    {
-      title: 'Development',
-      items: [
-        { id: 'test-coreui', label: 'Theme Demo', href: '/test-coreui', icon: '🎨' },
-        { id: 'prototypes', label: 'Prototypes', href: '/prototypes', icon: '🔬' }
-      ],
-      isCollapsible: true
     }
   ], [projectId])
+
+  // Legacy section - placed at bottom, separate from main navigation
+  const legacySection: NavSection = useMemo(() => ({
+    title: 'Legacy',
+    items: [
+      { id: 'assumptions', label: 'Assumptions & Factors', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/17/assumptions', icon: 'cilSettings' },
+      { id: 'market-assumptions', label: 'Market Assumptions (Old)', href: projectId ? `/properties/${projectId}/analysis` : '/properties/17/analysis', icon: 'cilChartPie' },
+      { id: 'market-intel-legacy', label: 'Market Intel (Old)', href: '/market', icon: 'cilGraph' },
+      { id: 'project-overview-legacy', label: 'Project Overview (Old)', href: projectId ? `/projects/${projectId}/overview` : '/projects/11/overview', icon: 'cilFile' },
+      { id: 'test-coreui', label: 'Theme Demo', href: '/test-coreui', icon: 'cilPaint' },
+      { id: 'prototypes', label: 'Prototypes', href: '/prototypes', icon: 'cilBeaker' },
+      { id: 'documentation', label: 'Documentation', href: '/documentation', icon: 'cilNotes' }
+    ],
+    isCollapsible: true
+  }), [projectId])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({
@@ -87,6 +137,117 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       [sectionTitle]: !prev[sectionTitle]
     }));
   };
+
+  // Helper function to render a navigation section
+  const renderSection = (section: NavSection, addTopBorder = false) => (
+    <div key={section.title} className={`mb-1 ${addTopBorder ? 'border-t pt-2' : ''}`} style={addTopBorder ? { borderColor: 'var(--cui-sidebar-border-color)' } : undefined}>
+      {section.isCollapsible ? (
+        <button
+          onClick={() => toggleSection(section.title)}
+          className="w-full text-left px-4 py-2 text-xs font-medium uppercase tracking-wide flex items-center justify-between transition-colors"
+          style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+        >
+          <span>{section.title}</span>
+          <svg
+            className={`w-4 h-4 transition-transform ${collapsedSections[section.title] ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      ) : (
+        <div
+          className="px-4 py-2 text-xs font-medium uppercase tracking-wide"
+          style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+        >
+          {section.title}
+        </div>
+      )}
+
+      {(!section.isCollapsible || !collapsedSections[section.title]) && (
+        <div className="space-y-0.5">
+          {section.items.map((item) => {
+            const isActive = item.href ? pathname === item.href : activeView === item.id;
+            const baseClasses = `w-full text-left px-6 py-2.5 text-base flex items-center gap-3 transition-colors no-underline`;
+            const activeStyle = isActive ? {
+              backgroundColor: 'var(--cui-sidebar-nav-link-active-bg)',
+              color: 'var(--cui-sidebar-nav-link-active-color)',
+              borderRight: '2px solid var(--cui-primary)'
+            } : {
+              color: 'var(--cui-sidebar-nav-link-color)'
+            };
+            const hoverStyle = !isActive ? { cursor: 'pointer' } : {};
+
+            if (item.href) {
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  target={item.target}
+                  className={baseClasses}
+                  style={{ ...activeStyle, ...hoverStyle }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {item.icon ? (
+                    <CIcon icon={ICON_MAP[item.icon]} size="sm" className="opacity-70" />
+                  ) : (
+                    <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                  )}
+                  <span>{item.label}</span>
+                </Link>
+              );
+            }
+
+            const handleClick = () => {
+              if (pathname !== '/') {
+                router.push('/');
+                setTimeout(() => setActiveView(item.id), 100);
+              } else {
+                setActiveView(item.id);
+              }
+            };
+
+            return (
+              <button
+                key={item.id}
+                onClick={handleClick}
+                className={baseClasses}
+                style={{ ...activeStyle, ...hoverStyle }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                {item.icon ? (
+                  <CIcon icon={ICON_MAP[item.icon]} size="sm" className="opacity-70" />
+                ) : (
+                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+                )}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <nav
@@ -110,147 +271,16 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         </div>
       </div>
 
-      {/* Project selector below logo */}
-      <div className="p-4 border-b" style={{ borderColor: 'var(--cui-sidebar-border-color)' }}>
-        <select
-          value={activeProject?.project_id || ''}
-          onChange={(e) => selectProject(Number(e.target.value))}
-          className="w-full px-3 py-2 text-sm rounded focus:outline-none"
-          style={{
-            backgroundColor: 'var(--cui-sidebar-nav-link-hover-bg)',
-            borderColor: 'var(--cui-sidebar-border-color)',
-            color: 'var(--cui-sidebar-nav-link-color)',
-            border: '1px solid var(--cui-sidebar-border-color)'
-          }}
-        >
-          <option value="">Select a project</option>
-          {projects.map((project) => (
-            <option key={project.project_id} value={project.project_id}>
-              {project.project_name}
-            </option>
-          ))}
-        </select>
-        <div className="mt-3">
-          <NewProjectButton />
-        </div>
-      </div>
-
+      {/* Navigation Menu */}
       <div className="flex-1 py-2 overflow-y-auto">
-        {navSections.map((section) => (
-          <div key={section.title} className="mb-1">
-            {section.isCollapsible ? (
-              <button
-                onClick={() => toggleSection(section.title)}
-                className="w-full text-left px-4 py-2 text-xs font-medium uppercase tracking-wide flex items-center justify-between transition-colors"
-                style={{ color: 'var(--cui-tertiary-color)' }}
-              >
-                <span>{section.title}</span>
-                <svg
-                  className={`w-4 h-4 transition-transform ${collapsedSections[section.title] ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            ) : (
-              <div
-                className="px-4 py-2 text-xs font-medium uppercase tracking-wide"
-                style={{ color: 'var(--cui-tertiary-color)' }}
-              >
-                {section.title}
-              </div>
-            )}
+        {/* Main navigation sections */}
+        {navSections.map(section => renderSection(section))}
 
-            {(!section.isCollapsible || !collapsedSections[section.title]) && (
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  // Determine if this item is active based on href or activeView
-                  const isActive = item.href
-                    ? pathname === item.href
-                    : activeView === item.id;
-                  const baseClasses = `w-full text-left px-6 py-2 text-sm flex items-center gap-3 transition-colors`;
-                  const activeStyle = isActive ? {
-                    backgroundColor: 'var(--cui-sidebar-nav-link-active-bg)',
-                    color: 'var(--cui-sidebar-nav-link-active-color)',
-                    borderRight: '2px solid var(--cui-primary)'
-                  } : {
-                    color: 'var(--cui-sidebar-nav-link-color)'
-                  };
-                  const hoverStyle = !isActive ? { cursor: 'pointer' } : {};
+        {/* Spacer to push legacy section to bottom */}
+        <div className="flex-grow min-h-4"></div>
 
-                  if (item.href) {
-                    return (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        target={item.target}
-                        className={baseClasses}
-                        style={{ ...activeStyle, ...hoverStyle }}
-                        onMouseEnter={(e) => {
-                          if (!isActive) {
-                            e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isActive) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
-                        {item.icon ? (
-                          <span className="text-base" aria-hidden="true">{item.icon}</span>
-                        ) : (
-                          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-                        )}
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  }
-
-                  // For items without href, navigate to root with state-based view
-                  const handleClick = () => {
-                    if (pathname !== '/') {
-                      // Navigate to root first, then set the view
-                      router.push('/');
-                      // Use setTimeout to ensure navigation completes before setting view
-                      setTimeout(() => setActiveView(item.id), 100);
-                    } else {
-                      setActiveView(item.id);
-                    }
-                  };
-
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={handleClick}
-                      className={baseClasses}
-                      style={{ ...activeStyle, ...hoverStyle }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      {item.icon ? (
-                        <span className="text-base" aria-hidden="true">{item.icon}</span>
-                      ) : (
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-                      )}
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
+        {/* Legacy section at bottom with separator */}
+        {renderSection(legacySection, true)}
       </div>
 
       <div className="p-4 border-t" style={{ borderColor: 'var(--cui-sidebar-border-color)' }}>

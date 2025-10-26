@@ -1,8 +1,8 @@
 # Landscape Pro-Forma Documentation
 
-**Version:** 3.3
-**Last Updated:** 2025-10-21
-**Status:** Production Ready + Python Financial Engine (Phase 1)
+**Version:** 3.4
+**Last Updated:** 2025-10-25
+**Status:** Production Ready + PDF Reports + Progressive Assumptions
 
 Welcome to the comprehensive documentation for the Landscape Pro-Forma financial modeling application.
 
@@ -16,7 +16,9 @@ Welcome to the comprehensive documentation for the Landscape Pro-Forma financial
 3. [System Architecture](01-architecture/DATABASE_SCHEMA.md) - Understand the system design
 
 **Looking for specific features?**
-- [Financial Engine](02-features/financial-engine/IMPLEMENTATION_STATUS.md) - Complete status ⭐ **NEW: Python Migration Phase 1**
+- [PDF Report Generation](session-notes/2025-10-25-pdf-reports-navigation.md) - ⭐ **NEW: ARGUS-Quality Reports**
+- [Progressive Assumptions System](session-notes/2025-10-25-pdf-reports-navigation.md#part-2-legacy-navigation-organization) - ⭐ **NEW: Napkin→Mid→Pro**
+- [Financial Engine](02-features/financial-engine/IMPLEMENTATION_STATUS.md) - Complete status
 - [Python Financial Engine](../services/financial_engine_py/README.md) - 5-10x faster calculations
 - [Rent Roll Interface](02-features/rent-roll/UNIVERSAL_RENT_ROLL_INTERFACE.md) - DVL auto-fill system
 - [Document Management](02-features/dms/DMS-Implementation-Status.md) - DMS implementation
@@ -149,6 +151,13 @@ Feature specifications and integration documentation
 - BUDGET_API_CONTAINER_INTEGRATION.md - Budget API integration
 - PROJECT_SETUP_WIZARD.md - Project setup wizard spec
 
+### [session-notes/](session-notes/)
+Development session notes and implementation logs
+- **[2025-10-25-pdf-reports-navigation.md](session-notes/2025-10-25-pdf-reports-navigation.md)** - ⭐ PDF Report Generation + Progressive Assumptions
+- [2025-10-25-multifamily-overview-integration.md](session-notes/2025-10-25-multifamily-overview-integration.md) - Property-type-aware Overview + Tab Fixes
+- [2025-10-24-multifam-django-consolidation.md](session-notes/2025-10-24-multifam-django-consolidation.md) - Django Backend Consolidation
+- [2025-10-23-multifam-rent-roll-prototype.md](session-notes/2025-10-23-multifam-rent-roll-prototype.md) - Rent Roll Prototype Development
+
 ### [archive/](archive/)
 Legacy and superseded documentation
 
@@ -221,6 +230,8 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 
 **Production Ready Features:**
 ✅ Financial Engine (Phases 1, 1.5, 2, 3, 4, 5, 7, 8)
+✅ PDF Report Generation (Property Summary, Cash Flow, Rent Roll)
+✅ Progressive Assumptions System (Napkin → Mid → Pro)
 ✅ Universal Rent Roll Interface with DVL auto-fill
 ✅ Multifamily property tracking
 ✅ Document Management System
@@ -228,7 +239,7 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 ✅ Land use management system
 ✅ CI/CD pipeline with Neon branching
 
-**Core Features: 85% Complete**
+**Core Features: 88% Complete**
 
 ---
 
@@ -265,8 +276,8 @@ When adding new features or making changes:
 ---
 
 **Maintained by:** Engineering Team
-**Documentation Version:** 3.2
-**Last Major Update:** October 21, 2025
+**Documentation Version:** 3.4
+**Last Major Update:** October 25, 2025
 **Next Review:** Upon next major feature release
 
 ---

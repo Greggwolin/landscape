@@ -1,0 +1,217 @@
+{% extends "reports/base.html" %}
+
+{% block title %}Property Summary - {{ property.project_name }}{% endblock %}
+
+{% block report_title %}Property Summary Report{% endblock %}
+{% block report_subtitle %}{{ property.project_name }}{% endblock %}
+
+{% block content %}
+
+<!-- Property Information -->
+<div class="property-info">
+    <h3>Property Information</h3>
+    <table>
+        <tr>
+            <td><strong>Property Name:</strong></td>
+            <td>{{ property.property_name }}</td>
+            <td><strong>Year Built:</strong></td>
+            <td>{{ property.year_built }}</td>
+        </tr>
+        <tr>
+            <td><strong>Address:</strong></td>
+            <td>{{ property.address }}</td>
+            <td><strong>Property Class:</strong></td>
+            <td>Class {{ property.property_class|default:"A" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Total Units:</strong></td>
+            <td>{{ property.total_units }}</td>
+            <td><strong>Total SF:</strong></td>
+            <td>{{ property.rentable_sf|floatformat:0 }} SF</td>
+        </tr>
+        <tr>
+            <td><strong>Purchase Price:</strong></td>
+            <td>${{ property.acquisition_price|floatformat:0 }}</td>
+            <td><strong>Price/Unit:</strong></td>
+            <td>${{ metrics.price_per_unit|floatformat:0 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Acquisition Date:</strong></td>
+            <td>{{ property.acquisition_date }}</td>
+            <td><strong>Price/SF:</strong></td>
+            <td>${{ metrics.price_per_sf|floatformat:2 }}</td>
+        </tr>
+    </table>
+</div>
+
+<!-- Key Financial Metrics -->
+<h2>Key Financial Metrics</h2>
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-label">Current Cap Rate</div>
+        <div class="metric-value">{{ metrics.current_cap_rate|floatformat:2 }}%</div>
+        <div class="metric-subvalue">NOI: ${{ current.noi|floatformat:0 }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Proforma Cap Rate</div>
+        <div class="metric-value">{{ metrics.proforma_cap_rate|floatformat:2 }}%</div>
+        <div class="metric-subvalue">NOI: ${{ proforma.noi|floatformat:0 }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">NOI Increase</div>
+        <div class="metric-value">{{ metrics.noi_increase_pct|floatformat:1 }}%</div>
+        <div class="metric-subvalue">${{ metrics.noi_increase_amount|floatformat:0 }}</div>
+    </div>
+</div>
+
+<!-- Current vs Proforma Analysis -->
+<h2>Current vs Proforma Analysis</h2>
+<table class="comparison-table">
+    <thead>
+        <tr>
+            <th>Line Item</th>
+            <th class="right">Current</th>
+            <th class="right">Proforma</th>
+            <th class="right">Variance</th>
+            <th class="right">% Change</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Gross Potential Rent</strong></td>
+            <td class="right">${{ current.gross_scheduled_rent|floatformat:0 }}</td>
+            <td class="right">${{ proforma.gross_scheduled_rent|floatformat:0 }}</td>
+            <td class="right variance-positive">${{ variance.gsr|floatformat:0 }}</td>
+            <td class="right variance-positive">{{ variance.gsr_pct|floatformat:1 }}%</td>
+        </tr>
+        <tr>
+            <td>Other Income</td>
+            <td class="right">${{ current.other_income|floatformat:0 }}</td>
+            <td class="right">${{ proforma.other_income|floatformat:0 }}</td>
+            <td class="right">$0</td>
+            <td class="right">0.0%</td>
+        </tr>
+        <tr>
+            <td><strong>Gross Potential Income</strong></td>
+            <td class="right">${{ current.gpi|floatformat:0 }}</td>
+            <td class="right">${{ proforma.gpi|floatformat:0 }}</td>
+            <td class="right variance-positive">${{ variance.gpi|floatformat:0 }}</td>
+            <td class="right variance-positive">{{ variance.gpi_pct|floatformat:1 }}%</td>
+        </tr>
+        <tr>
+            <td>Less: Vacancy ({{ vacancy_rate|floatformat:1 }}%)</td>
+            <td class="right variance-negative">(${{ current.vacancy_loss|floatformat:0 }})</td>
+            <td class="right variance-negative">(${{ proforma.vacancy_loss|floatformat:0 }})</td>
+            <td class="right">(${{ variance.vacancy|floatformat:0 }})</td>
+            <td class="right">--</td>
+        </tr>
+        <tr class="subtotal">
+            <td><strong>Effective Gross Income</strong></td>
+            <td class="right">${{ current.effective_gross_income|floatformat:0 }}</td>
+            <td class="right">${{ proforma.effective_gross_income|floatformat:0 }}</td>
+            <td class="right variance-positive">${{ variance.egi|floatformat:0 }}</td>
+            <td class="right variance-positive">{{ variance.egi_pct|floatformat:1 }}%</td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td colspan="4"></td>
+        </tr>
+        <tr>
+            <td><strong>Total Operating Expenses</strong></td>
+            <td class="right">${{ current.total_opex|floatformat:0 }}</td>
+            <td class="right">${{ proforma.total_opex|floatformat:0 }}</td>
+            <td class="right">${{ variance.opex|floatformat:0 }}</td>
+            <td class="right">{{ variance.opex_pct|floatformat:1 }}%</td>
+        </tr>
+        <tr>
+            <td class="text-small" style="padding-left: 2rem;">% of EGI</td>
+            <td class="right text-small">{{ current.opex_ratio|floatformat:2 }}%</td>
+            <td class="right text-small">{{ proforma.opex_ratio|floatformat:2 }}%</td>
+            <td class="right"></td>
+            <td class="right"></td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td colspan="4"></td>
+        </tr>
+        <tr class="total">
+            <td><strong>NET OPERATING INCOME</strong></td>
+            <td class="right">${{ current.noi|floatformat:0 }}</td>
+            <td class="right">${{ proforma.noi|floatformat:0 }}</td>
+            <td class="right variance-positive">${{ variance.noi|floatformat:0 }}</td>
+            <td class="right variance-positive">{{ variance.noi_pct|floatformat:1 }}%</td>
+        </tr>
+        <tr>
+            <td class="text-small" style="padding-left: 2rem;">Cap Rate</td>
+            <td class="right text-small">{{ metrics.current_cap_rate|floatformat:2 }}%</td>
+            <td class="right text-small">{{ metrics.proforma_cap_rate|floatformat:2 }}%</td>
+            <td class="right"></td>
+            <td class="right"></td>
+        </tr>
+        <tr>
+            <td class="text-small" style="padding-left: 2rem;">NOI/Unit</td>
+            <td class="right text-small">${{ current.noi_per_unit|floatformat:0 }}</td>
+            <td class="right text-small">${{ proforma.noi_per_unit|floatformat:0 }}</td>
+            <td class="right"></td>
+            <td class="right"></td>
+        </tr>
+        <tr>
+            <td class="text-small" style="padding-left: 2rem;">NOI/SF</td>
+            <td class="right text-small">${{ current.noi_per_sf|floatformat:2 }}</td>
+            <td class="right text-small">${{ proforma.noi_per_sf|floatformat:2 }}</td>
+            <td class="right"></td>
+            <td class="right"></td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- Returns Analysis -->
+<h2>Returns Analysis</h2>
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-label">Current GRM</div>
+        <div class="metric-value">{{ metrics.current_grm|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Proforma GRM</div>
+        <div class="metric-value">{{ metrics.proforma_grm|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Cash-on-Cash</div>
+        <div class="metric-value">{{ metrics.current_cap_rate|floatformat:2 }}%</div>
+    </div>
+</div>
+
+<!-- Operating Expenses Breakdown -->
+<h2>Operating Expenses</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Expense Category</th>
+            <th class="right">Annual Amount</th>
+            <th class="right">$/Unit</th>
+            <th class="right">$/SF</th>
+            <th class="right">% of EGI</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in expense_details %}
+        <tr class="expense-category">
+            <td>{{ item.category }}</td>
+            <td class="right">${{ item.amount|floatformat:0 }}</td>
+            <td class="right">${{ item.per_unit|floatformat:0 }}</td>
+            <td class="right">${{ item.per_sf|floatformat:2 }}</td>
+            <td class="right">{{ item.pct_of_egi|floatformat:2 }}%</td>
+        </tr>
+        {% endfor %}
+        <tr class="total">
+            <td><strong>TOTAL EXPENSES</strong></td>
+            <td class="right"><strong>${{ current.total_opex|floatformat:0 }}</strong></td>
+            <td class="right"><strong>${{ current.opex_per_unit|floatformat:0 }}</strong></td>
+            <td class="right"><strong>${{ current.opex_per_sf|floatformat:2 }}</strong></td>
+            <td class="right"><strong>{{ current.opex_ratio|floatformat:2 }}%</strong></td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock %}

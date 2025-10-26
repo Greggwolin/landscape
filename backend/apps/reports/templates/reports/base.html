@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Property Report{% endblock %}</title>
+    <style>
+        {{ css|safe }}
+    </style>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="report-container">
+        {% block header %}
+        <div class="report-header">
+            <h1 class="report-title">{% block report_title %}Property Report{% endblock %}</h1>
+            <div class="report-subtitle">{% block report_subtitle %}{% endblock %}</div>
+            <div class="report-date">Generated on {{ report_date }}</div>
+        </div>
+        {% endblock %}
+
+        {% block content %}{% endblock %}
+
+        {% block footer %}
+        <div class="report-footer">
+            <p>© 2025 Landscape Platform - Professional Real Estate Analytics</p>
+            <p class="text-small text-muted">This report contains confidential information. Do not distribute without authorization.</p>
+        </div>
+        {% endblock %}
+    </div>
+</body>
+</html>

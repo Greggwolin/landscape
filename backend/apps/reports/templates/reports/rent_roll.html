@@ -1,0 +1,93 @@
+{% extends "reports/base.html" %}
+{% load report_filters %}
+
+{% block body_class %}{% endblock %}
+
+{% block title %}Rent Roll Summary - {{ property.project_name }}{% endblock %}
+
+{% block report_title %}Rent Roll Summary{% endblock %}
+{% block report_subtitle %}{{ property.property_name }}{% endblock %}
+
+{% block content %}
+
+<!-- Property Summary -->
+<div class="property-info">
+    <table style="border: none; margin: 0; font-size: 9pt;">
+        <tr>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Total Units:</strong> {{ summary.total_units }}</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Occupied Units:</strong> {{ summary.occupied_units }}</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Physical Occupancy:</strong> {{ summary.occupancy_rate|floatformat:1 }}%</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Total SF:</strong> {{ summary.total_sf|intcomma }} SF</td>
+        </tr>
+        <tr>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Avg Current Rent:</strong> ${{ summary.avg_current_rent|floatformat:2 }}/SF</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Avg Proforma Rent:</strong> ${{ summary.avg_proforma_rent|floatformat:2 }}/SF</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Current Monthly Income:</strong> ${{ summary.current_monthly_income|intcomma }}</td>
+            <td style="border: none; padding: 0.15rem 0.75rem 0.15rem 0;"><strong>Monthly Upside:</strong> ${{ summary.monthly_upside|intcomma }} ({{ summary.upside_pct|floatformat:1 }}%)</td>
+        </tr>
+    </table>
+</div>
+
+<!-- Detailed Rent Roll -->
+<h2 style="margin-top: 0.5rem;">Unit-by-Unit Rent Roll</h2>
+<table style="font-size: 8pt; table-layout: fixed;">
+    <thead>
+        <tr>
+            <th style="width: 55px;">Unit #</th>
+            <th style="width: 100px;">Unit Type</th>
+            <th class="right" style="width: 50px;">SF</th>
+            <th class="right" style="width: 70px;">Current Rent</th>
+            <th class="right" style="width: 60px;">Curr $/SF</th>
+            <th class="right" style="width: 70px;">Proforma Rent</th>
+            <th class="right" style="width: 60px;">Prf $/SF</th>
+            <th class="right" style="width: 70px;">Variance</th>
+            <th class="right" style="width: 55px;">% Change</th>
+            <th class="center" style="width: 60px;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for group in units_by_type_list %}
+        <tr class="header-row">
+            <td colspan="10"><strong>{{ group.unit_type }} ({{ group.units|length }} units)</strong></td>
+        </tr>
+        {% for unit in group.units %}
+        <tr>
+            <td>{{ unit.unit_number }}</td>
+            <td>{{ unit.unit_type }}</td>
+            <td class="right">{{ unit.square_feet|intcomma }}</td>
+            <td class="right">{{ unit.current_rent|intcomma }}</td>
+            <td class="right">{{ unit.current_rent_psf|floatformat:2 }}</td>
+            <td class="right">{{ unit.proforma_rent|intcomma }}</td>
+            <td class="right">{{ unit.proforma_rent_psf|floatformat:2 }}</td>
+            <td class="right {% if unit.variance > 0 %}variance-positive{% else %}variance-negative{% endif %}">{{ unit.variance|intcomma }}</td>
+            <td class="right {% if unit.variance_pct > 0 %}variance-positive{% else %}variance-negative{% endif %}">{{ unit.variance_pct|floatformat:1 }}%</td>
+            <td class="center">{{ unit.status|upper }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="subtotal">
+            <td colspan="2"><strong>{{ group.unit_type }} Subtotal</strong></td>
+            <td class="right"><strong>{{ group.subtotal.total_sf|intcomma }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.current_monthly|intcomma }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.current_psf|floatformat:2 }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.proforma_monthly|intcomma }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.proforma_psf|floatformat:2 }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.variance|intcomma }}</strong></td>
+            <td class="right"><strong>{{ group.subtotal.variance_pct|floatformat:1 }}%</strong></td>
+            <td></td>
+        </tr>
+        {% endfor %}
+        <tr class="total">
+            <td colspan="2"><strong>GRAND TOTAL</strong></td>
+            <td class="right"><strong>{{ summary.total_sf|intcomma }}</strong></td>
+            <td class="right"><strong>{{ summary.current_monthly_income|intcomma }}</strong></td>
+            <td class="right"><strong>{{ summary.avg_current_rent|floatformat:2 }}</strong></td>
+            <td class="right"><strong>{{ summary.proforma_monthly_income|intcomma }}</strong></td>
+            <td class="right"><strong>{{ summary.avg_proforma_rent|floatformat:2 }}</strong></td>
+            <td class="right"><strong>{{ summary.monthly_upside|intcomma }}</strong></td>
+            <td class="right"><strong>{{ summary.upside_pct|floatformat:1 }}%</strong></td>
+            <td></td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock %}

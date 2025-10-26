@@ -1,0 +1,99 @@
+{% extends "reports/base.html" %}
+{% load report_filters %}
+
+{% block body_class %}{% if years >= 10 %}cash-flow-report-landscape{% endif %}{% endblock %}
+
+{% block title %}Cash Flow Proforma - {{ years }} Years{% endblock %}
+
+{% block report_title %}Cash Flow Proforma - {{ years }} Years{% endblock %}
+{% block report_subtitle %}{{ property.project_name }} - {{ scenario|title }} Scenario{% endblock %}
+
+{% block content %}
+
+<!-- Annual Cash Flow -->
+<h2 style="margin-top: 0.5rem; margin-bottom: 0.75rem;">{{ years }}-Year Cash Flow Projection</h2>
+<table style="font-size: 9pt;">
+    <thead>
+        <tr>
+            <th style="width: 32%; text-align: left;">Line Item</th>
+            {% for year in year_range %}
+            <th class="right" style="width: {{ 68|divisibleby:years }}%;">Year {{ year }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        <!-- REVENUE SECTION -->
+        <tr class="header-row">
+            <td colspan="{{ years|add:1 }}"><strong>REVENUE</strong></td>
+        </tr>
+        <tr>
+            <td style="white-space: nowrap;">Gross Scheduled Rent</td>
+            {% for cf in cash_flows %}
+            <td class="right">{{ cf.gross_scheduled_rent|intcomma }}</td>
+            {% endfor %}
+        </tr>
+        <tr>
+            <td style="padding-left: 1rem; white-space: nowrap;">Less: Vacancy Loss ({{ vacancy_rate|floatformat:1 }}%)</td>
+            {% for cf in cash_flows %}
+            <td class="right">({{ cf.vacancy_loss|intcomma }})</td>
+            {% endfor %}
+        </tr>
+        <tr class="subtotal">
+            <td style="white-space: nowrap;"><strong>Effective Rental Income</strong></td>
+            {% for cf in cash_flows %}
+            <td class="right"><strong>{{ cf.effective_rental_income|intcomma }}</strong></td>
+            {% endfor %}
+        </tr>
+        <tr>
+            <td style="white-space: nowrap;">Other Income</td>
+            {% for cf in cash_flows %}
+            <td class="right">{{ cf.other_income|intcomma }}</td>
+            {% endfor %}
+        </tr>
+        <tr class="total">
+            <td style="white-space: nowrap;"><strong>EFFECTIVE GROSS INCOME</strong></td>
+            {% for cf in cash_flows %}
+            <td class="right"><strong>{{ cf.effective_gross_income|intcomma }}</strong></td>
+            {% endfor %}
+        </tr>
+
+        <!-- EXPENSES SECTION -->
+        <tr>
+            <td colspan="{{ years|add:1 }}">&nbsp;</td>
+        </tr>
+        <tr class="header-row">
+            <td colspan="{{ years|add:1 }}"><strong>OPERATING EXPENSES</strong></td>
+        </tr>
+        <tr>
+            <td style="white-space: nowrap;">Total Operating Expenses</td>
+            {% for cf in cash_flows %}
+            <td class="right">{{ cf.total_opex|intcomma }}</td>
+            {% endfor %}
+        </tr>
+        <tr>
+            <td style="padding-left: 1rem; font-size: 8pt;">% of EGI</td>
+            {% for cf in cash_flows %}
+            <td class="right" style="font-size: 8pt;">{{ cf.opex_ratio|floatformat:1 }}%</td>
+            {% endfor %}
+        </tr>
+
+        <!-- NOI SECTION -->
+        <tr>
+            <td colspan="{{ years|add:1 }}">&nbsp;</td>
+        </tr>
+        <tr class="total">
+            <td style="white-space: nowrap;"><strong>NET OPERATING INCOME</strong></td>
+            {% for cf in cash_flows %}
+            <td class="right"><strong>{{ cf.noi|intcomma }}</strong></td>
+            {% endfor %}
+        </tr>
+        <tr>
+            <td style="padding-left: 1rem; font-size: 8pt;">NOI Margin %</td>
+            {% for cf in cash_flows %}
+            <td class="right" style="font-size: 8pt;">{{ cf.noi_margin|floatformat:1 }}%</td>
+            {% endfor %}
+        </tr>
+    </tbody>
+</table>
+
+{% endblock %}
