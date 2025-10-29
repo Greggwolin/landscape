@@ -7,7 +7,7 @@ Models for financial modeling scenarios with sensitivity analysis support.
 """
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.postgres.fields import ArrayField
 
@@ -85,7 +85,7 @@ class Scenario(models.Model):
 
     # Metadata
     created_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -7,6 +7,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import Navigation from '@/app/components/Navigation';
 import { PROPERTY_TYPE_TEMPLATES, PropertyType, getPropertyTypeTemplate } from '@/types/propertyTypes';
 import MapView from '@/app/components/MapView';
+import ProjectTabMap from '@/components/map/ProjectTabMap';
 
 // Tab definitions - property type specific
 const GENERIC_TABS = [
@@ -253,14 +254,11 @@ function OverviewTab({ projectId, project }: { projectId: string; project: Recor
         }}
       >
         <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--cui-body-color)' }}>
-          Map View
+          Map View - 3D Oblique
         </h2>
-        <MapView
-          latitude={37.7749}
-          longitude={-122.4194}
-          zoom={13}
-          height="400px"
-          address="San Francisco, CA"
+        <ProjectTabMap
+          projectId={projectId}
+          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
         />
       </div>
 
@@ -660,7 +658,7 @@ function OpexTab({ projectId }: { projectId: string }) {
           Operating Expenses
         </h2>
         <a
-          href={`/projects/${projectId}/opex`}
+          href={`/projects/${projectId}/opex-accounts`}
           className="px-4 py-2 rounded text-sm font-medium transition-colors"
           style={{
             backgroundColor: 'var(--cui-primary)',

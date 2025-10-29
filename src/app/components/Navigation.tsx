@@ -88,7 +88,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Financial',
       items: [
-        { id: 'opex', label: 'Operating Expenses', href: projectId ? `/projects/${projectId}/opex` : '/projects/11/opex', icon: 'cilCash' }
+        { id: 'opex', label: 'Operating Expenses', href: projectId ? `/projects/${projectId}/opex-accounts` : '/projects/11/opex-accounts', icon: 'cilCash' }
       ],
       isCollapsible: false
     },

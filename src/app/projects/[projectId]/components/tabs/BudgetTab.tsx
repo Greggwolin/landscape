@@ -1,0 +1,29 @@
+'use client';
+
+import React from 'react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
+
+interface Project {
+  project_id: number;
+  project_name: string;
+}
+
+interface BudgetTabProps {
+  project: Project;
+}
+
+export default function BudgetTab({ project }: BudgetTabProps) {
+  return (
+    <CCard>
+      <CCardHeader>Development Budget</CCardHeader>
+      <CCardBody>
+        <div className="text-center py-8">
+          <h5>Budget Tab - Coming Soon</h5>
+          <p className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+            This tab will display development costs, soft costs, and budget allocation for {project.project_name}.
+          </p>
+        </div>
+      </CCardBody>
+    </CCard>
+  );
+}
