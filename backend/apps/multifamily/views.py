@@ -6,7 +6,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.db.models import Count, Sum, Q, F
+from django.db.models import Count, Sum, Q, F, Prefetch
 from decimal import Decimal
 from .models import (
     MultifamilyUnit,
@@ -70,7 +70,13 @@ class MultifamilyUnitViewSet(viewsets.ModelViewSet):
     - GET /api/multifamily/units/by_building/:building_name/ - Get units by building
     """
 
-    queryset = MultifamilyUnit.objects.select_related('project').prefetch_related('leases').all()
+    queryset = MultifamilyUnit.objects.select_related('project').prefetch_related(
+        Prefetch(
+            'leases',
+            queryset=MultifamilyLease.objects.filter(lease_status='ACTIVE'),
+            to_attr='active_leases'
+        )
+    ).all()
     serializer_class = MultifamilyUnitSerializer
     permission_classes = [AllowAny]
 

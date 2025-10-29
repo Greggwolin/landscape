@@ -66,7 +66,12 @@ class MultifamilyUnitSerializer(serializers.ModelSerializer):
 
     def get_current_lease(self, obj):
         """Get the current active lease for this unit."""
-        current_lease = obj.leases.filter(lease_status='ACTIVE').first()
+        # Use prefetched active_leases if available, otherwise query normally
+        if hasattr(obj, 'active_leases'):
+            current_lease = obj.active_leases[0] if obj.active_leases else None
+        else:
+            current_lease = obj.leases.filter(lease_status='ACTIVE').first()
+
         if current_lease:
             return {
                 'lease_id': current_lease.lease_id,

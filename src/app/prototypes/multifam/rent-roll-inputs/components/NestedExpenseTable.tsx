@@ -344,22 +344,14 @@ export function NestedExpenseTable({
             <tr className="border-b border-gray-700">
               <th className="text-left px-4 py-2 font-medium text-gray-800">Expense Category</th>
               <th className="text-right px-4 py-2 font-medium text-gray-800">Annual Amount</th>
-              {visibleColumns.includes('per_unit') && (
-                <th className="text-right px-4 py-2 font-medium text-gray-800">Per Unit</th>
-              )}
-              {visibleColumns.includes('per_sf') && mode !== 'basic' && (
-                <th className="text-right px-4 py-2 font-medium text-gray-800">Per SF</th>
-              )}
-              {visibleColumns.includes('escalation_rate') && mode !== 'basic' && (
-                <th className="text-right px-4 py-2 font-medium text-gray-800">Escalation</th>
-              )}
-              {visibleColumns.includes('is_recoverable') && mode === 'advanced' && (
-                <th className="text-center px-4 py-2 font-medium text-gray-800">Recoverable</th>
-              )}
-              {visibleColumns.includes('recovery_rate') && mode === 'advanced' && (
-                <th className="text-right px-4 py-2 font-medium text-gray-800">Recovery %</th>
-              )}
-              <th className="w-20"></th> {/* Save button column */}
+              {visibleColumns.includes('per_unit') && <th className="text-right px-4 py-2 font-medium text-gray-800">Per Unit</th>}
+              {visibleColumns.includes('per_sf') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium text-gray-800">Per SF</th>}
+              {visibleColumns.includes('escalation_rate') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium text-gray-800">Escalation</th>}
+              {visibleColumns.includes('is_recoverable') && mode === 'advanced' && <th className="text-center px-4 py-2 font-medium text-gray-800">Recoverable</th>}
+              {visibleColumns.includes('recovery_rate') && mode === 'advanced' && <th className="text-right px-4 py-2 font-medium text-gray-800">Recovery %</th>}
+              <th className="w-20 text-right px-4 py-2 font-medium text-gray-800">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
