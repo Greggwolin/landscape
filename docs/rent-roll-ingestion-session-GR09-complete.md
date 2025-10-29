@@ -127,7 +127,7 @@ Expected: Creates records in multifamily_unit_type, multifamily_unit, multifamil
 
 ### Backend (Port 8000)
 ```bash
-# Set Claude API key
+# Set Claude API key (get from .env or your Anthropic account)
 export ANTHROPIC_API_KEY="your-api-key-here"
 
 # Start Django server
