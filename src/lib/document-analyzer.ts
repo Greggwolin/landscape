@@ -302,8 +302,8 @@ UTILITIES
     // Parse Red Valley PDF table content - the actual PDF format
     const parcelData: any[] = []
     let totalUnits = 0
-    let phases = new Set<string>()
-    let productTypes = new Set<string>()
+    const phases = new Set<string>()
+    const productTypes = new Set<string>()
 
     // Look for the actual PDF table structure in content
     const lines = content.split('\n')

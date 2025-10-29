@@ -81,7 +81,7 @@ const useOutsideClick = (ref: RefObject<HTMLElement>, handler: () => void) => {
 };
 
 export default function TopNavProjectPrototype() {
-  const { projects, isLoading, selectProject } = useProjectContext();
+  const { projects, isLoading, selectProject, activeProject, activeProjectId } = useProjectContext();
   const [activeTab, setActiveTab] = useState<string>('project');
   const [complexityMode, setComplexityMode] = useState<ComplexityTier>('standard');
   const [isLegacyOpen, setLegacyOpen] = useState(false);
@@ -94,17 +94,22 @@ export default function TopNavProjectPrototype() {
   useOutsideClick(settingsRef, () => setSettingsOpen(false));
 
   useEffect(() => {
-    if (projects.length > 0) {
+    if (!activeProjectId && projects.length > 0) {
       selectProject(DEFAULT_PROJECT_ID);
     }
-  }, [projects, selectProject]);
+  }, [projects, activeProjectId, selectProject]);
 
-  const project = useMemo(
-    () => projects.find((p) => p.project_id === DEFAULT_PROJECT_ID),
-    [projects]
-  );
+  const project = useMemo(() => {
+    if (activeProject) {
+      return activeProject;
+    }
+    if (activeProjectId) {
+      return projects.find((p) => p.project_id === activeProjectId) ?? null;
+    }
+    return projects.find((p) => p.project_id === DEFAULT_PROJECT_ID) ?? null;
+  }, [activeProject, activeProjectId, projects]);
 
-  const projectId = project?.project_id ?? DEFAULT_PROJECT_ID;
+  const projectId = project?.project_id ?? activeProjectId ?? DEFAULT_PROJECT_ID;
 
   const tabs = useMemo(() => getTabsForPropertyType(project?.property_type_code), [project]);
 
@@ -341,7 +346,9 @@ export default function TopNavProjectPrototype() {
             />
             <div className="flex-1 overflow-y-auto">
               <CContainer fluid className="p-4">
-                {activeTab === 'project' && <ProjectTab project={project} />}
+                {activeTab === 'project' && (
+                  <ProjectTab project={project} showProjectSelectorInLocationHeader />
+                )}
                 {activeTab === 'planning' && <PlanningTab project={project} />}
                 {activeTab === 'budget' && <BudgetTab project={project} />}
                 {activeTab === 'sales' && <SalesTab project={project} />}

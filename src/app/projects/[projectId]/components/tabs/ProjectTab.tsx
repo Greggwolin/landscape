@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter } from '@coreui/react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
+import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CFormSelect } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilMap, cilLightbulb, cilCloudUpload, cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/market-intel';
@@ -9,6 +9,7 @@ import ContactsSection from '@/components/projects/contacts/ContactsSection';
 import MapView from '@/app/components/MapView';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { StepRateTable, StepRow } from '@/app/prototypes/multifam/rent-roll-inputs/components/StepRateTable';
+import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface Project {
   project_id: number;
@@ -92,9 +93,14 @@ interface Project {
 
 interface ProjectTabProps {
   project: Project;
+  showProjectSelectorInLocationHeader?: boolean;
 }
 
-export default function ProjectTab({ project: initialProject }: ProjectTabProps) {
+export default function ProjectTab({
+  project: initialProject,
+  showProjectSelectorInLocationHeader = false
+}: ProjectTabProps) {
+  const { projects, selectProject, activeProjectId } = useProjectContext();
   // Fetch full project details (initial project from provider only has basic fields)
   const [project, setProject] = useState<Project>(initialProject);
   const [loadingProject, setLoadingProject] = useState(true);
@@ -192,6 +198,19 @@ export default function ProjectTab({ project: initialProject }: ProjectTabProps)
   }>>([]);
   const [originalInflationSteps, setOriginalInflationSteps] = useState<StepRow[]>([]);
   const scheduleNameInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleProjectSelection = (event: ChangeEvent<HTMLSelectElement>) => {
+    const { value } = event.target;
+    if (value === 'new') {
+      window.location.href = '/projects/setup';
+      return;
+    }
+
+    const nextId = Number(value);
+    if (!Number.isNaN(nextId)) {
+      selectProject(nextId);
+    }
+  };
 
   // Handle inflation step updates
   const handleUpdateInflationStep = (stepIndex: number, field: 'rate' | 'periods', value: number | null) => {
@@ -441,8 +460,29 @@ export default function ProjectTab({ project: initialProject }: ProjectTabProps)
         <CCol md={5}>
           {/* Location Card */}
           <CCard className="mb-3">
-            <CCardHeader className="d-flex justify-content-between align-items-center">
-              <span>Location</span>
+            <CCardHeader className="d-flex justify-content-between align-items-center gap-3">
+              <div className="flex-grow-1">
+                {showProjectSelectorInLocationHeader && projects.length > 0 ? (
+                  <CFormSelect
+                    size="sm"
+                    value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
+                    onChange={handleProjectSelection}
+                    aria-label="Select project"
+                  >
+                    <option value="">Select a project…</option>
+                    {projects.map((proj) => (
+                      <option key={proj.project_id} value={proj.project_id}>
+                        {proj.project_name}
+                      </option>
+                    ))}
+                    <option value="new">+ Add New Project</option>
+                  </CFormSelect>
+                ) : showProjectSelectorInLocationHeader ? (
+                  <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
+                ) : (
+                  <span>Location</span>
+                )}
+              </div>
               {!editingLocation ? (
                 <CButton
                   color="primary"

@@ -52,7 +52,7 @@ export async function POST(request: Request, context: { params: Params }) {
 
     const imported: any[] = []
     const errors: any[] = []
-    let containersCreated = {
+    const containersCreated = {
       level_2: 0,
       level_3: 0,
       level_4: 0,

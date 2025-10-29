@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Build search query
-    let whereConditions = [];
-    let params: any[] = [];
+    const whereConditions = [];
+    const params: any[] = [];
     let paramIndex = 1;
 
     if (email) {

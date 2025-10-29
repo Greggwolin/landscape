@@ -146,7 +146,7 @@ export default function ProjectOverviewPage() {
 }
 
 // Overview Tab Component (from handoff PL012)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function OverviewTab({ projectId, project }: { projectId: string; project: Record<string, unknown> }) {
   const [selectedPropertyType, setSelectedPropertyType] = useState<PropertyType>('multifamily');
   const template = getPropertyTypeTemplate(selectedPropertyType);
@@ -389,7 +389,7 @@ function FinancialTab({ projectId }: { projectId: string }) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function AssumptionsTab({ projectId }: { projectId: string }) {
   return (
     <div
@@ -642,7 +642,7 @@ function RentRollUnitMixTab({ projectId, project }: { projectId: string; project
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function OpexTab({ projectId }: { projectId: string }) {
   return (
     <div

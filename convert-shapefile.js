@@ -43,7 +43,7 @@ async function convertShapefile() {
             const feature = result.value;
 
             // Transform geometry coordinates from Web Mercator to WGS84
-            let transformedGeometry = { ...feature.geometry };
+            const transformedGeometry = { ...feature.geometry };
 
             if (feature.geometry && feature.geometry.coordinates) {
                 if (feature.geometry.type === 'Polygon') {

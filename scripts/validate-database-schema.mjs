@@ -101,11 +101,11 @@ async function validateSchema() {
     // 5. Validation Results
     console.log('✅ SCHEMA VALIDATION RESULTS\n');
     
-    let totalExpected = Object.keys(expectedByTable).length;
+    const totalExpected = Object.keys(expectedByTable).length;
     let totalFound = 0;
-    let missingTables = [];
-    let foundTables = [];
-    let schemaMapping = {};
+    const missingTables = [];
+    const foundTables = [];
+    const schemaMapping = {};
 
     // Check each expected table
     for (const [expectedTable, expectedCols] of Object.entries(expectedByTable)) {
