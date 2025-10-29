@@ -11,6 +11,15 @@ from .views import (
     ParticipationPaymentViewSet,
 )
 from .views_scenario import ScenarioViewSet, ScenarioComparisonViewSet
+from .views_valuation import (
+    SalesComparableViewSet,
+    SalesCompAdjustmentViewSet,
+    AIAdjustmentSuggestionViewSet,
+    CostApproachViewSet,
+    IncomeApproachViewSet,
+    ValuationReconciliationViewSet,
+    ValuationSummaryViewSet,
+)
 
 router = DefaultRouter()
 
@@ -27,6 +36,15 @@ router.register(r'participation-payments', ParticipationPaymentViewSet, basename
 # Scenario Management endpoints
 router.register(r'scenarios', ScenarioViewSet, basename='scenario')
 router.register(r'scenario-comparisons', ScenarioComparisonViewSet, basename='scenario-comparison')
+
+# Valuation endpoints
+router.register(r'valuation/sales-comps', SalesComparableViewSet, basename='salescomparable')
+router.register(r'valuation/adjustments', SalesCompAdjustmentViewSet, basename='salescompadjustment')
+router.register(r'valuation/ai-suggestions', AIAdjustmentSuggestionViewSet, basename='ai-suggestions')
+router.register(r'valuation/cost-approach', CostApproachViewSet, basename='costapproach')
+router.register(r'valuation/income-approach', IncomeApproachViewSet, basename='incomeapproach')
+router.register(r'valuation/reconciliation', ValuationReconciliationViewSet, basename='valuationreconciliation')
+router.register(r'valuation/summary', ValuationSummaryViewSet, basename='valuationsummary')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -15,6 +15,16 @@ from .models_finance_structure import (
     ParticipationPayment,
 )
 
+# Import valuation models
+from .models_valuation import (
+    SalesComparable,
+    SalesCompAdjustment,
+    CostApproach,
+    IncomeApproach,
+    CapRateComp,
+    ValuationReconciliation,
+)
+
 
 class BudgetItem(models.Model):
     """
