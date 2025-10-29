@@ -254,7 +254,7 @@ export interface CapexReserve {
 }
 
 export interface DebtFacility {
-  debt_facility_id?: number;
+  debt_facility_id?: string;
   project_id: number;
 
   // Napkin tier

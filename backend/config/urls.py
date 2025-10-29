@@ -40,4 +40,5 @@ urlpatterns = [
     path("api/gis/", include('apps.gis.urls')),
     path("api/dms/", include('apps.documents.urls')),
     path("api/market-intel/", include('apps.market_intel.urls')),
+    path("", include('apps.reports.urls')),  # Reports (includes /api/ prefix)
 ]

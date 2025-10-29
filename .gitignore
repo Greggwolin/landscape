@@ -70,3 +70,18 @@ public/pinal_parcels.geojson
 
 # Temporary backups
 *_backup
+*.backup
+*.old
+*.old2
+
+# Backend uploads (user data should not be committed)
+backend/uploads/
+
+# Test/debug data files
+backend/*_extraction.json
+backend/*_reconciliation_report.md
+backend/*_rent_roll_extracted.json
+
+# Python cache
+backend/**/__pycache__/
+backend/**/migrations/__pycache__/

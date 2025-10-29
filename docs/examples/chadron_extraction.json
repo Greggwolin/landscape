@@ -1,0 +1,23 @@
+{
+  "units": [
+    {"unit_number": "100", "unit_type": "Commercial", "square_feet": 1101, "bedrooms": 0, "bathrooms": 0, "current_rent": null, "market_rent": 3578, "lease_start": null, "lease_end": null, "status": "vacant", "is_section_8": false, "resident_name": null, "notes": "Commercial/vacant"},
+    {"unit_number": "101", "unit_type": "Commercial", "square_feet": 903, "bedrooms": 0, "bathrooms": 0, "current_rent": null, "market_rent": 2935, "lease_start": null, "lease_end": null, "status": "vacant", "is_section_8": false, "resident_name": null, "notes": "Commercial/vacant"},
+    {"unit_number": "102", "unit_type": "Office", "square_feet": 446, "bedrooms": 0, "bathrooms": 0, "current_rent": null, "market_rent": 0, "lease_start": "2017-02-01", "lease_end": null, "status": "office", "is_section_8": false, "resident_name": null, "notes": "Leasing office"},
+    {"unit_number": "103", "unit_type": "Commercial", "square_feet": 1305, "bedrooms": 0, "bathrooms": 0, "current_rent": null, "market_rent": 4241, "lease_start": null, "lease_end": null, "status": "vacant", "is_section_8": false, "resident_name": null, "notes": "Commercial/vacant"},
+    {"unit_number": "104", "unit_type": "Commercial", "square_feet": 1355, "bedrooms": 0, "bathrooms": 0, "current_rent": 4397, "market_rent": 4404, "lease_start": "2023-09-01", "lease_end": "2026-08-31", "status": "occupied", "is_section_8": false, "resident_name": "Mini Market", "notes": "Commercial - Mini Market"},
+    {"unit_number": "201", "unit_type": "3BR/2BA", "square_feet": 1307, "bedrooms": 3, "bathrooms": 2, "current_rent": null, "market_rent": 3850, "lease_start": null, "lease_end": null, "status": "vacant", "is_section_8": false, "resident_name": null, "notes": "balcony"},
+    {"unit_number": "202", "unit_type": "3BR/2BA", "square_feet": 1280, "bedrooms": 3, "bathrooms": 2, "current_rent": 2790, "market_rent": 3825, "lease_start": "2025-06-01", "lease_end": "2026-06-30", "status": "occupied", "is_section_8": false, "resident_name": "Resident", "notes": "balcony"},
+    {"unit_number": "203", "unit_type": "1BR/1BA", "square_feet": 750, "bedrooms": 1, "bathrooms": 1, "current_rent": 1700, "market_rent": 2500, "lease_start": "2022-01-01", "lease_end": "2022-12-31", "status": "occupied", "is_section_8": false, "resident_name": "Resident", "notes": "XL patio"},
+    {"unit_number": "204", "unit_type": "2BR/2BA", "square_feet": 1035, "bedrooms": 2, "bathrooms": 2, "current_rent": 2200, "market_rent": 3150, "lease_start": "2024-08-01", "lease_end": "2025-07-31", "status": "occupied", "is_section_8": false, "resident_name": "Resident", "notes": "balcony"},
+    {"unit_number": "205", "unit_type": "3BR/2BA", "square_feet": 1280, "bedrooms": 3, "bathrooms": 2, "current_rent": 3000, "market_rent": 3925, "lease_start": "2025-02-01", "lease_end": "2026-01-31", "status": "occupied", "is_section_8": true, "resident_name": "Resident", "notes": "XL patio, Section 8"}
+  ],
+  "summary": {
+    "total_units": 10,
+    "occupied_units": 5,
+    "vacant_units": 4,
+    "section_8_units": 1,
+    "commercial_units": 4,
+    "office_units": 1,
+    "total_monthly_income": 13087
+  }
+}

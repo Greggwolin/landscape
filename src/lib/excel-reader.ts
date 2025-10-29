@@ -15,6 +15,9 @@ export interface ExcelWorkbook {
 }
 
 export class ExcelReader {
+  private static readonly MAX_CELLS_PER_SHEET = 200_000;
+  private static readonly MAX_TOTAL_CELLS = 1_000_000;
+  private static readonly MAX_CELL_TEXT_LENGTH = 200_000;
   /**
    * Read an Excel file and return structured data
    */
@@ -25,25 +28,31 @@ export class ExcelReader {
       
       // Parse the workbook
       const workbook = XLSX.read(buffer, { type: 'buffer', cellStyles: true, cellFormula: true });
+      ExcelReader.validateWorkbookDimensions(workbook, filePath);
       
       const sheets: ExcelSheet[] = [];
       
       // Process each sheet
       workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) {
+          return;
+        }
         
         // Convert to array of arrays (preserves formatting)
-        const data = XLSX.utils.sheet_to_json(worksheet, { 
+        const rawData = XLSX.utils.sheet_to_json(worksheet, { 
           header: 1,
           defval: null,
           blankrows: false
         }) as unknown[][];
+        const data = ExcelReader.sanitizeMatrix(rawData, sheetName);
         
         // Convert to JSON with headers as keys
-        const json = XLSX.utils.sheet_to_json(worksheet, {
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, {
           defval: null,
           blankrows: false
         }) as Record<string, unknown>[];
+        const json = rawJson.map((row, rowIndex) => ExcelReader.sanitizeRecord(row, sheetName, rowIndex));
         
         sheets.push({
           name: sheetName,
@@ -229,5 +238,67 @@ export class ExcelReader {
       hasFormulas: formulas.length > 0,
       formulaCount: formulas.length
     };
+  }
+
+  private static validateWorkbookDimensions(workbook: XLSX.WorkBook, filePath: string): void {
+    let totalCells = 0;
+    workbook.SheetNames.forEach(sheetName => {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        return;
+      }
+      const ref = sheet['!ref'];
+      if (!ref || typeof ref !== 'string') {
+        return;
+      }
+      const range = XLSX.utils.decode_range(ref);
+      const rowCount = range.e.r - range.s.r + 1;
+      const colCount = range.e.c - range.s.c + 1;
+      const cellCount = rowCount * colCount;
+      if (cellCount > ExcelReader.MAX_CELLS_PER_SHEET) {
+        throw new Error(
+          `Sheet '${sheetName}' in ${path.basename(filePath)} has ${cellCount.toLocaleString()} cells which exceeds the safe limit of ${ExcelReader.MAX_CELLS_PER_SHEET.toLocaleString()}`
+        );
+      }
+      totalCells += cellCount;
+      if (totalCells > ExcelReader.MAX_TOTAL_CELLS) {
+        throw new Error(
+          `Workbook '${path.basename(filePath)}' exceeds the safe total cell limit of ${ExcelReader.MAX_TOTAL_CELLS.toLocaleString()}`
+        );
+      }
+    });
+  }
+
+  private static sanitizeMatrix(rows: unknown[][], sheetName: string): unknown[][] {
+    return rows.map((row, rowIndex) => {
+      if (!Array.isArray(row)) {
+        const value = ExcelReader.sanitizeCellValue(row, sheetName, XLSX.utils.encode_cell({ r: rowIndex, c: 0 }));
+        return [value];
+      }
+      return row.map((cell, colIndex) =>
+        ExcelReader.sanitizeCellValue(cell, sheetName, XLSX.utils.encode_cell({ r: rowIndex, c: colIndex }))
+      );
+    });
+  }
+
+  private static sanitizeRecord(row: Record<string, unknown>, sheetName: string, rowIndex: number): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    Object.entries(row).forEach(([key, value], columnIndex) => {
+      sanitized[key] = ExcelReader.sanitizeCellValue(
+        value,
+        sheetName,
+        `${key}[${rowIndex}:${columnIndex}]`
+      );
+    });
+    return sanitized;
+  }
+
+  private static sanitizeCellValue(value: unknown, sheetName: string, cellRef: string): unknown {
+    if (typeof value === 'string' && value.length > ExcelReader.MAX_CELL_TEXT_LENGTH) {
+      throw new Error(
+        `Cell ${sheetName}!${cellRef} exceeds the safe text length of ${ExcelReader.MAX_CELL_TEXT_LENGTH.toLocaleString()} characters`
+      );
+    }
+    return value;
   }
 }
