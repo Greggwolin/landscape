@@ -1,0 +1,146 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
+
+type MinimalProjectRequest = {
+  project_name: string
+  development_type?: string
+  property_type_code: string
+  property_subtype?: string
+  street_address?: string
+  cross_streets?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  latitude?: number | null
+  longitude?: number | null
+  site_area?: number | null
+  site_area_unit?: 'AC' | 'SF' | 'SM'
+  total_units?: number | null
+  gross_sf?: number | null
+  analysis_start_date?: string | null
+}
+
+const convertToAcres = (value: number | null | undefined, unit: MinimalProjectRequest['site_area_unit']): number | null => {
+  if (value === null || value === undefined) return null
+  if (!Number.isFinite(value)) return null
+  if (!unit || unit === 'AC') return value
+  if (unit === 'SF') {
+    return value / 43560
+  }
+  if (unit === 'SM') {
+    return value * 0.000247105
+  }
+  return value
+}
+
+const buildLocationDescription = (body: MinimalProjectRequest) => {
+  if (body.street_address) {
+    const parts = [body.street_address, body.city, body.state, body.zip_code].filter(Boolean)
+    return parts.join(', ')
+  }
+  if (body.cross_streets) {
+    const parts = [body.cross_streets, body.city, body.state].filter(Boolean)
+    return parts.join(', ')
+  }
+  if (body.latitude !== undefined && body.longitude !== undefined) {
+    return `${body.latitude?.toFixed(6)}, ${body.longitude?.toFixed(6)}`
+  }
+  return null
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json() as MinimalProjectRequest
+
+    if (!body.project_name || !body.property_type_code) {
+      return NextResponse.json(
+        { error: 'project_name and property_type_code are required' },
+        { status: 400 }
+      )
+    }
+
+    const acresGross = convertToAcres(body.site_area ?? null, body.site_area_unit)
+    const locationDescription = buildLocationDescription(body)
+    const latitude = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null
+    const longitude = typeof body.longitude === 'number' && Number.isFinite(body.longitude) ? body.longitude : null
+    const streetAddress = body.street_address?.trim() || null
+    const city = body.city?.trim() || null
+    const state = body.state?.trim()?.toUpperCase() || null
+    const zipCode = body.zip_code?.trim() || null
+    const totalUnits = typeof body.total_units === 'number' && Number.isFinite(body.total_units)
+      ? Math.round(body.total_units)
+      : null
+    const grossSf = typeof body.gross_sf === 'number' && Number.isFinite(body.gross_sf)
+      ? Math.round(body.gross_sf)
+      : null
+    const jurisdictionCity = city
+    const jurisdictionState = state
+    const projectStatus = 'PLANNING'
+
+    const inserted = await sql<{
+      project_id: number
+      project_name: string
+      property_type_code: string | null
+    }[]>`
+      INSERT INTO landscape.tbl_project (
+        project_name,
+        property_type_code,
+        project_type,
+        street_address,
+        city,
+        state,
+        zip_code,
+        location_description,
+        jurisdiction_city,
+        jurisdiction_state,
+        acres_gross,
+        location_lat,
+        location_lon,
+        total_units,
+        gross_sf,
+        project_status,
+        start_date,
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${body.project_name},
+        ${body.property_type_code},
+        ${body.property_subtype || body.development_type || null},
+        ${streetAddress},
+        ${city},
+        ${state},
+        ${zipCode},
+        ${locationDescription},
+        ${jurisdictionCity},
+        ${jurisdictionState},
+        ${acresGross},
+        ${latitude},
+        ${longitude},
+        ${totalUnits},
+        ${grossSf},
+        ${projectStatus},
+        ${body.analysis_start_date || null},
+        true,
+        NOW(),
+        NOW()
+      )
+      RETURNING project_id, project_name, property_type_code
+    `
+
+    if (inserted.length === 0) {
+      throw new Error('Failed to create project')
+    }
+
+    return NextResponse.json({
+      project: inserted[0]
+    })
+  } catch (error: unknown) {
+    console.error('Minimal project creation failed:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { error: 'Failed to create project', details: message },
+      { status: 500 }
+    )
+  }
+}

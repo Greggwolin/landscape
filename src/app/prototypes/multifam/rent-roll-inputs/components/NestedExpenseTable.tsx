@@ -34,22 +34,38 @@ export function NestedExpenseTable({
   // Flatten rows for rendering
   const flatRows = flattenExpenseRows(rows);
 
+  // Helper function to find root category by traversing up the hierarchy
+  const findRootCategory = (row: ExpenseRow): string => {
+    if (row.level === 0) {
+      return row.category;
+    }
+
+    // For non-root rows, traverse up to find the root parent
+    let currentRow = row;
+    while (currentRow.parentId) {
+      const parent = rows.find(r => r.id === currentRow.parentId);
+      if (!parent) break;
+      if (parent.level === 0) {
+        return parent.category;
+      }
+      currentRow = parent;
+    }
+
+    return row.category; // Fallback
+  };
+
   // Filter by selected categories
   const filteredRows = selectedCategories.length === 0
     ? flatRows
     : flatRows.filter(row => {
-        // Find the root parent category
-        const rootCategory = row.level === 0 ? row.category :
-          rows.find(r => r.id === (row.parentId || ''))?.category || row.category;
+        const rootCategory = findRootCategory(row);
         return selectedCategories.includes(rootCategory);
       });
 
   // Calculate category counts - count all rows (including children) in each category
   const categoryCounts = CATEGORY_DEFINITIONS.map(cat => {
     const count = flatRows.filter(r => {
-      // Find the root parent category for this row
-      const rootCategory = r.level === 0 ? r.category :
-        rows.find(parent => parent.id === r.parentId)?.category || r.category;
+      const rootCategory = findRootCategory(r);
       return rootCategory === cat.key;
     }).length;
     return { ...cat, count };

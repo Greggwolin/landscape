@@ -11,6 +11,7 @@ import ProjectTab from '@/app/projects/[projectId]/components/tabs/ProjectTab';
 import PlanningTab from '@/app/projects/[projectId]/components/tabs/PlanningTab';
 import BudgetTab from '@/app/projects/[projectId]/components/tabs/BudgetTab';
 import SalesTab from '@/app/projects/[projectId]/components/tabs/SalesTab';
+import FeasibilityTab from '@/app/projects/[projectId]/components/tabs/FeasibilityTab';
 import PropertyTab from '@/app/projects/[projectId]/components/tabs/PropertyTab';
 import OperationsTab from '@/app/projects/[projectId]/components/tabs/OperationsTab';
 import ValuationTab from '@/app/projects/[projectId]/components/tabs/ValuationTab';
@@ -22,6 +23,7 @@ import ReportsTab from '@/app/projects/[projectId]/components/tabs/ReportsTab';
 import DocumentsTab from '@/app/projects/[projectId]/components/tabs/DocumentsTab';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
 const DEFAULT_PROJECT_ID = 17;
 
@@ -49,6 +51,7 @@ const getTabsForPropertyType = (propertyType?: string) => {
       { id: 'planning', label: 'Planning' },
       { id: 'budget', label: 'Budget' },
       { id: 'sales', label: 'Sales & Absorption' },
+      { id: 'feasibility', label: 'Feasibility' },
       { id: 'capitalization', label: 'Capitalization' },
       { id: 'reports', label: 'Reports' },
       { id: 'documents', label: 'Documents' }
@@ -82,6 +85,7 @@ const useOutsideClick = (ref: RefObject<HTMLElement>, handler: () => void) => {
 
 export default function TopNavProjectPrototype() {
   const { projects, isLoading, selectProject, activeProject, activeProjectId } = useProjectContext();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<string>('project');
   const [complexityMode, setComplexityMode] = useState<ComplexityTier>('standard');
   const [isLegacyOpen, setLegacyOpen] = useState(false);
@@ -147,6 +151,21 @@ export default function TopNavProjectPrototype() {
       setComplexityMode('standard');
     }
   };
+
+  const renderThemeToggle = () => (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="rounded-full border px-3 py-2 text-sm font-medium transition-colors"
+      style={{
+        borderColor: 'var(--cui-sidebar-border-color)',
+        color: 'var(--cui-sidebar-nav-link-color)',
+        backgroundColor: 'transparent'
+      }}
+    >
+      {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+    </button>
+  );
 
   const renderLegacyDropdown = () => (
     <div className="relative" ref={legacyRef}>
@@ -295,6 +314,7 @@ export default function TopNavProjectPrototype() {
 
           <div className="flex items-center gap-2">
             {renderLegacyDropdown()}
+            {renderThemeToggle()}
             <button
               type="button"
               className="rounded-full border p-2 transition-colors"
@@ -343,6 +363,8 @@ export default function TopNavProjectPrototype() {
               onComplexityModeChange={
                 activeTab === 'operations' ? setComplexityMode : undefined
               }
+              hideProjectSelector
+              hideThemeToggle
             />
             <div className="flex-1 overflow-y-auto">
               <CContainer fluid className="p-4">
@@ -352,6 +374,7 @@ export default function TopNavProjectPrototype() {
                 {activeTab === 'planning' && <PlanningTab project={project} />}
                 {activeTab === 'budget' && <BudgetTab project={project} />}
                 {activeTab === 'sales' && <SalesTab project={project} />}
+                {activeTab === 'feasibility' && <FeasibilityTab project={project} />}
                 {activeTab === 'property' && <PropertyTab project={project} />}
                 {activeTab === 'operations' && (
                   <OperationsTab

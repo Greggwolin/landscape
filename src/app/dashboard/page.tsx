@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CButton } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import AppLayout from '@/app/components/AppLayout';
 import CIcon from '@coreui/icons-react';
 import { cilChartPie } from '@coreui/icons';
+import NewProjectModal from '@/app/components/NewProjectModal';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   'MPC': 'Master Planned Community',
@@ -35,6 +36,7 @@ const PROPERTY_TYPE_COLORS: Record<string, string> = {
 export default function DashboardPage() {
   const { projects, selectProject } = useProjectContext();
   const router = useRouter();
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
   const handleProjectClick = (projectId: number) => {
     const project = projects.find(p => p.project_id === projectId);
@@ -108,7 +110,7 @@ export default function DashboardPage() {
         <CCardHeader>
           <div className="flex items-center justify-between">
             <span className="font-semibold">All Projects</span>
-            <CButton color="primary" size="sm">
+            <CButton color="primary" size="sm" onClick={() => setIsNewProjectModalOpen(true)}>
               + New Project
             </CButton>
           </div>
@@ -197,7 +199,7 @@ export default function DashboardPage() {
               <p style={{ color: 'var(--cui-secondary-color)' }}>
                 No projects found. Create your first project to get started.
               </p>
-              <CButton color="primary" className="mt-3">
+              <CButton color="primary" className="mt-3" onClick={() => setIsNewProjectModalOpen(true)}>
                 Create Project
               </CButton>
             </div>
@@ -205,6 +207,10 @@ export default function DashboardPage() {
         </CCardBody>
       </CCard>
     </CContainer>
+    <NewProjectModal
+      isOpen={isNewProjectModalOpen}
+      onClose={() => setIsNewProjectModalOpen(false)}
+    />
     </AppLayout>
   );
 }

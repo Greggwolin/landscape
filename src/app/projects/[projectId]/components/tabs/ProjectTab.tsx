@@ -9,6 +9,7 @@ import ContactsSection from '@/components/projects/contacts/ContactsSection';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { StepRateTable, StepRow } from '@/app/prototypes/multifam/rent-roll-inputs/components/StepRateTable';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import NewProjectModal from '@/app/components/NewProjectModal';
 
 interface Project {
   project_id: number;
@@ -103,6 +104,7 @@ export default function ProjectTab({
   // Fetch full project details (initial project from provider only has basic fields)
   const [project, setProject] = useState<Project>(initialProject);
   const [loadingProject, setLoadingProject] = useState(true);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -201,7 +203,7 @@ export default function ProjectTab({
   const handleProjectSelection = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value } = event.target;
     if (value === 'new') {
-      window.location.href = '/projects/setup';
+      setIsNewProjectModalOpen(true);
       return;
     }
 
@@ -451,528 +453,659 @@ export default function ProjectTab({
     return editedProject[field] !== undefined ? editedProject[field] : project[field];
   };
 
+  const renderMapCard = () => (
+    <CCard style={{ height: '100%' }}>
+      <CCardHeader>Map - 3D Oblique View</CCardHeader>
+      <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
+        <ProjectTabMap
+          projectId={String(project.project_id)}
+          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+        />
+      </CCardBody>
+    </CCard>
+  );
+
+  const renderLocationCard = () => (
+    <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ backgroundColor: "var(--cui-sidebar-bg)", color: "var(--cui-body-color)" }}>
+        <div className="flex-grow-1">
+          {showProjectSelectorInLocationHeader ? (
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <span className="text-xs text-uppercase fw-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
+                Active Project
+              </span>
+              {projects.length > 0 ? (
+                <CFormSelect
+                  size="sm"
+                  value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
+                  onChange={handleProjectSelection}
+                  aria-label="Select project"
+                  style={{ minWidth: '200px', width: '75%', maxWidth: '320px' }}
+                >
+                  <option value="">Select a project…</option>
+                  {projects.map((proj) => (
+                    <option key={proj.project_id} value={proj.project_id}>
+                      {proj.project_name}
+                    </option>
+                  ))}
+                  <option value="new">+ Add New Project</option>
+                </CFormSelect>
+              ) : (
+                <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
+              )}
+            </div>
+          ) : (
+            <span>Location</span>
+          )}
+        </div>
+        {!editingLocation ? (
+          <CButton
+            color="primary"
+            size="sm"
+            onClick={() => setEditingLocation(true)}
+          >
+            <CIcon icon={cilPencil} size="sm" className="me-1" />
+            Edit
+          </CButton>
+        ) : (
+          <div className="d-flex gap-2">
+            <CButton
+              color="success"
+              size="sm"
+              onClick={handleSaveLocation}
+            >
+              <CIcon icon={cilCheck} size="sm" className="me-1" />
+              Save
+            </CButton>
+            <CButton
+              color="secondary"
+              size="sm"
+              onClick={handleCancelLocation}
+            >
+              <CIcon icon={cilX} size="sm" className="me-1" />
+              Cancel
+            </CButton>
+          </div>
+        )}
+      </CCardHeader>
+      <CCardBody style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+        {!editingLocation ? (
+          <>
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>Address</div>
+              <div>{project.street_address || 'Not specified'}</div>
+            </div>
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>City</div>
+              <div>
+                {project.city && project.state
+                  ? `${project.city}, ${project.state} ${project.zip_code || ''}`
+                  : 'Not specified'}
+              </div>
+            </div>
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>County</div>
+              <div>{project.county || 'Not specified'}</div>
+            </div>
+            {(project.market || project.submarket) && (
+              <div className="mb-2 d-flex">
+                <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>Market</div>
+                <div>
+                  {project.market || 'Not specified'}
+                  {project.submarket && (
+                    <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                      ({project.submarket})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {(project.apn_primary || project.apn_secondary) && (
+              <div className="mb-2 d-flex">
+                <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>APNs</div>
+                <div>
+                  {project.apn_primary}
+                  {project.apn_secondary && `, ${project.apn_secondary}`}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <style jsx>{`
+              .form-floating > label {
+                opacity: 0.65;
+                transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+              }
+            `}</style>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="street_address"
+                placeholder="Street Address"
+                value={getEditValue('street_address') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, street_address: e.target.value })}
+              />
+              <label htmlFor="street_address">Street Address</label>
+            </CFormFloating>
+
+            <CRow className="mb-3">
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="city"
+                    placeholder="City"
+                    value={getEditValue('city') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, city: e.target.value })}
+                  />
+                  <label htmlFor="city">City</label>
+                </CFormFloating>
+              </CCol>
+              <CCol md={3}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="state"
+                    placeholder="State"
+                    value={getEditValue('state') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, state: e.target.value })}
+                  />
+                  <label htmlFor="state">State</label>
+                </CFormFloating>
+              </CCol>
+              <CCol md={3}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="zip_code"
+                    placeholder="Zip"
+                    value={getEditValue('zip_code') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, zip_code: e.target.value })}
+                  />
+                  <label htmlFor="zip_code">Zip</label>
+                </CFormFloating>
+              </CCol>
+            </CRow>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="county"
+                placeholder="County"
+                value={getEditValue('county') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, county: e.target.value })}
+              />
+              <label htmlFor="county">County</label>
+            </CFormFloating>
+
+            <CRow className="mb-3">
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="market"
+                    placeholder="Market"
+                    value={getEditValue('market') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, market: e.target.value })}
+                  />
+                  <label htmlFor="market">Market</label>
+                </CFormFloating>
+              </CCol>
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="submarket"
+                    placeholder="Submarket"
+                    value={getEditValue('submarket') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, submarket: e.target.value })}
+                  />
+                  <label htmlFor="submarket">Submarket</label>
+                </CFormFloating>
+              </CCol>
+            </CRow>
+
+            <CRow>
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="apn_primary"
+                    placeholder="Primary APN"
+                    value={getEditValue('apn_primary') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, apn_primary: e.target.value })}
+                  />
+                  <label htmlFor="apn_primary">Primary APN</label>
+                </CFormFloating>
+              </CCol>
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="text"
+                    id="apn_secondary"
+                    placeholder="Secondary APN"
+                    value={getEditValue('apn_secondary') as string || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, apn_secondary: e.target.value })}
+                  />
+                  <label htmlFor="apn_secondary">Secondary APN</label>
+                </CFormFloating>
+              </CCol>
+            </CRow>
+          </>
+        )}
+      </CCardBody>
+    </CCard>
+  );
+
+  const renderProfileCard = () => (
+    <CCard>
+      <CCardHeader className="d-flex justify-content-between align-items-center">
+        <span>Project Profile</span>
+        {!editingProfile ? (
+          <CButton
+            color="primary"
+            size="sm"
+            onClick={() => setEditingProfile(true)}
+          >
+            <CIcon icon={cilPencil} size="sm" className="me-1" />
+            Edit
+          </CButton>
+        ) : (
+          <div className="d-flex gap-2">
+            <CButton
+              color="success"
+              size="sm"
+              onClick={handleSaveProfile}
+            >
+              <CIcon icon={cilCheck} size="sm" className="me-1" />
+              Save
+            </CButton>
+            <CButton
+              color="secondary"
+              size="sm"
+              onClick={handleCancelProfile}
+            >
+              <CIcon icon={cilX} size="sm" className="me-1" />
+              Cancel
+            </CButton>
+          </div>
+        )}
+      </CCardHeader>
+      <CCardBody>
+        {!editingProfile ? (
+          <>
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Type</div>
+              <div>{project.property_type_code || 'Not specified'}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Subtype</div>
+              <div>{project.property_subtype || 'Not specified'}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Class</div>
+              <div>{project.property_class || 'Not specified'}</div>
+            </div>
+
+            {isLandDevelopment && (
+              <div className="mb-2 d-flex">
+                <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Status</div>
+                <div>{project.status || 'Planning'}</div>
+              </div>
+            )}
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Ownership</div>
+              <div>{project.ownership_type || 'Not specified'}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Lot Size</div>
+              <div>
+                {project.lot_size_sf ? formatNumber(project.lot_size_sf) : 'TBD'}
+                {project.lot_size_acres && (
+                  <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                    ({Number(project.lot_size_acres).toFixed(2)} acres)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {isLandDevelopment && (
+              <div className="mb-2 d-flex">
+                <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Start Date</div>
+                <div>{project.start_date || 'TBD'}</div>
+              </div>
+            )}
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Year Built</div>
+              <div>{project.year_built || 'N/A'}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Total Units</div>
+              <div>{formatNumber(project.total_units)}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Stories</div>
+              <div>{project.stories || 'N/A'}</div>
+            </div>
+
+            <div className="mb-2 d-flex">
+              <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Gross SF</div>
+              <div>{formatNumber(project.gross_sf)}</div>
+            </div>
+
+            {project.project_notes && (
+              <div className="mb-2 mt-3">
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Notes</div>
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: 'var(--cui-tertiary-bg)',
+                  borderRadius: '4px',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.5'
+                }}>
+                  {project.project_notes}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <style jsx>{`
+              .form-floating > label {
+                opacity: 0.65;
+                transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+              }
+            `}</style>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="property_type_code"
+                placeholder="Property Type"
+                value={getEditValue('property_type_code') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, property_type_code: e.target.value })}
+              />
+              <label htmlFor="property_type_code">Property Type</label>
+            </CFormFloating>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="property_subtype"
+                placeholder="Property Subtype"
+                value={getEditValue('property_subtype') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, property_subtype: e.target.value })}
+              />
+              <label htmlFor="property_subtype">Property Subtype</label>
+            </CFormFloating>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="property_class"
+                placeholder="Property Class"
+                value={getEditValue('property_class') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, property_class: e.target.value })}
+              />
+              <label htmlFor="property_class">Property Class</label>
+            </CFormFloating>
+
+            {isLandDevelopment && (
+              <CFormFloating className="mb-3">
+                <CFormInput
+                  type="text"
+                  id="status"
+                  placeholder="Status"
+                  value={getEditValue('status') as string || ''}
+                  onChange={(e) => setEditedProject({ ...editedProject, status: e.target.value })}
+                />
+                <label htmlFor="status">Status</label>
+              </CFormFloating>
+            )}
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="text"
+                id="ownership_type"
+                placeholder="Ownership Type"
+                value={getEditValue('ownership_type') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, ownership_type: e.target.value })}
+              />
+              <label htmlFor="ownership_type">Ownership Type</label>
+            </CFormFloating>
+
+            <CRow className="mb-3">
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="number"
+                    id="lot_size_sf"
+                    placeholder="Lot Size (SF)"
+                    value={getEditValue('lot_size_sf') as number || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, lot_size_sf: parseFloat(e.target.value) })}
+                  />
+                  <label htmlFor="lot_size_sf">Lot Size (SF)</label>
+                </CFormFloating>
+              </CCol>
+              <CCol md={6}>
+                <CFormFloating>
+                  <CFormInput
+                    type="number"
+                    id="lot_size_acres"
+                    placeholder="Lot Size (Acres)"
+                    step="0.01"
+                    value={getEditValue('lot_size_acres') as number || ''}
+                    onChange={(e) => setEditedProject({ ...editedProject, lot_size_acres: parseFloat(e.target.value) })}
+                  />
+                  <label htmlFor="lot_size_acres">Lot Size (Acres)</label>
+                </CFormFloating>
+              </CCol>
+            </CRow>
+
+            {isLandDevelopment && (
+              <CFormFloating className="mb-3">
+                <CFormInput
+                  type="date"
+                  id="start_date"
+                  placeholder="Start Date"
+                  value={getEditValue('start_date') as string || ''}
+                  onChange={(e) => setEditedProject({ ...editedProject, start_date: e.target.value })}
+                />
+                <label htmlFor="start_date">Start Date</label>
+              </CFormFloating>
+            )}
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="number"
+                id="year_built"
+                placeholder="Year Built"
+                value={getEditValue('year_built') as number || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, year_built: parseInt(e.target.value) })}
+              />
+              <label htmlFor="year_built">Year Built</label>
+            </CFormFloating>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="number"
+                id="total_units"
+                placeholder="Total Units"
+                value={getEditValue('total_units') as number || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, total_units: parseInt(e.target.value) })}
+              />
+              <label htmlFor="total_units">Total Units</label>
+            </CFormFloating>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="number"
+                id="stories"
+                placeholder="Stories"
+                value={getEditValue('stories') as number || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, stories: parseInt(e.target.value) })}
+              />
+              <label htmlFor="stories">Stories</label>
+            </CFormFloating>
+
+            <CFormFloating className="mb-3">
+              <CFormInput
+                type="number"
+                id="gross_sf"
+                placeholder="Gross SF"
+                value={getEditValue('gross_sf') as number || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, gross_sf: parseFloat(e.target.value) })}
+              />
+              <label htmlFor="gross_sf">Gross SF</label>
+            </CFormFloating>
+
+            <CFormFloating>
+              <CFormTextarea
+                id="project_notes"
+                placeholder="Notes"
+                style={{ height: '100px' }}
+                value={getEditValue('project_notes') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, project_notes: e.target.value })}
+              />
+              <label htmlFor="project_notes">Notes</label>
+            </CFormFloating>
+          </>
+        )}
+      </CCardBody>
+    </CCard>
+  );
+
+  const renderOverviewColumns = () => {
+    if (showProjectSelectorInLocationHeader) {
+      const addressValue = project.street_address || project.project_address || 'Not specified';
+      const cityLine = project.city && project.state
+        ? `${project.city}, ${project.state}${project.zip_code ? ` ${project.zip_code}` : ''}`
+        : 'Not specified';
+      const marketLine = project.market
+        ? `${project.market}${project.submarket ? ` (${project.submarket})` : ''}`
+        : (project.submarket || 'Not specified');
+      const apnLine = [project.apn_primary, project.apn_secondary].filter(Boolean).join(', ') || 'Not specified';
+      const lotSizeLine = project.lot_size_sf
+        ? `${formatNumber(project.lot_size_sf)} SF${project.lot_size_acres ? ` (${Number(project.lot_size_acres).toFixed(2)} acres)` : ''}`
+        : (project.lot_size_acres ? `${Number(project.lot_size_acres).toFixed(2)} acres` : 'Not specified');
+
+      const summaryItems = [
+        { label: 'Type', value: project.property_type_code || 'Not specified' },
+        { label: 'Subtype', value: project.property_subtype || 'Not specified' },
+        { label: 'Class', value: project.property_class || 'Not specified' },
+        { label: 'Year Built', value: project.year_built ? String(project.year_built) : 'N/A' },
+        { label: 'Total Units', value: project.total_units ? formatNumber(project.total_units) : 'N/A' },
+        { label: 'Stories', value: project.stories ? String(project.stories) : 'N/A' },
+        { label: 'Gross SF', value: project.gross_sf ? formatNumber(project.gross_sf) : 'N/A' },
+        { label: 'Lot Size', value: lotSizeLine },
+        { label: 'Address', value: addressValue },
+        { label: 'City', value: cityLine },
+        { label: 'County', value: project.county || 'Not specified' },
+        { label: 'Market', value: marketLine },
+        { label: 'APNs', value: apnLine },
+        { label: 'Ownership', value: project.ownership_type || 'Not specified' }
+      ];
+
+      const handleEditClick = () => {
+        if (typeof window !== 'undefined') {
+          window.open(`/projects/${project.project_id}?tab=project`, '_blank', 'noopener');
+        }
+      };
+
+      return (
+        <>
+          <CCol md={5} lg={4}>
+            <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+              <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-sidebar-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+                <span className="fw-semibold text-uppercase" style={{ letterSpacing: '0.02em' }}>
+                  Active Project
+                </span>
+                <div className="d-flex align-items-center gap-3 flex-wrap">
+                  {projects.length > 0 ? (
+                    <CFormSelect
+                      size="sm"
+                      value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
+                      onChange={handleProjectSelection}
+                      aria-label="Select project"
+                      style={{ minWidth: '200px', maxWidth: '260px' }}
+                    >
+                      <option value="">Select a project…</option>
+                      {projects.map((proj) => (
+                        <option key={proj.project_id} value={proj.project_id}>
+                          {proj.project_name}
+                        </option>
+                      ))}
+                      <option value="new">+ Add New Project</option>
+                    </CFormSelect>
+                  ) : (
+                    <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
+                  )}
+                  <CButton
+                    type="button"
+                    color="link"
+                    className="text-uppercase fw-semibold text-decoration-none px-0"
+                    style={{ letterSpacing: '0.08em' }}
+                    onClick={handleEditClick}
+                  >
+                    Edit
+                  </CButton>
+                </div>
+              </CCardHeader>
+              <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+                <div className="d-flex flex-column">
+                  {summaryItems.map((item, index) => (
+                    <div
+                      key={item.label}
+                      className={`d-flex gap-3 py-2 ${index !== summaryItems.length - 1 ? 'border-bottom' : ''}`}
+                      style={{ borderColor: 'var(--cui-border-color)' }}
+                    >
+                      <span className="fw-semibold" style={{ minWidth: '120px', color: 'var(--cui-body-color)' }}>
+                        {item.label}
+                      </span>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CCardBody>
+            </CCard>
+          </CCol>
+          <CCol md={7} lg={8}>
+            {renderMapCard()}
+          </CCol>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <CCol md={5}>
+          {renderLocationCard()}
+          {renderProfileCard()}
+        </CCol>
+        <CCol md={7}>
+          {renderMapCard()}
+        </CCol>
+      </>
+    );
+  };
+
   return (
+    <>
     <div className="space-y-4">
       {/* Section 1: Location, Profile & Map (Two Column Layout) */}
       <CRow>
-        {/* Left Column - Location + Project Profile */}
-        <CCol md={5}>
-          {/* Location Card */}
-          <CCard className="mb-3">
-            <CCardHeader className="d-flex justify-content-between align-items-center gap-3">
-              <div className="flex-grow-1">
-                {showProjectSelectorInLocationHeader && projects.length > 0 ? (
-                  <CFormSelect
-                    size="sm"
-                    value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
-                    onChange={handleProjectSelection}
-                    aria-label="Select project"
-                  >
-                    <option value="">Select a project…</option>
-                    {projects.map((proj) => (
-                      <option key={proj.project_id} value={proj.project_id}>
-                        {proj.project_name}
-                      </option>
-                    ))}
-                    <option value="new">+ Add New Project</option>
-                  </CFormSelect>
-                ) : showProjectSelectorInLocationHeader ? (
-                  <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
-                ) : (
-                  <span>Location</span>
-                )}
-              </div>
-              {!editingLocation ? (
-                <CButton
-                  color="primary"
-                  size="sm"
-                  onClick={() => setEditingLocation(true)}
-                >
-                  <CIcon icon={cilPencil} size="sm" className="me-1" />
-                  Edit
-                </CButton>
-              ) : (
-                <div className="d-flex gap-2">
-                  <CButton
-                    color="success"
-                    size="sm"
-                    onClick={handleSaveLocation}
-                  >
-                    <CIcon icon={cilCheck} size="sm" className="me-1" />
-                    Save
-                  </CButton>
-                  <CButton
-                    color="secondary"
-                    size="sm"
-                    onClick={handleCancelLocation}
-                  >
-                    <CIcon icon={cilX} size="sm" className="me-1" />
-                    Cancel
-                  </CButton>
-                </div>
-              )}
-            </CCardHeader>
-            <CCardBody>
-              {!editingLocation ? (
-                <>
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>Address</div>
-                    <div>{project.street_address || 'Not specified'}</div>
-                  </div>
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>City</div>
-                    <div>
-                      {project.city && project.state
-                        ? `${project.city}, ${project.state} ${project.zip_code || ''}`
-                        : 'Not specified'}
-                    </div>
-                  </div>
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>County</div>
-                    <div>{project.county || 'Not specified'}</div>
-                  </div>
-                  {(project.market || project.submarket) && (
-                    <div className="mb-2 d-flex">
-                      <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>Market</div>
-                      <div>
-                        {project.market || 'Not specified'}
-                        {project.submarket && (
-                          <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
-                            ({project.submarket})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {(project.apn_primary || project.apn_secondary) && (
-                    <div className="mb-2 d-flex">
-                      <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>APNs</div>
-                      <div>
-                        {project.apn_primary}
-                        {project.apn_secondary && `, ${project.apn_secondary}`}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <style jsx>{`
-                    .form-floating > label {
-                      opacity: 0.65;
-                      transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
-                    }
-                  `}</style>
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="text"
-                      id="street_address"
-                      placeholder="Street Address"
-                      value={getEditValue('street_address') as string || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, street_address: e.target.value })}
-                    />
-                    <label htmlFor="street_address">Street Address</label>
-                  </CFormFloating>
-
-                  <CRow className="mb-3">
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="city"
-                          placeholder="City"
-                          value={getEditValue('city') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, city: e.target.value })}
-                        />
-                        <label htmlFor="city">City</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={3}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="state"
-                          placeholder="State"
-                          value={getEditValue('state') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, state: e.target.value })}
-                        />
-                        <label htmlFor="state">State</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={3}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="zip_code"
-                          placeholder="Zip"
-                          value={getEditValue('zip_code') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, zip_code: e.target.value })}
-                        />
-                        <label htmlFor="zip_code">Zip</label>
-                      </CFormFloating>
-                    </CCol>
-                  </CRow>
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="text"
-                      id="county"
-                      placeholder="County"
-                      value={getEditValue('county') as string || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, county: e.target.value })}
-                    />
-                    <label htmlFor="county">County</label>
-                  </CFormFloating>
-
-                  <CRow className="mb-3">
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="market"
-                          placeholder="Market"
-                          value={getEditValue('market') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, market: e.target.value })}
-                        />
-                        <label htmlFor="market">Market</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="submarket"
-                          placeholder="Submarket"
-                          value={getEditValue('submarket') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, submarket: e.target.value })}
-                        />
-                        <label htmlFor="submarket">Submarket</label>
-                      </CFormFloating>
-                    </CCol>
-                  </CRow>
-
-                  <CRow>
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="apn_primary"
-                          placeholder="Primary APN"
-                          value={getEditValue('apn_primary') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, apn_primary: e.target.value })}
-                        />
-                        <label htmlFor="apn_primary">Primary APN</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="apn_secondary"
-                          placeholder="Secondary APN"
-                          value={getEditValue('apn_secondary') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, apn_secondary: e.target.value })}
-                        />
-                        <label htmlFor="apn_secondary">Secondary APN</label>
-                      </CFormFloating>
-                    </CCol>
-                  </CRow>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-
-          {/* Project Profile Card */}
-          <CCard>
-            <CCardHeader className="d-flex justify-content-between align-items-center">
-              <span>Project Profile</span>
-              {!editingProfile ? (
-                <CButton
-                  color="primary"
-                  size="sm"
-                  onClick={() => setEditingProfile(true)}
-                >
-                  <CIcon icon={cilPencil} size="sm" className="me-1" />
-                  Edit
-                </CButton>
-              ) : (
-                <div className="d-flex gap-2">
-                  <CButton
-                    color="success"
-                    size="sm"
-                    onClick={handleSaveProfile}
-                  >
-                    <CIcon icon={cilCheck} size="sm" className="me-1" />
-                    Save
-                  </CButton>
-                  <CButton
-                    color="secondary"
-                    size="sm"
-                    onClick={handleCancelProfile}
-                  >
-                    <CIcon icon={cilX} size="sm" className="me-1" />
-                    Cancel
-                  </CButton>
-                </div>
-              )}
-            </CCardHeader>
-            <CCardBody>
-              {!editingProfile ? (
-                <>
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Type</div>
-                    <div>{project.property_type_code || 'Not specified'}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Subtype</div>
-                    <div>{project.property_subtype || 'Not specified'}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Class</div>
-                    <div>{project.property_class || 'Not specified'}</div>
-                  </div>
-
-                  {isLandDevelopment && (
-                    <div className="mb-2 d-flex">
-                      <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Status</div>
-                      <div>{project.status || 'Planning'}</div>
-                    </div>
-                  )}
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Ownership</div>
-                    <div>{project.ownership_type || 'Not specified'}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Lot Size</div>
-                    <div>
-                      {project.lot_size_sf ? formatNumber(project.lot_size_sf) : 'TBD'}
-                      {project.lot_size_acres && (
-                        <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
-                          ({Number(project.lot_size_acres).toFixed(2)} acres)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {isLandDevelopment && (
-                    <div className="mb-2 d-flex">
-                      <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Start Date</div>
-                      <div>{project.start_date || 'TBD'}</div>
-                    </div>
-                  )}
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Year Built</div>
-                    <div>{project.year_built || 'N/A'}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Total Units</div>
-                    <div>{formatNumber(project.total_units)}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Stories</div>
-                    <div>{project.stories || 'N/A'}</div>
-                  </div>
-
-                  <div className="mb-2 d-flex">
-                    <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Gross SF</div>
-                    <div>{formatNumber(project.gross_sf)}</div>
-                  </div>
-
-                  {project.project_notes && (
-                    <div className="mb-2 mt-3">
-                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Notes</div>
-                      <div style={{
-                        padding: '8px',
-                        backgroundColor: 'var(--cui-tertiary-bg)',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem',
-                        lineHeight: '1.5'
-                      }}>
-                        {project.project_notes}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <style jsx>{`
-                    .form-floating > label {
-                      opacity: 0.65;
-                      transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
-                    }
-                  `}</style>
-
-                  <CRow className="mb-3">
-                    <CCol md={8}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="property_subtype"
-                          placeholder="Property Subtype"
-                          value={getEditValue('property_subtype') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, property_subtype: e.target.value })}
-                        />
-                        <label htmlFor="property_subtype">Property Subtype</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={4}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="text"
-                          id="property_class"
-                          placeholder="Class"
-                          value={getEditValue('property_class') as string || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, property_class: e.target.value })}
-                        />
-                        <label htmlFor="property_class">Class</label>
-                      </CFormFloating>
-                    </CCol>
-                  </CRow>
-
-                  {isLandDevelopment && (
-                    <CFormFloating className="mb-3">
-                      <CFormInput
-                        type="text"
-                        id="status"
-                        placeholder="Status"
-                        value={getEditValue('status') as string || ''}
-                        onChange={(e) => setEditedProject({ ...editedProject, status: e.target.value })}
-                      />
-                      <label htmlFor="status">Status</label>
-                    </CFormFloating>
-                  )}
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="text"
-                      id="ownership_type"
-                      placeholder="Ownership Type"
-                      value={getEditValue('ownership_type') as string || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, ownership_type: e.target.value })}
-                    />
-                    <label htmlFor="ownership_type">Ownership Type</label>
-                  </CFormFloating>
-
-                  <CRow className="mb-3">
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="number"
-                          id="lot_size_sf"
-                          placeholder="Lot Size (SF)"
-                          value={getEditValue('lot_size_sf') as number || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, lot_size_sf: parseFloat(e.target.value) })}
-                        />
-                        <label htmlFor="lot_size_sf">Lot Size (SF)</label>
-                      </CFormFloating>
-                    </CCol>
-                    <CCol md={6}>
-                      <CFormFloating>
-                        <CFormInput
-                          type="number"
-                          id="lot_size_acres"
-                          placeholder="Lot Size (Acres)"
-                          step="0.01"
-                          value={getEditValue('lot_size_acres') as number || ''}
-                          onChange={(e) => setEditedProject({ ...editedProject, lot_size_acres: parseFloat(e.target.value) })}
-                        />
-                        <label htmlFor="lot_size_acres">Lot Size (Acres)</label>
-                      </CFormFloating>
-                    </CCol>
-                  </CRow>
-
-                  {isLandDevelopment && (
-                    <CFormFloating className="mb-3">
-                      <CFormInput
-                        type="date"
-                        id="start_date"
-                        placeholder="Start Date"
-                        value={getEditValue('start_date') as string || ''}
-                        onChange={(e) => setEditedProject({ ...editedProject, start_date: e.target.value })}
-                      />
-                      <label htmlFor="start_date">Start Date</label>
-                    </CFormFloating>
-                  )}
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="number"
-                      id="year_built"
-                      placeholder="Year Built"
-                      value={getEditValue('year_built') as number || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, year_built: parseInt(e.target.value) })}
-                    />
-                    <label htmlFor="year_built">Year Built</label>
-                  </CFormFloating>
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="number"
-                      id="total_units"
-                      placeholder="Total Units"
-                      value={getEditValue('total_units') as number || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, total_units: parseInt(e.target.value) })}
-                    />
-                    <label htmlFor="total_units">Total Units</label>
-                  </CFormFloating>
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="number"
-                      id="stories"
-                      placeholder="Stories"
-                      value={getEditValue('stories') as number || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, stories: parseInt(e.target.value) })}
-                    />
-                    <label htmlFor="stories">Stories</label>
-                  </CFormFloating>
-
-                  <CFormFloating className="mb-3">
-                    <CFormInput
-                      type="number"
-                      id="gross_sf"
-                      placeholder="Gross SF"
-                      value={getEditValue('gross_sf') as number || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, gross_sf: parseFloat(e.target.value) })}
-                    />
-                    <label htmlFor="gross_sf">Gross SF</label>
-                  </CFormFloating>
-
-                  <CFormFloating>
-                    <CFormTextarea
-                      id="project_notes"
-                      placeholder="Notes"
-                      style={{ height: '100px' }}
-                      value={getEditValue('project_notes') as string || ''}
-                      onChange={(e) => setEditedProject({ ...editedProject, project_notes: e.target.value })}
-                    />
-                    <label htmlFor="project_notes">Notes</label>
-                  </CFormFloating>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        {/* Right Column - Large Map (Oblique 3D) */}
-        <CCol md={7}>
-          <CCard style={{ height: '100%' }}>
-            <CCardHeader>Map - 3D Oblique View</CCardHeader>
-            <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
-              <ProjectTabMap
-                projectId={String(project.project_id)}
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-              />
-            </CCardBody>
-          </CCard>
-        </CCol>
+        {renderOverviewColumns()}
       </CRow>
 
       {/* Section 2: Financial Summary */}
@@ -1633,5 +1766,10 @@ export default function ProjectTab({
         </div>
       </CModal>
     </div>
+    <NewProjectModal
+      isOpen={isNewProjectModalOpen}
+      onClose={() => setIsNewProjectModalOpen(false)}
+    />
+    </>
   );
 }

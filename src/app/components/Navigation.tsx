@@ -1,7 +1,7 @@
 // app/components/Navigation.tsx
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
@@ -58,10 +58,13 @@ interface NavItem {
   href?: string;
   target?: string;
   icon?: string;
+  onClick?: () => void | Promise<void>;
+  disabled?: boolean;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const { activeProject } = useProjectContext()
   const projectId = activeProject?.project_id
   const router = useRouter();
@@ -116,12 +119,49 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     }
   ], [projectId])
 
+  const navigateToAnalysis = useCallback(async () => {
+    if (analysisLoading) return;
+    if (!projectId) {
+      alert('Select a project to open financial analysis.');
+      return;
+    }
+
+    setAnalysisLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/property`, {
+        cache: 'no-store'
+      });
+      const data = await response.json();
+
+      if (response.ok && data?.property_id) {
+        router.push(`/properties/${data.property_id}/analysis`);
+      } else {
+        const message =
+          data?.error ||
+          'This project is not linked to a property record. Please complete property setup first.';
+        alert(message);
+      }
+    } catch (error) {
+      console.error('Failed to open financial analysis interface:', error);
+      alert('Failed to open analysis. Please try again.');
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, [analysisLoading, projectId, router]);
+
   // Legacy section - placed at bottom, separate from main navigation
   const legacySection: NavSection = useMemo(() => ({
     title: 'Legacy',
     items: [
       { id: 'assumptions', label: 'Assumptions & Factors', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/17/assumptions', icon: 'cilSettings' },
-      { id: 'market-assumptions', label: 'Market Assumptions (Old)', href: projectId ? `/properties/${projectId}/analysis` : '/properties/17/analysis', icon: 'cilChartPie' },
+      {
+        id: 'financial-analysis',
+        label: analysisLoading ? 'Opening Analysis...' : 'Financial Analysis',
+        icon: 'cilChartPie',
+        onClick: navigateToAnalysis,
+        disabled: analysisLoading || !projectId
+      },
       { id: 'market-intel-legacy', label: 'Market Intel (Old)', href: '/market', icon: 'cilGraph' },
       { id: 'project-overview-legacy', label: 'Project Overview (Old)', href: projectId ? `/projects/${projectId}/overview` : '/projects/11/overview', icon: 'cilFile' },
       { id: 'test-coreui', label: 'Theme Demo', href: '/test-coreui', icon: 'cilPaint' },
@@ -129,7 +169,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       { id: 'documentation', label: 'Documentation', href: '/documentation', icon: 'cilNotes' }
     ],
     isCollapsible: true
-  }), [projectId])
+  }), [analysisLoading, navigateToAnalysis, projectId])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({
@@ -170,6 +210,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         <div className="space-y-0.5">
           {section.items.map((item) => {
             const isActive = item.href ? pathname === item.href : activeView === item.id;
+            const isDisabled = Boolean(item.disabled);
             const baseClasses = `w-full text-left px-6 py-2.5 text-base flex items-center gap-3 transition-colors no-underline`;
             const activeStyle = isActive ? {
               backgroundColor: 'var(--cui-sidebar-nav-link-active-bg)',
@@ -178,7 +219,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
             } : {
               color: 'var(--cui-sidebar-nav-link-color)'
             };
-            const hoverStyle = !isActive ? { cursor: 'pointer' } : {};
+            const hoverStyle = !isActive && !isDisabled ? { cursor: 'pointer' } : {};
+            const disabledStyle = isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {};
 
             if (item.href) {
               return (
@@ -187,14 +229,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
                   href={item.href}
                   target={item.target}
                   className={baseClasses}
-                  style={{ ...activeStyle, ...hoverStyle }}
+                  style={{ ...activeStyle, ...hoverStyle, ...disabledStyle }}
                   onMouseEnter={(e) => {
-                    if (!isActive) {
+                    if (!isActive && !isDisabled) {
                       e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) {
+                    if (!isActive && !isDisabled) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
@@ -210,6 +252,11 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
             }
 
             const handleClick = () => {
+              if (isDisabled) return;
+              if (item.onClick) {
+                void item.onClick();
+                return;
+              }
               if (pathname !== '/') {
                 router.push('/');
                 setTimeout(() => setActiveView(item.id), 100);
@@ -222,15 +269,16 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
               <button
                 key={item.id}
                 onClick={handleClick}
+                disabled={isDisabled}
                 className={baseClasses}
-                style={{ ...activeStyle, ...hoverStyle }}
+                style={{ ...activeStyle, ...hoverStyle, ...disabledStyle }}
                 onMouseEnter={(e) => {
-                  if (!isActive) {
+                  if (!isActive && !isDisabled) {
                     e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) {
+                  if (!isActive && !isDisabled) {
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }
                 }}

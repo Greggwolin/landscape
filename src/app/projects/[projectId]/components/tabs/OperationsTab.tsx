@@ -488,39 +488,46 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         </div>
       </div>
 
-      {/* Nested Expense Table */}
-      {hierarchicalRows.length > 0 ? (
-        <NestedExpenseTable
-          mode={mode}
-          rows={hierarchicalRows}
-          onToggleExpand={handleToggleExpand}
-          onUpdateExpense={handleUpdateExpense}
-          selectedCategories={selectedCategories}
-          onCategoryFilterChange={setSelectedCategories}
-          onConfigureColumns={() => setShowColumnConfig(true)}
-          visibleColumns={visibleColumnIds}
-        />
-      ) : (
-        <div
-          className="rounded border p-8 text-center"
-          style={{
-            backgroundColor: 'var(--cui-tertiary-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div style={{ color: 'var(--cui-secondary-color)' }}>
-            No expense data available
-          </div>
+      {/* Main Content Grid: Expense Table + Benchmark Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Nested Expense Table */}
+        <div className="lg:col-span-2">
+          {hierarchicalRows.length > 0 ? (
+            <NestedExpenseTable
+              mode={mode}
+              rows={hierarchicalRows}
+              onToggleExpand={handleToggleExpand}
+              onUpdateExpense={handleUpdateExpense}
+              selectedCategories={selectedCategories}
+              onCategoryFilterChange={setSelectedCategories}
+              onConfigureColumns={() => setShowColumnConfig(true)}
+              visibleColumns={visibleColumnIds}
+            />
+          ) : (
+            <div
+              className="rounded border p-8 text-center"
+              style={{
+                backgroundColor: 'var(--cui-tertiary-bg)',
+                borderColor: 'var(--cui-border-color)'
+              }}
+            >
+              <div style={{ color: 'var(--cui-secondary-color)' }}>
+                No expense data available
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Benchmark Panel */}
-      <BenchmarkPanel
-        mode={mode}
-        totalPerUnit={Math.round(totals.perUnit)}
-        marketMedian={8200}
-        alerts={benchmarkAlerts}
-      />
+        {/* Benchmark Panel */}
+        <div className="lg:col-span-1">
+          <BenchmarkPanel
+            mode={mode}
+            totalPerUnit={Math.round(totals.perUnit)}
+            marketMedian={8200}
+            alerts={benchmarkAlerts}
+          />
+        </div>
+      </div>
 
       {/* Save Button */}
       {hasUnsavedChanges && (

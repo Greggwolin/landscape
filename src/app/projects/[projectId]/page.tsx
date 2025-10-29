@@ -10,6 +10,7 @@ import ProjectTab from './components/tabs/ProjectTab';
 import PlanningTab from './components/tabs/PlanningTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import SalesTab from './components/tabs/SalesTab';
+import FeasibilityTab from './components/tabs/FeasibilityTab';
 import PropertyTab from './components/tabs/PropertyTab';
 import OperationsTab from './components/tabs/OperationsTab';
 import ValuationTab from './components/tabs/ValuationTab';
@@ -73,6 +74,7 @@ export default function ProjectPage() {
             {activeTab === 'planning' && <PlanningTab project={project} />}
             {activeTab === 'budget' && <BudgetTab project={project} />}
             {activeTab === 'sales' && <SalesTab project={project} />}
+            {activeTab === 'feasibility' && <FeasibilityTab project={project} />}
 
             {/* Income Property specific tabs */}
             {activeTab === 'property' && <PropertyTab project={project} />}

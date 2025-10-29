@@ -253,87 +253,87 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                 />
               </div>
 
-              {/* Hierarchy Levels */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Number of Hierarchy Levels
-                </label>
-                <div className="flex space-x-4">
-                  {[2, 3, 4].map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => handleLevelsChange(level as 2 | 3 | 4)}
-                      className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                        data.hierarchyLevels === level
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                      }`}
-                    >
-                      {level} Levels
-                    </button>
-                  ))}
+              {/* Hierarchy Levels + Custom Labels */}
+              <div className="grid gap-8 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">
+                    Number of Hierarchy Levels
+                  </label>
+                  <div className="flex flex-col space-y-3">
+                    {[2, 3, 4].map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => handleLevelsChange(level as 2 | 3 | 4)}
+                        className={`w-full px-6 py-3 rounded-lg font-medium transition-all ${
+                          data.hierarchyLevels === level
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {level} Levels
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    {data.hierarchyLevels === 2 && 'Flat structure (e.g., Building → Unit)'}
+                    {data.hierarchyLevels === 3 && 'Standard 3-tier hierarchy (recommended)'}
+                    {data.hierarchyLevels === 4 && 'Complex 4-tier hierarchy (for large projects)'}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {data.hierarchyLevels === 2 && 'Flat structure (e.g., Building → Unit)'}
-                  {data.hierarchyLevels === 3 && 'Standard 3-tier hierarchy (recommended)'}
-                  {data.hierarchyLevels === 4 && 'Complex 4-tier hierarchy (for large projects)'}
-                </p>
-              </div>
 
-              {/* Custom Labels */}
-              <div className="space-y-4">
-                <label className="block text-sm font-medium text-gray-300">
-                  Customize Hierarchy Labels
-                </label>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Level 1 (Top) *</label>
-                    <input
-                      type="text"
-                      value={data.level1Label}
-                      onChange={(e) => handleLabelChange('level1', e.target.value)}
-                      placeholder="e.g., Plan Area, Property, Campus"
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Level 2 *</label>
-                    <input
-                      type="text"
-                      value={data.level2Label}
-                      onChange={(e) => handleLabelChange('level2', e.target.value)}
-                      placeholder="e.g., Phase, Building"
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {data.hierarchyLevels >= 3 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300">
+                    Customize Hierarchy Labels
+                  </label>
+                  <div className="mt-4 space-y-4">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Level 3</label>
+                      <label className="block text-xs text-gray-500 mb-1">Level 1 (Top) *</label>
                       <input
                         type="text"
-                        value={data.level3Label}
-                        onChange={(e) => handleLabelChange('level3', e.target.value)}
-                        placeholder="e.g., Parcel, Unit, Suite"
+                        value={data.level1Label}
+                        onChange={(e) => handleLabelChange('level1', e.target.value)}
+                        placeholder="e.g., Plan Area, Property, Campus"
                         className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
                       />
                     </div>
-                  )}
 
-                  {data.hierarchyLevels === 4 && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Level 4 (Bottom)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Level 2 *</label>
                       <input
                         type="text"
-                        value={data.level4Label}
-                        onChange={(e) => handleLabelChange('level4', e.target.value)}
-                        placeholder="e.g., Lot, Bedroom, Floor"
+                        value={data.level2Label}
+                        onChange={(e) => handleLabelChange('level2', e.target.value)}
+                        placeholder="e.g., Phase, Building"
                         className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
                       />
                     </div>
-                  )}
+
+                    {data.hierarchyLevels >= 3 && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Level 3</label>
+                        <input
+                          type="text"
+                          value={data.level3Label}
+                          onChange={(e) => handleLabelChange('level3', e.target.value)}
+                          placeholder="e.g., Parcel, Unit, Suite"
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    {data.hierarchyLevels === 4 && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Level 4 (Bottom)</label>
+                        <input
+                          type="text"
+                          value={data.level4Label}
+                          onChange={(e) => handleLabelChange('level4', e.target.value)}
+                          placeholder="e.g., Lot, Bedroom, Floor"
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
