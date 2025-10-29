@@ -1,222 +1,473 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useProjectContext } from '@/app/components/ProjectProvider';
-import TemplateDesigner from '@/components/dms/admin/TemplateDesigner';
-import type { DMSTemplate } from '@/lib/dms/db';
+import { CButton, CForm, CFormInput, CFormLabel, CFormTextarea, CCard, CCardBody, CCardHeader } from '@coreui/react';
 
-export default function DMSTemplatesAdminPage() {
-  const { activeProject: currentProject } = useProjectContext();
-  const [templates, setTemplates] = useState<DMSTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<DMSTemplate | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [defaultWorkspaceId, setDefaultWorkspaceId] = useState<number>(1);
+interface Template {
+  template_id: number;
+  template_name: string;
+  description: string | null;
+  doc_type_options: string[];
+  is_default: boolean;
+  workspace_id: number | null;
+  project_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
 
-  // Fetch templates for current project
+interface TemplateFormData {
+  template_name: string;
+  description: string;
+  doc_type_options: string;
+  is_default: boolean;
+}
+
+export default function TemplatesAdminPage() {
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [formData, setFormData] = useState<TemplateFormData>({
+    template_name: '',
+    description: '',
+    doc_type_options: '',
+    is_default: false
+  });
+
+  const workspaceId = 1; // TODO: Get from context
+
   useEffect(() => {
-    async function fetchTemplates() {
-      try {
-        const params = new URLSearchParams({
-          workspaceId: defaultWorkspaceId.toString(),
-        });
-
-        if (currentProject) {
-          params.append('projectId', currentProject.project_id.toString());
-        }
-
-        const response = await fetch(`/api/dms/templates?${params.toString()}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch templates');
-        }
-        const data = await response.json();
-        setTemplates(data.templates || []);
-
-        // Select default template if available
-        const defaultTemplate = data.templates?.find((t: DMSTemplate) => t.is_default);
-        if (defaultTemplate) {
-          setSelectedTemplate(defaultTemplate);
-        }
-      } catch (error) {
-        console.error('Error fetching templates:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     fetchTemplates();
-  }, [currentProject, defaultWorkspaceId]);
+  }, []);
 
-  const handleSaveTemplate = async (template: Partial<DMSTemplate>, attributeConfigs: any[]) => {
+  const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/dms/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template: {
-            ...template,
-            workspace_id: defaultWorkspaceId,
-            project_id: currentProject?.project_id || null,
-          },
-          attributeConfigs,
-        }),
-      });
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`/api/dms/templates?workspace_id=${workspaceId}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch templates');
+      }
+
+      const data = await response.json();
+      setTemplates(data.templates || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingId(null);
+    setFormData({
+      template_name: '',
+      description: '',
+      doc_type_options: '',
+      is_default: false
+    });
+    setShowCreateForm(true);
+  };
+
+  const handleEdit = (template: Template) => {
+    setEditingId(template.template_id);
+    setFormData({
+      template_name: template.template_name,
+      description: template.description || '',
+      doc_type_options: template.doc_type_options.join('\n'),
+      is_default: template.is_default
+    });
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setShowCreateForm(false);
+    setFormData({
+      template_name: '',
+      description: '',
+      doc_type_options: '',
+      is_default: false
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      const docTypeArray = formData.doc_type_options
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (docTypeArray.length === 0) {
+        alert('Please enter at least one document type');
+        return;
+      }
+
+      const payload = {
+        template_name: formData.template_name,
+        description: formData.description || null,
+        doc_type_options: docTypeArray,
+        is_default: formData.is_default,
+        workspace_id: workspaceId
+      };
+
+      let response;
+      if (editingId) {
+        // Update existing template
+        response = await fetch(`/api/dms/templates/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Create new template
+        response = await fetch('/api/dms/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save template');
       }
 
-      const data = await response.json();
-
-      // Refresh templates list
-      const params = new URLSearchParams({
-        workspaceId: defaultWorkspaceId.toString(),
-      });
-      if (currentProject) {
-        params.append('projectId', currentProject.project_id.toString());
-      }
-
-      const refreshResponse = await fetch(`/api/dms/templates?${params.toString()}`);
-      const refreshData = await refreshResponse.json();
-      setTemplates(refreshData.templates || []);
-      setSelectedTemplate(data.template);
-
-      alert('Template saved successfully!');
-    } catch (error) {
-      console.error('Save error:', error);
-      throw error;
+      handleCancel();
+      fetchTemplates();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save template');
     }
   };
 
-  if (isLoading) {
+  const handleDelete = async (template: Template) => {
+    if (template.is_default) {
+      alert('Cannot delete the default template. Please set another template as default first.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${template.template_name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/dms/templates/${template.template_id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete template');
+      }
+
+      fetchTemplates();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete template');
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-gray-500 dark:text-gray-400">Loading templates...</div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Document Templates
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Configure which attributes are required or optional for different document types
-          {currentProject && (
-            <>
-              {' '}
-              in <strong>{currentProject.project_name}</strong>
-            </>
-          )}
-        </p>
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-red-600 dark:text-red-400">Error: {error}</div>
+          <CButton color="primary" onClick={fetchTemplates} className="mt-4">
+            Retry
+          </CButton>
+        </div>
       </div>
+    );
+  }
 
-      {!currentProject && (
-        <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            Select a project to create project-specific templates, or create workspace-level
-            templates below.
+  // Color palette for document type chips
+  const chipColors = [
+    { bg: 'rgba(13, 110, 253, 0.1)', text: 'rgb(13, 110, 253)', border: 'rgba(13, 110, 253, 0.3)' }, // blue
+    { bg: 'rgba(25, 135, 84, 0.1)', text: 'rgb(25, 135, 84)', border: 'rgba(25, 135, 84, 0.3)' }, // green
+    { bg: 'rgba(220, 53, 69, 0.1)', text: 'rgb(220, 53, 69)', border: 'rgba(220, 53, 69, 0.3)' }, // red
+    { bg: 'rgba(255, 193, 7, 0.1)', text: 'rgb(193, 115, 0)', border: 'rgba(255, 193, 7, 0.3)' }, // yellow
+    { bg: 'rgba(111, 66, 193, 0.1)', text: 'rgb(111, 66, 193)', border: 'rgba(111, 66, 193, 0.3)' }, // purple
+    { bg: 'rgba(13, 202, 240, 0.1)', text: 'rgb(13, 162, 200)', border: 'rgba(13, 202, 240, 0.3)' }, // cyan
+    { bg: 'rgba(253, 126, 20, 0.1)', text: 'rgb(253, 126, 20)', border: 'rgba(253, 126, 20, 0.3)' }, // orange
+    { bg: 'rgba(214, 51, 132, 0.1)', text: 'rgb(214, 51, 132)', border: 'rgba(214, 51, 132, 0.3)' }, // pink
+  ];
+
+  const getChipColor = (index: number) => chipColors[index % chipColors.length];
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+            Document Templates
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+            Manage document type options for your workspace
           </p>
         </div>
+        <CButton color="primary" onClick={handleCreate}>
+          + Create Template
+        </CButton>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <CCard className="mb-4">
+          <CCardHeader>
+            <h3 className="text-lg font-medium">Create New Template</h3>
+          </CCardHeader>
+          <CCardBody>
+            <CForm>
+              <div className="mb-3">
+                <CFormLabel htmlFor="template_name">Template Name *</CFormLabel>
+                <CFormInput
+                  type="text"
+                  id="template_name"
+                  value={formData.template_name}
+                  onChange={(e) => setFormData({ ...formData, template_name: e.target.value })}
+                  placeholder="e.g., Standard Document Types"
+                />
+              </div>
+
+              <div className="mb-3">
+                <CFormLabel htmlFor="description">Description</CFormLabel>
+                <CFormInput
+                  type="text"
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description"
+                />
+              </div>
+
+              <div className="mb-3">
+                <CFormLabel htmlFor="doc_type_options">Document Types * (one per line)</CFormLabel>
+                <CFormTextarea
+                  id="doc_type_options"
+                  rows={10}
+                  value={formData.doc_type_options}
+                  onChange={(e) => setFormData({ ...formData, doc_type_options: e.target.value })}
+                  placeholder={'Contract\nInvoice\nReport\nPlan\nProposal'}
+                />
+                <small className="text-gray-500 dark:text-gray-400">
+                  Enter each document type on a new line
+                </small>
+              </div>
+
+              <div className="mb-3 form-check">
+                <input
+                  type="checkbox"
+                  className="form-check-input"
+                  id="is_default"
+                  checked={formData.is_default}
+                  onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+                />
+                <label className="form-check-label" htmlFor="is_default">
+                  Set as default template
+                </label>
+              </div>
+
+              <div className="d-flex gap-2">
+                <CButton color="primary" onClick={handleSave}>
+                  Create Template
+                </CButton>
+                <CButton color="secondary" onClick={handleCancel}>
+                  Cancel
+                </CButton>
+              </div>
+            </CForm>
+          </CCardBody>
+        </CCard>
       )}
 
-      {/* Existing Templates */}
-      {templates.length > 0 && (
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Existing Templates
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map((template) => (
-              <button
+      {/* Templates List */}
+      {templates.length === 0 && !showCreateForm ? (
+        <div
+          className="text-center py-12 rounded-lg border"
+          style={{
+            backgroundColor: 'var(--cui-card-bg)',
+            borderColor: 'var(--cui-border-color)'
+          }}
+        >
+          <div className="mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
+            No templates found
+          </div>
+          <CButton color="primary" onClick={handleCreate}>
+            Create Your First Template
+          </CButton>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {templates.map((template) => {
+            const isEditing = editingId === template.template_id;
+
+            if (isEditing) {
+              return (
+                <CCard key={template.template_id}>
+                  <CCardHeader>
+                    <h3 className="text-lg font-medium">Edit Template</h3>
+                  </CCardHeader>
+                  <CCardBody>
+                    <CForm>
+                      <div className="mb-3">
+                        <CFormLabel htmlFor={`edit_name_${template.template_id}`}>Template Name *</CFormLabel>
+                        <CFormInput
+                          type="text"
+                          id={`edit_name_${template.template_id}`}
+                          value={formData.template_name}
+                          onChange={(e) => setFormData({ ...formData, template_name: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="mb-3">
+                        <CFormLabel htmlFor={`edit_desc_${template.template_id}`}>Description</CFormLabel>
+                        <CFormInput
+                          type="text"
+                          id={`edit_desc_${template.template_id}`}
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="mb-3">
+                        <CFormLabel htmlFor={`edit_types_${template.template_id}`}>Document Types * (one per line)</CFormLabel>
+                        <CFormTextarea
+                          id={`edit_types_${template.template_id}`}
+                          rows={10}
+                          value={formData.doc_type_options}
+                          onChange={(e) => setFormData({ ...formData, doc_type_options: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="mb-3 form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id={`edit_default_${template.template_id}`}
+                          checked={formData.is_default}
+                          onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+                        />
+                        <label className="form-check-label" htmlFor={`edit_default_${template.template_id}`}>
+                          Set as default template
+                        </label>
+                      </div>
+
+                      <div className="d-flex gap-2">
+                        <CButton color="primary" onClick={handleSave}>
+                          Save Changes
+                        </CButton>
+                        <CButton color="secondary" onClick={handleCancel}>
+                          Cancel
+                        </CButton>
+                      </div>
+                    </CForm>
+                  </CCardBody>
+                </CCard>
+              );
+            }
+
+            return (
+              <div
                 key={template.template_id}
-                onClick={() => setSelectedTemplate(template)}
-                className={`p-4 rounded-lg border-2 text-left transition-colors ${
-                  selectedTemplate?.template_id === template.template_id
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
+                className="rounded-lg border p-5"
+                style={{
+                  backgroundColor: 'var(--cui-card-bg)',
+                  borderColor: 'var(--cui-border-color)'
+                }}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {template.template_name}
-                    </h3>
-                    {template.doc_type && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        For: {template.doc_type}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium" style={{ color: 'var(--cui-body-color)' }}>
+                        {template.template_name}
+                      </h3>
+                      {template.is_default && (
+                        <span
+                          className="px-2 py-1 text-xs font-medium rounded"
+                          style={{
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            color: 'rgb(13, 110, 253)',
+                            border: '1px solid rgba(13, 110, 253, 0.3)'
+                          }}
+                        >
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    {template.description && (
+                      <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {template.description}
                       </p>
                     )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {(template as any).attribute_count || 0} attributes
-                    </p>
                   </div>
-                  {template.is_default && (
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                      Default
-                    </span>
-                  )}
+                  <div className="flex gap-2">
+                    <CButton
+                      color="warning"
+                      size="sm"
+                      onClick={() => handleEdit(template)}
+                    >
+                      Edit
+                    </CButton>
+                    <CButton
+                      color="danger"
+                      size="sm"
+                      onClick={() => handleDelete(template)}
+                      disabled={template.is_default}
+                    >
+                      Delete
+                    </CButton>
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
+
+                {/* Document Types */}
+                <div className="mt-3">
+                  <div className="text-xs font-medium mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                    Document Types ({template.doc_type_options.length})
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {template.doc_type_options.map((docType, idx) => {
+                      const color = getChipColor(idx);
+                      return (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 text-sm rounded-full"
+                          style={{
+                            backgroundColor: color.bg,
+                            color: color.text,
+                            border: `1px solid ${color.border}`
+                          }}
+                        >
+                          {docType}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Metadata */}
+                <div className="mt-3 pt-3 text-xs" style={{
+                  borderTop: '1px solid var(--cui-border-color)',
+                  color: 'var(--cui-secondary-color)'
+                }}>
+                  Created: {new Date(template.created_at).toLocaleDateString()} •
+                  Updated: {new Date(template.updated_at).toLocaleDateString()}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
-
-      {/* Template Designer */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <TemplateDesigner
-          workspaceId={defaultWorkspaceId}
-          projectId={currentProject?.project_id}
-          initialTemplate={selectedTemplate || undefined}
-          onSave={handleSaveTemplate}
-          onCancel={() => setSelectedTemplate(null)}
-        />
-      </div>
-
-      {/* Help Section */}
-      <div className="mt-8 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          About Templates
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-              Template Levels
-            </h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-              <li>
-                <strong>Workspace Templates:</strong> Apply to all projects in the workspace
-              </li>
-              <li>
-                <strong>Project Templates:</strong> Override workspace templates for specific
-                projects
-              </li>
-              <li>
-                <strong>Doc Type Templates:</strong> Different requirements for PDFs, contracts,
-                etc.
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-              Best Practices
-            </h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-              <li>Start with a default template for all document types</li>
-              <li>Mark essential fields as required</li>
-              <li>Create specialized templates for contracts, permits, etc.</li>
-              <li>Use display order to group related fields</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

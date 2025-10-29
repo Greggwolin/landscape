@@ -89,3 +89,109 @@ class Document(models.Model):
     
     def __str__(self):
         return self.doc_name
+
+
+class DMSAssertion(models.Model):
+    """
+    DMS Assertion model - stores extracted data from documents.
+    Maps to landscape.dms_assertion
+    """
+
+    assertion_id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        null=True,
+        blank=True,
+        related_name='assertions'
+    )
+    doc_id = models.TextField()  # Can reference core_doc or other doc systems
+    subject_type = models.CharField(max_length=255, null=True, blank=True)
+    subject_ref = models.TextField(null=True, blank=True)
+    metric_key = models.TextField(null=True, blank=True)
+    value_num = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    value_text = models.TextField(null=True, blank=True)
+    units = models.TextField(null=True, blank=True)
+    context = models.CharField(max_length=255, null=True, blank=True)
+    page = models.IntegerField(null=True, blank=True)
+    bbox = models.JSONField(null=True, blank=True)  # Bounding box coordinates
+    confidence = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    source = models.CharField(max_length=255, null=True, blank=True)
+    as_of_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'dms_assertion'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Assertion {self.assertion_id} - {self.metric_key}"
+
+
+class DMSExtractQueue(models.Model):
+    """
+    DMS Extract Queue model - tracks document extraction jobs.
+    Maps to landscape.dms_extract_queue
+    """
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    queue_id = models.AutoField(primary_key=True)
+    doc_id = models.BigIntegerField()
+    extract_type = models.CharField(max_length=100)  # 'rent_roll', 't12', etc.
+    priority = models.IntegerField(default=5)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
+    attempts = models.IntegerField(default=0)
+    max_attempts = models.IntegerField(default=3)
+    error_message = models.TextField(null=True, blank=True)
+    extracted_data = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'dms_extract_queue'
+        ordering = ['-priority', 'created_at']
+
+    def __str__(self):
+        return f"Extract Job {self.queue_id} - {self.extract_type} ({self.status})"
+
+
+class AICorrectionLog(models.Model):
+    """
+    AI Correction Log model - tracks user corrections to AI extractions.
+    This table may need to be created in the database.
+    """
+
+    correction_id = models.AutoField(primary_key=True)
+    extraction_result_id = models.BigIntegerField()  # References extraction job
+    user_id = models.BigIntegerField()
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        null=True,
+        blank=True,
+        related_name='ai_corrections'
+    )
+    doc_id = models.TextField(null=True, blank=True)
+    field_path = models.CharField(max_length=255)  # JSON path to corrected field
+    ai_value = models.TextField(null=True, blank=True)
+    user_value = models.TextField(null=True, blank=True)
+    correction_type = models.CharField(max_length=100)  # 'value_wrong', 'field_missing', etc.
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'ai_correction_log'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Correction {self.correction_id} - {self.field_path}"

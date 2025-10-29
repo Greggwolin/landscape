@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilFilterSquare } from '@coreui/icons';
-import { useProjectContext } from '@/app/components/ProjectProvider';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import FilterDetailView from '@/components/dms/views/FilterDetailView';
 import Dropzone from '@/components/dms/upload/Dropzone';
@@ -13,21 +12,22 @@ import type { DMSDocument } from '@/types/dms';
 
 type TabType = 'documents' | 'upload';
 
-export default function DMSPage() {
-  const { activeProject: currentProject } = useProjectContext();
+interface DMSViewProps {
+  projectId: number;
+  projectName: string;
+  projectType?: string | null;
+  hideHeader?: boolean;
+  defaultTab?: TabType;
+}
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab === 'upload' || tab === 'documents') {
-        return tab as TabType;
-      }
-    }
-    return 'documents';
-  });
-
+export default function DMSView({
+  projectId,
+  projectName,
+  projectType = null,
+  hideHeader = false,
+  defaultTab = 'documents'
+}: DMSViewProps) {
+  const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
   const defaultWorkspaceId = 1;
 
   // Documents tab state
@@ -50,29 +50,34 @@ export default function DMSPage() {
   }>>([]);
   const [selectedUploadFile, setSelectedUploadFile] = useState<typeof uploadedFiles[number] | null>(null);
 
+  const secondaryColorStyle: React.CSSProperties = { color: 'var(--cui-secondary-color)' };
+  const primaryColorStyle: React.CSSProperties = { color: 'var(--cui-primary)' };
+  const borderColor = 'var(--cui-border-color)';
+  const cardBg = 'var(--cui-card-bg)';
+  const tertiaryBg = 'var(--cui-tertiary-bg)';
+
   // Fetch filter data when Documents tab is active
   useEffect(() => {
-    if (currentProject?.project_id && activeTab === 'documents') {
+    if (projectId && activeTab === 'documents') {
       void loadFilters();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject?.project_id, currentProject?.project_type, activeTab]);
+  }, [projectId, projectType, activeTab]);
 
   const loadFilters = async () => {
-    if (!currentProject) return;
     setIsLoadingFilters(true);
     try {
       const docTypeParams = new URLSearchParams({
-        project_id: currentProject.project_id.toString(),
+        project_id: projectId.toString(),
         workspace_id: defaultWorkspaceId.toString()
       });
-      if (currentProject.project_type) {
-        docTypeParams.append('project_type', currentProject.project_type);
+      if (projectType) {
+        docTypeParams.append('project_type', projectType);
       }
 
       const [docTypesResponse, countsResponse] = await Promise.all([
         fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`),
-        fetch(`/api/dms/filters/counts?project_id=${currentProject.project_id}`)
+        fetch(`/api/dms/filters/counts?project_id=${projectId}`)
       ]);
 
       let docTypeOptions: string[] = [];
@@ -163,7 +168,7 @@ export default function DMSPage() {
 
     try {
       const response = await fetch(
-        `/api/dms/search?project_id=${currentProject.project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`
+        `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
       );
 
       if (!response.ok) {
@@ -240,108 +245,103 @@ export default function DMSPage() {
     }
   };
 
-  if (!currentProject) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-            No Project Selected
-          </h2>
-          <p className="text-yellow-700 dark:text-yellow-300">
-            Please select a project from the navigation to access the Document Management System.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen flex flex-col">
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="px-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('documents')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'documents'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Documents
-              </div>
-            </button>
+    <div className="h-full flex flex-col" style={{ backgroundColor: tertiaryBg }}>
+      {/* Header */}
+      {!hideHeader && (
+        <div
+          className="border-b"
+          style={{
+            borderColor,
+            backgroundColor: cardBg
+          }}
+        >
+          <div className="px-6">
+            <nav className="flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('documents')}
+                className="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                style={
+                  activeTab === 'documents'
+                    ? { borderColor: primaryColorStyle.color, color: primaryColorStyle.color }
+                    : { borderColor: 'transparent', ...secondaryColorStyle }
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Documents
+                </div>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'upload'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload
-              </div>
-            </button>
-          </nav>
+              <button
+                onClick={() => setActiveTab('upload')}
+                className="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                style={
+                  activeTab === 'upload'
+                    ? { borderColor: primaryColorStyle.color, color: primaryColorStyle.color }
+                    : { borderColor: 'transparent', ...secondaryColorStyle }
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload
+                </div>
+              </button>
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
         {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+          <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
             {/* Breadcrumb */}
-            <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
               <div className="flex items-center gap-2 text-sm">
-                <button className="text-blue-600 dark:text-blue-400 hover:underline">Home</button>
-                <span className="text-gray-400">{'>'}</span>
-                <button className="text-blue-600 dark:text-blue-400 hover:underline">Projects</button>
-                <span className="text-gray-400">{'>'}</span>
-                <span className="text-gray-900 dark:text-gray-100 truncate">
-                  {currentProject.project_name}
+                <button className="text-blue-600 hover:underline">Home</button>
+                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                <button className="text-blue-600 hover:underline">Projects</button>
+                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
+                  {projectName}
                 </span>
               </div>
             </div>
 
             {/* Toolbar */}
-            <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
               <div className="flex items-center gap-4">
-                <button className="text-blue-600 dark:text-blue-400">🔻</button>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <button className="text-blue-600">🔻</button>
+                <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                   {totalItemCount} items | 0 selected
                 </span>
                 <div className="ml-auto flex items-center gap-3 text-sm">
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     🤖 Ask AI
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     ✏️ Rename
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-1">
+                  <button className="hover:opacity-70 flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
                     <CIcon icon={cilFilterSquare} className="w-4 h-4" />
                     Move/Copy
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     📧 Email copy
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     ✏️ Edit profile
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     ✅ Check in
                   </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                     ⋯ More
                   </button>
                 </div>
@@ -353,19 +353,19 @@ export default function DMSPage() {
                 {isLoadingFilters ? (
                   <div className="flex items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-3 text-gray-600 dark:text-gray-400">Loading filters...</span>
+                    <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
                   </div>
                 ) : allFilters.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+                  <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--cui-secondary-color)' }}>
                     <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3" />
                     <p className="text-sm">No documents found in this project</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2">
                     {/* Left Column */}
-                    <div className="border-r border-gray-200 dark:border-gray-700">
+                    <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
                       <AccordionFilters
-                        projectId={currentProject.project_id}
+                        projectId={projectId}
                         filters={leftColumnFilters}
                         onExpand={handleAccordionExpand}
                         onFilterClick={handleFilterClick}
@@ -378,7 +378,7 @@ export default function DMSPage() {
                     {/* Right Column */}
                     <div>
                       <AccordionFilters
-                        projectId={currentProject.project_id}
+                        projectId={projectId}
                         filters={rightColumnFilters}
                         onExpand={handleAccordionExpand}
                         onFilterClick={handleFilterClick}
@@ -398,9 +398,12 @@ export default function DMSPage() {
                     onClick={handleCloseDetail}
                     role="presentation"
                   />
-                  <div className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3">
+                  <div
+                    className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3"
+                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
+                  >
                     <FilterDetailView
-                      projectId={currentProject.project_id}
+                      projectId={projectId}
                       docType={selectedFilterType}
                       onBack={handleCloseDetail}
                     />
@@ -416,7 +419,7 @@ export default function DMSPage() {
           <div className="h-full overflow-y-auto p-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
                   Upload Documents
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400">
@@ -427,9 +430,9 @@ export default function DMSPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left: Upload */}
                 <div className="space-y-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 bg-white dark:bg-gray-900">
                     <Dropzone
-                      projectId={currentProject.project_id}
+                      projectId={projectId}
                       workspaceId={defaultWorkspaceId}
                       docType="general"
                       onUploadComplete={handleUploadComplete}
@@ -438,8 +441,8 @@ export default function DMSPage() {
                   </div>
 
                   {uploadedFiles.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 bg-white dark:bg-gray-900">
+                      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
                         Uploaded Files ({uploadedFiles.length})
                       </h3>
                       <Queue
@@ -452,8 +455,8 @@ export default function DMSPage() {
                 </div>
 
                 {/* Right: Profile Form */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 h-fit sticky top-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 h-fit sticky top-6 bg-white dark:bg-gray-900">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
                     Document Profile
                   </h3>
 
@@ -470,10 +473,10 @@ export default function DMSPage() {
 
                       <ProfileForm
                         docId={selectedUploadFile.doc_id}
-                        projectId={currentProject.project_id}
+                        projectId={projectId}
                         workspaceId={defaultWorkspaceId}
                         docType="general"
-                        projectType={currentProject.project_type ?? null}
+                        projectType={projectType}
                         initialProfile={selectedUploadFile.profile_json || {}}
                         onSave={(profile) => handleProfileSave(selectedUploadFile.doc_id!, profile)}
                         onCancel={() => setSelectedUploadFile(null)}

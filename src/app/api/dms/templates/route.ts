@@ -1,58 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/dms/db';
-import type { DMSTemplate } from '@/lib/dms/db';
+/**
+ * DMS Templates API
+ * Simplified template management - just doc_type_options array
+ */
 
-// GET /api/dms/templates - List templates for workspace
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
+import { z } from 'zod';
+
+const CreateTemplateSchema = z.object({
+  template_name: z.string().min(1).max(100),
+  workspace_id: z.number().int().positive().optional(),
+  project_id: z.number().int().positive().optional(),
+  description: z.string().optional(),
+  doc_type_options: z.array(z.string()).min(1),
+  is_default: z.boolean().optional().default(false),
+});
+
+// GET - List templates
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const workspaceId = searchParams.get('workspaceId');
-    const projectId = searchParams.get('projectId');
+    const workspaceId = searchParams.get('workspace_id');
+    const projectId = searchParams.get('project_id');
 
-    if (!workspaceId) {
+    if (!workspaceId && !projectId) {
       return NextResponse.json(
-        { error: 'Workspace ID is required' },
+        { error: 'Either workspace_id or project_id is required' },
         { status: 400 }
       );
     }
 
-    let query;
-    if (projectId) {
-      query = sql<(DMSTemplate & { attribute_count: number })[]>`
-        SELECT t.*, 
-               COALESCE(attr_count.count, 0) as attribute_count
-        FROM landscape.dms_templates t
-        LEFT JOIN (
-          SELECT template_id, COUNT(*) as count
-          FROM landscape.dms_template_attributes
-          GROUP BY template_id
-        ) attr_count ON t.template_id = attr_count.template_id
-        WHERE t.workspace_id = ${parseInt(workspaceId)}
-          AND (t.project_id IS NULL OR t.project_id = ${parseInt(projectId)})
-        ORDER BY t.is_default DESC, t.template_name
-      `;
-    } else {
-      query = sql<(DMSTemplate & { attribute_count: number })[]>`
-        SELECT t.*, 
-               COALESCE(attr_count.count, 0) as attribute_count
-        FROM landscape.dms_templates t
-        LEFT JOIN (
-          SELECT template_id, COUNT(*) as count
-          FROM landscape.dms_template_attributes
-          GROUP BY template_id
-        ) attr_count ON t.template_id = attr_count.template_id
-        WHERE t.workspace_id = ${parseInt(workspaceId)}
-          AND t.project_id IS NULL
-        ORDER BY t.is_default DESC, t.template_name
-      `;
-    }
+    const templates = await sql`
+      SELECT
+        template_id,
+        template_name,
+        description,
+        doc_type_options,
+        is_default,
+        workspace_id,
+        project_id,
+        created_at,
+        updated_at
+      FROM landscape.dms_templates
+      WHERE (
+        ${workspaceId ? sql`workspace_id = ${parseInt(workspaceId)}` : sql`1=0`}
+        OR ${projectId ? sql`project_id = ${parseInt(projectId)}` : sql`1=0`}
+      )
+      ORDER BY is_default DESC, template_name ASC
+    `;
 
-    const templates = await query;
-
-    return NextResponse.json({ templates });
-
+    return NextResponse.json({
+      success: true,
+      templates
+    });
   } catch (error) {
-    console.error('Templates fetch error:', error);
+    console.error('Error fetching templates:', error);
     return NextResponse.json(
       { error: 'Failed to fetch templates' },
       { status: 500 }
@@ -60,67 +62,62 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/dms/templates - Create template with attributes
+// POST - Create template
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { template, attributeConfigs } = body;
+    const validated = CreateTemplateSchema.parse(body);
 
-    if (!template || !template.template_name || !template.workspace_id) {
-      return NextResponse.json(
-        { error: 'Template name and workspace ID are required' },
-        { status: 400 }
-      );
-    }
-
-    // If this is being set as default, unset other defaults
-    if (template.is_default) {
-      await sql`
-        UPDATE landscape.dms_templates 
-        SET is_default = false
-        WHERE workspace_id = ${template.workspace_id}
-          AND (project_id IS NULL OR project_id = ${template.project_id || null})
-          AND (doc_type IS NULL OR doc_type = ${template.doc_type || null})
-      `;
-    }
-
-    // Create the template
-    const createdTemplate = await sql<DMSTemplate[]>`
-      INSERT INTO landscape.dms_templates (
-        template_name, workspace_id, project_id, doc_type, is_default
-      )
-      VALUES (
-        ${template.template_name}, ${template.workspace_id}, 
-        ${template.project_id || null}, ${template.doc_type || null}, 
-        ${template.is_default || false}
-      )
-      RETURNING *
-    `;
-
-    const newTemplate = createdTemplate[0];
-
-    // Add attribute configurations if provided
-    if (attributeConfigs && Array.isArray(attributeConfigs) && attributeConfigs.length > 0) {
-      for (const config of attributeConfigs) {
+    // If setting as default, unset other defaults first
+    if (validated.is_default) {
+      if (validated.workspace_id) {
         await sql`
-          INSERT INTO landscape.dms_template_attributes (
-            template_id, attr_id, is_required, display_order
-          )
-          VALUES (
-            ${newTemplate.template_id}, ${config.attr_id}, 
-            ${config.is_required || false}, ${config.display_order || 0}
-          )
+          UPDATE landscape.dms_templates
+          SET is_default = false
+          WHERE workspace_id = ${validated.workspace_id}
+        `;
+      } else if (validated.project_id) {
+        await sql`
+          UPDATE landscape.dms_templates
+          SET is_default = false
+          WHERE project_id = ${validated.project_id}
         `;
       }
     }
 
+    const result = await sql`
+      INSERT INTO landscape.dms_templates (
+        template_name,
+        workspace_id,
+        project_id,
+        description,
+        doc_type_options,
+        is_default
+      ) VALUES (
+        ${validated.template_name},
+        ${validated.workspace_id || null},
+        ${validated.project_id || null},
+        ${validated.description || null},
+        ${validated.doc_type_options},
+        ${validated.is_default}
+      )
+      RETURNING *
+    `;
+
     return NextResponse.json({
       success: true,
-      template: newTemplate
-    });
-
+      template: result[0]
+    }, { status: 201 });
   } catch (error) {
-    console.error('Template creation error:', error);
+    console.error('Error creating template:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to create template' },
       { status: 500 }

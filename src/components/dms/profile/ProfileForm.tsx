@@ -5,104 +5,47 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
-import type { CoreDoc, DMSAttribute, DMSTemplate } from '@/lib/dms/db';
+import TagInput from './TagInput';
 
 interface ProfileFormProps {
-  doc: CoreDoc;
-  template?: DMSTemplate;
-  attributes?: (DMSAttribute & { is_required: boolean; display_order: number })[];
-  onSave: (docId: number, profile: Record<string, any>) => Promise<void>;
+  docId?: number;
+  projectId: number;
+  workspaceId?: number;
+  docType?: string;
+  projectType?: string | null;
+  initialProfile?: Record<string, unknown>;
+  onSave: (profile: Record<string, unknown>) => Promise<void>;
   onCancel: () => void;
-  onSuccess?: (doc: CoreDoc) => void;
+  onSuccess?: () => void;
 }
 
-// Dynamic schema based on attributes
-const createProfileSchema = (attributes: (DMSAttribute & { is_required: boolean })[] = []) => {
-  const schemaFields: Record<string, any> = {};
-  
-  attributes.forEach(attr => {
-    let fieldSchema: any;
-    
-    switch (attr.attr_type) {
-      case 'text':
-        fieldSchema = z.string();
-        if (attr.validation_rules?.maxLength) {
-          fieldSchema = fieldSchema.max(attr.validation_rules.maxLength);
-        }
-        if (attr.validation_rules?.minLength) {
-          fieldSchema = fieldSchema.min(attr.validation_rules.minLength);
-        }
-        break;
-        
-      case 'number':
-        fieldSchema = z.number();
-        if (attr.validation_rules?.min !== undefined) {
-          fieldSchema = fieldSchema.min(attr.validation_rules.min);
-        }
-        if (attr.validation_rules?.max !== undefined) {
-          fieldSchema = fieldSchema.max(attr.validation_rules.max);
-        }
-        break;
-        
-      case 'currency':
-        fieldSchema = z.number().min(0);
-        break;
-        
-      case 'date':
-        fieldSchema = z.string().refine((val) => !isNaN(Date.parse(val)), {
-          message: 'Invalid date format'
-        });
-        break;
-        
-      case 'boolean':
-        fieldSchema = z.boolean();
-        break;
-        
-      case 'enum':
-        if (attr.enum_values && attr.enum_values.length > 0) {
-          fieldSchema = z.enum(attr.enum_values as [string, ...string[]]);
-        } else {
-          fieldSchema = z.string();
-        }
-        break;
-        
-      case 'tags':
-        fieldSchema = z.array(z.string()).default([]);
-        break;
-        
-      case 'json':
-        fieldSchema = z.any();
-        break;
-        
-      default:
-        fieldSchema = z.string();
-    }
-    
-    // Make optional if not required
-    if (!attr.is_required) {
-      fieldSchema = fieldSchema.optional();
-    }
-    
-    schemaFields[attr.attr_key] = fieldSchema;
-  });
-  
-  return z.object(schemaFields);
-};
+// Simplified profile schema - no more complex attribute registry
+const profileSchema = z.object({
+  doc_type: z.string().min(1, 'Document type is required'),
+  description: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  doc_date: z.string().optional(),
+  parties: z.string().optional(), // Comma-separated string for simplicity
+  dollar_amount: z.number().optional(),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfileForm({
-  doc,
-  template,
-  attributes = [],
+  docId,
+  projectId,
+  workspaceId,
+  docType,
+  projectType,
+  initialProfile = {},
   onSave,
   onCancel,
   onSuccess
 }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [tagInputs, setTagInputs] = useState<Record<string, string>>({});
-  
-  const schema = createProfileSchema(attributes);
-  type ProfileFormData = z.infer<typeof schema>;
-  
+  const [docTypeOptions, setDocTypeOptions] = useState<string[]>([]);
+  const [loadingDocTypes, setLoadingDocTypes] = useState(true);
+
   const {
     register,
     handleSubmit,
@@ -110,287 +53,73 @@ export default function ProfileForm({
     watch,
     formState: { errors, isValid, isDirty }
   } = useForm<ProfileFormData>({
-    resolver: zodResolver(schema),
-    defaultValues: doc.profile_json || {},
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      doc_type: initialProfile.doc_type || docType || '',
+      description: initialProfile.description || '',
+      tags: initialProfile.tags || [],
+      doc_date: initialProfile.doc_date || '',
+      parties: initialProfile.parties || '',
+      dollar_amount: initialProfile.dollar_amount || undefined,
+    },
     mode: 'onChange'
   });
 
-  // Initialize tag inputs
+  const currentTags = watch('tags');
+
+  // Fetch doc_type options from template
   useEffect(() => {
-    const tagInputState: Record<string, string> = {};
-    attributes.forEach(attr => {
-      if (attr.attr_type === 'tags') {
-        tagInputState[attr.attr_key] = '';
+    const fetchDocTypeOptions = async () => {
+      try {
+        const params = new URLSearchParams({
+          project_id: projectId.toString(),
+        });
+
+        if (workspaceId) {
+          params.append('workspace_id', workspaceId.toString());
+        }
+        if (projectType) {
+          params.append('project_type', projectType);
+        }
+
+        const response = await fetch(`/api/dms/templates/doc-types?${params.toString()}`);
+
+        if (response.ok) {
+          const data = await response.json();
+          setDocTypeOptions(data.doc_type_options || ['general']);
+        } else {
+          // Fallback to common doc types
+          setDocTypeOptions(['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence']);
+        }
+      } catch (error) {
+        console.error('Error fetching doc type options:', error);
+        // Fallback to common doc types
+        setDocTypeOptions(['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence']);
+      } finally {
+        setLoadingDocTypes(false);
       }
-    });
-    setTagInputs(tagInputState);
-  }, [attributes]);
+    };
+
+    fetchDocTypeOptions();
+  }, [projectId, workspaceId, projectType]);
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
     try {
-      await onSave(doc.doc_id, data);
-      onSuccess?.(doc);
+      // Convert parties string to array if needed (for future flexibility)
+      const profileData = {
+        ...data,
+        parties: data.parties || undefined,
+        dollar_amount: data.dollar_amount || undefined,
+      };
+
+      await onSave(profileData);
+      onSuccess?.();
     } catch (error) {
       console.error('Failed to save profile:', error);
       alert('Failed to save profile. Please try again.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const addTag = (attrKey: string, tag: string) => {
-    if (tag.trim()) {
-      const currentTags = (watch(attrKey as keyof ProfileFormData) as string[]) || [];
-      const newTags = [...currentTags, tag.trim()];
-      setValue(attrKey as keyof ProfileFormData, newTags as any, { shouldDirty: true });
-      setTagInputs(prev => ({ ...prev, [attrKey]: '' }));
-    }
-  };
-
-  const removeTag = (attrKey: string, tagIndex: number) => {
-    const currentTags = (watch(attrKey as keyof ProfileFormData) as string[]) || [];
-    const newTags = currentTags.filter((_, index) => index !== tagIndex);
-    setValue(attrKey as keyof ProfileFormData, newTags as any, { shouldDirty: true });
-  };
-
-  const renderField = (attr: DMSAttribute & { is_required: boolean; display_order: number }) => {
-    const error = errors[attr.attr_key as keyof ProfileFormData];
-    const fieldValue = watch(attr.attr_key as keyof ProfileFormData);
-    
-    switch (attr.attr_type) {
-      case 'text':
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            {attr.validation_rules?.multiline ? (
-              <textarea
-                {...register(attr.attr_key as keyof ProfileFormData)}
-                id={attr.attr_key}
-                rows={3}
-                className={`block w-full rounded-md border ${
-                  error ? 'border-red-300' : 'border-gray-300'
-                } px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
-                placeholder={attr.validation_rules?.placeholder || `Enter ${attr.attr_name.toLowerCase()}`}
-              />
-            ) : (
-              <input
-                {...register(attr.attr_key as keyof ProfileFormData)}
-                type="text"
-                id={attr.attr_key}
-                className={`block w-full rounded-md border ${
-                  error ? 'border-red-300' : 'border-gray-300'
-                } px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
-                placeholder={attr.validation_rules?.placeholder || `Enter ${attr.attr_name.toLowerCase()}`}
-              />
-            )}
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      case 'number':
-      case 'currency':
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            <div className="relative">
-              {attr.attr_type === 'currency' && (
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 text-sm">$</span>
-                </div>
-              )}
-              <input
-                {...register(attr.attr_key as keyof ProfileFormData, { valueAsNumber: true })}
-                type="number"
-                id={attr.attr_key}
-                step={attr.attr_type === 'currency' ? '0.01' : attr.validation_rules?.step || '1'}
-                min={attr.validation_rules?.min}
-                max={attr.validation_rules?.max}
-                className={`block w-full rounded-md border ${
-                  error ? 'border-red-300' : 'border-gray-300'
-                } ${attr.attr_type === 'currency' ? 'pl-8' : 'pl-3'} pr-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
-                placeholder={attr.validation_rules?.placeholder || `Enter ${attr.attr_name.toLowerCase()}`}
-              />
-            </div>
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      case 'date':
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            <input
-              {...register(attr.attr_key as keyof ProfileFormData)}
-              type="date"
-              id={attr.attr_key}
-              className={`block w-full rounded-md border ${
-                error ? 'border-red-300' : 'border-gray-300'
-              } px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
-            />
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      case 'boolean':
-        return (
-          <div key={attr.attr_key} className="flex items-center">
-            <input
-              {...register(attr.attr_key as keyof ProfileFormData)}
-              type="checkbox"
-              id={attr.attr_key}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
-            />
-            <label htmlFor={attr.attr_key} className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="ml-6 text-xs text-gray-500 dark:text-gray-400">{attr.attr_description}</p>
-            )}
-          </div>
-        );
-
-      case 'enum':
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            <select
-              {...register(attr.attr_key as keyof ProfileFormData)}
-              id={attr.attr_key}
-              className={`block w-full rounded-md border ${
-                error ? 'border-red-300' : 'border-gray-300'
-              } px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
-            >
-              <option value="">Select {attr.attr_name.toLowerCase()}</option>
-              {attr.enum_values?.map(value => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      case 'tags':
-        const currentTags = (fieldValue as string[]) || [];
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            
-            {/* Tag input */}
-            <div className="flex space-x-2 mb-2">
-              <input
-                type="text"
-                value={tagInputs[attr.attr_key] || ''}
-                onChange={(e) => setTagInputs(prev => ({ ...prev, [attr.attr_key]: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault();
-                    addTag(attr.attr_key, tagInputs[attr.attr_key] || '');
-                  }
-                }}
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Type and press Enter to add tag"
-              />
-              <button
-                type="button"
-                onClick={() => addTag(attr.attr_key, tagInputs[attr.attr_key] || '')}
-                className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Add
-              </button>
-            </div>
-            
-            {/* Current tags */}
-            <div className="flex flex-wrap gap-2">
-              {currentTags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(attr.attr_key, index)}
-                    className="ml-1 hover:text-blue-600"
-                  >
-                    <XMarkIcon className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      case 'json':
-        return (
-          <div key={attr.attr_key}>
-            <label htmlFor={attr.attr_key} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {attr.attr_name}
-              {attr.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {attr.attr_description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{attr.attr_description}</p>
-            )}
-            <textarea
-              {...register(attr.attr_key as keyof ProfileFormData)}
-              id={attr.attr_key}
-              rows={4}
-              className={`block w-full rounded-md border ${
-                error ? 'border-red-300' : 'border-gray-300'
-              } px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono`}
-              placeholder="Enter valid JSON"
-            />
-            {error && (
-              <p className="mt-1 text-xs text-red-600">{error.message}</p>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
     }
   };
 
@@ -400,17 +129,15 @@ export default function ProfileForm({
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <div>
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-            Edit Profile: {doc.doc_name}
+            {docId ? 'Edit Document Profile' : 'Document Profile'}
           </h2>
-          {template && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Using template: {template.template_name}
-            </p>
-          )}
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Add metadata to help organize and find this document
+          </p>
         </div>
         <button
           onClick={onCancel}
-          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
         >
           <XMarkIcon className="w-5 h-5" />
         </button>
@@ -419,9 +146,121 @@ export default function ProfileForm({
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="p-4">
         <div className="space-y-4">
-          {attributes
-            .sort((a, b) => a.display_order - b.display_order)
-            .map(renderField)}
+          {/* Document Type */}
+          <div>
+            <label htmlFor="doc_type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Document Type <span className="text-red-500">*</span>
+            </label>
+            {loadingDocTypes ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                Loading options...
+              </div>
+            ) : (
+              <select
+                {...register('doc_type')}
+                id="doc_type"
+                className={`block w-full rounded-md border ${
+                  errors.doc_type ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
+                } px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white`}
+              >
+                <option value="">Select document type</option>
+                {docTypeOptions.map(option => (
+                  <option key={option} value={option}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.doc_type && (
+              <p className="mt-1 text-xs text-red-600">{errors.doc_type.message}</p>
+            )}
+          </div>
+
+          {/* Description */}
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea
+              {...register('description')}
+              id="description"
+              rows={3}
+              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Brief description of the document..."
+            />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Tags
+            </label>
+            <TagInput
+              value={currentTags}
+              onChange={(tags) => setValue('tags', tags, { shouldDirty: true })}
+              projectId={projectId}
+              workspaceId={workspaceId}
+              placeholder="Type to add tags (e.g., environmental, legal, financial)"
+            />
+          </div>
+
+          {/* Document Date */}
+          <div>
+            <label htmlFor="doc_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Document Date
+            </label>
+            <input
+              {...register('doc_date')}
+              type="date"
+              id="doc_date"
+              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              The official date of the document (e.g., contract date, report date)
+            </p>
+          </div>
+
+          {/* Parties */}
+          <div>
+            <label htmlFor="parties" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Parties Involved
+            </label>
+            <input
+              {...register('parties')}
+              type="text"
+              id="parties"
+              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="e.g., ABC Corp, City of Portland"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Organizations or individuals related to this document
+            </p>
+          </div>
+
+          {/* Dollar Amount */}
+          <div>
+            <label htmlFor="dollar_amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Dollar Amount
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 text-sm">$</span>
+              </div>
+              <input
+                {...register('dollar_amount', { valueAsNumber: true })}
+                type="number"
+                id="dollar_amount"
+                step="0.01"
+                min="0"
+                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 pl-8 pr-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="0.00"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Contract value, invoice amount, or other financial figure
+            </p>
+          </div>
         </div>
 
         {/* Actions */}
@@ -429,7 +268,7 @@ export default function ProfileForm({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -437,7 +276,7 @@ export default function ProfileForm({
           <button
             type="submit"
             disabled={!isValid || !isDirty || isLoading}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isLoading ? (
               <>
@@ -447,7 +286,7 @@ export default function ProfileForm({
             ) : (
               <>
                 <CheckIcon className="w-4 h-4 mr-2" />
-                Save Changes
+                Save Profile
               </>
             )}
           </button>

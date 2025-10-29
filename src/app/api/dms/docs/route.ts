@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 /**
  * POST /api/dms/docs
- * Create a new document record with duplicate detection
+ * Create a new document record with duplicate detection and tag tracking
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +18,31 @@ export async function POST(req: NextRequest) {
 
     // Validate request body
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
+
+    // Validate doc_type against template's doc_type_options
+    const template = await sql`
+      SELECT doc_type_options
+      FROM landscape.dms_templates
+      WHERE (project_id = ${system.project_id} OR workspace_id = ${system.workspace_id ?? null})
+        AND is_default = true
+      LIMIT 1
+    `;
+
+    if (template.length > 0 && template[0].doc_type_options) {
+      const validDocTypes = template[0].doc_type_options;
+      const docType = system.doc_type ?? 'general';
+
+      if (!validDocTypes.includes(docType)) {
+        return NextResponse.json(
+          {
+            error: 'Invalid doc_type',
+            details: `doc_type "${docType}" is not allowed. Valid options: ${validDocTypes.join(', ')}`,
+            valid_doc_types: validDocTypes
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Check for existing document with same sha256 + project_id (dedupe)
     const existing = await sql`
@@ -83,6 +108,25 @@ export async function POST(req: NextRequest) {
     const doc = inserted[0];
 
     console.log(`✅ Created document: doc_id=${doc.doc_id}, name=${doc.doc_name}`);
+
+    // Increment tag usage for all tags in profile_json.tags[]
+    if (profile.tags && Array.isArray(profile.tags) && profile.tags.length > 0) {
+      for (const tag of profile.tags) {
+        try {
+          await sql`
+            SELECT landscape.increment_tag_usage(
+              ${tag},
+              ${system.project_id},
+              ${system.workspace_id ?? null}
+            )
+          `;
+        } catch (tagError) {
+          console.warn(`⚠️ Failed to increment tag usage for "${tag}":`, tagError);
+          // Continue processing other tags even if one fails
+        }
+      }
+      console.log(`🏷️ Incremented usage for ${profile.tags.length} tag(s)`);
+    }
 
     // Create AI ingestion history record
     await sql`

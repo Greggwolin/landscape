@@ -24,6 +24,10 @@ export interface DMSDocument {
   workspace_name?: string | null;
   phase_name?: string | null;
   parcel_name?: string | null;
+
+  // Text content fields
+  extracted_text?: string;
+  word_count?: number;
 }
 
 export interface SearchableDocument {
