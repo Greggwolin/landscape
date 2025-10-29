@@ -4,7 +4,7 @@ export interface GeocodingResult {
   latitude: number
   longitude: number
   confidence: number
-  source: 'nominatim' | 'manual' | 'cache'
+  source: 'nominatim' | 'manual' | 'cache' | 'google'
   bounds?: {
     north: number
     south: number
@@ -36,13 +36,12 @@ export interface CensusTractResult {
 }
 
 // Known locations for faster lookup (can be expanded)
-const KNOWN_LOCATIONS: Record<string, GeocodingResult> = {
+const KNOWN_LOCATIONS: Record<string, Omit<GeocodingResult, 'source'>> = {
   // Red Valley area - Anderson and Farrell Roads intersection in Maricopa, AZ
   'anderson farrell maricopa': {
     latitude: 33.0583,
     longitude: -112.0147,
     confidence: 0.95,
-    source: 'manual',
     bounds: {
       north: 33.0683,
       south: 33.0483,
@@ -54,7 +53,6 @@ const KNOWN_LOCATIONS: Record<string, GeocodingResult> = {
     latitude: 33.0583,
     longitude: -112.0147,
     confidence: 0.95,
-    source: 'manual',
     bounds: {
       north: 33.0683,
       south: 33.0483,
@@ -74,6 +72,78 @@ function normalizeLocation(description: string): string {
     .replace(/\b(road|rd|street|st|avenue|ave|blvd|boulevard)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/**
+ * Geocodes a location description using Google Geocoding API
+ * Requires NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY or GOOGLE_GEOCODING_API_KEY environment variable
+ */
+async function geocodeWithGoogle(description: string): Promise<GeocodingResult | null> {
+  try {
+    // Try both client-side and server-side env vars
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY || process.env.GOOGLE_GEOCODING_API_KEY
+
+    if (!apiKey) {
+      console.log('⚠️ Google Geocoding API key not found, skipping Google geocoder')
+      return null
+    }
+
+    const encodedQuery = encodeURIComponent(description)
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedQuery}&key=${apiKey}`
+
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`Google Geocoding API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      const result = data.results[0]
+      const location = result.geometry.location
+      const viewport = result.geometry.viewport
+
+      // Determine confidence based on location_type
+      let confidence = 0.95 // Default high confidence
+      if (result.geometry.location_type === 'ROOFTOP') {
+        confidence = 0.99 // Precise address
+      } else if (result.geometry.location_type === 'RANGE_INTERPOLATED') {
+        confidence = 0.90 // Interpolated address
+      } else if (result.geometry.location_type === 'GEOMETRIC_CENTER') {
+        confidence = 0.80 // Geometric center
+      } else if (result.geometry.location_type === 'APPROXIMATE') {
+        confidence = 0.60 // Approximate location
+      }
+
+      console.log(`✅ Google Geocoding result: ${location.lat}, ${location.lng} (${result.geometry.location_type})`)
+
+      return {
+        latitude: location.lat,
+        longitude: location.lng,
+        confidence,
+        source: 'google',
+        bounds: viewport ? {
+          north: viewport.northeast.lat,
+          south: viewport.southwest.lat,
+          east: viewport.northeast.lng,
+          west: viewport.southwest.lng
+        } : undefined
+      }
+    } else if (data.status === 'ZERO_RESULTS') {
+      console.log('❌ Google Geocoding: No results found')
+      return null
+    } else if (data.status === 'OVER_QUERY_LIMIT') {
+      console.error('⚠️ Google Geocoding API quota exceeded')
+      return null
+    } else {
+      console.error(`❌ Google Geocoding error: ${data.status}`)
+      return null
+    }
+  } catch (error) {
+    console.error('Google Geocoding error:', error)
+    return null
+  }
 }
 
 /**
@@ -121,6 +191,7 @@ async function geocodeWithNominatim(description: string): Promise<GeocodingResul
 
 /**
  * Main geocoding function that tries multiple sources
+ * Priority: Cache → Google (if available) → Nominatim (fallback)
  */
 export async function geocodeLocation(description: string): Promise<GeocodingResult | null> {
   if (!description?.trim()) {
@@ -141,8 +212,17 @@ export async function geocodeLocation(description: string): Promise<GeocodingRes
     }
   }
 
+  // Try Google Geocoding API first (more accurate than Nominatim)
+  console.log('🌐 Trying Google Geocoding API...')
+  const googleResult = await geocodeWithGoogle(description)
+
+  if (googleResult) {
+    console.log(`✅ Google result: ${googleResult.latitude}, ${googleResult.longitude} (confidence: ${googleResult.confidence})`)
+    return googleResult
+  }
+
   // Fall back to Nominatim API
-  console.log('🌐 Trying Nominatim API...')
+  console.log('🌐 Falling back to Nominatim API...')
   const nominatimResult = await geocodeWithNominatim(description)
 
   if (nominatimResult) {
