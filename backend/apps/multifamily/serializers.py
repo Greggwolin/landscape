@@ -82,8 +82,15 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
     """Serializer for MultifamilyLease model."""
 
     unit_number = serializers.CharField(source='unit.unit_number', read_only=True)
-    building_name = serializers.CharField(source='unit.building_name', read_only=True)
+    building_name = serializers.CharField(source='unit.building_name', read_only=True, allow_null=True)
     project_id = serializers.IntegerField(source='unit.project.project_id', read_only=True)
+    # Include unit fields for RentRollGrid compatibility
+    unit_type = serializers.CharField(source='unit.unit_type', read_only=True)
+    square_feet = serializers.IntegerField(source='unit.square_feet', read_only=True)
+    bedrooms = serializers.DecimalField(source='unit.bedrooms', read_only=True, max_digits=3, decimal_places=1, allow_null=True)
+    bathrooms = serializers.DecimalField(source='unit.bathrooms', read_only=True, max_digits=3, decimal_places=2, allow_null=True)
+    market_rent = serializers.DecimalField(source='unit.market_rent', read_only=True, max_digits=10, decimal_places=2, allow_null=True)
+    other_features = serializers.CharField(source='unit.other_features', read_only=True, allow_null=True)
 
     class Meta:
         model = MultifamilyLease
@@ -108,6 +115,13 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
             'notice_date',
             'notice_to_vacate_days',
             'is_renewal',
+            # Unit fields for grid display
+            'unit_type',
+            'square_feet',
+            'bedrooms',
+            'bathrooms',
+            'market_rent',
+            'other_features',
             'created_at',
             'updated_at',
         ]

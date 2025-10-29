@@ -5,6 +5,7 @@ API views for Multifamily application.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.db.models import Count, Sum, Q, F
 from decimal import Decimal
 from .models import (
@@ -37,6 +38,7 @@ class MultifamilyUnitTypeViewSet(viewsets.ModelViewSet):
 
     queryset = MultifamilyUnitType.objects.select_related('project').all()
     serializer_class = MultifamilyUnitTypeSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by project_id if provided."""
@@ -70,6 +72,7 @@ class MultifamilyUnitViewSet(viewsets.ModelViewSet):
 
     queryset = MultifamilyUnit.objects.select_related('project').prefetch_related('leases').all()
     serializer_class = MultifamilyUnitSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by project_id or building_name if provided."""
@@ -122,6 +125,7 @@ class MultifamilyLeaseViewSet(viewsets.ModelViewSet):
 
     queryset = MultifamilyLease.objects.select_related('unit', 'unit__project').all()
     serializer_class = MultifamilyLeaseSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by project_id or lease_status if provided."""
