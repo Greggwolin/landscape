@@ -61,13 +61,15 @@ cd /Users/5150east/landscape/backend
 
 # Create virtual environment (first time only)
 python3.12 -m venv venv
+# or if python3.12 not available:
+python3 -m venv venv
 
 # Activate virtual environment
 source venv/bin/activate
 # On Windows: venv\Scripts\activate
 
 # Verify Python version
-python --version  # Should be Python 3.12.x
+python --version  # Should be Python 3.12.x or 3.10+
 
 # Upgrade pip
 pip install --upgrade pip
@@ -77,6 +79,33 @@ pip install -r requirements.txt
 
 # Verify key packages installed
 pip list | grep -E "django|psycopg2|pytest"
+```
+
+**Alternative: Minimal Installation (if requirements.txt has issues)**
+
+If `pip install -r requirements.txt` fails, install core dependencies manually:
+
+```bash
+cd /Users/5150east/landscape/backend
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install core Django dependencies
+pip install Django==5.0.1 \
+  djangorestframework==3.14.0 \
+  psycopg2-binary==2.9.9 \
+  python-decouple==3.8 \
+  dj-database-url \
+  djangorestframework-simplejwt==5.3.0 \
+  django-cors-headers==4.3.1 \
+  django-extensions==3.2.3 \
+  drf-spectacular==0.27.0
+
+# Verify installation
+python manage.py --version
+# Should show Django version
 ```
 
 **What this does:**
@@ -92,8 +121,10 @@ source venv/bin/activate
 
 ❌ **"pip: command not found"** → Wrong Python version or venv not activated
 ```bash
-python3.12 -m pip install --upgrade pip
+python3 -m pip install --upgrade pip
 ```
+
+❌ **"ERROR: Could not find a version that satisfies the requirement"** → Use minimal installation method above
 
 ---
 
@@ -425,12 +456,28 @@ pip install -r requirements.txt
 
 **Cause:** Django backend not running
 
+**Symptoms:**
+- Browser console shows: `GET http://localhost:3000/api/multifamily/unit-types/ net::ERR_CONNECTION_REFUSED`
+- API errors for:
+  - `/api/multifamily/unit-types/`
+  - `/api/multifamily/units/`
+  - `/api/multifamily/leases/`
+  - `/api/projects/`
+- Multifamily property data doesn't load
+- Project tabs show loading spinners indefinitely
+
 **Solution:**
 ```bash
 cd backend
 source venv/bin/activate
 python manage.py runserver 8000
+
+# Should see:
+# Starting development server at http://127.0.0.1:8000/
+# Quit the server with CONTROL-C.
 ```
+
+Then refresh your browser at the project page (e.g., http://localhost:3000/projects/17?tab=property)
 
 ### "404 Not Found" for geography lookups
 
