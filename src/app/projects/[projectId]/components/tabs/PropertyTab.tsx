@@ -36,6 +36,7 @@ interface Unit {
   bathrooms: number;
   currentRent: number;
   marketRent: number;
+  lossToLease: number;
   proformaRent: number;
   leaseStart: string;
   leaseEnd: string;
@@ -68,6 +69,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'leaseEnd', label: 'Lease End', category: 'lease', visible: true, type: 'input' },
   { id: 'currentRent', label: 'Current Rent', category: 'financial', visible: true, type: 'input' },
   { id: 'marketRent', label: 'Market Rent', category: 'financial', visible: true, type: 'input' },
+  { id: 'lossToLease', label: 'Loss to Lease', category: 'financial', visible: true, type: 'calculated', description: 'Difference between market rent and current rent' },
 ];
 
 // Mock floor plans data
@@ -122,6 +124,10 @@ function PropertyTab({ project }: PropertyTabProps) {
 
         const transformedUnits: Unit[] = unitsData.map(u => {
           const lease = leasesByUnit.get(u.unit_id);
+          const currentRent = lease ? Number(lease.base_rent_monthly) || 0 : 0;
+          const marketRent = Number(u.market_rent) || 0;
+          const lossToLease = marketRent - currentRent;
+
           return {
             id: u.unit_id.toString(),
             unitNumber: u.unit_number,
@@ -129,17 +135,18 @@ function PropertyTab({ project }: PropertyTabProps) {
             sqft: u.square_feet,
             bedrooms: Number(u.bedrooms || 0),
             bathrooms: Number(u.bathrooms || 0),
-            currentRent: lease ? Number(lease.base_rent_monthly) || 0 : 0,
-            marketRent: Number(u.market_rent) || 0,
-            proformaRent: (Number(u.market_rent) || 0) * 1.05,
+            currentRent,
+            marketRent,
+            lossToLease,
+            proformaRent: marketRent * 1.05,
             leaseStart: lease?.lease_start_date || '',
             leaseEnd: lease?.lease_end_date || '',
             tenantName: lease?.resident_name || '',
             status: lease?.lease_status === 'ACTIVE' ? 'Occupied' : 'Vacant',
             deposit: Number(lease?.security_deposit) || 0,
-            monthlyIncome: lease ? Number(lease.base_rent_monthly) || 0 : 0,
-            rentPerSF: u.square_feet > 0 && lease ? (Number(lease.base_rent_monthly) || 0) / u.square_feet : 0,
-            proformaRentPerSF: u.square_feet > 0 && u.market_rent ? (Number(u.market_rent) || 0) / u.square_feet : 0,
+            monthlyIncome: currentRent,
+            rentPerSF: u.square_feet > 0 && lease ? currentRent / u.square_feet : 0,
+            proformaRentPerSF: u.square_feet > 0 && u.market_rent ? marketRent / u.square_feet : 0,
             notes: u.other_features || ''
           };
         });
@@ -303,7 +310,7 @@ function PropertyTab({ project }: PropertyTabProps) {
               <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
                 <tr>
                   {visibleColumns.map(col => {
-                    const isNumeric = ['sqft', 'currentRent', 'marketRent'].includes(col.id);
+                    const isNumeric = ['sqft', 'currentRent', 'marketRent', 'lossToLease'].includes(col.id);
                     const isCentered = ['bedrooms', 'bathrooms'].includes(col.id);
                     return (
                       <th
@@ -331,11 +338,25 @@ function PropertyTab({ project }: PropertyTabProps) {
                     {visibleColumns.map(col => {
                       const value = unit[col.id as keyof Unit];
                       let displayValue: string;
+                      let textColor = 'var(--cui-body-color)';
 
                       // Format rent values
                       if (col.id === 'currentRent' || col.id === 'marketRent') {
                         const numValue = typeof value === 'number' ? value : 0;
                         displayValue = numValue > 0 ? `$${Math.round(numValue).toLocaleString()}` : '-';
+                      }
+                      // Format loss to lease (can be positive or negative)
+                      else if (col.id === 'lossToLease') {
+                        const numValue = typeof value === 'number' ? value : 0;
+                        if (numValue === 0) {
+                          displayValue = '-';
+                        } else if (numValue > 0) {
+                          displayValue = `$${Math.round(numValue).toLocaleString()}`;
+                          textColor = '#dc2626'; // red for loss
+                        } else {
+                          displayValue = `-$${Math.round(Math.abs(numValue)).toLocaleString()}`;
+                          textColor = '#16a34a'; // green for gain
+                        }
                       }
                       // Format SF values
                       else if (col.id === 'sqft') {
@@ -351,7 +372,7 @@ function PropertyTab({ project }: PropertyTabProps) {
                         displayValue = value ? value.toString() : '-';
                       }
 
-                      const isNumeric = ['sqft', 'currentRent', 'marketRent'].includes(col.id);
+                      const isNumeric = ['sqft', 'currentRent', 'marketRent', 'lossToLease'].includes(col.id);
                       const isCentered = ['bedrooms', 'bathrooms'].includes(col.id);
 
                       return (
@@ -362,7 +383,7 @@ function PropertyTab({ project }: PropertyTabProps) {
                             isCentered ? 'text-center' :
                             'text-left'
                           }`}
-                          style={{ color: 'var(--cui-body-color)' }}
+                          style={{ color: textColor }}
                         >
                           {displayValue}
                         </td>
