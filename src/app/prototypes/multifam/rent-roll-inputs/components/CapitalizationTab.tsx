@@ -1,0 +1,1094 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import DebtFacilityForm from './DebtFacilityForm';
+import EquityPartnerForm from './EquityPartnerForm';
+import WaterfallTierForm from './WaterfallTierForm';
+import DrawScheduleForm from './DrawScheduleForm';
+
+type Section = 'debt' | 'equity' | 'waterfall' | 'draws';
+
+interface CapitalizationTabProps {
+  projectId: number;
+  mode: 'basic' | 'standard' | 'advanced';
+}
+
+interface DebtFacility {
+  facility_id?: string;
+  project_id?: number;
+  facility_name: string;
+  lender_name?: string;
+  loan_amount: number;
+  interest_rate_pct: number;
+  loan_term_years: number;
+  amortization_years?: number;
+  is_construction_loan?: boolean;
+  rate_type?: string;
+  spread_over_index_bps?: number;
+  rate_floor_pct?: number;
+  rate_cap_pct?: number;
+  index_name?: string;
+  rate_reset_frequency?: string;
+  ltv_pct?: number;
+  dscr?: number;
+  commitment_fee_pct?: number;
+  extension_fee_bps?: number;
+  prepayment_penalty_years?: number;
+  exit_fee_pct?: number;
+  guarantee_type?: string;
+  guarantor_name?: string;
+  loan_covenant_dscr_min?: number;
+  loan_covenant_ltv_max?: number;
+  loan_covenant_occupancy_min?: number;
+  covenant_test_frequency?: string;
+  reserve_requirements?: unknown;
+  replacement_reserve_per_unit?: number;
+  tax_insurance_escrow_months?: number;
+  initial_reserve_months?: number;
+  recourse_carveout_provisions?: string;
+  commitment_balance?: number;
+  drawn_to_date?: number;
+  extension_options?: number;
+  extension_option_years?: number;
+  monthly_payment?: number;
+  annual_debt_service?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface EquityTranche {
+  tranche_id?: number;
+  tranche_name: string;
+  partner_type: string;
+  ownership_pct: number;
+  capital_contributed: number;
+  preferred_return_pct: number;
+  unreturned_capital?: number;
+  cumulative_distributions?: number;
+  accrued_preferred_return?: number;
+  preferred_return_paid_to_date?: number;
+  promote_pct?: number;
+  catch_up_pct?: number;
+  promote_trigger_type?: string;
+  promote_tier_1_threshold?: number;
+  promote_tier_3_threshold?: number;
+  promote_tier_3_pct?: number;
+  irr_target_pct?: number;
+  equity_multiple_target?: number;
+  cash_on_cash_target_pct?: number;
+  distribution_frequency?: string;
+  distribution_priority?: number;
+  can_defer_distributions?: boolean;
+  management_fee_pct?: number;
+  management_fee_base?: string;
+  acquisition_fee_pct?: number;
+  disposition_fee_pct?: number;
+  promote_fee_pct?: number;
+  has_clawback?: boolean;
+  clawback_threshold_pct?: number;
+  has_lookback?: boolean;
+  lookback_at_sale?: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface WaterfallTier {
+  tier_id?: number;
+  project_id?: number;
+  tier_number: number;
+  tier_name: string;
+  tier_description?: string;
+  irr_threshold_pct?: number | null;
+  equity_multiple_threshold?: number | null;
+  lp_split_pct: number;
+  gp_split_pct: number;
+  is_pari_passu?: boolean;
+  is_lookback_tier?: boolean;
+  catch_up_to_pct?: number | null;
+  has_catch_up?: boolean;
+  is_active: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface DrawScheduleItem {
+  draw_id?: number;
+  debt_facility_id?: string;
+  project_id?: number;
+  period_id?: number | null;
+  period_name: string;
+  draw_number?: number;
+  draw_amount: number;
+  outstanding_balance?: number;
+  draw_purpose: string;
+  interest_rate_pct?: number;
+  interest_expense?: number;
+  interest_paid?: number;
+  deferred_interest?: number;
+  unused_fee_charge?: number;
+  commitment_fee_charge?: number;
+  other_fees?: number;
+  draw_date: string;
+  request_date?: string;
+  approval_date?: string;
+  funding_date?: string;
+  inspector_approval?: boolean;
+  lender_approval?: boolean;
+  draw_status?: string;
+  created_at?: string;
+}
+
+interface SummaryData {
+  project_id: number;
+  total_capitalization: number;
+  total_debt: number;
+  total_equity: number;
+  leverage_ratio_pct: number;
+  debt_facilities_count: number;
+  equity_tranches_count: number;
+  waterfall_tiers_count: number;
+  waterfall_active_tiers_count?: number;
+  weighted_avg_interest_rate: number;
+  blended_ltv: number;
+  preferred_return_pct: number;
+  gp_promote_pct: number;
+}
+
+type ModalState =
+  | { type: 'debt'; entity: DebtFacility | null }
+  | { type: 'equity'; entity: EquityTranche | null }
+  | { type: 'waterfall'; entity: WaterfallTier | null }
+  | { type: 'draw'; entity: DrawScheduleItem | null }
+  | null;
+
+const SECTION_LABELS: Record<Section, string> = {
+  debt: 'Debt Facilities',
+  equity: 'Equity Structure',
+  waterfall: 'Waterfall Tiers',
+  draws: 'Draw Schedule',
+};
+
+export default function CapitalizationTab({ projectId, mode }: CapitalizationTabProps) {
+  const [activeSection, setActiveSection] = useState<Section>('debt');
+  const [debtFacilities, setDebtFacilities] = useState<DebtFacility[]>([]);
+  const [equityTranches, setEquityTranches] = useState<EquityTranche[]>([]);
+  const [waterfallTiers, setWaterfallTiers] = useState<WaterfallTier[]>([]);
+  const [drawSchedule, setDrawSchedule] = useState<DrawScheduleItem[]>([]);
+  const [drawSummary, setDrawSummary] = useState<{ total_commitment: number; total_drawn: number; remaining_capacity: number } | null>(null);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [modalState, setModalState] = useState<ModalState>(null);
+  const [isModalSaving, setIsModalSaving] = useState(false);
+  const [prototypeNotes, setPrototypeNotes] = useState('');
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notesMessage, setNotesMessage] = useState('');
+
+  useEffect(() => {
+    fetchAllData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  useEffect(() => {
+    const loadNotes = async () => {
+      try {
+        const response = await fetch('/api/prototypes/notes?prototypeId=multifam-capitalization');
+        if (response.ok) {
+          const notes = await response.json();
+          if (Array.isArray(notes) && notes.length > 0) {
+            setPrototypeNotes(notes[0].note);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load notes:', error);
+      }
+    };
+    loadNotes();
+  }, []);
+
+  const facilityOptions = useMemo(
+    () =>
+      debtFacilities
+        .filter((facility): facility is DebtFacility & { facility_id: string } =>
+          typeof facility.facility_id === 'string' && facility.facility_id.length > 0
+        )
+        .map((facility) => ({
+          value: facility.facility_id,
+          label: facility.facility_name,
+        })),
+    [debtFacilities]
+  );
+
+  const facilityLookup = useMemo(() => {
+    const map = new Map<string, DebtFacility>();
+    debtFacilities.forEach((facility) => {
+      if (typeof facility.facility_id === 'string' && facility.facility_id.length > 0) {
+        map.set(facility.facility_id, facility);
+      }
+    });
+    return map;
+  }, [debtFacilities]);
+
+  const fetchAllData = async () => {
+    try {
+      setIsLoading(true);
+      const [summaryRes, debtRes, equityRes, waterfallRes, drawsRes] = await Promise.all([
+        fetch(`/api/capitalization/summary?projectId=${projectId}`),
+        fetch(`/api/capitalization/debt?projectId=${projectId}`),
+        fetch(`/api/capitalization/equity?projectId=${projectId}`),
+        fetch(`/api/capitalization/waterfall?projectId=${projectId}`),
+        fetch(`/api/capitalization/draws?projectId=${projectId}`),
+      ]);
+
+      const [summaryData, debtData, equityData, waterfallData, drawsData] = await Promise.all([
+        summaryRes.json(),
+        debtRes.json(),
+        equityRes.json(),
+        waterfallRes.json(),
+        drawsRes.json(),
+      ]);
+
+      if (summaryData.success) setSummary(summaryData.data);
+      if (debtData.success) setDebtFacilities(debtData.data);
+      if (equityData.success) setEquityTranches(equityData.data);
+      if (waterfallData.success) setWaterfallTiers(waterfallData.data);
+      if (drawsData.success) {
+        setDrawSchedule(drawsData.data);
+        setDrawSummary(drawsData.summary ?? null);
+      }
+    } catch (error) {
+      console.error('Error fetching capitalization data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openDebtForm = (facility?: DebtFacility | null) => {
+    setModalState({ type: 'debt', entity: facility ?? null });
+  };
+
+  const openEquityForm = (partner?: EquityTranche | null) => {
+    setModalState({ type: 'equity', entity: partner ?? null });
+  };
+
+  const openWaterfallForm = (tier?: WaterfallTier | null) => {
+    setModalState({ type: 'waterfall', entity: tier ?? null });
+  };
+
+  const openDrawForm = (draw?: DrawScheduleItem | null) => {
+    setModalState({ type: 'draw', entity: draw ?? null });
+  };
+
+  const closeModal = () => {
+    if (!isModalSaving) {
+      setModalState(null);
+    }
+  };
+
+  const handleDebtSave = async (formValues: DebtFacility) => {
+    try {
+      setIsModalSaving(true);
+      const { facility_id, ...rest } = formValues;
+      const isEdit = Boolean(facility_id);
+      const response = await fetch(
+        isEdit ? `/api/capitalization/debt/${facility_id}` : '/api/capitalization/debt',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(isEdit ? rest : { ...rest, project_id: projectId }),
+        }
+      );
+
+      let payload: any = null;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        // Non-JSON response, fall back to text message
+        const text = await response.text().catch(() => '');
+        if (text) {
+          payload = { error: text };
+        }
+      }
+
+      if (!response.ok || payload?.success === false) {
+        console.error('Debt facility save failed', {
+          status: response.status,
+          payload,
+        });
+        const message =
+          payload?.error ||
+          payload?.message ||
+          `Failed to ${isEdit ? 'update' : 'create'} debt facility (status ${response.status})`;
+        throw new Error(message);
+      }
+
+      await fetchAllData();
+      setModalState(null);
+    } catch (error) {
+      console.error('Error saving debt facility:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save debt facility');
+    } finally {
+      setIsModalSaving(false);
+    }
+  };
+
+  const handleEquitySave = async (formValues: EquityTranche) => {
+    try {
+      setIsModalSaving(true);
+      const { tranche_id, ...rest } = formValues;
+      const isEdit = Boolean(tranche_id);
+      const response = await fetch(
+        isEdit ? `/api/capitalization/equity/${tranche_id}` : '/api/capitalization/equity',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(isEdit ? rest : { ...rest, project_id: projectId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to save equity partner');
+      }
+      await fetchAllData();
+      setModalState(null);
+    } catch (error) {
+      console.error('Error saving equity partner:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save equity partner');
+    } finally {
+      setIsModalSaving(false);
+    }
+  };
+
+  const handleWaterfallSave = async (formValues: WaterfallTier) => {
+    try {
+      setIsModalSaving(true);
+      const { tier_id, ...rest } = formValues;
+      const isEdit = Boolean(tier_id);
+      const response = await fetch(
+        isEdit ? `/api/capitalization/waterfall/${tier_id}` : '/api/capitalization/waterfall',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(isEdit ? rest : { ...rest, project_id: projectId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to save waterfall tier');
+      }
+      await fetchAllData();
+      setModalState(null);
+    } catch (error) {
+      console.error('Error saving waterfall tier:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save waterfall tier');
+    } finally {
+      setIsModalSaving(false);
+    }
+  };
+
+  const handleDrawSave = async (formValues: DrawScheduleItem) => {
+    try {
+      setIsModalSaving(true);
+      const { draw_id, debt_facility_id, ...rest } = formValues;
+      const isEdit = Boolean(draw_id);
+      if (!debt_facility_id) {
+        throw new Error('Select a debt facility for this draw schedule item.');
+      }
+      const payload = isEdit
+        ? {
+            draw_amount: rest.draw_amount,
+            draw_date: rest.draw_date,
+            draw_purpose: rest.draw_purpose,
+            draw_status: rest.draw_status,
+          }
+        : {
+            facility_id: debt_facility_id,
+            draw_amount: rest.draw_amount,
+            draw_date: rest.draw_date,
+            draw_purpose: rest.draw_purpose,
+            draw_status: rest.draw_status ?? 'PROJECTED',
+            period_id: rest.period_id ?? null,
+          };
+
+      const response = await fetch(
+        isEdit ? `/api/capitalization/draws/${draw_id}` : '/api/capitalization/draws',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to save draw schedule item');
+      }
+      await fetchAllData();
+      setModalState(null);
+    } catch (error) {
+      console.error('Error saving draw schedule item:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save draw schedule item');
+    } finally {
+      setIsModalSaving(false);
+    }
+  };
+
+  const deleteDebtFacility = async (facilityId: string) => {
+    if (!confirm('Delete this debt facility? Associated draw schedules will also be removed.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/capitalization/debt/${facilityId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to delete debt facility');
+      }
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error deleting debt facility:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete debt facility');
+    }
+  };
+
+  const deleteEquityTranche = async (trancheId: number) => {
+    if (!confirm('Delete this equity partner?')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/capitalization/equity/${trancheId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to delete equity partner');
+      }
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error deleting equity partner:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete equity partner');
+    }
+  };
+
+  const deleteWaterfallTier = async (tierId: number) => {
+    if (!confirm('Delete this waterfall tier?')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/capitalization/waterfall/${tierId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to delete waterfall tier');
+      }
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error deleting waterfall tier:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete waterfall tier');
+    }
+  };
+
+  const deleteDrawScheduleItem = async (drawId: number) => {
+    if (!confirm('Delete this draw schedule item?')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/capitalization/draws/${drawId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to delete draw schedule item');
+      }
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error deleting draw schedule item:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete draw schedule item');
+    }
+  };
+
+  const toggleWaterfallTier = async (tierId: number, isActive: boolean) => {
+    try {
+      const response = await fetch(`/api/capitalization/waterfall/${tierId}/toggle`, { method: 'PATCH' });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to toggle tier');
+      }
+      setWaterfallTiers((prev) =>
+        prev.map((tier) => (tier.tier_id === tierId ? { ...tier, is_active: !isActive } : tier))
+      );
+    } catch (error) {
+      console.error('Error toggling waterfall tier:', error);
+      alert(error instanceof Error ? error.message : 'Failed to toggle waterfall tier');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    setIsSavingNotes(true);
+    setNotesMessage('');
+    try {
+      const response = await fetch('/api/prototypes/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prototypeId: 'multifam-capitalization',
+          note: prototypeNotes,
+        }),
+      });
+      if (response.ok) {
+        setNotesMessage('Notes saved successfully.');
+        setTimeout(() => setNotesMessage(''), 2500);
+      } else {
+        setNotesMessage('Failed to save notes');
+      }
+    } catch (error) {
+      console.error('Failed to save notes:', error);
+      setNotesMessage('Error saving notes');
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return '—';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatPercent = (value: number | null | undefined, digits = 2) => {
+    if (value == null || Number.isNaN(value)) return '—';
+    return `${value.toFixed(digits)}%`;
+  };
+
+  const handleAddDraw = () => {
+    if (debtFacilities.length === 0) {
+      alert('Add a debt facility before creating draw schedule items.');
+      return;
+    }
+    const defaultFacilityId = facilityOptions[0]?.value;
+    openDrawForm({
+      debt_facility_id: defaultFacilityId,
+      period_name: '',
+      draw_amount: 0,
+      draw_purpose: '',
+      draw_date: new Date().toISOString().split('T')[0],
+      draw_status: 'PROJECTED',
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="text-gray-400">Loading capitalization data...</div>
+      </div>
+    );
+  }
+
+  const renderDebtSection = () => (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-white">Debt Facilities</h3>
+        <button
+          onClick={() => openDebtForm()}
+          className="px-4 py-2 bg-blue-700 text-white text-sm rounded hover:bg-blue-600"
+        >
+          + Add Facility
+        </button>
+      </div>
+
+      {debtFacilities.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No debt facilities recorded yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-900">
+              <tr className="border-b border-gray-700">
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Facility</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Lender</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Loan Amount</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Rate</th>
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Term</th>
+                {mode !== 'basic' && (
+                  <>
+                    <th className="text-right px-3 py-2 font-medium text-gray-300">LTV</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-300">DSCR</th>
+                  </>
+                )}
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {debtFacilities.map((facility, idx) => (
+                <tr
+                  key={facility.facility_id ?? idx}
+                  className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
+                >
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-white font-semibold">{facility.facility_name}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Created {facility.created_at ? new Date(facility.created_at).toLocaleDateString() : '—'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 align-top text-gray-300">{facility.lender_name || '—'}</td>
+                  <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(facility.loan_amount)}</td>
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(facility.interest_rate_pct)}</td>
+                  <td className="px-3 py-3 align-top text-center text-gray-300">{facility.loan_term_years ?? '—'}</td>
+                  {mode !== 'basic' && (
+                    <>
+                      <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(facility.ltv_pct)}</td>
+                      <td className="px-3 py-3 align-top text-right text-gray-300">
+                        {facility.dscr != null ? facility.dscr.toFixed(2) : '—'}
+                      </td>
+                    </>
+                  )}
+                  <td className="px-3 py-3 align-top text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openDebtForm(facility)}
+                        className="px-3 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
+                      >
+                        View / Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!facility.facility_id) return;
+                          deleteDebtFacility(facility.facility_id);
+                        }}
+                        disabled={!facility.facility_id}
+                        className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderEquitySection = () => (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-white">Equity Structure</h3>
+        <button
+          onClick={() => openEquityForm()}
+          className="px-4 py-2 bg-blue-700 text-white text-sm rounded hover:bg-blue-600"
+        >
+          + Add Partner
+        </button>
+      </div>
+
+      {equityTranches.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No equity partners recorded yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-900">
+              <tr className="border-b border-gray-700">
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Partner</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Ownership</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Capital</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Pref Return</th>
+                {mode !== 'basic' && (
+                  <th className="text-left px-3 py-2 font-medium text-gray-300">Distribution Terms</th>
+                )}
+                {mode === 'advanced' && (
+                  <th className="text-right px-3 py-2 font-medium text-gray-300">Promote</th>
+                )}
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {equityTranches.map((tranche, idx) => (
+                <tr
+                  key={tranche.tranche_id ?? idx}
+                  className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
+                >
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-white font-semibold">{tranche.tranche_name}</div>
+                    <div className="text-xs text-gray-500 mt-1">{tranche.partner_type}</div>
+                  </td>
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(tranche.ownership_pct)}</td>
+                  <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(tranche.capital_contributed)}</td>
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(tranche.preferred_return_pct)}</td>
+                  {mode !== 'basic' && (
+                    <td className="px-3 py-3 align-top text-left text-gray-300 space-y-1">
+                      <div>{tranche.distribution_frequency || 'Frequency: —'}</div>
+                      {tranche.distribution_priority != null && (
+                        <div className="text-xs text-gray-500">Priority {tranche.distribution_priority}</div>
+                      )}
+                      {tranche.can_defer_distributions && (
+                        <div className="text-xs text-amber-300">Deferrable distributions enabled</div>
+                      )}
+                    </td>
+                  )}
+                  {mode === 'advanced' && (
+                    <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(tranche.promote_pct)}</td>
+                  )}
+                  <td className="px-3 py-3 align-top text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openEquityForm(tranche)}
+                        className="px-3 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
+                      >
+                        View / Edit
+                      </button>
+                      <button
+                        onClick={() => deleteEquityTranche(tranche.tranche_id ?? 0)}
+                        className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderWaterfallSection = () => (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-white">Waterfall Tiers</h3>
+        <button
+          onClick={() => openWaterfallForm()}
+          className="px-4 py-2 bg-blue-700 text-white text-sm rounded hover:bg-blue-600"
+        >
+          + Add Tier
+        </button>
+      </div>
+
+      {waterfallTiers.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No waterfall tiers configured yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-900">
+              <tr className="border-b border-gray-700">
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Tier</th>
+                {mode !== 'basic' && (
+                  <th className="text-left px-3 py-2 font-medium text-gray-300">Threshold</th>
+                )}
+                <th className="text-right px-3 py-2 font-medium text-gray-300">LP Split</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">GP Split</th>
+                {mode === 'advanced' && (
+                  <th className="text-center px-3 py-2 font-medium text-gray-300">Catch-Up / Notes</th>
+                )}
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Status</th>
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {waterfallTiers.map((tier, idx) => (
+                <tr
+                  key={tier.tier_id ?? idx}
+                  className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
+                >
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-white font-semibold">
+                      Tier {tier.tier_number}: {tier.tier_name}
+                    </div>
+                    {tier.tier_description && (
+                      <div className="text-xs text-gray-500 mt-1">{tier.tier_description}</div>
+                    )}
+                  </td>
+                  {mode !== 'basic' && (
+                    <td className="px-3 py-3 align-top text-left text-gray-300 space-y-1">
+                      <div>IRR: {formatPercent(tier.irr_threshold_pct)}</div>
+                      <div>
+                        Equity Multiple:{' '}
+                        {tier.equity_multiple_threshold != null ? tier.equity_multiple_threshold.toFixed(2) : '—'}
+                      </div>
+                    </td>
+                  )}
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(tier.lp_split_pct)}</td>
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(tier.gp_split_pct)}</td>
+                  {mode === 'advanced' && (
+                    <td className="px-3 py-3 align-top text-center text-gray-300 space-y-1">
+                      <div>{tier.is_pari_passu ? 'Pari Passu' : 'Promote Tier'}</div>
+                      {tier.catch_up_to_pct != null && (
+                        <div className="text-xs text-gray-500">Catch-up to {tier.catch_up_to_pct.toFixed(2)}%</div>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-3 py-3 align-top text-center">
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        tier.is_active
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-slate-700 text-slate-300 border border-slate-500/40'
+                      }`}
+                    >
+                      {tier.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 align-top text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openWaterfallForm(tier)}
+                        className="px-3 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
+                      >
+                        View / Edit
+                      </button>
+                      <button
+                        onClick={() => toggleWaterfallTier(tier.tier_id ?? 0, tier.is_active)}
+                        className="px-3 py-1 text-xs bg-amber-900 text-amber-200 rounded hover:bg-amber-800 transition-colors"
+                      >
+                        {tier.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => deleteWaterfallTier(tier.tier_id ?? 0)}
+                        className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderDrawSection = () => (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-white">Construction Draw Schedule</h3>
+        <button
+          onClick={handleAddDraw}
+          className="px-4 py-2 bg-blue-700 text-white text-sm rounded hover:bg-blue-600"
+        >
+          + Add Draw
+        </button>
+      </div>
+
+      {drawSummary && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div className="bg-gray-800 border border-gray-700 rounded p-4">
+            <div className="text-xs text-gray-400 uppercase">Total Commitment</div>
+            <div className="text-lg font-semibold text-white">{formatCurrency(drawSummary.total_commitment)}</div>
+          </div>
+          <div className="bg-gray-800 border border-gray-700 rounded p-4">
+            <div className="text-xs text-gray-400 uppercase">Total Drawn</div>
+            <div className="text-lg font-semibold text-white">{formatCurrency(drawSummary.total_drawn)}</div>
+          </div>
+          <div className="bg-gray-800 border border-gray-700 rounded p-4">
+            <div className="text-xs text-gray-400 uppercase">Remaining Capacity</div>
+            <div className="text-lg font-semibold text-white">{formatCurrency(drawSummary.remaining_capacity)}</div>
+          </div>
+        </div>
+      )}
+
+      {drawSchedule.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No draw schedule items recorded yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-900">
+              <tr className="border-b border-gray-700">
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Period</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Facility</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-300">Draw Amount</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Purpose</th>
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Draw Date</th>
+                <th className="text-center px-3 py-2 font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drawSchedule.map((draw, idx) => {
+                const facility = draw.debt_facility_id ? facilityLookup.get(draw.debt_facility_id) : undefined;
+                return (
+                  <tr
+                    key={draw.draw_id ?? idx}
+                    className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
+                  >
+                    <td className="px-3 py-3 align-top text-white font-medium">{draw.period_name || 'Unscheduled'}</td>
+                    <td className="px-3 py-3 align-top text-gray-300">{facility?.facility_name || '—'}</td>
+                    <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(draw.draw_amount)}</td>
+                    <td className="px-3 py-3 align-top text-gray-300">{draw.draw_purpose || '—'}</td>
+                    <td className="px-3 py-3 align-top text-center text-gray-300">
+                      {draw.draw_date ? new Date(draw.draw_date).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-3 py-3 align-top text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openDrawForm(draw)}
+                          className="px-3 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
+                        >
+                          View / Edit
+                        </button>
+                        <button
+                          onClick={() => deleteDrawScheduleItem(draw.draw_id ?? 0)}
+                          className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="p-4 space-y-4 bg-gray-950">
+      <div className="bg-gray-800 rounded border border-gray-700 p-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">Capitalization - Prototype</h2>
+        <button
+          onClick={() => setShowNotesModal(true)}
+          className={`px-3 py-2 text-white text-sm rounded transition-colors flex items-center gap-2 ${
+            prototypeNotes ? 'bg-blue-700 hover:bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+        >
+          {prototypeNotes ? 'Edit Notes' : 'Add Notes'}
+        </button>
+      </div>
+
+      {summary && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-800 rounded border border-gray-700 p-4">
+            <div className="text-xs text-gray-400 mb-1">Total Capitalization</div>
+            <div className="text-2xl font-bold text-white">{formatCurrency(summary.total_capitalization)}</div>
+            <div className="text-xs text-gray-500 mt-1">Debt + Equity</div>
+          </div>
+          <div className="bg-gray-800 rounded border border-gray-700 p-4">
+            <div className="text-xs text-gray-400 mb-1">Total Debt</div>
+            <div className="text-2xl font-bold text-white">{formatCurrency(summary.total_debt)}</div>
+            <div className="text-xs text-gray-500 mt-1">{summary.debt_facilities_count} facilities</div>
+          </div>
+          <div className="bg-gray-800 rounded border border-gray-700 p-4">
+            <div className="text-xs text-gray-400 mb-1">Total Equity</div>
+            <div className="text-2xl font-bold text-white">{formatCurrency(summary.total_equity)}</div>
+            <div className="text-xs text-gray-500 mt-1">{summary.equity_tranches_count} partners</div>
+          </div>
+          <div className="bg-gray-800 rounded border border-gray-700 p-4">
+            <div className="text-xs text-gray-400 mb-1">Leverage Ratio</div>
+            <div className="text-2xl font-bold text-white">{formatPercent(summary.leverage_ratio_pct)}</div>
+            <div className="text-xs text-gray-500 mt-1">Weighted rate {formatPercent(summary.weighted_avg_interest_rate, 3)}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-4 border-b border-gray-700 pb-2">
+        {(['debt', 'equity', 'waterfall', 'draws'] as Section[]).map((section) => (
+          <button
+            key={section}
+            onClick={() => setActiveSection(section)}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeSection === section
+                ? 'text-white border-b-2 border-white'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            {SECTION_LABELS[section]} (
+            {section === 'debt'
+              ? debtFacilities.length
+              : section === 'equity'
+                ? equityTranches.length
+                : section === 'waterfall'
+                  ? waterfallTiers.length
+                  : drawSchedule.length}
+            )
+          </button>
+        ))}
+      </div>
+
+      <div className="p-4 space-y-6">
+        {activeSection === 'debt' && renderDebtSection()}
+        {activeSection === 'equity' && renderEquitySection()}
+        {activeSection === 'waterfall' && renderWaterfallSection()}
+        {activeSection === 'draws' && renderDrawSection()}
+      </div>
+
+      {showNotesModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowNotesModal(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-lg max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Prototype Notes</h3>
+              <button onClick={() => setShowNotesModal(false)} className="text-gray-400 hover:text-white">
+                ✕
+              </button>
+            </div>
+            <textarea
+              className="w-full min-h-[160px] bg-gray-800 border border-gray-700 rounded p-3 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={prototypeNotes}
+              onChange={(e) => setPrototypeNotes(e.target.value)}
+              placeholder="Capture quick reactions or follow-ups while reviewing this prototype."
+            />
+            {notesMessage && <div className="mt-2 text-sm text-emerald-400">{notesMessage}</div>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="px-3 py-2 text-sm bg-gray-800 text-gray-300 rounded hover:bg-gray-700"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSaveNotes}
+                disabled={isSavingNotes}
+                className="px-3 py-2 text-sm bg-blue-700 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                {isSavingNotes ? 'Saving…' : 'Save Notes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalState?.type === 'debt' && (
+        <DebtFacilityForm
+          facility={modalState.entity}
+          mode={mode}
+          onSave={handleDebtSave}
+          onCancel={closeModal}
+          isSaving={isModalSaving}
+        />
+      )}
+
+      {modalState?.type === 'equity' && (
+        <EquityPartnerForm
+          partner={modalState.entity}
+          mode={mode}
+          onSave={handleEquitySave}
+          onCancel={closeModal}
+          isSaving={isModalSaving}
+        />
+      )}
+
+      {modalState?.type === 'waterfall' && (
+        <WaterfallTierForm
+          tier={modalState.entity}
+          mode={mode}
+          onSave={handleWaterfallSave}
+          onCancel={closeModal}
+          isSaving={isModalSaving}
+        />
+      )}
+
+      {modalState?.type === 'draw' && (
+        <DrawScheduleForm
+          draw={modalState.entity}
+          mode={mode}
+          onSave={handleDrawSave}
+          onCancel={closeModal}
+          isSaving={isModalSaving}
+          facilityOptions={facilityOptions}
+        />
+      )}
+    </div>
+  );
+}

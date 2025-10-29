@@ -2,6 +2,16 @@ import type { PrototypeMetadata } from './types';
 
 export const prototypeRegistry: PrototypeMetadata[] = [
   {
+    id: 'project-topnav',
+    name: 'Project Workspace - Top Nav',
+    description:
+      'Multifamily project template experiment with a horizontal navigation bar and legacy menu dropdown.',
+    status: 'wip',
+    owners: ['Dev Team'],
+    tags: ['project', 'navigation', 'layout'],
+    notes: 'Replaces sidebar with top navigation; focuses on project 17 dataset.'
+  },
+  {
     id: 'mui-budget-dashboard',
     name: 'MUI Budget Dashboard',
     description:

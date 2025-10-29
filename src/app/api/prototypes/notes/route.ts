@@ -50,8 +50,21 @@ export const GET = async (request: Request) => {
   const notes = await readNotes();
   const url = new URL(request.url);
   const prototypeId = url.searchParams.get('prototypeId');
+  const type = url.searchParams.get('type'); // 'multifam' for MultiFam prototypes
 
-  const filtered = prototypeId ? notes.filter((entry) => entry.prototypeId === prototypeId) : notes;
+  let filtered = notes;
+
+  if (prototypeId) {
+    filtered = filtered.filter((entry) => entry.prototypeId === prototypeId);
+  }
+
+  if (type === 'multifam') {
+    // Filter to only MultiFam prototype IDs (can be extended with prefix logic if needed)
+    filtered = filtered.filter((entry) => entry.prototypeId.startsWith('multifam-'));
+  } else if (type === 'regular') {
+    // Filter to only regular prototypes (exclude MultiFam)
+    filtered = filtered.filter((entry) => !entry.prototypeId.startsWith('multifam-'));
+  }
 
   return NextResponse.json(filtered);
 };

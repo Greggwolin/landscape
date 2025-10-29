@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-
+import Header from '../components/Header';
+import Navigation from '../components/Navigation';
+import { ProjectProvider } from '../components/ProjectProvider';
 import { prototypeRegistry } from '@/lib/prototypes/registry';
 
 const statusMap: Record<string, string> = {
@@ -20,7 +22,6 @@ interface PrototypeNoteEntry {
 
 type NotesByPrototype = Record<string, PrototypeNoteEntry[]>;
 
-
 const formatTimestamp = (iso: string) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -29,7 +30,7 @@ const formatTimestamp = (iso: string) => {
   return date.toLocaleString();
 };
 
-export default function PrototypesIndexPage() {
+function PrototypesIndexContent() {
   const [notes, setNotes] = useState<NotesByPrototype>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +47,7 @@ export default function PrototypesIndexPage() {
   useEffect(() => {
     const loadNotes = async () => {
       try {
-        const response = await fetch('/api/prototypes/notes', { cache: 'no-store' });
+        const response = await fetch('/api/prototypes/notes?type=regular', { cache: 'no-store' });
         if (!response.ok) {
           throw new Error('Failed to load notes');
         }
@@ -69,23 +70,14 @@ export default function PrototypesIndexPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-6">
-        <h2 className="text-lg font-semibold">How this works</h2>
-        <p className="mt-2 text-sm text-neutral-400">
-          Each card links to an isolated experiment. Prototypes can point to different branches, document
-          owners, and list the UI systems they rely on. When you checkout a branch that contains the prototype
-          code, the corresponding entry renders automatically.
-        </p>
-        <p className="mt-4 text-sm text-neutral-400">
-          Add feedback from the prototype page itself. The most recent entry appears on each card, and the full
-          history stays in <code className="mx-1 rounded bg-neutral-800 px-2 py-0.5 text-xs">docs/prototypes/notes.log</code>.
-        </p>
-        {error ? (
-          <p className="mt-3 text-sm text-amber-400">{error}</p>
-        ) : null}
-      </div>
+    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+      {error ? (
+        <div className="rounded border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+          <p className="text-sm" style={{ color: 'var(--cui-warning)' }}>{error}</p>
+        </div>
+      ) : null}
 
+      {/* Prototypes Grid */}
       <div className="grid gap-4 md:grid-cols-2">
         {prototypeRegistry.map((prototype) => {
           const prototypeNotes = orderedNotes[prototype.id] ?? [];
@@ -95,7 +87,11 @@ export default function PrototypesIndexPage() {
             <Link
               key={prototype.id}
               href={`/prototypes/${prototype.id}`}
-              className="group flex h-full flex-col justify-between rounded-xl border border-neutral-800 bg-neutral-900/60 p-5 transition hover:border-neutral-300/60 hover:bg-neutral-900 cursor-pointer"
+              className="group flex h-full flex-col justify-between rounded-lg border p-5 transition cursor-pointer"
+              style={{
+                borderColor: 'var(--cui-border-color)',
+                backgroundColor: 'var(--cui-body-bg)'
+              }}
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
@@ -113,36 +109,36 @@ export default function PrototypesIndexPage() {
                     {prototype.status}
                   </span>
                 </div>
-                <p className="text-sm text-neutral-400">{prototype.description}</p>
+                <p className="text-sm text-gray-400">{prototype.description}</p>
                 {prototype.notes ? (
-                  <p className="rounded-lg border border-dashed border-neutral-700 bg-neutral-900/80 px-3 py-2 text-xs text-neutral-400">
+                  <p className="rounded-lg border border-dashed border-gray-700 bg-gray-900/80 px-3 py-2 text-xs text-gray-400">
                     {prototype.notes}
                   </p>
                 ) : null}
                 {prototype.tags && prototype.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 text-xs text-neutral-400">
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-400">
                     {prototype.tags.map((tag) => (
-                      <span key={tag} className="rounded-full border border-neutral-700 px-3 py-1 uppercase">
+                      <span key={tag} className="rounded-full border border-gray-700 px-3 py-1 uppercase">
                         {tag}
                       </span>
                     ))}
                   </div>
                 ) : null}
                 {prototype.branch ? (
-                  <div className="text-xs text-neutral-500">
+                  <div className="text-xs text-gray-500">
                     Branch: <code>{prototype.branch}</code>
                   </div>
                 ) : null}
 
-                <div className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-950/60 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Latest note</div>
+                <div className="space-y-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Latest note</div>
                   {latestNote ? (
-                    <div className="text-xs text-neutral-300">
-                      <div className="font-medium text-neutral-200">{formatTimestamp(latestNote.timestamp)}</div>
-                      <div className="mt-1 text-neutral-400">{latestNote.note}</div>
+                    <div className="text-xs text-gray-300">
+                      <div className="font-medium text-gray-200">{formatTimestamp(latestNote.timestamp)}</div>
+                      <div className="mt-1 text-gray-400">{latestNote.note}</div>
                     </div>
                   ) : (
-                    <div className="text-xs text-neutral-500">No notes yet.</div>
+                    <div className="text-xs text-gray-500">No notes yet.</div>
                   )}
                 </div>
               </div>
@@ -151,5 +147,20 @@ export default function PrototypesIndexPage() {
         })}
       </div>
     </div>
+  );
+}
+
+export default function PrototypesIndexPage() {
+  const [activeView] = useState('prototype-lab');
+
+  return (
+    <ProjectProvider>
+      <div className="flex h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+        <Navigation activeView={activeView} setActiveView={() => {}} />
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+          <PrototypesIndexContent />
+        </main>
+      </div>
+    </ProjectProvider>
   );
 }

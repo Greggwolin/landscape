@@ -14,7 +14,8 @@ const loaderMap: Record<string, () => Promise<{ default: ComponentType<Record<st
   'gis-test': () => import('@/prototypes/gis/GISTestPrototype'),
   'gis-simple-test': () => import('@/prototypes/gis/GISSimpleTestPrototype'),
   'map-debug': () => import('@/prototypes/gis/MapDebugPrototype'),
-  'parcel-test': () => import('@/prototypes/gis/ParcelTestPrototype')
+  'parcel-test': () => import('@/prototypes/gis/ParcelTestPrototype'),
+  'project-topnav': () => import('@/prototypes/project/TopNavProjectPrototype')
 };
 
 export const loadPrototypeComponent = (id: string) => {

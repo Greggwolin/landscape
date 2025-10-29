@@ -1,17 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import Navigation from '@/app/components/Navigation';
-import { ProjectProvider } from '@/app/components/ProjectProvider';
-import { PageHeader } from './components/PageHeader';
-import { TabBar } from './components/TabBar';
-import { OperatingExpensesTab } from './components/OperatingExpensesTab';
-import { MarketRatesTab } from './components/MarketRatesTab';
-import CapitalizationTab from './components/CapitalizationTab';
-import { StagingModal } from '@/components/extraction/StagingModal';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
-import { Snackbar, Alert } from '@mui/material';
-import ProjectTabMap from '@/components/map/ProjectTabMap';
 
 // Mock data types
 interface FloorPlan {
@@ -122,7 +112,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'notes', label: 'Notes', category: 'unit', visible: false, type: 'input', description: 'Free-form notes for this unit' },
 ];
 
-function MultiFamRentRollInputsContent() {
+export default function MultiFamRentRollInputsContentPage() {
   const projectId = 17; // Project ID for this prototype/property (14105 Chadron Ave)
 
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
@@ -133,12 +123,8 @@ function MultiFamRentRollInputsContent() {
   const [editDraft, setEditDraft] = useState<Unit | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [planEditDraft, setPlanEditDraft] = useState<FloorPlan | null>(null);
-  const [prototypeNotes, setPrototypeNotes] = useState<string>('');
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
-  const [notesMessage, setNotesMessage] = useState<string>('');
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
   const [showFieldChooser, setShowFieldChooser] = useState(false);
-  const [showNotesModal, setShowNotesModal] = useState(false);
 
   // Load real data from database
   useEffect(() => {
@@ -212,53 +198,6 @@ function MultiFamRentRollInputsContent() {
 
     loadData();
   }, [projectId]);
-
-  // Load prototype notes on mount
-  useEffect(() => {
-    const loadNotes = async () => {
-      try {
-        const response = await fetch('/api/prototypes/notes?prototypeId=multifam-rent-roll-inputs');
-        if (response.ok) {
-          const notes = await response.json();
-          if (notes.length > 0) {
-            // Get the most recent note
-            setPrototypeNotes(notes[0].note);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load notes:', err);
-      }
-    };
-    loadNotes();
-  }, []);
-
-  // Save prototype notes
-  const handleSaveNotes = async () => {
-    setIsSavingNotes(true);
-    setNotesMessage('');
-    try {
-      const response = await fetch('/api/prototypes/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prototypeId: 'multifam-rent-roll-inputs',
-          note: prototypeNotes
-        })
-      });
-
-      if (response.ok) {
-        setNotesMessage('Notes saved successfully!');
-        setTimeout(() => setNotesMessage(''), 3000);
-      } else {
-        setNotesMessage('Failed to save notes');
-      }
-    } catch (err) {
-      console.error('Failed to save notes:', err);
-      setNotesMessage('Error saving notes');
-    } finally {
-      setIsSavingNotes(false);
-    }
-  };
 
   // Get visible columns
   const visibleColumns = useMemo(() => {
@@ -531,57 +470,34 @@ function MultiFamRentRollInputsContent() {
 
   return (
     <div className="p-4 space-y-4 bg-gray-950 min-h-screen">
-      {/* Page Title with Notes Button */}
-      <div className="bg-gray-800 rounded border border-gray-700 p-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Rent Roll & Unit Inputs - Prototype 1</h2>
-          <button
-            onClick={() => setShowNotesModal(true)}
-            className={`px-3 py-2 text-white text-sm rounded transition-colors flex items-center gap-2 relative ${
-              prototypeNotes
-                ? 'bg-blue-700 hover:bg-blue-600'
-                : 'bg-gray-700 hover:bg-gray-600'
-            }`}
-          >
-            {prototypeNotes && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-            )}
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            {prototypeNotes ? 'Edit Notes' : 'Add Notes'}
-          </button>
-        </div>
-      </div>
-
       {/* Upper Row: Floor Plans (left) + Comparables Map (right) */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
         {/* Floor Plan Matrix - Upper Left (WIDER) */}
         <div className="bg-gray-800 rounded border border-gray-700">
-          <div className="px-4 py-2 border-b border-gray-700">
+          <div className="px-4 py-3 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h3 className="text-base font-semibold text-white">Floor Plan Matrix</h3>
+                <h3 className="text-lg font-semibold text-white">Floor Plan Matrix</h3>
                 <div className="flex items-center gap-2 px-2 py-1 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
-                  <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
                   </svg>
                   <span className="text-blue-300 font-medium">Aggregates from Units</span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Total Units:</span> <span className="text-white font-semibold">{totalUnits}</span>
-                </div>
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Avg Current:</span> <span className="text-white font-semibold">${avgCurrentRent.toLocaleString()}</span>
-                </div>
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Avg Market:</span> <span className="text-white font-semibold">${avgMarketRent.toLocaleString()}</span>
-                </div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+              <div className="text-gray-400">
+                <span className="block text-gray-500">Total Units</span>
+                <span className="text-white text-lg font-semibold">{totalUnits}</span>
+              </div>
+              <div className="text-gray-400">
+                <span className="block text-gray-500">Avg Current</span>
+                <span className="text-white text-lg font-semibold">${avgCurrentRent.toLocaleString()}</span>
+              </div>
+              <div className="text-gray-400">
+                <span className="block text-gray-500">Avg Market</span>
+                <span className="text-white text-lg font-semibold">${avgMarketRent.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -738,7 +654,7 @@ function MultiFamRentRollInputsContent() {
             </div>
 
             {/* Landscaper Analysis Box */}
-            <div className="border-t border-gray-700 pt-4">
+            <div className="border-t border-gray-700 pt-4 mt-4">
               <div className="bg-purple-900/20 border border-purple-700/40 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
@@ -784,12 +700,15 @@ function MultiFamRentRollInputsContent() {
             <p className="text-xs text-gray-400 mt-1">AI-analyzed nearby properties</p>
           </div>
           <div className="p-4 space-y-3">
-            {/* Project Map */}
-            <div className="h-[400px]">
-              <ProjectTabMap
-                projectId="17"
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-              />
+            {/* Map Placeholder - BIGGER */}
+            <div className="bg-gray-900 rounded border border-gray-700 h-80 flex items-center justify-center">
+              <div className="text-center text-gray-500">
+                <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <p className="text-sm">Map with comparable locations</p>
+                <p className="text-xs">(MapLibre integration ready)</p>
+              </div>
             </div>
 
             {/* Comparables Table - COMPACT */}
@@ -823,21 +742,20 @@ function MultiFamRentRollInputsContent() {
 
       {/* Detailed Rent Roll Table - Bottom (FULL WIDTH) */}
       <div className="bg-gray-800 rounded border border-gray-700">
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+          <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-base font-semibold text-white">Detailed Rent Roll</h3>
+              <h3 className="text-lg font-semibold text-white">Detailed Rent Roll</h3>
               <div className="flex items-center gap-2 px-2 py-1 bg-green-900/20 border border-green-700/40 rounded text-xs">
-                <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                 </svg>
                 <span className="text-green-300 font-medium">Populates Floor Plans</span>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
               <span>Occupancy: <span className="text-white font-medium">{occupancyRate}%</span></span>
               <span>Units: <span className="text-white font-medium">{units.length} / {totalUnits}</span></span>
-              <span className="text-purple-400">AI will populate DVLs from floor plan matrix</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1015,185 +933,38 @@ function MultiFamRentRollInputsContent() {
                 </div>
               </div>
 
-              {/* Unit Info */}
-              <div className="mb-3">
-                <h4 className="text-xs font-semibold text-blue-400 mb-1 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  Unit Info
-                </h4>
-                <div className="space-y-0.5 ml-5">
-                  {columns.filter(col => col.category === 'unit').map(col => (
-                    <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
-                      <input
-                        type="checkbox"
-                        id={`field-${col.id}`}
-                        checked={col.visible}
-                        onChange={(e) => {
-                          setColumns(prev => prev.map(c =>
-                            c.id === col.id ? { ...c, visible: e.target.checked } : c
-                          ));
-                        }}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
-                      />
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                        col.type === 'input'
-                          ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                          : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                      }`}>
-                        {col.type === 'input' ? 'Input' : 'Calc'}
-                      </span>
-                      <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                      <span className="text-gray-400 flex-1">{col.description}</span>
-                    </label>
-                  ))}
+              {/* Column categories */}
+              {['unit', 'floorplan', 'tenant', 'lease', 'financial'].map(category => (
+                <div key={category} className="mb-3">
+                  <h4 className="text-xs font-semibold text-blue-400 mb-1 capitalize">{category} Info</h4>
+                  <div className="space-y-0.5 ml-5">
+                    {columns.filter(col => col.category === category).map(col => (
+                      <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
+                        <input
+                          type="checkbox"
+                          id={`field-${col.id}`}
+                          checked={col.visible}
+                          onChange={(e) => {
+                            setColumns(prev => prev.map(c =>
+                              c.id === col.id ? { ...c, visible: e.target.checked } : c
+                            ));
+                          }}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
+                        />
+                        <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
+                          col.type === 'input'
+                            ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
+                            : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
+                        }`}>
+                          {col.type === 'input' ? 'Input' : 'Calc'}
+                        </span>
+                        <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
+                        <span className="text-gray-400 flex-1">{col.description}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              {/* Floor Plan */}
-              <div className="mb-3">
-                <h4 className="text-xs font-semibold text-purple-400 mb-1 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  </svg>
-                  Floor Plan
-                </h4>
-                <div className="space-y-0.5 ml-5">
-                  {columns.filter(col => col.category === 'floorplan').map(col => (
-                    <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
-                      <input
-                        type="checkbox"
-                        id={`field-${col.id}`}
-                        checked={col.visible}
-                        onChange={(e) => {
-                          setColumns(prev => prev.map(c =>
-                            c.id === col.id ? { ...c, visible: e.target.checked } : c
-                          ));
-                        }}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
-                      />
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                        col.type === 'input'
-                          ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                          : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                      }`}>
-                        {col.type === 'input' ? 'Input' : 'Calc'}
-                      </span>
-                      <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                      <span className="text-gray-400 flex-1">{col.description}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tenant Info */}
-              <div className="mb-3">
-                <h4 className="text-xs font-semibold text-green-400 mb-1 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Tenant Info
-                </h4>
-                <div className="space-y-0.5 ml-5">
-                  {columns.filter(col => col.category === 'tenant').map(col => (
-                    <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
-                      <input
-                        type="checkbox"
-                        id={`field-${col.id}`}
-                        checked={col.visible}
-                        onChange={(e) => {
-                          setColumns(prev => prev.map(c =>
-                            c.id === col.id ? { ...c, visible: e.target.checked } : c
-                          ));
-                        }}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
-                      />
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                        col.type === 'input'
-                          ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                          : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                      }`}>
-                        {col.type === 'input' ? 'Input' : 'Calc'}
-                      </span>
-                      <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                      <span className="text-gray-400 flex-1">{col.description}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Lease Terms */}
-              <div className="mb-3">
-                <h4 className="text-xs font-semibold text-amber-400 mb-1 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Lease Terms
-                </h4>
-                <div className="space-y-0.5 ml-5">
-                  {columns.filter(col => col.category === 'lease').map(col => (
-                    <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
-                      <input
-                        type="checkbox"
-                        id={`field-${col.id}`}
-                        checked={col.visible}
-                        onChange={(e) => {
-                          setColumns(prev => prev.map(c =>
-                            c.id === col.id ? { ...c, visible: e.target.checked } : c
-                          ));
-                        }}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
-                      />
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                        col.type === 'input'
-                          ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                          : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                      }`}>
-                        {col.type === 'input' ? 'Input' : 'Calc'}
-                      </span>
-                      <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                      <span className="text-gray-400 flex-1">{col.description}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Financials */}
-              <div className="mb-3">
-                <h4 className="text-xs font-semibold text-emerald-400 mb-1 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Financials
-                </h4>
-                <div className="space-y-0.5 ml-5">
-                  {columns.filter(col => col.category === 'financial').map(col => (
-                    <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
-                      <input
-                        type="checkbox"
-                        id={`field-${col.id}`}
-                        checked={col.visible}
-                        onChange={(e) => {
-                          setColumns(prev => prev.map(c =>
-                            c.id === col.id ? { ...c, visible: e.target.checked } : c
-                          ));
-                        }}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
-                      />
-                      <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                        col.type === 'input'
-                          ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                          : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                      }`}>
-                        {col.type === 'input' ? 'Input' : 'Calc'}
-                      </span>
-                      <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                      <span className="text-gray-400 flex-1">{col.description}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Modal Footer */}
@@ -1216,267 +987,6 @@ function MultiFamRentRollInputsContent() {
           </div>
         </div>
       )}
-
-      {/* Notes Modal */}
-      {showNotesModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Prototype Notes</h3>
-                <p className="text-xs text-gray-400 mt-1">What you like or don&apos;t like about this prototype</p>
-              </div>
-              <button
-                onClick={() => setShowNotesModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-4 flex-1 overflow-y-auto">
-              <textarea
-                className="w-full h-64 bg-gray-900 border border-gray-700 rounded px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-blue-500"
-                placeholder="Add your notes here...&#10;&#10;Examples:&#10;- I like the KPI tiles, they provide good context&#10;- The field chooser is helpful but needs better grouping&#10;- Would be nice to have bulk edit capabilities&#10;- Consider adding export to Excel functionality"
-                value={prototypeNotes}
-                onChange={(e) => setPrototypeNotes(e.target.value)}
-              />
-              {notesMessage && (
-                <div className={`mt-3 text-sm ${notesMessage.includes('success') ? 'text-green-400' : 'text-red-400'}`}>
-                  {notesMessage}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setPrototypeNotes('');
-                  setNotesMessage('');
-                }}
-                className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
-              >
-                Clear Notes
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowNotesModal(false)}
-                  className="px-4 py-2 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    handleSaveNotes();
-                  }}
-                  disabled={isSavingNotes}
-                  className="px-4 py-2 text-sm bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSavingNotes ? 'Saving...' : 'Save Notes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-export default function MultiFamRentRollInputsPage() {
-  const [activeView] = useState('prototype-multifam-rent-roll');
-  const [activeTab, setActiveTab] = useState<'rent-roll' | 'opex' | 'market-rates' | 'capitalization'>('rent-roll');
-  const [currentMode, setCurrentMode] = useState<'basic' | 'standard' | 'advanced'>('standard');
-
-  // Upload and staging state
-  const [stagingDocId, setStagingDocId] = useState<number | null>(null);
-  const [showStaging, setShowStaging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadInputKey, setUploadInputKey] = useState(0);
-  const [uploadNotification, setUploadNotification] = useState<{open: boolean; message: string; severity: 'info' | 'success' | 'error'}>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
-
-  // Field counts for mode toggle
-  const fieldCounts = {
-    basic: 6,
-    standard: 13,
-    advanced: 20
-  };
-
-  // Handle file upload for rent roll AI ingestion
-  const handleUploadClick = () => {
-    const fileInput = document.getElementById('rent-roll-upload-input') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const projectId = 17;
-    console.log('🚀 Upload started:', file.name);
-    setUploading(true);
-    setUploadNotification({
-      open: true,
-      message: `Processing ${file.name} with AI extraction... This may take 15-30 seconds.`,
-      severity: 'info'
-    });
-    console.log('✅ Upload state set to true - button should show "Processing..."');
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('project_id', projectId.toString());
-    formData.append('doc_type', 'rent_roll');
-
-    try {
-      const response = await fetch('http://localhost:8000/api/dms/upload/', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-      console.log('📤 Upload response:', result);
-
-      if (result.success) {
-        setStagingDocId(result.doc_id);
-        console.log('📋 Doc ID:', result.doc_id, '- Starting polling for extraction...');
-
-        const checkInterval = setInterval(async () => {
-          const statusResponse = await fetch(`http://localhost:8000/api/dms/staging/${result.doc_id}/`);
-          console.log('🔄 Polling status:', statusResponse.status);
-
-          if (statusResponse.status === 200) {
-            const statusData = await statusResponse.json();
-            if (statusData.summary) {
-              console.log('✅ Extraction complete! Opening staging modal...');
-              clearInterval(checkInterval);
-              setUploading(false);
-              setUploadNotification({
-                open: true,
-                message: `Successfully extracted ${statusData.summary.total_units || 0} units!`,
-                severity: 'success'
-              });
-              setShowStaging(true);
-            } else {
-              console.log('⏳ Still extracting... data incomplete');
-            }
-          } else if (statusResponse.status === 202) {
-            console.log('⏳ Still processing (202)...');
-          }
-        }, 2000);
-
-        setTimeout(() => {
-          console.log('⏱️ Timeout reached (2 minutes) - stopping polling');
-          clearInterval(checkInterval);
-          setUploading(false);
-          alert('Extraction is taking longer than expected. Please check back later.');
-        }, 120000);
-      } else {
-        console.error('❌ Upload failed:', result.error);
-        setUploading(false);
-        alert(`Upload failed: ${result.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('❌ Upload exception:', error);
-      setUploading(false);
-      alert('Upload failed. Please ensure the backend server is running on port 8000.');
-    }
-
-    setUploadInputKey(prev => prev + 1);
-  };
-
-  const handleCommit = () => {
-    window.location.reload();
-  };
-
-  return (
-    <ProjectProvider>
-      <div className="min-h-screen bg-gray-950 flex flex-col">
-        <div className="flex flex-1">
-          <Navigation activeView={activeView} setActiveView={() => {}} />
-          <main className="flex-1 overflow-visible bg-gray-950">
-
-            {/* Page Header with Mode Toggle */}
-            <PageHeader
-              projectName="14105 Chadron Ave"
-              projectId={17}
-              mode={currentMode}
-              onModeChange={setCurrentMode}
-              fieldCounts={fieldCounts}
-              onUploadClick={handleUploadClick}
-              uploading={uploading}
-            />
-
-            {/* Tab Navigation */}
-            <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
-
-            {/* Tab Content */}
-            <div className="tab-content">
-              {activeTab === 'rent-roll' && (
-                <MultiFamRentRollInputsContent />
-              )}
-              {activeTab === 'opex' && (
-                <OperatingExpensesTab mode={currentMode} projectId={17} />
-              )}
-              {activeTab === 'market-rates' && (
-                <MarketRatesTab mode={currentMode} projectId={17} />
-              )}
-              {activeTab === 'capitalization' && (
-                <CapitalizationTab projectId={17} mode={currentMode} />
-              )}
-            </div>
-
-          </main>
-        </div>
-
-        {/* Hidden file input for upload */}
-        <input
-          id="rent-roll-upload-input"
-          key={uploadInputKey}
-          type="file"
-          accept=".xlsx,.xls,.csv,.pdf"
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-        />
-
-        {/* Staging Modal */}
-        {stagingDocId && (
-          <StagingModal
-            open={showStaging}
-            docId={stagingDocId}
-            projectId={17}
-            onClose={() => setShowStaging(false)}
-            onCommit={handleCommit}
-          />
-        )}
-
-        {/* Upload Notification Snackbar */}
-        <Snackbar
-          open={uploadNotification.open}
-          autoHideDuration={uploading ? null : 6000}
-          onClose={() => setUploadNotification(prev => ({ ...prev, open: false }))}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        >
-          <Alert
-            onClose={uploading ? undefined : () => setUploadNotification(prev => ({ ...prev, open: false }))}
-            severity={uploadNotification.severity}
-            variant="filled"
-            sx={{ width: '100%' }}
-          >
-            {uploadNotification.message}
-          </Alert>
-        </Snackbar>
-      </div>
-    </ProjectProvider>
   );
 }
