@@ -1,13 +1,79 @@
 'use client'
 
+import { useState } from 'react'
 import { useProjectContext } from '@/app/components/ProjectProvider'
 import RentRollGrid from './components/RentRollGrid'
 import FloorplansGrid from './components/FloorplansGrid'
+import { StagingModal } from '@/components/extraction/StagingModal'
+import { Button } from '@mui/material'
+import UploadIcon from '@mui/icons-material/Upload'
 
 export default function RentRollPage() {
   const { activeProject, isLoading } = useProjectContext()
+  const [stagingDocId, setStagingDocId] = useState<number | null>(null)
+  const [showStaging, setShowStaging] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const projectId = activeProject?.project_id ?? null
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !projectId) return
+
+    setUploading(true)
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('project_id', projectId.toString())
+    formData.append('doc_type', 'rent_roll')
+
+    try {
+      const response = await fetch('http://localhost:8000/api/dms/upload/', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Show staging modal after brief delay for extraction
+        setStagingDocId(result.doc_id)
+
+        // Poll for extraction completion
+        const checkInterval = setInterval(async () => {
+          const statusResponse = await fetch(`http://localhost:8000/api/dms/staging/${result.doc_id}/`)
+
+          if (statusResponse.status === 200) {
+            const statusData = await statusResponse.json()
+            if (statusData.summary) {
+              clearInterval(checkInterval)
+              setUploading(false)
+              setShowStaging(true)
+            }
+          }
+        }, 2000)
+
+        // Timeout after 2 minutes
+        setTimeout(() => {
+          clearInterval(checkInterval)
+          setUploading(false)
+          alert('Extraction is taking longer than expected. Please check back later.')
+        }, 120000)
+      } else {
+        setUploading(false)
+        alert(`Upload failed: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Upload failed:', error)
+      setUploading(false)
+      alert('Upload failed. Please try again.')
+    }
+  }
+
+  const handleCommit = () => {
+    // Refresh rent roll data
+    window.location.reload()
+  }
 
   if (isLoading) {
     return (
@@ -40,6 +106,22 @@ export default function RentRollPage() {
                 {activeProject?.project_name || 'Unknown Project'}
               </p>
             </div>
+            <div>
+              <Button
+                variant="contained"
+                component="label"
+                startIcon={<UploadIcon />}
+                disabled={uploading}
+              >
+                {uploading ? 'Processing...' : 'Upload Rent Roll'}
+                <input
+                  type="file"
+                  hidden
+                  onChange={handleFileUpload}
+                  accept=".xlsx,.xls,.csv,.pdf"
+                />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -68,6 +150,17 @@ export default function RentRollPage() {
           <RentRollGrid projectId={projectId} />
         </div>
       </div>
+
+      {/* Staging Modal */}
+      {stagingDocId && (
+        <StagingModal
+          open={showStaging}
+          docId={stagingDocId}
+          projectId={projectId}
+          onClose={() => setShowStaging(false)}
+          onCommit={handleCommit}
+        />
+      )}
     </div>
   )
 }

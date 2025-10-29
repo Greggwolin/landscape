@@ -5,7 +5,13 @@ import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
 import useSWR from 'swr'
-import { fetchJson } from '@/lib/fetchJson'
+import {
+  fetchLeases,
+  fetchUnits,
+  fetchUnitTypes,
+  leasesAPI,
+  unitsAPI,
+} from '@/lib/api/multifamily'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -141,23 +147,20 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     setTimeout(() => setNotification(null), 3000)
   }, [])
 
-  const fetcher = (url: string) => fetchJson<LeaseResponse>(url)
-  const unitFetcher = (url: string) => fetchJson<UnitResponse>(url)
-
   const { data: response, error, mutate } = useSWR(
     projectId ? `/api/multifamily/leases?project_id=${projectId}` : null,
-    fetcher
+    fetchLeases
   )
 
   const { data: unitsResponse } = useSWR(
     projectId ? `/api/multifamily/units?project_id=${projectId}` : null,
-    unitFetcher
+    fetchUnits
   )
 
   // Fetch unit types for DVL and auto-fill
   const { data: unitTypesResponse } = useSWR(
     projectId ? `/api/multifamily/unit-types?project_id=${projectId}` : null,
-    fetcher,
+    fetchUnitTypes,
     { revalidateOnFocus: false }
   )
 
@@ -175,10 +178,10 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     const map = new Map()
     unitTypes.forEach(ut => {
       map.set(ut.unit_type_code, {
-        bedrooms: parseFloat(ut.bedrooms),
-        bathrooms: parseFloat(ut.bathrooms),
-        square_feet: parseInt(ut.avg_square_feet),
-        market_rent: parseFloat(ut.current_market_rent)
+        bedrooms: Number(ut.bedrooms),
+        bathrooms: Number(ut.bathrooms),
+        square_feet: Number(ut.avg_square_feet),
+        market_rent: Number(ut.current_market_rent)
       })
     })
     return map
@@ -213,7 +216,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         if (!floorplanData || !floorplanData.market_rent) return sum
 
         const marketRent = floorplanData.market_rent
-        const inPlaceRent = lease.base_rent_monthly || 0
+        const inPlaceRent = Number(lease.base_rent_monthly) || 0
         const l2l = marketRent - inPlaceRent
 
         return sum + l2l
@@ -255,17 +258,21 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   }, [])
 
   // Format currency
-  const formatCurrency = useCallback((value: number) => {
+  const formatCurrency = useCallback((value: number | string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(numValue)) return '$0'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
-    }).format(value)
+    }).format(numValue)
   }, [])
 
   // Format number with commas
-  const formatNumber = useCallback((value: number) => {
-    return value.toLocaleString()
+  const formatNumber = useCallback((value: number | string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(numValue)) return ''
+    return numValue.toLocaleString()
   }, [])
 
   // Delete row handler
@@ -279,17 +286,11 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     try {
       // Delete lease first
       if (lease.lease_id) {
-        const leaseResponse = await fetch(`/api/multifamily/leases/${lease.lease_id}`, {
-          method: 'DELETE'
-        })
-        if (!leaseResponse.ok) throw new Error('Failed to delete lease')
+        await leasesAPI.delete(lease.lease_id)
       }
 
       // Then delete unit
-      const unitResponse = await fetch(`/api/multifamily/units/${lease.unit_id}`, {
-        method: 'DELETE'
-      })
-      if (!unitResponse.ok) throw new Error('Failed to delete unit')
+      await unitsAPI.delete(lease.unit_id)
 
       // Refresh grid
       await mutate()
@@ -464,8 +465,9 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         return `${sign}$${Math.abs(l2l).toLocaleString()}`
       },
       valueGetter: (params) => {
+        if (!params.data) return null
         const unitType = params.data.unit_type
-        const inPlaceRent = params.data.base_rent_monthly || 0
+        const inPlaceRent = Number(params.data.base_rent_monthly) || 0
 
         // Look up market rent from floorplan
         const floorplanData = unitTypeMap.get(unitType)
@@ -477,6 +479,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         return marketRent - inPlaceRent
       },
       tooltipValueGetter: (params) => {
+        if (!params.data) return ''
         const unitType = params.data.unit_type
         const floorplanData = unitTypeMap.get(unitType)
 
@@ -485,7 +488,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         }
 
         const marketRent = floorplanData.market_rent || 0
-        const inPlaceRent = params.data.base_rent_monthly || 0
+        const inPlaceRent = Number(params.data.base_rent_monthly) || 0
         const l2l = marketRent - inPlaceRent
 
         return `Market: $${marketRent.toLocaleString()} | In-Place: $${inPlaceRent.toLocaleString()} | L2L: ${l2l >= 0 ? '+' : ''}$${l2l.toLocaleString()}`
@@ -521,13 +524,9 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
                   if (!floorplanData) return
 
                   try {
-                    await fetch(`/api/multifamily/units/${lease.unit_id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        bathrooms: floorplanData.bathrooms,
-                        square_feet: floorplanData.square_feet
-                      })
+                    await unitsAPI.update(lease.unit_id, {
+                      bathrooms: floorplanData.bathrooms,
+                      square_feet: floorplanData.square_feet
                     })
                     await mutate()
                     showNotification('✅ Copied from floorplan', 'success')
@@ -619,24 +618,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
         console.log('Saving unit_type and auto-fill to units table:', updates)
 
-        const response = await fetch(`/api/multifamily/units/${updatedLease.unit_id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates)
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('API Error Response:', errorText)
-          throw new Error(`Save failed: ${response.status} ${errorText}`)
-        }
-
-        const result = await response.json()
-        console.log('Save result:', result)
-
-        if (!result.success) {
-          throw new Error(result.error || 'Save failed')
-        }
+        await unitsAPI.update(updatedLease.unit_id, updates)
 
         // Update the underlying data object directly
         // This won't trigger onCellValueChanged events
@@ -682,40 +664,10 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
       if (isUnitField) {
         // Update unit
-        const response = await fetch(`/api/multifamily/units/${updatedLease.unit_id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [field]: newValue }),
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('API Error Response:', errorText)
-          throw new Error(`Save failed: ${response.status}`)
-        }
-
-        const result = await response.json()
-        if (!result.success) {
-          throw new Error(result.error || 'Save failed')
-        }
+        await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
       } else {
         // Update lease
-        const response = await fetch(`/api/multifamily/leases/${leaseId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [field]: newValue }),
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('API Error Response:', errorText)
-          throw new Error(`Save failed: ${response.status}`)
-        }
-
-        const result = await response.json()
-        if (!result.success) {
-          throw new Error(result.error || 'Save failed')
-        }
+        await leasesAPI.update(leaseId, { [field]: newValue })
       }
 
       console.log(`✅ Saved ${field}`)
@@ -746,19 +698,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         renovation_status: 'ORIGINAL',
       }
 
-      const unitResponse = await fetch('/api/multifamily/units', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUnit),
-      })
-
-      if (!unitResponse.ok) {
-        const errorData = await unitResponse.json()
-        throw new Error(errorData.error || 'Failed to create unit')
-      }
-
-      const unitResult = await unitResponse.json()
-      const unitId = unitResult.data.unit_id
+      const createdUnit = await unitsAPI.create(newUnit)
+      const unitId = createdUnit.unit_id
 
       // Then, create a lease for that unit
       const today = new Date().toISOString().split('T')[0]
@@ -774,16 +715,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         lease_status: 'ACTIVE',
       }
 
-      const leaseResponse = await fetch('/api/multifamily/leases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newLease),
-      })
-
-      if (!leaseResponse.ok) {
-        const errorData = await leaseResponse.json()
-        throw new Error(errorData.error || 'Failed to create lease')
-      }
+      await leasesAPI.create(newLease)
 
       await mutate() // Refresh grid
       showNotification('✅ Created new unit successfully', 'success')

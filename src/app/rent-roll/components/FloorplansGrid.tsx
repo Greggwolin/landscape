@@ -5,7 +5,7 @@ import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
 import useSWR from 'swr'
-import { fetchJson } from '@/lib/fetchJson'
+import { fetchUnitTypes, unitTypesAPI } from '@/lib/api/multifamily'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -50,27 +50,30 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
   }, [])
 
   // Fetch unit types
-  const fetcher = (url: string) => fetchJson<UnitTypeResponse>(url)
   const { data: response, error, mutate } = useSWR(
     projectId ? `/api/multifamily/unit-types?project_id=${projectId}` : null,
-    fetcher,
+    fetchUnitTypes,
     { revalidateOnFocus: false }
   )
 
   const unitTypes = response?.data ?? []
 
   // Format currency
-  const formatCurrency = useCallback((value: number) => {
+  const formatCurrency = useCallback((value: number | string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(numValue)) return '$0'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
-    }).format(value)
+    }).format(numValue)
   }, [])
 
   // Format number with commas
-  const formatNumber = useCallback((value: number) => {
-    return new Intl.NumberFormat('en-US').format(value)
+  const formatNumber = useCallback((value: number | string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(numValue)) return ''
+    return new Intl.NumberFormat('en-US').format(numValue)
   }, [])
 
   // Delete unit type
@@ -82,14 +85,7 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
     if (!confirmed) return
 
     try {
-      const response = await fetch(`/api/multifamily/unit-types/${unitType.unit_type_id}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete')
-      }
+      await unitTypesAPI.delete(unitType.unit_type_id)
 
       await mutate()
       showNotification('✅ Deleted successfully', 'success')
@@ -244,13 +240,7 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
     if (!unitTypeId) return
 
     try {
-      const response = await fetch(`/api/multifamily/unit-types/${unitTypeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: newValue }),
-      })
-
-      if (!response.ok) throw new Error('Save failed')
+      await unitTypesAPI.update(unitTypeId, { [field]: newValue })
 
       // Refresh grid data
       await mutate()
@@ -289,16 +279,7 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
     }
 
     try {
-      const response = await fetch('/api/multifamily/unit-types', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newType),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create')
-      }
+      await unitTypesAPI.create(newType)
 
       await mutate()
       showNotification('✅ Created new unit type successfully', 'success')
