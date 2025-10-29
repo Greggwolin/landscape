@@ -159,3 +159,24 @@ TRUNCATE public.geo_xwalk CASCADE;
 
 -- Then re-run the seed scripts
 ```
+
+---
+
+## Related Documentation
+
+- [Geography Setup Guide](db/migrations/README_GEO_SETUP.md) - Comprehensive geography data documentation
+- [Post-Sync Setup Guide](docs/06-devops/POST_SYNC_SETUP.md) - **IMPORTANT:** Complete machine setup after pulling from Git
+- [Git Sync Guide](docs/06-devops/SYNC_ALL_TO_GIT_PROMPT.md) - How to sync everything to Git
+
+## Important Note
+
+**Just pulling code from Git is NOT enough!** After pulling, you also need to:
+
+1. Install Node.js dependencies: `npm install`
+2. Set up Python virtual environments and install dependencies
+3. Configure environment variables (.env files)
+4. **Start the Django backend**: `cd backend && source venv/bin/activate && python manage.py runserver 8000`
+5. Run database migrations
+6. Load geography seed data (this guide)
+
+See [POST_SYNC_SETUP.md](docs/06-devops/POST_SYNC_SETUP.md) for complete instructions.

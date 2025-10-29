@@ -228,6 +228,129 @@ If changes include:
 - New dependencies → Team needs to run `npm install` / `pip install -r requirements.txt`
 - Environment variables → Team needs to update their `.env` files
 - Breaking changes → Team needs migration guide
+- New Python packages → Team needs to reinstall backend/services dependencies
+- New system tools → Team needs to install (postgres, python, node, etc.)
+
+**Critical: Dependency Synchronization for Other Machines**
+
+When team members pull your changes, they need to synchronize MORE than just code. Include these instructions in your commit message or team notification:
+
+**1. Node.js Dependencies (if package.json changed):**
+```bash
+# At project root
+npm install
+# or
+pnpm install
+```
+
+**2. Python Backend Dependencies (if backend/requirements.txt changed):**
+```bash
+cd backend
+
+# Activate virtual environment (create if doesn't exist)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install/update dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+**3. Python Services Dependencies (if services/*/pyproject.toml changed):**
+```bash
+# Financial Engine
+cd services/financial_engine_py
+poetry install
+# or
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# Market Ingest Service
+cd services/market_ingest_py
+poetry install
+# or
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+**4. Database Migrations (if migrations/*.sql added):**
+```bash
+# Set database URL
+export DATABASE_URL="postgresql://..."
+
+# Run migrations
+./scripts/run-migrations.sh
+
+# Or for geography seeds specifically:
+./db/migrations/run_geo_seeds.sh
+```
+
+**5. Environment Variables (if .env.*.template changed):**
+```bash
+# Copy template and fill in values
+cp .env.local.template .env.local
+cp backend/.env.example backend/.env
+cp services/financial_engine_py/.env.example services/financial_engine_py/.env
+
+# Edit each .env file with actual values:
+# - DATABASE_URL
+# - API keys
+# - Secret keys
+```
+
+**6. System Services (if new services required):**
+
+Check if Django backend is running:
+```bash
+cd backend
+source venv/bin/activate
+python manage.py runserver 8000
+```
+
+Check if database is accessible:
+```bash
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM landscape.tbl_project;"
+```
+
+**7. Rebuild Frontend (if major changes):**
+```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Rebuild
+npm run build
+# or
+npm run dev
+```
+
+**Common Issues After Sync:**
+
+❌ **"Module not found"** → Run `npm install` or `pip install -r requirements.txt`
+
+❌ **"Connection refused" / API errors** → Django backend not running
+```bash
+cd backend
+source venv/bin/activate
+python manage.py runserver 8000
+```
+
+❌ **"Table/column doesn't exist"** → Database migrations not run
+```bash
+./scripts/run-migrations.sh
+```
+
+❌ **"404 errors for geography lookups"** → Geography seed data missing
+```bash
+./db/migrations/run_geo_seeds.sh
+```
+
+❌ **"Import error" in Python** → Virtual environment not activated or dependencies not installed
+```bash
+source venv/bin/activate  # or source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 **Update Tracking:**
 - Update `/docs/08-migration-history/` if database migrations added
