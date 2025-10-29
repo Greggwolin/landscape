@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, memo } from 'react';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 
@@ -79,7 +79,7 @@ const mockFloorPlans: FloorPlan[] = [
   { id: '5', name: 'C1', bedrooms: 3, bathrooms: 2, sqft: 1250, unitCount: 16, currentRent: 2100, marketRent: 2250, aiEstimate: 2300 },
 ];
 
-export default function PropertyTab({ project }: PropertyTabProps) {
+function PropertyTab({ project }: PropertyTabProps) {
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,8 +97,14 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         console.log('[PropertyTab] Loading data for project:', projectId);
         console.log('[PropertyTab] NEXT_PUBLIC_DJANGO_API_URL:', process.env.NEXT_PUBLIC_DJANGO_API_URL);
 
-        // Fetch unit types (floor plans)
-        const unitTypesData = await unitTypesAPI.list(projectId);
+        // Fetch all data in parallel for better performance
+        const [unitTypesData, unitsData, leasesData] = await Promise.all([
+          unitTypesAPI.list(projectId),
+          unitsAPI.list(projectId),
+          leasesAPI.list(projectId)
+        ]);
+
+        // Transform floor plans
         const transformedFloorPlans: FloorPlan[] = unitTypesData.map(ut => ({
           id: ut.unit_type_id.toString(),
           name: ut.unit_type_code,
@@ -111,11 +117,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           aiEstimate: (Number(ut.current_market_rent) || 0) * 1.05
         }));
 
-        // Fetch units
-        const unitsData = await unitsAPI.list(projectId);
-
-        // Fetch leases
-        const leasesData = await leasesAPI.list(projectId);
+        // Create lease lookup map
         const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
 
         const transformedUnits: Unit[] = unitsData.map(u => {
@@ -469,3 +471,6 @@ export default function PropertyTab({ project }: PropertyTabProps) {
     </div>
   );
 }
+
+// Export memoized version to prevent unnecessary re-renders
+export default memo(PropertyTab);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
 import { NestedExpenseTable } from '@/app/prototypes/multifam/rent-roll-inputs/components/NestedExpenseTable';
 import { BenchmarkPanel } from '@/app/prototypes/multifam/rent-roll-inputs/components/BenchmarkPanel';
@@ -48,7 +48,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: 'recovery_rate', label: 'Recovery %', visible: true, minTier: 'advanced', description: 'Percentage of expense recovered from tenants' }
 ];
 
-export default function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
+function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
   // Use prop mode if provided, otherwise use local state
   const [localMode, setLocalMode] = useState<ComplexityTier>('standard');
   const mode = propMode || localMode;
@@ -562,3 +562,6 @@ export default function OperationsTab({ project, mode: propMode, onModeChange }:
     </div>
   );
 }
+
+// Export memoized version to prevent unnecessary re-renders
+export default memo(OperationsTab);

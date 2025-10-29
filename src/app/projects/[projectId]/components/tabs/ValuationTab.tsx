@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from '../../valuation/components/SalesComparisonApproach';
@@ -18,7 +18,7 @@ interface ValuationTabProps {
   project: any;
 }
 
-export default function ValuationTab({ project }: ValuationTabProps) {
+function ValuationTab({ project }: ValuationTabProps) {
   const projectId = project.project_id;
   const [activeTab, setActiveTab] = useState<Tab>('sales-comparison');
   const [valuationData, setValuationData] = useState<ValuationSummary | null>(null);
@@ -213,3 +213,6 @@ export default function ValuationTab({ project }: ValuationTabProps) {
     </div>
   );
 }
+
+// Export memoized version to prevent unnecessary re-renders
+export default memo(ValuationTab);
