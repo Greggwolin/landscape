@@ -1,0 +1,11 @@
+[2025-10-23T17:15:40.524Z] (multifam-rent-roll-inputs) need to consider landscaper workflow.  if user provides a detailed broker package that contains a complete rent roll, landscaper would populate the detailed rent roll and "roll up" those values into the floor plan matrix.  Alternatively, the document uploaded may contain ONLY the floorplan matrix.  Needs to work both ways.
+[2025-10-23T21:31:28.313Z] (multifam-opex) The configure columns modal should mirror the format of the modal in the Rent Roll tab
+[2025-10-23T21:31:31.150Z] (multifam-opex) The configure columns modal should mirror the format of the modal in the Rent Roll tab
+[2025-10-23T21:55:28.120Z] (multifam-market-rates) tis needs to be reformatted and is not functioning anything like the Market Rates and Prices page.  Too frilly.  No Crud.
+[2025-10-23T22:15:40.567Z] (multifam-opex) The configure columns modal should mirror the format of the modal in the Rent Roll tab
+
+Reconsider benchmark tile. 
+Integrate landscaper
+[2025-10-24T20:31:49.621Z] (multifam-opex) The configure columns modal should mirror the format of the modal in the Rent Roll tab
+
+The filter chips in the detail don't filter
