@@ -3,10 +3,9 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CFormSelect } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilMap, cilLightbulb, cilCloudUpload, cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { cilLightbulb, cilCloudUpload, cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/market-intel';
 import ContactsSection from '@/components/projects/contacts/ContactsSection';
-import MapView from '@/app/components/MapView';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { StepRateTable, StepRow } from '@/app/prototypes/multifam/rent-roll-inputs/components/StepRateTable';
 import { useProjectContext } from '@/app/components/ProjectProvider';
