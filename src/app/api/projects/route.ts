@@ -296,19 +296,39 @@ export async function POST(request: NextRequest) {
     const level2Label = 'Phase'
     const level3Label = 'Parcel'
 
+    // Default land use labels for land development projects
+    const landUseLevel1 = 'Family'
+    const landUseLevel1Plural = 'Families'
+    const landUseLevel2 = 'Type'
+    const landUseLevel2Plural = 'Types'
+    const landUseLevel3 = 'Product'
+    const landUseLevel3Plural = 'Products'
+
     await sql`
       INSERT INTO landscape.tbl_project_config (
         project_id,
         asset_type,
         level1_label,
         level2_label,
-        level3_label
+        level3_label,
+        land_use_level1_label,
+        land_use_level1_label_plural,
+        land_use_level2_label,
+        land_use_level2_label_plural,
+        land_use_level3_label,
+        land_use_level3_label_plural
       ) VALUES (
         ${projectId},
         ${body.property_type_code},
         ${level1Label},
         ${level2Label},
-        ${level3Label}
+        ${level3Label},
+        ${landUseLevel1},
+        ${landUseLevel1Plural},
+        ${landUseLevel2},
+        ${landUseLevel2Plural},
+        ${landUseLevel3},
+        ${landUseLevel3Plural}
       )
     `
 

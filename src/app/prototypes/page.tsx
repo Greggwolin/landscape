@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Header from '../components/Header';
-import Navigation from '../components/Navigation';
-import { ProjectProvider } from '../components/ProjectProvider';
 import { prototypeRegistry } from '@/lib/prototypes/registry';
 
 const statusMap: Record<string, string> = {
@@ -151,16 +148,5 @@ function PrototypesIndexContent() {
 }
 
 export default function PrototypesIndexPage() {
-  const [activeView] = useState('prototype-lab');
-
-  return (
-    <ProjectProvider>
-      <div className="flex h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-        <Navigation activeView={activeView} setActiveView={() => {}} />
-        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-          <PrototypesIndexContent />
-        </main>
-      </div>
-    </ProjectProvider>
-  );
+  return <PrototypesIndexContent />;
 }
