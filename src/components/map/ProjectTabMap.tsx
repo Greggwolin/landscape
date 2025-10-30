@@ -248,10 +248,12 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
                   const currentZoom = typeof mapRef.current.getZoom === 'function'
                     ? mapRef.current.getZoom()
                     : 13;
+                  console.log('[ProjectTabMap] Saving view:', { currentPitch, currentBearing, currentZoom });
                   setPitch(currentPitch);
                   setBearing(currentBearing);
                   setSavedView({ pitch: currentPitch, bearing: currentBearing, zoom: currentZoom });
                 } else {
+                  console.log('[ProjectTabMap] No map ref, using defaults');
                   setSavedView({ pitch, bearing, zoom: 13 });
                 }
               }}
