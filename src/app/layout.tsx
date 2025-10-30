@@ -5,6 +5,7 @@ import '@/styles/coreui-theme.css';
 import { IssueReporterProvider } from "@/components/IssueReporter";
 import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
 import { ProjectProvider } from "@/app/components/ProjectProvider";
+import NavigationLayout from "@/app/components/NavigationLayout";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <CoreUIThemeProvider>
           <ProjectProvider>
             <IssueReporterProvider>
-              {children}
+              <NavigationLayout>
+                {children}
+              </NavigationLayout>
             </IssueReporterProvider>
           </ProjectProvider>
         </CoreUIThemeProvider>

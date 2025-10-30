@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CButton } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import AppLayout from '@/app/components/AppLayout';
 import CIcon from '@coreui/icons-react';
 import { cilChartPie } from '@coreui/icons';
 import NewProjectModal from '@/app/components/NewProjectModal';
@@ -47,19 +46,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <AppLayout>
-      <CContainer fluid className="p-4">
-        <div className="mb-4">
-        <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--cui-body-color)' }}>
-          Dashboard
-        </h1>
-        <p style={{ color: 'var(--cui-secondary-color)' }}>
-          All projects in your portfolio
-        </p>
-      </div>
-
+    <CContainer fluid className="p-4">
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <CCard className="text-center">
           <CCardBody>
             <div className="text-3xl font-bold" style={{ color: 'var(--cui-primary)' }}>
@@ -103,24 +92,31 @@ export default function DashboardPage() {
             </div>
           </CCardBody>
         </CCard>
+
+        <CCard
+          className="text-center cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => setIsNewProjectModalOpen(true)}
+          style={{ cursor: 'pointer' }}
+        >
+          <CCardBody>
+            <div className="text-3xl font-bold" style={{ color: 'var(--cui-success)' }}>
+              +
+            </div>
+            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+              New Project
+            </div>
+          </CCardBody>
+        </CCard>
       </div>
 
       {/* Projects Table */}
       <CCard>
-        <CCardHeader>
-          <div className="flex items-center justify-between">
-            <span className="font-semibold">All Projects</span>
-            <CButton color="primary" size="sm" onClick={() => setIsNewProjectModalOpen(true)}>
-              + New Project
-            </CButton>
-          </div>
-        </CCardHeader>
-        <CCardBody>
-          <CTable hover responsive>
-            <CTableHead>
+        <CCardBody className="p-0">
+          <CTable hover responsive className="mb-0">
+            <CTableHead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <CTableRow>
-                <CTableHeaderCell scope="col">Project Name</CTableHeaderCell>
-                <CTableHeaderCell scope="col">Property Type</CTableHeaderCell>
+                <CTableHeaderCell scope="col">Name</CTableHeaderCell>
+                <CTableHeaderCell scope="col">Type</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Location</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Acreage</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Status</CTableHeaderCell>
@@ -197,20 +193,17 @@ export default function DashboardPage() {
           {projects.length === 0 && (
             <div className="text-center py-8">
               <p style={{ color: 'var(--cui-secondary-color)' }}>
-                No projects found. Create your first project to get started.
+                No projects found. Click the + New Project tile to get started.
               </p>
-              <CButton color="primary" className="mt-3" onClick={() => setIsNewProjectModalOpen(true)}>
-                Create Project
-              </CButton>
             </div>
           )}
         </CCardBody>
       </CCard>
+
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+      />
     </CContainer>
-    <NewProjectModal
-      isOpen={isNewProjectModalOpen}
-      onClose={() => setIsNewProjectModalOpen(false)}
-    />
-    </AppLayout>
   );
 }
