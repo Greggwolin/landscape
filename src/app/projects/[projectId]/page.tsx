@@ -2,10 +2,7 @@
 
 import { useParams, useSearchParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import Navigation from '@/app/components/Navigation';
 import { CContainer } from '@coreui/react';
-import ProjectHeader from './components/ProjectHeader';
-import TabNavigation from './components/TabNavigation';
 import ProjectTab from './components/tabs/ProjectTab';
 import PlanningTab from './components/tabs/PlanningTab';
 import BudgetTab from './components/tabs/BudgetTab';
@@ -29,7 +26,6 @@ export default function ProjectPage() {
   const projectId = Number(params.projectId);
   const activeTab = searchParams.get('tab') || 'project';
   const { projects } = useProjectContext();
-  const [activeView, setActiveView] = useState('project-overview');
   const [complexityMode, setComplexityMode] = useState<ComplexityTier>('standard');
 
   const project = projects.find(p => p.project_id === projectId);
@@ -46,24 +42,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-      <Navigation activeView={activeView} setActiveView={setActiveView} />
-
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Project Header with Selector */}
-        <ProjectHeader
-          projectId={projectId}
-          project={project}
-          complexityMode={activeTab === 'operations' ? complexityMode : undefined}
-          onComplexityModeChange={activeTab === 'operations' ? setComplexityMode : undefined}
-        />
-
-        {/* Tab Navigation */}
-        <TabNavigation activeTab={activeTab} projectId={projectId} propertyType={project.property_type_code} />
-
-        {/* Tab Content - Only render active tab */}
-        <div className="flex-1 overflow-y-auto">
-          <CContainer fluid className="p-4">
+    <CContainer fluid className="p-4" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
             {/* Universal tabs */}
             {activeTab === 'project' && <ProjectTab project={project} />}
             {activeTab === 'capitalization' && <CapitalizationTab project={project} />}
@@ -86,9 +65,6 @@ export default function ProjectPage() {
             {activeTab === 'sources' && <SourcesTab project={project} />}
             {activeTab === 'uses' && <UsesTab project={project} />}
             {activeTab === 'gis' && <GISTab project={project} />}
-          </CContainer>
-        </div>
-      </main>
-    </div>
+    </CContainer>
   );
 }

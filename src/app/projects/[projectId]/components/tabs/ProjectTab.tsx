@@ -467,36 +467,11 @@ export default function ProjectTab({
 
   const renderLocationCard = () => (
     <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
-      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ backgroundColor: "var(--cui-sidebar-bg)", color: "var(--cui-body-color)" }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ backgroundColor: "var(--cui-tertiary-bg)", color: "var(--cui-body-color)" }}>
         <div className="flex-grow-1">
-          {showProjectSelectorInLocationHeader ? (
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              <span className="text-xs text-uppercase fw-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
-                Active Project
-              </span>
-              {projects.length > 0 ? (
-                <CFormSelect
-                  size="sm"
-                  value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
-                  onChange={handleProjectSelection}
-                  aria-label="Select project"
-                  style={{ minWidth: '200px', width: '75%', maxWidth: '320px' }}
-                >
-                  <option value="">Select a project…</option>
-                  {projects.map((proj) => (
-                    <option key={proj.project_id} value={proj.project_id}>
-                      {proj.project_name}
-                    </option>
-                  ))}
-                  <option value="new">+ Add New Project</option>
-                </CFormSelect>
-              ) : (
-                <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
-              )}
-            </div>
-          ) : (
-            <span>Location</span>
-          )}
+          <span className="text-xs text-uppercase fw-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
+            Project Profile
+          </span>
         </div>
         {!editingLocation ? (
           <CButton
@@ -1025,30 +1000,11 @@ export default function ProjectTab({
         <>
           <CCol md={5} lg={4}>
             <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
-              <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-sidebar-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+              <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
                 <span className="fw-semibold text-uppercase" style={{ letterSpacing: '0.02em' }}>
-                  Active Project
+                  Project Profile
                 </span>
                 <div className="d-flex align-items-center gap-3 flex-wrap">
-                  {projects.length > 0 ? (
-                    <CFormSelect
-                      size="sm"
-                      value={activeProjectId ? activeProjectId.toString() : initialProject.project_id.toString()}
-                      onChange={handleProjectSelection}
-                      aria-label="Select project"
-                      style={{ minWidth: '200px', maxWidth: '260px' }}
-                    >
-                      <option value="">Select a project…</option>
-                      {projects.map((proj) => (
-                        <option key={proj.project_id} value={proj.project_id}>
-                          {proj.project_name}
-                        </option>
-                      ))}
-                      <option value="new">+ Add New Project</option>
-                    </CFormSelect>
-                  ) : (
-                    <span style={{ color: 'var(--cui-tertiary-color)' }}>Projects unavailable</span>
-                  )}
                   <CButton
                     type="button"
                     color="link"

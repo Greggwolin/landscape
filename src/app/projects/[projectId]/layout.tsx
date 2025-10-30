@@ -1,4 +1,5 @@
 import { ComplexityModeProvider } from '@/contexts/ComplexityModeContext';
+import ProjectContextBar from '@/app/components/ProjectContextBar';
 
 type Params = { projectId: string };
 
@@ -16,7 +17,12 @@ export default async function ProjectLayout({
       userId="demo_user"
       projectId={parseInt(projectId)}
     >
-      {children}
+      <div className="flex flex-col min-h-screen">
+        <ProjectContextBar projectId={parseInt(projectId)} />
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
     </ComplexityModeProvider>
   );
 }
