@@ -178,8 +178,6 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         mapStyle = styleUrl;
       }
 
-      console.log('[MapOblique] Creating new map with:', { center, zoom, pitch, bearing });
-
       const map = new maplibregl.Map({
         container: containerRef.current,
         style: mapStyle,
@@ -191,12 +189,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
       });
 
       map.on('load', () => {
-        console.log('[MapOblique] Map loaded');
         setMapLoaded(true);
-      });
-
-      map.on('zoom', () => {
-        console.log('[MapOblique] Zoom changed to:', map.getZoom());
       });
 
       mapRef.current = map;

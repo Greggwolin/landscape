@@ -63,7 +63,6 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
   // Save to localStorage whenever savedView changes
   useEffect(() => {
     if (savedView) {
-      console.log('[ProjectTabMap] Saving to localStorage, key:', storageKey, 'value:', savedView);
       localStorage.setItem(storageKey, JSON.stringify(savedView));
     }
   }, [savedView, storageKey]);
@@ -239,12 +238,10 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
                   const currentZoom = typeof mapRef.current.getZoom === 'function'
                     ? mapRef.current.getZoom()
                     : 13;
-                  console.log('[ProjectTabMap] Saving view:', { currentPitch, currentBearing, currentZoom });
                   setPitch(currentPitch);
                   setBearing(currentBearing);
                   setSavedView({ pitch: currentPitch, bearing: currentBearing, zoom: currentZoom });
                 } else {
-                  console.log('[ProjectTabMap] No map ref, using defaults');
                   setSavedView({ pitch, bearing, zoom: 13 });
                 }
               }}
