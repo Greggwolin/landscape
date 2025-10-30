@@ -94,8 +94,8 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
           ref={mapRef}
           center={data.center}
           zoom={13}
-          pitch={pitch}
-          bearing={bearing}
+          pitch={20}
+          bearing={0}
           styleUrl={styleUrl}
           showExtrusions={false}
           markers={markers}
