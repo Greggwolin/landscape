@@ -960,96 +960,82 @@ export default function ProjectTab({
   );
 
   const renderOverviewColumns = () => {
-    if (showProjectSelectorInLocationHeader) {
-      const addressValue = project.street_address || project.project_address || 'Not specified';
-      const cityLine = project.city && project.state
-        ? `${project.city}, ${project.state}${project.zip_code ? ` ${project.zip_code}` : ''}`
-        : 'Not specified';
-      const marketLine = project.market
-        ? `${project.market}${project.submarket ? ` (${project.submarket})` : ''}`
-        : (project.submarket || 'Not specified');
-      const apnLine = [project.apn_primary, project.apn_secondary].filter(Boolean).join(', ') || 'Not specified';
-      const lotSizeLine = project.lot_size_sf
-        ? `${formatNumber(project.lot_size_sf)} SF${project.lot_size_acres ? ` (${Number(project.lot_size_acres).toFixed(2)} acres)` : ''}`
-        : (project.lot_size_acres ? `${Number(project.lot_size_acres).toFixed(2)} acres` : 'Not specified');
+    const addressValue = project.street_address || project.project_address || 'Not specified';
+    const cityLine = project.city && project.state
+      ? `${project.city}, ${project.state}${project.zip_code ? ` ${project.zip_code}` : ''}`
+      : 'Not specified';
+    const marketLine = project.market
+      ? `${project.market}${project.submarket ? ` (${project.submarket})` : ''}`
+      : (project.submarket || 'Not specified');
+    const apnLine = [project.apn_primary, project.apn_secondary].filter(Boolean).join(', ') || 'Not specified';
+    const lotSizeLine = project.lot_size_sf
+      ? `${formatNumber(project.lot_size_sf)} SF${project.lot_size_acres ? ` (${Number(project.lot_size_acres).toFixed(2)} acres)` : ''}`
+      : (project.lot_size_acres ? `${Number(project.lot_size_acres).toFixed(2)} acres` : 'Not specified');
 
-      const summaryItems = [
-        { label: 'Type', value: project.property_type_code || 'Not specified' },
-        { label: 'Subtype', value: project.property_subtype || 'Not specified' },
-        { label: 'Class', value: project.property_class || 'Not specified' },
-        { label: 'Year Built', value: project.year_built ? String(project.year_built) : 'N/A' },
-        { label: 'Total Units', value: project.total_units ? formatNumber(project.total_units) : 'N/A' },
-        { label: 'Stories', value: project.stories ? String(project.stories) : 'N/A' },
-        { label: 'Gross SF', value: project.gross_sf ? formatNumber(project.gross_sf) : 'N/A' },
-        { label: 'Lot Size', value: lotSizeLine },
-        { label: 'Address', value: addressValue },
-        { label: 'City', value: cityLine },
-        { label: 'County', value: project.county || 'Not specified' },
-        { label: 'Market', value: marketLine },
-        { label: 'APNs', value: apnLine },
-        { label: 'Ownership', value: project.ownership_type || 'Not specified' }
-      ];
+    const summaryItems = [
+      { label: 'Type', value: project.property_type_code || 'Not specified' },
+      { label: 'Subtype', value: project.property_subtype || 'Not specified' },
+      { label: 'Class', value: project.property_class || 'Not specified' },
+      { label: 'Year Built', value: project.year_built ? String(project.year_built) : 'N/A' },
+      { label: 'Total Units', value: project.total_units ? formatNumber(project.total_units) : 'N/A' },
+      { label: 'Stories', value: project.stories ? String(project.stories) : 'N/A' },
+      { label: 'Gross SF', value: project.gross_sf ? formatNumber(project.gross_sf) : 'N/A' },
+      { label: 'Lot Size', value: lotSizeLine },
+      { label: 'Address', value: addressValue },
+      { label: 'City', value: cityLine },
+      { label: 'County', value: project.county || 'Not specified' },
+      { label: 'Market', value: marketLine },
+      { label: 'APNs', value: apnLine },
+      { label: 'Ownership', value: project.ownership_type || 'Not specified' }
+    ];
 
-      const handleEditClick = () => {
-        if (typeof window !== 'undefined') {
-          window.open(`/projects/${project.project_id}?tab=project`, '_blank', 'noopener');
-        }
-      };
-
-      return (
-        <>
-          <CCol md={5} lg={4}>
-            <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
-              <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
-                <span className="fw-semibold text-uppercase" style={{ letterSpacing: '0.02em' }}>
-                  Project Profile
-                </span>
-                <div className="d-flex align-items-center gap-3 flex-wrap">
-                  <CButton
-                    type="button"
-                    color="link"
-                    className="text-uppercase fw-semibold text-decoration-none px-0"
-                    style={{ letterSpacing: '0.08em' }}
-                    onClick={handleEditClick}
-                  >
-                    Edit
-                  </CButton>
-                </div>
-              </CCardHeader>
-              <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
-                <div className="d-flex flex-column">
-                  {summaryItems.map((item, index) => (
-                    <div
-                      key={item.label}
-                      className={`d-flex gap-3 py-2 ${index !== summaryItems.length - 1 ? 'border-bottom' : ''}`}
-                      style={{ borderColor: 'var(--cui-border-color)' }}
-                    >
-                      <span className="fw-semibold" style={{ minWidth: '120px', color: 'var(--cui-body-color)' }}>
-                        {item.label}
-                      </span>
-                      <span style={{ color: 'var(--cui-secondary-color)' }}>
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CCardBody>
-            </CCard>
-          </CCol>
-          <CCol md={7} lg={8}>
-            {renderMapCard()}
-          </CCol>
-        </>
-      );
-    }
+    const handleEditClick = () => {
+      if (typeof window !== 'undefined') {
+        window.open(`/projects/${project.project_id}?tab=project`, '_blank', 'noopener');
+      }
+    };
 
     return (
       <>
-        <CCol md={5}>
-          {renderLocationCard()}
-          {renderProfileCard()}
+        <CCol md={5} lg={4}>
+          <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+            <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+              <span className="fw-semibold text-uppercase" style={{ letterSpacing: '0.02em' }}>
+                Project Profile
+              </span>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <CButton
+                  type="button"
+                  color="link"
+                  className="text-uppercase fw-semibold text-decoration-none px-0"
+                  style={{ letterSpacing: '0.08em' }}
+                  onClick={handleEditClick}
+                >
+                  Edit
+                </CButton>
+              </div>
+            </CCardHeader>
+            <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+              <div className="d-flex flex-column">
+                {summaryItems.map((item, index) => (
+                  <div
+                    key={item.label}
+                    className={`d-flex gap-3 py-2 ${index !== summaryItems.length - 1 ? 'border-bottom' : ''}`}
+                    style={{ borderColor: 'var(--cui-border-color)' }}
+                  >
+                    <span className="fw-semibold" style={{ minWidth: '120px', color: 'var(--cui-body-color)' }}>
+                      {item.label}
+                    </span>
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
-        <CCol md={7}>
+        <CCol md={7} lg={8}>
           {renderMapCard()}
         </CCol>
       </>

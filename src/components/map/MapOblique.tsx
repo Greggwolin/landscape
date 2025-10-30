@@ -68,7 +68,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
     {
       center,
       zoom = 14,
-      pitch = 30,
+      pitch = 20,
       bearing = 0,
       styleUrl,
       extrusions = [],
