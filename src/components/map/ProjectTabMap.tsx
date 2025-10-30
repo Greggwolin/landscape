@@ -42,9 +42,11 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   useEffect(() => {
     const storageKey = `map-saved-view-${projectId}`;
     const stored = localStorage.getItem(storageKey);
+    console.log('[ProjectTabMap] Loading from localStorage, key:', storageKey, 'value:', stored);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        console.log('[ProjectTabMap] Parsed saved view:', parsed);
         setSavedView(parsed);
       } catch (e) {
         console.error('Failed to load saved view:', e);
@@ -54,10 +56,13 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
 
   // Apply saved view to map when both savedView and map are ready (only once on mount)
   useEffect(() => {
+    console.log('[ProjectTabMap] Apply saved view effect, savedView:', savedView, 'appliedRef:', appliedSavedViewRef.current);
     if (savedView && mapRef.current && data && !appliedSavedViewRef.current) {
       // Use setTimeout to ensure map is fully initialized
+      console.log('[ProjectTabMap] Will apply saved view in 500ms:', savedView);
       setTimeout(() => {
         if (mapRef.current && !appliedSavedViewRef.current) {
+          console.log('[ProjectTabMap] Applying saved view:', savedView);
           mapRef.current.flyToSubject(undefined, savedView.zoom);
           mapRef.current.setPitch(savedView.pitch);
           mapRef.current.setBearing(savedView.bearing);
@@ -73,6 +78,7 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   useEffect(() => {
     if (savedView) {
       const storageKey = `map-saved-view-${projectId}`;
+      console.log('[ProjectTabMap] Saving to localStorage, key:', storageKey, 'value:', savedView);
       localStorage.setItem(storageKey, JSON.stringify(savedView));
     }
   }, [savedView, projectId]);
