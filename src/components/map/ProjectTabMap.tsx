@@ -18,10 +18,28 @@ export interface ProjectTabMapProps {
 export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProps) {
   const { data, error, isLoading } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
-  const [pitch, setPitch] = useState(20);
-  const [bearing, setBearing] = useState(0);
+
+  // Load initial values from localStorage
+  const getInitialSavedView = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`map-saved-view-${projectId}`);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          console.error('Failed to parse saved view:', e);
+        }
+      }
+    }
+    return null;
+  };
+
+  const initialSavedView = getInitialSavedView();
+  const [pitch, setPitch] = useState(initialSavedView?.pitch ?? 20);
+  const [bearing, setBearing] = useState(initialSavedView?.bearing ?? 0);
+  const [initialZoom] = useState(initialSavedView?.zoom ?? 13);
   const [controlsExpanded, setControlsExpanded] = useState(false);
-  const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(null);
+  const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(initialSavedView);
   const appliedSavedViewRef = useRef(false);
 
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
@@ -37,42 +55,6 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data?.context ? JSON.stringify(data.context) : null]
   );
-
-  // Load saved view from localStorage on mount
-  useEffect(() => {
-    const storageKey = `map-saved-view-${projectId}`;
-    const stored = localStorage.getItem(storageKey);
-    console.log('[ProjectTabMap] Loading from localStorage, key:', storageKey, 'value:', stored);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        console.log('[ProjectTabMap] Parsed saved view:', parsed);
-        setSavedView(parsed);
-      } catch (e) {
-        console.error('Failed to load saved view:', e);
-      }
-    }
-  }, [projectId]);
-
-  // Apply saved view to map when both savedView and map are ready (only once on mount)
-  useEffect(() => {
-    console.log('[ProjectTabMap] Apply saved view effect, savedView:', savedView, 'appliedRef:', appliedSavedViewRef.current);
-    if (savedView && mapRef.current && data && !appliedSavedViewRef.current) {
-      // Use setTimeout to ensure map is fully initialized
-      console.log('[ProjectTabMap] Will apply saved view in 500ms:', savedView);
-      setTimeout(() => {
-        if (mapRef.current && !appliedSavedViewRef.current) {
-          console.log('[ProjectTabMap] Applying saved view:', savedView);
-          mapRef.current.flyToSubject(undefined, savedView.zoom);
-          mapRef.current.setPitch(savedView.pitch);
-          mapRef.current.setBearing(savedView.bearing);
-          setPitch(savedView.pitch);
-          setBearing(savedView.bearing);
-          appliedSavedViewRef.current = true;
-        }
-      }, 500); // Increased timeout to ensure map is fully ready
-    }
-  }, [savedView, data]); // Depend on data to ensure map is loaded
 
   // Save to localStorage whenever savedView changes
   useEffect(() => {
@@ -139,9 +121,9 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
         <MapOblique
           ref={mapRef}
           center={data.center}
-          zoom={13}
-          pitch={20}
-          bearing={0}
+          zoom={initialZoom}
+          pitch={pitch}
+          bearing={bearing}
           styleUrl={styleUrl}
           showExtrusions={false}
           markers={markers}
