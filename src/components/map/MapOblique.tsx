@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -84,6 +84,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
   ) {
     const mapRef = useRef<maplibregl.Map | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const [mapLoaded, setMapLoaded] = useState(false);
 
     useImperativeHandle(
       ref,
@@ -187,11 +188,16 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         antialias: true
       });
 
+      map.on('load', () => {
+        setMapLoaded(true);
+      });
+
       mapRef.current = map;
 
       return () => {
         map.remove();
         mapRef.current = null;
+        setMapLoaded(false);
       };
     }, [styleUrl]);
     // Only recreate map if styleUrl changes
@@ -201,120 +207,100 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
     // Effect: Update lines when they change
     useEffect(() => {
       const map = mapRef.current;
-      if (!map) return;
+      if (!map || !mapLoaded) return;
 
-      const updateLines = () => {
-        if (!map.isStyleLoaded()) return;
-
-        // Remove existing line layers and sources
-        const existingLayers = map.getStyle().layers || [];
-        for (const layer of existingLayers) {
-          if (layer.id.endsWith('-line')) {
-            map.removeLayer(layer.id);
-            const sourceId = layer.id.replace('-line', '');
-            if (map.getSource(sourceId)) {
-              map.removeSource(sourceId);
-            }
+      // Remove existing line layers and sources
+      const existingLayers = map.getStyle().layers || [];
+      for (const layer of existingLayers) {
+        if (layer.id.endsWith('-line')) {
+          map.removeLayer(layer.id);
+          const sourceId = layer.id.replace('-line', '');
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
           }
         }
-
-        // Add new lines
-        for (const l of lines) {
-          if (!map.getSource(l.id)) {
-            map.addSource(l.id, { type: 'geojson', data: l.data });
-          }
-          if (!map.getLayer(`${l.id}-line`)) {
-            map.addLayer({
-              id: `${l.id}-line`,
-              type: 'line',
-              source: l.id,
-              paint: {
-                'line-color': l.color ?? '#999',
-                'line-width': l.width ?? 1.2,
-                'line-opacity': 0.9
-              }
-            });
-          }
-        }
-      };
-
-      if (map.isStyleLoaded()) {
-        updateLines();
-      } else {
-        map.once('load', updateLines);
       }
-    }, [lines]);
+
+      // Add new lines
+      for (const l of lines) {
+        if (!map.getSource(l.id)) {
+          map.addSource(l.id, { type: 'geojson', data: l.data });
+        }
+        if (!map.getLayer(`${l.id}-line`)) {
+          map.addLayer({
+            id: `${l.id}-line`,
+            type: 'line',
+            source: l.id,
+            paint: {
+              'line-color': l.color ?? '#999',
+              'line-width': l.width ?? 1.2,
+              'line-opacity': 0.9
+            }
+          });
+        }
+      }
+    }, [lines, mapLoaded]);
 
     // Effect: Update extrusions when they change
     useEffect(() => {
       const map = mapRef.current;
-      if (!map) return;
+      if (!map || !mapLoaded) return;
 
-      const updateExtrusions = () => {
-        if (!map.isStyleLoaded()) return;
-
-        // Remove existing extrusion layers and sources
-        const existingLayers = map.getStyle().layers || [];
-        for (const layer of existingLayers) {
-          if (layer.id.endsWith('-fill')) {
-            map.removeLayer(layer.id);
-            const sourceId = layer.id.replace('-fill', '');
-            if (map.getSource(sourceId)) {
-              map.removeSource(sourceId);
-            }
+      // Remove existing extrusion layers and sources
+      const existingLayers = map.getStyle().layers || [];
+      for (const layer of existingLayers) {
+        if (layer.id.endsWith('-fill')) {
+          map.removeLayer(layer.id);
+          const sourceId = layer.id.replace('-fill', '');
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
           }
         }
-
-        // Add extrusions only if showExtrusions is true
-        if (showExtrusions) {
-          for (const e of extrusions) {
-            const { color, expr } = buildHeightExpr(e.color);
-            if (!map.getSource(e.id)) {
-              map.addSource(e.id, { type: 'geojson', data: e.data });
-            }
-            if (!map.getLayer(`${e.id}-fill`)) {
-              map.addLayer({
-                id: `${e.id}-fill`,
-                type: 'fill-extrusion',
-                source: e.id,
-                paint: {
-                  'fill-extrusion-color': color,
-                  'fill-extrusion-opacity': 0.88,
-                  'fill-extrusion-height': e.heightExpr ?? expr,
-                  'fill-extrusion-base': 0
-                }
-              });
-            }
-
-            // Add click handlers
-            if (onFeatureClick) {
-              const layerId = `${e.id}-fill`;
-              map.off('click', layerId); // Remove old handlers
-              map.on('click', layerId, (ev) => {
-                const f = ev.features?.[0];
-                onFeatureClick(String(f?.id ?? f?.properties?.id ?? ''));
-              });
-              map.on('mouseenter', layerId, () => {
-                if (map.getCanvas()) {
-                  map.getCanvas().style.cursor = 'pointer';
-                }
-              });
-              map.on('mouseleave', layerId, () => {
-                if (map.getCanvas()) {
-                  map.getCanvas().style.cursor = '';
-                }
-              });
-            }
-          }
-        }
-      };
-
-      if (map.isStyleLoaded()) {
-        updateExtrusions();
-      } else {
-        map.once('load', updateExtrusions);
       }
-    }, [extrusions, showExtrusions, onFeatureClick]);
+
+      // Add extrusions only if showExtrusions is true
+      if (showExtrusions) {
+        for (const e of extrusions) {
+          const { color, expr } = buildHeightExpr(e.color);
+          if (!map.getSource(e.id)) {
+            map.addSource(e.id, { type: 'geojson', data: e.data });
+          }
+          if (!map.getLayer(`${e.id}-fill`)) {
+            map.addLayer({
+              id: `${e.id}-fill`,
+              type: 'fill-extrusion',
+              source: e.id,
+              paint: {
+                'fill-extrusion-color': color,
+                'fill-extrusion-opacity': 0.88,
+                'fill-extrusion-height': e.heightExpr ?? expr,
+                'fill-extrusion-base': 0
+              }
+            });
+          }
+
+          // Add click handlers
+          if (onFeatureClick) {
+            const layerId = `${e.id}-fill`;
+            map.off('click', layerId); // Remove old handlers
+            map.on('click', layerId, (ev) => {
+              const f = ev.features?.[0];
+              onFeatureClick(String(f?.id ?? f?.properties?.id ?? ''));
+            });
+            map.on('mouseenter', layerId, () => {
+              if (map.getCanvas()) {
+                map.getCanvas().style.cursor = 'pointer';
+              }
+            });
+            map.on('mouseleave', layerId, () => {
+              if (map.getCanvas()) {
+                map.getCanvas().style.cursor = '';
+              }
+            });
+          }
+        }
+      }
+    }, [extrusions, showExtrusions, onFeatureClick, mapLoaded]);
 
     // Effect: Update markers when they change
     // Store marker instances to clean them up
@@ -322,73 +308,63 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
 
     useEffect(() => {
       const map = mapRef.current;
-      if (!map) return;
+      if (!map || !mapLoaded) return;
 
-      const updateMarkers = () => {
-        if (!map.isStyleLoaded()) return;
-
-        // Remove existing markers
-        for (const marker of markersRef.current) {
-          marker.remove();
-        }
-        markersRef.current = [];
-
-        // Add markers only if showExtrusions is false
-        if (!showExtrusions && markers.length > 0) {
-          for (const m of markers) {
-            const el = document.createElement('div');
-            el.className = 'map-marker';
-            el.style.cursor = 'pointer';
-
-            // Special styling for subject property
-            if (m.id === 'subject') {
-              el.style.width = '32px';
-              el.style.height = '32px';
-              el.innerHTML = `
-                <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="16" cy="16" r="14" fill="white" stroke="#dc2626" stroke-width="3"/>
-                </svg>
-              `;
-            } else {
-              // Regular pushpin for comparables
-              el.style.width = '30px';
-              el.style.height = '30px';
-              el.innerHTML = `
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="${m.color || '#2d8cf0'}" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                </svg>
-              `;
-            }
-
-            if (onFeatureClick) {
-              el.addEventListener('click', () => onFeatureClick(m.id));
-            }
-
-            const marker = new maplibregl.Marker({ element: el })
-              .setLngLat(m.coordinates)
-              .addTo(map);
-
-            // Add popup if provided
-            if (m.popup) {
-              const popup = new maplibregl.Popup({
-                offset: 25,
-                closeButton: true,
-                closeOnClick: false
-              }).setHTML(m.popup);
-              marker.setPopup(popup);
-            }
-
-            markersRef.current.push(marker);
-          }
-        }
-      };
-
-      if (map.isStyleLoaded()) {
-        updateMarkers();
-      } else {
-        map.once('load', updateMarkers);
+      // Remove existing markers
+      for (const marker of markersRef.current) {
+        marker.remove();
       }
-    }, [markers, showExtrusions, onFeatureClick]);
+      markersRef.current = [];
+
+      // Add markers only if showExtrusions is false
+      if (!showExtrusions && markers.length > 0) {
+        for (const m of markers) {
+          const el = document.createElement('div');
+          el.className = 'map-marker';
+          el.style.cursor = 'pointer';
+
+          // Special styling for subject property
+          if (m.id === 'subject') {
+            el.style.width = '32px';
+            el.style.height = '32px';
+            el.innerHTML = `
+              <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="14" fill="white" stroke="#dc2626" stroke-width="3"/>
+              </svg>
+            `;
+          } else {
+            // Regular pushpin for comparables
+            el.style.width = '30px';
+            el.style.height = '30px';
+            el.innerHTML = `
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="${m.color || '#2d8cf0'}" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            `;
+          }
+
+          if (onFeatureClick) {
+            el.addEventListener('click', () => onFeatureClick(m.id));
+          }
+
+          const marker = new maplibregl.Marker({ element: el })
+            .setLngLat(m.coordinates)
+            .addTo(map);
+
+          // Add popup if provided
+          if (m.popup) {
+            const popup = new maplibregl.Popup({
+              offset: 25,
+              closeButton: true,
+              closeOnClick: false
+            }).setHTML(m.popup);
+            marker.setPopup(popup);
+          }
+
+          markersRef.current.push(marker);
+        }
+      }
+    }, [markers, showExtrusions, onFeatureClick, mapLoaded]);
 
     return (
       <div
