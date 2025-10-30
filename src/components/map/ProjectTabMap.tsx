@@ -177,7 +177,16 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setSavedView({ pitch, bearing });
+                // Get current values from the map, not state
+                if (mapRef.current) {
+                  const currentPitch = mapRef.current.getPitch();
+                  const currentBearing = mapRef.current.getBearing();
+                  setPitch(currentPitch);
+                  setBearing(currentBearing);
+                  setSavedView({ pitch: currentPitch, bearing: currentBearing });
+                } else {
+                  setSavedView({ pitch, bearing });
+                }
               }}
               className="px-4 py-2 text-sm font-medium rounded transition-colors whitespace-nowrap"
               style={{
@@ -196,52 +205,56 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
               {savedView ? 'Update Saved View' : 'Save View'}
             </button>
 
-            {/* Pitch Slider */}
+            {/* Pitch Input */}
             <div>
               <label
                 className="text-xs font-medium mb-1 block"
                 style={{ color: 'var(--cui-secondary-color)' }}
               >
-                Pitch: {pitch}°
+                Pitch (0-75°)
               </label>
               <input
-                type="range"
+                type="number"
                 min={0}
                 max={75}
                 value={pitch}
                 onChange={(e) => {
-                  const newPitch = Number(e.target.value);
+                  const newPitch = Math.max(0, Math.min(75, Number(e.target.value) || 0));
                   setPitch(newPitch);
                   mapRef.current?.setPitch(newPitch);
                 }}
-                className="w-full"
+                className="w-full px-3 py-1.5 text-sm rounded"
                 style={{
-                  accentColor: 'var(--cui-primary)'
+                  backgroundColor: 'var(--cui-input-bg)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid var(--cui-border-color)'
                 }}
               />
             </div>
 
-            {/* Bearing Slider */}
+            {/* Bearing Input */}
             <div>
               <label
                 className="text-xs font-medium mb-1 block"
                 style={{ color: 'var(--cui-secondary-color)' }}
               >
-                Bearing: {bearing}°
+                Bearing (-180 to 180°)
               </label>
               <input
-                type="range"
+                type="number"
                 min={-180}
                 max={180}
                 value={bearing}
                 onChange={(e) => {
-                  const newBearing = Number(e.target.value);
+                  const newBearing = Math.max(-180, Math.min(180, Number(e.target.value) || 0));
                   setBearing(newBearing);
                   mapRef.current?.setBearing(newBearing);
                 }}
-                className="w-full"
+                className="w-full px-3 py-1.5 text-sm rounded"
                 style={{
-                  accentColor: 'var(--cui-primary)'
+                  backgroundColor: 'var(--cui-input-bg)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid var(--cui-border-color)'
                 }}
               />
             </div>
