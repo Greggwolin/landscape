@@ -21,7 +21,7 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   const [pitch, setPitch] = useState(20);
   const [bearing, setBearing] = useState(0);
   const [controlsExpanded, setControlsExpanded] = useState(false);
-  const [savedView, setSavedView] = useState<{ pitch: number; bearing: number } | null>(null);
+  const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(null);
 
   if (isLoading) {
     return (
@@ -154,7 +154,23 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
           >
             {/* Reset View Button */}
             <button
-              onClick={() => mapRef.current?.flyToSubject()}
+              onClick={() => {
+                if (savedView && mapRef.current) {
+                  // Restore saved view
+                  mapRef.current.flyToSubject(undefined, savedView.zoom);
+                  mapRef.current.setPitch(savedView.pitch);
+                  mapRef.current.setBearing(savedView.bearing);
+                  setPitch(savedView.pitch);
+                  setBearing(savedView.bearing);
+                } else {
+                  // Reset to default
+                  mapRef.current?.flyToSubject(undefined, 13);
+                  mapRef.current?.setPitch(20);
+                  mapRef.current?.setBearing(0);
+                  setPitch(20);
+                  setBearing(0);
+                }
+              }}
               className="px-4 py-2 text-sm font-medium rounded transition-colors whitespace-nowrap"
               style={{
                 backgroundColor: 'var(--cui-secondary-bg)',
@@ -169,7 +185,7 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
                 e.currentTarget.style.opacity = '1';
               }}
             >
-              Reset View
+              {savedView ? 'Restore Saved View' : 'Reset View'}
             </button>
 
             {/* Save View Button */}
@@ -181,11 +197,12 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
                 if (mapRef.current) {
                   const currentPitch = mapRef.current.getPitch();
                   const currentBearing = mapRef.current.getBearing();
+                  const currentZoom = mapRef.current.getZoom();
                   setPitch(currentPitch);
                   setBearing(currentBearing);
-                  setSavedView({ pitch: currentPitch, bearing: currentBearing });
+                  setSavedView({ pitch: currentPitch, bearing: currentBearing, zoom: currentZoom });
                 } else {
-                  setSavedView({ pitch, bearing });
+                  setSavedView({ pitch, bearing, zoom: 13 });
                 }
               }}
               className="px-4 py-2 text-sm font-medium rounded transition-colors whitespace-nowrap"

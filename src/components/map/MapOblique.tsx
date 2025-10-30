@@ -46,6 +46,7 @@ export interface MapObliqueRef {
   setPitch: (pitch: number) => void;
   getBearing: () => number;
   getPitch: () => number;
+  getZoom: () => number;
   fitBounds: (bounds: [[number, number], [number, number]], options?: { padding?: number; pitch?: number; bearing?: number }) => void;
 }
 
@@ -93,6 +94,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         setPitch: (p: number) => mapRef.current?.setPitch(p),
         getBearing: () => mapRef.current?.getBearing() ?? 0,
         getPitch: () => mapRef.current?.getPitch() ?? 0,
+        getZoom: () => mapRef.current?.getZoom() ?? zoom,
         fitBounds: (bounds: [[number, number], [number, number]], options?: { padding?: number; pitch?: number; bearing?: number }) => {
           if (mapRef.current) {
             mapRef.current.fitBounds(bounds, {
