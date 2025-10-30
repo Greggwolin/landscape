@@ -29,22 +29,12 @@ import {
   CAlert
 } from '@coreui/react';
 import { ThemeToggle } from '@/app/components/ThemeToggle';
-import { ProjectProvider } from '@/app/components/ProjectProvider';
-import Navigation from '@/app/components/Navigation';
-import Header from '@/app/components/Header';
 
 export default function TestCoreUIPage() {
   const [activeTab, setActiveTab] = useState(1);
-  const [activeView, setActiveView] = useState('test-coreui');
 
   return (
-    <ProjectProvider>
-      <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-        <Header />
-        <div className="flex flex-1">
-          <Navigation activeView={activeView} setActiveView={setActiveView} />
-          <main className="flex-1" style={{ padding: '2rem', backgroundColor: 'var(--cui-body-bg)' }}>
-      <CContainer fluid>
+    <CContainer fluid className="p-4">
         {/* Header */}
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
@@ -256,9 +246,5 @@ export default function TestCoreUIPage() {
           </CCardBody>
         </CCard>
       </CContainer>
-          </main>
-        </div>
-      </div>
-    </ProjectProvider>
   );
 }
