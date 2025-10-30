@@ -460,6 +460,7 @@ export default function ProjectTab({
         <ProjectTabMap
           projectId={String(project.project_id)}
           styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+          tabId="project"
         />
       </CCardBody>
     </CCard>

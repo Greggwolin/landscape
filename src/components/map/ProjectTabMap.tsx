@@ -13,16 +13,20 @@ import { useProjectMapData } from '@/lib/map/hooks';
 export interface ProjectTabMapProps {
   projectId: string;
   styleUrl: string;
+  tabId?: string; // Optional identifier for which tab this map is on (e.g., 'project', 'property')
 }
 
-export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProps) {
+export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }: ProjectTabMapProps) {
   const { data, error, isLoading } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
+
+  // Create storage key with tabId to keep tab views independent
+  const storageKey = `map-saved-view-${projectId}-${tabId}`;
 
   // Load initial values from localStorage
   const getInitialSavedView = () => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`map-saved-view-${projectId}`);
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         try {
           return JSON.parse(stored);
@@ -59,11 +63,10 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   // Save to localStorage whenever savedView changes
   useEffect(() => {
     if (savedView) {
-      const storageKey = `map-saved-view-${projectId}`;
       console.log('[ProjectTabMap] Saving to localStorage, key:', storageKey, 'value:', savedView);
       localStorage.setItem(storageKey, JSON.stringify(savedView));
     }
-  }, [savedView, projectId]);
+  }, [savedView, storageKey]);
 
   if (isLoading) {
     return (

@@ -268,6 +268,7 @@ function PropertyTab({ project }: PropertyTabProps) {
           <ProjectTabMap
             projectId={projectId.toString()}
             styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+            tabId="property"
           />
         </div>
       </div>
