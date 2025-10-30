@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CContainer } from '@coreui/react';
 import { ChevronDown, HelpCircle, Settings, UserCircle2 } from 'lucide-react';
 
-import ProjectHeader from '@/app/projects/[projectId]/components/ProjectHeader';
 import ProjectTab from '@/app/projects/[projectId]/components/tabs/ProjectTab';
 import PlanningTab from '@/app/projects/[projectId]/components/tabs/PlanningTab';
 import BudgetTab from '@/app/projects/[projectId]/components/tabs/BudgetTab';
@@ -88,13 +87,17 @@ export default function TopNavProjectPrototype() {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<string>('project');
   const [complexityMode, setComplexityMode] = useState<ComplexityTier>('standard');
-  const [isLegacyOpen, setLegacyOpen] = useState(false);
+  const [isSandboxOpen, setSandboxOpen] = useState(false);
+  const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isLandscaperOpen, setLandscaperOpen] = useState(false);
 
-  const legacyRef = useRef<HTMLDivElement>(null);
+  const sandboxRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  useOutsideClick(legacyRef, () => setLegacyOpen(false));
+  useOutsideClick(sandboxRef, () => setSandboxOpen(false));
+  useOutsideClick(userMenuRef, () => setUserMenuOpen(false));
   useOutsideClick(settingsRef, () => setSettingsOpen(false));
 
   useEffect(() => {
@@ -117,30 +120,44 @@ export default function TopNavProjectPrototype() {
 
   const tabs = useMemo(() => getTabsForPropertyType(project?.property_type_code), [project]);
 
-  const legacyLinks: LegacyLink[] = useMemo(
+  const sandboxPages: string[] = useMemo(
     () => [
-      { label: 'Project', href: `/projects/${projectId}` },
-      { label: 'Operating Expenses', href: `/projects/${projectId}/opex-accounts` },
-      { label: 'Rent Roll', href: '/rent-roll' },
-      { label: 'Financial Reports', href: '/reports' },
-      { label: 'Document Library', href: '/dms' },
-      { label: 'DMS Admin', href: '/admin/dms/templates' },
-      { label: 'Assumptions & Factors', href: `/projects/${projectId}/assumptions` },
-      { label: 'Market Assumptions (Old)', href: `/properties/${projectId}/analysis` },
-      { label: 'Market Intel (Old)', href: '/market' },
-      { label: 'Project Overview (Old)', href: `/projects/${projectId}/overview` },
-      { label: 'Theme Demo', href: '/test-coreui' },
-      { label: 'Prototypes', href: '/prototypes' },
-      { label: 'Documentation', href: '/documentation' }
+      'Development Status',
+      'Documentation Center',
+      'Prototypes',
+      '---',
+      'Project',
+      'Operating Expenses',
+      'Rent Roll',
+      'Financial Reports',
+      'Document Library',
+      'DMS Admin',
+      'Assumptions & Factors',
+      'Market Assumptions (Old)',
+      'Market Intel (Old)',
+      'Project Overview (Old)',
+      'Theme Demo',
+      'Budget Grid',
+      'Budget Grid v2',
+      'GIS Test',
+      'Parcel Test',
+      'Database Schema Viewer'
     ],
-    [projectId]
+    []
+  );
+
+  const userMenuItems: SettingsAction[] = useMemo(
+    () => [
+      { label: 'Profile', onClick: () => console.log('Profile clicked') },
+      { label: 'Account Settings', onClick: () => console.log('Account Settings clicked') }
+    ],
+    []
   );
 
   const settingsActions: SettingsAction[] = useMemo(
     () => [
-      { label: 'Global Preferences' },
-      { label: 'Document Management' },
-      { label: 'Landscaper Configuration' }
+      { label: 'Global Preferences', onClick: () => console.log('Global Preferences - placeholder') },
+      { label: 'Landscaper Configuration', onClick: () => console.log('Landscaper Config - placeholder') }
     ],
     []
   );
@@ -167,41 +184,95 @@ export default function TopNavProjectPrototype() {
     </button>
   );
 
-  const renderLegacyDropdown = () => (
-    <div className="relative" ref={legacyRef}>
+  const renderSandboxDropdown = () => (
+    <div className="relative" ref={sandboxRef}>
       <button
         type="button"
-        onClick={() => setLegacyOpen((prev) => !prev)}
+        onClick={() => setSandboxOpen((prev) => !prev)}
         className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors"
         style={{
           color: 'var(--cui-sidebar-nav-link-color)',
           backgroundColor: 'transparent'
         }}
       >
-        Legacy
+        Sandbox
         <ChevronDown className="h-4 w-4" />
       </button>
-      {isLegacyOpen ? (
+      {isSandboxOpen ? (
         <div
-          className="absolute right-0 mt-2 w-64 rounded-md border shadow-lg z-20"
+          className="absolute right-0 mt-2 w-72 rounded-md border shadow-lg z-20 max-h-96 overflow-y-auto"
           style={{
             backgroundColor: 'var(--cui-body-bg)',
             borderColor: 'var(--cui-border-color)'
           }}
         >
           <div className="py-2">
-            {legacyLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href ?? '#'}
-                target={link.isExternal ? '_blank' : undefined}
-                rel={link.isExternal ? 'noreferrer' : undefined}
-                className="block px-4 py-2 text-sm transition-colors"
+            {sandboxPages.map((page, index) => (
+              page === '---' ? (
+                <div
+                  key={`sep-${index}`}
+                  className="my-2 border-t"
+                  style={{ borderColor: 'var(--cui-border-color)' }}
+                />
+              ) : (
+                <div
+                  key={page}
+                  className="px-4 py-2 text-sm"
+                  style={{ color: 'var(--cui-secondary-color)', cursor: 'default' }}
+                >
+                  {page}
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const renderUserMenu = () => (
+    <div className="relative" ref={userMenuRef}>
+      <button
+        type="button"
+        onClick={() => setUserMenuOpen((prev) => !prev)}
+        className="rounded-full border p-2 transition-colors"
+        style={{
+          borderColor: 'var(--cui-sidebar-border-color)',
+          color: 'var(--cui-sidebar-nav-link-color)'
+        }}
+        aria-haspopup="true"
+        aria-expanded={isUserMenuOpen}
+      >
+        <UserCircle2 className="h-5 w-5" />
+      </button>
+      {isUserMenuOpen ? (
+        <div
+          className="absolute right-0 mt-2 w-56 rounded-md border shadow-lg z-20"
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            borderColor: 'var(--cui-border-color)'
+          }}
+        >
+          <div className="py-2">
+            {userMenuItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  item.onClick?.();
+                  setUserMenuOpen(false);
+                }}
+                className="block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-opacity-10"
                 style={{ color: 'var(--cui-body-color)' }}
-                onClick={() => setLegacyOpen(false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                {link.label}
-              </Link>
+                {item.label}
+              </button>
             ))}
           </div>
         </div>
@@ -214,16 +285,15 @@ export default function TopNavProjectPrototype() {
       <button
         type="button"
         onClick={() => setSettingsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors"
+        className="rounded-full border p-2 transition-colors"
         style={{
-          color: 'var(--cui-sidebar-nav-link-color)',
-          backgroundColor: 'transparent'
+          borderColor: 'var(--cui-sidebar-border-color)',
+          color: 'var(--cui-sidebar-nav-link-color)'
         }}
         aria-haspopup="true"
         aria-expanded={isSettingsOpen}
       >
         <Settings className="h-5 w-5" />
-        <ChevronDown className="h-3 w-3" />
       </button>
       {isSettingsOpen ? (
         <div
@@ -244,6 +314,12 @@ export default function TopNavProjectPrototype() {
                 }}
                 className="block w-full px-4 py-2 text-left text-sm transition-colors"
                 style={{ color: 'var(--cui-body-color)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
                 {action.label}
               </button>
@@ -254,37 +330,168 @@ export default function TopNavProjectPrototype() {
     </div>
   );
 
+  const renderLandscaperModal = () => {
+    if (!isLandscaperOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+          onClick={() => setLandscaperOpen(false)}
+        />
+
+        {/* Modal Content */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="relative flex max-h-[85vh] w-[92vw] max-w-7xl flex-col overflow-hidden rounded-2xl border shadow-2xl"
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            borderColor: 'var(--cui-border-color)'
+          }}
+        >
+          {/* Header */}
+          <header
+            className="border-b px-6 py-5 flex items-center justify-between"
+            style={{ borderColor: 'var(--cui-border-color)' }}
+          >
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
+              Landscaper AI
+            </h2>
+            <button
+              onClick={() => setLandscaperOpen(false)}
+              className="rounded-full p-2 transition-colors"
+              style={{ color: 'var(--cui-body-color)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--cui-sidebar-nav-link-hover-bg)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="text-2xl">×</span>
+            </button>
+          </header>
+
+          {/* Content */}
+          <div className="flex-1 overflow-hidden p-6">
+            <div
+              className="h-full rounded-lg border p-4"
+              style={{
+                backgroundColor: 'var(--cui-tertiary-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)'
+              }}
+            >
+              <p className="text-center text-sm opacity-70">
+                General Landscaper AI chat interface - not associated with a specific tab or function.
+              </p>
+              <p className="text-center text-xs opacity-50 mt-2">
+                (Chat component will be integrated here)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className="flex min-h-screen flex-col"
       style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)' }}
     >
-      <header
-        className="sticky top-0 z-20 border-b"
-        style={{
-          backgroundColor: 'var(--cui-sidebar-bg)',
-          borderColor: 'var(--cui-sidebar-border-color)'
-        }}
-      >
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center">
-              <Image
-                src="/logo-invert.png"
-                alt="Landscape"
-                width={140}
-                height={32}
-                className="h-8 w-auto object-contain"
-              />
+      <header className="sticky top-0 z-20" style={{ backgroundColor: 'var(--cui-sidebar-bg)' }}>
+        {/* TIER 1: Global Navigation */}
+        <div
+          className="flex items-center justify-between px-6 border-b"
+          style={{ borderColor: 'var(--cui-sidebar-border-color)', height: '58px' }}
+        >
+          {/* Logo - Left */}
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo-invert.png"
+              alt="Landscape"
+              width={140}
+              height={32}
+              className="h-8 w-auto object-contain"
+            />
+          </Link>
+
+          {/* Navigation Items - Right */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="px-3 py-2 text-sm transition-colors"
+              style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+            >
+              Dashboard
             </Link>
-            <nav className="flex items-center gap-2">
-              <Link
-                href="/dashboard"
-                className="relative px-3 py-2 text-sm font-medium transition-colors"
-                style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+            <Link
+              href="/dms"
+              className="px-3 py-2 text-sm transition-colors"
+              style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+            >
+              Documents
+            </Link>
+            <button
+              type="button"
+              onClick={() => setLandscaperOpen(true)}
+              className="px-3 py-2 text-sm transition-colors"
+              style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
+            >
+              Landscaper AI
+            </button>
+            {renderSandboxDropdown()}
+            {renderUserMenu()}
+            {renderSettingsDropdown()}
+            {renderThemeToggle()}
+          </div>
+        </div>
+
+        {/* TIER 2: Project Context - only show when project loaded */}
+        {project && (
+          <div
+            className="flex items-center gap-8 px-6 h-14 border-b"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)'
+            }}
+          >
+            {/* Project Selector - Left Side */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium" style={{ color: 'var(--cui-secondary-color)' }}>
+                Active Project:
+              </span>
+              <select
+                value={project.project_id}
+                onChange={(e) => {
+                  const newProjectId = Number(e.target.value);
+                  if (!Number.isNaN(newProjectId)) {
+                    selectProject(newProjectId);
+                  }
+                }}
+                className="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                style={{
+                  backgroundColor: 'var(--cui-tertiary-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid var(--cui-border-color)',
+                  cursor: 'pointer',
+                  minWidth: '320px'
+                }}
               >
-                Dashboard
-              </Link>
+                {projects.map((proj) => (
+                  <option key={proj.project_id} value={proj.project_id}>
+                    {proj.project_name} - {proj.property_type_code || 'Unknown'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Project Tabs - Right Side */}
+            <div className="flex flex-1">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -292,53 +499,32 @@ export default function TopNavProjectPrototype() {
                     key={tab.id}
                     type="button"
                     onClick={() => handleTabChange(tab.id)}
-                    className="relative px-3 py-2 text-sm font-medium transition-colors"
+                    className="px-5 py-4 text-sm font-medium transition-colors relative"
                     style={{
-                      color: isActive
-                        ? 'var(--cui-primary)'
-                        : 'var(--cui-sidebar-nav-link-color)'
+                      color: isActive ? 'var(--cui-primary)' : 'var(--cui-secondary-color)',
+                      borderBottom: isActive ? '2px solid var(--cui-primary)' : '2px solid transparent',
+                      backgroundColor: 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'rgba(74, 158, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     {tab.label}
-                    {isActive ? (
-                      <span
-                        className="absolute left-0 right-0 -bottom-2 mx-auto h-0.5 rounded-full"
-                        style={{ backgroundColor: 'var(--cui-primary)' }}
-                      />
-                    ) : null}
                   </button>
                 );
               })}
-            </nav>
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            {renderLegacyDropdown()}
-            {renderThemeToggle()}
-            <button
-              type="button"
-              className="rounded-full border p-2 transition-colors"
-              style={{
-                borderColor: 'var(--cui-sidebar-border-color)',
-                color: 'var(--cui-sidebar-nav-link-color)'
-              }}
-            >
-              <UserCircle2 className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="rounded-full border p-2 transition-colors"
-              style={{
-                borderColor: 'var(--cui-sidebar-border-color)',
-                color: 'var(--cui-sidebar-nav-link-color)'
-              }}
-            >
-              <HelpCircle className="h-5 w-5" />
-            </button>
-            {renderSettingsDropdown()}
-          </div>
-        </div>
+        )}
       </header>
+
+      {/* Landscaper AI Modal */}
+      {renderLandscaperModal()}
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {isLoading && !project ? (
@@ -356,16 +542,6 @@ export default function TopNavProjectPrototype() {
           </div>
         ) : (
           <>
-            <ProjectHeader
-              projectId={projectId}
-              project={project}
-              complexityMode={activeTab === 'operations' ? complexityMode : undefined}
-              onComplexityModeChange={
-                activeTab === 'operations' ? setComplexityMode : undefined
-              }
-              hideProjectSelector
-              hideThemeToggle
-            />
             <div className="flex-1 overflow-y-auto">
               <CContainer fluid className="p-4">
                 {activeTab === 'project' && (
