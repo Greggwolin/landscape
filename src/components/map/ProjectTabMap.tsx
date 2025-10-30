@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
 
@@ -22,6 +22,17 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   const [bearing, setBearing] = useState(0);
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(null);
+
+  // Memoize markers and lines to prevent map re-initialization on re-renders
+  const markers = useMemo(
+    () => (data?.center ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }] : []),
+    [data?.center]
+  );
+
+  const lines = useMemo(
+    () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
+    [data?.context]
+  );
 
   if (isLoading) {
     return (
@@ -84,14 +95,8 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
           bearing={bearing}
           styleUrl={styleUrl}
           showExtrusions={false}
-          markers={[
-            { id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }
-          ]}
-          lines={
-            data.context
-              ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }]
-              : []
-          }
+          markers={markers}
+          lines={lines}
         />
       </div>
 
