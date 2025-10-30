@@ -7,7 +7,7 @@
 .light-theme {
   /* Backgrounds - use CoreUI native values */
   --cui-body-bg: #ffffff;
-  --cui-tertiary-bg: #f3f4f7;
+  --cui-tertiary-bg: #e6e7eb;
   --cui-secondary-bg: #e7eaee;
   --cui-body-color: rgba(37, 42.92, 54.02, 0.95);
   --cui-border-color: #dbdfe6;
@@ -237,7 +237,7 @@ body {
 .light-theme .min-h-screen,
 .light-theme main,
 .light-theme [role="main"] {
-  background-color: #f3f4f7 !important;
+  background-color: #e6e7eb !important;
 }
 
 /* Background colors - convert dark to light */
