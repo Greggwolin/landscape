@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
 
@@ -22,6 +22,7 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   const [bearing, setBearing] = useState(0);
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(null);
+  const appliedSavedViewRef = useRef(false);
 
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
@@ -36,6 +37,45 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data?.context ? JSON.stringify(data.context) : null]
   );
+
+  // Load saved view from localStorage on mount
+  useEffect(() => {
+    const storageKey = `map-saved-view-${projectId}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setSavedView(parsed);
+      } catch (e) {
+        console.error('Failed to load saved view:', e);
+      }
+    }
+  }, [projectId]);
+
+  // Apply saved view to map when both savedView and map are ready (only once on mount)
+  useEffect(() => {
+    if (savedView && mapRef.current && data && !appliedSavedViewRef.current) {
+      // Use setTimeout to ensure map is fully initialized
+      setTimeout(() => {
+        if (mapRef.current && !appliedSavedViewRef.current) {
+          mapRef.current.flyToSubject(undefined, savedView.zoom);
+          mapRef.current.setPitch(savedView.pitch);
+          mapRef.current.setBearing(savedView.bearing);
+          setPitch(savedView.pitch);
+          setBearing(savedView.bearing);
+          appliedSavedViewRef.current = true;
+        }
+      }, 500); // Increased timeout to ensure map is fully ready
+    }
+  }, [savedView, data]); // Depend on data to ensure map is loaded
+
+  // Save to localStorage whenever savedView changes
+  useEffect(() => {
+    if (savedView) {
+      const storageKey = `map-saved-view-${projectId}`;
+      localStorage.setItem(storageKey, JSON.stringify(savedView));
+    }
+  }, [savedView, projectId]);
 
   if (isLoading) {
     return (
