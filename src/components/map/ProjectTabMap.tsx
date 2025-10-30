@@ -18,8 +18,8 @@ export interface ProjectTabMapProps {
 export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProps) {
   const { data, error, isLoading } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
-  const [pitch, setPitch] = useState(60);
-  const [bearing, setBearing] = useState(30);
+  const [pitch, setPitch] = useState(20);
+  const [bearing, setBearing] = useState(0);
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [savedView, setSavedView] = useState<{ pitch: number; bearing: number } | null>(null);
 
@@ -79,6 +79,7 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
         <MapOblique
           ref={mapRef}
           center={data.center}
+          zoom={13}
           pitch={pitch}
           bearing={bearing}
           styleUrl={styleUrl}
