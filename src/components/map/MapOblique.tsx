@@ -297,7 +297,9 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         map.remove();
         mapRef.current = null;
       };
-    }, [styleUrl, center, zoom, pitch, bearing, extrusions, lines, onFeatureClick]);
+    }, [styleUrl, center, extrusions, lines, onFeatureClick, showExtrusions, markers]);
+    // Note: zoom, pitch, bearing intentionally excluded - they're only for initial setup
+    // Changing them shouldn't recreate the map
 
     return (
       <div
