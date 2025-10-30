@@ -23,15 +23,18 @@ export default function ProjectTabMap({ projectId, styleUrl }: ProjectTabMapProp
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(null);
 
-  // Memoize markers and lines to prevent map re-initialization on re-renders
+  // Memoize markers and lines with deep comparison to prevent unnecessary updates
+  // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(
     () => (data?.center ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }] : []),
-    [data?.center]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data?.center ? JSON.stringify(data.center) : null]
   );
 
   const lines = useMemo(
     () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
-    [data?.context]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data?.context ? JSON.stringify(data.context) : null]
   );
 
   if (isLoading) {

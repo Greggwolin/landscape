@@ -109,6 +109,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
       [center, zoom, pitch, bearing]
     );
 
+    // Main effect: Create map once
+    // Only recreate if styleUrl changes or component unmounts
     useEffect(() => {
       if (!containerRef.current) return;
 
@@ -185,55 +187,119 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         antialias: true
       });
 
-      // Controls removed - user requested no controls
+      mapRef.current = map;
 
-      map.on('load', () => {
-        // Lines (context)
-        for (const l of lines) {
-          map.addSource(l.id, { type: 'geojson', data: l.data });
-          map.addLayer({
-            id: `${l.id}-line`,
-            type: 'line',
-            source: l.id,
-            paint: {
-              'line-color': l.color ?? '#999',
-              'line-width': l.width ?? 1.2,
-              'line-opacity': 0.9
+      return () => {
+        map.remove();
+        mapRef.current = null;
+      };
+    }, [styleUrl]);
+    // Only recreate map if styleUrl changes
+    // center, zoom, pitch, bearing are intentionally excluded - they're only for initial setup
+    // The map preserves user's camera state after initialization
+
+    // Effect: Update lines when they change
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      const updateLines = () => {
+        if (!map.isStyleLoaded()) return;
+
+        // Remove existing line layers and sources
+        const existingLayers = map.getStyle().layers || [];
+        for (const layer of existingLayers) {
+          if (layer.id.endsWith('-line')) {
+            map.removeLayer(layer.id);
+            const sourceId = layer.id.replace('-line', '');
+            if (map.getSource(sourceId)) {
+              map.removeSource(sourceId);
             }
-          });
+          }
         }
 
-        // Extrusions (subject + comps) - only if showExtrusions is true
-        if (showExtrusions) {
-          for (const e of extrusions) {
-            const { color, expr } = buildHeightExpr(e.color);
-            map.addSource(e.id, { type: 'geojson', data: e.data });
+        // Add new lines
+        for (const l of lines) {
+          if (!map.getSource(l.id)) {
+            map.addSource(l.id, { type: 'geojson', data: l.data });
+          }
+          if (!map.getLayer(`${l.id}-line`)) {
             map.addLayer({
-              id: `${e.id}-fill`,
-              type: 'fill-extrusion',
-              source: e.id,
+              id: `${l.id}-line`,
+              type: 'line',
+              source: l.id,
               paint: {
-                'fill-extrusion-color': color,
-                'fill-extrusion-opacity': 0.88,
-                'fill-extrusion-height': e.heightExpr ?? expr,
-                'fill-extrusion-base': 0
+                'line-color': l.color ?? '#999',
+                'line-width': l.width ?? 1.2,
+                'line-opacity': 0.9
               }
             });
           }
+        }
+      };
 
-          if (onFeatureClick) {
-            for (const e of extrusions) {
-              const id = `${e.id}-fill`;
-              map.on('click', id, (ev) => {
+      if (map.isStyleLoaded()) {
+        updateLines();
+      } else {
+        map.once('load', updateLines);
+      }
+    }, [lines]);
+
+    // Effect: Update extrusions when they change
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      const updateExtrusions = () => {
+        if (!map.isStyleLoaded()) return;
+
+        // Remove existing extrusion layers and sources
+        const existingLayers = map.getStyle().layers || [];
+        for (const layer of existingLayers) {
+          if (layer.id.endsWith('-fill')) {
+            map.removeLayer(layer.id);
+            const sourceId = layer.id.replace('-fill', '');
+            if (map.getSource(sourceId)) {
+              map.removeSource(sourceId);
+            }
+          }
+        }
+
+        // Add extrusions only if showExtrusions is true
+        if (showExtrusions) {
+          for (const e of extrusions) {
+            const { color, expr } = buildHeightExpr(e.color);
+            if (!map.getSource(e.id)) {
+              map.addSource(e.id, { type: 'geojson', data: e.data });
+            }
+            if (!map.getLayer(`${e.id}-fill`)) {
+              map.addLayer({
+                id: `${e.id}-fill`,
+                type: 'fill-extrusion',
+                source: e.id,
+                paint: {
+                  'fill-extrusion-color': color,
+                  'fill-extrusion-opacity': 0.88,
+                  'fill-extrusion-height': e.heightExpr ?? expr,
+                  'fill-extrusion-base': 0
+                }
+              });
+            }
+
+            // Add click handlers
+            if (onFeatureClick) {
+              const layerId = `${e.id}-fill`;
+              map.off('click', layerId); // Remove old handlers
+              map.on('click', layerId, (ev) => {
                 const f = ev.features?.[0];
                 onFeatureClick(String(f?.id ?? f?.properties?.id ?? ''));
               });
-              map.on('mouseenter', id, () => {
+              map.on('mouseenter', layerId, () => {
                 if (map.getCanvas()) {
                   map.getCanvas().style.cursor = 'pointer';
                 }
               });
-              map.on('mouseleave', id, () => {
+              map.on('mouseleave', layerId, () => {
                 if (map.getCanvas()) {
                   map.getCanvas().style.cursor = '';
                 }
@@ -241,8 +307,33 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             }
           }
         }
+      };
 
-        // Markers (simple pushpins) - alternative to extrusions
+      if (map.isStyleLoaded()) {
+        updateExtrusions();
+      } else {
+        map.once('load', updateExtrusions);
+      }
+    }, [extrusions, showExtrusions, onFeatureClick]);
+
+    // Effect: Update markers when they change
+    // Store marker instances to clean them up
+    const markersRef = useRef<maplibregl.Marker[]>([]);
+
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      const updateMarkers = () => {
+        if (!map.isStyleLoaded()) return;
+
+        // Remove existing markers
+        for (const marker of markersRef.current) {
+          marker.remove();
+        }
+        markersRef.current = [];
+
+        // Add markers only if showExtrusions is false
         if (!showExtrusions && markers.length > 0) {
           for (const m of markers) {
             const el = document.createElement('div');
@@ -274,7 +365,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             }
 
             const marker = new maplibregl.Marker({ element: el })
-              .setLngLat(m.coordinates);
+              .setLngLat(m.coordinates)
+              .addTo(map);
 
             // Add popup if provided
             if (m.popup) {
@@ -286,20 +378,17 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
               marker.setPopup(popup);
             }
 
-            marker.addTo(map);
+            markersRef.current.push(marker);
           }
         }
-      });
-
-      mapRef.current = map;
-
-      return () => {
-        map.remove();
-        mapRef.current = null;
       };
-    }, [styleUrl, center, extrusions, lines, onFeatureClick, showExtrusions, markers]);
-    // Note: zoom, pitch, bearing intentionally excluded - they're only for initial setup
-    // Changing them shouldn't recreate the map
+
+      if (map.isStyleLoaded()) {
+        updateMarkers();
+      } else {
+        map.once('load', updateMarkers);
+      }
+    }, [markers, showExtrusions, onFeatureClick]);
 
     return (
       <div
