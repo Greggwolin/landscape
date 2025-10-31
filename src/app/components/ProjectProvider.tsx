@@ -17,6 +17,9 @@ interface ProjectSummary {
   property_type_code?: string | null
   project_type?: string | null
   is_active?: boolean
+  analysis_type?: string | null
+  property_subtype?: string | null
+  property_class?: string | null
 }
 
 interface ProjectContextValue {
@@ -53,6 +56,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     if (activeProjectId !== null && typeof window !== 'undefined') {
       localStorage.setItem('activeProjectId', activeProjectId.toString())
+      localStorage.setItem('activeProjectTimestamp', new Date().toISOString())
     }
   }, [activeProjectId])
 

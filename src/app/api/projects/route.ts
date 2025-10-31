@@ -15,6 +15,9 @@ type RawProjectRow = {
   property_type_code?: string | null
   project_type: string | null
   is_active?: boolean | null
+  analysis_type?: string | null
+  property_subtype?: string | null
+  property_class?: string | null
 }
 
 type FallbackProjectRow = Omit<RawProjectRow, 'property_type_code' | 'is_active'>
@@ -57,10 +60,10 @@ function normalizePropertyTypeCode(propertyType: string | null, projectType: str
 async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]> {
   try {
     return await sql<RawProjectRow[]>`
-      SELECT 
-        project_id, 
-        project_name, 
-        acres_gross, 
+      SELECT
+        project_id,
+        project_name,
+        acres_gross,
         location_lat,
         location_lon,
         start_date,
@@ -69,7 +72,10 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         jurisdiction_state,
         property_type_code,
         project_type,
-        is_active
+        is_active,
+        analysis_type,
+        property_subtype,
+        property_class
       FROM landscape.tbl_project
       WHERE 1 = 1
         ${includeInactive ? sql`` : sql`AND COALESCE(is_active, true)`}
@@ -99,6 +105,9 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
       ...row,
       property_type_code: null,
       is_active: true,
+      analysis_type: null,
+      property_subtype: null,
+      property_class: null
     }))
   }
 }

@@ -108,3 +108,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Failed to update parcel', details: msg }, { status: 500 })
   }
 }
+
+// DELETE /api/parcels/[id]
+// Deletes a parcel by ID
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+
+    // Check if parcel exists
+    const parcelCheck = await sql`
+      SELECT parcel_id FROM landscape.tbl_parcel WHERE parcel_id = ${id}::bigint
+    `
+
+    if (parcelCheck.length === 0) {
+      return NextResponse.json({ error: 'Parcel not found' }, { status: 404 })
+    }
+
+    // Delete the parcel
+    await sql`DELETE FROM landscape.tbl_parcel WHERE parcel_id = ${id}::bigint`
+
+    return NextResponse.json({ ok: true, message: 'Parcel deleted successfully' })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('Parcels DELETE error:', e)
+    return NextResponse.json({ error: 'Failed to delete parcel', details: msg }, { status: 500 })
+  }
+}

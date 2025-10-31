@@ -32,3 +32,41 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Failed to update phase', details: msg }, { status: 500 })
   }
 }
+
+// DELETE /api/phases/[id]
+// Deletes a phase by ID. Will fail if the phase has parcels associated with it.
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+
+    // Check if phase exists
+    const phaseCheck = await sql`
+      SELECT phase_id FROM landscape.tbl_phase WHERE phase_id = ${id}::bigint
+    `
+
+    if (phaseCheck.length === 0) {
+      return NextResponse.json({ error: 'Phase not found' }, { status: 404 })
+    }
+
+    // Check if phase has parcels
+    const parcelCheck = await sql`
+      SELECT COUNT(*) as count FROM landscape.tbl_parcel WHERE phase_id = ${id}::bigint
+    `
+
+    if (parcelCheck[0].count > 0) {
+      return NextResponse.json({
+        error: 'Cannot delete phase with parcels. Please delete all parcels first.',
+        details: `Phase has ${parcelCheck[0].count} parcel(s)`
+      }, { status: 400 })
+    }
+
+    // Delete the phase
+    await sql`DELETE FROM landscape.tbl_phase WHERE phase_id = ${id}::bigint`
+
+    return NextResponse.json({ ok: true, message: 'Phase deleted successfully' })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('Phase DELETE error:', e)
+    return NextResponse.json({ error: 'Failed to delete phase', details: msg }, { status: 500 })
+  }
+}

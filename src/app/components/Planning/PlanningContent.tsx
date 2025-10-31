@@ -9,6 +9,8 @@ import type { Parcel as WizardParcel, Phase as WizardPhase, Area as WizardArea }
 interface Parcel {
   parcel_id: number;
   area_no: number;
+  area_id?: number;
+  phase_id?: number;
   phase_name: string;
   parcel_name: string;
   usecode: string;
@@ -25,12 +27,15 @@ interface Parcel {
 interface Phase {
   phase_id: number;
   area_no: number;
+  area_id?: number;
   phase_name: string;
   gross_acres: number;
   net_acres: number;
   units_total: number;
   start_date: string | null;
   status: string;
+  description?: string;
+  label?: string;
 }
 
 type ParcelDetailUpdates = {
@@ -153,6 +158,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
   // Phase editing state
   const [isAnyPhaseEditing, setIsAnyPhaseEditing] = useState(false)
+
+  // Area editing state
+  const [editingAreaNo, setEditingAreaNo] = useState<number | null>(null)
+  const [editingAreaTitle, setEditingAreaTitle] = useState('')
 
   // Filter parcels based on area and phase filters
   const filteredParcels = useMemo(() => {
@@ -283,6 +292,169 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     }
   }
 
+  // Delete Parcel function
+  const deleteParcel = async (parcelId: number) => {
+    if (!projectId) return
+    if (!confirm('Are you sure you want to delete this parcel?')) return
+
+    try {
+      const response = await fetch(`/api/parcels/${parcelId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || 'Failed to delete parcel')
+      }
+
+      // Refresh parcels and phases data
+      await mutateParcels()
+      await mutatePhases()
+
+      // Dispatch data change event
+      window.dispatchEvent(new CustomEvent('dataChanged', {
+        detail: { entity: 'parcel', id: parcelId, projectId }
+      }))
+    } catch (error) {
+      console.error('Error deleting parcel:', error)
+      alert(`Failed to delete parcel: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Delete Phase function
+  const deletePhase = async (phaseId: number) => {
+    if (!projectId) return
+    if (!confirm('Are you sure you want to delete this phase? All parcels in this phase must be deleted first.')) return
+
+    try {
+      const response = await fetch(`/api/phases/${phaseId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete phase')
+      }
+
+      // Refresh phases data
+      await mutatePhases()
+      await mutateParcels()
+
+      // Dispatch data change event
+      window.dispatchEvent(new CustomEvent('dataChanged', {
+        detail: { entity: 'phase', id: phaseId, projectId }
+      }))
+    } catch (error) {
+      console.error('Error deleting phase:', error)
+      alert(`Failed to delete phase: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Add Area function
+  const addArea = async () => {
+    if (!projectId) return
+
+    const areaName = prompt('Enter area name (optional):')
+    if (areaName === null) return // User cancelled
+
+    try {
+      const response = await fetch('/api/areas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          area_name: areaName || undefined
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || 'Failed to create area')
+      }
+
+      const result = await response.json()
+      console.log('Created area:', result)
+
+      // Refresh all data
+      await mutatePhases()
+      await mutateParcels()
+    } catch (error) {
+      console.error('Error creating area:', error)
+      alert(`Failed to create area: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Update Area function
+  const updateAreaTitle = async (areaNo: number, newTitle: string) => {
+    if (!projectId) return
+
+    try {
+      // Find the area_id for this area_no from phases data
+      const phase = phases.find(p => p.area_no === areaNo)
+      if (!phase?.area_id) {
+        alert('Area not found - no phases exist for this area')
+        return
+      }
+
+      const response = await fetch(`/api/areas/${phase.area_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: newTitle
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || 'Failed to update area')
+      }
+
+      // Refresh data
+      await mutatePhases()
+      await mutateParcels()
+
+      setEditingAreaNo(null)
+      setEditingAreaTitle('')
+    } catch (error) {
+      console.error('Error updating area:', error)
+      alert(`Failed to update area: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Delete Area function
+  const deleteArea = async (areaNo: number) => {
+    if (!projectId) return
+    if (!confirm('Are you sure you want to delete this area? All phases and parcels in this area must be deleted first.')) return
+
+    try {
+      // Find the area_id for this area_no from phases or parcels data
+      const phase = phases.find(p => p.area_no === areaNo)
+      const parcel = parcels.find(p => p.area_no === areaNo)
+      const areaId = phase?.area_id || parcel?.area_id
+
+      if (!areaId) {
+        alert('Area not found or cannot be deleted - area_id not found')
+        return
+      }
+
+      const response = await fetch(`/api/areas/${areaId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete area')
+      }
+
+      // Refresh all data
+      await mutatePhases()
+      await mutateParcels()
+    } catch (error) {
+      console.error('Error deleting area:', error)
+      alert(`Failed to delete area: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   // Get family name from parcel data (now included in API response)
   const getFamilyName = (parcel: Parcel): string => {
     return parcel.family_name || 'Unknown'
@@ -358,16 +530,24 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       }`}>
         {/* Level 1 summary */}
         <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
             <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level1LabelPlural}</h3>
+            <button
+              onClick={addArea}
+              className="px-3 py-1.5 text-xs text-white rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-success)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              + Add {level1Label}
+            </button>
           </div>
           <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {areaCards.map(({ key, areaNo, title, stats }) => (
                 <div
                   key={key}
-                  onClick={() => toggleAreaFilter(areaNo)}
-                  className="rounded p-3 border-2 cursor-pointer transition-all min-w-[140px]"
+                  className="rounded p-3 border-2 transition-all min-w-[140px] relative"
                   style={selectedAreaFilters.includes(areaNo) ? {
                     backgroundColor: 'var(--cui-primary)',
                     borderColor: 'var(--cui-primary)',
@@ -376,24 +556,47 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                     backgroundColor: 'var(--cui-card-bg)',
                     borderColor: 'var(--cui-border-color)'
                   }}
-                  onMouseEnter={(e) => {
-                    if (selectedAreaFilters.includes(areaNo)) {
-                      e.currentTarget.style.opacity = '1';
-                    } else {
-                      e.currentTarget.style.borderColor = 'var(--cui-primary)';
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedAreaFilters.includes(areaNo)) {
-                      e.currentTarget.style.opacity = '0.9';
-                    } else {
-                      e.currentTarget.style.borderColor = 'var(--cui-border-color)';
-                      e.currentTarget.style.backgroundColor = 'var(--cui-card-bg)';
-                    }
-                  }}
                 >
-                  <div className="text-center">
+                  {/* Action buttons */}
+                  <div className="absolute top-2 right-2 flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => deleteArea(areaNo)}
+                      className="px-1.5 py-0.5 text-xs rounded transition-colors"
+                      style={{ backgroundColor: 'var(--cui-danger)', color: 'white' }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                      title="Delete area"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div
+                    className="text-center cursor-pointer"
+                    onClick={() => toggleAreaFilter(areaNo)}
+                    onMouseEnter={(e) => {
+                      const parent = e.currentTarget.parentElement
+                      if (parent) {
+                        if (selectedAreaFilters.includes(areaNo)) {
+                          parent.style.opacity = '1';
+                        } else {
+                          parent.style.borderColor = 'var(--cui-primary)';
+                          parent.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
+                        }
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      const parent = e.currentTarget.parentElement
+                      if (parent) {
+                        if (selectedAreaFilters.includes(areaNo)) {
+                          parent.style.opacity = '0.9';
+                        } else {
+                          parent.style.borderColor = 'var(--cui-border-color)';
+                          parent.style.backgroundColor = 'var(--cui-card-bg)';
+                        }
+                      }
+                    }}
+                  >
                     <div className="text-lg font-bold mb-1 whitespace-nowrap"
                       style={{ color: selectedAreaFilters.includes(areaNo) ? 'white' : 'var(--cui-body-color)' }}
                       title={title}
@@ -469,6 +672,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                       parcels={parcels}
                       onEditingChange={setIsAnyPhaseEditing}
                       onSaved={mutatePhases}
+                      onDelete={deletePhase}
                     />
                   ))}
                 </tbody>
@@ -544,6 +748,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <EditableParcelRow key={parcel.parcel_id} parcel={parcel} index={index}
                   onSaved={(updated) => setParcels(prev => prev.map(p => p.parcel_id === updated.parcel_id ? { ...p, ...updated } : p))}
                   onOpenDetail={() => openDetailForParcel(parcel)}
+                  onDelete={deleteParcel}
                   getFamilyName={getFamilyName}
                   projectId={projectId}
                 />
@@ -615,7 +820,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
 // Filter helper UI
 // Inline-editable parcel row
-const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; getFamilyName: (parcel: Parcel) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, getFamilyName, projectId }) => {
+const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; onDelete?: (parcelId: number) => void; getFamilyName: (parcel: Parcel) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, projectId }) => {
   const [editing, setEditing] = useState(false)
   const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
@@ -1141,6 +1346,15 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
             >
               Detail
             </button>
+            <button
+              className="px-1.5 py-0.5 text-xs text-white rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-danger)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onClick={() => onDelete && onDelete(parcel.parcel_id)}
+            >
+              Delete
+            </button>
           </div>
         )}
       </td>
@@ -1159,7 +1373,8 @@ const PhaseRow: React.FC<{
   parcels: Parcel[];
   onEditingChange: (isEditing: boolean) => void;
   onSaved: () => void;
-}> = ({ phase, index, selectedFilters, onToggleFilter, parcels, onEditingChange, onSaved }) => {
+  onDelete?: (phaseId: number) => void;
+}> = ({ phase, index, selectedFilters, onToggleFilter, parcels, onEditingChange, onSaved, onDelete }) => {
   const [editing, setEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [description, setDescription] = useState(phase.description || '')
@@ -1287,6 +1502,15 @@ const PhaseRow: React.FC<{
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
               Filter
+            </button>
+            <button
+              onClick={() => onDelete && onDelete(phase.phase_id)}
+              className="px-2 py-0.5 text-xs rounded-full transition-colors text-white"
+              style={{ backgroundColor: 'var(--cui-danger)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              Delete
             </button>
           </div>
         </td>
