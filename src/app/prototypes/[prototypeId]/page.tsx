@@ -7,9 +7,9 @@ import PrototypeViewer from './prototype-viewer';
 import PrototypeNotesClient from './PrototypeNotesClient';
 
 interface PrototypePageProps {
-  params: {
+  params: Promise<{
     prototypeId: string;
-  };
+  }>;
 }
 
 const PrototypeMeta = ({ prototype }: { prototype: PrototypeMetadata }) => {
@@ -42,8 +42,9 @@ const PrototypeMeta = ({ prototype }: { prototype: PrototypeMetadata }) => {
   );
 };
 
-export default function PrototypePage({ params }: PrototypePageProps) {
-  const prototype = getPrototypeById(params.prototypeId);
+export default async function PrototypePage({ params }: PrototypePageProps) {
+  const { prototypeId } = await params;
+  const prototype = getPrototypeById(prototypeId);
 
   if (!prototype) {
     notFound();

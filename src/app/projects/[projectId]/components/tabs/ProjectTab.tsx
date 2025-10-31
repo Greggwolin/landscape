@@ -467,7 +467,7 @@ export default function ProjectTab({
 
   const renderLocationCard = () => (
     <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
-      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ backgroundColor: "var(--cui-sidebar-bg)", color: "var(--cui-body-color)" }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center gap-3">
         <div className="flex-grow-1">
           {showProjectSelectorInLocationHeader ? (
             <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -1350,11 +1350,11 @@ export default function ProjectTab({
           <CCardBody>
             {/* Inflation / Growth Rates */}
             <div className="mb-3">
-              <h6 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>Inflation / Growth Rates</h6>
+              <h6 className="mb-3" style={{ color: 'var(--cui-body-color)', fontWeight: 'bold' }}>Inflation / Growth Rates</h6>
 
               {/* General Inflation Row */}
               <div className="mb-2 d-flex align-items-center">
-                <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>Inflation: General</div>
+                <div style={{ width: '180px', flexShrink: 0 }}>Inflation: General</div>
                 <div style={{ width: '120px', marginRight: '10px' }}>
                   <CFormInput
                     id="general_inflation"
@@ -1382,7 +1382,7 @@ export default function ProjectTab({
               {/* Saved Inflation Schedules - Each on its own row */}
               {savedInflationSchedules.map((schedule) => (
                 <div key={schedule.id} className="mb-2 d-flex align-items-center">
-                  <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>
+                  <div style={{ width: '180px', flexShrink: 0 }}>
                     Inflation: {schedule.name}
                   </div>
                   <div
@@ -1433,97 +1433,6 @@ export default function ProjectTab({
             </div>
           </CCardBody>
         )}
-      </CCard>
-
-      {/* Section 4: Contacts */}
-      <CCard className="mb-3">
-        <CCardHeader
-          className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
-          onClick={() => setContactsExpanded(!contactsExpanded)}
-        >
-          <span>Contacts</span>
-          <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-        </CCardHeader>
-        {contactsExpanded && (
-          <CCardBody>
-            {project.listing_brokerage && (
-              <div className="mb-3">
-                <strong>Listing Brokerage:</strong>
-                <div>{project.listing_brokerage}</div>
-              </div>
-            )}
-
-            {/* Contacts Section */}
-            <ContactsSection projectId={project.project_id} />
-          </CCardBody>
-        )}
-      </CCard>
-
-      {/* Section 5: Landscaper AI Assistant with Document Upload */}
-      <CCard>
-        <CCardHeader>
-          <CIcon icon={cilLightbulb} className="me-2" />
-          Landscaper AI Assistant
-        </CCardHeader>
-        <CCardBody>
-          <CRow>
-            {/* Left side - AI Description */}
-            <CCol md={7}>
-              <h5>Welcome to your project!</h5>
-              <p>
-                Landscaper AI can help you get started by analyzing your planning documents,
-                site plans, market studies, and financial models.
-              </p>
-              <p><strong>Upload documents to automatically extract:</strong></p>
-              <ul>
-                <li>Project hierarchy and phasing</li>
-                <li>Development assumptions</li>
-                <li>Market comparables</li>
-                <li>Financial projections</li>
-              </ul>
-              <div className="mt-3">
-                <h6>Supported Documents:</h6>
-                <ul className="text-sm">
-                  <li>Site plans and plat maps (PDF, images)</li>
-                  <li>Market studies and feasibility reports (PDF, Word)</li>
-                  <li>Financial models (Excel, CSV)</li>
-                  <li>Entitlement documents (PDF)</li>
-                  <li>Engineering plans (PDF, CAD)</li>
-                </ul>
-              </div>
-              <div className="mt-3">
-                <CButton color="link" href={`/projects/${project.project_id}?tab=documents`}>
-                  View all documents →
-                </CButton>
-              </div>
-            </CCol>
-
-            {/* Right side - Drag & Drop Upload Area */}
-            <CCol md={5}>
-              <div
-                className="border-2 border-dashed rounded p-6 text-center h-100 d-flex flex-column justify-content-center"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-tertiary-bg)',
-                  minHeight: '300px'
-                }}
-              >
-                <CIcon icon={cilCloudUpload} size="xl" className="mb-3" style={{ color: 'var(--cui-secondary-color)' }} />
-                <p className="mb-2">Drag and drop files here</p>
-                <p className="text-sm mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                  or click to browse
-                </p>
-                <div>
-                  <CButton color="primary">Select Files</CButton>
-                </div>
-                <p className="text-xs mt-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                  PDF, Excel, Word, Images, CAD files
-                </p>
-              </div>
-            </CCol>
-          </CRow>
-        </CCardBody>
       </CCard>
 
       {/* Section 7: Macro Conditions - Individual Colored Tiles */}
@@ -1690,6 +1599,97 @@ export default function ProjectTab({
           </CCard>
         </CCol>
       </CRow>
+
+      {/* Section 4: Contacts */}
+      <CCard className="mb-3">
+        <CCardHeader
+          className="d-flex justify-content-between align-items-center"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setContactsExpanded(!contactsExpanded)}
+        >
+          <span>Contacts</span>
+          <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
+        </CCardHeader>
+        {contactsExpanded && (
+          <CCardBody>
+            {project.listing_brokerage && (
+              <div className="mb-3">
+                <strong>Listing Brokerage:</strong>
+                <div>{project.listing_brokerage}</div>
+              </div>
+            )}
+
+            {/* Contacts Section */}
+            <ContactsSection projectId={project.project_id} />
+          </CCardBody>
+        )}
+      </CCard>
+
+      {/* Section 5: Landscaper AI Assistant with Document Upload */}
+      <CCard>
+        <CCardHeader>
+          <CIcon icon={cilLightbulb} className="me-2" />
+          Landscaper AI Assistant
+        </CCardHeader>
+        <CCardBody>
+          <CRow>
+            {/* Left side - AI Description */}
+            <CCol md={7}>
+              <h5>Welcome to your project!</h5>
+              <p>
+                Landscaper AI can help you get started by analyzing your planning documents,
+                site plans, market studies, and financial models.
+              </p>
+              <p><strong>Upload documents to automatically extract:</strong></p>
+              <ul>
+                <li>Project hierarchy and phasing</li>
+                <li>Development assumptions</li>
+                <li>Market comparables</li>
+                <li>Financial projections</li>
+              </ul>
+              <div className="mt-3">
+                <h6>Supported Documents:</h6>
+                <ul className="text-sm">
+                  <li>Site plans and plat maps (PDF, images)</li>
+                  <li>Market studies and feasibility reports (PDF, Word)</li>
+                  <li>Financial models (Excel, CSV)</li>
+                  <li>Entitlement documents (PDF)</li>
+                  <li>Engineering plans (PDF, CAD)</li>
+                </ul>
+              </div>
+              <div className="mt-3">
+                <CButton color="link" href={`/projects/${project.project_id}?tab=documents`}>
+                  View all documents →
+                </CButton>
+              </div>
+            </CCol>
+
+            {/* Right side - Drag & Drop Upload Area */}
+            <CCol md={5}>
+              <div
+                className="border-2 border-dashed rounded p-6 text-center h-100 d-flex flex-column justify-content-center"
+                style={{
+                  borderColor: 'var(--cui-border-color)',
+                  backgroundColor: 'var(--cui-tertiary-bg)',
+                  minHeight: '300px'
+                }}
+              >
+                <CIcon icon={cilCloudUpload} size="xl" className="mb-3" style={{ color: 'var(--cui-secondary-color)' }} />
+                <p className="mb-2">Drag and drop files here</p>
+                <p className="text-sm mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                  or click to browse
+                </p>
+                <div>
+                  <CButton color="primary">Select Files</CButton>
+                </div>
+                <p className="text-xs mt-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                  PDF, Excel, Word, Images, CAD files
+                </p>
+              </div>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
 
       {/* Inflation Step Schedule Modal */}
       <CModal
