@@ -48,11 +48,23 @@ CALCULATION_FREQUENCIES = [
 class ProjectAdminForm(forms.ModelForm):
     """Custom form for Project admin with dropdown choices from lookup tables."""
 
-    # Property Type dropdown (tbl_property_type_config)
-    property_type_code = forms.ChoiceField(
+    # New Taxonomy Fields (migration 013)
+    analysis_type = forms.ChoiceField(
         required=False,
-        label="Property Type",
-        help_text="Primary property type (MPC, Multifamily, Office, Retail, Industrial, Hotel)"
+        label="Analysis Type",
+        help_text="Land Development or Income Property"
+    )
+
+    property_subtype = forms.ChoiceField(
+        required=False,
+        label="Property Subtype",
+        help_text="Specific property subtype (e.g., Master Planned Community, Multifamily)"
+    )
+
+    property_class = forms.ChoiceField(
+        required=False,
+        label="Property Class",
+        help_text="Property class (for Income Property only)"
     )
 
     # Project Type dropdown (lu_subtype)
@@ -60,13 +72,6 @@ class ProjectAdminForm(forms.ModelForm):
         required=False,
         label="Project Type",
         help_text="Project classification (from lu_subtype lookup table)"
-    )
-
-    # Development Type dropdown (text field, but we can add common values)
-    development_type = forms.ChoiceField(
-        required=False,
-        label="Development Type",
-        help_text="Type of development"
     )
 
     # Financial Model Type dropdown
@@ -100,26 +105,40 @@ class ProjectAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Property type labels matching frontend (HomeOverview.tsx lines 7-16)
-        PROPERTY_TYPE_LABELS = {
-            'mpc': 'Master Planned Community',
-            'multifamily': 'Multifamily',
-            'commercial': 'Commercial',
-            'office': 'Office',
-            'retail': 'Retail',
-            'industrial': 'Industrial',
-            'hotel': 'Hotel',
-            'mixed_use': 'Mixed Use'
-        }
+        # Populate analysis_type choices
+        analysis_type_choices = [
+            ('', '---------'),
+            ('Land Development', 'Land Development'),
+            ('Income Property', 'Income Property'),
+        ]
+        self.fields['analysis_type'].choices = analysis_type_choices
 
-        # Populate property_type_code from tbl_property_type_config
-        # These are the application-level property types (mpc, multifamily, office, retail, etc.)
-        type_choices = [('', 'Select Type')]
-        for prop_type in PropertyTypeConfig.objects.all().order_by('property_type'):
-            code = prop_type.property_type.upper()
-            label = PROPERTY_TYPE_LABELS.get(prop_type.property_type.lower(), code)
-            type_choices.append((code, label))
-        self.fields['property_type_code'].choices = type_choices
+        # Populate property_subtype choices (simplified for admin)
+        property_subtype_choices = [
+            ('', '---------'),
+            ('Master Planned Community', 'Master Planned Community'),
+            ('Subdivision', 'Subdivision'),
+            ('Multifamily Development', 'Multifamily Development'),
+            ('Commercial Development', 'Commercial Development'),
+            ('Industrial Development', 'Industrial Development'),
+            ('Mixed-Use Development', 'Mixed-Use Development'),
+            ('Multifamily', 'Multifamily'),
+            ('Office', 'Office'),
+            ('Retail', 'Retail'),
+            ('Industrial', 'Industrial'),
+            ('Hotel', 'Hotel'),
+            ('Self-Storage', 'Self-Storage'),
+        ]
+        self.fields['property_subtype'].choices = property_subtype_choices
+
+        # Populate property_class choices
+        property_class_choices = [
+            ('', '---------'),
+            ('Class A', 'Class A'),
+            ('Class B', 'Class B'),
+            ('Class C', 'Class C'),
+        ]
+        self.fields['property_class'].choices = property_class_choices
 
         # Populate project_type choices from lu_subtype (active subtypes only)
         # These are for more detailed classifications
@@ -127,19 +146,6 @@ class ProjectAdminForm(forms.ModelForm):
         for subtype in LookupSubtype.objects.filter(active=True).order_by('ord', 'name'):
             subtype_choices.append((subtype.code, f"{subtype.code} - {subtype.name}"))
         self.fields['project_type'].choices = subtype_choices
-
-        # Populate development_type with common values
-        development_choices = [
-            ('', '---------'),
-            ('Master-Planned Community', 'Master-Planned Community'),
-            ('Subdivision', 'Subdivision'),
-            ('Infill', 'Infill Development'),
-            ('Redevelopment', 'Redevelopment'),
-            ('Mixed-Use', 'Mixed-Use'),
-            ('Greenfield', 'Greenfield'),
-            ('Brownfield', 'Brownfield'),
-        ]
-        self.fields['development_type'].choices = development_choices
 
 
 @admin.register(Project)
@@ -152,8 +158,8 @@ class ProjectAdmin(admin.ModelAdmin):
         'project_id',
         'project_name',
         'project_type',
-        'property_type_code',
-        'development_type',
+        'analysis_type',
+        'property_subtype',
         'jurisdiction_city',
         'jurisdiction_state',
         'is_active',
@@ -165,8 +171,9 @@ class ProjectAdmin(admin.ModelAdmin):
 
     list_filter = [
         'project_type',
-        'property_type_code',
-        'development_type',
+        'analysis_type',
+        'property_subtype',
+        'property_class',
         'financial_model_type',
         'jurisdiction_state',
         'is_active',
@@ -197,8 +204,9 @@ class ProjectAdmin(admin.ModelAdmin):
                 'project_id',
                 'project_name',
                 'project_type',
-                'property_type_code',
-                'development_type',
+                'analysis_type',
+                'property_subtype',
+                'property_class',
                 'financial_model_type',
                 'is_active',
             )

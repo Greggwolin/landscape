@@ -32,10 +32,17 @@ class Project(models.Model):
     jurisdiction_integrated = models.BooleanField(blank=True, null=True)
     county = models.CharField(max_length=100, blank=True, null=True)
 
-    # Development Type
-    development_type = models.CharField(max_length=100, blank=True, null=True)
+    # New Taxonomy (as of migration 013)
+    analysis_type = models.CharField(max_length=50, blank=True, null=True)
+    property_subtype = models.CharField(max_length=100, blank=True, null=True)
+    property_class = models.CharField(max_length=50, blank=True, null=True)
+
+    # Deprecated fields (kept for backwards compatibility)
+    development_type_deprecated = models.CharField(max_length=100, blank=True, null=True, db_column='development_type_deprecated')
+    property_type_code_deprecated = models.CharField(max_length=50, blank=True, null=True, db_column='property_type_code_deprecated')
+
+    # Other project classification
     project_type = models.CharField(max_length=50, blank=True, null=True)
-    property_type_code = models.CharField(max_length=50, blank=True, null=True)
     financial_model_type = models.CharField(max_length=50, blank=True, null=True)
 
     # Taxonomy

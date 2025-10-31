@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CButton } from '@coreui/react';
+import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CButton, CRow, CCol } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import CIcon from '@coreui/icons-react';
 import { cilChartPie } from '@coreui/icons';
 import NewProjectModal from '@/app/components/NewProjectModal';
+import UserTile from '@/app/components/dashboard/UserTile';
+import DashboardMap from '@/app/components/dashboard/DashboardMap';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   'MPC': 'Master Planned Community',
@@ -45,8 +47,30 @@ export default function DashboardPage() {
     }
   };
 
+  const handleLandscaperMessage = (message: string) => {
+    // TODO: Implement AI integration with Landscaper
+    console.log('Message to Landscaper:', message);
+  };
+
   return (
     <CContainer fluid className="p-4">
+      {/* User Tile and Map */}
+      <CRow className="mb-4" style={{ minHeight: '500px' }}>
+        <CCol md={5} lg={4} className="d-flex">
+          <UserTile username="Gregg" onSubmit={handleLandscaperMessage} />
+        </CCol>
+        <CCol md={7} lg={8} className="d-flex">
+          <CCard style={{ height: '100%', width: '100%' }}>
+            <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+              <span className="fw-semibold">Project Locations</span>
+            </CCardHeader>
+            <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
+              <DashboardMap projects={projects} />
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <CCard className="text-center">
@@ -111,10 +135,14 @@ export default function DashboardPage() {
 
       {/* Projects Table */}
       <CCard>
+        <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+          <span className="text-base font-semibold">Projects</span>
+        </CCardHeader>
         <CCardBody className="p-0">
           <CTable hover responsive className="mb-0">
             <CTableHead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <CTableRow>
+                <CTableHeaderCell scope="col">ID</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Name</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Type</CTableHeaderCell>
                 <CTableHeaderCell scope="col">Location</CTableHeaderCell>
@@ -131,6 +159,11 @@ export default function DashboardPage() {
                   onClick={() => handleProjectClick(project.project_id)}
                   style={{ cursor: 'pointer' }}
                 >
+                  <CTableDataCell>
+                    <span className="text-sm font-mono" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {project.project_id}
+                    </span>
+                  </CTableDataCell>
                   <CTableDataCell>
                     <div className="flex items-center gap-2">
                       <CIcon icon={cilChartPie} size="sm" className="opacity-70" />
