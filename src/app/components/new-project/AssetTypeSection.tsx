@@ -2,11 +2,8 @@
 
 import { useEffect } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
-import {
-  DEVELOPMENT_TYPE_OPTIONS,
-  PROPERTY_TYPE_OPTIONS
-} from './constants'
-import type { DevelopmentType, NewProjectFormData } from './types'
+import { ANALYSIS_TYPE_OPTIONS } from './constants'
+import type { AnalysisType, NewProjectFormData } from './types'
 
 type AssetTypeSectionProps = {
   form: UseFormReturn<NewProjectFormData>
@@ -20,24 +17,27 @@ const AssetTypeSection = ({ form, hasError = false }: AssetTypeSectionProps) => 
     formState: { errors }
   } = form
 
-  const developmentType = watch('development_type') as DevelopmentType | ''
-  const propertyTypeCode = watch('property_type_code')
+  const analysisType = watch('analysis_type') as AnalysisType | ''
 
   useEffect(() => {
-    if (!developmentType) {
-      setValue('property_type_code', '')
+    // Clear property subtype and class when analysis type changes
+    if (!analysisType) {
       setValue('property_subtype', '')
+      setValue('property_class', '')
+      // Also update deprecated fields for backwards compatibility
+      setValue('development_type', '')
+      setValue('property_type_code', '')
       return
     }
 
-    const options = PROPERTY_TYPE_OPTIONS[developmentType]
-    if (!options.some(option => option.value === propertyTypeCode)) {
-      setValue('property_type_code', '')
-      setValue('property_subtype', '')
-    }
-  }, [developmentType, propertyTypeCode, setValue])
+    // Sync deprecated fields for backwards compatibility
+    setValue('development_type', analysisType, { shouldDirty: false })
 
-  const propertyTypeOptions = developmentType ? PROPERTY_TYPE_OPTIONS[developmentType] : []
+    // Clear property class if switching to Land Development
+    if (analysisType === 'Land Development') {
+      setValue('property_class', '')
+    }
+  }, [analysisType, setValue])
 
   return (
     <section
@@ -46,18 +46,18 @@ const AssetTypeSection = ({ form, hasError = false }: AssetTypeSectionProps) => 
       }`}
     >
       <header>
-        <h3 className="text-lg font-semibold text-slate-100">Asset type</h3>
-        <p className="text-sm text-slate-400">Pick the development family and subtype to tailor inputs.</p>
+        <h3 className="text-lg font-semibold text-slate-100">Analysis type</h3>
+        <p className="text-sm text-slate-400">Choose the type of financial analysis for this project.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {DEVELOPMENT_TYPE_OPTIONS.map(option => {
-          const isSelected = developmentType === option.value
+        {ANALYSIS_TYPE_OPTIONS.map(option => {
+          const isSelected = analysisType === option.value
           return (
             <button
               key={option.value}
               type="button"
-              onClick={() => setValue('development_type', option.value, { shouldDirty: true, shouldValidate: true })}
+              onClick={() => setValue('analysis_type', option.value, { shouldDirty: true, shouldValidate: true })}
               className={`rounded-lg border px-4 py-3 text-left transition ${
                 isSelected
                   ? 'border-blue-500 bg-blue-900/30 text-blue-100'
@@ -70,31 +70,9 @@ const AssetTypeSection = ({ form, hasError = false }: AssetTypeSectionProps) => 
           )
         })}
       </div>
-      {errors.development_type && (
-        <p className="text-xs text-rose-400">{errors.development_type.message as string}</p>
+      {errors.analysis_type && (
+        <p className="text-xs text-rose-400">{errors.analysis_type.message as string}</p>
       )}
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-100">
-          Property type detail <span className="text-rose-400">*</span>
-        </label>
-        <select
-          value={propertyTypeCode}
-          onChange={(event) => setValue('property_type_code', event.target.value, { shouldDirty: true, shouldValidate: true })}
-          disabled={!developmentType}
-          className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">{developmentType ? 'Select a property type' : 'Select development type first'}</option>
-          {propertyTypeOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {errors.property_type_code && (
-          <p className="mt-2 text-xs text-rose-400">{errors.property_type_code.message as string}</p>
-        )}
-      </div>
     </section>
   )
 }

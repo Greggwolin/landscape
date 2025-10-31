@@ -1,79 +1,82 @@
-import type { DevelopmentType, PropertyTypeOption } from './types'
+import type { AnalysisType, PropertyTypeOption } from './types'
+import {
+  ANALYSIS_TYPES,
+  LAND_DEVELOPMENT_SUBTYPES,
+  INCOME_PROPERTY_SUBTYPE_GROUPS,
+  PROPERTY_CLASSES,
+  type PropertySubtype
+} from '@/types/project-taxonomy'
 
-export const DEVELOPMENT_TYPE_OPTIONS: Array<{
-  value: DevelopmentType
+// Analysis Type Options (replaces Development Type)
+export const ANALYSIS_TYPE_OPTIONS: Array<{
+  value: AnalysisType
   label: string
   description: string
 }> = [
   {
     value: 'Land Development',
     label: 'Land Development',
-    description: 'Master planned communities, subdivisions, mixed-use, and industrial parks.'
+    description: 'Development feasibility, lot absorption, phased infrastructure, residual value'
   },
   {
     value: 'Income Property',
     label: 'Income Property',
-    description: 'Multifamily, office, retail, industrial/warehouse, hospitality, and more.'
+    description: 'NOI analysis, cap rates, leasing, stabilization, existing property valuation'
   }
 ]
 
-export const PROPERTY_TYPE_OPTIONS: Record<DevelopmentType, PropertyTypeOption[]> = {
-  'Land Development': [
-    { value: 'MPC', label: 'Master Planned Community (MPC)' },
-    { value: 'SUBDIVISION', label: 'Residential Subdivision' },
-    { value: 'MIXED_USE_DEV', label: 'Mixed-Use Development' },
-    { value: 'INDUSTRIAL_PARK', label: 'Industrial/Business Park' }
-  ],
-  'Income Property': [
-    { value: 'MULTIFAMILY', label: 'Multifamily' },
-    { value: 'OFFICE', label: 'Office' },
-    { value: 'RETAIL', label: 'Retail' },
-    { value: 'INDUSTRIAL', label: 'Industrial/Warehouse' },
-    { value: 'SELF_STORAGE', label: 'Self-Storage' },
-    { value: 'HOSPITALITY', label: 'Hospitality' },
-    { value: 'OTHER', label: 'Other' }
-  ]
+// Property Subtype Options (cascades from Analysis Type)
+export const PROPERTY_SUBTYPE_OPTIONS: Record<AnalysisType, Array<{ value: PropertySubtype; label: string }>> = {
+  'Land Development': LAND_DEVELOPMENT_SUBTYPES.map(subtype => ({
+    value: subtype,
+    label: subtype
+  })),
+  'Income Property': INCOME_PROPERTY_SUBTYPE_GROUPS.flatMap(group =>
+    group.subtypes.map(subtype => ({
+      value: subtype,
+      label: subtype,
+      category: group.category
+    }))
+  )
 }
 
-export const PROPERTY_SUBTYPE_SAMPLES: Record<string, string[]> = {
-  MULTIFAMILY: [
-    'Garden Apartments',
-    'Mid-Rise',
-    'High-Rise',
-    'Student Housing',
-    'Senior Housing'
+// Property Class Options (Income Property only)
+export const PROPERTY_CLASS_OPTIONS = PROPERTY_CLASSES.map(cls => ({
+  value: cls,
+  label: cls
+}))
+
+// Grouped Income Property Subtypes (for better UI organization)
+export const INCOME_PROPERTY_GROUPED_OPTIONS = INCOME_PROPERTY_SUBTYPE_GROUPS.map(group => ({
+  category: group.category,
+  options: group.subtypes.map(subtype => ({
+    value: subtype,
+    label: subtype
+  }))
+}))
+
+// DEPRECATED - Keeping for backwards compatibility during migration
+export const DEVELOPMENT_TYPE_OPTIONS = ANALYSIS_TYPE_OPTIONS
+export const PROPERTY_TYPE_OPTIONS: Record<AnalysisType, PropertyTypeOption[]> = {
+  'Land Development': [
+    { value: 'Master Planned Community', label: 'Master Planned Community' },
+    { value: 'Subdivision', label: 'Subdivision' },
+    { value: 'Multifamily Development', label: 'Multifamily Development' },
+    { value: 'Commercial Development', label: 'Commercial Development' },
+    { value: 'Industrial Development', label: 'Industrial Development' },
+    { value: 'Mixed-Use Development', label: 'Mixed-Use Development' }
   ],
-  OFFICE: [
-    'Class A Office',
-    'Class B Office',
-    'Class C Office',
-    'Medical Office Building',
-    'Flex/R&D'
-  ],
-  RETAIL: [
-    'Neighborhood Center',
-    'Community Center',
-    'Power Center',
-    'Lifestyle Center',
-    'Freestanding'
-  ],
-  INDUSTRIAL: [
-    'Warehouse/Distribution',
-    'Manufacturing',
-    'Flex Space',
-    'Cold Storage',
-    'Last Mile Logistics'
-  ],
-  SUBDIVISION: [
-    'Single-Family Detached',
-    'Single-Family Attached',
-    'Townhomes',
-    'Custom Lots'
-  ],
-  MPC: [
-    'Mixed Residential',
-    'Residential + Commercial',
-    'Industrial Focused'
+  'Income Property': [
+    { value: 'Garden Multifamily', label: 'Garden Multifamily' },
+    { value: 'Mid-Rise Multifamily', label: 'Mid-Rise Multifamily' },
+    { value: 'High-Rise Multifamily', label: 'High-Rise Multifamily' },
+    { value: 'Class A Office', label: 'Class A Office' },
+    { value: 'Class B Office', label: 'Class B Office' },
+    { value: 'Class C Office', label: 'Class C Office' },
+    { value: 'Neighborhood Retail', label: 'Neighborhood Retail' },
+    { value: 'Community Retail', label: 'Community Retail' },
+    { value: 'Warehouse/Distribution', label: 'Warehouse/Distribution' },
+    { value: 'Hotel', label: 'Hotel' }
   ]
 }
 

@@ -1,4 +1,7 @@
-export type DevelopmentType = 'Land Development' | 'Income Property'
+import type { AnalysisType, PropertySubtype, PropertyClass } from '@/types/project-taxonomy'
+
+// Re-export for backwards compatibility
+export type DevelopmentType = AnalysisType
 
 export type LocationMode = 'address' | 'cross_streets' | 'coordinates'
 
@@ -19,10 +22,16 @@ export interface UploadedDocument {
 }
 
 export interface NewProjectFormData {
-  // Step 1
-  development_type: DevelopmentType | ''
+  // Step 1: Asset Type
+  analysis_type: AnalysisType | '' // NEW: replaces development_type
+  property_subtype: PropertySubtype | '' // UPDATED: now cascades from analysis_type
+  property_class: PropertyClass | '' // NEW: Income Property only
+
+  // DEPRECATED: keeping for backwards compatibility
+  development_type: AnalysisType | ''
   property_type_code: string
-  property_subtype: string
+
+  // Location
   location_mode: LocationMode
   single_line_address: string
   street_address: string
@@ -34,7 +43,7 @@ export interface NewProjectFormData {
   longitude: string
   project_name: string
 
-  // Step 2
+  // Step 2: Property Data
   total_units: string
   building_sf: string
   site_area: string
@@ -44,7 +53,7 @@ export interface NewProjectFormData {
   scale_input_method: ScaleInputMethod
   analysis_start_date: string
 
-  // Step 3
+  // Step 3: Creation Path
   path_choice: ProjectCreationPath | ''
 }
 

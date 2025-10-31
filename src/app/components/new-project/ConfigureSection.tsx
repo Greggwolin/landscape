@@ -5,7 +5,8 @@ import type { UseFormReturn } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import ProjectSummaryPreview from './ProjectSummaryPreview'
 import type { NewProjectFormData, UploadedDocument } from './types'
-import { PROPERTY_SUBTYPE_SAMPLES } from './constants'
+import { PROPERTY_SUBTYPE_OPTIONS, PROPERTY_CLASS_OPTIONS } from './constants'
+import type { AnalysisType } from './types'
 
 type ConfigureSectionProps = {
   form: UseFormReturn<NewProjectFormData>
@@ -23,13 +24,16 @@ const ConfigureSection = ({ form, uploadedDocuments, extractionPending, hasError
   } = form
   const [showSubtype, setShowSubtype] = useState(false)
 
-  const propertyTypeCode = watch('property_type_code')
+  // Use new analysis_type field, fallback to development_type for backwards compatibility
+  const analysisType = watch('analysis_type') || watch('development_type')
   const formData = watch()
 
   const propertySubtypeOptions = useMemo(() => {
-    if (!propertyTypeCode) return []
-    return PROPERTY_SUBTYPE_SAMPLES[propertyTypeCode] ?? []
-  }, [propertyTypeCode])
+    if (!analysisType) return []
+    return PROPERTY_SUBTYPE_OPTIONS[analysisType as AnalysisType] ?? []
+  }, [analysisType])
+
+  const showPropertyClass = analysisType === 'Income Property'
 
   return (
     <section
@@ -60,40 +64,56 @@ const ConfigureSection = ({ form, uploadedDocuments, extractionPending, hasError
           )}
         </div>
 
-        {propertyTypeCode && (
-          <div>
-            <button
-              type="button"
-              className="text-xs font-semibold text-blue-300 underline-offset-2 hover:underline"
-              onClick={() => setShowSubtype(prev => !prev)}
-            >
-              {showSubtype ? 'Hide subtype options' : 'Add subtype specificity'}
-            </button>
+        {analysisType && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-100">
+                Property subtype
+              </label>
+              {propertySubtypeOptions.length > 0 ? (
+                <select
+                  value={watch('property_subtype')}
+                  onChange={(event) => setValue('property_subtype', event.target.value, { shouldDirty: true, shouldValidate: true })}
+                  className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select subtype (optional)</option>
+                  {propertySubtypeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  {...register('property_subtype')}
+                  placeholder="Type subtype (optional)"
+                  className="mt-2 border-slate-700 bg-slate-900/40 text-slate-100"
+                />
+              )}
+              <p className="mt-1 text-xs text-slate-400">
+                Helps Landscaper tailor AI defaults and benchmarking.
+              </p>
+            </div>
 
-            {showSubtype && (
-              <div className="mt-3 space-y-2">
-                {propertySubtypeOptions.length > 0 ? (
-                  <select
-                    value={watch('property_subtype')}
-                    onChange={(event) => setValue('property_subtype', event.target.value, { shouldDirty: true })}
-                    className="w-full rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select subtype (optional)</option>
-                    {propertySubtypeOptions.map(subtype => (
-                      <option key={subtype} value={subtype}>
-                        {subtype}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    {...register('property_subtype')}
-                    placeholder="Type subtype (optional)"
-                    className="border-slate-700 bg-slate-900/40 text-slate-100"
-                  />
-                )}
-                <p className="text-xs text-slate-400">
-                  Helps Landscaper tailor AI defaults and benchmarking.
+            {showPropertyClass && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-100">
+                  Property class
+                </label>
+                <select
+                  value={watch('property_class') || ''}
+                  onChange={(event) => setValue('property_class', event.target.value, { shouldDirty: true, shouldValidate: true })}
+                  className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select property class (optional)</option>
+                  {PROPERTY_CLASS_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  Quality/institutional grade classification (A, B, C, D).
                 </p>
               </div>
             )}

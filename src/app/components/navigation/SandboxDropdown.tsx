@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { useOutsideClick } from '@/app/hooks/useOutsideClick';
 import { SANDBOX_PAGES, Z_INDEX } from './constants';
@@ -8,8 +9,8 @@ import { SANDBOX_PAGES, Z_INDEX } from './constants';
 /**
  * SandboxDropdown Component
  *
- * Dropdown menu for developer/prototype page references.
- * Items are non-clickable (display-only) for reference purposes.
+ * Dropdown menu for developer/prototype page navigation.
+ * Provides quick access to all prototypes and development pages.
  */
 export default function SandboxDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,12 +18,16 @@ export default function SandboxDropdown() {
 
   useOutsideClick(dropdownRef, () => setIsOpen(false));
 
+  const handleLinkClick = () => {
+    setIsOpen(false);
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-opacity-10"
         style={{
           color: 'var(--cui-sidebar-nav-link-color)',
           backgroundColor: 'transparent',
@@ -44,24 +49,31 @@ export default function SandboxDropdown() {
           }}
         >
           <div className="py-2">
-            {SANDBOX_PAGES.map((page, index) =>
-              page === '---' ? (
+            {SANDBOX_PAGES.map((item, index) =>
+              'separator' in item && item.separator ? (
                 <div
                   key={`sep-${index}`}
                   className="my-2 border-t"
                   style={{ borderColor: 'var(--cui-border-color)' }}
                 />
               ) : (
-                <div
-                  key={page}
-                  className="px-4 py-2 text-sm"
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={handleLinkClick}
+                  className="block px-4 py-2 text-sm transition-colors hover:bg-opacity-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
-                    cursor: 'default',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(var(--cui-primary-rgb), 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  {page}
-                </div>
+                  {item.label}
+                </Link>
               )
             )}
           </div>

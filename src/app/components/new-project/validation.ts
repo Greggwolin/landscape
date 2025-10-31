@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import type { NewProjectFormData } from './types'
 
-const developmentTypeEnum = z.enum(['Land Development', 'Income Property'])
+const analysisTypeEnum = z.enum(['Land Development', 'Income Property'])
+const developmentTypeEnum = analysisTypeEnum // backwards compatibility
 const locationModeEnum = z.enum(['address', 'cross_streets', 'coordinates'])
 const siteAreaUnitEnum = z.enum(['AC', 'SF', 'SM'])
 const scaleMethodEnum = z.enum(['units', 'density', 'later'])
@@ -10,9 +11,16 @@ const optionalString = (message?: string) =>
   z.string({ required_error: message }).max(255).optional().or(z.literal(''))
 
 export const newProjectSchema = z.object({
-  development_type: developmentTypeEnum,
-  property_type_code: z.string().min(1, 'Property type is required'),
+  // New fields
+  analysis_type: analysisTypeEnum,
   property_subtype: optionalString(),
+  property_class: optionalString(),
+
+  // Deprecated fields (keeping for backwards compatibility)
+  development_type: developmentTypeEnum.optional().or(z.literal('')),
+  property_type_code: optionalString(),
+
+  // Location fields
   location_mode: locationModeEnum.default('address'),
   single_line_address: optionalString(),
   street_address: optionalString(),
@@ -27,6 +35,8 @@ export const newProjectSchema = z.object({
   latitude: optionalString(),
   longitude: optionalString(),
   project_name: optionalString('Project name is required'),
+
+  // Property data fields
   total_units: optionalString(),
   building_sf: optionalString(),
   site_area: optionalString(),
@@ -35,6 +45,8 @@ export const newProjectSchema = z.object({
   density: optionalString(),
   scale_input_method: scaleMethodEnum.default('units'),
   analysis_start_date: optionalString(),
+
+  // Path selection
   path_choice: z.enum(['immediate', 'extended_wizard', 'ai_extraction']).optional().or(z.literal(''))
 })
   .superRefine((data, ctx) => {
@@ -83,7 +95,10 @@ export const newProjectSchema = z.object({
       }
     }
 
-    if (data.development_type === 'Income Property') {
+    // Use analysis_type (new) or fall back to development_type (deprecated)
+    const analysisType = data.analysis_type || data.development_type
+
+    if (analysisType === 'Income Property') {
       const units = data.total_units ? Number(data.total_units) : NaN
       const buildingSf = data.building_sf ? Number(data.building_sf) : NaN
       if (
@@ -105,7 +120,7 @@ export const newProjectSchema = z.object({
       }
     }
 
-    if (data.development_type === 'Land Development') {
+    if (analysisType === 'Land Development') {
       const siteArea = Number(data.site_area)
       if (Number.isNaN(siteArea) || siteArea <= 0) {
         ctx.addIssue({
@@ -142,9 +157,16 @@ export const newProjectSchema = z.object({
 export type NewProjectSchema = z.infer<typeof newProjectSchema>
 
 export const emptyFormDefaults: NewProjectFormData = {
+  // New fields
+  analysis_type: '',
+  property_subtype: '',
+  property_class: '',
+
+  // Deprecated fields
   development_type: '',
   property_type_code: '',
-  property_subtype: '',
+
+  // Location fields
   location_mode: 'address',
   single_line_address: '',
   street_address: '',
@@ -155,6 +177,8 @@ export const emptyFormDefaults: NewProjectFormData = {
   latitude: '',
   longitude: '',
   project_name: '',
+
+  // Property data fields
   total_units: '',
   building_sf: '',
   site_area: '',
@@ -163,6 +187,8 @@ export const emptyFormDefaults: NewProjectFormData = {
   density: '',
   scale_input_method: 'units',
   analysis_start_date: new Date().toISOString().split('T')[0],
+
+  // Path selection
   path_choice: ''
 }
 

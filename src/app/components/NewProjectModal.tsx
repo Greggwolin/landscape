@@ -37,10 +37,15 @@ const getNumeric = (value: string) => {
 type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData' | 'path'
 
 const FIELD_SECTION_MAP: Record<string, SectionKey> = {
-  development_type: 'asset',
-  property_type_code: 'asset',
+  // Asset type section
+  analysis_type: 'asset',
+  development_type: 'asset', // deprecated
+  property_type_code: 'asset', // deprecated
+  // Configure section
   property_subtype: 'configure',
+  property_class: 'configure',
   project_name: 'configure',
+  // Location section
   location_mode: 'location',
   single_line_address: 'location',
   street_address: 'location',
@@ -50,6 +55,7 @@ const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   cross_streets: 'location',
   latitude: 'location',
   longitude: 'location',
+  // Property data section
   total_units: 'propertyData',
   building_sf: 'propertyData',
   site_area: 'propertyData',
@@ -58,6 +64,7 @@ const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   density: 'propertyData',
   scale_input_method: 'propertyData',
   analysis_start_date: 'propertyData',
+  // Path section
   path_choice: 'path'
 }
 
@@ -209,9 +216,14 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
       const projectName = generateProjectName(data)
       const payload = {
         project_name: projectName,
-        development_type: data.development_type,
-        property_type_code: data.property_type_code,
+        // New taxonomy fields
+        analysis_type: data.analysis_type,
         property_subtype: data.property_subtype || undefined,
+        property_class: data.property_class || undefined,
+        // Deprecated fields (for backwards compatibility during transition)
+        development_type: data.analysis_type, // sync deprecated field
+        property_type_code: data.property_subtype || '', // sync deprecated field
+        // Location fields
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,
         city: data.city || undefined,
@@ -219,6 +231,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
         zip_code: data.zip || undefined,
         latitude: getNumeric(data.latitude),
         longitude: getNumeric(data.longitude),
+        // Property data fields
         site_area: getNumeric(data.site_area),
         site_area_unit: data.site_area_unit,
         total_units: getNumeric(data.total_units),

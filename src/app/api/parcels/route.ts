@@ -21,17 +21,26 @@ export async function GET(request: Request) {
         p.phase_id,
         a.area_no AS area_no,
         ph.phase_no AS phase_no,
-        CONCAT(a.area_no::text, '.', ph.phase_no::text) AS phase_name,
-        CONCAT(
-          a.area_no::text,
-          '.',
-          ph.phase_no::text,
-          LPAD(
-            ROW_NUMBER() OVER (PARTITION BY a.area_no, ph.phase_no ORDER BY p.parcel_id)::text,
-            2,
-            '0'
+        CASE
+          WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+          THEN CONCAT(a.area_no::text, '.', ph.phase_no::text)
+          ELSE COALESCE(p.parcel_code, 'Unassigned')
+        END AS phase_name,
+        CASE
+          WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+          THEN CONCAT(
+            a.area_no::text,
+            '.',
+            ph.phase_no::text,
+            '.',
+            LPAD(
+              ROW_NUMBER() OVER (PARTITION BY a.area_no, ph.phase_no ORDER BY p.parcel_id)::text,
+              2,
+              '0'
+            )
           )
-        ) AS parcel_name,
+          ELSE COALESCE(p.parcel_code, CONCAT('Parcel-', p.parcel_id::text))
+        END AS parcel_name,
         COALESCE(p.landuse_code, '') as usecode,
         COALESCE(CAST(p.acres_gross AS FLOAT), 0) as acres,
         COALESCE(p.lot_product, '') as product,
@@ -45,11 +54,14 @@ export async function GET(request: Request) {
         COALESCE('', '') as subtype_name,
         COALESCE(lu.name, p.landuse_code) as landuse_name
       FROM landscape.tbl_parcel p
-      JOIN landscape.tbl_area a ON a.area_id = p.area_id
-      JOIN landscape.tbl_phase ph ON ph.phase_id = p.phase_id
+      LEFT JOIN landscape.tbl_area a ON a.area_id = p.area_id
+      LEFT JOIN landscape.tbl_phase ph ON ph.phase_id = p.phase_id
       LEFT JOIN landscape.tbl_landuse lu ON lu.landuse_code = p.landuse_code
       WHERE p.project_id = ${projectId}
-      ORDER BY a.area_no, ph.phase_no, p.parcel_id;
+      ORDER BY
+        CASE WHEN a.area_no IS NULL THEN 999999 ELSE a.area_no END,
+        CASE WHEN ph.phase_no IS NULL THEN 999999 ELSE ph.phase_no END,
+        p.parcel_id;
     `;
 
     return NextResponse.json(result || []);
