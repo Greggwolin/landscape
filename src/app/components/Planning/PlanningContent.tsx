@@ -344,10 +344,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   }
 
   return (
-    <div className="p-4 space-y-4 bg-gray-950 min-h-screen">
+    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'rgb(230, 231, 235)' }}>
       {/* Page Title */}
-      <div className="bg-gray-800 rounded border border-gray-700 p-3">
-        <h2 className="text-lg font-semibold text-white">Planning Overview</h2>
+      <div className="rounded border p-3" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
       </div>
 
       {/* Level overview row */}
@@ -357,9 +357,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           : 'grid-cols-1 lg:grid-cols-[40%_1fr]'
       }`}>
         {/* Level 1 summary */}
-        <div className="bg-gray-800 rounded border border-gray-700">
-          <div className="px-4 py-3 border-b border-gray-700">
-            <h3 className="text-lg font-semibold text-white">{level1LabelPlural}</h3>
+        <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level1LabelPlural}</h3>
           </div>
           <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -367,15 +367,42 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <div
                   key={key}
                   onClick={() => toggleAreaFilter(areaNo)}
-                  className={`rounded p-3 border-2 cursor-pointer transition-colors min-w-[140px] ${
-                    selectedAreaFilters.includes(areaNo)
-                      ? 'bg-blue-700 border-blue-500'
-                      : 'bg-gray-700 border-gray-600 hover:bg-gray-650 hover:border-blue-500'
-                  }`}
+                  className="rounded p-3 border-2 cursor-pointer transition-all min-w-[140px]"
+                  style={selectedAreaFilters.includes(areaNo) ? {
+                    backgroundColor: 'var(--cui-primary)',
+                    borderColor: 'var(--cui-primary)',
+                    opacity: 0.9
+                  } : {
+                    backgroundColor: 'var(--cui-card-bg)',
+                    borderColor: 'var(--cui-border-color)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedAreaFilters.includes(areaNo)) {
+                      e.currentTarget.style.opacity = '1';
+                    } else {
+                      e.currentTarget.style.borderColor = 'var(--cui-primary)';
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedAreaFilters.includes(areaNo)) {
+                      e.currentTarget.style.opacity = '0.9';
+                    } else {
+                      e.currentTarget.style.borderColor = 'var(--cui-border-color)';
+                      e.currentTarget.style.backgroundColor = 'var(--cui-card-bg)';
+                    }
+                  }}
                 >
                   <div className="text-center">
-                    <div className="text-lg font-bold text-white mb-1 whitespace-nowrap" title={title}>{title}</div>
-                    <div className="space-y-1 text-xs text-gray-300">
+                    <div className="text-lg font-bold mb-1 whitespace-nowrap"
+                      style={{ color: selectedAreaFilters.includes(areaNo) ? 'white' : 'var(--cui-body-color)' }}
+                      title={title}
+                    >
+                      {title}
+                    </div>
+                    <div className="space-y-1 text-xs"
+                      style={{ color: selectedAreaFilters.includes(areaNo) ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)' }}
+                    >
                       <div>{stats.grossAcres} acres</div>
                       <div>{stats.phases} {level2LabelPlural}</div>
                       <div>{stats.parcels} {level3LabelPlural}</div>
@@ -389,13 +416,19 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         </div>
 
         {/* Level 2 summary */}
-        <div className="bg-gray-800 rounded border border-gray-700">
-          <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">{level2LabelPlural} Overview</h3>
+        <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level2LabelPlural} Overview</h3>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Add {level2Label}:</span>
+              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level2Label}:</span>
               <select
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
                 onChange={async (e) => {
                   if (e.target.value) {
                     const areaNo = parseInt(e.target.value)
@@ -415,14 +448,14 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           <div className="p-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-600">
-                    <th className="text-left py-2 text-gray-300 font-medium">{level2Label}</th>
-                    <th className="text-left py-2 text-gray-300 font-medium">Uses</th>
-                    <th className="text-left py-2 text-gray-300 font-medium">Description</th>
-                    <th className="text-center py-2 text-gray-300 font-medium">Acres</th>
-                    <th className="text-center py-2 text-gray-300 font-medium">Units</th>
-                    <th className="text-center py-2 text-gray-300 font-medium">Actions</th>
+                <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+                  <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Uses</th>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Description</th>
+                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
+                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
+                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -446,22 +479,31 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       </div>
 
       {/* Parcel Detail Section */}
-      <div className="bg-gray-800 rounded border border-gray-700">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Parcel Detail</h3>
+      <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Parcel Detail</h3>
           <div className="flex items-center gap-3">
             {(selectedAreaFilters.length > 0 || selectedPhaseFilters.length > 0) && (
               <button
                 onClick={clearFilters}
-                className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-full hover:bg-red-600 transition-colors"
+                className="px-3 py-1.5 text-white text-sm rounded-full transition-colors"
+                style={{ backgroundColor: 'var(--cui-danger)' }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
               >
                 Clear Filters ({selectedAreaFilters.length + selectedPhaseFilters.length})
               </button>
             )}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Add {level3Label}:</span>
+              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level3Label}:</span>
               <select
-                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
                 onChange={async (e) => {
                   if (e.target.value) {
                     const phaseId = parseInt(e.target.value)
@@ -484,17 +526,17 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         <div className={detailOpen ? 'p-2 grid grid-cols-3 gap-4' : 'overflow-x-auto'}>
           <div className={detailOpen ? 'col-span-2 overflow-x-auto' : ''}>
           <table className="w-full text-sm">
-            <thead className="bg-gray-900">
+            <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
               <tr>
-                <th className="text-left px-2 py-2 font-medium text-gray-300">{level1Label}</th>
-                <th className="text-left px-2 py-2 font-medium text-gray-300">{level2Label}</th>
-                <th className="text-left px-2 py-2 font-medium text-gray-300">{level3Label} ID</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Use Family</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Use Type</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Product</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Acres</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Units</th>
-                <th className="text-center px-2 py-2 font-medium text-gray-300">Actions</th>
+                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level1Label}</th>
+                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level3Label} ID</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Product</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
+                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -901,14 +943,29 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
   }
 
   return (
-    <tr className={`border-b border-gray-700 hover:bg-gray-700 ${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}>
-      <td className="px-2 py-1.5 text-gray-300">{parcel.area_no}</td>
-      <td className="px-2 py-1.5 text-gray-300">{parcel.phase_name}</td>
-      <td className="px-2 py-1.5 text-gray-300">{parcel.parcel_name}</td>
+    <tr className={`border-b transition-colors`} style={{
+      borderColor: 'var(--cui-border-color)',
+      backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+    }}>
+      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
+      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.phase_name}</td>
+      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.parcel_name}</td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <select
-            className="w-32 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="w-32 rounded px-2 py-1 text-xs"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)',
+              border: '1px solid'
+            }}
             value={selectedFamily}
             onChange={e => {
               const newFamily = e.target.value
@@ -927,13 +984,19 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
             {families.map(f => <option key={f.family_id} value={f.family_id}>{f.name}</option>)}
           </select>
         ) : (
-          <span className="text-gray-300">{getFamilyName(parcel)}</span>
+          <span style={{ color: 'var(--cui-body-color)' }}>{getFamilyName(parcel)}</span>
         )}
       </td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <select
-            className="w-40 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="w-40 rounded px-2 py-1 text-xs"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)',
+              border: '1px solid'
+            }}
             value={selectedType}
             onChange={e => {
               const newType = e.target.value
@@ -963,11 +1026,17 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
           </span>
         )}
       </td>
-      <td className="px-2 py-1.5 text-center text-gray-300">
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
         {editing ? (
           selectedType && products.length > 0 ? (
             <select
-              className="w-32 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+              className="w-32 rounded px-2 py-1 text-xs"
+              style={{
+                backgroundColor: 'var(--cui-body-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)',
+                border: '1px solid'
+              }}
               value={draft.product}
               onChange={e => setDraft(d => ({ ...d, product: e.target.value }))}
             >
@@ -979,55 +1048,99 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
               ))}
             </select>
           ) : selectedType ? (
-            <span className="text-xs text-gray-400 italic">N/A</span>
+            <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>N/A</span>
           ) : (
-            <span className="text-xs text-gray-500">—</span>
+            <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
           )
         ) : (
           parcel.product || '—'
         )}
       </td>
-      <td className="px-2 py-1.5 text-center text-gray-300">
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
         {editing ? (
-          <input className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center" inputMode="decimal"
+          <input className="w-20 rounded px-2 py-1 text-center" inputMode="decimal"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)',
+              border: '1px solid'
+            }}
             value={draft.acres} onChange={e => setDraft(d => ({ ...d, acres: e.target.value === '' ? 0 : Number(e.target.value) }))}
           />
         ) : (
           new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parcel.acres)
         )}
       </td>
-      <td className="px-2 py-1.5 text-center text-gray-300">
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
         {editing ? (
           (() => {
             const currentFamilyName = selectedFamily
               ? families.find(f => f.family_id === selectedFamily)?.name
               : parcel.family_name
             return currentFamilyName === 'Residential' ? (
-              <input className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center" inputMode="decimal"
+              <input className="w-20 rounded px-2 py-1 text-center" inputMode="decimal"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
                 value={draft.units} onChange={e => setDraft(d => ({ ...d, units: e.target.value === '' ? 0 : Number(e.target.value) }))}
               />
             ) : (
-              <span className="text-xs text-gray-500">—</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
             )
           })()
         ) : (
           parcel.family_name === 'Residential' ? (
             new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parcel.units)
           ) : (
-            <span className="text-gray-500">—</span>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>—</span>
           )
         )}
       </td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <div className="flex items-center gap-2 justify-center">
-            <button className="px-1.5 py-0.5 text-xs bg-blue-700 text-white rounded" onClick={save}>Save</button>
-            <button className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-200 rounded" onClick={cancel}>Cancel</button>
+            <button
+              className="px-1.5 py-0.5 text-xs text-white rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-primary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onClick={save}
+            >
+              Save
+            </button>
+            <button
+              className="px-1.5 py-0.5 text-xs rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onClick={cancel}
+            >
+              Cancel
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-2 justify-center">
-            <button className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600" onClick={() => setEditing(true)}>Edit</button>
-            <button className="px-1.5 py-0.5 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600" onClick={() => onOpenDetail && onOpenDetail()}>Detail</button>
+            <button
+              className="px-1.5 py-0.5 text-xs rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </button>
+            <button
+              className="px-1.5 py-0.5 text-xs text-white rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-info)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onClick={() => onOpenDetail && onOpenDetail()}
+            >
+              Detail
+            </button>
           </div>
         )}
       </td>
@@ -1086,9 +1199,19 @@ const PhaseRow: React.FC<{
 
   return (
     <>
-      <tr className={`border-b border-gray-700 hover:bg-gray-700 ${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}>
+      <tr className={`border-b transition-colors`}
+        style={{
+          borderColor: 'var(--cui-border-color)',
+          backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+        }}>
         {/* Phase column */}
-        <td className="py-2 px-2 text-gray-300">
+        <td className="py-2 px-2" style={{ color: 'var(--cui-body-color)' }}>
           <span>{phase.phase_name}</span>
         </td>
 
@@ -1109,7 +1232,7 @@ const PhaseRow: React.FC<{
                 {useCode}
               </span>
             ))}
-            {phaseUseCodes.length === 0 && <span className="text-gray-400 text-xs">No uses</span>}
+            {phaseUseCodes.length === 0 && <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>No uses</span>}
           </div>
         </td>
 
@@ -1118,7 +1241,10 @@ const PhaseRow: React.FC<{
           <div className="flex items-center gap-2">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
+              className="transition-colors flex-shrink-0"
+              style={{ color: 'var(--cui-secondary-color)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--cui-body-color)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--cui-secondary-color)'}
               title={expanded ? 'Collapse' : 'Expand'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1130,7 +1256,7 @@ const PhaseRow: React.FC<{
               </svg>
             </button>
             {phase.description && phase.description.trim().length > 0 && (
-              <span className="text-xs text-gray-300 truncate max-w-[200px]" title={phase.description}>
+              <span className="text-xs truncate max-w-[200px]" style={{ color: 'var(--cui-body-color)' }} title={phase.description}>
                 {phase.description}
               </span>
             )}
@@ -1138,10 +1264,10 @@ const PhaseRow: React.FC<{
         </td>
 
         {/* Acres column */}
-        <td className="py-2 px-2 text-center text-gray-300">{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
+        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
 
         {/* Units column */}
-        <td className="py-2 px-2 text-center text-gray-300">{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
+        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
 
         {/* Actions column */}
         <td className="py-2 px-2 text-center">
@@ -1150,9 +1276,15 @@ const PhaseRow: React.FC<{
               onClick={() => onToggleFilter(phase.phase_name)}
               className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                 selectedFilters.includes(phase.phase_name)
-                  ? 'bg-blue-700 text-white'
-                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  ? 'text-white'
+                  : ''
               }`}
+              style={selectedFilters.includes(phase.phase_name) ?
+                { backgroundColor: 'var(--cui-primary)' } :
+                { backgroundColor: 'var(--cui-secondary)', color: 'white' }
+              }
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
               Filter
             </button>
@@ -1162,16 +1294,22 @@ const PhaseRow: React.FC<{
 
       {/* Expanded description row */}
       {expanded && (
-        <tr className={index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}>
+        <tr style={{ backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)' }}>
           <td colSpan={6} className="px-4 py-3">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>
                   Phase {phase.phase_name} - Description
                 </label>
               </div>
               <textarea
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                className="w-full rounded px-3 py-2 text-sm"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
                 placeholder="Enter phase description..."
                 value={description}
                 onChange={e => setDescription(e.target.value)}
@@ -1179,13 +1317,19 @@ const PhaseRow: React.FC<{
               />
               <div className="flex gap-2 justify-end">
                 <button
-                  className="px-3 py-1.5 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+                  className="px-3 py-1.5 text-xs rounded transition-colors"
+                  style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                   onClick={cancel}
                 >
                   Cancel
                 </button>
                 <button
-                  className="px-3 py-1.5 text-xs bg-blue-700 text-white rounded hover:bg-blue-600"
+                  className="px-3 py-1.5 text-xs text-white rounded transition-colors"
+                  style={{ backgroundColor: 'var(--cui-primary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                   onClick={save}
                   disabled={saving}
                 >
