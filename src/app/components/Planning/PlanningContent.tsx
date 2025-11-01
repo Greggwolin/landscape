@@ -656,11 +656,11 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
               <table className="w-full text-sm">
                 <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Land Uses</th>
-                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
-                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Description</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>{level2Label}</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '35%' }}>Land Uses</th>
+                    <th className="text-center py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>Acres</th>
+                    <th className="text-center py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>Units</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '29%' }}>Description</th>
                   </tr>
                 </thead>
                 <tbody>
