@@ -109,12 +109,34 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
   const { level1Label, level2Label, level3Label, level1LabelPlural, level2LabelPlural, level3LabelPlural } = labels
 
+  // Format Parcel ID display: "1.1.02" → "1.1.2" (strip leading zeros)
+  const formatParcelIdDisplay = useCallback((dbId: string): string => {
+    if (!dbId) return '';
+
+    // Check if uses areas (3-level format: area.phase.counter)
+    const match3Level = dbId.match(/^(\d+)\.(\d)(\d+)$/);
+    if (match3Level) {
+      const [_, area, phase, counter] = match3Level;
+      return `${area}.${phase}.${parseInt(counter, 10)}`;
+    }
+
+    // 2-level format (phase.counter)
+    const parts = dbId.split('.');
+    if (parts.length === 2) {
+      return `${parts[0]}.${parseInt(parts[1], 10)}`;
+    }
+
+    // Return as-is if format doesn't match
+    return dbId;
+  }, []);
+
   // number formatting helpers moved inline in JSX
 
   const getAreaStats = useCallback((areaNo: number) => {
-    const areaParcels = parcels.filter(p => p.area_no === areaNo);
-    const areaPhases = [...new Set(areaParcels.map(p => p.phase_name))].sort();
-    
+    // Filter out parcels with null area_no
+    const areaParcels = parcels.filter(p => p.area_no === areaNo && p.area_no != null);
+    const areaPhases = [...new Set(areaParcels.map(p => p.phase_name).filter(phaseName => phaseName != null))].sort();
+
     return {
       grossAcres: Math.round(areaParcels.reduce((sum, p) => sum + (p.acres || 0), 0)),
       phases: areaPhases.length,
@@ -136,7 +158,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         }))
     }
 
-    const distinctAreas = Array.from(new Set(parcels.map(p => p.area_no))).sort((a, b) => a - b)
+    // Filter out null/undefined area_no to prevent "Plan Area null"
+    const distinctAreas = Array.from(new Set(parcels.map(p => p.area_no).filter(areaNo => areaNo != null))).sort((a, b) => a - b)
     const fallbackList = distinctAreas.length > 0 ? distinctAreas : [1, 2, 3, 4]
     return fallbackList.map(areaNo => ({
       key: `area-${areaNo}`,
@@ -166,6 +189,14 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   // Import PDF modal state
   const [showImportPdfModal, setShowImportPdfModal] = useState(false)
 
+  // Land use filter for Phasing tile
+  const [selectedLandUseFilter, setSelectedLandUseFilter] = useState<string>('')
+
+  // Get unique land use codes across all parcels
+  const allLandUseCodes = useMemo(() => {
+    return Array.from(new Set(parcels.map(p => p.type_code).filter(Boolean))).sort()
+  }, [parcels])
+
   // Filter parcels based on area and phase filters
   const filteredParcels = useMemo(() => {
     let filtered = parcels
@@ -183,13 +214,25 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     return filtered
   }, [parcels, selectedAreaFilters, selectedPhaseFilters])
 
-  // Filter phases based on area filters
+  // Filter phases based on area and land use filters
   const filteredPhases = useMemo(() => {
+    let filtered = phases
+
+    // Apply area filters
     if (selectedAreaFilters.length > 0) {
-      return phases.filter(phase => selectedAreaFilters.includes(phase.area_no))
+      filtered = filtered.filter(phase => selectedAreaFilters.includes(phase.area_no))
     }
-    return phases
-  }, [phases, selectedAreaFilters])
+
+    // Apply land use filter - only show phases that have parcels with the selected land use
+    if (selectedLandUseFilter) {
+      filtered = filtered.filter(phase => {
+        const phaseParcels = parcels.filter(p => p.phase_name === phase.phase_name)
+        return phaseParcels.some(p => p.type_code === selectedLandUseFilter)
+      })
+    }
+
+    return filtered
+  }, [phases, selectedAreaFilters, selectedLandUseFilter, parcels])
 
   // Toggle area filter - multi-select like phase filters
   const toggleAreaFilter = (areaNo: number) => {
@@ -213,6 +256,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const clearFilters = () => {
     setSelectedAreaFilters([])
     setSelectedPhaseFilters([])
+    setSelectedLandUseFilter('')
   }
 
   // Add Phase function
@@ -607,8 +651,38 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
         {/* Level 2 summary */}
         <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level2LabelPlural} Overview</h3>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Phasing</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Filter by Land Use:</span>
+              <select
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
+                value={selectedLandUseFilter}
+                onChange={(e) => setSelectedLandUseFilter(e.target.value)}
+              >
+                <option value="">All Land Uses</option>
+                {allLandUseCodes.map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+              {selectedLandUseFilter && (
+                <button
+                  onClick={() => setSelectedLandUseFilter('')}
+                  className="px-2 py-1 text-xs text-white rounded transition-colors"
+                  style={{ backgroundColor: 'var(--cui-danger)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
           <div className="p-4">
             <div className="overflow-x-auto">
@@ -616,11 +690,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                     <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Uses</th>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Description</th>
                     <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
                     <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
-                    <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Land Uses</th>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Description</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -648,7 +721,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
           <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Parcel Detail</h3>
           <div className="flex items-center gap-3">
-            {(selectedAreaFilters.length > 0 || selectedPhaseFilters.length > 0) && (
+            {(selectedAreaFilters.length > 0 || selectedPhaseFilters.length > 0 || selectedLandUseFilter) && (
               <button
                 onClick={clearFilters}
                 className="px-3 py-1.5 text-white text-sm rounded-full transition-colors"
@@ -656,7 +729,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
               >
-                Clear Filters ({selectedAreaFilters.length + selectedPhaseFilters.length})
+                Clear Filters ({selectedAreaFilters.length + selectedPhaseFilters.length + (selectedLandUseFilter ? 1 : 0)})
               </button>
             )}
             <button
@@ -720,6 +793,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                   onOpenDetail={() => openDetailForParcel(parcel)}
                   onDelete={deleteParcel}
                   getFamilyName={getFamilyName}
+                  formatParcelIdDisplay={formatParcelIdDisplay}
                   projectId={projectId}
                 />
               ))}
@@ -823,7 +897,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
 // Filter helper UI
 // Inline-editable parcel row
-const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; onDelete?: (parcelId: number) => void; getFamilyName: (parcel: Parcel) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, projectId }) => {
+const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; onDelete?: (parcelId: number) => void; getFamilyName: (parcel: Parcel) => string; formatParcelIdDisplay: (dbId: string) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId }) => {
   const [editing, setEditing] = useState(false)
   const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
@@ -1163,7 +1237,7 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
     }}>
       <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
       <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.phase_name}</td>
-      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.parcel_name}</td>
+      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{formatParcelIdDisplay(parcel.parcel_name)}</td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <select
@@ -1433,7 +1507,13 @@ const PhaseRow: React.FC<{
           <span>{phase.phase_name}</span>
         </td>
 
-        {/* Uses column */}
+        {/* Acres column */}
+        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
+
+        {/* Units column */}
+        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
+
+        {/* Land Uses column */}
         <td className="py-2 px-2 text-left">
           <div className="flex flex-wrap gap-1">
             {phaseUseCodes.map((useCode, idx) => (
@@ -1454,7 +1534,7 @@ const PhaseRow: React.FC<{
           </div>
         </td>
 
-        {/* Description column - icon and truncated text */}
+        {/* Description column - icon and truncated text (moved to last) */}
         <td className="py-2 px-2">
           <div className="flex items-center gap-2">
             <button
@@ -1480,25 +1560,12 @@ const PhaseRow: React.FC<{
             )}
           </div>
         </td>
-
-        {/* Acres column */}
-        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
-
-        {/* Units column */}
-        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
-
-        {/* Actions column - removed Filter and Delete buttons per MVP requirements */}
-        <td className="py-2 px-2 text-center">
-          <div className="flex items-center gap-2 justify-center">
-            {/* No actions needed - phases are auto-created from Parcel Detail */}
-          </div>
-        </td>
       </tr>
 
       {/* Expanded description row */}
       {expanded && (
         <tr style={{ backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)' }}>
-          <td colSpan={6} className="px-4 py-3">
+          <td colSpan={5} className="px-4 py-3">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>
