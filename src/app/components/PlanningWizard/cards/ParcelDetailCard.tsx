@@ -72,7 +72,6 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
     frontage: 0,
     product: '',
     status: 'Planned',
-    notes: '',
     efficiency: 0.85,
     density_gross: 0,
     ff_per_acre: 0
@@ -120,7 +119,6 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
         frontage: parcel.frontage || 0,
         product: parcel.product || '',
         status: parcel.status || 'Planned',
-        notes: parcel.notes || '',
         efficiency: parcel.efficiency || 0.85,
         density_gross: parcel.density_gross || (parcel.acres > 0 ? parcel.units / parcel.acres : 0),
         ff_per_acre: parcel.ff_per_acre || (parcel.frontage && parcel.acres > 0 ? parcel.frontage / parcel.acres : 0)
@@ -179,7 +177,7 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
     
     // Check if any field has changed from original values
     const newData = { ...formData, [field]: value }
-    const hasChangedData = 
+    const hasChangedData =
       newData.name !== parcel.name ||
       newData.landUse !== parcel.landUse ||
       newData.acres !== parcel.acres ||
@@ -187,8 +185,7 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
       newData.description !== ((parcel as any).description || '') ||
       newData.frontage !== (parcel.frontage || 0) ||
       newData.product !== (parcel.product || '') ||
-      newData.status !== (parcel.status || 'Planned') ||
-      newData.notes !== (parcel.notes || '')
+      newData.status !== (parcel.status || 'Planned')
     
     console.log('ParcelDetailCard - Form change:', { field, value, hasChangedData })
     setHasChanges(hasChangedData)
@@ -300,8 +297,20 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
           {/* Content */}
           <div className="flex-1 p-6 overflow-y-auto">
+            <style jsx>{`
+              /* Remove number input spinners */
+              input[type=number]::-webkit-outer-spin-button,
+              input[type=number]::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+              }
+              input[type=number] {
+                -moz-appearance: textfield;
+              }
+            `}</style>
+
             <div className="space-y-6">
-              {/* Parcel Name */}
+              {/* Row 1: Parcel Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Parcel Name
@@ -315,92 +324,7 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 />
               </div>
 
-              {/* Land Use Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Land Use Type
-                </label>
-                <select
-                  value={formData.landUse}
-                  onChange={(e) => handleFormChange('landUse', e.target.value as LandUseType)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  {landUseOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label} ({option.densityRange})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Acres */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Acres
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.acres}
-                  onChange={(e) => handleFormChange('acres', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-
-              {/* Units */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Units
-                </label>
-                <input
-                  type="number"
-                  value={formData.units}
-                  onChange={(e) => handleFormChange('units', parseInt(e.target.value) || 0)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  disabled={['OS'].includes(formData.landUse)}
-                />
-                {formData.acres && formData.units && !['C', 'OS'].includes(formData.landUse) && (
-                  <p className="text-gray-400 text-xs mt-1">
-                    Density: {calculateDensity()} units/acre
-                  </p>
-                )}
-              </div>
-
-              {/* Two-column layout for additional fields */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Frontage */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Frontage (ft)
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={formData.frontage}
-                    onChange={(e) => handleFormChange('frontage', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="<Add>"
-                  />
-                </div>
-
-                {/* Product */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Product Type
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.product}
-                    onChange={(e) => handleFormChange('product', e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="<Add>"
-                  />
-                </div>
-              </div>
-
-              {/* Status removed per spec */}
-
-              {/* Land Use Family */}
+              {/* Row 2: Land Use Family - MUST BE FIRST */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Land Use Family
@@ -419,18 +343,18 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 </select>
               </div>
 
-              {/* Land Use Subtype */}
+              {/* Row 3: Land Use Subtype - AFTER Family */}
               {selectedFamily && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Land Use Subtype
+                    Land Use Type
                   </label>
                   <select
                     value={selectedSubtype}
                     onChange={(e) => handleSubtypeChange(e.target.value)}
                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   >
-                    <option value="">Select Subtype</option>
+                    <option value="">Select Type</option>
                     {getFilteredSubtypes().map(subtype => (
                       <option key={subtype.subtype_id} value={subtype.subtype_id}>
                         {subtype.name}
@@ -440,11 +364,84 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 </div>
               )}
 
-              {/* Land Use Code */}
+              {/* Row 4: Acres & Units - SAME ROW, NO SPINNERS */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Acres
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.acres}
+                    onChange={(e) => handleFormChange('acres', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Units
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.units}
+                    onChange={(e) => handleFormChange('units', parseInt(e.target.value) || 0)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    disabled={['OS'].includes(formData.landUse)}
+                  />
+                </div>
+              </div>
+
+              {/* Density display */}
+              {formData.acres && formData.units && !['C', 'OS'].includes(formData.landUse) && (
+                <p className="text-gray-400 text-xs -mt-3">
+                  Density: {calculateDensity()} units/acre
+                </p>
+              )}
+
+              {/* Row 5: Product & Frontage - PRODUCT FIRST */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Product Type
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.product}
+                    onChange={(e) => handleFormChange('product', e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    placeholder="<Add>"
+                  />
+                </div>
+
+                {/* Frontage - Only show for SFD products */}
+                {formData.product &&
+                 formData.product.startsWith('SF') &&
+                 !formData.product.toUpperCase().includes('TH') &&
+                 !formData.product.toUpperCase().includes('TOWNHOME') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Frontage (ft)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.frontage ? formData.frontage.toLocaleString('en-US') : ''}
+                      readOnly
+                      className="w-full bg-gray-600 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-300 cursor-default"
+                      placeholder="Calculated"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Land Use Code - Optional detailed selection */}
               {selectedFamily && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Land Use Code
+                    Land Use Code (Optional)
                   </label>
                   <select
                     value={formData.landuse_code_id || ''}
@@ -461,7 +458,7 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 </div>
               )}
 
-              {/* Description */}
+              {/* Row 7: Description - LAST POSITION */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Description
@@ -469,25 +466,13 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleFormChange('description', e.target.value)}
-                  rows={2}
+                  rows={4}
                   className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  placeholder="<Add>"
+                  placeholder="Optional notes about this parcel"
                 />
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Notes
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => handleFormChange('notes', e.target.value)}
-                  rows={2}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  placeholder="<Add>"
-                />
-              </div>
+              {/* Notes field REMOVED per requirements */}
 
               {/* Summary Info */}
               <div className="bg-gray-700 border border-gray-600 rounded-md p-4">
