@@ -113,15 +113,15 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const formatParcelIdDisplay = useCallback((dbId: string): string => {
     if (!dbId) return '';
 
-    // Check if uses areas (3-level format: area.phase.counter)
-    const match3Level = dbId.match(/^(\d+)\.(\d)(\d+)$/);
-    if (match3Level) {
-      const [_, area, phase, counter] = match3Level;
-      return `${area}.${phase}.${parseInt(counter, 10)}`;
+    // Split by dots
+    const parts = dbId.split('.');
+
+    // 3-level format: area.phase.counter
+    if (parts.length === 3) {
+      return `${parts[0]}.${parts[1]}.${parseInt(parts[2], 10)}`;
     }
 
-    // 2-level format (phase.counter)
-    const parts = dbId.split('.');
+    // 2-level format: phase.counter
     if (parts.length === 2) {
       return `${parts[0]}.${parseInt(parts[1], 10)}`;
     }
@@ -197,7 +197,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     return Array.from(new Set(parcels.map(p => p.type_code).filter(Boolean))).sort()
   }, [parcels])
 
-  // Filter parcels based on area and phase filters
+  // Filter parcels based on area, phase, and land use filters
   const filteredParcels = useMemo(() => {
     let filtered = parcels
 
@@ -211,10 +211,15 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       filtered = filtered.filter(parcel => selectedPhaseFilters.includes(parcel.phase_name))
     }
 
-    return filtered
-  }, [parcels, selectedAreaFilters, selectedPhaseFilters])
+    // Apply land use filter
+    if (selectedLandUseFilter) {
+      filtered = filtered.filter(parcel => parcel.type_code === selectedLandUseFilter)
+    }
 
-  // Filter phases based on area and land use filters
+    return filtered
+  }, [parcels, selectedAreaFilters, selectedPhaseFilters, selectedLandUseFilter])
+
+  // Filter phases based on area filters only
   const filteredPhases = useMemo(() => {
     let filtered = phases
 
@@ -223,16 +228,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       filtered = filtered.filter(phase => selectedAreaFilters.includes(phase.area_no))
     }
 
-    // Apply land use filter - only show phases that have parcels with the selected land use
-    if (selectedLandUseFilter) {
-      filtered = filtered.filter(phase => {
-        const phaseParcels = parcels.filter(p => p.phase_name === phase.phase_name)
-        return phaseParcels.some(p => p.type_code === selectedLandUseFilter)
-      })
-    }
-
     return filtered
-  }, [phases, selectedAreaFilters, selectedLandUseFilter, parcels])
+  }, [phases, selectedAreaFilters])
 
   // Toggle area filter - multi-select like phase filters
   const toggleAreaFilter = (areaNo: number) => {
@@ -651,38 +648,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
         {/* Level 2 summary */}
         <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
             <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Phasing</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Filter by Land Use:</span>
-              <select
-                className="rounded px-2 py-1 text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  border: '1px solid'
-                }}
-                value={selectedLandUseFilter}
-                onChange={(e) => setSelectedLandUseFilter(e.target.value)}
-              >
-                <option value="">All Land Uses</option>
-                {allLandUseCodes.map((code) => (
-                  <option key={code} value={code}>{code}</option>
-                ))}
-              </select>
-              {selectedLandUseFilter && (
-                <button
-                  onClick={() => setSelectedLandUseFilter('')}
-                  className="px-2 py-1 text-xs text-white rounded transition-colors"
-                  style={{ backgroundColor: 'var(--cui-danger)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
           </div>
           <div className="p-4">
             <div className="overflow-x-auto">
@@ -690,9 +657,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                     <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Land Uses</th>
                     <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
                     <th className="text-center py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
-                    <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Land Uses</th>
                     <th className="text-left py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Description</th>
                   </tr>
                 </thead>
@@ -741,6 +708,25 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             >
               Import PDF
             </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Land Use:</span>
+              <select
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid'
+                }}
+                value={selectedLandUseFilter}
+                onChange={(e) => setSelectedLandUseFilter(e.target.value)}
+              >
+                <option value="">All</option>
+                {allLandUseCodes.map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level3Label}:</span>
               <select
@@ -1489,29 +1475,35 @@ const PhaseRow: React.FC<{
     setEditing(false)
   }
 
+  const isSelected = selectedFilters.includes(phase.phase_name);
+
   return (
     <>
-      <tr className={`border-b transition-colors`}
+      <tr className={`border-b transition-colors cursor-pointer`}
         style={{
           borderColor: 'var(--cui-border-color)',
-          backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'
+          backgroundColor: isSelected ? 'var(--cui-primary)' : (index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'),
+          opacity: isSelected ? 0.9 : 1
         }}
+        onClick={() => onToggleFilter(phase.phase_name)}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+          if (isSelected) {
+            e.currentTarget.style.opacity = '1';
+          } else {
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+          }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+          if (isSelected) {
+            e.currentTarget.style.opacity = '0.9';
+          } else {
+            e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+          }
         }}>
         {/* Phase column */}
-        <td className="py-2 px-2" style={{ color: 'var(--cui-body-color)' }}>
+        <td className="py-2 px-2" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }}>
           <span>{phase.phase_name}</span>
         </td>
-
-        {/* Acres column */}
-        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
-
-        {/* Units column */}
-        <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
 
         {/* Land Uses column */}
         <td className="py-2 px-2 text-left">
@@ -1534,15 +1526,24 @@ const PhaseRow: React.FC<{
           </div>
         </td>
 
+        {/* Acres column */}
+        <td className="py-2 px-2 text-center" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.gross_acres)}</td>
+
+        {/* Units column */}
+        <td className="py-2 px-2 text-center" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
+
         {/* Description column - icon and truncated text (moved to last) */}
         <td className="py-2 px-2">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setExpanded(!expanded)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }}
               className="transition-colors flex-shrink-0"
-              style={{ color: 'var(--cui-secondary-color)' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--cui-body-color)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--cui-secondary-color)'}
+              style={{ color: isSelected ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = isSelected ? 'white' : 'var(--cui-body-color)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = isSelected ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)'}
               title={expanded ? 'Collapse' : 'Expand'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1554,7 +1555,7 @@ const PhaseRow: React.FC<{
               </svg>
             </button>
             {phase.description && phase.description.trim().length > 0 && (
-              <span className="text-xs truncate max-w-[200px]" style={{ color: 'var(--cui-body-color)' }} title={phase.description}>
+              <span className="text-xs truncate max-w-[200px]" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }} title={phase.description}>
                 {phase.description}
               </span>
             )}
