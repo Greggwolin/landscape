@@ -48,7 +48,6 @@ export async function GET(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
-        p.project_status,
         p.target_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,
@@ -110,7 +109,6 @@ export async function PATCH(
     const fieldMapping: Record<string, string> = {
       'analysis_type': 'analysis_type',
       'property_subtype': 'property_subtype',
-      'project_status': 'project_status',
       'target_units': 'target_units',
       'gross_acres': 'acres_gross',
       'address': 'street_address',
@@ -155,7 +153,6 @@ export async function PATCH(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
-        p.project_status,
         p.target_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,

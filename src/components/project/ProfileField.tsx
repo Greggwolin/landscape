@@ -10,21 +10,30 @@ interface ProfileFieldProps {
   label: string;
   value?: string | number | null;
   defaultText?: string;
+  isLast?: boolean;
 }
 
 export const ProfileField: React.FC<ProfileFieldProps> = ({
   label,
   value,
-  defaultText = 'Not specified'
+  defaultText = 'Not specified',
+  isLast = false
 }) => {
   const displayValue = value !== null && value !== undefined && value !== ''
     ? String(value)
     : defaultText;
 
   return (
-    <div className="profile-field">
-      <div className="profile-field-label">{label}</div>
-      <div className="profile-field-value">{displayValue}</div>
+    <div
+      className={`d-flex gap-3 py-2 ${!isLast ? 'border-bottom' : ''}`}
+      style={{ borderColor: 'var(--cui-border-color)' }}
+    >
+      <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
+        {label}
+      </span>
+      <span style={{ color: 'var(--cui-secondary-color)' }}>
+        {displayValue}
+      </span>
     </div>
   );
 };

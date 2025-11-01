@@ -15,7 +15,6 @@ export interface ProjectProfile {
   project_name: string;
   analysis_type?: AnalysisType;
   property_subtype?: PropertySubtype;
-  project_status?: ProjectStatus;
   target_units?: number;
   gross_acres?: number;
   address?: string;
@@ -48,7 +47,6 @@ export interface MSA {
 export interface ProjectProfileFormData {
   analysis_type: AnalysisType;
   property_subtype?: PropertySubtype;
-  project_status?: ProjectStatus;
   target_units?: number;
   gross_acres?: number;
   address?: string;
@@ -106,11 +104,11 @@ export const OWNERSHIP_TYPES: readonly OwnershipType[] = [
 // ============================================================================
 
 /**
- * Format gross acres with 2 decimal places and commas
+ * Format gross acres as integer with commas (e.g., 1,500 ac)
  */
 export function formatGrossAcres(acres?: number | null): string {
   if (acres === null || acres === undefined) return 'Not specified';
-  return `${acres.toFixed(2)} ac`;
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(acres)} ac`;
 }
 
 /**

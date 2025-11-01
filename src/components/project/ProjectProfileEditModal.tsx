@@ -25,7 +25,7 @@ import {
 import useSWR from 'swr';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile, ProjectProfileFormData, MSA } from '@/types/project-profile';
-import { PROJECT_STATUSES, OWNERSHIP_TYPES, validateTargetUnits, validateGrossAcres } from '@/types/project-profile';
+import { OWNERSHIP_TYPES, validateTargetUnits, validateGrossAcres } from '@/types/project-profile';
 import { ANALYSIS_TYPES, getSubtypesForAnalysisType, type AnalysisType } from '@/types/project-taxonomy';
 
 interface ProjectProfileEditModalProps {
@@ -48,7 +48,6 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
   const [formData, setFormData] = useState<ProjectProfileFormData>({
     analysis_type: (profile.analysis_type || 'Land Development') as AnalysisType,
     property_subtype: profile.property_subtype,
-    project_status: profile.project_status,
     target_units: profile.target_units,
     gross_acres: profile.gross_acres,
     address: profile.address,
@@ -199,20 +198,6 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
           </CRow>
 
           <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel htmlFor="project_status">Project Status</CFormLabel>
-              <CFormSelect
-                id="project_status"
-                value={formData.project_status || ''}
-                onChange={(e) => handleInputChange('project_status', e.target.value || undefined)}
-              >
-                <option value="">-- Select --</option>
-                {PROJECT_STATUSES.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
             <CCol md={6}>
               <CFormLabel htmlFor="ownership_type">Ownership Type</CFormLabel>
               <CFormSelect

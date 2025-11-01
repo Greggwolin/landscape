@@ -518,11 +518,18 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   return (
     <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'rgb(230, 231, 235)' }}>
       {/* Page Title */}
-      <div className="rounded border p-3" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+      <div className="rounded border p-4" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+        <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+          The Parcel Detail table is the source of truth for all planning data. Enter parcels with their Plan Area and Phase assignments below.
+          Plan Areas and Phases Overview sections automatically roll up from your parcel entries.
+        </p>
       </div>
 
-      {/* Level overview row */}
+      {/* NOTE: In MVP workflow, Parcel Detail should be HERE at top, but keeping current layout for now
+          TODO: Physically reorder sections - move Parcel Detail section (line ~640) to here */}
+
+      {/* Plan Areas and Phases Overview - Read-only rollups from Parcel Detail */}
       <div className={`grid gap-4 transition-all duration-300 ${
         isAnyPhaseEditing
           ? 'grid-cols-1 lg:grid-cols-[20%_1fr]'

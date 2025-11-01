@@ -78,64 +78,67 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
 
   return (
     <>
-      <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
-          <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0 h5 fw-semibold">Project Profile</h2>
+      <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+        <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-card-cap-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+          <span className="fw-semibold" style={{ letterSpacing: '0.02em' }}>
+            Project Profile
+          </span>
+          <div className="d-flex align-items-center gap-3 flex-wrap">
             <CButton
-              color="primary"
-              size="sm"
+              type="button"
+              color="link"
+              className="text-uppercase fw-semibold text-decoration-none px-0"
+              style={{ letterSpacing: '0.08em' }}
               onClick={handleEditClick}
             >
-              EDIT
+              Edit
             </CButton>
           </div>
         </CCardHeader>
-        <CCardBody className="profile-fields">
-          <ProfileField
-            label="Analysis Type"
-            value={profile.analysis_type}
-          />
-          <ProfileField
-            label="Property Subtype"
-            value={profile.property_subtype}
-          />
-          <ProfileField
-            label="Project Status"
-            value={profile.project_status}
-          />
-          <ProfileField
-            label="Target Units"
-            value={profile.target_units ? formatTargetUnits(profile.target_units) : undefined}
-          />
-          <ProfileField
-            label="Gross Acres"
-            value={profile.gross_acres ? formatGrossAcres(profile.gross_acres) : undefined}
-          />
-          <ProfileField
-            label="Address"
-            value={profile.address}
-          />
-          <ProfileField
-            label="City"
-            value={profile.city}
-          />
-          <ProfileField
-            label="County"
-            value={profile.county}
-          />
-          <ProfileField
-            label="Market"
-            value={formatMSADisplay(profile.msa_name, profile.state_abbreviation)}
-          />
-          <ProfileField
-            label="APN"
-            value={profile.apn}
-          />
-          <ProfileField
-            label="Ownership Type"
-            value={profile.ownership_type}
-          />
+        <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+          <div className="d-flex flex-column">
+            <ProfileField
+              label="Analysis Type"
+              value={profile.analysis_type}
+            />
+            <ProfileField
+              label="Property Subtype"
+              value={profile.property_subtype}
+            />
+            <ProfileField
+              label="Target Units"
+              value={profile.target_units ? formatTargetUnits(profile.target_units) : undefined}
+            />
+            <ProfileField
+              label="Gross Acres"
+              value={profile.gross_acres ? formatGrossAcres(profile.gross_acres) : undefined}
+            />
+            <ProfileField
+              label="Address"
+              value={profile.address}
+            />
+            <ProfileField
+              label="City"
+              value={profile.city}
+            />
+            <ProfileField
+              label="County"
+              value={profile.county}
+            />
+            <ProfileField
+              label="Market"
+              value={formatMSADisplay(profile.msa_name, profile.state_abbreviation)}
+            />
+            <ProfileField
+              label="APN"
+              value={profile.apn}
+            />
+            <ProfileField
+              label="Ownership Type"
+              value={profile.ownership_type}
+              isLast={true}
+            />
+          </div>
         </CCardBody>
       </CCard>
 
@@ -148,36 +151,6 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           onSaveSuccess={handleSaveSuccess}
         />
       )}
-
-      <style jsx>{`
-        :global(.project-profile-tile) {
-          height: 100%;
-        }
-
-        :global(.profile-fields) {
-          padding: 1.5rem;
-        }
-
-        :global(.profile-field) {
-          margin-bottom: 1rem;
-        }
-
-        :global(.profile-field:last-child) {
-          margin-bottom: 0;
-        }
-
-        :global(.profile-field-label) {
-          font-weight: 600;
-          color: #1a1a1a;
-          margin-bottom: 0.25rem;
-          font-size: 0.875rem;
-        }
-
-        :global(.profile-field-value) {
-          color: #4a4a4a;
-          font-size: 0.875rem;
-        }
-      `}</style>
     </>
   );
 };
