@@ -14,22 +14,25 @@ const landUseOptions: { value: LandUseType; label: string; densityRange: string 
 ]
 
 interface LandUseFamily {
-  family_id: string
+  family_id: number
   name: string
 }
 
 interface LandUseSubtype {
-  subtype_id: string
-  family_id: string
+  subtype_id: number
+  family_id: number
+  code: string
   name: string
+  ord: number
+  active: boolean
 }
 
 interface LandUseCode {
   landuse_id: number
   landuse_code: string
   name: string
-  family_id: string
-  subtype_id: string
+  family_id: number
+  subtype_id: number
   has_zoning: boolean
   has_programming: boolean
 }
@@ -86,8 +89,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
   const [hasChanges, setHasChanges] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
 
-  const [selectedFamily, setSelectedFamily] = useState('')
-  const [selectedSubtype, setSelectedSubtype] = useState('')
+  const [selectedFamily, setSelectedFamily] = useState<number | null>(null)
+  const [selectedSubtype, setSelectedSubtype] = useState<number | null>(null)
 
   // Load land use data
   useEffect(() => {
@@ -230,13 +233,13 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
     onClose()
   }
 
-  const handleFamilyChange = (familyId: string) => {
+  const handleFamilyChange = (familyId: number | null) => {
     setSelectedFamily(familyId)
-    setSelectedSubtype('')
+    setSelectedSubtype(null)
     setFormData({ ...formData, landuse_code_id: null })
   }
 
-  const handleSubtypeChange = (subtypeId: string) => {
+  const handleSubtypeChange = (subtypeId: number | null) => {
     setSelectedSubtype(subtypeId)
     setFormData({ ...formData, landuse_code_id: null })
   }
@@ -330,8 +333,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                   Land Use Family
                 </label>
                 <select
-                  value={selectedFamily}
-                  onChange={(e) => handleFamilyChange(e.target.value)}
+                  value={selectedFamily || ''}
+                  onChange={(e) => handleFamilyChange(e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 >
                   <option value="">Select Family</option>
@@ -350,8 +353,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                     Land Use Type
                   </label>
                   <select
-                    value={selectedSubtype}
-                    onChange={(e) => handleSubtypeChange(e.target.value)}
+                    value={selectedSubtype || ''}
+                    onChange={(e) => handleSubtypeChange(e.target.value ? parseInt(e.target.value) : null)}
                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="">Select Type</option>
