@@ -163,6 +163,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const [editingAreaNo, setEditingAreaNo] = useState<number | null>(null)
   const [editingAreaTitle, setEditingAreaTitle] = useState('')
 
+  // Import PDF modal state
+  const [showImportPdfModal, setShowImportPdfModal] = useState(false)
+
   // Filter parcels based on area and phase filters
   const filteredParcels = useMemo(() => {
     let filtered = parcels
@@ -656,6 +659,15 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 Clear Filters ({selectedAreaFilters.length + selectedPhaseFilters.length})
               </button>
             )}
+            <button
+              onClick={() => setShowImportPdfModal(true)}
+              className="px-3 py-1.5 text-xs text-white rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-info)' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              Import PDF
+            </button>
             <div className="flex items-center gap-2">
               <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level3Label}:</span>
               <select
@@ -772,6 +784,39 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           )}
         </div>
       </div>
+
+      {/* Import PDF Modal - Coming Soon */}
+      {showImportPdfModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowImportPdfModal(false)}
+        >
+          <div
+            className="rounded-lg p-6 max-w-md w-full mx-4"
+            style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)', border: '1px solid' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--cui-body-color)' }}>
+              PDF Import - Coming Soon
+            </h3>
+            <p className="mb-6" style={{ color: 'var(--cui-body-color)' }}>
+              Landscaper AI will soon extract parcel data from PDF tables automatically.
+              For now, please add parcels manually using the <strong>Add {level3Label}</strong> dropdown.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowImportPdfModal(false)}
+                className="px-4 py-2 text-white rounded transition-colors"
+                style={{ backgroundColor: 'var(--cui-primary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
