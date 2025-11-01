@@ -530,17 +530,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       }`}>
         {/* Level 1 summary */}
         <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
             <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level1LabelPlural}</h3>
-            <button
-              onClick={addArea}
-              className="px-3 py-1.5 text-xs text-white rounded transition-colors"
-              style={{ backgroundColor: 'var(--cui-success)' }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              + Add {level1Label}
-            </button>
           </div>
           <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -557,20 +548,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                     borderColor: 'var(--cui-border-color)'
                   }}
                 >
-                  {/* Action buttons */}
-                  <div className="absolute top-2 right-2 flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => deleteArea(areaNo)}
-                      className="px-1.5 py-0.5 text-xs rounded transition-colors"
-                      style={{ backgroundColor: 'var(--cui-danger)', color: 'white' }}
-                      onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-                      onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                      title="Delete area"
-                    >
-                      ×
-                    </button>
-                  </div>
-
                   <div
                     className="text-center cursor-pointer"
                     onClick={() => toggleAreaFilter(areaNo)}
@@ -620,33 +597,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
         {/* Level 2 summary */}
         <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
             <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level2LabelPlural} Overview</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level2Label}:</span>
-              <select
-                className="rounded px-2 py-1 text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  border: '1px solid'
-                }}
-                onChange={async (e) => {
-                  if (e.target.value) {
-                    const areaNo = parseInt(e.target.value)
-                    await addPhase(areaNo)
-                    e.target.value = ''
-                  }
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>Select {level1Label}...</option>
-                {areaCards.map(({ areaNo, title }) => (
-                  <option key={areaNo} value={areaNo}>{title}</option>
-                ))}
-              </select>
-            </div>
           </div>
           <div className="p-4">
             <div className="overflow-x-auto">
@@ -672,7 +624,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                       parcels={parcels}
                       onEditingChange={setIsAnyPhaseEditing}
                       onSaved={mutatePhases}
-                      onDelete={deletePhase}
                     />
                   ))}
                 </tbody>
@@ -1484,34 +1435,10 @@ const PhaseRow: React.FC<{
         {/* Units column */}
         <td className="py-2 px-2 text-center" style={{ color: 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
 
-        {/* Actions column */}
+        {/* Actions column - removed Filter and Delete buttons per MVP requirements */}
         <td className="py-2 px-2 text-center">
           <div className="flex items-center gap-2 justify-center">
-            <button
-              onClick={() => onToggleFilter(phase.phase_name)}
-              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
-                selectedFilters.includes(phase.phase_name)
-                  ? 'text-white'
-                  : ''
-              }`}
-              style={selectedFilters.includes(phase.phase_name) ?
-                { backgroundColor: 'var(--cui-primary)' } :
-                { backgroundColor: 'var(--cui-secondary)', color: 'white' }
-              }
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              Filter
-            </button>
-            <button
-              onClick={() => onDelete && onDelete(phase.phase_id)}
-              className="px-2 py-0.5 text-xs rounded-full transition-colors text-white"
-              style={{ backgroundColor: 'var(--cui-danger)' }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              Delete
-            </button>
+            {/* No actions needed - phases are auto-created from Parcel Detail */}
           </div>
         </td>
       </tr>
