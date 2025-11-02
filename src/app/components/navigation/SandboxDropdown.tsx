@@ -49,17 +49,25 @@ export default function SandboxDropdown() {
           }}
         >
           <div className="py-2">
-            {SANDBOX_PAGES.map((item, index) =>
-              'separator' in item && item.separator ? (
-                <div
-                  key={`sep-${index}`}
-                  className="my-2 border-t"
-                  style={{ borderColor: 'var(--cui-border-color)' }}
-                />
-              ) : (
+            {SANDBOX_PAGES.map((item, index) => {
+              // Type guard: check if item is a separator
+              if ('separator' in item && item.separator) {
+                return (
+                  <div
+                    key={`sep-${index}`}
+                    className="my-2 border-t"
+                    style={{ borderColor: 'var(--cui-border-color)' }}
+                  />
+                );
+              }
+
+              // Type assertion: item must have label and href
+              const linkItem = item as { label: string; href: string };
+
+              return (
                 <Link
-                  key={item.label}
-                  href={item.href}
+                  key={linkItem.label}
+                  href={linkItem.href}
                   onClick={handleLinkClick}
                   className="block px-4 py-2 text-sm transition-colors hover:bg-opacity-10"
                   style={{
@@ -72,10 +80,10 @@ export default function SandboxDropdown() {
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  {item.label}
+                  {linkItem.label}
                 </Link>
-              )
-            )}
+              );
+            })}
           </div>
         </div>
       )}

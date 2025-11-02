@@ -29,7 +29,7 @@ export interface NewProjectFormData {
 
   // DEPRECATED: keeping for backwards compatibility
   development_type: AnalysisType | ''
-  property_type_code: string
+  project_type_code: string
 
   // Location
   location_mode: LocationMode

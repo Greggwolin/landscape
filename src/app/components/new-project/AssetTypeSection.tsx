@@ -26,7 +26,7 @@ const AssetTypeSection = ({ form, hasError = false }: AssetTypeSectionProps) => 
       setValue('property_class', '')
       // Also update deprecated fields for backwards compatibility
       setValue('development_type', '')
-      setValue('property_type_code', '')
+      setValue('project_type_code', '')
       return
     }
 

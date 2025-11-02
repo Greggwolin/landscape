@@ -40,7 +40,7 @@ const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   // Asset type section
   analysis_type: 'asset',
   development_type: 'asset', // deprecated
-  property_type_code: 'asset', // deprecated
+  project_type_code: 'asset', // deprecated
   // Configure section
   property_subtype: 'configure',
   property_class: 'configure',
@@ -222,7 +222,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
         property_class: data.property_class || undefined,
         // Deprecated fields (for backwards compatibility during transition)
         development_type: data.analysis_type, // sync deprecated field
-        property_type_code: data.property_subtype || '', // sync deprecated field
+        project_type_code: data.property_subtype || '', // sync deprecated field
         // Location fields
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,

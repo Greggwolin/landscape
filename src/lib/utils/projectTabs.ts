@@ -24,7 +24,10 @@ export interface Tab {
  */
 export function getTabsForPropertyType(propertyType?: string): Tab[] {
   const normalized = propertyType?.toUpperCase() || '';
+
+  // Land Development projects (standardized code: LAND)
   const isLandDev =
+    normalized === 'LAND' ||
     normalized === 'MPC' ||
     normalized === 'LAND DEVELOPMENT' ||
     propertyType?.includes('Land Development');
@@ -43,7 +46,7 @@ export function getTabsForPropertyType(propertyType?: string): Tab[] {
     ];
   }
 
-  // Income Properties (Multifamily, Office, Retail, etc.): 7 tabs
+  // Income Properties (standardized codes: MF, OFF, RET, IND, HTL, MXU): 7 tabs
   return [
     { id: 'project', label: 'Project' },
     { id: 'property', label: 'Property' },

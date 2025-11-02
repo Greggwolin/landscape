@@ -271,7 +271,7 @@ Focus on NOI growth through:
       <div
         className="px-4 py-3 border-b flex items-center gap-3"
         style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
+          backgroundColor: 'rgb(241, 242, 246)',
           borderColor: 'var(--cui-border-color)'
         }}
       >

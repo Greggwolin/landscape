@@ -1,8 +1,24 @@
 # Landscape Financial Engine – Schema Design & Implementation Plan
 
-**Version:** 1.0
-**Date:** 2025-10-13
+**Version:** 1.1
+**Date:** 2025-11-02
 **Purpose:** Unified database schema supporting land development, income property, and mixed-use modeling with ARGUS Enterprise parity
+
+## Recent Updates
+
+### Migration 013 - Project Type Code Standardization (Nov 2, 2025)
+- **Database Column Rename**: `property_type_code` → `project_type_code` in `landscape.tbl_project`
+- **Standardized Codes**: 7 official project type codes:
+  - `LAND` - Land Development (Master-planned communities, subdivisions)
+  - `MF` - Multifamily (Apartment communities)
+  - `OFF` - Office (Office buildings and business parks)
+  - `RET` - Retail (Shopping centers and retail properties)
+  - `IND` - Industrial (Warehouses, distribution centers)
+  - `HTL` - Hotel (Hotels and hospitality properties)
+  - `MXU` - Mixed-Use (Combined development types)
+- **Database Constraint**: CHECK constraint ensures only valid codes are used
+- **Default Value**: `LAND` (was previously `MPC`)
+- **Migration File**: `backend/apps/projects/migrations/0009_rename_property_type_code.py`
 
 ---
 
@@ -41,7 +57,22 @@ Primary container for all project data.
 
 **Existing Fields:** ✓ (already has project_id, name, location, etc.)
 
-**New Fields Required:**
+**Current Schema (as of Migration 013):**
+```sql
+-- Key fields in tbl_project
+CREATE TABLE landscape.tbl_project (
+  project_id INTEGER PRIMARY KEY,
+  project_name VARCHAR(255),
+  project_type_code VARCHAR(10) NOT NULL DEFAULT 'LAND',  -- Migration 013: renamed from property_type_code
+  -- Standardized codes: LAND, MF, OFF, RET, IND, HTL, MXU
+  CONSTRAINT chk_project_type_code CHECK (
+    project_type_code IN ('LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
+  ),
+  ...
+);
+```
+
+**Additional Fields for Financial Engine:**
 ```sql
 ALTER TABLE landscape.tbl_project ADD COLUMN IF NOT EXISTS
   project_type VARCHAR(50) DEFAULT 'Land Development', -- 'Land Development', 'Income Property', 'Mixed Use'

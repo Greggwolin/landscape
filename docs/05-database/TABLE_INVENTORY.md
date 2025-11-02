@@ -1,9 +1,17 @@
 # Database Table Inventory
 
-**Version:** 1.0
-**Last Updated:** October 21, 2025
+**Version:** 1.1
+**Last Updated:** November 2, 2025
 **Database:** land_v2 (Neon PostgreSQL)
 **Schema:** landscape
+
+## Recent Schema Changes
+
+### Migration 013 - Project Type Code Standardization (Nov 2, 2025)
+- **Table Modified**: `landscape.tbl_project`
+- **Column Renamed**: `property_type_code` → `project_type_code`
+- **Constraint Added**: CHECK constraint for 7 standardized codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+- **Default Updated**: From `MPC` to `LAND`
 
 ---
 
@@ -183,6 +191,8 @@ The Landscape platform database contains **158 active tables** (excluding 5 lega
 
 ### 13. Project & Container Management (8 tables)
 - `tbl_project` (40 columns) - Master project container
+  - **Key Field**: `project_type_code` (Migration 013) - Standardized codes: LAND, MF, OFF, RET, IND, HTL, MXU
+  - Replaced `property_type_code` (Nov 2, 2025)
 - `tbl_container` (11 columns) - Universal container system
 - `tbl_project_config` (7 columns) - Project-level configuration
 - `tbl_project_settings` (9 columns) - User preferences per project

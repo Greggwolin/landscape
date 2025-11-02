@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, memo } from 'react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 
 interface Project {
   project_id: number;
   project_name: string;
-  property_type_code?: string;
+  project_type_code?: string;
 }
 
 interface PropertyTabProps {
@@ -200,25 +201,20 @@ function PropertyTab({ project }: PropertyTabProps) {
       {/* Floor Plans / Unit Mix Section with Map */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Unit Mix Table */}
-        <div
-          className="rounded border"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div
-            className="px-6 py-3 border-b"
-            style={{ borderColor: 'var(--cui-border-color)' }}
-          >
+        <CCard>
+          <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-              Unit Mix: {floorPlans.length} Plans, {floorPlans.reduce((sum, fp) => sum + fp.unitCount, 0)} Units
+              Unit Mix
             </h2>
-          </div>
+            <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+              {floorPlans.length} Plans, {floorPlans.reduce((sum, fp) => sum + fp.unitCount, 0)} Units
+            </p>
+          </CCardHeader>
 
-          <div className="overflow-x-auto">
+          <CCardBody className="p-0">
+            <div className="overflow-x-auto">
             <table className="w-full">
-              <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+              <thead style={{ backgroundColor: '#f8f8f8' }}>
                 <tr>
                   <th className="px-4 py-2 text-left text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>Plan</th>
                   <th className="px-2 py-2 text-center text-sm font-medium" style={{ color: 'var(--cui-body-color)', width: '60px' }}>Bed</th>
@@ -260,8 +256,9 @@ function PropertyTab({ project }: PropertyTabProps) {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+            </div>
+          </CCardBody>
+        </CCard>
 
         {/* Map */}
         <div>
@@ -275,40 +272,34 @@ function PropertyTab({ project }: PropertyTabProps) {
 
       {/* Rent Roll Section */}
       {units.length > 0 && (
-        <div
-          className="rounded border"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div
-            className="px-6 py-4 border-b flex items-center justify-between"
-            style={{ borderColor: 'var(--cui-border-color)' }}
-          >
-            <div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                Rent Roll
-              </h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                {units.length} units loaded
-              </p>
+        <CCard>
+          <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                  Rent Roll
+                </h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                  {units.length} units loaded
+                </p>
+              </div>
+              <button
+                onClick={() => setShowFieldChooser(true)}
+                className="px-4 py-2 rounded transition-colors"
+                style={{
+                  backgroundColor: 'var(--cui-primary)',
+                  color: 'white'
+                }}
+              >
+                Configure Columns
+              </button>
             </div>
-            <button
-              onClick={() => setShowFieldChooser(true)}
-              className="px-4 py-2 rounded transition-colors"
-              style={{
-                backgroundColor: 'var(--cui-primary)',
-                color: 'white'
-              }}
-            >
-              Configure Columns
-            </button>
-          </div>
+          </CCardHeader>
 
-          <div className="overflow-x-auto">
+          <CCardBody className="p-0">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+              <thead style={{ backgroundColor: '#f8f8f8' }}>
                 <tr>
                   {visibleColumns.map(col => {
                     const isNumeric = ['sqft', 'currentRent', 'marketRent', 'lossToLease'].includes(col.id);
@@ -394,8 +385,9 @@ function PropertyTab({ project }: PropertyTabProps) {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+            </div>
+          </CCardBody>
+        </CCard>
       )}
 
       {/* Field Chooser Modal */}

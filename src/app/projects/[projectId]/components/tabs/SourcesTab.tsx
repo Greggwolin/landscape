@@ -6,7 +6,7 @@ import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 interface Project {
   project_id: number;
   project_name: string;
-  property_type_code?: string;
+  project_type_code?: string;
 }
 
 interface SourcesTabProps {
@@ -14,7 +14,7 @@ interface SourcesTabProps {
 }
 
 export default function SourcesTab({ project }: SourcesTabProps) {
-  const isMultifamily = project.property_type_code?.toUpperCase() === 'MULTIFAMILY';
+  const isMultifamily = project.project_type_code?.toUpperCase() === 'MULTIFAMILY';
 
   // For multifamily projects, embed the rent roll prototype content in an iframe
   if (isMultifamily) {

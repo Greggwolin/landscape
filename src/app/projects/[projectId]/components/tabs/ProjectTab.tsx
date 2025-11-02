@@ -38,7 +38,7 @@ interface Project {
   legal_description?: string;
 
   // Property Classification
-  property_type_code?: string;
+  project_type_code?: string;
   property_subtype?: string;
   property_class?: string;
 
@@ -394,9 +394,9 @@ export default function ProjectTab({
   }
 
   // Determine if this is a land development project
-  const isLandDevelopment = project.property_type_code === 'LAND' ||
-                            project.property_type_code === 'SUBDIVISION' ||
-                            project.property_type_code === 'MPC';
+  const isLandDevelopment = project.project_type_code === 'LAND' ||
+                            project.project_type_code === 'SUBDIVISION' ||
+                            project.project_type_code === 'MPC';
 
   // Handle save for location
   const handleSaveLocation = async () => {
@@ -715,7 +715,7 @@ export default function ProjectTab({
           <>
             <div className="mb-2 d-flex">
               <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Type</div>
-              <div>{project.property_type_code || 'Not specified'}</div>
+              <div>{project.project_type_code || 'Not specified'}</div>
             </div>
 
             <div className="mb-2 d-flex">
@@ -806,12 +806,12 @@ export default function ProjectTab({
             <CFormFloating className="mb-3">
               <CFormInput
                 type="text"
-                id="property_type_code"
+                id="project_type_code"
                 placeholder="Property Type"
-                value={getEditValue('property_type_code') as string || ''}
-                onChange={(e) => setEditedProject({ ...editedProject, property_type_code: e.target.value })}
+                value={getEditValue('project_type_code') as string || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, project_type_code: e.target.value })}
               />
-              <label htmlFor="property_type_code">Property Type</label>
+              <label htmlFor="project_type_code">Property Type</label>
             </CFormFloating>
 
             <CFormFloating className="mb-3">

@@ -26,9 +26,17 @@ const DocumentationIndex: React.FC = () => {
       title: 'Implementation Status',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Django Phase 2 completion and Finance Structure migration',
+      description: 'Current implementation status and progress tracking - Updated with Migration 013 (Project Type Code Standardization)',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-01-22'
+      lastModified: '2025-11-02'
+    },
+    {
+      title: 'CHANGELOG',
+      path: '/CHANGELOG.md',
+      category: 'Status',
+      description: 'Complete version history with Migration 013 details - Project type code standardization, backend updates, and tab routing fixes',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-11-02'
     },
     {
       title: 'Finance Structure Migration Complete',
@@ -108,44 +116,68 @@ const DocumentationIndex: React.FC = () => {
       title: 'System Architecture',
       path: '/docs/09-technical-dd/02-architecture/system-architecture.md',
       category: 'Architecture',
-      description: 'Complete system architecture documentation',
+      description: 'Complete system architecture documentation - Updated with Migration 013 (Project Type Code Standardization)',
       icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-10-16'
+      lastModified: '2025-11-02'
     },
     {
-      title: 'Land Use System',
-      path: '/docs/02-features/land-use/land-use-system.md',
+      title: 'Database Schema Design',
+      path: '/docs/05-database/DATABASE_SCHEMA.md',
       category: 'Architecture',
-      description: 'Complete land use taxonomy system (Family → Density → Type → Product)',
-      icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-10-16'
-    },
-    {
-      title: 'Database Schema',
-      path: '/docs/05-database/schema-overview.md',
-      category: 'Architecture',
-      description: 'Complete database schema documentation',
+      description: 'Financial engine schema specification - Updated with Migration 013 project_type_code standardization and CHECK constraints',
       icon: <Database className="w-5 h-5" />,
-      lastModified: '2025-10-16'
+      lastModified: '2025-11-02'
     },
     {
       title: 'Database Table Inventory',
       path: '/docs/05-database/TABLE_INVENTORY.md',
       category: 'Architecture',
-      description: 'Complete inventory of 151 active + 7 deprecated tables organized by functional area (CRE Analytics, Community Development, DMS, etc.)',
+      description: 'Complete inventory of 158 active tables - Updated with Migration 013 tbl_project schema changes (project_type_code)',
       icon: <Database className="w-5 h-5" />,
-      lastModified: '2025-10-21'
+      lastModified: '2025-11-02'
     },
     {
       title: 'Database Documentation Index',
       path: '/docs/05-database/README.md',
       category: 'Architecture',
-      description: 'Database documentation navigation hub with links to schema, migrations, and table inventory',
+      description: 'Database documentation hub - Updated with Migration 013 recent changes and metrics (13 migrations executed)',
       icon: <Database className="w-5 h-5" />,
-      lastModified: '2025-10-21'
+      lastModified: '2025-11-02'
     },
 
     // Migration & Consolidation
+    {
+      title: 'Migration 013 - Project Type Code Standardization',
+      path: '/docs/08-migration-history/013-project-type-code-standardization.md',
+      category: 'Migration',
+      description: 'Complete migration 013 history - Standardized 7 project type codes (LAND, MF, OFF, RET, IND, HTL, MXU), renamed property_type_code → project_type_code, updated 21 frontend files + Django backend',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-11-02'
+    },
+    {
+      title: 'Migration 013 Execution Report',
+      path: '/MIGRATION_013_EXECUTION_REPORT.md',
+      category: 'Migration',
+      description: 'Detailed execution report for Migration 013 - Timeline, verification results, manual tests, server restart procedures, and statistics',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-11-02'
+    },
+    {
+      title: 'Migration 013 Backend Updates',
+      path: '/MIGRATION_013_BACKEND_UPDATES.md',
+      category: 'Migration',
+      description: 'Django backend changes for Migration 013 - Updated models, serializers, and fixed HTTP 500 errors on multifamily API endpoints',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-11-02'
+    },
+    {
+      title: 'Migration 013 Tab Routing Fix',
+      path: '/MIGRATION_013_TAB_ROUTING_FIX.md',
+      category: 'Migration',
+      description: 'Tab routing bug fix - LAND projects now correctly show Land Development tabs instead of Income Property tabs',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-11-02'
+    },
     {
       title: 'Budget Consolidation Migration',
       path: '/docs/08-migration-history/Budget-Consolidation-Migration-Complete.md',

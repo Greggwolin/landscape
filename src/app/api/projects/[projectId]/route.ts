@@ -24,7 +24,7 @@ export async function PATCH(req: Request, context: Params) {
       'start_date',
       'location_lat',
       'location_lon',
-      'property_type_code',
+      'project_type_code',
       'project_type',
       'template_id'
     ]
@@ -114,7 +114,7 @@ export async function GET(_req: Request, context: Params) {
         location_lat,
         location_lon,
         start_date,
-        property_type_code,
+        project_type_code,
         project_type,
         template_id,
         is_active,

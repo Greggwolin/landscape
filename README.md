@@ -5,15 +5,19 @@ A comprehensive Next.js application for land development and income property fin
 ## 🎯 Overview
 
 Landscape provides enterprise-grade financial modeling capabilities for:
-- **Master-Planned Communities (MPCs)** - Land development with phasing, absorption, and lot sales
-- **Income Properties** - Commercial, retail, office, and industrial leasing
-- **Multifamily Properties** - Unit-level tracking with lease management, turns, and occupancy analysis
-- **Mixed-Use Developments** - Combined land + income + multifamily modeling
+- **Land Development (LAND)** - Master-planned communities, subdivisions, and land entitlement with phasing, absorption, and lot sales
+- **Multifamily (MF)** - Apartment communities with unit-level tracking, lease management, turns, and occupancy analysis
+- **Office (OFF)** - Office buildings and business parks
+- **Retail (RET)** - Shopping centers and retail properties
+- **Industrial (IND)** - Warehouses, distribution centers, and industrial facilities
+- **Hotel (HTL)** - Hotels and hospitality properties
+- **Mixed-Use (MXU)** - Combined land + income + multifamily modeling
 
 ### Key Features
 
+✅ **Standardized Project Types** - 7 official project type codes (Migration 013 - Nov 2025)
 ✅ **Universal Container System** - Production-ready flexible hierarchy (Area/Phase/Parcel OR Property/Building/Unit)
-✅ **Comprehensive Data Layer** - 117 tables + 26 views in PostgreSQL
+✅ **Comprehensive Data Layer** - 183 tables + 26 views in PostgreSQL
 ✅ **Unit-Level Multifamily** - Lease tracking, turn analysis, occupancy reporting
 ✅ **Lease Management** - Escalations, recoveries, percentage rent, rollover analysis
 ✅ **Dependency Engine** - Automated timeline calculation with circular detection
@@ -30,14 +34,16 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 ### Quick Links
 
 - **[Complete Documentation Index](docs/README.md)** - Master navigation guide
-- **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** ⭐ NEW - Django setup & admin panel
+- **[CHANGELOG](CHANGELOG.md)** - Version history and recent changes
+- **[Migration 013 Report](MIGRATION_013_EXECUTION_REPORT.md)** ⭐ NEW - Project type code standardization (Nov 2025)
+- **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** - Django setup & admin panel
 - **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
 - **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
 - **[Financial Engine Status](docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md)** - Financial modeling status
 - **[Database Schema](docs/05-database/DATABASE_SCHEMA.md)** - Complete schema reference
 - **[API Reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** - API documentation
 - **[DevOps Guide](docs/06-devops/DEVOPS_GUIDE.md)** - Deployment and operations
-- **[Django Admin Guide](backend/ADMIN_ACCESS.md)** ⭐ NEW - Admin panel access
+- **[Django Admin Guide](backend/ADMIN_ACCESS.md)** - Admin panel access
 
 ### Documentation Structure
 

@@ -73,7 +73,7 @@ const ProjectSummaryPreview = ({ data, uploadedDocuments, extractionPending }: P
           <div className={labelClass}>Type</div>
           <div className={valueClass}>
             {data.development_type || 'Select a property type'}
-            {data.property_type_code && ` • ${data.property_type_code}`}
+            {data.project_type_code && ` • ${data.project_type_code}`}
             {data.property_subtype && ` (${data.property_subtype})`}
           </div>
         </div>

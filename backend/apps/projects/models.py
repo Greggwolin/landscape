@@ -37,11 +37,8 @@ class Project(models.Model):
     property_subtype = models.CharField(max_length=100, blank=True, null=True)
     property_class = models.CharField(max_length=50, blank=True, null=True)
 
-    # Deprecated fields (kept for backwards compatibility)
-    development_type_deprecated = models.CharField(max_length=100, blank=True, null=True, db_column='development_type_deprecated')
-    property_type_code_deprecated = models.CharField(max_length=50, blank=True, null=True, db_column='property_type_code_deprecated')
-
-    # Other project classification
+    # Primary project classification (migration 013)
+    project_type_code = models.CharField(max_length=50, blank=True, null=True, db_column='project_type_code')
     project_type = models.CharField(max_length=50, blank=True, null=True)
     financial_model_type = models.CharField(max_length=50, blank=True, null=True)
 

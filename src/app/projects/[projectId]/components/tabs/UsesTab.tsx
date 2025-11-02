@@ -6,7 +6,7 @@ import { OperatingExpensesTab } from '@/app/prototypes/multifam/rent-roll-inputs
 interface Project {
   project_id: number;
   project_name: string;
-  property_type_code?: string;
+  project_type_code?: string;
 }
 
 interface UsesTabProps {
@@ -14,7 +14,7 @@ interface UsesTabProps {
 }
 
 export default function UsesTab({ project }: UsesTabProps) {
-  const isMultifamily = project.property_type_code?.toUpperCase() === 'MULTIFAMILY';
+  const isMultifamily = project.project_type_code?.toUpperCase() === 'MULTIFAMILY';
 
   // For multifamily projects, show Operating Expenses content
   if (isMultifamily) {

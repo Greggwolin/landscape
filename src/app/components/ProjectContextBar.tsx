@@ -33,7 +33,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
   }, [projects, projectId, activeProject]);
 
   const tabs = useMemo(() => {
-    return getTabsForPropertyType(project?.property_type_code);
+    return getTabsForPropertyType(project?.project_type_code);
   }, [project]);
 
   if (!project) {
@@ -51,10 +51,12 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
 
   return (
     <div
-      className="flex items-center gap-8 px-6 h-14 border-b"
+      className="sticky flex items-center gap-8 px-6 h-14 border-b"
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         borderColor: 'var(--cui-border-color)',
+        top: '0px',
+        zIndex: 40,
       }}
     >
       {/* Project Selector - Left */}
@@ -80,7 +82,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         >
           {projects.map((proj) => (
             <option key={proj.project_id} value={proj.project_id}>
-              {proj.project_name} - {proj.property_type_code || 'Unknown'}
+              {proj.project_name} - {proj.project_type_code || 'Unknown'}
             </option>
           ))}
         </select>

@@ -128,32 +128,37 @@ export default function ValuationPage() {
             borderColor: 'var(--cui-border-color)'
           }}
         >
-          <div className="px-6 flex gap-1">
+          <div className="px-6 flex gap-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => tab.enabled && setActiveTab(tab.id)}
                 disabled={!tab.enabled}
-                className="px-4 py-3 text-sm font-medium transition-colors relative"
+                className="px-5 py-3 text-sm font-medium transition-colors relative rounded-t-lg"
                 style={{
                   color: activeTab === tab.id
                     ? 'var(--cui-primary)'
                     : tab.enabled
-                    ? 'var(--cui-body-color)'
+                    ? 'var(--cui-secondary-color)'
                     : 'var(--cui-secondary-color)',
+                  backgroundColor: activeTab === tab.id
+                    ? 'var(--cui-tertiary-bg)'
+                    : 'transparent',
+                  borderBottom: activeTab === tab.id
+                    ? '3px solid var(--cui-primary)'
+                    : '3px solid transparent',
                   opacity: tab.enabled ? 1 : 0.5,
-                  cursor: tab.enabled ? 'pointer' : 'not-allowed'
+                  cursor: tab.enabled ? 'pointer' : 'not-allowed',
+                  marginBottom: '-1px'
                 }}
                 onMouseEnter={(e) => {
                   if (tab.enabled && activeTab !== tab.id) {
-                    e.currentTarget.style.color = 'var(--cui-primary)';
-                    e.currentTarget.style.opacity = '0.8';
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (tab.enabled && activeTab !== tab.id) {
-                    e.currentTarget.style.color = 'var(--cui-body-color)';
-                    e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }
                 }}
               >
@@ -168,12 +173,6 @@ export default function ValuationPage() {
                   >
                     Coming Soon
                   </span>
-                )}
-                {activeTab === tab.id && (
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-0.5"
-                    style={{ backgroundColor: 'var(--cui-primary)' }}
-                  />
                 )}
               </button>
             ))}

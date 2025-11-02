@@ -18,7 +18,7 @@ export const newProjectSchema = z.object({
 
   // Deprecated fields (keeping for backwards compatibility)
   development_type: developmentTypeEnum.optional().or(z.literal('')),
-  property_type_code: optionalString(),
+  project_type_code: optionalString(),
 
   // Location fields
   location_mode: locationModeEnum.default('address'),
@@ -164,7 +164,7 @@ export const emptyFormDefaults: NewProjectFormData = {
 
   // Deprecated fields
   development_type: '',
-  property_type_code: '',
+  project_type_code: '',
 
   // Location fields
   location_mode: 'address',

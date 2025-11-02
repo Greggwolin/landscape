@@ -14,7 +14,7 @@ interface ProjectSummary {
   jurisdiction_city?: string | null
   jurisdiction_county?: string | null
   jurisdiction_state?: string | null
-  property_type_code?: string | null
+  project_type_code?: string | null
   project_type?: string | null
   is_active?: boolean
   analysis_type?: string | null

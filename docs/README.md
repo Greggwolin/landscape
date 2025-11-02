@@ -1,10 +1,22 @@
 # Landscape Pro-Forma Documentation
 
-**Version:** 3.4
-**Last Updated:** 2025-10-25
-**Status:** Production Ready + PDF Reports + Progressive Assumptions
+**Version:** 3.4 + Migration 013
+**Last Updated:** 2025-11-02
+**Status:** Production Ready + PDF Reports + Progressive Assumptions + Standardized Project Types
 
 Welcome to the comprehensive documentation for the Landscape Pro-Forma financial modeling application.
+
+## 🔥 Recent Updates (November 2025)
+
+**Migration 013 - Project Type Code Standardization** (Nov 2, 2025)
+- ✅ Standardized 7 project type codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+- ✅ Renamed `property_type_code` → `project_type_code` in database
+- ✅ Updated 21 frontend files + Django backend
+- ✅ Fixed tab routing for LAND projects
+- 📄 [MIGRATION_013_EXECUTION_REPORT.md](../MIGRATION_013_EXECUTION_REPORT.md)
+- 📄 [MIGRATION_013_BACKEND_UPDATES.md](../MIGRATION_013_BACKEND_UPDATES.md)
+- 📄 [MIGRATION_013_TAB_ROUTING_FIX.md](../MIGRATION_013_TAB_ROUTING_FIX.md)
+- 📄 [CHANGELOG.md](../CHANGELOG.md)
 
 ---
 

@@ -1,6 +1,19 @@
 # System Architecture Documentation
 ## Landscape Real Estate Development Platform
 
+**Last Updated:** 2025-11-02
+**Version:** 3.5 (includes Migration 013 - Project Type Code Standardization)
+
+## Recent Updates
+
+### Migration 013 - Project Type Code Standardization (Nov 2, 2025)
+- **Standardized Project Type Codes**: 7 official codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+- **Database Schema Change**: Renamed `property_type_code` → `project_type_code` in `landscape.tbl_project`
+- **Frontend Updates**: 21 files updated to use `project_type_code`
+- **Django Backend**: Models and serializers updated for new field name
+- **Tab Routing**: Updated to recognize standardized LAND code
+- **Dashboard**: Added support for all 7 standardized codes
+
 ### High-Level Architecture
 
 ```mermaid
@@ -235,7 +248,13 @@ Error Handling:
 #### Database Schema Overview
 ```sql
 -- Core Business Entities
-tbl_project (project_id, project_name, location, ...)
+tbl_project (
+  project_id,
+  project_name,
+  project_type_code,  -- Migration 013: Standardized codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+  location,
+  ...
+)
 tbl_parcel (parcel_id, project_id, geometry, ...)
 tbl_landuse (landuse_id, type, specifications, ...)
 tbl_phase (phase_id, project_id, timing, ...)

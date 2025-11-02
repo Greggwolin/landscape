@@ -37,13 +37,11 @@ class ProjectListSerializer(serializers.ModelSerializer):
         fields = [
             'project_id',
             'project_name',
+            'project_type_code',
             'project_type',
             'analysis_type',
             'property_subtype',
             'property_class',
-            # Deprecated fields for backwards compatibility
-            'development_type_deprecated',
-            'property_type_code_deprecated',
             'jurisdiction_city',
             'jurisdiction_county',
             'jurisdiction_state',

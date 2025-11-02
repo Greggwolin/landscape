@@ -25,11 +25,26 @@ export default function ProjectPage() {
   const searchParams = useSearchParams();
   const projectId = Number(params.projectId);
   const activeTab = searchParams.get('tab') || 'project';
-  const { projects } = useProjectContext();
+  const { projects, isLoading } = useProjectContext();
   const [complexityMode, setComplexityMode] = useState<ComplexityTier>('standard');
 
   const project = projects.find(p => p.project_id === projectId);
 
+  // Show loading state while projects are being fetched
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-pulse">
+            <div className="h-8 w-48 bg-gray-200 rounded mb-4 mx-auto"></div>
+            <div className="h-4 w-64 bg-gray-100 rounded mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show "not found" after loading completes
   if (!project) {
     return (
       <div className="flex h-screen items-center justify-center">

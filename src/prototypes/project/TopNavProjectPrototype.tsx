@@ -118,7 +118,7 @@ export default function TopNavProjectPrototype() {
 
   const projectId = project?.project_id ?? activeProjectId ?? DEFAULT_PROJECT_ID;
 
-  const tabs = useMemo(() => getTabsForPropertyType(project?.property_type_code), [project]);
+  const tabs = useMemo(() => getTabsForPropertyType(project?.project_type_code), [project]);
 
   const sandboxPages: string[] = useMemo(
     () => [
@@ -484,7 +484,7 @@ export default function TopNavProjectPrototype() {
               >
                 {projects.map((proj) => (
                   <option key={proj.project_id} value={proj.project_id}>
-                    {proj.project_name} - {proj.property_type_code || 'Unknown'}
+                    {proj.project_name} - {proj.project_type_code || 'Unknown'}
                   </option>
                 ))}
               </select>

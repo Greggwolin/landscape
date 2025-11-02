@@ -11,6 +11,15 @@ import UserTile from '@/app/components/dashboard/UserTile';
 import DashboardMap from '@/app/components/dashboard/DashboardMap';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  // Standardized codes (Migration 013)
+  'LAND': 'Land Development',
+  'MF': 'Multifamily',
+  'OFF': 'Office',
+  'RET': 'Retail',
+  'IND': 'Industrial',
+  'HTL': 'Hotel',
+  'MXU': 'Mixed-Use',
+  // Legacy codes (backwards compatibility)
   'MPC': 'Master Planned Community',
   'MULTIFAMILY': 'Multifamily',
   'COMMERCIAL': 'Commercial',
@@ -23,6 +32,15 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
 };
 
 const PROPERTY_TYPE_COLORS: Record<string, string> = {
+  // Standardized codes (Migration 013)
+  'LAND': 'primary',
+  'MF': 'success',
+  'OFF': 'warning',
+  'RET': 'danger',
+  'IND': 'secondary',
+  'HTL': 'dark',
+  'MXU': 'info',
+  // Legacy codes (backwards compatibility)
   'MPC': 'primary',
   'MULTIFAMILY': 'success',
   'COMMERCIAL': 'info',
@@ -98,7 +116,7 @@ export default function DashboardPage() {
         <CCard className="text-center">
           <CCardBody>
             <div className="text-3xl font-bold" style={{ color: 'var(--cui-info)' }}>
-              {projects.filter(p => p.property_type_code === 'MPC' || p.property_type_code === 'SUBDIVISION').length}
+              {projects.filter(p => p.project_type_code === 'LAND' || p.project_type_code === 'MPC' || p.project_type_code === 'SUBDIVISION').length}
             </div>
             <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
               Land Development
@@ -109,7 +127,7 @@ export default function DashboardPage() {
         <CCard className="text-center">
           <CCardBody>
             <div className="text-3xl font-bold" style={{ color: 'var(--cui-warning)' }}>
-              {projects.filter(p => p.property_type_code === 'MULTIFAMILY' || p.property_type_code === 'OFFICE' || p.property_type_code === 'RETAIL').length}
+              {projects.filter(p => p.project_type_code === 'MF' || p.project_type_code === 'OFF' || p.project_type_code === 'RET' || p.project_type_code === 'IND' || p.project_type_code === 'HTL' || p.project_type_code === 'MXU' || p.project_type_code === 'MULTIFAMILY' || p.project_type_code === 'OFFICE' || p.project_type_code === 'RETAIL').length}
             </div>
             <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
               Income Properties
@@ -171,9 +189,9 @@ export default function DashboardPage() {
                     </div>
                   </CTableDataCell>
                   <CTableDataCell>
-                    {project.property_type_code ? (
-                      <CBadge color={PROPERTY_TYPE_COLORS[project.property_type_code] || 'secondary'}>
-                        {PROPERTY_TYPE_LABELS[project.property_type_code] || project.property_type_code}
+                    {project.project_type_code ? (
+                      <CBadge color={PROPERTY_TYPE_COLORS[project.project_type_code] || 'secondary'}>
+                        {PROPERTY_TYPE_LABELS[project.project_type_code] || project.project_type_code}
                       </CBadge>
                     ) : (
                       <span style={{ color: 'var(--cui-secondary-color)' }}>Not specified</span>

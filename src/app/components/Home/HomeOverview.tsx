@@ -142,7 +142,7 @@ export default function HomeOverview() {
   };
 
   const currentProject = isEditing ? editedProject : activeProject;
-  const propertyTypeLabel = PROPERTY_TYPE_LABELS[currentProject.property_type_code] || currentProject.property_type_code || 'Unknown';
+  const propertyTypeLabel = PROPERTY_TYPE_LABELS[currentProject.project_type_code] || currentProject.project_type_code || 'Unknown';
 
   return (
     <div className="space-y-6">
@@ -172,8 +172,8 @@ export default function HomeOverview() {
                 <span className="text-sm text-gray-400">Type:</span>
                 {isEditing ? (
                   <select
-                    value={currentProject.property_type_code || ''}
-                    onChange={(e) => handleFieldChange('property_type_code', e.target.value)}
+                    value={currentProject.project_type_code || ''}
+                    onChange={(e) => handleFieldChange('project_type_code', e.target.value)}
                     className="px-3 py-1 bg-gray-900 border border-gray-600 rounded text-white text-sm font-medium focus:border-blue-500 focus:outline-none"
                   >
                     <option value="">Select Type</option>

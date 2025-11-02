@@ -57,7 +57,7 @@ export default function DashboardMap({ projects }: DashboardMapProps) {
     const projectMarkers = projectsWithCoords.map((project, index) => ({
       id: `project-${project.project_id}`,
       coordinates: [project.location_lon!, project.location_lat!] as [number, number],
-      color: PROPERTY_TYPE_COLORS[project.property_type_code || ''] || '#6c757d',
+      color: PROPERTY_TYPE_COLORS[project.project_type_code || ''] || '#6c757d',
       label: `${index + 1}`,
       tooltip: project.project_name
     }));

@@ -107,6 +107,15 @@ AI-powered document management:
 
 ## Recent Changes
 
+**November 2, 2025:** Migration 013 - Project Type Code Standardization
+- **Column Rename**: `property_type_code` → `project_type_code` in `landscape.tbl_project`
+- **Standardized Codes**: 7 official project type codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+- **Database Constraint**: CHECK constraint ensures only valid codes are used
+- **Default Value**: Changed from `MPC` to `LAND`
+- **Frontend Updates**: 21 files updated to use new field name
+- **Django Backend**: Models and serializers updated
+- **Migration File**: `backend/apps/projects/migrations/0009_rename_property_type_code.py`
+
 **October 21, 2025:** Deprecated legacy hierarchy tables
 - Marked `tbl_area`, `tbl_phase`, `tbl_lot` as DEPRECATED
 - Added database comments for deprecation status
@@ -171,7 +180,7 @@ See [MIGRATION-SUMMARY.md](MIGRATION-SUMMARY.md) for complete history.
 | Foreign Keys | 100+ |
 | Indexes | 200+ |
 | Views | 12+ |
-| Migrations Executed | 8 |
+| Migrations Executed | 13 |
 
 ---
 
@@ -179,13 +188,13 @@ See [MIGRATION-SUMMARY.md](MIGRATION-SUMMARY.md) for complete history.
 
 ### Documentation
 - [Main Documentation Index](../README.md)
-- [Developer Guide](../00-getting-started/DEVELOPER_GUIDE.md)
-- [DevOps Guide](../06-devops/DEVOPS_GUIDE.md)
+- [Migration 013 History](../08-migration-history/013-project-type-code-standardization.md)
+- [CHANGELOG](../../CHANGELOG.md)
 
 ### Database Access
 - Production: Neon (ep-spring-mountain-af3hdne2-pooler)
 - Connection details: See `.env` file
-- Migrations: `migrations/` folder in project root
+- Migrations: `backend/apps/projects/migrations/` folder
 
 ### Common Tasks
 - **View all tables:** See [TABLE_INVENTORY.md](TABLE_INVENTORY.md)
@@ -195,7 +204,7 @@ See [MIGRATION-SUMMARY.md](MIGRATION-SUMMARY.md) for complete history.
 
 ---
 
-**Last Updated:** October 21, 2025
+**Last Updated:** November 2, 2025
 **Maintained By:** Engineering Team
 
 [← Back to Documentation Home](../README.md)

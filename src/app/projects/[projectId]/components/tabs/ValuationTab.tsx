@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect, memo } from 'react';
+import { CCard, CCardBody } from '@coreui/react';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from '../../valuation/components/SalesComparisonApproach';
@@ -126,28 +127,23 @@ function ValuationTab({ project }: ValuationTabProps) {
       )}
 
       {error && !loading && (
-        <div
-          className="rounded-lg p-6 border text-center"
-          style={{
-            backgroundColor: 'var(--cui-danger-bg)',
-            borderColor: 'var(--cui-danger)',
-            color: 'var(--cui-danger)'
-          }}
-        >
-          <div className="text-5xl mb-4">⚠️</div>
-          <h3 className="text-xl font-bold mb-2">Error Loading Valuation Data</h3>
-          <p className="text-sm mb-4">{error}</p>
-          <button
-            onClick={fetchData}
-            className="px-4 py-2 text-sm font-medium rounded"
-            style={{
-              backgroundColor: 'var(--cui-danger)',
-              color: 'white'
-            }}
-          >
-            Try Again
-          </button>
-        </div>
+        <CCard style={{ borderColor: 'var(--cui-danger)' }}>
+          <CCardBody className="p-6 text-center" style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}>
+            <div className="text-5xl mb-4">⚠️</div>
+            <h3 className="text-xl font-bold mb-2">Error Loading Valuation Data</h3>
+            <p className="text-sm mb-4">{error}</p>
+            <button
+              onClick={fetchData}
+              className="px-4 py-2 text-sm font-medium rounded"
+              style={{
+                backgroundColor: 'var(--cui-danger)',
+                color: 'white'
+              }}
+            >
+              Try Again
+            </button>
+          </CCardBody>
+        </CCard>
       )}
 
       {!loading && !error && valuationData && (
@@ -162,51 +158,43 @@ function ValuationTab({ project }: ValuationTabProps) {
           )}
 
           {activeTab === 'cost' && (
-            <div
-              className="text-center py-20 rounded-lg border"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)'
-              }}
-            >
-              <div className="text-6xl mb-4">🏗️</div>
-              <h3
-                className="text-xl font-bold mb-2"
-                style={{ color: 'var(--cui-body-color)' }}
-              >
-                Cost Approach
-              </h3>
-              <p
-                className="text-sm"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                Coming in Phase 2
-              </p>
-            </div>
+            <CCard>
+              <CCardBody className="text-center py-20">
+                <div className="text-6xl mb-4">🏗️</div>
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: 'var(--cui-body-color)' }}
+                >
+                  Cost Approach
+                </h3>
+                <p
+                  className="text-sm"
+                  style={{ color: 'var(--cui-secondary-color)' }}
+                >
+                  Coming in Phase 2
+                </p>
+              </CCardBody>
+            </CCard>
           )}
 
           {activeTab === 'income' && (
-            <div
-              className="text-center py-20 rounded-lg border"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)'
-              }}
-            >
-              <div className="text-6xl mb-4">💰</div>
-              <h3
-                className="text-xl font-bold mb-2"
-                style={{ color: 'var(--cui-body-color)' }}
-              >
-                Income Approach
-              </h3>
-              <p
-                className="text-sm"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                Coming in Phase 2
-              </p>
-            </div>
+            <CCard>
+              <CCardBody className="text-center py-20">
+                <div className="text-6xl mb-4">💰</div>
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: 'var(--cui-body-color)' }}
+                >
+                  Income Approach
+                </h3>
+                <p
+                  className="text-sm"
+                  style={{ color: 'var(--cui-secondary-color)' }}
+                >
+                  Coming in Phase 2
+                </p>
+              </CCardBody>
+            </CCard>
           )}
         </>
       )}

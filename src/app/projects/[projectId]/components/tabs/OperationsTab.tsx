@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
+import { CCard, CCardBody } from '@coreui/react';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
 import { NestedExpenseTable } from '@/app/prototypes/multifam/rent-roll-inputs/components/NestedExpenseTable';
 import { BenchmarkPanel } from '@/app/prototypes/multifam/rent-roll-inputs/components/BenchmarkPanel';
@@ -11,7 +12,7 @@ import { multifamilyOpExFields } from '@/config/opex/multifamily-fields';
 interface Project {
   project_id: number;
   project_name: string;
-  property_type_code?: string;
+  project_type_code?: string;
 }
 
 interface OperationsTabProps {
@@ -504,17 +505,13 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
               visibleColumns={visibleColumnIds}
             />
           ) : (
-            <div
-              className="rounded border p-8 text-center"
-              style={{
-                backgroundColor: 'var(--cui-tertiary-bg)',
-                borderColor: 'var(--cui-border-color)'
-              }}
-            >
-              <div style={{ color: 'var(--cui-secondary-color)' }}>
-                No expense data available
-              </div>
-            </div>
+            <CCard>
+              <CCardBody className="p-8 text-center">
+                <div style={{ color: 'var(--cui-secondary-color)' }}>
+                  No expense data available
+                </div>
+              </CCardBody>
+            </CCard>
           )}
         </div>
 
