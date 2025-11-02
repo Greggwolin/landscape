@@ -1,0 +1,299 @@
+/**
+ * Budget Gantt Custom Styles
+ *
+ * Customizes the SVAR Gantt chart for budget-specific UI
+ */
+
+.budget-gantt-container {
+  background: #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  height: 700px;
+  width: 100%;
+}
+
+/* Loading State */
+.budget-gantt-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  color: #94a3b8;
+}
+
+.budget-gantt-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #334155;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error State */
+.budget-gantt-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  color: #ef4444;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Saving Indicator */
+.budget-gantt-saving {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #3b82f6;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+/* Gantt Grid Overrides */
+.budget-gantt-container .wx-gantt {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Column Headers */
+.budget-gantt-container .wx-gantt-header {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-weight: 600;
+  border-bottom: 2px solid #334155;
+}
+
+.budget-gantt-container .wx-gantt-header-cell {
+  border-right: 1px solid #334155;
+  padding: 12px 8px;
+}
+
+/* Grid Cells */
+.budget-gantt-container .wx-gantt-cell {
+  border-right: 1px solid #334155;
+  border-bottom: 1px solid #1e293b;
+  padding: 8px;
+  color: #cbd5e1;
+}
+
+/* Calculated Cells (Amount) - Green Text */
+.budget-gantt-container .wx-gantt-cell.calculated {
+  color: #10b981;
+  font-weight: 500;
+}
+
+/* Input Cells - Blue Text */
+.budget-gantt-container .wx-gantt-cell.editable {
+  color: #3b82f6;
+  cursor: text;
+}
+
+.budget-gantt-container .wx-gantt-cell.editable:hover {
+  background: #334155;
+}
+
+/* Dropdown Cells - Purple Text */
+.budget-gantt-container .wx-gantt-cell.dropdown {
+  color: #a855f7;
+  cursor: pointer;
+}
+
+.budget-gantt-container .wx-gantt-cell.dropdown:hover {
+  background: #334155;
+}
+
+/* Parent Rows (Subtotals) - Bold */
+.budget-gantt-container .wx-gantt-row.parent {
+  font-weight: 600;
+  background: #334155;
+}
+
+.budget-gantt-container .wx-gantt-row.summary {
+  font-weight: 600;
+  background: #334155;
+}
+
+/* Row Hover Effect */
+.budget-gantt-container .wx-gantt-row:hover {
+  background: rgba(51, 65, 85, 0.5);
+}
+
+/* Timeline Area */
+.budget-gantt-container .wx-gantt-timeline {
+  background: #1e293b;
+}
+
+/* Timeline Scale Headers */
+.budget-gantt-container .wx-gantt-scale {
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+/* Timeline Grid Lines */
+.budget-gantt-container .wx-gantt-timeline-cell {
+  border-right: 1px solid #334155;
+  border-bottom: 1px solid #1e293b;
+}
+
+/* Task Bars - Different Colors by Scope */
+.budget-gantt-container .wx-gantt-bar {
+  border-radius: 4px;
+  opacity: 0.9;
+}
+
+.budget-gantt-container .wx-gantt-bar.acquisition {
+  background: #ef4444;
+  border: 1px solid #dc2626;
+}
+
+.budget-gantt-container .wx-gantt-bar.stage1,
+.budget-gantt-container .wx-gantt-bar[data-scope*="Stage 1"] {
+  background: #3b82f6;
+  border: 1px solid #2563eb;
+}
+
+.budget-gantt-container .wx-gantt-bar.stage2,
+.budget-gantt-container .wx-gantt-bar[data-scope*="Stage 2"] {
+  background: #10b981;
+  border: 1px solid #059669;
+}
+
+.budget-gantt-container .wx-gantt-bar.stage3,
+.budget-gantt-container .wx-gantt-bar[data-scope*="Stage 3"] {
+  background: #f59e0b;
+  border: 1px solid #d97706;
+}
+
+.budget-gantt-container .wx-gantt-bar:hover {
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Tree Icons (Expand/Collapse) */
+.budget-gantt-container .wx-gantt-tree-icon {
+  color: #94a3b8;
+}
+
+.budget-gantt-container .wx-gantt-tree-icon:hover {
+  color: #cbd5e1;
+}
+
+/* Scrollbars */
+.budget-gantt-container .wx-gantt::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.budget-gantt-container .wx-gantt::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.budget-gantt-container .wx-gantt::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+}
+
+.budget-gantt-container .wx-gantt::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Resize Handles */
+.budget-gantt-container .wx-gantt-resize-handle {
+  background: #475569;
+  width: 2px;
+  cursor: col-resize;
+}
+
+.budget-gantt-container .wx-gantt-resize-handle:hover {
+  background: #64748b;
+}
+
+/* Selected Row */
+.budget-gantt-container .wx-gantt-row.selected {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* Context Menu (if implemented) */
+.budget-gantt-context-menu {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  min-width: 200px;
+}
+
+.budget-gantt-context-menu-item {
+  padding: 8px 12px;
+  color: #e2e8f0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.budget-gantt-context-menu-item:hover {
+  background: #334155;
+}
+
+/* Tooltips */
+.budget-gantt-tooltip {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  max-width: 300px;
+}
+
+.budget-gantt-tooltip-label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #3b82f6;
+}
+
+.budget-gantt-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.budget-gantt-tooltip-key {
+  color: #94a3b8;
+}
+
+.budget-gantt-tooltip-value {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1440px) {
+  .budget-gantt-container {
+    height: 600px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .budget-gantt-container {
+    height: 500px;
+  }
+}
