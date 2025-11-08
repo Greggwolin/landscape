@@ -37,7 +37,7 @@ export function IssueReporterProvider({ children }: IssueReporterProviderProps) 
   return (
     <IssueReporterContext.Provider value={contextValue}>
       {children}
-      {/* <IssueReporterButton /> */}
+      <IssueReporterButton />
       <IssueReporterDialog
         open={isOpen}
         draft={draft}
