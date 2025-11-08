@@ -10,12 +10,11 @@ export interface Tab {
 
 /**
  * Returns the list of tabs for the Global Preferences section
+ * Note: Cost Library and Benchmarks have moved to /admin routes
  */
 export function getPreferencesTabs(): Tab[] {
   return [
-    { id: 'unit-costs', label: 'Cost Library' },
     { id: 'products', label: 'Product Library' },
     { id: 'taxonomy', label: 'Land Use Manager' },
-    { id: 'benchmarks', label: 'Benchmarks' },
   ];
 }

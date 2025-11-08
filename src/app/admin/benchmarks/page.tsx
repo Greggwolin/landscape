@@ -13,6 +13,7 @@ import LandscaperPanel from '@/components/benchmarks/LandscaperPanel';
 import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
 import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
 import AbsorptionVelocityPanel from '@/components/benchmarks/absorption/AbsorptionVelocityPanel';
+import AdminNavBar from '@/app/components/AdminNavBar';
 import type {
   Benchmark,
   AISuggestion,
@@ -21,13 +22,10 @@ import type {
   GrowthRateSet
 } from '@/types/benchmarks';
 
-// Category definitions
+// Category definitions - Cost Factors only (no stage links)
 const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
   { key: 'transaction_cost', label: 'Transaction Costs', icon: 'Receipt', count: 0 },
-  { key: 'unit_cost_stage1', label: 'Stage 1 - Entitlements', icon: 'FileText', count: 0 },
-  { key: 'unit_cost_stage2', label: 'Stage 2 - Engineering', icon: 'Ruler', count: 0 },
-  { key: 'unit_cost_stage3', label: 'Stage 3 - Development', icon: 'Construction', count: 0 },
   { key: 'absorption', label: 'Absorption Velocity', icon: 'Timeline', count: 0 },
   { key: 'contingency', label: 'Contingency Standards', icon: 'Shield', count: 0 },
   { key: 'market_timing', label: 'Market Timing', icon: 'Schedule', count: 0 },
@@ -50,11 +48,7 @@ export default function GlobalBenchmarksPage() {
   const [addingToCategory, setAddingToCategory] = useState<BenchmarkCategory | null>(null);
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
   const [absorptionCount, setAbsorptionCount] = useState(0);
-  const [unitCostStageCounts, setUnitCostStageCounts] = useState({
-    stage1_entitlements: 0,
-    stage2_engineering: 0,
-    stage3_development: 0
-  });
+  const [totalCostLineItems, setTotalCostLineItems] = useState(0);
   const [leftPanelWidth, setLeftPanelWidth] = useState(33); // Percentage
   const [isDragging, setIsDragging] = useState(false);
 
@@ -69,11 +63,11 @@ export default function GlobalBenchmarksPage() {
     setError(null);
 
     try {
-      const [benchmarkRes, suggestionsRes, absorptionRes, unitCostCategoriesRes] = await Promise.all([
+      const [benchmarkRes, suggestionsRes, absorptionRes, unitCostTemplatesRes] = await Promise.all([
         fetch('/api/benchmarks'),
         fetch('/api/benchmarks/ai-suggestions'),
         fetch('/api/benchmarks/absorption-velocity'),
-        fetch('/api/unit-costs/categories-by-stage'),
+        fetch('/api/unit-costs/templates'),
       ]);
 
       if (!benchmarkRes.ok) {
@@ -103,37 +97,27 @@ export default function GlobalBenchmarksPage() {
         absorptionData = await absorptionRes.json();
       }
 
-      // Load unit cost stage counts
-      let unitCostData: any = {
-        stage1_entitlements: [],
-        stage2_engineering: [],
-        stage3_development: []
-      };
-      if (!unitCostCategoriesRes.ok) {
-        console.warn('Failed to load unit cost categories:', {
-          status: unitCostCategoriesRes.status,
-          statusText: unitCostCategoriesRes.statusText
+      // Load total cost line items count
+      let templateCount = 0;
+      if (!unitCostTemplatesRes.ok) {
+        console.warn('Failed to load unit cost templates:', {
+          status: unitCostTemplatesRes.status,
+          statusText: unitCostTemplatesRes.statusText
         });
       } else {
-        unitCostData = await unitCostCategoriesRes.json();
+        const templatesData = await unitCostTemplatesRes.json();
+        templateCount = Array.isArray(templatesData.templates) ? templatesData.templates.length : 0;
       }
-
-      // Calculate template counts per stage
-      const stageCounts = {
-        stage1_entitlements: unitCostData.stage1_entitlements?.reduce((sum: number, cat: any) => sum + (cat.template_count || 0), 0) || 0,
-        stage2_engineering: unitCostData.stage2_engineering?.reduce((sum: number, cat: any) => sum + (cat.template_count || 0), 0) || 0,
-        stage3_development: unitCostData.stage3_development?.reduce((sum: number, cat: any) => sum + (cat.template_count || 0), 0) || 0
-      };
 
       const growthRatesData = await fetchGrowthRates();
       setAbsorptionCount(Array.isArray(absorptionData) ? absorptionData.length : 0);
-      setUnitCostStageCounts(stageCounts);
+      setTotalCostLineItems(templateCount);
       console.log('admin growth rates data loaded', {
         benchmarkCount: benchmarkData.benchmarks?.length,
         suggestionsCount: suggestionsData.suggestions?.length,
         growthRatesCount: growthRatesData.sets?.length,
         growthRateSets: growthRatesData.sets,
-        unitCostStageCounts: stageCounts
+        totalCostLineItems: templateCount
       });
 
       // Group benchmarks by category
@@ -194,33 +178,28 @@ export default function GlobalBenchmarksPage() {
       count = growthRateSets.length;
     } else if (cat.key === 'absorption') {
       count = absorptionCount;
-    } else if (cat.key === 'unit_cost_stage1') {
-      count = unitCostStageCounts.stage1_entitlements;
-    } else if (cat.key === 'unit_cost_stage2') {
-      count = unitCostStageCounts.stage2_engineering;
-    } else if (cat.key === 'unit_cost_stage3') {
-      count = unitCostStageCounts.stage3_development;
     }
     return { ...cat, count };
   });
 
   return (
-    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-      <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="rounded-lg shadow-sm border overflow-hidden">
-        {/* Breadcrumb Header */}
-        <div className="flex justify-between items-center px-6 py-4" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-            <a href="/preferences" style={{ color: 'var(--cui-primary)', textDecoration: 'none' }}>Global Preferences</a>
-            <span style={{ color: 'var(--cui-border-color)' }}>/</span>
-            <span>Benchmarks</span>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+      <AdminNavBar />
+      <div className="p-4 space-y-4">
+        <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="rounded-lg shadow-sm border overflow-hidden">
+          {/* Header */}
+        <div className="p-6" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>Global Benchmarks</h1>
+            <span style={{ color: 'var(--cui-body-color)', fontSize: '1.5rem', fontWeight: 'bold', lineHeight: 1 }}>·</span>
+            <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+              Market intelligence: cost factors, rates, and timing standards
+            </span>
           </div>
         </div>
 
-        {/* Header */}
-        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--cui-body-color)' }}>Global Benchmarks</h1>
-          </div>
+        {/* Landscaper and Refresh Controls */}
+        <div className="px-6 py-3 flex items-center justify-end gap-3" style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
           <div className="flex items-center gap-3">
             {/* Landscaper Mode Selector */}
             <div className="flex items-center gap-2">
@@ -254,37 +233,44 @@ export default function GlobalBenchmarksPage() {
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
-              Benchmarks Admin
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/preferences?tab=unit-costs"
-                className="rounded border px-3 py-1.5 text-xs font-medium transition"
-                style={{
-                  borderColor: 'var(--cui-success)',
-                  backgroundColor: 'var(--cui-success-bg)',
-                  color: 'var(--cui-success)'
-                }}
-              >
-                Unit Cost Templates
-              </Link>
-              <Link
-                href="/preferences?tab=products"
-                className="rounded border px-3 py-1.5 text-xs font-medium transition"
-                style={{
-                  borderColor: 'var(--cui-info)',
-                  backgroundColor: 'var(--cui-info-bg)',
-                  color: 'var(--cui-info)'
-                }}
-              >
-                Product Library & Standards
-              </Link>
+        {/* Cost Library Card - Prominent Link */}
+        <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+          <Link
+            href="/admin/benchmarks/cost-library"
+            className="block rounded-lg border-2 p-4 transition-all hover:shadow-lg"
+            style={{
+              borderColor: 'var(--cui-primary)',
+              backgroundColor: 'var(--cui-card-bg)',
+              textDecoration: 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--cui-primary)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--cui-primary)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg p-2" style={{ backgroundColor: 'var(--cui-primary-bg)' }}>
+                  <svg className="w-6 h-6" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold" style={{ color: 'var(--cui-body-color)' }}>
+                    Cost Line Item Library →
+                  </h3>
+                  <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                    View and manage cost benchmark database ({totalCostLineItems.toLocaleString()} line items)
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={24} style={{ color: 'var(--cui-primary)' }} />
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Error State */}
@@ -310,44 +296,6 @@ export default function GlobalBenchmarksPage() {
               </div>
             ) : (
               categoriesWithCounts.map(category => {
-                // Handle unit cost stage tiles as navigation links
-                if (category.key.startsWith('unit_cost_stage')) {
-                  const stageMap: Record<string, string> = {
-                    'unit_cost_stage1': 'stage1_entitlements',
-                    'unit_cost_stage2': 'stage2_engineering',
-                    'unit_cost_stage3': 'stage3_development'
-                  };
-                  const stage = stageMap[category.key];
-
-                  return (
-                    <div key={category.key} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                      <Link
-                        href={`/benchmarks/unit-costs?stage=${stage}`}
-                        className="flex w-full items-center justify-between px-4 py-3 transition-colors"
-                        style={{
-                          color: 'var(--cui-body-color)',
-                          backgroundColor: 'transparent',
-                          textDecoration: 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <ChevronRight size={20} style={{ color: 'var(--cui-secondary-color)' }} />
-                          <span className="font-medium">{category.label}</span>
-                        </div>
-                        <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                          {category.count} templates
-                        </span>
-                      </Link>
-                    </div>
-                  );
-                }
-
                 if (category.key === 'growth_rate') {
                   return (
                     <GrowthRateCategoryPanel
@@ -471,6 +419,7 @@ export default function GlobalBenchmarksPage() {
             }}
           />
         )}
+        </div>
       </div>
     </div>
   );

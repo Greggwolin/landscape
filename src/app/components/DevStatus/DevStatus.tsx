@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Check, AlertTriangle, Clock, Wrench, Bug, Palette, FileText, RefreshCw, Edit3, FileQuestion, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface StatusData {
@@ -24,12 +24,142 @@ interface StatusData {
   lastUpdated: string;
 }
 
+type IssueType = 'bug' | 'feature' | 'feedback' | 'question' | 'other';
+
+interface IssueLogEntry {
+  issueId: number;
+  issueType: IssueType;
+  title: string | null;
+  description: string;
+  pagePath: string | null;
+  componentPath: string | null;
+  branch: string | null;
+  commitSha: string | null;
+  reporterName: string | null;
+  reporterEmail: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+const OFFLINE_QUEUE_KEY = 'devIssueOfflineQueue';
+
+function readOfflineIssues(): IssueLogEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((issue) => ({
+      issueId: issue.issueId ?? Date.now(),
+      issueType: (issue.issueType as IssueType) ?? 'bug',
+      title: issue.title ?? null,
+      description: issue.description ?? '',
+      pagePath: issue.pagePath ?? null,
+      componentPath: issue.componentPath ?? null,
+      branch: issue.branch ?? null,
+      commitSha: issue.commitSha ?? null,
+      reporterName: issue.reporterName ?? null,
+      reporterEmail: issue.reporterEmail ?? null,
+      metadata: issue.metadata ?? { source: 'offline-cache' },
+      createdAt: issue.createdAt ?? new Date().toISOString(),
+      resolvedAt: issue.resolvedAt ?? null,
+    }));
+  } catch (error) {
+    console.error('Failed to read offline issues', error);
+    return [];
+  }
+}
+
+const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
+  {
+    issueId: 9001,
+    issueType: 'bug',
+    title: 'Parcel map filters reset on save',
+    description:
+      'When saving edits on Planning Overview, the parcel map filter chips reset to default and remove the developer’s selected scope. Preserve the filters after save.',
+    pagePath: '/planning/overview',
+    componentPath: 'PlanningOverviewFilters',
+    branch: 'local-sample',
+    commitSha: null,
+    reporterName: 'Sample QA',
+    reporterEmail: 'qa@landscape.dev',
+    metadata: { source: 'local-sample' },
+    createdAt: '2025-01-05T14:20:00.000Z',
+    resolvedAt: null,
+  },
+  {
+    issueId: 9002,
+    issueType: 'feedback',
+    title: 'Inflation cards need clearer empty state',
+    description:
+      'Growth Rates > Inflation cards render an empty grid without guidance. Add helper text so users know they must select a family first.',
+    pagePath: '/market/assumptions',
+    componentPath: 'InflationCardGrid',
+    branch: 'local-sample',
+    commitSha: null,
+    reporterName: 'Sample QA',
+    reporterEmail: 'qa@landscape.dev',
+    metadata: { source: 'local-sample' },
+    createdAt: '2025-01-05T15:05:00.000Z',
+    resolvedAt: null,
+  },
+  {
+    issueId: 9003,
+    issueType: 'bug',
+    title: 'Budget variance chart flickers on hover',
+    description:
+      'The Budget Variance chart re-renders on every tooltip hover causing noticeable flicker. Memoize the dataset or throttle tooltip events.',
+    pagePath: '/budget/variance',
+    componentPath: 'BudgetVarianceChart',
+    branch: 'local-sample',
+    commitSha: null,
+    reporterName: 'Sample QA',
+    reporterEmail: 'qa@landscape.dev',
+    metadata: { source: 'local-sample' },
+    createdAt: '2025-01-05T16:12:00.000Z',
+    resolvedAt: null,
+  },
+  {
+    issueId: 9004,
+    issueType: 'feature',
+    title: 'Need quick link to Dev Status in nav',
+    description:
+      'Product wants a persistent bug icon in the global nav so testers can log issues without scrolling. Consider a bug icon near the user menu.',
+    pagePath: '/dashboard',
+    componentPath: 'TopNavigationBar',
+    branch: 'local-sample',
+    commitSha: null,
+    reporterName: 'Sample QA',
+    reporterEmail: 'qa@landscape.dev',
+    metadata: { source: 'local-sample' },
+    createdAt: '2025-01-05T17:00:00.000Z',
+    resolvedAt: null,
+  },
+];
+
+const ISSUE_BADGE_CLASSES: Record<IssueType, string> = {
+  bug: 'bg-red-500/10 text-red-300 border border-red-500/30',
+  feature: 'bg-blue-500/10 text-blue-300 border border-blue-500/30',
+  feedback: 'bg-purple-500/10 text-purple-300 border border-purple-500/30',
+  question: 'bg-amber-500/10 text-amber-300 border border-amber-500/30',
+  other: 'bg-gray-500/10 text-gray-300 border border-gray-500/30',
+};
+
 const DevStatus: React.FC = () => {
   const [statusData, setStatusData] = useState<StatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<any>(null);
+  const [issueLogs, setIssueLogs] = useState<IssueLogEntry[]>([]);
+  const [baselineIssueLogs, setBaselineIssueLogs] = useState<IssueLogEntry[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(true);
+  const [issuesError, setIssuesError] = useState<string | null>(null);
+  const [issuesHydrated, setIssuesHydrated] = useState(false);
+  const [issueFilterInput, setIssueFilterInput] = useState('');
+  const [activeIssueFilter, setActiveIssueFilter] = useState('');
 
   // Load data from localStorage if available, otherwise use mock data
   useEffect(() => {
@@ -328,6 +458,110 @@ const DevStatus: React.FC = () => {
     }
   };
 
+  const fetchIssueLogs = useCallback(async (pagePath?: string, signal?: AbortSignal) => {
+    setIssuesLoading(true);
+    setIssuesError(null);
+
+    try {
+      const params = new URLSearchParams({ pageSize: '50' });
+      if (pagePath) {
+        params.set('pagePath', pagePath);
+      }
+
+      const response = await fetch(`/api/dev-status/issues?${params.toString()}`, {
+        cache: 'no-store',
+        signal,
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          typeof payload?.error === 'string'
+            ? payload.error
+            : 'Failed to load live issue log.';
+        throw new Error(message);
+      }
+
+      const issues = Array.isArray(payload?.issues)
+        ? (payload.issues as IssueLogEntry[]).map((issue) => ({
+            ...issue,
+            metadata: issue.metadata ?? {},
+          }))
+        : [];
+      if (signal?.aborted) {
+        return;
+      }
+
+      const offlineIssues = readOfflineIssues().filter((issue) =>
+        pagePath ? issue.pagePath === pagePath : true
+      );
+      const combinedIssues =
+        offlineIssues.length > 0 ? [...offlineIssues, ...issues] : issues;
+
+      setIssueLogs(combinedIssues);
+      if (!pagePath) {
+        setBaselineIssueLogs(combinedIssues);
+        setIssuesHydrated(true);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
+      const offlineFallback = readOfflineIssues().filter((issue) =>
+        pagePath ? issue.pagePath === pagePath : true
+      );
+      const sampleFallback = pagePath
+        ? LOCAL_SAMPLE_ISSUES.filter((issue) => issue.pagePath === pagePath)
+        : LOCAL_SAMPLE_ISSUES;
+      const fallbackIssues =
+        offlineFallback.length > 0 ? offlineFallback : sampleFallback;
+
+      setIssueLogs(fallbackIssues);
+      if (!pagePath) {
+        setBaselineIssueLogs(offlineFallback.length > 0 ? offlineFallback : LOCAL_SAMPLE_ISSUES);
+        setIssuesHydrated(true);
+      }
+
+      setIssuesError(error instanceof Error ? error.message : 'Failed to load live issue log.');
+    } finally {
+      if (signal?.aborted) {
+        return;
+      }
+      setIssuesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchIssueLogs(activeIssueFilter ? activeIssueFilter : undefined, controller.signal);
+    return () => controller.abort();
+  }, [activeIssueFilter, fetchIssueLogs]);
+
+  const handleIssueFilterSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setActiveIssueFilter(issueFilterInput.trim());
+  };
+
+  const handleIssueFilterReset = () => {
+    setIssueFilterInput('');
+    setActiveIssueFilter('');
+  };
+
+  const handleIssueRefresh = () => {
+    fetchIssueLogs(activeIssueFilter ? activeIssueFilter : undefined);
+  };
+
+  const issuesForSummary = activeIssueFilter ? baselineIssueLogs : issueLogs;
+  const hasActiveIssueFilter = Boolean(activeIssueFilter);
+  const issueBreakdown = useMemo(() => {
+    const base: Record<IssueType, number> = { bug: 0, feature: 0, feedback: 0, question: 0, other: 0 };
+    issuesForSummary.forEach((issue) => {
+      base[issue.issueType] = base[issue.issueType] + 1;
+    });
+    return base;
+  }, [issuesForSummary]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -350,12 +584,37 @@ const DevStatus: React.FC = () => {
     );
   }
 
+  const fallbackIssuesTotal = statusData.issues.critical + statusData.issues.major + statusData.issues.minor;
   const overallCompletion = Math.round(
     statusData.pages.reduce((sum, page) => sum + page.completion, 0) / statusData.pages.length
   );
 
-  const totalIssues = statusData.issues.critical + statusData.issues.major + statusData.issues.minor;
+  const totalIssues = issuesHydrated ? issuesForSummary.length : fallbackIssuesTotal;
   const totalTechnicalDebt = statusData.technicalDebt.database + statusData.technicalDebt.codeQuality + statusData.technicalDebt.infrastructure;
+  const issueSummaryText = (() => {
+    if (issuesLoading && !issuesHydrated) {
+      return 'Loading live issue log...';
+    }
+    if (issuesError && !issuesHydrated) {
+      return 'Issue log unavailable.';
+    }
+    if (issuesLoading && issuesHydrated) {
+      return 'Refreshing issue log...';
+    }
+    if (issuesHydrated) {
+      const parts = [
+        `Bug: ${issueBreakdown.bug}`,
+        `Feature: ${issueBreakdown.feature}`,
+        `Feedback: ${issueBreakdown.feedback}`,
+      ];
+
+      if (issueBreakdown.question > 0 || issueBreakdown.other > 0) {
+        parts.push(`Other: ${issueBreakdown.question + issueBreakdown.other}`);
+      }
+      return parts.join(' • ');
+    }
+    return `${statusData.issues.critical} Critical • ${statusData.issues.major} Major • ${statusData.issues.minor} Minor`;
+  })();
 
   return (
     <div className="min-h-screen bg-gray-950 p-6">
@@ -405,7 +664,7 @@ const DevStatus: React.FC = () => {
               </div>
             </div>
             <div className="mt-2 text-xs text-gray-400">
-              {statusData.issues.critical} Critical • {statusData.issues.major} Major • {statusData.issues.minor} Minor
+              {issueSummaryText}
             </div>
           </div>
 
@@ -437,6 +696,142 @@ const DevStatus: React.FC = () => {
             <div className="mt-2 text-xs text-gray-400">
               {statusData.pages.filter(p => p.completion >= 90).length} Complete • {statusData.pages.filter(p => p.completion < 50).length} Needs Work
             </div>
+          </div>
+        </div>
+
+        {/* Issue Log */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 mb-8">
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Live Issue Log</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Pulls directly from <code className="bg-gray-900 px-2 py-1 rounded text-xs">/api/dev-status/issues</code>.
+                </p>
+              </div>
+              <form onSubmit={handleIssueFilterSubmit} className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                <input
+                  type="text"
+                  value={issueFilterInput}
+                  onChange={(event) => setIssueFilterInput(event.target.value)}
+                  placeholder="Filter by page path (e.g. /planning/overview)"
+                  className="flex-1 rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                    disabled={issuesLoading && !!activeIssueFilter && issueFilterInput.trim() === activeIssueFilter}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleIssueFilterReset}
+                    className="rounded-md border border-gray-600 px-4 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-700 disabled:opacity-50"
+                    disabled={!issueFilterInput && !activeIssueFilter}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleIssueRefresh}
+                    className="inline-flex items-center justify-center rounded-md border border-gray-600 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-700"
+                    aria-label="Refresh issue log"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${issuesLoading ? 'animate-spin text-indigo-300' : 'text-gray-300'}`} />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div className="p-6">
+            {issuesLoading && !issuesHydrated ? (
+              <div className="py-10 text-center text-gray-400">
+                <RefreshCw className="w-5 h-5 mx-auto mb-3 animate-spin text-indigo-300" />
+                <div>Loading issue log...</div>
+              </div>
+            ) : issuesError && !issuesHydrated ? (
+              <div className="py-10 text-center text-red-400">
+                <AlertTriangle className="w-6 h-6 mx-auto mb-3 text-red-500" />
+                <div>{issuesError}</div>
+              </div>
+            ) : (
+              <>
+                {issuesError && issuesHydrated && (
+                  <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                    {issuesError} Showing last known data.
+                  </div>
+                )}
+                {issueLogs.length === 0 ? (
+                  <div className="py-10 text-center text-gray-400">
+                    {hasActiveIssueFilter
+                      ? 'No issues match this page path yet.'
+                      : issuesHydrated
+                        ? 'No issues have been reported yet.'
+                        : 'Issue log will appear here once loaded.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-900 text-xs uppercase tracking-wide text-gray-400">
+                        <tr>
+                          <th className="px-4 py-3">Issue</th>
+                          <th className="px-4 py-3">Details</th>
+                          <th className="px-4 py-3">Page</th>
+                          <th className="px-4 py-3">Component</th>
+                          <th className="px-4 py-3">Reporter</th>
+                          <th className="px-4 py-3">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {issueLogs.map((issue) => (
+                          <tr key={issue.issueId} className="hover:bg-gray-900/60">
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-white font-semibold">#{issue.issueId}</div>
+                              <span
+                                className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ISSUE_BADGE_CLASSES[issue.issueType]}`}
+                              >
+                                {issue.issueType.charAt(0).toUpperCase() + issue.issueType.slice(1)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-white font-medium">
+                                {issue.title?.trim() || issue.description.slice(0, 80)}
+                                {issue.title ? '' : issue.description.length > 80 ? '…' : ''}
+                              </div>
+                              <p className="mt-1 text-xs text-gray-400">
+                                {issue.description.length > 160 ? `${issue.description.slice(0, 160)}…` : issue.description}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-sm text-gray-100">{issue.pagePath ?? '—'}</div>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-sm text-gray-100">{issue.componentPath ?? '—'}</div>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-sm text-gray-100">
+                                {issue.reporterName || issue.reporterEmail || '—'}
+                              </div>
+                              {issue.reporterName && issue.reporterEmail && (
+                                <div className="text-xs text-gray-400">{issue.reporterEmail}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-top text-sm text-gray-300">
+                              {new Date(issue.createdAt).toLocaleString(undefined, {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 

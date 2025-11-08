@@ -45,11 +45,25 @@ export default function TaxonomyManagerPage() {
       // Auto-select first family (Residential)
       if (data.length > 0) {
         setSelectedFamily(data[0]);
+        // Auto-load and select first type to show products panel
+        loadFirstType(data[0].family_id);
       }
     } catch (error) {
       console.error('Failed to load families:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFirstType = async (familyId: number) => {
+    try {
+      const response = await fetch(`/api/taxonomy/types?family_id=${familyId}`);
+      const types = await response.json();
+      if (Array.isArray(types) && types.length > 0) {
+        setSelectedType(types[0]);
+      }
+    } catch (error) {
+      console.error('Failed to load types:', error);
     }
   };
 

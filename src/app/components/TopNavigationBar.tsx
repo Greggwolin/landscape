@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
+import { useIssueReporter } from '@/components/IssueReporter';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
@@ -31,9 +32,10 @@ import { cilBug } from '@coreui/icons';
  */
 export default function TopNavigationBar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
   const [isLandscaperOpen, setLandscaperOpen] = useState(false);
+  const [showBugHint, setShowBugHint] = useState(false);
   const logoSrc = theme === 'light' ? '/logo-color.png' : '/logo-invert.png';
 
   const navHoverHandlers = (isActive = false) => ({
@@ -48,6 +50,14 @@ export default function TopNavigationBar() {
         : 'transparent';
     },
   });
+
+  const handleBugButtonClick = () => {
+    const opened = openReporterWithLatestTarget({ issueType: 'bug' });
+    if (!opened) {
+      setShowBugHint(true);
+      window.setTimeout(() => setShowBugHint(false), 2500);
+    }
+  };
 
   return (
     <>
@@ -71,7 +81,9 @@ export default function TopNavigationBar() {
               alt="Landscape"
               width={140}
               height={32}
-              className="h-8 w-auto object-contain"
+              priority
+              className="object-contain"
+              sizes="140px"
             />
           </Link>
 
@@ -110,19 +122,6 @@ export default function TopNavigationBar() {
             <SandboxDropdown />
             <UserMenuDropdown />
 
-            {/* Bug/Issues Icon Button */}
-            <button
-              type="button"
-              onClick={() => router.push('/dev-status')}
-              className="rounded-full p-2 transition-colors"
-              style={{ color: 'var(--nav-text)' }}
-              {...navHoverHandlers()}
-              aria-label="View Issues and Bug Reports"
-              title="Issues & Bug Reports"
-            >
-              <CIcon icon={cilBug} size="lg" />
-            </button>
-
             <SettingsDropdown />
 
             {/* Theme Toggle */}
@@ -140,6 +139,38 @@ export default function TopNavigationBar() {
             >
               {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
             </button>
+
+            {/* Bug/Issues Icon Button */}
+            <div className="relative flex flex-col items-end">
+              <button
+                type="button"
+                data-issue-reporter-ignore="true"
+                onClick={handleBugButtonClick}
+                className="rounded-full p-2 transition-colors"
+                style={{ color: hasTargetContext ? 'var(--nav-text)' : 'var(--nav-border)' }}
+                {...navHoverHandlers()}
+                aria-label={
+                  hasTargetContext
+                    ? `Report a bug for ${lastTargetLabel ?? 'the selected element'}`
+                    : 'Click any UI element first, then tap the bug icon'
+                }
+                title={
+                  hasTargetContext
+                    ? 'Report a bug for the last element you interacted with'
+                    : 'Click the target element first, then tap this icon'
+                }
+              >
+                <CIcon icon={cilBug} size="lg" />
+              </button>
+              {!hasTargetContext && showBugHint && (
+                <div
+                  data-issue-reporter-ignore="true"
+                  className="absolute right-0 top-full mt-2 rounded-md bg-slate-800 px-3 py-1 text-xs font-medium text-white shadow-lg"
+                >
+                  Click a UI element first, then tap the bug icon.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

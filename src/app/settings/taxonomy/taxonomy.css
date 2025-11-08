@@ -474,7 +474,7 @@
 
 /* Products Panel */
 .products-panel {
-  width: 260px;
+  width: 380px;
   border-left: 1px solid var(--cui-border-color);
   background-color: var(--cui-card-bg);
   display: flex;

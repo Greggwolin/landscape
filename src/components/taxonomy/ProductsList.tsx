@@ -124,15 +124,30 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
           <div className="products-title">Products ({products.length})</div>
           <div className="products-subtitle">{type.name}</div>
         </div>
-        <div className="products-header-actions">
-          <button className="btn-edit" onClick={handleAddNew} title="Add Product">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-          <button className="btn-icon" onClick={onClose}>×</button>
-        </div>
+        <button className="btn-icon" onClick={onClose}>×</button>
+      </div>
+
+      {/* Add Product Button */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--cui-border-color)' }}>
+        <button
+          onClick={handleAddNew}
+          style={{
+            width: '100%',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: 'var(--cui-primary)',
+            color: 'white',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 500,
+            transition: 'opacity 0.2s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          + Add Product
+        </button>
       </div>
 
       {/* Products List */}

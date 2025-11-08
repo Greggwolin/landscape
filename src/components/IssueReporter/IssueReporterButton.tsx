@@ -41,9 +41,13 @@ export function IssueReporterButton() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-6 right-6 z-[200] flex flex-col items-end space-y-2 sm:space-y-3">
+    <div
+      data-issue-reporter-ignore="true"
+      className="pointer-events-none fixed bottom-6 right-6 z-[200] flex flex-col items-end space-y-2 sm:space-y-3"
+    >
       <button
         type="button"
+        data-issue-reporter-ignore="true"
         onClick={() => openReporter()}
         className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2"
       >

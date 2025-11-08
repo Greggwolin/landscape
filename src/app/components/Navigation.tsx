@@ -116,6 +116,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
         { id: 'dms-admin', label: 'DMS Admin', href: '/admin/dms/templates', icon: 'cilSettings' }
       ],
       isCollapsible: false
+    },
+    {
+      title: 'Admin',
+      items: [
+        { id: 'admin-preferences', label: 'Preferences', href: '/admin/preferences', icon: 'cilSettings' },
+        { id: 'admin-benchmarks', label: 'Benchmarks', href: '/admin/benchmarks', icon: 'cilGraph' }
+      ],
+      isCollapsible: false
     }
   ], [projectId])
 

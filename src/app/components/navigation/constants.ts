@@ -58,7 +58,8 @@ export const USER_MENU_ITEMS = [
 
 // Settings menu items
 export const SETTINGS_ACTIONS = [
-  { label: 'Global Preferences', action: 'global-preferences', href: '/preferences' },
+  { label: 'System Preferences', action: 'admin-preferences', href: '/admin/preferences' },
+  { label: 'Benchmarks', action: 'admin-benchmarks', href: '/admin/benchmarks' },
   { label: 'Landscaper Configuration', action: 'landscaper-config' },
   { label: 'Landscaper Training', action: 'landscaper-training', href: '/documents/review' },
   { label: 'DMS Admin', action: 'dms-admin', href: '/admin/dms/templates' },

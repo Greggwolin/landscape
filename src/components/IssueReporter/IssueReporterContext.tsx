@@ -17,6 +17,9 @@ export type IssueReporterContextValue = {
   openReporter: (draft?: IssueReporterDraft) => void
   closeReporter: () => void
   setDraft: (draft: IssueReporterDraft | null) => void
+  openReporterWithLatestTarget: (draft?: IssueReporterDraft) => boolean
+  hasTargetContext: boolean
+  lastTargetLabel: string | null
 }
 
 export const IssueReporterContext = createContext<IssueReporterContextValue | null>(null)

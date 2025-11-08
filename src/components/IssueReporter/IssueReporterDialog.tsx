@@ -34,6 +34,41 @@ const COMMIT_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
   ''
 
+const OFFLINE_QUEUE_KEY = 'devIssueOfflineQueue'
+
+type OfflineIssueEntry = {
+  issueId: number
+  issueType: IssueReporterIssueType
+  title: string | null
+  description: string
+  pagePath: string | null
+  componentPath: string | null
+  branch: string | null
+  commitSha: string | null
+  reporterName: string | null
+  reporterEmail: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  resolvedAt: null
+}
+
+function enqueueOfflineIssue(entry: OfflineIssueEntry): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_QUEUE_KEY)
+    const queue = raw ? (JSON.parse(raw) as OfflineIssueEntry[]) : []
+    if (!Array.isArray(queue)) {
+      throw new Error('Offline queue is corrupted')
+    }
+    queue.unshift(entry)
+    window.localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(0, 200)))
+    return true
+  } catch (error) {
+    console.error('Failed to store offline issue entry', error)
+    return false
+  }
+}
+
 export function IssueReporterDialog({
   open,
   draft,
@@ -50,6 +85,7 @@ export function IssueReporterDialog({
   const [reporterEmail, setReporterEmail] = useState('')
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -59,6 +95,7 @@ export function IssueReporterDialog({
       setComponentPath(draft?.componentPath ?? '')
       setSubmissionState('idle')
       setErrorMessage(null)
+      setSuccessMessage(null)
     } else {
       setDraft(null)
       setTitle('')
@@ -66,6 +103,7 @@ export function IssueReporterDialog({
       setComponentPath('')
       setReporterName('')
       setReporterEmail('')
+      setSuccessMessage(null)
     }
   }, [open, draft, setDraft])
 
@@ -132,22 +170,61 @@ export function IssueReporterDialog({
       }
 
       setSubmissionState('success')
+      setSuccessMessage('Thanks! We captured your note and sent it to the Dev Status dashboard.')
       setTimeout(() => {
         setOpen(false)
         onClose()
       }, 1200)
     } catch (error) {
       console.error('Failed to submit issue report', error)
+      const fallbackMessage = error instanceof Error ? error.message : 'Unexpected error occurred.'
+      const offlineSaved = enqueueOfflineIssue({
+        issueId: Date.now(),
+        issueType,
+        title: payload.title ?? null,
+        description: payload.description,
+        pagePath: payload.pagePath ?? null,
+        componentPath: payload.componentPath ?? null,
+        branch: payload.branch ?? null,
+        commitSha: payload.commitSha ?? null,
+        reporterName: payload.reporterName ?? null,
+        reporterEmail: payload.reporterEmail ?? null,
+        metadata: {
+          ...(payload.metadata ?? {}),
+          source: 'offline-cache',
+        },
+        createdAt: new Date().toISOString(),
+        resolvedAt: null,
+      })
+
+      if (offlineSaved) {
+        setSubmissionState('success')
+        setErrorMessage(null)
+        setSuccessMessage('Saved offline. We will sync it once the issue service is available.')
+        setTimeout(() => {
+          setOpen(false)
+          onClose()
+        }, 1400)
+        return
+      }
+
       setSubmissionState('error')
-      setErrorMessage(error instanceof Error ? error.message : 'Unexpected error occurred.')
+      setErrorMessage(fallbackMessage)
+      setSuccessMessage(null)
     }
   }
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => (next ? setOpen(true) : onClose())}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[190] bg-slate-900/50 backdrop-blur-sm data-[state=open]:animate-fade-in" />
-        <Dialog.Content className="fixed inset-x-4 bottom-12 z-[200] mx-auto w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl transition data-[state=open]:animate-slide-up sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2">
+        <Dialog.Overlay
+          data-issue-reporter-ignore="true"
+          className="fixed inset-0 z-[190] bg-slate-900/50 backdrop-blur-sm data-[state=open]:animate-fade-in"
+        />
+        <Dialog.Content
+          data-issue-reporter-ignore="true"
+          className="fixed inset-x-4 bottom-12 z-[200] mx-auto w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl transition data-[state=open]:animate-slide-up sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
+        >
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <Dialog.Title className="text-lg font-semibold text-slate-900">Report an Issue / Idea</Dialog.Title>
             <Dialog.Close className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
@@ -252,9 +329,9 @@ export function IssueReporterDialog({
               </div>
             )}
 
-            {submissionState === 'success' && (
+            {submissionState === 'success' && successMessage && (
               <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                Thanks! We captured your note and sent it to the Dev Status dashboard.
+                {successMessage}
               </div>
             )}
 
