@@ -1,0 +1,871 @@
+================================================================================
+LANDSCAPE PROJECT - DIRECTORY STRUCTURE
+================================================================================
+Generated: Fri Nov  8, 2025
+Project Root: /Users/5150east/landscape
+Branch: work
+Last Commit: 789e632 - feat: comprehensive system updates and new feature implementations
+
+This file shows the complete directory structure up to 3 levels deep.
+Excluded: node_modules, .git, .next, dist, build, coverage, venv, __pycache__
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+MAIN DIRECTORIES:
+- backend/          Django backend API with multiple apps
+- src/              Next.js frontend application
+- docs/             Comprehensive documentation and session notes
+- scripts/          Utility scripts for data seeding and management
+- data/             External data and reference materials
+- public/           Static assets and sample files
+- reference/        Reference documents (multifamily properties, etc.)
+
+KEY BACKEND APPS:
+- benchmarks        Absorption rate modeling and benchmarking
+- documents         Document management with OCR and AI extraction
+- financial         Budget, categories, unit costs, variance tracking
+- landuse           Taxonomy, product types, and land use management
+- projects          Core project management and profiles
+- sales_absorption  Sales and absorption tracking
+- gis               Geographic information systems
+- multifamily       Multifamily-specific models
+- commercial        Commercial real estate models
+
+KEY FRONTEND AREAS:
+- src/app/          Next.js 13+ app directory with pages and API routes
+- src/components/   Reusable React components
+- src/hooks/        Custom React hooks
+- src/types/        TypeScript type definitions
+- src/lib/          Utility libraries
+- src/styles/       CSS and styling
+
+================================================================================
+FULL DIRECTORY TREE (3 LEVELS DEEP)
+================================================================================
+
+.
+├── .DS_Store
+├── .auto-commit.pid
+├── .claude
+│   ├── commands
+│   │   ├── README.md
+│   │   └── update-docs.md
+│   └── settings.local.json
+├── .devcontainer
+│   └── devcontainer.json
+├── .env
+├── .env.local
+├── .env.local.example
+├── .env.local.template
+├── .evn.local
+├── .gitattributes
+├── .github
+│   └── workflows
+│       ├── cleanup.yml
+│       ├── disaster-drill.yml
+│       ├── preview.yml
+│       └── production.yml
+├── .gitignore
+├── .husky
+│   ├── _
+│   │   ├── .gitignore
+│   │   ├── applypatch-msg
+│   │   ├── commit-msg
+│   │   ├── h
+│   │   ├── husky.sh
+│   │   ├── post-applypatch
+│   │   ├── post-checkout
+│   │   ├── post-commit
+│   │   ├── post-merge
+│   │   ├── post-rewrite
+│   │   ├── pre-applypatch
+│   │   ├── pre-auto-gc
+│   │   ├── pre-commit
+│   │   ├── pre-merge-commit
+│   │   ├── pre-push
+│   │   ├── pre-rebase
+│   │   └── prepare-commit-msg
+│   ├── pre-commit
+│   └── pre-commit.bak
+├── BUDGET_CATEGORY_HIERARCHY_IMPLEMENTATION_STATUS.md
+├── BUDGET_CATEGORY_IMPLEMENTATION_SUMMARY.md
+├── BUDGET_CATEGORY_PHASE_5_COMPLETION.md
+├── BUDGET_GRID_UI_IMPROVEMENTS.md
+├── BUDGET_IMPLEMENTATION_GAP_ANALYSIS.md
+├── BUDGET_TAB_IMPROVEMENTS_NOV_2_2025.md
+├── CHANGELOG.md
+├── CLAUDE_CODE_PROMPT_OTHER_MACHINE.md
+├── CUSTOM_BUDGET_GRID_IMPLEMENTATION.md
+├── DOCUMENTATION_UPDATE_SUMMARY.md
+├── Documentation
+│   ├── example-todo-tracking.tsx
+│   ├── gis_foundation_ai_first.sql
+│   ├── lease-input-page.html
+│   └── update-status.js
+├── FRONTEND_CORRECTION_UI_IMPLEMENTATION.md
+├── GIS
+├── GLOBAL_BENCHMARKS_PHASE1_STATUS.md
+├── IMPLEMENTATION_COMPLETE_SUMMARY.md
+├── INLINE_BENCHMARK_EDITING_IMPLEMENTATION.md
+├── MIGRATION_013_BACKEND_UPDATES.md
+├── MIGRATION_013_EXECUTION_REPORT.md
+├── MIGRATION_013_TAB_ROUTING_FIX.md
+├── PLANNING_PAGE_IMPLEMENTATION_STATUS.md
+├── PROJECT_TYPE_CODE_MIGRATION_REPORT.md
+├── QUICKSTART_BENCHMARKS.md
+├── QUICK_SETUP_GEO.md
+├── README.md
+├── SETUP_OTHER_MACHINE.md
+├── SVAR_GANTT_IMPLEMENTATION_SUMMARY.md
+├── TRANSACTION_COST_FORM_FINAL.md
+├── TRANSACTION_COST_FORM_IMPROVEMENTS.md
+├── TRANSACTION_COST_REFINEMENTS.md
+├── TRANSACTION_COST_TILE_FORMATTING.md
+├── auto-commit.log
+├── backend
+│   ├── .DS_Store
+│   ├── .coveragerc
+│   ├── .env
+│   ├── .gitignore
+│   ├── ADMIN_ACCESS.md
+│   ├── DJANGO_BACKEND_COMPLETE.md
+│   ├── PHASE3_COMPLETION.md
+│   ├── PHASE4_COMPLETION.md
+│   ├── PHASE5_COMPLETION.md
+│   ├── PHASE6_COMPLETION.md
+│   ├── PHASE7_COMPLETION.md
+│   ├── README.md
+│   ├── README_FRONTEND_INTEGRATION.md
+│   ├── README_PHASE3.md
+│   ├── README_PHASE4.md
+│   ├── README_PHASE5.md
+│   ├── README_TESTING.md
+│   ├── TESTING_GUIDE.md
+│   ├── apps
+│   │   ├── .DS_Store
+│   │   ├── benchmarks
+│   │   ├── calculations
+│   │   ├── commercial
+│   │   ├── containers
+│   │   ├── documents
+│   │   ├── financial
+│   │   ├── gis
+│   │   ├── landuse
+│   │   ├── market_intel
+│   │   ├── multifamily
+│   │   ├── projects
+│   │   ├── reports
+│   │   └── sales_absorption
+│   ├── config
+│   │   ├── __init__.py
+│   │   ├── asgi.py
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── conftest.py
+│   ├── create_market_rates_tables.sql
+│   ├── db
+│   │   └── migrations
+│   ├── db_backend
+│   │   ├── __init__.py
+│   │   └── base.py
+│   ├── manage.py
+│   ├── migrations
+│   │   ├── 011_create_chadron_units.sql
+│   │   ├── 012_chadron_rentroll_remediation.sql
+│   │   ├── 012_scenario_management.sql
+│   │   ├── 013_create_chadron_leases.sql
+│   │   ├── 013_project_contacts_system.sql
+│   │   ├── 014_project_location_metadata.sql
+│   │   ├── 014_valuation_system.sql
+│   │   ├── 015_ai_adjustment_suggestions.sql
+│   │   ├── add_granularity_settings.sql
+│   │   └── generate_chadron_migration.py
+│   ├── pytest.ini
+│   ├── requirements.txt
+│   ├── run_migration.py
+│   ├── scripts
+│   │   ├── README_CHADRON_CLEAN_IMPORT.md
+│   │   ├── README_CHADRON_EXTRACTION.md
+│   │   ├── chadron_import_FINAL.sql
+│   │   ├── cleanup_chadron_units.py
+│   │   ├── complete_import.sql
+│   │   ├── complete_import_with_data.sql
+│   │   ├── extract_chadron_rent_roll.py
+│   │   ├── full_import.sql
+│   │   ├── full_import_corrected.sql
+│   │   ├── full_import_final.sql
+│   │   ├── full_import_fixed.sql
+│   │   ├── import_chadron_CLEAN.sql
+│   │   ├── import_chadron_CORRECT.sql
+│   │   ├── import_chadron_FIXED2.sql
+│   │   ├── import_chadron_FIXED3.sql
+│   │   ├── import_chadron_FIXED4.sql
+│   │   ├── import_chadron_FIXED5.sql
+│   │   ├── import_chadron_clean_slate.py
+│   │   ├── import_chadron_rent_roll.sql
+│   │   ├── inserts_only.sql
+│   │   ├── json_to_sql_temp.py
+│   │   ├── parse_chadron_manual.py
+│   │   ├── run_chadron_clean_import.sh
+│   │   ├── run_chadron_extraction.sh
+│   │   ├── seed_chadron_valuation.py
+│   │   ├── temp_table_inserts.sql
+│   │   └── test-geocoding.ts
+│   ├── seed_budget_sample_data.sql
+│   ├── services
+│   │   ├── __init__.py
+│   │   └── extraction
+│   ├── sql
+│   │   └── create_ai_correction_log.sql
+│   ├── test_finance_structure_api.py
+│   ├── tests_e2e_workflows.py
+│   └── tests_performance.py
+├── check-missing-codes.sh
+├── convert-shapefile.js
+├── create_market_rates_tables.sql
+├── data
+│   ├── external
+│   │   ├── .gitkeep
+│   │   ├── README.md
+│   │   └── pinal-county
+│   ├── parcels
+│   ├── prototype-notes.json
+│   └── red_valley_unit_costs.csv
+├── db
+│   ├── .DS_Store
+│   └── migrations
+│       ├── 001_create_universal_containers.down.sql
+│       ├── 001_create_universal_containers.up.sql
+│       ├── 002_enhance_core_fin_tables.down.sql
+│       ├── 002_enhance_core_fin_tables.up.sql
+│       ├── 003_create_tagging_system.down.sql
+│       ├── 003_create_tagging_system.up.sql
+│       ├── 004_create_calculation_periods.down.sql
+│       ├── 004_create_calculation_periods.up.sql
+│       ├── 005_create_project_settings.down.sql
+│       ├── 005_create_project_settings.up.sql
+│       ├── 006_create_growth_rate_tables.down.sql
+│       ├── 006_create_growth_rate_tables.up.sql
+│       ├── 012_create_msa_lookup.sql
+│       ├── 012_multifamily_assumptions.down.sql
+│       ├── 012_multifamily_assumptions.up.sql
+│       ├── 013_add_parcel_description.sql
+│       ├── 013_project_type_reclassification.sql
+│       ├── 013_restructure_project_taxonomy.down.sql
+│       ├── 013_restructure_project_taxonomy.up.sql
+│       ├── 013_rollback.sql
+│       ├── 013_verify_taxonomy_migration.sql
+│       ├── 014_budget_category_system.down.sql
+│       ├── 014_budget_category_system.up.sql
+│       ├── 019_sales_absorption_module.sql
+│       ├── 20251008_01_market_core.sql
+│       ├── 20251008_02_geo_seed.sql
+│       ├── 20251008_03_dev_issue_log.sql
+│       ├── 20251029_01_california_geo_seed.sql
+│       ├── 20251103_01_cpi_auto_sync.sql
+│       ├── README_GEO_SETUP.md
+│       └── run_geo_seeds.sh
+├── debug-timeline.js
+├── dev.log
+├── docs
+│   ├── .DS_Store
+│   ├── 00-getting-started
+│   │   ├── DEVELOPER_GUIDE.md
+│   │   ├── QUICK_START_FINANCIAL_ENGINE.md
+│   │   └── README.md
+│   ├── 01-architecture
+│   ├── 02-features
+│   │   ├── .DS_Store
+│   │   ├── dms
+│   │   ├── financial-engine
+│   │   ├── gis
+│   │   ├── land-use
+│   │   ├── multifamily
+│   │   └── rent-roll
+│   ├── 03-api-reference
+│   │   ├── API_REFERENCE_PHASE2.md
+│   │   └── budget_grid_api_spec.md
+│   ├── 04-ui-components
+│   │   ├── .DS_Store
+│   │   ├── UI_COMPONENTS_PHASE4.md
+│   │   ├── materio-nextjs
+│   │   └── prototypes
+│   ├── 05-database
+│   │   ├── DATABASE_SCHEMA.md
+│   │   ├── MIGRATION-SUMMARY.md
+│   │   ├── README.md
+│   │   ├── TABLE_INVENTORY.md
+│   │   └── db-schema.md
+│   ├── 06-devops
+│   │   ├── DEVOPS_GUIDE.md
+│   │   ├── POST_SYNC_SETUP.md
+│   │   ├── SYNC_ALL_TO_GIT_PROMPT.md
+│   │   └── Unified-Extractor-Integration-Complete.md
+│   ├── 07-testing
+│   │   ├── VALIDATION_COMPLETE.md
+│   │   ├── VALIDATION_RESULTS.md
+│   │   └── VALIDATION_SUMMARY.md
+│   ├── 08-migration-history
+│   │   ├── 013-project-type-code-standardization.md
+│   │   ├── Budget-Consolidation-Migration-Complete.md
+│   │   ├── Budget-Finance-Schema-Overlap-Analysis.md
+│   │   ├── Schema-Coverage-Analysis.md
+│   │   └── Schema-Naming-Convention-Analysis.md
+│   ├── 09-technical-dd
+│   │   ├── .DS_Store
+│   │   ├── 01-executive-summary
+│   │   ├── 02-architecture
+│   │   ├── 03-codebase-analysis
+│   │   ├── 04-feature-functionality
+│   │   ├── 04-security-assessment
+│   │   ├── 05-performance-metrics
+│   │   ├── 05-security-assessment
+│   │   ├── 06-ip-licensing
+│   │   ├── 07-technical-debt
+│   │   ├── 08-appendices
+│   │   └── README.md
+│   ├── 10-correspondence
+│   │   ├── ASU-2-pager.docx
+│   │   ├── ASU-3-pager.docx
+│   │   ├── ASU-memo_re-landscape.pdf
+│   │   ├── README.md
+│   │   └── ~$U-2-pager.docx
+│   ├── 11-implementation-status
+│   │   ├── BUDGET_CONTAINER_INTEGRATION_COMPLETE.md
+│   │   ├── CONTAINER_CRUD_FRONTEND_COMPLETE.md
+│   │   ├── CONTAINER_CRUD_IMPLEMENTATION_STATUS.md
+│   │   ├── CONTAINER_INTEGRATION_COMPLETE.md
+│   │   ├── CORE_UI_MIGRATION_COMPLETE.md
+│   │   ├── FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md
+│   │   ├── IMPLEMENTATION_STATUS.md
+│   │   ├── IMPLEMENTATION_STATUS_OLD.md
+│   │   ├── PHASE_1_DEPLOYMENT_COMPLETE.md
+│   │   ├── README.md
+│   │   └── SCENARIO_MANAGEMENT_STATUS.md
+│   ├── 12-migration-plans
+│   │   ├── BUDGET_CONTAINER_MIGRATION.md
+│   │   ├── CONTAINER_MIGRATION_CHECKLIST.md
+│   │   ├── PE_LEVEL_DEPRECATION_PLAN.md
+│   │   ├── PLANNING_WIZARD_CONTAINER_MIGRATION.md
+│   │   └── README.md
+│   ├── 13-testing-docs
+│   │   ├── DYNAMIC_BREADCRUMB_POC.md
+│   │   ├── MULTIFAMILY_TEST_RESULTS.md
+│   │   ├── README.md
+│   │   ├── TESTING_BREADCRUMB_DEMO.md
+│   │   └── TESTING_PLANNING_WIZARD_CONTAINERS.md
+│   ├── 14-specifications
+│   │   ├── BUDGET_API_CONTAINER_INTEGRATION.md
+│   │   ├── HOME_PAGE_REDESIGN_CONTEXT.md
+│   │   ├── LANDSCAPE_AI_INGESTION_BRIEF.md
+│   │   ├── PROJECT_SETUP_WIZARD.md
+│   │   └── README.md
+│   ├── 1451-Red Valley Phase 1 Email.pdf
+│   ├── 3.1 Preliminary Plat Narrative & Approval.pdf
+│   ├── 99-prompts
+│   │   ├── CLAUDE_CODE_RENT_ROLL_INGESTION_PROMPT.md
+│   │   ├── IMPLEMENTATION_PROMPT_UPDATE_SUMMARY.md
+│   │   └── chadron_rent_roll_ingestion_spec.md
+│   ├── API
+│   │   └── landscape_APIs_2025-11-04.md
+│   ├── ASSUMPTIONS_UI_FINAL_STATUS.md
+│   ├── ASSUMPTIONS_UI_IMPLEMENTATION_SUMMARY.md
+│   ├── ASSUMPTIONS_UI_QUICKSTART.md
+│   ├── ASSUMPTIONS_UI_TEST_CHECKLIST.md
+│   ├── CPI_AUTO_SYNC_IMPLEMENTATION_PROMPT.md
+│   ├── CRE_CALCULATION_ENGINE_DOCUMENTATION.md
+│   ├── CRE_IMPLEMENTATION_SUMMARY.md
+│   ├── CRE_PROPERTY_ANALYSIS_UPDATE.md
+│   ├── CRE_README.md
+│   ├── DJANGO_BACKEND_IMPLEMENTATION.md
+│   ├── DOCUMENTATION_UPDATE_WORKFLOW.md
+│   ├── IMPLEMENTATION_CHECKLIST.md
+│   ├── LAND_USE_LABELS_IMPLEMENTATION.md
+│   ├── PROJECT_TAXONOMY_RESTRUCTURE_IMPLEMENTATION.md
+│   ├── PROPERTY_ANALYSIS_UI_IMPLEMENTATION.md
+│   ├── QUICK_START_LAND_USE_LABELS.md
+│   ├── README.md
+│   ├── SCOTTSDALE_DATA_SUMMARY.md
+│   ├── TAXONOMY_CRUD_API_REFERENCE.md
+│   ├── UI_STANDARDS_v1.0.md
+│   ├── UX
+│   │   ├── .DS_Store
+│   │   ├── patches
+│   │   └── ui_consistency_audit_pass_a_2025-11-05.md
+│   ├── ZondaReports.xlsx
+│   ├── ai-chats
+│   │   ├── .archive
+│   │   ├── 2025-09-17-ai-chat-logs.md
+│   │   └── 2025-09-17-ai-chat.md
+│   ├── archive
+│   │   ├── App-Development-Status.md
+│   │   ├── BUG_FIX_SUMMARY.md
+│   │   ├── CLEANUP_COMPLETED.md
+│   │   ├── COMPONENT_MIGRATION_PLAN.md
+│   │   ├── UI_DEVELOPMENT_CONTEXT.md
+│   │   ├── dev-issue-reporter.md
+│   │   └── parcel-cleanup-documentation.md
+│   ├── budget_grid_queries.sql
+│   ├── budget_grid_ui_spec.xml
+│   ├── capitalization
+│   │   ├── API_FIELD_COVERAGE_UPDATE.md
+│   │   └── FULL_ARGUS_PARITY_IMPLEMENTATION_STATUS.md
+│   ├── chadron-complete-integration-summary.md
+│   ├── chadron-financial-reconciliation-findings.md
+│   ├── chadron-frontend-connection-fix.md
+│   ├── chadron-rent-roll-migration-summary.md
+│   ├── chadron-unit-numbering-discrepancy.md
+│   ├── components
+│   │   └── GrowthRatesMaterio.md
+│   ├── data_validation_lists_reference.md
+│   ├── examples
+│   │   ├── chadron_extraction.json
+│   │   ├── chadron_reconciliation_report.md
+│   │   └── chadron_rent_roll_extracted.json
+│   ├── geocoding-and-imagery-upgrade-COMPLETE.md
+│   ├── gis-infrastructure-analysis.md
+│   ├── map-api-setup-guide.md
+│   ├── maplibre-oblique-implementation-summary.md
+│   ├── prototype-to-production-conversion.md
+│   ├── prototypes
+│   │   ├── .DS_Store
+│   │   ├── BEST_PRACTICES.md
+│   │   ├── README.md
+│   │   ├── _template.md
+│   │   ├── general
+│   │   ├── multifam
+│   │   ├── notes.log
+│   │   └── planning
+│   ├── rent-roll-ingestion-COMPLETE.md
+│   ├── rent-roll-ingestion-implementation-summary.md
+│   ├── rent-roll-ingestion-quick-start.md
+│   ├── rent-roll-ingestion-session-GR09-complete.md
+│   ├── rent-roll-ingestion-testing-guide.md
+│   ├── session-notes
+│   │   ├── 2025-10-10-market-intelligence-fixes.md
+│   │   ├── 2025-10-22-documentation-system.md
+│   │   ├── 2025-10-23-multifam-rent-roll-prototype.md
+│   │   ├── 2025-10-24-coreui-modern-implementation-complete.md
+│   │   ├── 2025-10-24-multifam-django-consolidation.md
+│   │   ├── 2025-10-25-multifamily-overview-integration.md
+│   │   ├── 2025-10-25-pdf-reports-navigation.md
+│   │   ├── 2025-10-29-maplibre-coordinate-fixes.md
+│   │   ├── 2025-10-30-dms-ai-extraction-implementation.md
+│   │   ├── 2025-10-30-landscaper-training-implementation.md
+│   │   ├── 2025-11-02-budget-category-phase-5-completion.md
+│   │   ├── 2025-11-02-migration-013-documentation-update.md
+│   │   ├── 2025-11-03-budget-variance-implementation-phases-4-7.md
+│   │   ├── 2025-11-05-project-type-data-consistency-fix.md
+│   │   ├── 2025-11-07 - ThemeTokenization & top nav refresh.md
+│   │   ├── 2025-11-07-area-phase-filter-tiles-implementation.md
+│   │   ├── 2025-11-07-budget-modal-container-fixes.md
+│   │   ├── 2025-11-07-budget-modal-redesign-implementation.md
+│   │   ├── 2025-11-07-inline-editing-500-error-fix.md
+│   │   ├── 2025-11-07-session-summary.md
+│   │   ├── 2025-11-07-taxonomy-benchmark-layout-navigation.md
+│   │   ├── 2025-11-07-unit-cost-development-stages-implementation.md
+│   │   ├── 2025-11-07-unit-cost-inline-editing-implementation.md
+│   │   └── 2025-11-07-unit-cost-ui-enhancements-implementation.md
+│   ├── sql
+│   │   ├── CRE_proforma_schema.sql
+│   │   ├── Land_Dev_MVP_schema.sql
+│   │   ├── land_use_management.sql
+│   │   ├── land_use_seed_data.sql
+│   │   ├── market_assumptions.sql
+│   │   └── universal_container_system.sql
+│   ├── upload-button-location-fix.md
+│   ├── upload-feedback-enhancement.md
+│   ├── valuation-tab-COMPLETE-implementation.md
+│   ├── valuation-tab-implementation-summary.md
+│   ├── valuation-tab-interactive-adjustments-IMPLEMENTATION-COMPLETE.md
+│   ├── valuation-tab-interactive-adjustments-SESSION-COMPLETE.md
+│   └── valuation-tab-interactive-adjustments-implementation.md
+├── eslint.config.mjs
+├── handsontable-custom-theme.css
+├── inspect-shapefile.js
+├── jest.config.ts
+├── lib
+├── migration_013_backup_timestamp.txt
+├── migrations
+│   ├── 001_financial_engine_schema.sql
+│   ├── 001_phase1_parallel_population.sql
+│   ├── 002_dependencies_revenue_finance.sql
+│   ├── 002a_fix_dependency_views.sql
+│   ├── 006_lease_management.sql
+│   ├── 007_add_budget_timing_columns.sql
+│   ├── 008_add_multifamily_units.sql
+│   ├── 009_phase2_container_queries.sql
+│   ├── 010_phase3_container_indexes.sql
+│   ├── 011_phase4_drop_legacy_pe.sql
+│   ├── 012_container_crud_constraints.sql
+│   ├── 013_add_template_id_to_project.sql
+│   ├── 014_unit_costs_and_products.sql
+│   ├── 014_unit_costs_and_products_final.sql
+│   ├── 014_unit_costs_and_products_fixed.sql
+│   ├── 015_add_budget_period_fields.sql
+│   ├── 015_unit_costs_and_products_api.sql
+│   ├── 016_absorption_velocity_benchmarks.sql
+│   ├── 016_cleanup_project7_containers.sql
+│   ├── 016_cleanup_project7_containers_v2.sql
+│   └── 017_unit_cost_template_extensions.sql
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── patches
+│   └── xlsx+0.18.5.patch
+├── postcss.config.js
+├── project-structure.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── logo-color.png
+│   ├── logo-invert.png
+│   ├── next.svg
+│   ├── prototypes
+│   │   └── lease-input-page.html
+│   ├── samples
+│   │   └── pinal-parcels-sample.json
+│   ├── vercel.svg
+│   └── window.svg
+├── reference
+│   ├── .DS_Store
+│   ├── database
+│   │   ├── landscape_neon_91225b.json
+│   │   └── neon_landscape_full.sql
+│   ├── docs
+│   │   ├── ARGUS Developer User Guide  8.2.3.docx
+│   │   ├── ARGUS Enterprise 1-250.pdf
+│   │   ├── ARGUS Enterprise 1001-end.pdf
+│   │   ├── ARGUS Enterprise 251-500.pdf
+│   │   ├── ARGUS Enterprise 501-750.pdf
+│   │   ├── ARGUS Enterprise 751-1000.pdf
+│   │   ├── Argus_EstateMaster_UserGuide.pdf
+│   │   └── Yardi_Manual_BLVD.pdf
+│   ├── excel-models
+│   │   └── PeoriaLakes MPC_2023.xlsm
+│   ├── images
+│   │   ├── ProjInterface_PeoriaLakes.png
+│   │   ├── Screenshot 2025-09-12 at 4.53.44 PM.png
+│   │   ├── logo-invert.png
+│   │   └── neon_database_erd.svg
+│   ├── multifam
+│   │   ├── .DS_Store
+│   │   ├── 2025 JPM Co-Star Los Angeles - MultiFamily.pdf
+│   │   ├── 2025 M&M US Multifamily Investment Forecast.pdf
+│   │   ├── 4Q024 Matthews Orange County Multifamily Report.docx
+│   │   ├── 4Q24-Matthews-LA-County-Multifamily-Sales-Report.pdf
+│   │   ├── Fontana Comps.pdf
+│   │   ├── Fontana Sales Map.docx
+│   │   ├── Fontana Workbook.xlsx
+│   │   ├── Glendora Comps.pdf
+│   │   ├── Glendora Sales Map.docx
+│   │   ├── Glendora Workbook.xlsx
+│   │   ├── Lynn Villas OM 2025_FINAL FOR MARKETING.pdf
+│   │   ├── VINCENT VILLAGE - OM SM.pdf
+│   │   ├── VINCENT VILLAGE - RR.pdf
+│   │   └── chadron
+│   └── planning
+│       └── LandscapeApp - PlanningWizard.pdf
+├── scripts
+│   ├── add-industrial-codes.mjs
+│   ├── add-pricing-columns.sql
+│   ├── add-time-series-dvls.sql
+│   ├── audit-apis.mjs
+│   ├── auto-commit.sh
+│   ├── bootstrap-containers.mjs
+│   ├── check_excel.ts
+│   ├── check_specific_items.ts
+│   ├── create-ai-review-tables.sql
+│   ├── create-project-boundaries-tables.sql
+│   ├── create_missing_categories.ts
+│   ├── delete_unit_costs.ts
+│   ├── dev-full.sh
+│   ├── drop-legacy-budget-tables.sql
+│   ├── export-prototype-notes.js
+│   ├── fix-sql-schema.py
+│   ├── generate-schema-md.mjs
+│   ├── generate-types.mjs
+│   ├── inspect-xlsm.mjs
+│   ├── load-fixtures.sh
+│   ├── load-scottsdale-data.js
+│   ├── load_scottsdale_roster.sql
+│   ├── load_scottsdale_roster.sql.bak
+│   ├── migrate-budget-to-containers-simple.sql
+│   ├── migrate-budget-to-containers.sql
+│   ├── migrate-budget-to-containers.ts
+│   ├── migrate-budget-to-core-fin.sql
+│   ├── migrate-pricing-columns.mjs
+│   ├── neon-branch-create.sh
+│   ├── neon-branch-delete.sh
+│   ├── normalize-ai-chats.mjs
+│   ├── rollback-production.sh
+│   ├── run-extraction-migration.js
+│   ├── run-extraction-migration.sh
+│   ├── run-migration-004.js
+│   ├── run-migrations.mjs
+│   ├── run-migrations.sh
+│   ├── run-scottsdale-migration.js
+│   ├── seed-market-series.mjs
+│   ├── seed-transaction-cost-defaults.sql
+│   ├── seed_unit_cost_templates_benchmark_excel.ts
+│   ├── seed_unit_cost_templates_red_valley.cjs
+│   ├── seed_unit_cost_templates_red_valley.ts
+│   ├── setup-auto-start.sh
+│   ├── setup-database-roles.sql
+│   ├── setup-monitoring.sql
+│   ├── stage-ai-chats.sh
+│   ├── start-auto-commit.sh
+│   ├── test-dms-api-manual.md
+│   ├── test-dms-docs-api.sh
+│   ├── test-dms-search-manual.md
+│   ├── test-dms-search.sh
+│   ├── validate-database-schema.mjs
+│   ├── validate-glossary-zoning.mjs
+│   ├── verify-assumptions-db.sh
+│   ├── verify-market-latest.mjs
+│   ├── verify-migration-004-simple.js
+│   ├── verify-migration-004.js
+│   ├── verify_new_import.ts
+│   └── verify_unit_costs.ts
+├── seed
+│   └── market_series_v1.csv
+├── services
+│   ├── .env
+│   ├── financial_engine_py
+│   │   ├── .coverage
+│   │   ├── .env
+│   │   ├── .env.example
+│   │   ├── .gitignore
+│   │   ├── INSTALLATION_COMPLETE.md
+│   │   ├── MIGRATION_STATUS.md
+│   │   ├── README.md
+│   │   ├── financial_engine
+│   │   ├── poetry.lock
+│   │   ├── pyproject.toml
+│   │   ├── setup.sh
+│   │   └── tests
+│   └── market_ingest_py
+│       ├── .env
+│       ├── .venv
+│       ├── README.md
+│       ├── market_ingest
+│       ├── pyproject.toml
+│       └── requirements.txt
+├── sql
+├── src
+│   ├── .DS_Store
+│   ├── .env.local
+│   ├── Archive.zip
+│   ├── app
+│   │   ├── .DS_Store
+│   │   ├── admin
+│   │   ├── ai-document-review
+│   │   ├── api
+│   │   ├── benchmarks
+│   │   ├── breadcrumb-demo
+│   │   ├── budget-grid
+│   │   ├── budget-grid-v2
+│   │   ├── components
+│   │   ├── dashboard
+│   │   ├── db-schema
+│   │   ├── dev-status
+│   │   ├── dms
+│   │   ├── documentation
+│   │   ├── documents
+│   │   ├── favicon.ico
+│   │   ├── gis-simple-test
+│   │   ├── gis-test
+│   │   ├── globals.css
+│   │   ├── growth-rates
+│   │   ├── growthratedetail
+│   │   ├── growthrates
+│   │   ├── growthrates-original
+│   │   ├── growthratesmanager
+│   │   ├── hooks
+│   │   ├── inventory
+│   │   ├── layout.tsx
+│   │   ├── lease
+│   │   ├── lib
+│   │   ├── map-debug
+│   │   ├── market
+│   │   ├── market-assumptions
+│   │   ├── page.tsx
+│   │   ├── parcel-test
+│   │   ├── planning
+│   │   ├── preferences
+│   │   ├── projects
+│   │   ├── properties
+│   │   ├── property
+│   │   ├── prototypes
+│   │   ├── prototypes-multifam
+│   │   ├── rent-roll
+│   │   ├── reports
+│   │   ├── settings
+│   │   ├── styles
+│   │   ├── test-coreui
+│   │   ├── test-global-assumptions
+│   │   └── utils
+│   ├── components
+│   │   ├── .DS_Store
+│   │   ├── IssueReporter
+│   │   ├── benchmarks
+│   │   ├── budget
+│   │   ├── dms
+│   │   ├── documents
+│   │   ├── extraction
+│   │   ├── map
+│   │   ├── project
+│   │   ├── projects
+│   │   ├── reports
+│   │   ├── sales
+│   │   ├── scenarios
+│   │   ├── shared
+│   │   ├── taxonomy
+│   │   └── ui
+│   ├── config
+│   │   ├── .DS_Store
+│   │   ├── assumptions
+│   │   └── opex
+│   ├── contexts
+│   │   ├── ComplexityModeContext.tsx
+│   │   └── ScenarioContext.tsx
+│   ├── hooks
+│   │   ├── useBenchmarks.ts
+│   │   ├── useBudgetCategories.ts
+│   │   ├── useBudgetGrouping.ts
+│   │   ├── useBudgetVariance.ts
+│   │   ├── useContainers.ts
+│   │   ├── useEditGuard.ts
+│   │   ├── useLandUseChoices.ts
+│   │   ├── useLandUseLabels.ts
+│   │   ├── useProjectConfig.ts
+│   │   ├── useSalesAbsorption.ts
+│   │   └── useTaxonomy.ts
+│   ├── lib
+│   │   ├── .DS_Store
+│   │   ├── ai
+│   │   ├── api
+│   │   ├── calculations
+│   │   ├── containerHelpers.ts
+│   │   ├── db.ts
+│   │   ├── devStatus
+│   │   ├── dms
+│   │   ├── document-analyzer-broken.ts
+│   │   ├── document-analyzer.ts
+│   │   ├── excel-reader.ts
+│   │   ├── feature-flags.ts
+│   │   ├── fetchJson.ts
+│   │   ├── financial-engine
+│   │   ├── geocoding.ts
+│   │   ├── logger.ts
+│   │   ├── map
+│   │   ├── opex
+│   │   ├── pdf
+│   │   ├── prototypes
+│   │   ├── prototypes-multifam
+│   │   ├── python-calculations.ts
+│   │   ├── unitCostCache.ts
+│   │   ├── unitCostFallback.ts
+│   │   ├── uom-utils.tsx
+│   │   ├── uploadthing.ts
+│   │   ├── utils
+│   │   ├── utils.ts
+│   │   └── validation
+│   ├── prototypes
+│   │   ├── .DS_Store
+│   │   ├── coreui
+│   │   ├── gis
+│   │   ├── glide
+│   │   ├── mui
+│   │   ├── project
+│   │   ├── remote
+│   │   └── tailwind
+│   ├── shims
+│   │   └── react-use.ts
+│   ├── styles
+│   │   ├── coreui-theme.css
+│   │   ├── horizon-dark.css
+│   │   ├── lease.css
+│   │   ├── parcel-tiles.css
+│   │   ├── property.css
+│   │   ├── scenarios.css
+│   │   └── tokens.css
+│   ├── theme
+│   │   ├── index.ts
+│   │   └── muiTheme.ts
+│   ├── theme.ts
+│   ├── themes
+│   │   ├── .DS_Store
+│   │   ├── README.md
+│   │   ├── current
+│   │   └── mui-materio
+│   ├── types
+│   │   ├── assumptions.ts
+│   │   ├── benchmarks.ts
+│   │   ├── budget-categories.ts
+│   │   ├── contacts.ts
+│   │   ├── containers.ts
+│   │   ├── database
+│   │   ├── database.ts
+│   │   ├── dms.ts
+│   │   ├── financial-engine.ts
+│   │   ├── growth-rates.ts
+│   │   ├── index.ts
+│   │   ├── landuse.ts
+│   │   ├── opex.ts
+│   │   ├── project-profile.ts
+│   │   ├── project-taxonomy.ts
+│   │   ├── propertyTypes.ts
+│   │   ├── sales-absorption.ts
+│   │   ├── scenario.ts
+│   │   └── valuation.ts
+│   └── utils
+│       ├── formatNumber.ts
+│       └── formatters
+├── src.zip
+├── tailwind.config.js
+├── technical-dd
+│   └── .DS_Store
+├── test-data
+│   ├── pinal-county-sample-parcels.json
+│   └── test-ingest-payload.json
+├── test-file.txt
+├── test-parcels.html
+├── test-queries
+│   └── gis-validation.sql
+├── test-unified-extract.js
+├── tests
+│   ├── data_layer_smoke_test.sql
+│   ├── fixtures
+│   │   ├── seed-test-data.sql
+│   │   ├── smoke-test-fixtures.sql
+│   │   └── validation-test-peoria.sql
+│   ├── lease-calculator.spec.ts
+│   ├── lease-rollover.spec.ts
+│   └── setup.ts
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+├── ui-audit-pack_2025-11-04.zip
+└── vercel.json
+
+217 directories, 589 files
+
+================================================================================
+STATISTICS
+================================================================================
+
+Total directories (excluding hidden): 854
+Total files (excluding hidden): 2138
+
+Backend Python files: 186
+Frontend TypeScript/React files: 808
+API Routes: 246
+Documentation files: 194
+
+Generated on: Sat Nov  8 09:14:58 MST 2025
+
+================================================================================
