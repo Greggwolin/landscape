@@ -1,0 +1,365 @@
+diff --git a/src/app/globals.css b/src/app/globals.css
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -107,8 +107,7 @@
+ /* Target option elements with maximum specificity */
+ .parcel-inline-select option,
+ select.parcel-inline-select option,
+-select[class*="parcel-inline"] option,
+-option {
++select[class*="parcel-inline"] option {
+   color: #000 !important;
+   background-color: #ffffff !important;
+   -webkit-text-fill-color: #000 !important;
+diff --git a/src/styles/coreui-theme.css b/src/styles/coreui-theme.css
+--- a/src/styles/coreui-theme.css
++++ b/src/styles/coreui-theme.css
+@@ -299,7 +299,8 @@
+ }
+ 
+ /* Smooth transitions for theme changes */
+-* {
++html.light-theme *,
++html.dark-theme * {
+   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+ }
+ 
+@@ -308,226 +309,4 @@
+   transition: none !important;
+ }
+ 
+-/* ===== LIGHT THEME OVERRIDES ===== */
+-/* Main page background - CoreUI Modern light grey */
+-.light-theme .min-h-screen,
+-.light-theme main,
+-.light-theme [role="main"] {
+-  background-color: #e6e7eb !important;
+-}
+-
+-/* Background colors - convert dark to light */
+-.light-theme .bg-gray-950,
+-.light-theme .bg-gray-900,
+-.light-theme .bg-gray-800 {
+-  background-color: #ffffff !important;
+-}
+-
+-.light-theme .bg-gray-700 {
+-  background-color: #f9fafb !important;
+-}
+-
+-.light-theme .bg-gray-600 {
+-  background-color: #6366f1 !important;
+-  color: #ffffff !important;
+-}
+-
+-.light-theme .bg-gray-900\/60,
+-.light-theme .bg-gray-900\/30 {
+-  background-color: #f9fafb !important;
+-}
+-
+-/* Border colors - CoreUI Modern style (#dbdfe6 = --cui-gray-300) */
+-.light-theme .border-gray-800,
+-.light-theme .border-gray-700,
+-.light-theme .border-gray-600 {
+-  border-color: #dbdfe6 !important;
+-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
+-}
+-
+-.light-theme .border-gray-700\/60 {
+-  border-color: #dbdfe6 !important;
+-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
+-}
+-
+-/* Make all borders CoreUI Modern style with subtle shadow */
+-.light-theme .border {
+-  border-color: #dbdfe6 !important;
+-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
+-}
+-
+-.light-theme .rounded-lg,
+-.light-theme .rounded {
+-  border-color: #dbdfe6 !important;
+-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
+-}
+-
+-/* Text colors - ensure readability */
+-.light-theme .text-white {
+-  color: #111827 !important;
+-}
+-
+-.light-theme .text-gray-300 {
+-  color: #374151 !important;
+-}
+-
+-.light-theme .text-gray-400 {
+-  color: #6b7280 !important;
+-}
+-
+-.light-theme .text-gray-500 {
+-  color: #9ca3af !important;
+-}
+-
+-/* Color badges and highlights - maintain readability */
+-.light-theme .bg-blue-900\/30,
+-.light-theme .bg-blue-900 {
+-  background-color: #dbeafe !important;
+-}
+-
+-.light-theme .border-blue-700 {
+-  border-color: #3b82f6 !important;
+-}
+-
+-.light-theme .text-blue-300 {
+-  color: #2563eb !important;
+-  font-weight: 600 !important;
+-}
+-
+-.light-theme .bg-purple-300,
+-.light-theme .bg-purple-400 {
+-  background-color: #c4b5fd !important;
+-  color: #5b21b6 !important;
+-}
+-
+-.light-theme .bg-indigo-500\/20 {
+-  background-color: #e0e7ff !important;
+-}
+-
+-.light-theme .bg-yellow-900\/30,
+-.light-theme .bg-yellow-900 {
+-  background-color: #fef3c7 !important;
+-}
+-
+-.light-theme .border-yellow-700 {
+-  border-color: #f59e0b !important;
+-}
+-
+-.light-theme .text-yellow-300 {
+-  color: #d97706 !important;
+-  font-weight: 600 !important;
+-}
+-
+-.light-theme .bg-red-900\/30,
+-.light-theme .bg-red-900 {
+-  background-color: #fee2e2 !important;
+-}
+-
+-.light-theme .border-red-700 {
+-  border-color: #ef4444 !important;
+-}
+-
+-.light-theme .text-red-300 {
+-  color: #dc2626 !important;
+-}
+-
+-.light-theme .bg-green-900\/30,
+-.light-theme .bg-green-900 {
+-  background-color: #d1fae5 !important;
+-}
+-
+-.light-theme .text-green-400,
+-.light-theme .text-green-300 {
+-  color: #16a34a !important;
+-  font-weight: 600 !important;
+-}
+-
+-.light-theme .text-emerald-300 {
+-  color: #059669 !important;
+-  font-weight: 700 !important;
+-}
+-
+-.light-theme .text-sky-300 {
+-  color: #0284c7 !important;
+-  font-weight: 700 !important;
+-}
+-
+-.light-theme .text-amber-300 {
+-  color: #d97706 !important;
+-  font-weight: 700 !important;
+-}
+-
+-/* Button overrides for light theme */
+-.light-theme .bg-blue-600 {
+-  background-color: #2563eb !important;
+-}
+-
+-.light-theme .hover\:bg-blue-700:hover {
+-  background-color: #1d4ed8 !important;
+-}
+-
+-.light-theme .bg-green-600 {
+-  background-color: #16a34a !important;
+-}
+-
+-.light-theme .hover\:bg-green-700:hover {
+-  background-color: #15803d !important;
+-}
+-
+-/* Operations page tiles - make them pop with solid background */
+-.light-theme [style*="--cui-primary-bg"],
+-.light-theme [style*="--cui-success-bg"],
+-.light-theme [style*="--cui-info-bg"],
+-.light-theme [style*="--cui-warning-bg"] {
+-  background-color: #f1f2f6 !important;
+-}
+-
+-/* Specific component fixes */
+-.light-theme .bg-indigo-500 {
+-  background-color: #6366f1 !important;
+-}
+-
+-.light-theme .hover\:bg-indigo-400:hover {
+-  background-color: #818cf8 !important;
+-}
+-
+-/* Keep dark theme looking good */
+-.dark-theme .bg-gray-800 {
+-  background-color: #1f2937 !important;
+-}
+-
+-.dark-theme .bg-gray-900 {
+-  background-color: #111827 !important;
+-}
+-
+-.dark-theme .bg-gray-950 {
+-  background-color: #030712 !important;
+-}
+-
+-.dark-theme .bg-gray-700 {
+-  background-color: #374151 !important;
+-}
+-
+-.dark-theme .border-gray-700 {
+-  border-color: #374151 !important;
+-}
+-
+-.dark-theme .border-gray-800 {
+-  border-color: #1f2937 !important;
+-}
+-
+-.dark-theme .text-white {
+-  color: #ffffff !important;
+-}
+-
+-.dark-theme .text-gray-300 {
+-  color: #d1d5db !important;
+-}
+-
+-.dark-theme .text-gray-400 {
+-  color: #9ca3af !important;
+-}
+-
+-.dark-theme .text-gray-500 {
+-  color: #6b7280 !important;
+-}
++
+diff --git a/src/styles/parcel-tiles.css b/src/styles/parcel-tiles.css
+--- a/src/styles/parcel-tiles.css
++++ b/src/styles/parcel-tiles.css
+@@ -1,66 +1,56 @@
+-/* Nuclear option - highest specificity possible with !important */
+-.parcel-tile-container {
+-  display: grid !important;
+-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+-  gap: 12px !important;
+-  width: 100% !important;
+-  overflow: visible !important;
++/* Scoped parcel tile helpers */
++:where(.parcel-tile-container) {
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
++  gap: 12px;
++  width: 100%;
++  overflow: visible;
+ }
+ 
+-.parcel-tile {
+-  background-color: #16a34a !important;
+-  border-radius: 8px !important;
+-  padding: 12px !important;
+-  min-width: 220px !important;
+-  max-width: 100% !important;
+-  display: flex !important;
+-  flex-direction: column !important;
+-  gap: 6px !important;
+-  color: white !important;
+-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+-  overflow: visible !important;
+-  word-wrap: break-word !important;
+-  overflow-wrap: anywhere !important;
+-  flex-shrink: 0 !important;
++:where(.parcel-tile) {
++  background-color: var(--info, #16a34a);
++  border-radius: 8px;
++  padding: 12px;
++  min-width: 220px;
++  max-width: 100%;
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  color: #ffffff;
++  border: 1px solid rgba(255, 255, 255, 0.2);
++  overflow: visible;
++  word-wrap: break-word;
++  overflow-wrap: anywhere;
++  flex-shrink: 0;
+ }
+ 
+-.parcel-tile * {
+-  overflow: visible !important;
+-  text-overflow: clip !important;
+-  white-space: normal !important;
+-  word-wrap: break-word !important;
+-  overflow-wrap: anywhere !important;
+-  max-width: 100% !important;
++:where(.parcel-tile *) {
++  overflow: visible;
++  text-overflow: clip;
++  white-space: normal;
++  word-wrap: break-word;
++  overflow-wrap: anywhere;
++  max-width: 100%;
+ }
+ 
+-.parcel-tile-commercial {
+-  background-color: #ea580c !important;
++:where(.parcel-tile-commercial) {
++  background-color: #ea580c;
+ }
+ 
+-.parcel-tile-residential {
+-  background-color: #16a34a !important;
++:where(.parcel-tile-residential) {
++  background-color: #16a34a;
+ }
+ 
+-.parcel-tile-other {
+-  background-color: #6366f1 !important;
++:where(.parcel-tile-other) {
++  background-color: #6366f1;
+ }
+ 
+-.parcel-text {
+-  font-size: 13px !important;
+-  word-wrap: break-word !important;
+-  overflow-wrap: anywhere !important;
+-  white-space: normal !important;
+-  overflow: visible !important;
+-  max-width: 100% !important;
+-  text-overflow: clip !important;
++:where(.parcel-text) {
++  font-size: 13px;
+ }
+ 
+-.parcel-title {
+-  font-weight: 600 !important;
+-  font-size: 14px !important;
+-  margin-bottom: 4px !important;
+-  word-wrap: break-word !important;
+-  overflow-wrap: anywhere !important;
+-  white-space: normal !important;
+-  overflow: visible !important;
++:where(.parcel-title) {
++  font-weight: 600;
++  font-size: 14px;
++  margin-bottom: 4px;
+ }

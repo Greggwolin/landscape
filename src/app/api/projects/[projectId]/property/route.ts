@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 /**
  * GET /api/projects/[projectId]/property
  * Resolve the primary CRE property associated with the given project.
  */
 export async function GET(
   _request: Request,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = Number(params.projectId);
+    const { projectId: projectIdParam } = await context.params;
+    const projectId = Number(projectIdParam);
 
     if (!Number.isInteger(projectId)) {
       return NextResponse.json(

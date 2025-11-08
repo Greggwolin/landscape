@@ -46,6 +46,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
   onSaveSuccess
 }) => {
   const [formData, setFormData] = useState<ProjectProfileFormData>({
+    project_name: profile.project_name,
     analysis_type: (profile.analysis_type || 'Land Development') as AnalysisType,
     property_subtype: profile.property_subtype,
     target_units: profile.target_units,
@@ -92,6 +93,10 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
     const newErrors: Record<string, string> = {};
 
     // Required field: analysis_type
+    if (!formData.project_name?.trim()) {
+      newErrors.project_name = 'Project Name is required';
+    }
+
     if (!formData.analysis_type) {
       newErrors.analysis_type = 'Analysis Type is required';
     }
@@ -158,10 +163,32 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
   return (
     <CModal visible={isOpen} onClose={onClose} size="lg" backdrop="static">
       <CModalHeader>
-        <CModalTitle>Edit Project Profile</CModalTitle>
+        <CModalTitle className="d-flex flex-column">
+          <span>Edit Project Profile</span>
+          {profile.project_name && (
+            <span className="text-muted small">{profile.project_name}</span>
+          )}
+        </CModalTitle>
       </CModalHeader>
       <CModalBody>
         <CForm>
+          <CRow className="mb-3">
+            <CCol md={12}>
+              <CFormLabel htmlFor="project_name">
+                Project Name <span className="text-danger">*</span>
+              </CFormLabel>
+              <CFormInput
+                id="project_name"
+                value={formData.project_name || ''}
+                onChange={(e) => handleInputChange('project_name', e.target.value)}
+                invalid={!!errors.project_name}
+              />
+              {errors.project_name && (
+                <div className="invalid-feedback d-block">{errors.project_name}</div>
+              )}
+            </CCol>
+          </CRow>
+
           <CRow className="mb-3">
             <CCol md={6}>
               <CFormLabel htmlFor="analysis_type">

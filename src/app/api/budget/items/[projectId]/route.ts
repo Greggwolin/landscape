@@ -47,12 +47,23 @@ export async function GET(
           vbv.variance_percent,
           vbv.variance_status,
           parent_cat.detail as parent_category_name,
-          parent_cat.code as parent_category_code
+          parent_cat.code as parent_category_code,
+          -- Build category breadcrumb from L1 → L2 → L3 → L4
+          CONCAT_WS(' → ',
+            NULLIF(l1.name, ''),
+            NULLIF(l2.name, ''),
+            NULLIF(l3.name, ''),
+            NULLIF(l4.name, '')
+          ) as category_breadcrumb
         FROM landscape.vw_budget_grid_items vbgi
         LEFT JOIN landscape.vw_budget_variance vbv ON vbgi.fact_id = vbv.fact_id
         LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
           SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
         )
+        LEFT JOIN landscape.core_budget_category l1 ON l1.category_id = vbgi.category_l1_id
+        LEFT JOIN landscape.core_budget_category l2 ON l2.category_id = vbgi.category_l2_id
+        LEFT JOIN landscape.core_budget_category l3 ON l3.category_id = vbgi.category_l3_id
+        LEFT JOIN landscape.core_budget_category l4 ON l4.category_id = vbgi.category_l4_id
         WHERE vbgi.project_id = ${numericProjectId}
           AND (${scopeFilter}::text IS NULL OR vbgi.scope = ${scopeFilter})
           AND vbgi.budget_version = ${versionFilter}
@@ -67,11 +78,22 @@ export async function GET(
         SELECT
           vbgi.*,
           parent_cat.detail as parent_category_name,
-          parent_cat.code as parent_category_code
+          parent_cat.code as parent_category_code,
+          -- Build category breadcrumb from L1 → L2 → L3 → L4
+          CONCAT_WS(' → ',
+            NULLIF(l1.name, ''),
+            NULLIF(l2.name, ''),
+            NULLIF(l3.name, ''),
+            NULLIF(l4.name, '')
+          ) as category_breadcrumb
         FROM landscape.vw_budget_grid_items vbgi
         LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
           SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
         )
+        LEFT JOIN landscape.core_budget_category l1 ON l1.category_id = vbgi.category_l1_id
+        LEFT JOIN landscape.core_budget_category l2 ON l2.category_id = vbgi.category_l2_id
+        LEFT JOIN landscape.core_budget_category l3 ON l3.category_id = vbgi.category_l3_id
+        LEFT JOIN landscape.core_budget_category l4 ON l4.category_id = vbgi.category_l4_id
         WHERE vbgi.project_id = ${numericProjectId}
           AND (${scopeFilter}::text IS NULL OR vbgi.scope = ${scopeFilter})
           AND vbgi.budget_version = ${versionFilter}

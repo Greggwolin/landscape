@@ -1,0 +1,230 @@
+"""Serializers for Sales & Absorption models."""
+
+from typing import Any, Dict
+
+from rest_framework import serializers
+
+from .models import (
+    BenchmarkAbsorptionVelocity,
+    BenchmarkMarketTiming,
+    ClosingEvent,
+    ParcelAbsorptionProfile,
+    ParcelSaleEvent,
+    ProjectAbsorptionAssumption,
+    ProjectPricingAssumption,
+    ProjectTimingAssumption,
+)
+
+
+class BenchmarkMarketTimingSerializer(serializers.ModelSerializer):
+    """CRUD serializer for market timing benchmarks."""
+
+    class Meta:
+        model = BenchmarkMarketTiming
+        fields = "__all__"
+        read_only_fields = ["benchmark_timing_id", "created_at", "updated_at", "last_updated"]
+
+    def validate_duration_months(self, value: int) -> int:
+        if value < 0:
+            raise serializers.ValidationError("Duration must be zero or a positive integer.")
+        return value
+
+
+class BenchmarkAbsorptionVelocitySerializer(serializers.ModelSerializer):
+    """CRUD serializer for absorption velocity benchmarks."""
+
+    class Meta:
+        model = BenchmarkAbsorptionVelocity
+        fields = "__all__"
+        read_only_fields = ["benchmark_velocity_id", "created_at", "updated_at", "last_updated"]
+
+    def validate_units_per_month(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError("Units per month must be greater than zero.")
+        return value
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        min_months = attrs.get("builder_inventory_target_min_months")
+        max_months = attrs.get("builder_inventory_target_max_months")
+        if min_months is not None and max_months is not None and min_months > max_months:
+            raise serializers.ValidationError("Minimum inventory target cannot exceed maximum target.")
+        return attrs
+
+
+class ProjectTimingAssumptionSerializer(serializers.ModelSerializer):
+    """Serializer for project timing overrides."""
+
+    class Meta:
+        model = ProjectTimingAssumption
+        fields = "__all__"
+        read_only_fields = [
+            "project_timing_id",
+            "created_at",
+            "updated_at",
+            "project_id",
+        ]
+
+    def validate_duration_months_override(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Override duration must be greater than zero.")
+        return value
+
+
+class ProjectAbsorptionAssumptionSerializer(serializers.ModelSerializer):
+    """Serializer for project absorption overrides."""
+
+    class Meta:
+        model = ProjectAbsorptionAssumption
+        fields = "__all__"
+        read_only_fields = [
+            "project_absorption_id",
+            "created_at",
+            "updated_at",
+            "project_id",
+        ]
+
+    def validate_units_per_month_override(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Override velocity must be greater than zero.")
+        return value
+
+
+class ClosingEventSerializer(serializers.ModelSerializer):
+    """Serializer for closing (takedown) events."""
+
+    class Meta:
+        model = ClosingEvent
+        fields = "__all__"
+        read_only_fields = [
+            "closing_id",
+            "created_at",
+            "updated_at",
+            "sale_event",
+        ]
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        lots_closed = attrs.get("lots_closed")
+        net = attrs.get("net_proceeds")
+        gross = attrs.get("gross_proceeds")
+        if lots_closed is not None and lots_closed <= 0:
+            raise serializers.ValidationError({"lots_closed": "Lots closed must be greater than zero."})
+        if gross is not None and gross <= 0:
+            raise serializers.ValidationError({"gross_proceeds": "Gross proceeds must be greater than zero."})
+        if net is not None and net < 0:
+            raise serializers.ValidationError({"net_proceeds": "Net proceeds cannot be negative."})
+        return attrs
+
+
+class ParcelSaleEventSerializer(serializers.ModelSerializer):
+    """Serializer for parcel sale events with nested closing summary."""
+
+    closings = ClosingEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ParcelSaleEvent
+        fields = "__all__"
+        read_only_fields = [
+            "sale_event_id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_total_lots_contracted(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Total lots contracted must be greater than zero.")
+        return value
+
+    def validate_base_price_per_lot(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Base price per lot must be greater than zero.")
+        return value
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        sale_type = attrs.get("sale_type")
+        if sale_type not in {"single_closing", "structured_sale", "bulk_assignment"}:
+            raise serializers.ValidationError({"sale_type": "Invalid sale type."})
+        return attrs
+
+
+class ParcelAbsorptionProfileSerializer(serializers.ModelSerializer):
+    """Serializer for parcel absorption assumptions."""
+
+    class Meta:
+        model = ParcelAbsorptionProfile
+        fields = "__all__"
+        read_only_fields = [
+            "absorption_profile_id",
+            "created_at",
+            "updated_at",
+            "project_id",
+            "parcel_id",
+        ]
+
+    def validate_absorption_velocity_override(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Override velocity must be greater than zero.")
+        return value
+
+
+class InventoryGaugeRowSerializer(serializers.Serializer):
+    """Lightweight serializer for rows returned by the inventory gauge view."""
+
+    project_id = serializers.IntegerField()
+    year = serializers.IntegerField()
+    lots_delivered = serializers.DecimalField(max_digits=12, decimal_places=2)
+    lots_absorbed = serializers.DecimalField(max_digits=12, decimal_places=2)
+    year_end_inventory = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class ProjectPricingAssumptionSerializer(serializers.ModelSerializer):
+    """Serializer for project-level land use pricing assumptions."""
+
+    inflated_value = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectPricingAssumption
+        fields = [
+            "id",
+            "project_id",
+            "lu_type_code",
+            "product_code",
+            "price_per_unit",
+            "unit_of_measure",
+            "growth_rate",
+            "created_at",
+            "updated_at",
+            "inflated_value",  # Calculated field
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "inflated_value"]
+
+    def get_inflated_value(self, obj):
+        """Calculate inflated value based on growth rate and time elapsed."""
+        if not obj.price_per_unit or not obj.growth_rate or not obj.created_at:
+            return obj.price_per_unit
+
+        from datetime import datetime
+        from decimal import Decimal
+
+        # Calculate years elapsed from creation date to now
+        now = datetime.now(obj.created_at.tzinfo) if obj.created_at.tzinfo else datetime.now()
+        days_elapsed = (now - obj.created_at).days
+        years_elapsed = Decimal(days_elapsed) / Decimal(365.25)
+
+        # Calculate inflated value: price * (1 + rate) ^ years
+        multiplier = (Decimal(1) + obj.growth_rate) ** years_elapsed
+        inflated = obj.price_per_unit * multiplier
+
+        # Round to 2 decimal places
+        return float(round(inflated, 2))
+
+    def validate_price_per_unit(self, value):
+        """Ensure price is positive."""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Price per unit must be greater than zero.")
+        return value
+
+    def validate_growth_rate(self, value):
+        """Ensure growth rate is between 0 and 10%."""
+        if value is not None and (value < 0 or value > 0.10):
+            raise serializers.ValidationError("Growth rate must be between 0 and 0.10 (10%).")
+        return value

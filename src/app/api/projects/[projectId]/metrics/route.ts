@@ -2,12 +2,14 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
   request: Request,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
 
     if (isNaN(projectId)) {
       return NextResponse.json(

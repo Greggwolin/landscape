@@ -258,7 +258,11 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
     return s + Number(base)
   }, 0), [lines])
 
-  const getChipClass = (state: number) => state === 3 ? 'bg-purple-700 hover:bg-purple-800' : state === 2 ? 'bg-blue-700 hover:bg-blue-800' : 'bg-gray-700 hover:bg-gray-600'
+  const getChipClass = (state: number) => {
+    if (state === 3) return 'bg-chip-warning hover:opacity-90';
+    if (state === 2) return 'bg-chip-info hover:opacity-90';
+    return 'bg-chip-muted hover:opacity-90';
+  };
   const getChipLabel = (row?: { notes: number; docs: number; chip_state: number }) => {
     if (!row) return 'Add source'
     return row.chip_state === 3 ? 'Docs' : row.chip_state === 2 ? 'Source' : 'Add source'
@@ -434,7 +438,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
                   />
                 </div>
                 <div className="w-1/12 text-center">
-                  <button className={`px-2 py-1 rounded text-white ${getChipClass(sourceBadges[line.fact_id]?.chip_state ?? 1)}`} onClick={() => toggleSourcePanel(line.fact_id)}>
+                  <button className={`px-2 py-1 rounded text-text-inverse ${getChipClass(sourceBadges[line.fact_id]?.chip_state ?? 1)}`} onClick={() => toggleSourcePanel(line.fact_id)}>
                     {getChipLabel(sourceBadges[line.fact_id])}
                   </button>
                 </div>

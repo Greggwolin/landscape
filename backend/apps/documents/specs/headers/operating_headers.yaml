@@ -1,0 +1,25 @@
+# Operating statement canonical header mappings
+
+operating_headers:
+  account_name:
+    - "Account"
+    - "Line Item"
+    - "Description"
+    - "Account Name"
+
+  amount:
+    - "Amount"
+    - "Annual"
+    - "Total"
+    - "Yearly"
+
+  per_unit:
+    - "$/Unit"
+    - "Per Unit"
+    - "Unit Amount"
+
+  pct_egi:
+    - "% of EGI"
+    - "% EGI"
+    - "Percentage"
+    - "Pct of EGI"

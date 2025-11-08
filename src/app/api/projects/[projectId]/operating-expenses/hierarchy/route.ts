@@ -1,6 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 const sql = neon(process.env.DATABASE_URL!);
 
 interface OpexAccount {
@@ -20,10 +22,10 @@ interface NestedAccount extends OpexAccount {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
 
     if (isNaN(projectId)) {
       return NextResponse.json(

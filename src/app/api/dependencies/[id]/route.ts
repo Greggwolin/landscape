@@ -7,6 +7,8 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 
+type Params = { params: Promise<{ id: string }> };
+
 const sql = neon(process.env.DATABASE_URL!);
 
 /**
@@ -15,10 +17,10 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const { id } = params;
+    const {  id  } = await context.params;
     const body = await request.json();
     const {
       trigger_event,
@@ -112,10 +114,10 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const { id } = params;
+    const {  id  } = await context.params;
 
     // Get dependency info before deleting
     const info = await sql`

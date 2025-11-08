@@ -13,18 +13,26 @@ export const GLOBAL_NAV_LINKS = [
 // Sandbox dropdown pages (developer/prototype reference)
 // Only includes pages that actually exist with page.tsx files
 export const SANDBOX_PAGES = [
+  { label: 'Development Status', href: '/dev-status' },
   { label: 'Documentation Center', href: '/documentation' },
   { label: 'Prototypes Hub', href: '/prototypes' },
   { label: 'Database Schema', href: '/db-schema' },
   { separator: true },
   { label: 'Planning (Peoria Lakes)', href: '/planning' },
   { label: 'Peoria Lakes (Project 7)', href: '/projects/7' },
+  { label: 'Assumptions (Peoria Lakes)', href: '/projects/7/assumptions' },
   { label: 'Project Setup', href: '/projects/setup' },
   { separator: true },
   { label: 'Rent Roll Inputs', href: '/prototypes/multifam/rent-roll-inputs' },
   { label: 'Multifam Prototypes', href: '/prototypes-multifam' },
   { label: 'Budget Grid', href: '/budget-grid' },
   { label: 'Budget Grid v2', href: '/budget-grid-v2' },
+  { separator: true },
+  { label: 'Market Assumptions (Peoria Lakes)', href: '/market-assumptions' },
+  { label: 'Growth Rates (Materio)', href: '/growthrates' },
+  { label: 'Growth Rates (Original)', href: '/growthrates-original' },
+  { label: 'Growth Rate Detail', href: '/growthratedetail' },
+  { label: 'Growth Rates Manager', href: '/growthratesmanager' },
   { separator: true },
   { label: 'Document Review', href: '/documents/review' },
   { label: 'AI Document Review', href: '/ai-document-review' },
@@ -50,7 +58,7 @@ export const USER_MENU_ITEMS = [
 
 // Settings menu items
 export const SETTINGS_ACTIONS = [
-  { label: 'Global Preferences', action: 'global-preferences' },
+  { label: 'Global Preferences', action: 'global-preferences', href: '/preferences' },
   { label: 'Landscaper Configuration', action: 'landscaper-config' },
   { label: 'Landscaper Training', action: 'landscaper-training', href: '/documents/review' },
   { label: 'DMS Admin', action: 'dms-admin', href: '/admin/dms/templates' },

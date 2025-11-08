@@ -1,0 +1,31 @@
+# Operating statement validation rules
+
+fields:
+  account_name:
+    data_type: string
+    required: true
+
+  amount:
+    data_type: number
+    required: true
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 100000000
+
+rules:
+  - type: required_field
+    field: account_name
+    severity: error
+    message: "Account name is required"
+
+  - type: required_field
+    field: amount
+    severity: error
+    message: "Amount is required"
+
+  - type: logical_check
+    field: amount
+    condition: "amount != 0"
+    severity: warning
+    message: "Account has zero amount"

@@ -1,0 +1,46 @@
+# Parcel table canonical header mappings
+
+parcel_headers:
+  parcel_id:
+    - "Parcel ID"
+    - "Parcel #"
+    - "Parcel Number"
+    - "ID"
+
+  land_use:
+    - "Land Use"
+    - "Use"
+    - "Zoning"
+    - "Land Use Code"
+
+  acres_gross:
+    - "Gross Acres"
+    - "Gross Ac"
+    - "Total Acres"
+    - "acres_gross"
+
+  acres_net:
+    - "Net Acres"
+    - "Net Ac"
+    - "Developable Acres"
+    - "acres_net"
+
+  max_units:
+    - "Max Units"
+    - "Units"
+    - "Dwelling Units"
+    - "DU"
+
+  density:
+    - "Density"
+    - "DU/Ac"
+    - "Units/Acre"
+
+  phase:
+    - "Phase"
+    - "Development Phase"
+
+  notes:
+    - "Notes"
+    - "Comments"
+    - "Status"

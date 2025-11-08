@@ -1,0 +1,69 @@
+# Rent roll canonical header mappings
+
+rent_roll_headers:
+  unit_id:
+    - "Unit #"
+    - "Unit"
+    - "Apt #"
+    - "Unit Number"
+    - "Unit ID"
+
+  bed_bath:
+    - "Type"
+    - "Unit Type"
+    - "Bed/Bath"
+    - "BR/BA"
+    - "Configuration"
+
+  sqft:
+    - "SF"
+    - "Sq Ft"
+    - "Square Feet"
+    - "Size"
+    - "sqft"
+
+  market_rent:
+    - "Market Rent"
+    - "Market"
+    - "Asking Rent"
+    - "market_rent"
+
+  current_rent:
+    - "Actual Rent"
+    - "Current Rent"
+    - "Rent"
+    - "Monthly Rent"
+    - "actual_rent"
+
+  lease_start:
+    - "Lease Start"
+    - "Start Date"
+    - "Move-In"
+    - "lease_start"
+
+  lease_end:
+    - "Lease End"
+    - "End Date"
+    - "Expiration"
+    - "lease_end"
+
+  tenant_name:
+    - "Tenant Name"
+    - "Tenant"
+    - "Resident"
+    - "tenant_name"
+
+  deposit:
+    - "Deposit"
+    - "Security Deposit"
+    - "deposit"
+
+  status:
+    - "Status"
+    - "Occupancy"
+    - "status"
+
+  notes:
+    - "Notes"
+    - "Comments"
+    - "notes"

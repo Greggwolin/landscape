@@ -92,3 +92,36 @@ class Type(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class LotProduct(models.Model):
+    """
+    Global catalog of lot products with dimensional standards.
+
+    Maps to landscape.res_lot_product table.
+    """
+
+    product_id = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=100, unique=True)
+    lot_w_ft = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    lot_d_ft = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    lot_area_sf = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    type = models.ForeignKey(
+        'landuse.Type',
+        on_delete=models.SET_NULL,
+        db_column='type_id',
+        null=True,
+        blank=True,
+        related_name='lot_products'
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'res_lot_product'
+        ordering = ['code']
+
+    def __str__(self):
+        return self.code

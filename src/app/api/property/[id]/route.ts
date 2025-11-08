@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getPropertyData } from '../mock-data';
 
+type Params = { params: Promise<{ id: string }> };
+
 /**
  * GET /api/property/[id]
  * Retrieve property data
  * Currently uses mock data for prototype
  */
-export const GET = async (_request: Request, { params }: { params: { id: string } }) => {
+export const GET = async (_request: Request, context: Params) => {
   try {
-    const propertyId = params.id;
+    const propertyId = (await context.params).id;
 
     if (!propertyId) {
       return NextResponse.json(
@@ -41,9 +43,9 @@ export const GET = async (_request: Request, { params }: { params: { id: string 
  * PUT /api/property/[id]
  * Update property data
  */
-export const PUT = async (request: Request, { params }: { params: { id: string } }) => {
+export const PUT = async (request: Request, context: Params) => {
   try {
-    const propertyId = params.id;
+    const propertyId = (await context.params).id;
 
     if (!propertyId) {
       return NextResponse.json(

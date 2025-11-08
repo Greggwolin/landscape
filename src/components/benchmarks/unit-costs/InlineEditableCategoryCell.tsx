@@ -1,0 +1,167 @@
+'use client';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+interface Category {
+  category_id: number;
+  category_name: string;
+}
+
+interface InlineEditableCategoryCellProps {
+  value: number; // category_id
+  displayValue: string; // category_name
+  recordId: number;
+  categories: Category[];
+  onSave: (recordId: number, fieldName: string, value: number) => Promise<boolean>;
+  className?: string;
+}
+
+export default function InlineEditableCategoryCell({
+  value,
+  displayValue,
+  recordId,
+  categories,
+  onSave,
+  className = ''
+}: InlineEditableCategoryCellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+  const [originalValue] = useState(value);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    if (isEditing && selectRef.current) {
+      selectRef.current.focus();
+    }
+  }, [isEditing]);
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setEditValue(value);
+      setIsEditing(true);
+      setError(null);
+    }
+  };
+
+  const handleSave = useCallback(async (newValue: number) => {
+    if (newValue === originalValue) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const success = await onSave(recordId, 'category_id', newValue);
+
+      if (success) {
+        setIsEditing(false);
+      } else {
+        setError('Failed to save');
+        setEditValue(originalValue);
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setError(err instanceof Error ? err.message : 'Save failed');
+      setEditValue(originalValue);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [recordId, originalValue, onSave]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newValue = parseInt(e.target.value, 10);
+    setEditValue(newValue);
+    handleSave(newValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditValue(originalValue);
+      setIsEditing(false);
+      setError(null);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave(editValue);
+    }
+  };
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      if (isEditing && !isSaving) {
+        // If value changed, save it
+        if (editValue !== originalValue) {
+          handleSave(editValue);
+        } else {
+          setIsEditing(false);
+        }
+      }
+    }, 150);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="relative">
+        <select
+          ref={selectRef}
+          value={editValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          disabled={isSaving}
+          className={`
+            w-full px-2 py-1
+            border-2 rounded
+            text-sm focus:outline-none
+            ${error ? 'border-red-500' : 'border-blue-500'}
+            ${isSaving ? 'opacity-50 cursor-wait' : ''}
+            ${className}
+          `}
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            color: 'var(--cui-body-color)'
+          }}
+        >
+          {categories.map(cat => (
+            <option key={cat.category_id} value={cat.category_id}>
+              {cat.category_name}
+            </option>
+          ))}
+        </select>
+        {error && (
+          <div className="absolute top-full left-0 mt-1 text-xs whitespace-nowrap z-10" style={{ color: 'var(--cui-danger)' }}>
+            {error}
+          </div>
+        )}
+        {isSaving && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <div
+              className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: 'var(--cui-primary)' }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={handleClick}
+      className={`
+        px-2 py-1 cursor-pointer rounded
+        transition-colors
+        ${className}
+      `}
+      style={{ color: 'var(--cui-secondary-color)' }}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)'}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+    >
+      {displayValue}
+    </div>
+  );
+}

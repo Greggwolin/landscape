@@ -45,7 +45,7 @@ export function PageHeader({
             <option value="">Select a project</option>
             {projects.map((project) => (
               <option key={project.project_id} value={project.project_id}>
-                {project.project_name} - {project.property_type_code || 'Unknown Type'}
+                {project.project_name} - {project.project_type_code || 'Unknown Type'}
               </option>
             ))}
           </select>

@@ -17,12 +17,12 @@ export default async function ProjectLayout({
       userId="demo_user"
       projectId={parseInt(projectId)}
     >
-      <div className="flex flex-col min-h-screen">
+      <>
         <ProjectContextBar projectId={parseInt(projectId)} />
-        <main className="flex-1 overflow-auto">
+        <main style={{ overflow: 'visible' }}>
           {children}
         </main>
-      </div>
+      </>
     </ComplexityModeProvider>
   );
 }

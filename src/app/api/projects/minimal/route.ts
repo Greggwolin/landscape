@@ -4,7 +4,7 @@ import { sql } from '@/lib/db'
 type MinimalProjectRequest = {
   project_name: string
   development_type?: string
-  property_type_code: string
+  project_type_code: string
   property_subtype?: string
   street_address?: string
   cross_streets?: string
@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as MinimalProjectRequest
 
-    if (!body.project_name || !body.property_type_code) {
+    if (!body.project_name || !body.project_type_code) {
       return NextResponse.json(
-        { error: 'project_name and property_type_code are required' },
+        { error: 'project_name and project_type_code are required' },
         { status: 400 }
       )
     }
@@ -80,11 +80,11 @@ export async function POST(request: NextRequest) {
     const inserted = await sql<{
       project_id: number
       project_name: string
-      property_type_code: string | null
+      project_type_code: string | null
     }[]>`
       INSERT INTO landscape.tbl_project (
         project_name,
-        property_type_code,
+        project_type_code,
         project_type,
         street_address,
         city,
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         updated_at
       ) VALUES (
         ${body.project_name},
-        ${body.property_type_code},
+        ${body.project_type_code},
         ${body.property_subtype || body.development_type || null},
         ${streetAddress},
         ${city},
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         NOW(),
         NOW()
       )
-      RETURNING project_id, project_name, property_type_code
+      RETURNING project_id, project_name, project_type_code
     `
 
     if (inserted.length === 0) {

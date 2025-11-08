@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { z } from 'zod';
 
+type Params = { params: Promise<{ id: string }> };
+
 const UpdateTemplateSchema = z.object({
   template_name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
@@ -16,12 +18,12 @@ const UpdateTemplateSchema = z.object({
 // PATCH - Update template
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
     const body = await request.json();
     const validated = UpdateTemplateSchema.parse(body);
-    const templateId = parseInt(params.id);
+    const templateId = parseInt((await context.params).id);
 
     // If setting as default, need to get workspace/project and unset others
     if (validated.is_default) {
@@ -95,10 +97,10 @@ export async function PATCH(
 // DELETE - Delete template
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const templateId = parseInt(params.id);
+    const templateId = parseInt((await context.params).id);
 
     // Don't allow deleting default templates
     const result = await sql`

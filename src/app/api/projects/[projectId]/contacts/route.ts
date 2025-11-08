@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 /**
  * GET /api/projects/[projectId]/contacts
  * Returns contacts grouped by role
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const { projectId: projectIdParam } = await context.params;
+    const projectId = parseInt(projectIdParam);
 
     // Fetch all contacts for this project
     const result = await sql`
@@ -86,10 +89,11 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const { projectId: projectIdParam } = await context.params;
+    const projectId = parseInt(projectIdParam);
     const body = await request.json();
 
     const { rows } = await sql`

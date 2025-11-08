@@ -8,8 +8,8 @@ const proj4 = require("proj4");
 async function convertShapefile() {
     console.log("🔄 Starting shapefile conversion...");
 
-    const shapefilePath = "./src/app/GIS/Pinal_County_Tax_Parcels_viewer.shp";
-    const outputPath = "./public/pinal_parcels.geojson";
+    const shapefilePath = process.env.PINAL_PARCELS_SOURCE_PATH || "./data/external/pinal-county/raw/Pinal_County_Tax_Parcels_viewer.shp";
+    const outputPath = process.env.PINAL_PARCELS_OUTPUT_PATH || "./data/external/pinal-county/processed/pinal_parcels.geojson";
 
     // Define coordinate systems
     // Web Mercator (EPSG:3857) - input projection
@@ -19,14 +19,17 @@ async function convertShapefile() {
 
     console.log("🗺️  Setting up coordinate transformation: Web Mercator -> WGS84");
 
-    // Ensure public directory exists
-    const publicDir = path.dirname(outputPath);
-    if (!fs.existsSync(publicDir)) {
-        fs.mkdirSync(publicDir, { recursive: true });
+    // Ensure output directory exists
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
     }
 
     try {
         console.log("📂 Reading shapefile:", shapefilePath);
+        if (!fs.existsSync(shapefilePath)) {
+            throw new Error(`Shapefile not found at ${shapefilePath}`);
+        }
 
         const features = [];
         let count = 0;

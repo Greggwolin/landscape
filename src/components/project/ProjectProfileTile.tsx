@@ -15,6 +15,7 @@ import ProjectProfileEditModal from './ProjectProfileEditModal';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
+import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface ProjectProfileTileProps {
   projectId: number;
@@ -24,6 +25,7 @@ const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
 
 export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectId }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const { refreshProjects } = useProjectContext();
 
   const { data: profile, error, isLoading, mutate } = useSWR<ProjectProfile>(
     `/api/projects/${projectId}/profile`,
@@ -41,6 +43,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
 
   const handleSaveSuccess = () => {
     mutate(); // Refresh the profile data
+    refreshProjects(); // Refresh the global projects list (for Dashboard, map, etc.)
     setIsEditModalOpen(false);
   };
 

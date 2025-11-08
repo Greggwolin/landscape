@@ -79,7 +79,7 @@ export default function DashboardPage() {
         </CCol>
         <CCol md={7} lg={8} className="d-flex">
           <CCard style={{ height: '100%', width: '100%' }}>
-            <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+            <CCardHeader style={{ backgroundColor: 'var(--surface-card)' }}>
               <span className="fw-semibold">Project Locations</span>
             </CCardHeader>
             <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
@@ -153,7 +153,7 @@ export default function DashboardPage() {
 
       {/* Projects Table */}
       <CCard>
-        <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+        <CCardHeader style={{ backgroundColor: 'var(--surface-card)' }}>
           <span className="text-base font-semibold">Projects</span>
         </CCardHeader>
         <CCardBody className="p-0">

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
@@ -19,8 +19,11 @@ type ContainerRow = {
   updated_at: string | null
 }
 
-export async function PATCH(request: Request, context: { params: Params }) {
-  const { containerId } = await context.params
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { containerId } = await params
   const id = Number(containerId)
 
   if (!Number.isFinite(id)) {
@@ -178,8 +181,11 @@ export async function PATCH(request: Request, context: { params: Params }) {
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Params}) {
-  const { containerId } = await context.params
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { containerId } = await params
   const id = Number(containerId)
 
   if (!Number.isFinite(id)) {

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { ProjectConfig, ProjectSettings } from '@/types'
 
@@ -28,8 +28,11 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   discount_rate: 0.1,
 }
 
-export async function GET(_request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {
@@ -82,8 +85,11 @@ export async function GET(_request: Request, context: { params: Params }) {
   }
 }
 
-export async function PATCH(request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

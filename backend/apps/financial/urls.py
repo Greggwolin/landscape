@@ -20,6 +20,16 @@ from .views_valuation import (
     ValuationReconciliationViewSet,
     ValuationSummaryViewSet,
 )
+from .views_variance import (
+    get_project_variance_summary,
+    get_category_variance_detail,
+    reconcile_category_variance,
+)
+from .views_unit_costs import (
+    UnitCostCategoryViewSet,
+    UnitCostTemplateViewSet,
+    PlanningStandardView,
+)
 
 router = DefaultRouter()
 
@@ -45,7 +55,15 @@ router.register(r'valuation/cost-approach', CostApproachViewSet, basename='costa
 router.register(r'valuation/income-approach', IncomeApproachViewSet, basename='incomeapproach')
 router.register(r'valuation/reconciliation', ValuationReconciliationViewSet, basename='valuationreconciliation')
 router.register(r'valuation/summary', ValuationSummaryViewSet, basename='valuationsummary')
+router.register(r'unit-costs/categories', UnitCostCategoryViewSet, basename='unitcostcategories')
+router.register(r'unit-costs/templates', UnitCostTemplateViewSet, basename='unitcosttemplates')
 
 urlpatterns = [
     path('', include(router.urls)),
+
+    # Budget Variance endpoints
+    path('budget/variance/<int:project_id>/', get_project_variance_summary, name='budget-variance-summary'),
+    path('budget/variance/<int:project_id>/category/<int:category_id>/', get_category_variance_detail, name='budget-variance-detail'),
+    path('budget/reconcile/<int:project_id>/category/<int:category_id>/', reconcile_category_variance, name='budget-reconcile'),
+    path('planning-standards/', PlanningStandardView.as_view(), name='planning-standards'),
 ]

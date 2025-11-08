@@ -1,19 +1,19 @@
 // /app/api/projects/[projectId]/route.ts
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = { params: Promise<{ projectId: string }> }
 
-export async function PATCH(req: Request, context: Params) {
+export async function PATCH(req: NextRequest, context: Params) {
   try {
     const { projectId } = await context.params
     if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
 
-    const updates = await req.json()
+  const updates = await req.json()
 
-    // Allowed fields for update
-    const allowedFields = [
-      'project_name',
+  // Allowed fields for update
+  const allowedFields = [
+    'project_name',
       'description',
       'location_description',
       'jurisdiction_city',
@@ -24,10 +24,11 @@ export async function PATCH(req: Request, context: Params) {
       'start_date',
       'location_lat',
       'location_lon',
-      'project_type_code',
-      'project_type',
-      'template_id'
-    ]
+    'project_type_code',
+    'project_type',
+    'template_id',
+    'planning_efficiency'
+  ]
 
     // Build SET clause dynamically
     const validUpdates: Record<string, unknown> = {}
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, context: Params) {
   }
 }
 
-export async function GET(_req: Request, context: Params) {
+export async function GET(_req: NextRequest, context: Params) {
   try {
     const { projectId } = await context.params
     if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
@@ -117,6 +118,7 @@ export async function GET(_req: Request, context: Params) {
         project_type_code,
         project_type,
         template_id,
+        planning_efficiency,
         is_active,
         created_at,
         updated_at

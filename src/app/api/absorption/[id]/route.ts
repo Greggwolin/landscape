@@ -16,10 +16,10 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const result = await sql`
       SELECT
@@ -61,12 +61,12 @@ export async function GET(
         timing_detail: timing,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Absorption GET error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to fetch absorption schedule',
+        error: error instanceof Error ? error.message : 'Failed to fetch absorption schedule',
       },
       { status: 500 }
     );
@@ -79,15 +79,15 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // Build dynamic update
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramCount = 1;
 
     const allowedFields = [
@@ -155,12 +155,12 @@ export async function PATCH(
       data: result[0],
       message: 'Absorption schedule updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Absorption PATCH error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to update absorption schedule',
+        error: error instanceof Error ? error.message : 'Failed to update absorption schedule',
       },
       { status: 500 }
     );
@@ -173,10 +173,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if exists
     const check = await sql`
@@ -205,12 +205,12 @@ export async function DELETE(
       success: true,
       message: 'Absorption schedule deleted successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Absorption DELETE error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to delete absorption schedule',
+        error: error instanceof Error ? error.message : 'Failed to delete absorption schedule',
       },
       { status: 500 }
     );

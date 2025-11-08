@@ -12,7 +12,7 @@ type RawProjectRow = {
   jurisdiction_city: string | null
   jurisdiction_county: string | null
   jurisdiction_state: string | null
-  property_type_code?: string | null
+  project_type_code?: string | null
   project_type: string | null
   is_active?: boolean | null
   analysis_type?: string | null
@@ -20,7 +20,7 @@ type RawProjectRow = {
   property_class?: string | null
 }
 
-type FallbackProjectRow = Omit<RawProjectRow, 'property_type_code' | 'is_active'>
+type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
 
 type PostgresError = Error & { code?: string }
 
@@ -43,14 +43,14 @@ const CARNEY_FALLBACK_PROJECT: RawProjectRow = {
   jurisdiction_city: 'Phoenix',
   jurisdiction_county: 'Maricopa County',
   jurisdiction_state: 'AZ',
-  property_type_code: 'COMMERCIAL',
+  project_type_code: 'COMMERCIAL',
   project_type: 'Retail Power Center',
   is_active: true,
 }
 
-function normalizePropertyTypeCode(propertyType: string | null, projectType: string | null): string | null {
-  if (propertyType && propertyType.trim().length > 0) {
-    return propertyType.toUpperCase()
+function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: string | null): string | null {
+  if (projectTypeCode && projectTypeCode.trim().length > 0) {
+    return projectTypeCode.toUpperCase()
   }
   if (!projectType) return null
   const match = PROPERTY_TYPE_FALLBACKS.find(([pattern]) => pattern.test(projectType))
@@ -70,7 +70,7 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         jurisdiction_city,
         jurisdiction_county,
         jurisdiction_state,
-        property_type_code,
+        project_type_code,
         project_type,
         is_active,
         analysis_type,
@@ -103,7 +103,7 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
 
     return fallbackRows.map((row) => ({
       ...row,
-      property_type_code: null,
+      project_type_code: null,
       is_active: true,
       analysis_type: null,
       property_subtype: null,
@@ -136,12 +136,12 @@ export async function GET(request: NextRequest) {
 
     const normalized = rows.map((project) => ({
       ...project,
-      property_type_code: normalizePropertyTypeCode(project.property_type_code, project.project_type),
+      project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
       is_active: project.is_active ?? true,
     }))
 
     const filtered = propertyTypeFilter
-      ? normalized.filter((project) => project.property_type_code === propertyTypeFilter.toUpperCase())
+      ? normalized.filter((project) => project.project_type_code === propertyTypeFilter.toUpperCase())
       : normalized
 
     console.log('Found projects:', filtered)
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
 
 type CreateProjectRequest = {
   project_name: string
-  property_type_code: string
+  project_type_code: string
   template_id: number
   description?: string
   location_description?: string
@@ -192,9 +192,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as CreateProjectRequest
 
     // Validate required fields
-    if (!body.project_name || !body.property_type_code || !body.template_id) {
+    if (!body.project_name || !body.project_type_code || !body.template_id) {
       return NextResponse.json(
-        { error: 'Missing required fields: project_name, property_type_code, template_id' },
+        { error: 'Missing required fields: project_name, project_type_code, template_id' },
         { status: 400 }
       )
     }
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
     const projectRows = await sql<{ project_id: number }[]>`
       INSERT INTO landscape.tbl_project (
         project_name,
-        property_type_code,
+        project_type_code,
         description,
         location_description,
         jurisdiction_city,
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
         updated_at
       ) VALUES (
         ${body.project_name},
-        ${body.property_type_code},
+        ${body.project_type_code},
         ${body.description || null},
         ${body.location_description || null},
         ${body.jurisdiction_city || null},
@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
         land_use_level3_label_plural
       ) VALUES (
         ${projectId},
-        ${body.property_type_code},
+        ${body.project_type_code},
         ${level1Label},
         ${level2Label},
         ${level3Label},
@@ -355,7 +355,7 @@ export async function POST(request: NextRequest) {
         jurisdiction_city,
         jurisdiction_county,
         jurisdiction_state,
-        property_type_code,
+        project_type_code,
         project_type,
         is_active
       FROM landscape.tbl_project

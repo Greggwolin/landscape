@@ -25,6 +25,9 @@ from .models_valuation import (
     ValuationReconciliation,
 )
 
+# Import budget category models
+from .models_budget_categories import BudgetCategory
+
 
 class BudgetItem(models.Model):
     """
@@ -86,6 +89,44 @@ class BudgetItem(models.Model):
         help_text='GL account code'
     )
 
+    # New: Budget Category Hierarchy (4 levels)
+    category_l1 = models.ForeignKey(
+        BudgetCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='category_l1_id',
+        related_name='budget_items_l1',
+        help_text='Level 1 category (e.g., Revenue, OpEx, CapEx)'
+    )
+    category_l2 = models.ForeignKey(
+        BudgetCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='category_l2_id',
+        related_name='budget_items_l2',
+        help_text='Level 2 category (e.g., Land, Vertical, Marketing)'
+    )
+    category_l3 = models.ForeignKey(
+        BudgetCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='category_l3_id',
+        related_name='budget_items_l3',
+        help_text='Level 3 category (e.g., Due Diligence, Engineering)'
+    )
+    category_l4 = models.ForeignKey(
+        BudgetCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='category_l4_id',
+        related_name='budget_items_l4',
+        help_text='Level 4 category (e.g., Geotechnical, Traffic Study)'
+    )
+
     # Time Period
     fiscal_year = models.IntegerField(help_text='Fiscal year (e.g., 2025)')
     fiscal_period = models.SmallIntegerField(
@@ -102,13 +143,54 @@ class BudgetItem(models.Model):
             ('annual', 'Annual'),
         ]
     )
+    start_period = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='start_period',
+        help_text='Starting period number (1, 2, 3, etc.)'
+    )
+    periods = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='periods',
+        help_text='Duration in number of periods'
+    )
+    end_period = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='end_period',
+        help_text='Ending period number (auto-calculated: start + periods - 1)'
+    )
 
     # Financial Values
+    qty = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        default=Decimal('1.0'),
+        db_column='qty',
+        help_text='Quantity'
+    )
+    rate = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        db_column='rate',
+        help_text='Rate per unit'
+    )
+    uom_code = models.CharField(
+        max_length=10,
+        db_column='uom_code',
+        help_text='Unit of measure (EA, AC, SF, etc.)'
+    )
     budgeted_amount = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
-        help_text='Budgeted amount for period'
+        db_column='amount',
+        help_text='Budgeted amount for period (qty × rate)'
     )
     variance_amount = models.DecimalField(
         max_digits=15,
@@ -116,6 +198,15 @@ class BudgetItem(models.Model):
         null=True,
         blank=True,
         help_text='Variance vs actual (if available)'
+    )
+
+    # Vendor/Source
+    vendor_name = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        db_column='vendor_name',
+        help_text='Vendor or source for this line item'
     )
 
     # Hierarchy and Rollup
@@ -195,6 +286,42 @@ class BudgetItem(models.Model):
         ).order_by('category')
 
         return {item['category']: item['total'] for item in rollup}
+
+    def get_category_path(self):
+        """
+        Get full category breadcrumb path.
+
+        Returns:
+            str: "Acquisition > Due Diligence > Environmental > Phase I ESA"
+        """
+        parts = []
+        if self.category_l1:
+            parts.append(self.category_l1.name)
+        if self.category_l2:
+            parts.append(self.category_l2.name)
+        if self.category_l3:
+            parts.append(self.category_l3.name)
+        if self.category_l4:
+            parts.append(self.category_l4.name)
+        return ' > '.join(parts) if parts else ''
+
+    def get_category_code_path(self):
+        """
+        Get full category code path.
+
+        Returns:
+            str: "LAND_ACQ.LAND_ACQ_DD.LAND_ACQ_DD_ENV.LAND_ACQ_DD_ENV_P1"
+        """
+        parts = []
+        if self.category_l1:
+            parts.append(self.category_l1.code)
+        if self.category_l2:
+            parts.append(self.category_l2.code)
+        if self.category_l3:
+            parts.append(self.category_l3.code)
+        if self.category_l4:
+            parts.append(self.category_l4.code)
+        return '.'.join(parts) if parts else ''
 
 
 class ActualItem(models.Model):

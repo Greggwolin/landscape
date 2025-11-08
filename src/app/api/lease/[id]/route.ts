@@ -4,14 +4,16 @@ import { getFullLeaseData, updateLease, deleteLease } from '@/lib/financial-engi
 import type { LeaseUpdate } from '@/types/financial-engine';
 import { getLeaseData } from '../mock-data';
 
+type Params = { params: Promise<{ id: string }> };
+
 /**
  * GET /api/lease/[id]
  * Retrieve full lease data including all related tables
  * Falls back to mock data if lease not found in database
  */
-export const GET = async (_request: Request, { params }: { params: { id: string } }) => {
+export const GET = async (_request: Request, context: Params) => {
   try {
-    const leaseId = parseInt(params.id, 10);
+    const leaseId = parseInt((await context.params).id, 10);
 
     if (isNaN(leaseId)) {
       return NextResponse.json(
@@ -49,9 +51,9 @@ export const GET = async (_request: Request, { params }: { params: { id: string 
  * PUT /api/lease/[id]
  * Update lease master record
  */
-export const PUT = async (request: Request, { params }: { params: { id: string } }) => {
+export const PUT = async (request: Request, context: Params) => {
   try {
-    const leaseId = parseInt(params.id, 10);
+    const leaseId = parseInt((await context.params).id, 10);
 
     if (isNaN(leaseId)) {
       return NextResponse.json(
@@ -85,9 +87,9 @@ export const PUT = async (request: Request, { params }: { params: { id: string }
  * DELETE /api/lease/[id]
  * Delete a lease and all related records (cascading)
  */
-export const DELETE = async (_request: Request, { params }: { params: { id: string } }) => {
+export const DELETE = async (_request: Request, context: Params) => {
   try {
-    const leaseId = parseInt(params.id, 10);
+    const leaseId = parseInt((await context.params).id, 10);
 
     if (isNaN(leaseId)) {
       return NextResponse.json(

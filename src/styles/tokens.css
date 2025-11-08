@@ -1,0 +1,71 @@
+/* v1.0 – Tokens (2025-11-07) */
+:root {
+  /* Brand */
+  --brand-primary: #0ea5e9;
+  --brand-accent: #14b8a6;
+
+  /* Surfaces */
+  --surface-bg: #ffffff;
+  --surface-card: #f7f7fb;
+  --surface-tile: #ffffff;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-inverse: #ffffff;
+
+  /* Lines */
+  --line-soft: #e5e7eb;
+  --line-strong: #cbd5e1;
+
+  /* Overlays */
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --active-overlay: rgba(0, 0, 0, 0.08);
+
+  /* Parcels (tiles) */
+  --parcel-residential: #16a34a;
+  --parcel-commercial: #ea580c;
+  --parcel-other: #6366f1;
+
+  /* Chips (semantic) */
+  --chip-info: #2563eb;
+  --chip-success: #16a34a;
+  --chip-warning: #ca8a04;
+  --chip-error: #dc2626;
+  --chip-muted: #4b5563;
+
+  /* Top Navigation */
+  --nav-bg: var(--surface-card);
+  --nav-border: var(--line-strong);
+  --nav-text: var(--text-primary);
+  --nav-hover-bg: var(--hover-overlay);
+  --nav-active-bg: var(--active-overlay);
+  --nav-brand: var(--brand-primary);
+}
+
+/* Dark theme scope */
+[data-theme='dark'] {
+  --surface-bg: #0b1220;
+  --surface-card: #111827;
+  --surface-tile: #0f172a;
+
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-inverse: #111827;
+
+  --line-soft: #1f2937;
+  --line-strong: #374151;
+
+  --hover-overlay: rgba(255, 255, 255, 0.06);
+  --active-overlay: rgba(255, 255, 255, 0.12);
+
+  /* Keep parcel/chip hues stable for recognizability; adjust only if contrast fails */
+
+  /* Top Navigation */
+  --nav-bg: #111827;
+  --nav-border: #1f2937;
+  --nav-text: var(--text-primary);
+  --nav-hover-bg: rgba(255, 255, 255, 0.06);
+  --nav-active-bg: rgba(255, 255, 255, 0.12);
+  --nav-brand: var(--brand-primary);
+}

@@ -9,10 +9,14 @@ from .views import (
     get_staging_data,
     commit_staging_data
 )
+from .api.corrections import ExtractionReviewViewSet
+from .api.section_detection import DocumentSectionViewSet
 
 router = DefaultRouter()
 router.register(r'documents', DocumentViewSet, basename='document')
 router.register(r'folders', DocumentFolderViewSet, basename='document-folder')
+router.register(r'extractions', ExtractionReviewViewSet, basename='extraction')
+router.register(r'document-sections', DocumentSectionViewSet, basename='document-section')
 
 urlpatterns = [
     path('', include(router.urls)),

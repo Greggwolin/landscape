@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 // GET /api/projects/:projectId/assumptions/financing
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const _projectId = parseInt(params.projectId);
+    const _projectId = parseInt((await context.params).projectId);
 
     // Note: Using existing tbl_debt_facility table with different structure
     // This endpoint returns default values for now
@@ -31,10 +33,10 @@ export async function GET(
 // POST /api/projects/:projectId/assumptions/financing
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const _projectId = parseInt(params.projectId);
+    const _projectId = parseInt((await context.params).projectId);
     const data = await request.json();
 
     // For now, return the data back

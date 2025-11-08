@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dmsDb } from '@/lib/dms/db';
 
+type Params = { params: Promise<{ id: string }> };
+
 // PATCH /api/dms/documents/[id]/profile - Update document profile
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const docId = parseInt(params.id);
+    const docId = parseInt((await context.params).id);
     
     if (isNaN(docId)) {
       return NextResponse.json(
@@ -59,10 +61,10 @@ export async function PATCH(
 // GET /api/dms/documents/[id]/profile - Get document with template attributes
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const docId = parseInt(params.id);
+    const docId = parseInt((await context.params).id);
     
     if (isNaN(docId)) {
       return NextResponse.json(

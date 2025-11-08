@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
@@ -58,8 +58,11 @@ interface PropertyTypeConfig {
 
 // GET /api/projects/:projectId/inventory
 // Fetches all inventory items and column configuration for a project
-export async function GET(request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {
@@ -141,8 +144,11 @@ export async function GET(request: Request, context: { params: Params }) {
 
 // POST /api/projects/:projectId/inventory
 // Creates a new inventory item
-export async function POST(request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

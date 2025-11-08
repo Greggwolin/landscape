@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
@@ -19,8 +19,12 @@ type PeriodTotal = {
   amount: string | null
 }
 
-export async function POST(_request: Request, context: { params: Params }) {
-  const id = Number(context.params.projectId)
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
+  const id = Number(projectId)
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid project id' }, { status: 400 })
   }

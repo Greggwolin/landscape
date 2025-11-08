@@ -27,10 +27,16 @@ export default function SandboxDropdown() {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-opacity-10"
+        className="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors"
         style={{
-          color: 'var(--cui-sidebar-nav-link-color)',
+          color: 'var(--nav-text)',
           backgroundColor: 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
         }}
         aria-haspopup="true"
         aria-expanded={isOpen}
@@ -69,12 +75,12 @@ export default function SandboxDropdown() {
                   key={linkItem.label}
                   href={linkItem.href}
                   onClick={handleLinkClick}
-                  className="block px-4 py-2 text-sm transition-colors hover:bg-opacity-10"
+                  className="block px-4 py-2 text-sm transition-colors"
                   style={{
                     color: 'var(--cui-secondary-color)',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(var(--cui-primary-rgb), 0.1)';
+                    e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';

@@ -76,6 +76,7 @@ interface WaterfallTier {
   equity_multiple_threshold?: number;
   lp_split_pct: number;
   gp_split_pct: number;
+  promote_pct?: number;
   is_active: boolean;
 }
 

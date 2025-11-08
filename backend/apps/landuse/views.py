@@ -3,8 +3,14 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import InventoryItem, Family, Type
-from .serializers import InventoryItemSerializer, FamilySerializer, TypeSerializer
+
+from .models import InventoryItem, Family, Type, LotProduct
+from .serializers import (
+    InventoryItemSerializer,
+    FamilySerializer,
+    TypeSerializer,
+    LotProductSerializer,
+)
 
 
 class FamilyViewSet(viewsets.ModelViewSet):
@@ -41,3 +47,31 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         items = self.queryset.filter(container_id=container_id)
         serializer = self.get_serializer(items, many=True)
         return Response({'inventory_items': serializer.data})
+
+
+class LotProductViewSet(viewsets.ModelViewSet):
+    """CRUD viewset for lot product catalog."""
+
+    queryset = LotProduct.objects.select_related('type').all()
+    serializer_class = LotProductSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset
+        type_id = self.request.query_params.get('type_id')
+        if type_id:
+            queryset = queryset.filter(type_id=type_id)
+
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(code__icontains=search)
+
+        active_only = self.request.query_params.get('active_only')
+        if active_only is None or active_only.lower() != 'false':
+            queryset = queryset.filter(is_active=True)
+
+        return queryset.order_by('code')
+
+    def perform_destroy(self, instance):
+        """Soft delete lot products."""
+        instance.is_active = False
+        instance.save(update_fields=['is_active', 'updated_at'])

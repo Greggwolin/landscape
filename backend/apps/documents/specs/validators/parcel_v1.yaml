@@ -1,0 +1,47 @@
+# Parcel table validation rules
+
+fields:
+  parcel_id:
+    data_type: string
+    required: true
+
+  acres_gross:
+    data_type: number
+    required: true
+    confidence_rules:
+      - type: range_check
+        min: 0.1
+        max: 10000
+
+  acres_net:
+    data_type: number
+    required: true
+    confidence_rules:
+      - type: range_check
+        min: 0.1
+        max: 10000
+
+  density:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 100
+
+rules:
+  - type: required_field
+    field: parcel_id
+    severity: error
+    message: "Parcel ID is required"
+
+  - type: required_field
+    field: acres_gross
+    severity: error
+    message: "Gross acres is required"
+
+  - type: logical_check
+    field: acres_net
+    condition: "acres_net <= acres_gross"
+    severity: error
+    message: "Net acres cannot exceed gross acres"

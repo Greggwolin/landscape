@@ -153,7 +153,7 @@ export default function ValuationPage() {
                 }}
                 onMouseEnter={(e) => {
                   if (tab.enabled && activeTab !== tab.id) {
-                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
+                    e.currentTarget.style.backgroundColor = 'var(--hover-overlay)';
                   }
                 }}
                 onMouseLeave={(e) => {

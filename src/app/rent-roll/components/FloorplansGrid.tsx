@@ -103,123 +103,103 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
     {
       headerName: 'Unit Type',
       field: 'unit_type_code',
-      width: 130,
+      width: 180,
       pinned: 'left',
       editable: true,
-      cellStyle: { fontWeight: '600', color: 'rgb(147 197 253)' }
+      cellStyle: { fontWeight: '500' }
     },
     {
       headerName: 'Bed',
       field: 'bedrooms',
-      width: 80,
+      width: 70,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 0,
         max: 10,
-        precision: 0  // INTEGER ONLY (no decimals)
+        precision: 0
       },
       cellStyle: {
-        textAlign: 'center'  // CENTER TEXT
+        textAlign: 'center'
       },
       valueFormatter: (params) => {
         if (!params.value) return ''
-        return Math.floor(params.value).toString()  // Ensure integer display
+        return Math.floor(params.value).toString()
       },
       valueParser: (params) => {
-        return Math.floor(parseFloat(params.newValue))  // Round down to integer
+        return Math.floor(parseFloat(params.newValue))
       }
     },
     {
       headerName: 'Bath',
       field: 'bathrooms',
-      width: 80,
+      width: 70,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 0.5,
         max: 10,
-        precision: 2,  // UP TO 2 DECIMAL PLACES (allows 1.5, 2.25, 2.75, etc.)
-        step: 0.25     // Increment by 0.25 when using arrow keys
+        precision: 2,
+        step: 0.25
       },
       cellStyle: {
-        textAlign: 'center'  // CENTER TEXT
+        textAlign: 'center'
       },
       valueFormatter: (params) => {
         if (!params.value) return ''
-        // Ensure we have a number first
         const numValue = typeof params.value === 'number' ? params.value : parseFloat(params.value)
         if (isNaN(numValue)) return ''
-        // Show up to 2 decimals, but trim trailing zeros
         const num = parseFloat(numValue.toFixed(2))
-        return num.toString()  // "1.5", "2", "2.25"
+        return num.toString()
       }
     },
     {
-      headerName: 'Avg SF',
+      headerName: 'SF',
       field: 'avg_square_feet',
-      width: 100,
+      width: 90,
       type: 'numericColumn',
       editable: true,
       valueFormatter: (params) => params.value ? formatNumber(params.value) : '',
     },
     {
-      headerName: 'Market Rent',
+      headerName: 'Market\nRent',
       field: 'current_market_rent',
-      width: 130,
+      width: 100,
       type: 'numericColumn',
       editable: true,
-      cellStyle: { fontWeight: '500', color: 'rgb(134 239 172)' }, // green-300
+      cellStyle: { fontWeight: '500' },
       valueFormatter: (params) => params.value ? formatCurrency(params.value) : '$0',
+      wrapHeaderText: true,
+      autoHeaderHeight: true
     },
     {
-      headerName: 'Total Units',
+      headerName: 'Total\nUnits',
       field: 'total_units',
-      width: 110,
+      width: 80,
       type: 'numericColumn',
       editable: true,
-      cellStyle: { fontWeight: '500', color: 'rgb(253 224 71)' }, // yellow-300
-    },
-    {
-      headerName: 'Other Features',
-      field: 'other_features',
-      width: 200,
-      editable: true,
-      tooltipField: 'other_features',
-      cellEditor: 'agLargeTextCellEditor',
-      cellEditorParams: {
-        maxLength: 100,
-        rows: 3,
-        cols: 30
-      }
-    },
-    {
-      headerName: 'Notes',
-      field: 'notes',
-      width: 250,
-      editable: true,
-      cellEditor: 'agLargeTextCellEditor',
-      cellEditorParams: {
-        maxLength: 500,
-        rows: 5,
-        cols: 40
-      },
-      tooltipField: 'notes'
+      cellStyle: { fontWeight: '500' },
+      wrapHeaderText: true,
+      autoHeaderHeight: true
     },
     {
       headerName: 'Actions',
       field: 'actions',
-      width: 100,
+      width: 90,
       pinned: 'right',
       cellRenderer: (params: any) => {
         return (
           <button
             onClick={() => handleDeleteRow(params.data)}
-            className="px-2 py-1 text-xs font-medium rounded bg-red-900/50 text-red-300 hover:bg-red-800 border border-red-700"
+            className="px-2 py-1 text-xs font-medium rounded hover:bg-gray-100 border"
+            style={{
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-danger)'
+            }}
           >
-            🗑️ Delete
+            Delete
           </button>
         )
       },
@@ -329,36 +309,30 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-4 px-6 pt-6">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Floorplans & Market Assumptions</h2>
-          <p className="text-sm text-gray-400">
-            Define unit types with physical characteristics and market rent assumptions. Upload floorplan documents for AI analysis.
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Total units across all types: {unitTypes.reduce((sum, ut) => sum + ut.total_units, 0)}
-          </p>
+      <div className="flex justify-between items-center mb-3 px-4 pt-3 border-b pb-3" style={{ borderColor: 'var(--cui-border-color)' }}>
+        <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+          Total units: {unitTypes.reduce((sum, ut) => sum + ut.total_units, 0)}
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleAddRow}
             disabled={isAdding}
-            className={`
-              px-3 py-2 text-xs font-medium rounded-md
-              ${isAdding
-                ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 text-white border border-blue-500 hover:bg-blue-500'
-              }
-            `}
+            className="px-3 py-1.5 text-xs font-medium rounded"
+            style={{
+              backgroundColor: isAdding ? 'var(--cui-secondary-bg)' : 'var(--cui-primary)',
+              color: 'white',
+              cursor: isAdding ? 'not-allowed' : 'pointer',
+              opacity: isAdding ? 0.6 : 1
+            }}
           >
-            {isAdding ? '⏳ Adding...' : '➕ Add Unit Type'}
+            {isAdding ? 'Adding...' : '+ Add Unit Type'}
           </button>
         </div>
       </div>
 
       {/* Grid */}
-      <div className="flex-1 px-6 pb-6 overflow-auto">
-        <div className="ag-theme-alpine-dark" style={{ height: '600px', minWidth: '1200px', width: '100%' }}>
+      <div className="px-4 pb-4">
+        <div className="ag-theme-alpine" style={{ height: '400px', width: '100%' }}>
           <AgGridReact<UnitType>
             rowData={unitTypes}
             columnDefs={columnDefs}

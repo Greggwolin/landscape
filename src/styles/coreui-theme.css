@@ -3,50 +3,86 @@
 /* Import CoreUI base styles */
 @import '@coreui/coreui/dist/css/coreui.min.css';
 
+/* v1.0 – CoreUI Bridge (2025-11-07) */
+:root {
+  --bs-body-bg: var(--surface-bg);
+  --bs-body-color: var(--text-primary);
+  --bs-border-color: var(--line-soft);
+
+  /* CoreUI specifics */
+  --cui-body-bg: var(--surface-bg);
+  --cui-body-color: var(--text-primary);
+  --cui-card-bg: var(--surface-card);
+  --cui-card-border-color: var(--line-soft);
+  --cui-footer-bg: var(--surface-card);
+
+  /* Primary brand bridge */
+  --bs-primary: var(--brand-primary);
+  --bs-link-color: var(--brand-primary);
+  --cui-primary: var(--brand-primary);
+  --cui-primary-rgb: 14, 165, 233;
+
+  /* Top Navigation Bridge */
+  --cui-header-bg: var(--nav-bg);
+  --cui-header-color: var(--nav-text);
+  --cui-header-border-color: var(--nav-border);
+  --cui-header-hover-bg: var(--nav-hover-bg);
+  --cui-header-active-bg: var(--nav-active-bg);
+  --cui-header-brand-color: var(--nav-brand);
+}
+
+[data-theme='dark'] {
+  --bs-body-bg: var(--surface-bg);
+  --bs-body-color: var(--text-primary);
+  --bs-border-color: var(--line-soft);
+
+  --cui-card-bg: var(--surface-card);
+  --cui-card-border-color: var(--line-strong);
+  --cui-footer-bg: var(--surface-card);
+
+  /* Top Navigation Bridge */
+  --cui-header-bg: var(--nav-bg);
+  --cui-header-color: var(--nav-text);
+  --cui-header-border-color: var(--nav-border);
+}
+
+/* UI Standards v1.0 · 2025-11-02 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Light Theme (Default) - Using CoreUI Modern native variables */
 .light-theme {
-  /* Backgrounds - use CoreUI native values */
-  --cui-body-bg: #ffffff;
-  --cui-tertiary-bg: #e6e7eb;
-  --cui-secondary-bg: #e7eaee;
-  --cui-body-color: rgba(37, 42.92, 54.02, 0.95);
-  --cui-border-color: #dbdfe6;
+  /* Backgrounds driven by tokens */
+  --cui-body-bg: var(--surface-bg);
+  --cui-tertiary-bg: var(--surface-card);
+  --cui-secondary-bg: var(--surface-card);
+  --cui-body-color: var(--text-primary);
+  --cui-border-color: var(--line-soft);
 
   /* Card styles */
-  --cui-card-bg: #ffffff;
-  --cui-card-border-color: #dbdfe6;
-  --cui-card-cap-bg: #f1f2f6;
+  --cui-card-bg: var(--surface-card);
+  --cui-card-border-color: var(--line-soft);
+  --cui-card-cap-bg: var(--surface-card);
 
-  /* Primary color - CoreUI Modern */
-  --cui-primary: #39f;
-  --cui-primary-rgb: 51, 153, 255;
+  /* Primary color - token bridge */
+  --cui-primary: var(--brand-primary);
+  --cui-primary-rgb: 14, 165, 233;
 
-  /* Text colors - CoreUI Modern */
-  --cui-emphasis-color: #080a0c;
-  --cui-secondary-color: rgba(37, 42.92, 54.02, 0.681);
-  --cui-tertiary-color: rgba(37, 42.92, 54.02, 0.38);
-
-  /* Navigation - ALWAYS DARK regardless of theme */
-  --cui-sidebar-bg: #1f2937;
-  --cui-sidebar-border-color: #374151;
-  --cui-sidebar-nav-link-color: #d1d5db;
-  --cui-sidebar-nav-link-hover-bg: #374151;
-  --cui-sidebar-nav-link-active-bg: #312e81;
-  --cui-sidebar-nav-link-active-color: #a5b4fc;
-
-  /* Header */
-  --cui-header-bg: #ffffff;
-  --cui-header-border-color: #9ca3af;
+  /* Text colors */
+  --cui-emphasis-color: var(--text-primary);
+  --cui-secondary-color: var(--text-secondary);
+  --cui-tertiary-color: color-mix(in srgb, var(--text-secondary) 70%, var(--surface-bg));
 
   /* Forms */
-  --cui-input-bg: #ffffff;
-  --cui-input-border-color: #dbdfe6;
-  --cui-input-focus-border-color: #39f;
+  --cui-input-bg: var(--surface-card);
+  --cui-input-border-color: var(--line-soft);
+  --cui-input-focus-border-color: var(--brand-primary);
 
   /* Tables */
-  --cui-table-bg: #ffffff;
-  --cui-table-hover-bg: #f9fafb;
-  --cui-table-striped-bg: #f9fafb;
+  --cui-table-bg: var(--surface-card);
+  --cui-table-hover-bg: color-mix(in srgb, var(--surface-card) 92%, var(--surface-bg));
+  --cui-table-striped-bg: color-mix(in srgb, var(--surface-card) 96%, var(--surface-bg));
 
   /* Shadows - CoreUI Modern native values */
   --cui-box-shadow: 0 0.5rem 1rem rgba(8, 10, 12, 0.15);
@@ -56,47 +92,35 @@
 
 /* Dark Theme */
 .dark-theme {
-  --cui-body-bg: #111827;
-  --cui-body-color: #f3f4f6;
-  --cui-border-color: #374151;
+  --cui-body-bg: var(--surface-bg);
+  --cui-body-color: var(--text-primary);
+  --cui-border-color: var(--line-strong);
 
   /* Card styles */
-  --cui-card-bg: #1f2937;
-  --cui-card-border-color: #374151;
-  --cui-card-cap-bg: #111827;
+  --cui-card-bg: var(--surface-card);
+  --cui-card-border-color: var(--line-strong);
+  --cui-card-cap-bg: var(--surface-card);
 
   /* Primary color */
-  --cui-primary: #818cf8;
-  --cui-primary-rgb: 129, 140, 248;
+  --cui-primary: var(--brand-primary);
+  --cui-primary-rgb: 14, 165, 233;
 
   /* Text colors */
-  --cui-emphasis-color: #f3f4f6;
-  --cui-secondary-color: #d1d5db;
-  --cui-tertiary-color: #9ca3af;
-
-  /* Navigation */
-  --cui-sidebar-bg: #1f2937;
-  --cui-sidebar-border-color: #374151;
-  --cui-sidebar-nav-link-color: #d1d5db;
-  --cui-sidebar-nav-link-hover-bg: #374151;
-  --cui-sidebar-nav-link-active-bg: #312e81;
-  --cui-sidebar-nav-link-active-color: #a5b4fc;
-
-  /* Header */
-  --cui-header-bg: #1f2937;
-  --cui-header-border-color: #374151;
+  --cui-emphasis-color: var(--text-primary);
+  --cui-secondary-color: var(--text-secondary);
+  --cui-tertiary-color: color-mix(in srgb, var(--text-secondary) 70%, var(--surface-bg));
 
   /* Forms */
-  --cui-input-bg: #374151;
-  --cui-input-border-color: #4b5563;
-  --cui-input-focus-border-color: #818cf8;
-  --cui-input-color: #f3f4f6;
+  --cui-input-bg: var(--surface-card);
+  --cui-input-border-color: var(--line-strong);
+  --cui-input-focus-border-color: var(--brand-primary);
+  --cui-input-color: var(--text-primary);
 
   /* Tables */
-  --cui-table-bg: #1f2937;
-  --cui-table-hover-bg: #374151;
-  --cui-table-striped-bg: #2d3748;
-  --cui-table-color: #f3f4f6;
+  --cui-table-bg: var(--surface-card);
+  --cui-table-hover-bg: color-mix(in srgb, var(--surface-card) 90%, var(--surface-bg));
+  --cui-table-striped-bg: color-mix(in srgb, var(--surface-card) 80%, var(--surface-bg));
+  --cui-table-color: var(--text-primary);
 
   /* Shadows */
   --cui-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -118,9 +142,16 @@ body {
   border-radius: 0.375rem;
 }
 
-.card-header {
-  background-color: var(--cui-card-cap-bg);
+.card-header,
+.card > .card-header {
+  background-color: var(--cui-card-cap-bg) !important;
   border-bottom-color: var(--cui-border-color);
+}
+
+/* Ensure light theme card headers use the correct background */
+.light-theme .card-header,
+.light-theme .card > .card-header {
+  background-color: #f0f1f2 !important;
 }
 
 /* Form controls */
@@ -186,29 +217,11 @@ body {
   background-color: var(--cui-table-striped-bg);
 }
 
-/* Sidebar */
-.sidebar {
-  background-color: var(--cui-sidebar-bg);
-  border-right-color: var(--cui-sidebar-border-color);
-}
-
-.sidebar-nav .nav-link {
-  color: var(--cui-sidebar-nav-link-color);
-}
-
-.sidebar-nav .nav-link:hover {
-  background-color: var(--cui-sidebar-nav-link-hover-bg);
-}
-
-.sidebar-nav .nav-link.active {
-  background-color: var(--cui-sidebar-nav-link-active-bg);
-  color: var(--cui-sidebar-nav-link-active-color);
-}
-
 /* Header */
 .header {
   background-color: var(--cui-header-bg);
   border-bottom-color: var(--cui-header-border-color);
+  color: var(--cui-header-color);
 }
 
 /* Buttons */
@@ -396,6 +409,14 @@ body {
 
 .light-theme .hover\:bg-green-700:hover {
   background-color: #15803d !important;
+}
+
+/* Operations page tiles - make them pop with solid background */
+.light-theme [style*="--cui-primary-bg"],
+.light-theme [style*="--cui-success-bg"],
+.light-theme [style*="--cui-info-bg"],
+.light-theme [style*="--cui-warning-bg"] {
+  background-color: #f1f2f6 !important;
 }
 
 /* Specific component fixes */

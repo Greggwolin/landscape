@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { CalculationPeriod } from '@/types'
 
@@ -6,8 +6,11 @@ type Params = {
   projectId: string
 }
 
-export async function GET(_request: Request, context: { params: Params }) {
-  const { projectId } = context.params
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

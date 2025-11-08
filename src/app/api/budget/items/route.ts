@@ -13,7 +13,11 @@ export const dynamic = 'force-dynamic';
  *   budgetId: number,
  *   projectId: number,
  *   containerId?: number (null for project-level),
- *   categoryId: number,
+ *   categoryId: number, // Legacy field (for backward compatibility)
+ *   categoryL1Id?: number, // New hierarchy fields
+ *   categoryL2Id?: number,
+ *   categoryL3Id?: number,
+ *   categoryL4Id?: number,
  *   uomCode?: string (default: "EA"),
  *   qty?: number,
  *   rate?: number,
@@ -45,13 +49,20 @@ export async function POST(request: Request) {
       peId,
       projectId: projectIdInput,
       // Common fields
-      categoryId,
+      categoryId, // Legacy field
+      categoryL1Id, // New hierarchy fields
+      categoryL2Id,
+      categoryL3Id,
+      categoryL4Id,
       uomCode = 'EA',
       qty,
       rate,
       amount,
       startDate,
       endDate,
+      startPeriod,
+      periods,
+      vendorName,
       escalationRate = 0,
       contingencyPct = 0,
       timingMethod = 'distributed',
@@ -59,12 +70,13 @@ export async function POST(request: Request) {
     } = body;
 
     // Validate required fields - now more flexible
-    if (!budgetId || !categoryId) {
+    // Either legacy categoryId OR at least one category hierarchy field is required
+    if (!budgetId || (!categoryId && !categoryL1Id)) {
       return NextResponse.json(
         {
           success: false,
           error: 'Missing required fields',
-          details: 'budgetId and categoryId are required'
+          details: 'budgetId and either categoryId or categoryL1Id is required'
         },
         { status: 400 }
       );
@@ -157,12 +169,19 @@ export async function POST(request: Request) {
         container_id,
         project_id,
         category_id,
+        category_l1_id,
+        category_l2_id,
+        category_l3_id,
+        category_l4_id,
         uom_code,
         qty,
         rate,
         amount,
         start_date,
         end_date,
+        start_period,
+        periods,
+        vendor_name,
         escalation_rate,
         contingency_pct,
         timing_method,
@@ -172,13 +191,20 @@ export async function POST(request: Request) {
         ${budgetId},
         ${resolvedContainerId},
         ${projectId},
-        ${categoryId},
+        ${categoryId || null},
+        ${categoryL1Id || null},
+        ${categoryL2Id || null},
+        ${categoryL3Id || null},
+        ${categoryL4Id || null},
         ${uomCode},
         ${qty || null},
         ${rate || null},
         ${finalAmount},
         ${startDate || null},
         ${endDate || null},
+        ${startPeriod || null},
+        ${periods || null},
+        ${vendorName || null},
         ${escalationRate},
         ${contingencyPct},
         ${timingMethod},
@@ -190,16 +216,27 @@ export async function POST(request: Request) {
 
     const newItem = result[0];
 
-    // Fetch the complete item with category hierarchy
+    // Fetch the complete item with category hierarchy and breadcrumb
     const enrichedItem = await sql`
       SELECT
         vbgi.*,
         parent_cat.detail as parent_category_name,
-        parent_cat.code as parent_category_code
+        parent_cat.code as parent_category_code,
+        -- Build category breadcrumb from L1 → L2 → L3 → L4
+        CONCAT_WS(' → ',
+          NULLIF(l1.name, ''),
+          NULLIF(l2.name, ''),
+          NULLIF(l3.name, ''),
+          NULLIF(l4.name, '')
+        ) as category_breadcrumb
       FROM landscape.vw_budget_grid_items vbgi
       LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
         SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
       )
+      LEFT JOIN landscape.core_budget_category l1 ON l1.category_id = vbgi.category_l1_id
+      LEFT JOIN landscape.core_budget_category l2 ON l2.category_id = vbgi.category_l2_id
+      LEFT JOIN landscape.core_budget_category l3 ON l3.category_id = vbgi.category_l3_id
+      LEFT JOIN landscape.core_budget_category l4 ON l4.category_id = vbgi.category_l4_id
       WHERE vbgi.fact_id = ${newItem.fact_id}
     `;
 

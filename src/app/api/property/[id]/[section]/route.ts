@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import { updatePropertySection } from '../../mock-data';
 
+type Params = { params: Promise<{ id: string; section: string }> };
+
 /**
  * PUT /api/property/[id]/[section]
  * Update a specific section of property data
  */
 export const PUT = async (
   request: Request,
-  { params }: { params: { id: string; section: string } }
+  context: Params
 ) => {
   try {
-    const { id: propertyId, section } = params;
+    const { id: propertyId, section } = await context.params;
 
     if (!propertyId || !section) {
       return NextResponse.json(

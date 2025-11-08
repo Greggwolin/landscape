@@ -3,13 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+type Params = { params: Promise<{ projectId: string; accountId: string }> };
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string; accountId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
-    const accountId = parseInt(params.accountId);
+    const { projectId: projectIdParam, accountId: accountIdParam } = await context.params;
+    const projectId = parseInt(projectIdParam);
+    const accountId = parseInt(accountIdParam);
 
     if (isNaN(projectId) || isNaN(accountId)) {
       return NextResponse.json(

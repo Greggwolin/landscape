@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 /**
  * GET /api/projects/[projectId]/details
  * Returns full project details with all fields for Project tab display
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const { projectId: projectIdParam } = await context.params;
+    const projectId = parseInt(projectIdParam);
 
     const rows = await sql`
       SELECT *
@@ -43,10 +46,11 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const { projectId: projectIdParam } = await context.params;
+    const projectId = parseInt(projectIdParam);
     const updates = await request.json();
 
     // Build dynamic update query

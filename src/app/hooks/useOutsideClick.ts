@@ -13,7 +13,7 @@ import { useEffect, type RefObject } from 'react';
  * const dropdownRef = useRef<HTMLDivElement>(null);
  * useOutsideClick(dropdownRef, () => setIsOpen(false));
  */
-export function useOutsideClick(ref: RefObject<HTMLElement>, handler: () => void) {
+export function useOutsideClick(ref: RefObject<HTMLElement | null>, handler: () => void) {
   useEffect(() => {
     const listener = (event: MouseEvent) => {
       // Do nothing if clicking ref's element or descendent elements

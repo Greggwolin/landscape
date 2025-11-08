@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 // GET /api/projects/:projectId/assumptions/equity
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
 
     const result = await sql`
       SELECT * FROM landscape.tbl_equity_structure
@@ -29,10 +31,10 @@ export async function GET(
 // POST /api/projects/:projectId/assumptions/equity
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
     const data = await request.json();
 
     const existing = await sql`

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { ContainerNode } from '@/types'
 
@@ -73,8 +73,11 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   return roots
 }
 
-export async function GET(_request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

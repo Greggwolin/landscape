@@ -2,15 +2,15 @@
 import { NextResponse } from 'next/server'
 import { sql } from '../../../../../lib/db'
 
-interface RouteParams {
-  params: {
+type Params = {
+  params: Promise<{
     setId: string
-  }
+  }>
 }
 
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request, context: Params) {
   try {
-    const { setId } = await params
+    const { setId } = await context.params
 
     if (!setId) {
       return NextResponse.json({ error: 'Missing setId' }, { status: 400 })
@@ -32,9 +32,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request, context: Params) {
   try {
-    const { setId } = await params
+    const { setId } = await context.params
     const body = await request.json()
     const { steps } = body
 

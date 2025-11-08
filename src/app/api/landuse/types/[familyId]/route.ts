@@ -4,12 +4,14 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 
+type Params = { params: Promise<{ familyId: string }> };
+
 export async function GET(
   request: Request,
-  { params }: { params: { familyId: string } }
+  context: Params
 ) {
   try {
-    const { familyId: familyIdStr } = await params;
+    const { familyId: familyIdStr } = await context.params;
     const familyId = parseInt(familyIdStr);
 
     if (!familyId || isNaN(familyId)) {

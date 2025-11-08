@@ -424,7 +424,7 @@ geom_3857 := ST_Transform(geom_4326, 3857);
 
 ### Test Data Files
 
-1. **`test-data/pinal-county-sample-parcels.geojson`**
+1. **`test-data/pinal-county-sample-parcels.json`**
    - 5 sample tax parcels in GeoJSON format
    - Pinal County assessor attributes
    - WGS84 coordinates (SRID 4326)

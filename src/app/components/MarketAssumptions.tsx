@@ -6,7 +6,7 @@ import ProjectCosts from './ProjectCosts'
 import LandUsePricing from './LandUsePricing'
 import GrowthRateDetail from './GrowthRateDetail'
 import DVLTimeSeries from './DVLTimeSeries'
-import { processUOMOptions } from '../lib/uom-utils'
+import { processUOMOptions } from '../../lib/uom-utils'
 
 type LookupResp = { [k: string]: { code: string; label: string; sort_order?: number }[] }
 

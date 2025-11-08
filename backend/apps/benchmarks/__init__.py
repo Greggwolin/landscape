@@ -1,0 +1,2 @@
+"""Benchmarks app package."""
+

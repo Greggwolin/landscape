@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { BudgetTag, FactType } from '@/types'
 
@@ -17,8 +17,12 @@ type PostBody = {
   action?: 'add' | 'remove'
 }
 
-export async function GET(_request: Request, context: { params: Params }) {
-  const factId = Number(context.params.factId)
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { factId: factIdParam } = await params
+  const factId = Number(factIdParam)
   if (!Number.isFinite(factId)) {
     return NextResponse.json({ error: 'Invalid fact id' }, { status: 400 })
   }
@@ -42,8 +46,12 @@ export async function GET(_request: Request, context: { params: Params }) {
   }
 }
 
-export async function POST(request: Request, context: { params: Params }) {
-  const factId = Number(context.params.factId)
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { factId: factIdParam } = await params
+  const factId = Number(factIdParam)
   if (!Number.isFinite(factId)) {
     return NextResponse.json({ error: 'Invalid fact id' }, { status: 400 })
   }

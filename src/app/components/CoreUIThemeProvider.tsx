@@ -38,8 +38,9 @@ export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // Add the current theme class
     root.classList.add(`${theme}-theme`);
 
-    // Set data attribute for CoreUI
+    // Set data attributes for tokens + CoreUI
     root.setAttribute('data-coreui-theme', theme);
+    root.setAttribute('data-theme', theme);
 
     // Persist to localStorage
     localStorage.setItem('coreui-theme', theme);

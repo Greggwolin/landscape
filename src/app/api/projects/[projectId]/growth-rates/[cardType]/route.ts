@@ -2,16 +2,16 @@
 import { NextResponse } from 'next/server'
 import { sql } from '../../../../../../lib/db'
 
-interface RouteParams {
-  params: {
+type Params = {
+  params: Promise<{
     projectId: string
     cardType: string
-  }
+  }>
 }
 
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request, context: Params) {
   try {
-    const { projectId, cardType } = await params
+    const { projectId, cardType } = await context.params
 
     if (!projectId || !cardType) {
       return NextResponse.json({ error: 'Missing projectId or cardType' }, { status: 400 })
@@ -33,9 +33,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(request: Request, context: Params) {
   try {
-    const { projectId, cardType } = await params
+    const { projectId, cardType } = await context.params
     const body = await request.json()
     const { set_name, is_default } = body
 

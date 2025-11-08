@@ -62,6 +62,73 @@ const KNOWN_LOCATIONS: Record<string, Omit<GeocodingResult, 'source'>> = {
   }
 }
 
+const DIRECTIONAL_MAP: Record<string, string> = {
+  n: 'North',
+  s: 'South',
+  e: 'East',
+  w: 'West',
+  ne: 'Northeast',
+  nw: 'Northwest',
+  se: 'Southeast',
+  sw: 'Southwest'
+}
+
+const STREET_TYPE_MAP: Record<string, string> = {
+  st: 'Street',
+  street: 'Street',
+  rd: 'Road',
+  road: 'Road',
+  dr: 'Drive',
+  drive: 'Drive',
+  ln: 'Lane',
+  lane: 'Lane',
+  ave: 'Avenue',
+  av: 'Avenue',
+  avenue: 'Avenue',
+  blvd: 'Boulevard',
+  boulevard: 'Boulevard',
+  cir: 'Circle',
+  circle: 'Circle',
+  ct: 'Court',
+  court: 'Court',
+  hwy: 'Highway',
+  highway: 'Highway',
+  pkwy: 'Parkway',
+  parkway: 'Parkway',
+  ter: 'Terrace',
+  terrace: 'Terrace',
+  sq: 'Square',
+  square: 'Square',
+  pl: 'Place',
+  place: 'Place',
+  way: 'Way',
+  trl: 'Trail',
+  trail: 'Trail'
+}
+
+const normalizeWord = (word: string) => word.toLowerCase().replace(/\./g, '')
+
+function expandDirectionalAbbreviations(description: string): string {
+  return description.replace(/\b(N|S|E|W|NE|NW|SE|SW)\.?(?=\s|,|$)/gi, (match) => {
+    const key = normalizeWord(match)
+    return DIRECTIONAL_MAP[key] ?? match
+  })
+}
+
+function expandStreetTypeAbbreviations(description: string): string {
+  return description.replace(/\b([A-Za-z]{2,7})\.?(?=(\s|,|$))/g, (match) => {
+    const key = normalizeWord(match)
+    return STREET_TYPE_MAP[key] ?? match
+  })
+}
+
+function expandAddressAbbreviations(description: string): string {
+  if (!description) return description
+  let expanded = expandDirectionalAbbreviations(description)
+  expanded = expandStreetTypeAbbreviations(expanded)
+  return expanded.replace(/\s{2,}/g, ' ').trim()
+}
+
 /**
  * Normalizes a location description for lookup
  */
@@ -198,10 +265,15 @@ export async function geocodeLocation(description: string): Promise<GeocodingRes
     return null
   }
 
+  const expandedDescription = expandAddressAbbreviations(description)
+
   console.log(`🌍 Geocoding location: "${description}"`)
+  if (expandedDescription !== description) {
+    console.log(`✨ Expanded address: "${expandedDescription}"`)
+  }
 
   // First, try known locations cache
-  const normalized = normalizeLocation(description)
+  const normalized = normalizeLocation(expandedDescription)
   console.log(`🔍 Normalized query: "${normalized}"`)
 
   // Check for exact matches in known locations
@@ -214,7 +286,7 @@ export async function geocodeLocation(description: string): Promise<GeocodingRes
 
   // Try Google Geocoding API first (more accurate than Nominatim)
   console.log('🌐 Trying Google Geocoding API...')
-  const googleResult = await geocodeWithGoogle(description)
+  const googleResult = await geocodeWithGoogle(expandedDescription)
 
   if (googleResult) {
     console.log(`✅ Google result: ${googleResult.latitude}, ${googleResult.longitude} (confidence: ${googleResult.confidence})`)
@@ -223,7 +295,7 @@ export async function geocodeLocation(description: string): Promise<GeocodingRes
 
   // Fall back to Nominatim API
   console.log('🌐 Falling back to Nominatim API...')
-  const nominatimResult = await geocodeWithNominatim(description)
+  const nominatimResult = await geocodeWithNominatim(expandedDescription)
 
   if (nominatimResult) {
     console.log(`✅ Nominatim result: ${nominatimResult.latitude}, ${nominatimResult.longitude}`)

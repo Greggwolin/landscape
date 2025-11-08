@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Card,
@@ -29,7 +29,9 @@ import {
   MenuItem,
   FormControl,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 import {
   Business as BuildingIcon,
@@ -39,13 +41,17 @@ import {
   KeyboardArrowUp as ArrowUpIcon,
   Analytics,
   Timeline,
-  Save as SaveIcon
+  Save as SaveIcon,
+  WarningAmber as WarningIcon,
+  OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { BarChart } from '@mui/x-charts/BarChart';
 import type {
   GrowthRateAssumption,
   GrowthRatesResponse
 } from '../../types/growth-rates';
+import type { AlertColor } from '@mui/material/Alert';
+import { useRouter } from 'next/navigation';
 
 // Materio-inspired theme (keep your existing theme)
 const materioTheme = createTheme({
@@ -163,7 +169,64 @@ const CompactTable = styled(TableContainer)(({ theme }) => ({
 
 type Props = { projectId?: number | null }
 
+const getAvailableTabs = (
+  assumptionId: number,
+  assumptionsList: GrowthRateAssumption[],
+  customNamesMap: Record<string, string>
+) => {
+  const baseAssumption = assumptionsList.find(a => a.id === assumptionId);
+  if (!baseAssumption) return [{ label: 'Custom 1', content: 'custom1' }];
+
+  const customSetsInCategory = assumptionsList.filter(a =>
+    a.category === baseAssumption.category &&
+    a.id !== assumptionId &&
+    a.id > 3
+  ).length;
+
+  const tabs = [];
+
+  const custom1Key = `${assumptionId}-0`;
+  const custom1Name = customNamesMap[custom1Key];
+  if (custom1Name && custom1Name.trim()) {
+    tabs.push({ label: custom1Name, content: 'custom1' });
+  } else {
+    tabs.push({ label: 'Custom 1', content: 'custom1' });
+  }
+
+  if (customSetsInCategory >= 1) {
+    const custom2Key = `${assumptionId}-1`;
+    const custom2Name = customNamesMap[custom2Key];
+    if (custom2Name && custom2Name.trim()) {
+      tabs.push({ label: custom2Name, content: 'custom2' });
+    } else {
+      tabs.push({ label: 'Custom 2', content: 'custom2' });
+    }
+  }
+
+  if (customSetsInCategory >= 2) {
+    const custom3Key = `${assumptionId}-2`;
+    const custom3Name = customNamesMap[custom3Key];
+    if (custom3Name && custom3Name.trim()) {
+      tabs.push({ label: custom3Name, content: 'custom3' });
+    } else {
+      tabs.push({ label: 'Custom 3', content: 'custom3' });
+    }
+  }
+
+  return tabs;
+};
+
+const applyCustomTabs = (
+  assumptionsList: GrowthRateAssumption[] = [],
+  customNamesMap: Record<string, string> = {}
+): GrowthRateAssumption[] =>
+  assumptionsList.map(assumption => ({
+    ...assumption,
+    tabs: getAvailableTabs(assumption.id, assumptionsList, customNamesMap)
+  }));
+
 const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
+  const router = useRouter();
   const [expandedCards, setExpandedCards] = useState(new Set<number>());
   const [cardTabs, setCardTabs] = useState<Record<number, number>>({});
   const [customNames, setCustomNames] = useState<Record<string, string>>({});
@@ -176,6 +239,30 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
   const [assumptions, setAssumptions] = useState<GrowthRateAssumption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cpiBaseline, setCpiBaseline] = useState<{
+    rate: number;
+    rateDecimal: number;
+    asOf: string;
+    source: string;
+    loading: boolean;
+    error: string | null;
+  }>({
+    rate: 0,
+    rateDecimal: 0,
+    asOf: '',
+    source: '',
+    loading: true,
+    error: null
+  });
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: AlertColor;
+  }>({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
 
   // Land pricing state
   const [landPricingLoading, setLandPricingLoading] = useState(true);
@@ -193,12 +280,146 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
   // Analysis impact visibility state
   const [showAnalysisImpact, setShowAnalysisImpact] = useState<Record<number, boolean>>({});
 
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
   // Function to toggle analysis impact visibility
   const toggleAnalysisImpact = (assumptionId: number) => {
     setShowAnalysisImpact(prev => ({
       ...prev,
       [assumptionId]: !prev[assumptionId]
     }));
+  };
+
+  const refreshGrowthRates = useCallback(async () => {
+    const url = projectId
+      ? `/api/assumptions/growth-rates?project_id=${projectId}`
+      : '/api/assumptions/growth-rates';
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as (GrowthRatesResponse & { error?: string });
+
+    if (data.error) {
+      throw new Error(String(data.error));
+    }
+
+    setAssumptions(applyCustomTabs(data.assumptions ?? [], customNames));
+  }, [projectId, customNames, applyCustomTabs]);
+
+  const handleApplyCPIBaseline = async (targetCategory: string) => {
+    const target = assumptions.find(assumption => assumption.category === targetCategory);
+    const baselineRate = Number(cpiBaseline.rateDecimal);
+
+    if (!target) {
+      setSnackbar({
+        open: true,
+        message: 'Target assumption not found for CPI baseline.',
+        severity: 'error'
+      });
+      return;
+    }
+
+    if (cpiBaseline.loading || cpiBaseline.error) {
+      setSnackbar({
+        open: true,
+        message: 'CPI baseline is unavailable. Please try again later.',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    if (!Number.isFinite(baselineRate)) {
+      setSnackbar({
+        open: true,
+        message: 'Invalid CPI baseline rate.',
+        severity: 'error'
+      });
+      return;
+    }
+
+    const formattedRate = `${cpiBaseline.rate.toFixed(2)}%`;
+
+    // Apply locally when no project scope is provided
+    if (!projectId) {
+      setAssumptions(prev =>
+        prev.map(assumption =>
+          assumption.category === targetCategory
+            ? { ...assumption, globalRate: formattedRate }
+            : assumption
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: `Applied CPI baseline (${formattedRate}) locally. Select a project to persist changes.`,
+        severity: 'info'
+      });
+      return;
+    }
+
+    try {
+      const updatePayload = {
+        id: target.id,
+        projectId,
+        globalRate: formattedRate,
+        steps: target.steps,
+        impact: target.impact
+      };
+
+      let response = await fetch('/api/assumptions/growth-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Create project-specific assumption if PUT failed due to missing record
+          const createPayload = {
+            projectId,
+            category: target.category,
+            name: target.name,
+            globalRate: formattedRate,
+            steps: target.steps,
+            impact: target.impact
+          };
+
+          response = await fetch('/api/assumptions/growth-rates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(createPayload)
+          });
+        } else {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Failed to update growth rate assumption');
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to persist CPI baseline');
+      }
+
+      await refreshGrowthRates();
+
+      setSnackbar({
+        open: true,
+        message: `Applied CPI baseline (${formattedRate}) to ${target.name}.`,
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Failed to apply CPI baseline', err);
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to apply CPI baseline.',
+        severity: 'error'
+      });
+    }
   };
 
   // Helper function to get color for assumption category
@@ -230,60 +451,6 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
   if (value === null || value === undefined || Number.isNaN(value)) return '0';
   return value.toLocaleString('en-US', options);
 };
-
-// Helper function to determine which tabs should be available for an assumption
-const getAvailableTabs = (assumptionId: number, assumptions: GrowthRateAssumption[], customNames: Record<string, string>) => {
-  const baseAssumption = assumptions.find(a => a.id === assumptionId);
-  if (!baseAssumption) return [{ label: 'Custom 1', content: 'custom1' }];
-
-  // Count how many custom sets exist for this category
-  const customSetsInCategory = assumptions.filter(a =>
-    a.category === baseAssumption.category &&
-    a.id !== assumptionId &&
-    a.id > 3 // Only count actual saved custom sets
-  ).length;
-
-  const tabs = [];
-
-  // Always show Custom 1 tab as the first tab (tab 0)
-  const custom1Key = `${assumptionId}-0`;
-  const custom1Name = customNames[custom1Key];
-  if (custom1Name && custom1Name.trim()) {
-    tabs.push({ label: custom1Name, content: 'custom1' });
-  } else {
-    tabs.push({ label: 'Custom 1', content: 'custom1' });
-  }
-
-  // Show Custom 2 tab only if Custom 1 has been saved (we have at least 1 custom set)
-  if (customSetsInCategory >= 1) {
-    const custom2Key = `${assumptionId}-1`;
-    const custom2Name = customNames[custom2Key];
-    if (custom2Name && custom2Name.trim()) {
-      tabs.push({ label: custom2Name, content: 'custom2' });
-    } else {
-      tabs.push({ label: 'Custom 2', content: 'custom2' });
-    }
-  }
-
-  // Show Custom 3 tab only if Custom 2 has been saved (we have at least 2 custom sets)
-  if (customSetsInCategory >= 2) {
-    const custom3Key = `${assumptionId}-2`;
-    const custom3Name = customNames[custom3Key];
-    if (custom3Name && custom3Name.trim()) {
-      tabs.push({ label: custom3Name, content: 'custom3' });
-    } else {
-      tabs.push({ label: 'Custom 3', content: 'custom3' });
-    }
-  }
-
-  return tabs;
-};
-
-const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Record<string, string> = {}): GrowthRateAssumption[] =>
-  (assumptions || []).map(assumption => ({
-    ...assumption,
-    tabs: getAvailableTabs(assumption.id, assumptions || [], customNames)
-  }));
 
   // Function to check if pricing data has changed
   const checkForChanges = (newData: any[]) => {
@@ -387,45 +554,69 @@ const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Reco
 
   // Fetch growth rate assumptions from API
   useEffect(() => {
+    let isMounted = true;
+
     const fetchAssumptions = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        const url = projectId
-          ? `/api/assumptions/growth-rates?project_id=${projectId}`
-          : '/api/assumptions/growth-rates';
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        // Initially load with basic tab structure, will be updated by useEffect when customNames changes
-        const baseAssumptions = (data.assumptions || []).map((assumption: any) => ({
-          ...assumption,
-          tabs: [
-            { label: 'Custom 1', content: 'custom1' }
-          ]
-        }));
-        setAssumptions(baseAssumptions);
+        await refreshGrowthRates();
       } catch (err) {
+        if (!isMounted) return;
         console.error('Error fetching growth rate assumptions:', err);
         setError(err instanceof Error ? err.message : 'Failed to load assumptions');
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchAssumptions();
-  }, [projectId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshGrowthRates]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchBaseline = async () => {
+      setCpiBaseline(prev => ({ ...prev, loading: true, error: null }));
+      try {
+        const response = await fetch('/api/assumptions/cpi-baseline');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CPI baseline: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (!isMounted) return;
+
+        setCpiBaseline({
+          rate: typeof data.rate === 'number' ? data.rate : Number(data.rate ?? 0),
+          rateDecimal: typeof data.rateDecimal === 'number' ? data.rateDecimal : Number(data.rateDecimal ?? 0),
+          asOf: data.asOf ?? '',
+          source: data.source ?? 'BLS CPI-U',
+          loading: false,
+          error: null
+        });
+      } catch (err) {
+        if (!isMounted) return;
+        setCpiBaseline(prev => ({
+          ...prev,
+          loading: false,
+          error: err instanceof Error ? err.message : 'Failed to load CPI baseline'
+        }));
+      }
+    };
+
+    fetchBaseline();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Load land pricing data
   useEffect(() => {
@@ -1399,6 +1590,118 @@ const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Reco
     }
   };
 
+  const CPIBaselineCard = () => {
+    if (cpiBaseline.loading) {
+      return (
+        <Card sx={{ mb: { xs: 2, md: 3 } }}>
+          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <CircularProgress size={20} color="info" />
+            <Typography variant="body2" color="text.secondary">
+              Loading CPI baseline&hellip;
+            </Typography>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (cpiBaseline.error) {
+      return (
+        <Card
+          sx={{
+            mb: { xs: 2, md: 3 },
+            border: '1px solid',
+            borderColor: 'error.light',
+            bgcolor: 'error.lighter'
+          }}
+        >
+          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <WarningIcon color="error" fontSize="small" />
+            <Box>
+              <Typography variant="body2" color="error.main" sx={{ fontWeight: 600 }}>
+                Unable to load CPI baseline
+              </Typography>
+              <Typography variant="caption" color="error.main">
+                {cpiBaseline.error}
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const asOfLabel = cpiBaseline.asOf
+      ? new Date(cpiBaseline.asOf).toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric'
+        })
+      : 'N/A';
+
+    return (
+      <Card
+        sx={{
+          mb: { xs: 2, md: 3 },
+          border: '1px solid',
+          borderColor: 'info.light',
+          bgcolor: 'info.lighter'
+        }}
+      >
+        <CardContent
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: { xs: 'flex-start', md: 'center' },
+            justifyContent: 'space-between',
+            gap: 2
+          }}
+        >
+          <Box>
+            <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Market Baseline (Auto-Updated)
+            </Typography>
+            <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mt: 0.5 }}>
+              <Typography variant="h4" color="info.main" sx={{ fontWeight: 700, fontSize: { xs: '1.6rem', md: '1.8rem' } }}>
+                {cpiBaseline.rate.toFixed(2)}%
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                trailing 12-month CPI
+              </Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              As of {asOfLabel} &bull; {cpiBaseline.source}
+            </Typography>
+          </Box>
+
+          <Stack direction={{ xs: 'row', md: 'column' }} spacing={1} alignItems={{ xs: 'center', md: 'flex-end' }}>
+            <Tooltip title="Apply CPI baseline to Development Cost growth assumption">
+              <span>
+                <Button
+                  variant="contained"
+                  color="info"
+                  size="small"
+                  onClick={() => handleApplyCPIBaseline('DEVELOPMENT_COSTS')}
+                  startIcon={<TrendingUp fontSize="small" />}
+                >
+                  Use for Dev Costs
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Open Market dashboard for detailed CPI history">
+              <Button
+                variant="text"
+                color="info"
+                size="small"
+                endIcon={<OpenInNewIcon fontSize="small" />}
+                onClick={() => router.push('/market')}
+              >
+                View Market Data
+              </Button>
+            </Tooltip>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Loading and error states (keep your existing logic)
   if (loading) {
     return (
@@ -1466,6 +1769,8 @@ const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Reco
             Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
           </Typography>
         </Card>
+
+        <CPIBaselineCard />
 
         <Box
           sx={{
@@ -2196,6 +2501,17 @@ const applyCustomTabs = (assumptions?: GrowthRateAssumption[], customNames: Reco
             </Card>
           );
         })}
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
 
       </Box>
     </ThemeProvider>

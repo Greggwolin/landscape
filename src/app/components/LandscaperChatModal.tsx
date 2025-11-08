@@ -63,8 +63,7 @@ export default function LandscaperChatModal({
             className="rounded-full p-2 transition-colors"
             style={{ color: 'var(--cui-body-color)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor =
-                'var(--cui-sidebar-nav-link-hover-bg)';
+              e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';

@@ -9,7 +9,7 @@ interface BudgetGridLightProps {
 
 export default function BudgetGridLight({ projectId }: BudgetGridLightProps) {
   return (
-    <Box className="p-6" sx={{ backgroundColor: 'action.hover', minHeight: '100vh' }}>
+    <Box className="p-6" sx={{ backgroundColor: 'var(--surface-bg)', minHeight: '100vh' }}>
       <BudgetGrid projectId={projectId} />
     </Box>
   );

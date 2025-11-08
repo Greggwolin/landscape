@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { geocodeLocation } from '@/lib/geocoding';
 
 export interface ProjectProfile {
   project_id: number;
@@ -22,6 +23,8 @@ export interface ProjectProfile {
   address?: string;
   city?: string;
   county?: string;
+  state?: string;
+  zip_code?: string;
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
@@ -53,6 +56,8 @@ export async function GET(
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
         COALESCE(p.county, p.jurisdiction_county) as county,
+        p.state,
+        p.zip_code,
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
@@ -107,6 +112,7 @@ export async function PATCH(
 
     // Map frontend field names to database column names
     const fieldMapping: Record<string, string> = {
+      'project_name': 'project_name',
       'analysis_type': 'analysis_type',
       'property_subtype': 'property_subtype',
       'target_units': 'target_units',
@@ -114,6 +120,8 @@ export async function PATCH(
       'address': 'street_address',
       'city': 'city',
       'county': 'county',
+      'state': 'state',
+      'zip_code': 'zip_code',
       'msa_id': 'msa_id',
       'apn': 'apn_primary',
       'ownership_type': 'ownership_type'
@@ -124,6 +132,107 @@ export async function PATCH(
         updates.push(`${dbColumn} = $${paramCount}`);
         values.push(body[frontendField]);
         paramCount++;
+      }
+    }
+
+    // Auto-sync project_type_code when analysis_type or property_subtype changes
+    // This ensures data consistency between Dashboard and Profile views
+    if (body.analysis_type !== undefined || body.property_subtype !== undefined) {
+      // Fetch current values if needed
+      const current = await sql<{ analysis_type: string; property_subtype: string | null }[]>`
+        SELECT analysis_type, property_subtype
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+      `;
+
+      const analysisType = body.analysis_type || current[0]?.analysis_type;
+      const propertySubtype = body.property_subtype || current[0]?.property_subtype;
+
+      // Determine correct project_type_code based on analysis_type and property_subtype
+      let projectTypeCode = 'LAND'; // default
+
+      if (analysisType === 'Income Property') {
+        // Map property_subtype to project_type_code for income properties
+        if (propertySubtype?.toLowerCase().includes('office')) {
+          projectTypeCode = 'OFF';
+        } else if (propertySubtype?.toLowerCase().includes('multifamily') || propertySubtype?.toLowerCase().includes('garden')) {
+          projectTypeCode = 'MF';
+        } else if (propertySubtype?.toLowerCase().includes('retail')) {
+          projectTypeCode = 'RET';
+        } else if (propertySubtype?.toLowerCase().includes('industrial') || propertySubtype?.toLowerCase().includes('warehouse')) {
+          projectTypeCode = 'IND';
+        } else if (propertySubtype?.toLowerCase().includes('hotel') || propertySubtype?.toLowerCase().includes('hospitality')) {
+          projectTypeCode = 'HTL';
+        } else if (propertySubtype?.toLowerCase().includes('mixed')) {
+          projectTypeCode = 'MXU';
+        }
+      } else if (analysisType === 'Land Development') {
+        projectTypeCode = 'LAND';
+      }
+
+      // Add project_type_code to updates
+      updates.push(`project_type_code = $${paramCount}`);
+      values.push(projectTypeCode);
+      paramCount++;
+    }
+
+    // Auto-geocode when address, city, or county changes
+    // This populates location_lat and location_lon for map display
+    if (
+      body.address !== undefined ||
+      body.city !== undefined ||
+      body.county !== undefined ||
+      body.state !== undefined ||
+      body.zip_code !== undefined
+    ) {
+      // Fetch current values to build complete address
+      const current = await sql<{
+        street_address: string | null;
+        city: string | null;
+        county: string | null;
+        state: string | null;
+        zip_code: string | null;
+        jurisdiction_city: string | null;
+        jurisdiction_county: string | null;
+        jurisdiction_state: string | null;
+      }[]>`
+        SELECT street_address, city, county, state, zip_code, jurisdiction_city, jurisdiction_county, jurisdiction_state
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+      `;
+
+      const address = body.address || current[0]?.street_address;
+      const city = body.city || current[0]?.city || current[0]?.jurisdiction_city;
+      const county = body.county || current[0]?.county || current[0]?.jurisdiction_county;
+      const state = body.state || current[0]?.state || current[0]?.jurisdiction_state;
+      const zipCode = body.zip_code || current[0]?.zip_code;
+
+      // Build address string for geocoding
+      if (address && city) {
+        const fullAddress = [address, city, state, zipCode, county].filter(Boolean).join(', ');
+        console.log(`🌍 Geocoding project ${projectId} address: ${fullAddress}`);
+
+        try {
+          const geocodeResult = await geocodeLocation(fullAddress);
+
+          if (geocodeResult) {
+            console.log(`✅ Geocoded to: ${geocodeResult.latitude}, ${geocodeResult.longitude} (source: ${geocodeResult.source})`);
+
+            // Add location coordinates to updates
+            updates.push(`location_lat = $${paramCount}`);
+            values.push(geocodeResult.latitude);
+            paramCount++;
+
+            updates.push(`location_lon = $${paramCount}`);
+            values.push(geocodeResult.longitude);
+            paramCount++;
+          } else {
+            console.log(`⚠️ Could not geocode address: ${fullAddress}`);
+          }
+        } catch (error) {
+          console.error('Geocoding error:', error);
+          // Don't fail the whole update if geocoding fails
+        }
       }
     }
 
@@ -158,6 +267,8 @@ export async function PATCH(
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
         COALESCE(p.county, p.jurisdiction_county) as county,
+        p.state,
+        p.zip_code,
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,

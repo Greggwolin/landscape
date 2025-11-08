@@ -46,8 +46,8 @@ interface GrowthRatesManagerProps {
 }
 
 const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
-  projectId,
-  cardType,
+  projectId = 7,
+  cardType = 'cost',
   onGrowthRateChange
 }) => {
   const [growthSets, setGrowthSets] = useState<GrowthRateSet[]>([])

@@ -1,72 +1,64 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
-// Get lot products and their subtype associations (using hardcoded data until schema is updated)
+// Get lot products from res_lot_product table
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const subtypeId = searchParams.get('subtype_id');
-    const familyId = searchParams.get('family_id');
+    const typeId = searchParams.get('type_id');
 
-    // Hardcoded products data for compatibility
-    const allProducts = [
-      {
-        product_id: 1,
-        code: 'SFD-50X100',
-        lot_w_ft: 50,
-        lot_d_ft: 100,
-        lot_area_sf: 5000,
-        subtype_id: 1,
-        subtype_name: 'Single Family Detached',
-        subtype_code: 'SFD',
-        family_name: 'Residential'
-      },
-      {
-        product_id: 2,
-        code: 'SFD-60X120',
-        lot_w_ft: 60,
-        lot_d_ft: 120,
-        lot_area_sf: 7200,
-        subtype_id: 1,
-        subtype_name: 'Single Family Detached',
-        subtype_code: 'SFD',
-        family_name: 'Residential'
-      },
-      {
-        product_id: 3,
-        code: 'TH-20X100',
-        lot_w_ft: 20,
-        lot_d_ft: 100,
-        lot_area_sf: 2000,
-        subtype_id: 3,
-        subtype_name: 'Townhomes',
-        subtype_code: 'TH',
-        family_name: 'Residential'
-      },
-      {
-        product_id: 4,
-        code: 'CONDO-1BR',
-        lot_w_ft: null,
-        lot_d_ft: null,
-        lot_area_sf: 750,
-        subtype_id: 4,
-        subtype_name: 'Condominiums',
-        subtype_code: 'CONDO',
-        family_name: 'Residential'
-      }
-    ];
-
-    let products = [];
-
-    if (subtypeId) {
-      // Filter products for specific subtype
-      products = allProducts.filter(p => p.subtype_id.toString() === subtypeId);
-    } else if (familyId) {
-      // For now, assume family_id 1 is Residential
-      products = familyId === '1' ? allProducts : [];
+    let products;
+    if (typeId) {
+      // Filter products by type via junction table
+      products = await sql`
+        SELECT
+          p.product_id,
+          p.code,
+          p.lot_w_ft,
+          p.lot_d_ft,
+          p.lot_area_sf,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'type_id', t.type_id,
+                'type_name', t.name,
+                'type_code', t.code
+              )
+            ) FILTER (WHERE t.type_id IS NOT NULL),
+            '[]'
+          ) as linked_types
+        FROM landscape.res_lot_product p
+        INNER JOIN landscape.type_lot_product tlp ON p.product_id = tlp.product_id
+        LEFT JOIN landscape.lu_type t ON tlp.type_id = t.type_id
+        WHERE tlp.type_id = ${typeId}
+        GROUP BY p.product_id, p.code, p.lot_w_ft, p.lot_d_ft, p.lot_area_sf
+        ORDER BY p.code
+      `;
     } else {
-      // Return all products
-      products = allProducts;
+      // Return all products with their linked types
+      products = await sql`
+        SELECT
+          p.product_id,
+          p.code,
+          p.lot_w_ft,
+          p.lot_d_ft,
+          p.lot_area_sf,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'type_id', t.type_id,
+                'type_name', t.name,
+                'type_code', t.code
+              )
+            ) FILTER (WHERE t.type_id IS NOT NULL),
+            '[]'
+          ) as linked_types
+        FROM landscape.res_lot_product p
+        LEFT JOIN landscape.type_lot_product tlp ON p.product_id = tlp.product_id
+        LEFT JOIN landscape.lu_type t ON tlp.type_id = t.type_id
+        GROUP BY p.product_id, p.code, p.lot_w_ft, p.lot_d_ft, p.lot_area_sf
+        ORDER BY p.code
+      `;
     }
 
     return NextResponse.json(products);
@@ -83,8 +75,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { code, lot_w_ft, lot_d_ft, lot_area_sf, subtype_ids = [] } = await request.json();
+    const { code, lot_w_ft, lot_d_ft, linked_type_ids = [] } = await request.json();
 
+    // Validation
     if (!code || !lot_w_ft || !lot_d_ft) {
       return NextResponse.json(
         { error: 'Code, lot width, and lot depth are required' },
@@ -92,43 +85,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate area if not provided
-    const calculatedArea = lot_area_sf || (lot_w_ft * lot_d_ft);
+    if (lot_w_ft <= 0 || lot_d_ft <= 0) {
+      return NextResponse.json(
+        { error: 'Lot dimensions must be greater than 0' },
+        { status: 400 }
+      );
+    }
 
-    // Create the lot product
+    // Create the lot product (lot_area_sf is auto-calculated by database)
     const productResult = await sql`
-      INSERT INTO landscape.res_lot_product (code, lot_w_ft, lot_d_ft, lot_area_sf)
-      VALUES (${code}, ${lot_w_ft}, ${lot_d_ft}, ${calculatedArea})
-      RETURNING *
+      INSERT INTO landscape.res_lot_product (code, lot_w_ft, lot_d_ft)
+      VALUES (${code}, ${lot_w_ft}, ${lot_d_ft})
+      RETURNING product_id, code, lot_w_ft, lot_d_ft, lot_area_sf
     `;
 
     const product = productResult[0];
 
-    // Associate with subtypes if provided
-    if (subtype_ids.length > 0) {
-      const associations = subtype_ids.map((subtypeId: number) => 
-        sql`INSERT INTO landscape.subtype_lot_product (subtype_id, product_id) VALUES (${subtypeId}, ${product.product_id})`
-      );
-      
-      await Promise.all(associations);
+    // Associate with types if provided
+    if (linked_type_ids.length > 0) {
+      for (const typeId of linked_type_ids) {
+        await sql`
+          INSERT INTO landscape.type_lot_product (type_id, product_id)
+          VALUES (${typeId}, ${product.product_id})
+          ON CONFLICT DO NOTHING
+        `;
+      }
     }
 
     return NextResponse.json({
       ...product,
-      associated_subtypes: subtype_ids
-    });
+      linked_type_ids
+    }, { status: 201 });
 
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('Error creating lot product:', error);
-    
+
     if (msg.includes('unique')) {
       return NextResponse.json(
         { error: 'Lot product code already exists' },
         { status: 409 }
       );
     }
-    
+
     return NextResponse.json(
       { error: 'Failed to create lot product', details: msg },
       { status: 500 }

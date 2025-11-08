@@ -1,3 +1,24 @@
+# Documentation Update Summary - November 7, 2025
+
+## Theme Tokenization & Top Navigation Refresh (Nov 7, 2025) ⭐ NEW
+
+**Docs Updated**
+- `docs/session-notes.md` – Added a detailed section covering the new color token system, CoreUI/Tailwind bridge, component refactors, and logo swap.
+- `docs/11-implementation-status/IMPLEMENTATION_STATUS.md` – Logged the unified theme/nav work in the Recent Updates list with file inventory and status callouts.
+- *(This summary)* – Recording the documentation impact of the token + navigation initiative.
+
+**Key Implementation Artifacts**
+- New token source file (`src/styles/tokens.css`) with light/dark palettes for brand, surfaces, text, overlays, parcels, chips, and navigation contexts.
+- Tailwind config rewritten to use `withVar(...)` helpers; CoreUI bridge updated to apply the tokens to Bootstrap/CoreUI CSS variables.
+- Navigation components (TopNavigationBar, dropdowns, legacy Navigation list, LandscaperChatModal) switched to the nav tokens; light mode now loads `public/logo-color.png`.
+
+**Next Documentation Actions**
+1. Ensure design system pages reference the new tokens table in an upcoming style guide refresh.
+2. Capture light/dark comparison screenshots for the wiki once QA signs off.
+3. Update onboarding docs to mention `tokens.css` as the starting point for palette adjustments.
+
+---
+
 # Documentation Update Summary - November 2, 2025
 
 **Session:** Migration 013 + Tab Routing Fix + Backend Updates

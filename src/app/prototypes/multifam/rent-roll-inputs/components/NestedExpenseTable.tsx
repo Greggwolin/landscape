@@ -185,7 +185,7 @@ export function NestedExpenseTable({
         // Show calculated value if not editable
         if (!isEditable) {
           return (
-            <div className={`text-right px-2 py-1 ${isParentRow ? 'font-bold text-white' : 'text-gray-800'}`}>
+            <div className={`text-right px-2 py-1 ${isParentRow ? 'font-bold' : ''}`} style={{ color: 'var(--cui-body-color)' }}>
               ${row.annualAmount.toLocaleString()}
             </div>
           );
@@ -194,8 +194,13 @@ export function NestedExpenseTable({
         return isEditing ? (
           <input
             type="text"
-            className="w-full bg-white border rounded px-2 py-1 text-gray-900 text-right"
-            style={{ borderColor: '#666', borderWidth: '2px' }}
+            className="w-full border rounded px-2 py-1 text-right"
+            style={{
+              borderColor: 'var(--cui-border-color)',
+              borderWidth: '2px',
+              backgroundColor: 'var(--cui-input-bg)',
+              color: 'var(--cui-body-color)'
+            }}
             value={editValue}
             onChange={(e) => handleValueChange(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.id, field)}
@@ -205,9 +210,8 @@ export function NestedExpenseTable({
         ) : (
           <button
             onClick={() => handleStartEdit(row.id, field, row.annualAmount)}
-            className={`w-full text-right hover:bg-gray-100 px-2 py-1 rounded ${
-              isParentRow ? 'font-bold text-white' : 'text-gray-800'
-            }`}
+            className={`w-full text-right px-2 py-1 rounded ${isParentRow ? 'font-bold' : ''}`}
+            style={{ color: 'var(--cui-body-color)' }}
           >
             ${row.annualAmount.toLocaleString()}
           </button>
@@ -216,7 +220,7 @@ export function NestedExpenseTable({
       case 'per_unit':
         if (!visibleColumns.includes('per_unit')) return null;
         return (
-          <div className={`text-right ${isParentRow ? 'font-semibold text-white' : 'text-gray-800'}`}>
+          <div className={`text-right ${isParentRow ? 'font-semibold' : ''}`} style={{ color: 'var(--cui-body-color)' }}>
             ${Math.round(row.perUnit).toLocaleString()}
           </div>
         );
@@ -224,7 +228,7 @@ export function NestedExpenseTable({
       case 'per_sf':
         if (!visibleColumns.includes('per_sf') || mode === 'basic') return null;
         return (
-          <div className={`text-right ${isParentRow ? 'font-semibold text-white' : 'text-gray-800'}`}>
+          <div className={`text-right ${isParentRow ? 'font-semibold' : ''}`} style={{ color: 'var(--cui-body-color)' }}>
             ${row.perSF.toFixed(2)}
           </div>
         );
@@ -235,7 +239,7 @@ export function NestedExpenseTable({
         // Only editable fields can have escalation rates edited
         if (!isEditable) {
           return (
-            <div className={`text-right px-2 py-1 ${isParentRow ? 'font-semibold text-white' : 'text-gray-800'}`}>
+            <div className={`text-right px-2 py-1 ${isParentRow ? 'font-semibold' : ''}`} style={{ color: 'var(--cui-body-color)' }}>
               {(row.escalationRate * 100).toFixed(1)}%
             </div>
           );
@@ -245,8 +249,13 @@ export function NestedExpenseTable({
           <input
             type="number"
             step="0.001"
-            className="w-full bg-white border rounded px-2 py-1 text-gray-900 text-right"
-            style={{ borderColor: '#666', borderWidth: '2px' }}
+            className="w-full border rounded px-2 py-1 text-right"
+            style={{
+              borderColor: 'var(--cui-border-color)',
+              borderWidth: '2px',
+              backgroundColor: 'var(--cui-input-bg)',
+              color: 'var(--cui-body-color)'
+            }}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.id, field)}
@@ -256,9 +265,8 @@ export function NestedExpenseTable({
         ) : (
           <button
             onClick={() => handleStartEdit(row.id, field, row.escalationRate)}
-            className={`w-full text-right hover:bg-gray-100 px-2 py-1 rounded ${
-              isParentRow ? 'font-semibold text-white' : 'text-gray-800'
-            }`}
+            className={`w-full text-right px-2 py-1 rounded ${isParentRow ? 'font-semibold' : ''}`}
+            style={{ color: 'var(--cui-body-color)' }}
           >
             {(row.escalationRate * 100).toFixed(1)}%
           </button>
@@ -279,13 +287,18 @@ export function NestedExpenseTable({
 
       case 'recovery_rate':
         if (!visibleColumns.includes('recovery_rate') || mode !== 'advanced') return null;
-        if (!row.isRecoverable) return <div className="text-center text-gray-600">—</div>;
+        if (!row.isRecoverable) return <div className="text-center" style={{ color: 'var(--cui-secondary-color)' }}>—</div>;
         return isEditing ? (
           <input
             type="number"
             step="0.01"
-            className="w-full bg-white border rounded px-2 py-1 text-gray-900 text-right"
-            style={{ borderColor: '#666', borderWidth: '2px' }}
+            className="w-full border rounded px-2 py-1 text-right"
+            style={{
+              borderColor: 'var(--cui-border-color)',
+              borderWidth: '2px',
+              backgroundColor: 'var(--cui-input-bg)',
+              color: 'var(--cui-body-color)'
+            }}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.id, field)}
@@ -295,7 +308,8 @@ export function NestedExpenseTable({
         ) : (
           <button
             onClick={() => handleStartEdit(row.id, field, row.recoveryRate || 0)}
-            className="w-full text-right hover:bg-gray-100 px-2 py-1 rounded text-gray-800"
+            className="w-full text-right px-2 py-1 rounded"
+            style={{ color: 'var(--cui-body-color)' }}
           >
             {((row.recoveryRate || 0) * 100).toFixed(0)}%
           </button>
@@ -307,11 +321,11 @@ export function NestedExpenseTable({
   };
 
   return (
-    <div className="bg-gray-800 rounded border border-gray-700">
+    <div className="rounded border" style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)' }}>
       {/* Table Header with Filters */}
-      <div className="px-4 py-3 border-b border-gray-700">
+      <div className="px-4 py-2 border-b" style={{ backgroundColor: '#f1f2f6', borderColor: 'var(--cui-border-color)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-white">Detailed Breakdown</h3>
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Detailed Breakdown</h3>
           <button
             onClick={onConfigureColumns}
             className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors flex items-center gap-2"
@@ -356,16 +370,16 @@ export function NestedExpenseTable({
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-900 sticky top-0">
-            <tr className="border-b border-gray-700">
-              <th className="text-left px-4 py-2 font-medium text-gray-800">Expense Category</th>
-              <th className="text-right px-4 py-2 font-medium text-gray-800">Annual Amount</th>
-              {visibleColumns.includes('per_unit') && <th className="text-right px-4 py-2 font-medium text-gray-800">Per Unit</th>}
-              {visibleColumns.includes('per_sf') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium text-gray-800">Per SF</th>}
-              {visibleColumns.includes('escalation_rate') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium text-gray-800">Escalation</th>}
-              {visibleColumns.includes('is_recoverable') && mode === 'advanced' && <th className="text-center px-4 py-2 font-medium text-gray-800">Recoverable</th>}
-              {visibleColumns.includes('recovery_rate') && mode === 'advanced' && <th className="text-right px-4 py-2 font-medium text-gray-800">Recovery %</th>}
-              <th className="w-20 text-right px-4 py-2 font-medium text-gray-800">
+          <thead className="sticky top-0" style={{ backgroundColor: '#f8f8f8' }}>
+            <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <th className="text-left px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Expense Category</th>
+              <th className="text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Annual Amount</th>
+              {visibleColumns.includes('per_unit') && <th className="text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Per Unit</th>}
+              {visibleColumns.includes('per_sf') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Per SF</th>}
+              {visibleColumns.includes('escalation_rate') && mode !== 'basic' && <th className="text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Escalation</th>}
+              {visibleColumns.includes('is_recoverable') && mode === 'advanced' && <th className="text-center px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Recoverable</th>}
+              {visibleColumns.includes('recovery_rate') && mode === 'advanced' && <th className="text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Recovery %</th>}
+              <th className="w-20 text-right px-4 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -381,14 +395,16 @@ export function NestedExpenseTable({
               filteredRows.map(row => (
                 <tr
                   key={row.id}
-                  className={`border-b border-gray-700 hover:bg-gray-750 ${
-                    row.isParent ? 'bg-gray-800' : row.isChild ? 'bg-gray-825' : 'bg-gray-850'
-                  }`}
+                  className="border-b"
+                  style={{
+                    borderColor: 'var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-body-bg)'
+                  }}
                 >
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       {renderIndentation(row)}
-                      <span className={row.isParent ? 'font-bold text-white' : 'text-gray-900'} style={row.isParent ? {} : { color: '#1a1a1a' }}>
+                      <span className={row.isParent ? 'font-bold' : ''} style={{ color: 'var(--cui-body-color)' }}>
                         {row.label}
                       </span>
                       {row.hasChildren && (

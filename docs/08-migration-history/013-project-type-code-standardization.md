@@ -305,13 +305,55 @@ cd backend && python manage.py runserver 8000
 
 ---
 
+## Data Consistency Fix (November 5, 2025)
+
+### Post-Migration Issue Discovered
+After Migration 013 deployment, a data consistency issue was identified where some projects had mismatched `project_type_code` and `analysis_type` values, causing different UI views to display contradictory information.
+
+### Projects Affected
+1. **Project 18 (Gainey Center II)**:
+   - Had: `project_type_code='LAND'`, `analysis_type='Income Property'`, `property_subtype='Class A Office'`
+   - Fixed: `project_type_code='OFF'` to match income property classification
+
+2. **Project 11 (Gern's Crossing Apartments)**:
+   - Had: `project_type_code='MF'`, `analysis_type='Land Development'`, `property_subtype='Multifamily Development'`
+   - Fixed: `project_type_code='LAND'` to match land development classification
+
+### Root Cause
+- Dashboard component uses `project_type_code` for display
+- Project Profile tile uses `analysis_type` and `property_subtype`
+- These fields can diverge when updated separately
+
+### Resolution
+```sql
+-- Project 18: Income Property correction
+UPDATE landscape.tbl_project
+SET project_type_code = 'OFF', updated_at = NOW()
+WHERE project_id = 18;
+
+-- Project 11: Land Development correction
+UPDATE landscape.tbl_project
+SET project_type_code = 'LAND', updated_at = NOW()
+WHERE project_id = 11;
+```
+
+### Verification
+All 10 projects now have consistent `project_type_code` aligned with their `analysis_type`:
+- ✅ Land Development projects: `project_type_code = 'LAND'`
+- ✅ Income Property projects: `project_type_code IN ('OFF', 'MF', 'RET', 'IND', 'HTL', 'MXU')`
+
+**Documentation:** [docs/session-notes/2025-11-05-project-type-data-consistency-fix.md](../session-notes/2025-11-05-project-type-data-consistency-fix.md)
+
+---
+
 ## Future Considerations
 
-1. **Add More Types**: If needed, add codes like 'HOSP' (Hospitality), 'MED' (Medical), etc.
-2. **Migrate Legacy Data**: Eventually remove support for old codes (MPC, MULTIFAMILY)
-3. **Audit Existing Code**: Search for any remaining `property_type_code` references
-4. **Update Tests**: Ensure test fixtures use standardized codes
-5. **Document Taxonomy**: Create comprehensive guide to all 7 project types
+1. **Data Validation Constraint**: Add CHECK constraint to ensure `project_type_code` aligns with `analysis_type`
+2. **Add More Types**: If needed, add codes like 'HOSP' (Hospitality), 'MED' (Medical), etc.
+3. **Migrate Legacy Data**: Eventually remove support for old codes (MPC, MULTIFAMILY)
+4. **Audit Existing Code**: Search for any remaining `property_type_code` references
+5. **Update Tests**: Ensure test fixtures use standardized codes
+6. **Document Taxonomy**: Create comprehensive guide to all 7 project types
 
 ---
 

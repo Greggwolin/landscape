@@ -8,6 +8,7 @@ import { BenchmarkPanel } from '@/app/prototypes/multifam/rent-roll-inputs/compo
 import { ConfigureColumnsModal } from './ConfigureColumnsModal';
 import { buildHierarchicalExpenses, ExpenseRow } from '@/config/opex/hierarchical-structure';
 import { multifamilyOpExFields } from '@/config/opex/multifamily-fields';
+import { unitsAPI } from '@/lib/api/multifamily';
 
 interface Project {
   project_id: number;
@@ -85,17 +86,16 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
   const loadPropertyData = async () => {
     try {
-      const response = await fetch(`/api/multifamily/units?project_id=${project.project_id}`);
-      if (response.ok) {
-        const data = await response.json();
-        const unitCount = data.count || 0;
-        const totalSF = data.results?.reduce((sum: number, unit: any) => sum + (parseFloat(unit.square_feet) || 0), 0) || 0;
+      const units = await unitsAPI.list(project.project_id);
+      const unitCount = units.length;
+      const totalSF = units.reduce((sum, unit) => sum + (parseFloat(unit.square_feet?.toString() || '0') || 0), 0);
 
-        console.log('[OperationsTab] Property data:', { unitCount, totalSF });
-        setPropertyData({ unitCount, totalSF });
-      }
+      console.log('[OperationsTab] Property data:', { unitCount, totalSF });
+      setPropertyData({ unitCount, totalSF });
     } catch (error) {
       console.error('Error loading property data:', error);
+      // Set defaults if no units found
+      setPropertyData({ unitCount: 0, totalSF: 0 });
     }
   };
 

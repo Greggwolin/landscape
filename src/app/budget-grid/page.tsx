@@ -19,7 +19,7 @@ export default function BudgetGridPage() {
   const [projectId, setProjectId] = useState<number>(7);
 
   return (
-    <Box className="p-6" sx={{ backgroundColor: 'action.hover', minHeight: '100vh' }}>
+    <Box className="p-6" sx={{ backgroundColor: 'var(--surface-bg)', minHeight: '100vh' }}>
       {/* Page Header Card */}
       <Card className="mb-6">
         <CardContent>

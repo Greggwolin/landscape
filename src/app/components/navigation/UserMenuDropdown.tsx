@@ -40,8 +40,15 @@ export default function UserMenuDropdown() {
         onClick={() => setIsOpen((prev) => !prev)}
         className="rounded-full border p-2 transition-colors"
         style={{
-          borderColor: 'var(--cui-sidebar-border-color)',
-          color: 'var(--cui-sidebar-nav-link-color)',
+          borderColor: 'var(--nav-border)',
+          color: 'var(--nav-text)',
+          backgroundColor: 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
         }}
         aria-haspopup="true"
         aria-expanded={isOpen}
@@ -68,8 +75,7 @@ export default function UserMenuDropdown() {
                 className="block w-full px-4 py-2 text-left text-sm transition-colors"
                 style={{ color: 'var(--cui-body-color)' }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    'var(--cui-sidebar-nav-link-hover-bg)';
+                  e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';

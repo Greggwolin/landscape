@@ -1,0 +1,939 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowLeft,
+  AlertTriangle,
+  Edit,
+  Save,
+  Check,
+  TrendingUp,
+  TrendingDown,
+  Lightbulb,
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
+import { CorrectionModal } from '@/components/documents/CorrectionModal';
+
+// ===== TYPES =====
+
+interface ExtractionQueueItem {
+  extraction_id: number;
+  document_id: number;
+  document_name: string;
+  document_type: string;
+  extraction_type: 'rent_roll' | 'operating_statement' | 'parcel_table';
+  overall_confidence: number;
+  review_status: 'pending' | 'in_review' | 'corrected' | 'committed';
+  correction_count: number;
+  extracted_at: string;
+  page_count: number;
+  error_count: number;
+  warning_count: number;
+}
+
+interface ExtractedField {
+  field_path: string;
+  field_label: string;
+  value: any;
+  confidence: number;
+  is_corrected?: boolean;
+  corrected_value?: any;
+}
+
+interface ExtractedSection {
+  section_name: string;
+  section_label: string;
+  fields: ExtractedField[];
+}
+
+interface ValidationWarning {
+  field_path: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  suggested_value?: any;
+}
+
+interface ExtractionDetail {
+  extraction_id: number;
+  document_id: number;
+  document_name: string;
+  extraction_type: string;
+  overall_confidence: number;
+  sections: ExtractedSection[];
+  warnings: ValidationWarning[];
+  extracted_at: string;
+  review_status: string;
+}
+
+interface TopCorrectedField {
+  field: string;
+  correction_count: number;
+  avg_ai_confidence: number;
+  pattern: string;
+  recommendation: string;
+}
+
+interface AccuracyTrendPoint {
+  date: string;
+  accuracy: number;
+  extractions: number;
+  corrections: number;
+}
+
+interface CorrectionType {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+interface AnalyticsData {
+  period: string;
+  total_corrections: number;
+  total_extractions: number;
+  correction_rate: number;
+  top_corrected_fields: TopCorrectedField[];
+  accuracy_trend: AccuracyTrendPoint[];
+  correction_types: CorrectionType[];
+}
+
+// ===== MAIN COMPONENT =====
+
+export default function LandscaperTrainingPage() {
+  const [activeTab, setActiveTab] = useState<string>('queue');
+  const [selectedExtraction, setSelectedExtraction] = useState<ExtractionDetail | null>(null);
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="mb-6 border-b pb-4">
+        <h1 className="text-3xl font-bold">Landscaper AI Training</h1>
+        <p className="text-muted-foreground mt-1">
+          Review extractions, make corrections, and track accuracy improvements
+        </p>
+        <p className="text-xs text-muted-foreground mt-2 italic">
+          Route: /documents/review
+        </p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6 h-12 border-2 border-border bg-muted/30 p-1">
+          <TabsTrigger
+            value="queue"
+            className="h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold"
+          >
+            Review Queue
+          </TabsTrigger>
+          <TabsTrigger
+            value="detail"
+            disabled={!selectedExtraction}
+            className="h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold disabled:opacity-40"
+          >
+            Detail View
+          </TabsTrigger>
+          <TabsTrigger
+            value="analytics"
+            className="h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold"
+          >
+            Training Analytics
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="queue">
+          <QueueTab
+            onSelectExtraction={(extraction) => {
+              setSelectedExtraction(extraction);
+              setActiveTab('detail');
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="detail">
+          {selectedExtraction && (
+            <DetailTab
+              extraction={selectedExtraction}
+              onBack={() => setActiveTab('queue')}
+              onRefresh={(updated) => setSelectedExtraction(updated)}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ===== QUEUE TAB =====
+
+function QueueTab({ onSelectExtraction }: { onSelectExtraction: (extraction: ExtractionDetail) => void }) {
+  const [extractions, setExtractions] = useState<ExtractionQueueItem[]>([]);
+  const [filter, setFilter] = useState<string>('pending');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchExtractions();
+  }, [filter]);
+
+  const fetchExtractions = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/extractions/queue?status=${filter}&limit=50`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      setExtractions(data.queue || []);
+    } catch (error) {
+      console.error('Failed to fetch extractions:', error);
+      setExtractions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/ai/analyze-document', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error(`API Error for ${file.name}:`, result);
+          throw new Error(result.error || result.message || `Failed to process ${file.name}`);
+        }
+
+        if (!result.success) {
+          console.error(`Processing failed for ${file.name}:`, result);
+          throw new Error(result.error || `Processing failed for ${file.name}`);
+        }
+
+        console.log('Document processed successfully:', result);
+        alert(`✓ Successfully processed ${file.name}`);
+      } catch (error) {
+        console.error(`Error processing ${file.name}:`, error);
+        const errorMessage = error instanceof Error ? error.message : `Failed to process ${file.name}`;
+        alert(`✗ ${errorMessage}`);
+      }
+    }
+
+    setUploading(false);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    // Refresh the list
+    fetchExtractions();
+  };
+
+  const handleSelect = async (extractionId: number) => {
+    try {
+      const response = await fetch(`/api/extractions/${extractionId}/review`);
+      const data = await response.json();
+      const sections = transformDataToSections(data);
+      onSelectExtraction({
+        ...data,
+        sections
+      });
+    } catch (error) {
+      console.error('Failed to fetch extraction:', error);
+    }
+  };
+
+  const getConfidenceBadge = (confidence: number) => {
+    if (confidence >= 0.85) {
+      return <Badge className="bg-green-600 hover:bg-green-700">✓ {(confidence * 100).toFixed(0)}%</Badge>;
+    } else if (confidence >= 0.70) {
+      return <Badge className="bg-yellow-600 hover:bg-yellow-700">⚠ {(confidence * 100).toFixed(0)}%</Badge>;
+    } else {
+      return <Badge variant="destructive">⚠ {(confidence * 100).toFixed(0)}%</Badge>;
+    }
+  };
+
+  const getConfidenceIcon = (confidence: number) => {
+    if (confidence >= 0.85) return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (confidence >= 0.70) return <AlertCircle className="h-5 w-5 text-yellow-600" />;
+    return <AlertCircle className="h-5 w-5 text-red-600" />;
+  };
+
+  const formatExtractionType = (type: string) => {
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-sm">
+      {/* Upload Documents Section */}
+      <Card className="mb-6 bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800">
+        <CardContent className="py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold mb-1">Upload Documents for AI Extraction</h3>
+              <p className="text-sm text-muted-foreground">
+                Upload offering memos, rent rolls, operating statements, or parcel tables. The AI will automatically extract data and add them to the review queue.
+              </p>
+            </div>
+            <div className="ml-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.xlsx,.xls,.doc,.docx"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                size="lg"
+                disabled={uploading}
+              >
+                {uploading ? 'Processing...' : 'Upload Documents'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="mb-4 flex justify-end">
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Extractions</SelectItem>
+            <SelectItem value="pending">Pending Review</SelectItem>
+            <SelectItem value="in_review">In Review</SelectItem>
+            <SelectItem value="corrected">Corrected</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="text-muted-foreground">Loading extractions...</div>
+        </div>
+      ) : extractions.length === 0 ? (
+        <Card className="bg-card border-2">
+          <CardContent className="py-12 text-center">
+            <div className="space-y-4">
+              <div className="text-muted-foreground">
+                <p className="text-lg font-medium mb-2">No extractions found</p>
+                <p className="text-sm">Upload documents to the DMS to start extracting data for review</p>
+              </div>
+              <Button
+                onClick={() => window.location.href = '/dms?tab=upload'}
+                className="mx-auto"
+              >
+                Upload Documents
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {extractions.map((extraction) => (
+            <Card
+              key={extraction.extraction_id}
+              className="cursor-pointer hover:shadow-md transition-all bg-card border-2 hover:border-primary/50"
+              onClick={() => handleSelect(extraction.extraction_id)}
+            >
+              <CardContent className="py-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0">
+                    {getConfidenceIcon(extraction.overall_confidence)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold truncate">{extraction.document_name}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {extraction.page_count && `${extraction.page_count} pages • `}
+                      {formatExtractionType(extraction.extraction_type)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {getConfidenceBadge(extraction.overall_confidence)}
+
+                    {extraction.warning_count > 0 && (
+                      <Badge variant="outline" className="text-yellow-600">
+                        {extraction.warning_count} warnings
+                      </Badge>
+                    )}
+
+                    {extraction.error_count > 0 && (
+                      <Badge variant="destructive">
+                        {extraction.error_count} errors
+                      </Badge>
+                    )}
+
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      {formatDistanceToNow(new Date(extraction.extracted_at), { addSuffix: true })}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== DETAIL TAB =====
+
+function DetailTab({
+  extraction,
+  onBack,
+  onRefresh
+}: {
+  extraction: ExtractionDetail;
+  onBack: () => void;
+  onRefresh: (updated: ExtractionDetail) => void;
+}) {
+  const [editingField, setEditingField] = useState<ExtractedField | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const fetchExtraction = async () => {
+    try {
+      const response = await fetch(`/api/extractions/${extraction.extraction_id}/review`);
+      const data = await response.json();
+      const sections = transformDataToSections(data);
+      onRefresh({
+        ...data,
+        sections
+      });
+    } catch (error) {
+      console.error('Failed to fetch extraction:', error);
+    }
+  };
+
+  const handleCorrection = async (
+    field: ExtractedField,
+    newValue: any,
+    correctionType: string,
+    notes?: string
+  ) => {
+    try {
+      const response = await fetch(`/api/extractions/${extraction.extraction_id}/correct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field_path: field.field_path,
+          old_value: field.value,
+          new_value: newValue,
+          correction_type: correctionType,
+          notes: notes
+        })
+      });
+
+      if (response.ok) {
+        fetchExtraction();
+        setEditingField(null);
+      }
+    } catch (error) {
+      console.error('Error logging correction:', error);
+    }
+  };
+
+  const handleCommit = async () => {
+    if (!confirm('Commit this extraction to the database? This action cannot be undone.')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/extractions/${extraction.extraction_id}/commit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commit_notes: 'Reviewed and corrected via UI'
+        })
+      });
+
+      if (response.ok) {
+        onBack();
+      }
+    } catch (error) {
+      console.error('Error committing extraction:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getConfidenceBadge = (confidence: number, isCorrected?: boolean) => {
+    if (isCorrected) {
+      return <Badge className="bg-green-600"><Check className="h-3 w-3 mr-1" /> Corrected</Badge>;
+    }
+    if (confidence >= 0.85) {
+      return <Badge className="bg-green-600">{(confidence * 100).toFixed(0)}%</Badge>;
+    } else if (confidence >= 0.70) {
+      return <Badge className="bg-yellow-600">{(confidence * 100).toFixed(0)}%</Badge>;
+    } else {
+      return <Badge variant="destructive">{(confidence * 100).toFixed(0)}%</Badge>;
+    }
+  };
+
+  const getWarningsForField = (fieldPath: string) => {
+    return extraction?.warnings.filter(w => w.field_path === fieldPath) || [];
+  };
+
+  const formatFieldLabel = (str: string) => {
+    return str.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-sm">
+      {/* Header */}
+      <div className="mb-6">
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Queue
+        </Button>
+
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold">{extraction.document_name}</h2>
+            <p className="text-muted-foreground">
+              {formatFieldLabel(extraction.extraction_type)}
+            </p>
+          </div>
+
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground mb-1">Overall Confidence</div>
+            <div className="text-3xl font-bold">
+              {(extraction.overall_confidence * 100).toFixed(0)}%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Global Warnings */}
+      {extraction.warnings.filter(w => !w.field_path).length > 0 && (
+        <Alert className="mb-4" variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <ul className="list-disc list-inside">
+              {extraction.warnings.filter(w => !w.field_path).map((warning, idx) => (
+                <li key={idx}>{warning.message}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Tabbed Sections */}
+      <Tabs defaultValue={extraction.sections[0]?.section_name} className="mb-6">
+        <TabsList>
+          {extraction.sections.map(section => (
+            <TabsTrigger key={section.section_name} value={section.section_name}>
+              {section.section_label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {extraction.sections.map(section => (
+          <TabsContent key={section.section_name} value={section.section_name}>
+            <Card>
+              <CardHeader>
+                <CardTitle>{section.section_label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {section.fields.map(field => {
+                    const fieldWarnings = getWarningsForField(field.field_path);
+
+                    return (
+                      <div key={field.field_path} className="border-b pb-4 last:border-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{field.field_label}</span>
+                              {getConfidenceBadge(field.confidence, field.is_corrected)}
+                            </div>
+
+                            <div className="text-lg">
+                              {field.is_corrected ? (
+                                <>
+                                  <span className="line-through text-muted-foreground mr-2">
+                                    {String(field.value)}
+                                  </span>
+                                  <span className="text-green-600 font-semibold">
+                                    {String(field.corrected_value)}
+                                  </span>
+                                </>
+                              ) : (
+                                <span>{String(field.value)}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingField(field)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
+
+                        {/* Field warnings */}
+                        {fieldWarnings.map((warning, idx) => (
+                          <Alert
+                            key={idx}
+                            className="mt-2"
+                            variant={warning.severity === 'error' ? 'destructive' : 'default'}
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              {warning.message}
+                              {warning.suggested_value && (
+                                <span className="block mt-1 text-sm">
+                                  Suggested: {String(warning.suggested_value)}
+                                </span>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      {/* Actions */}
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={fetchExtraction}>
+          <Save className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+
+        <Button onClick={handleCommit} disabled={saving}>
+          <Check className="h-4 w-4 mr-2" />
+          {saving ? 'Committing...' : 'Commit to Database'}
+        </Button>
+      </div>
+
+      {/* Correction Modal */}
+      {editingField && (
+        <CorrectionModal
+          field={editingField}
+          onSave={handleCorrection}
+          onClose={() => setEditingField(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===== ANALYTICS TAB =====
+
+function AnalyticsTab() {
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [period, setPeriod] = useState('7');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [period]);
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/corrections/analytics?days=${period}`);
+      const data = await response.json();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatFieldName = (fieldPath: string) => {
+    const parts = fieldPath.split('.');
+    return parts[parts.length - 1]
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  if (loading || !analytics) {
+    return <div className="text-center py-12">Loading analytics...</div>;
+  }
+
+  const overallAccuracy = analytics.total_extractions > 0
+    ? 1 - (analytics.total_corrections / (analytics.total_extractions * 20))
+    : 0;
+
+  const previousAccuracy = analytics.accuracy_trend.length > 0
+    ? analytics.accuracy_trend[0].accuracy
+    : 0;
+
+  const accuracyChange = overallAccuracy - previousAccuracy;
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-sm">
+      <div className="mb-4 flex justify-end">
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Last 7 Days</SelectItem>
+            <SelectItem value="30">Last 30 Days</SelectItem>
+            <SelectItem value="90">Last 90 Days</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Overall Accuracy</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold">{(overallAccuracy * 100).toFixed(1)}%</span>
+              {accuracyChange !== 0 && (
+                <Badge variant={accuracyChange > 0 ? 'default' : 'destructive'} className={accuracyChange > 0 ? 'bg-green-600' : ''}>
+                  {accuracyChange > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
+                  {Math.abs(accuracyChange * 100).toFixed(1)}%
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {accuracyChange > 0 ? 'up' : 'down'} from previous period
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Total Corrections</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{analytics.total_corrections}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              across {analytics.total_extractions} documents
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Correction Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{(analytics.correction_rate * 100).toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {analytics.total_extractions > 0
+                ? (analytics.total_corrections / analytics.total_extractions).toFixed(1)
+                : 0} corrections per document
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Accuracy Trend Chart */}
+      {analytics.accuracy_trend.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Accuracy Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={analytics.accuracy_trend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis domain={[0, 1]} tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} />
+                <Tooltip
+                  formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                <Line type="monotone" dataKey="accuracy" stroke="#10b981" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Correction Types Breakdown */}
+      {analytics.correction_types.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Correction Types</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {analytics.correction_types.map((ct) => (
+                <div key={ct.type} className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium">{formatFieldName(ct.type)}</div>
+                    <div className="w-full bg-muted rounded-full h-2 mt-1">
+                      <div
+                        className="bg-primary h-2 rounded-full"
+                        style={{ width: `${ct.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="ml-4 text-sm text-muted-foreground">
+                    {ct.count} ({ct.percentage.toFixed(1)}%)
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Corrected Fields */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top Corrected Fields</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {analytics.top_corrected_fields.slice(0, 5).map((field, index) => (
+              <div key={field.field} className="border-b pb-4 last:border-0">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold">
+                    {index + 1}
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold">{formatFieldName(field.field)}</h3>
+                      <Badge variant="outline">
+                        {field.correction_count} corrections
+                      </Badge>
+                      <Badge variant="outline">
+                        Avg confidence: {(field.avg_ai_confidence * 100).toFixed(0)}%
+                      </Badge>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground mb-2">
+                      <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                        {field.field}
+                      </code>
+                    </div>
+
+                    {field.pattern && (
+                      <div className="flex items-start gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium">Pattern Detected:</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatFieldName(field.pattern)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {field.recommendation && (
+                      <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-950 p-3 rounded-md">
+                        <Lightbulb className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium">Recommendation:</div>
+                          <div className="text-sm text-muted-foreground">{field.recommendation}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ===== HELPER FUNCTIONS =====
+
+function transformDataToSections(data: any): ExtractedSection[] {
+  const sections: ExtractedSection[] = [];
+
+  if (data.data) {
+    Object.keys(data.data).forEach(sectionKey => {
+      const sectionData = data.data[sectionKey];
+      const fields: ExtractedField[] = [];
+
+      if (typeof sectionData === 'object') {
+        Object.keys(sectionData).forEach(fieldKey => {
+          const fieldData = sectionData[fieldKey];
+          fields.push({
+            field_path: `${sectionKey}.${fieldKey}`,
+            field_label: formatFieldLabel(fieldKey),
+            value: fieldData.value || fieldData,
+            confidence: fieldData.confidence || 0
+          });
+        });
+      }
+
+      sections.push({
+        section_name: sectionKey,
+        section_label: formatFieldLabel(sectionKey),
+        fields
+      });
+    });
+  }
+
+  return sections;
+}
+
+function formatFieldLabel(str: string) {
+  return str.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}

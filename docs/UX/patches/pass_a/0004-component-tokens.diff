@@ -1,0 +1,322 @@
+diff --git a/src/app/dashboard/page.tsx b/src/app/dashboard/page.tsx
+--- a/src/app/dashboard/page.tsx
++++ b/src/app/dashboard/page.tsx
+@@ -79,7 +79,7 @@
+         </CCol>
+         <CCol md={7} lg={8} className="d-flex">
+           <CCard style={{ height: '100%', width: '100%' }}>
+-            <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
++            <CCardHeader className="bg-muted text-foreground">
+               <span className="fw-semibold">Project Locations</span>
+             </CCardHeader>
+             <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
+@@ -93,10 +93,10 @@
+       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+         <CCard className="text-center">
+           <CCardBody>
+-            <div className="text-3xl font-bold" style={{ color: 'var(--cui-primary)' }}>
++            <div className="text-3xl font-bold text-primary">
+               {projects.length}
+             </div>
+-            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
++            <div className="text-sm text-muted-foreground">
+               Total Projects
+             </div>
+           </CCardBody>
+@@ -104,10 +104,10 @@
+ 
+         <CCard className="text-center">
+           <CCardBody>
+-            <div className="text-3xl font-bold" style={{ color: 'var(--cui-success)' }}>
++            <div className="text-3xl font-bold text-success">
+               {projects.filter(p => p.is_active).length}
+             </div>
+-            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
++            <div className="text-sm text-muted-foreground">
+               Active Projects
+             </div>
+           </CCardBody>
+@@ -115,10 +115,10 @@
+ 
+         <CCard className="text-center">
+           <CCardBody>
+-            <div className="text-3xl font-bold" style={{ color: 'var(--cui-info)' }}>
++            <div className="text-3xl font-bold text-info">
+               {projects.filter(p => p.project_type_code === 'LAND' || p.project_type_code === 'MPC' || p.project_type_code === 'SUBDIVISION').length}
+             </div>
+-            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
++            <div className="text-sm text-muted-foreground">
+               Land Development
+             </div>
+           </CCardBody>
+@@ -126,10 +126,10 @@
+ 
+         <CCard className="text-center">
+           <CCardBody>
+-            <div className="text-3xl font-bold" style={{ color: 'var(--cui-warning)' }}>
++            <div className="text-3xl font-bold text-warning">
+               {projects.filter(p => p.project_type_code === 'MF' || p.project_type_code === 'OFF' || p.project_type_code === 'RET' || p.project_type_code === 'IND' || p.project_type_code === 'HTL' || p.project_type_code === 'MXU' || p.project_type_code === 'MULTIFAMILY' || p.project_type_code === 'OFFICE' || p.project_type_code === 'RETAIL').length}
+             </div>
+-            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
++            <div className="text-sm text-muted-foreground">
+               Income Properties
+             </div>
+           </CCardBody>
+@@ -138,13 +138,12 @@
+         <CCard
+           className="text-center cursor-pointer hover:shadow-lg transition-shadow"
+           onClick={() => setIsNewProjectModalOpen(true)}
+-          style={{ cursor: 'pointer' }}
+         >
+           <CCardBody>
+-            <div className="text-3xl font-bold" style={{ color: 'var(--cui-success)' }}>
++            <div className="text-3xl font-bold text-success">
+               +
+             </div>
+-            <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
++            <div className="text-sm text-muted-foreground">
+               New Project
+             </div>
+           </CCardBody>
+@@ -153,12 +152,12 @@
+ 
+       {/* Projects Table */}
+       <CCard>
+-        <CCardHeader style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
++        <CCardHeader className="bg-muted text-foreground">
+           <span className="text-base font-semibold">Projects</span>
+         </CCardHeader>
+         <CCardBody className="p-0">
+           <CTable hover responsive className="mb-0">
+-            <CTableHead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
++            <CTableHead className="bg-muted">
+               <CTableRow>
+                 <CTableHeaderCell scope="col">ID</CTableHeaderCell>
+                 <CTableHeaderCell scope="col">Name</CTableHeaderCell>
+@@ -175,10 +174,9 @@
+                   key={project.project_id}
+                   className="cursor-pointer"
+                   onClick={() => handleProjectClick(project.project_id)}
+-                  style={{ cursor: 'pointer' }}
+                 >
+                   <CTableDataCell>
+-                    <span className="text-sm font-mono" style={{ color: 'var(--cui-secondary-color)' }}>
++                    <span className="text-sm font-mono text-muted-foreground">
+                       {project.project_id}
+                     </span>
+                   </CTableDataCell>
+@@ -194,7 +192,7 @@
+                         {PROPERTY_TYPE_LABELS[project.project_type_code] || project.project_type_code}
+                       </CBadge>
+                     ) : (
+-                      <span style={{ color: 'var(--cui-secondary-color)' }}>Not specified</span>
++                      <span className="text-muted-foreground">Not specified</span>
+                     )}
+                   </CTableDataCell>
+                   <CTableDataCell>
+@@ -202,20 +200,20 @@
+                       <div>
+                         <div>{project.jurisdiction_city}, {project.jurisdiction_state}</div>
+                         {project.jurisdiction_county && (
+-                          <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
++                          <div className="text-xs text-muted-foreground">
+                             {project.jurisdiction_county}
+                           </div>
+                         )}
+                       </div>
+                     ) : (
+-                      <span style={{ color: 'var(--cui-secondary-color)' }}>Not specified</span>
++                      <span className="text-muted-foreground">Not specified</span>
+                     )}
+                   </CTableDataCell>
+                   <CTableDataCell>
+                     {project.acres_gross ? (
+                       `${project.acres_gross} ac`
+                     ) : (
+-                      <span style={{ color: 'var(--cui-secondary-color)' }}>TBD</span>
++                      <span className="text-muted-foreground">TBD</span>
+                     )}
+                   </CTableDataCell>
+                   <CTableDataCell>
+@@ -243,7 +241,7 @@
+ 
+           {projects.length === 0 && (
+             <div className="text-center py-8">
+-              <p style={{ color: 'var(--cui-secondary-color)' }}>
++              <p className="text-muted-foreground">
+                 No projects found. Click the + New Project tile to get started.
+               </p>
+             </div>
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -12,8 +12,8 @@
+   }, [router]);
+ 
+   return (
+-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)' }}>
+-      <div style={{ color: 'var(--cui-secondary-color)' }}>Redirecting to dashboard...</div>
++    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
++      <div className="text-muted-foreground">Redirecting to dashboard...</div>
+     </div>
+   );
+ }
+diff --git a/src/app/components/TopNavigationBar.tsx b/src/app/components/TopNavigationBar.tsx
+--- a/src/app/components/TopNavigationBar.tsx
++++ b/src/app/components/TopNavigationBar.tsx
+@@ -26,7 +26,7 @@
+  * - Theme toggle
+  *
+  * Height: 58px
+- * Background: var(--cui-sidebar-bg) (dark)
++ * Background: var(--sidebar-surface) (dark)
+  * Position: Sticky top
+  */
+ 
+@@ -184,12 +184,12 @@
+     <>
+       <header
+         className="sticky top-0"
+-        style={{ backgroundColor: 'var(--cui-sidebar-bg)', zIndex: 50 }}
++        style={{ backgroundColor: 'var(--sidebar-surface)', zIndex: 50 }}
+       >
+         <div
+           className="flex items-center justify-between px-6 border-b"
+           style={{
+-            borderColor: 'var(--cui-sidebar-border-color)',
++            borderColor: 'var(--sidebar-border)',
+             height: '58px',
+           }}
+         >
+@@ -217,8 +217,8 @@
+                 style={{
+                   color:
+                     pathname === link.href
+-                      ? 'var(--cui-primary)'
+-                      : 'var(--cui-sidebar-nav-link-color)',
++                      ? 'var(--primary)'
++                      : 'var(--sidebar-link)',
+                   fontWeight: pathname === link.href ? '600' : '400',
+                 }}
+               >
+@@ -231,7 +231,7 @@
+               type="button"
+               onClick={() => setLandscaperOpen(true)}
+               className="px-3 py-2 text-sm transition-colors"
+-              style={{ color: 'var(--cui-sidebar-nav-link-color)' }}
++              style={{ color: 'var(--sidebar-link)' }}
+             >
+               Landscaper AI
+             </button>
+@@ -247,8 +247,8 @@
+               onClick={openBugModal}
+               className="rounded-full border p-2 transition-colors"
+               style={{
+-                borderColor: 'var(--cui-sidebar-border-color)',
+-                color: 'var(--cui-sidebar-nav-link-color)',
++                borderColor: 'var(--sidebar-border)',
++                color: 'var(--sidebar-link)',
+                 backgroundColor: 'transparent',
+               }}
+               aria-label="Log page task"
+@@ -262,8 +262,8 @@
+               onClick={toggleTheme}
+               className="rounded-full border px-3 py-2 text-sm font-medium transition-colors"
+               style={{
+-                borderColor: 'var(--cui-sidebar-border-color)',
+-                color: 'var(--cui-sidebar-nav-link-color)',
++                borderColor: 'var(--sidebar-border)',
++                color: 'var(--sidebar-link)',
+                 backgroundColor: 'transparent',
+               }}
+               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+@@ -279,18 +279,18 @@
+           <div
+             className="w-full max-w-md rounded-lg border shadow-lg"
+             style={{
+-              backgroundColor: 'var(--cui-card-bg)',
+-              borderColor: 'var(--cui-border-color)',
+-              color: 'var(--cui-body-color)',
++              backgroundColor: 'var(--card)',
++              borderColor: 'var(--border)',
++              color: 'var(--foreground)',
+             }}
+           >
+             <div
+               className="flex items-center justify-between border-b px-4 py-3"
+-              style={{ borderColor: 'var(--cui-border-color)' }}
++              style={{ borderColor: 'var(--border)' }}
+             >
+               <div>
+                 <h2 className="text-base font-semibold">Log Page Task</h2>
+-                <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
++                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                   {pageLabel} &middot; {displayLocation}
+                 </p>
+               </div>
+@@ -298,7 +298,7 @@
+                 type="button"
+                 onClick={closeBugModal}
+                 className="rounded-full p-1.5 transition-colors"
+-                style={{ color: 'var(--cui-secondary-color)' }}
++                style={{ color: 'var(--muted-foreground)' }}
+                 aria-label="Close quick task dialog"
+               >
+                 <X className="h-4 w-4" />
+@@ -306,7 +306,7 @@
+             </div>
+ 
+             <div className="space-y-3 px-4 py-4">
+-              <label className="block text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
++              <label className="block text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+                 Task
+               </label>
+               <textarea
+@@ -319,14 +319,14 @@
+                 className="w-full resize-y rounded border px-3 py-2 text-sm leading-snug"
+                 style={{
+                   backgroundColor: 'var(--cui-body-bg)',
+-                  borderColor: 'var(--cui-border-color)',
+-                  color: 'var(--cui-body-color)',
++                  borderColor: 'var(--border)',
++                  color: 'var(--foreground)',
+                 }}
+                 placeholder="Capture the fix or task needed for this page…"
+                 autoFocus
+               />
+               {bugError && (
+-                <div className="text-xs font-medium" style={{ color: 'rgb(220,38,38)' }}>
++                <div className="text-xs font-medium text-destructive">
+                   {bugError}
+                 </div>
+               )}
+@@ -334,15 +334,15 @@
+ 
+             <div
+               className="flex items-center justify-end gap-3 border-t px-4 py-3"
+-              style={{ borderColor: 'var(--cui-border-color)' }}
++              style={{ borderColor: 'var(--border)' }}
+             >
+               <button
+                 type="button"
+                 onClick={closeBugModal}
+                 className="rounded border px-3 py-2 text-sm"
+                 style={{
+-                  borderColor: 'var(--cui-border-color)',
+-                  color: 'var(--cui-secondary-color)',
++                  borderColor: 'var(--border)',
++                  color: 'var(--muted-foreground)',
+                   backgroundColor: 'transparent',
+                 }}
+                 disabled={isSavingBug}
+@@ -354,8 +354,8 @@
+                 onClick={handleBugSubmit}
+                 className="rounded px-4 py-2 text-sm font-medium transition-colors"
+                 style={{
+-                  backgroundColor: 'var(--cui-primary)',
+-                  color: '#fff',
++                  backgroundColor: 'var(--primary)',
++                  color: 'var(--primary-foreground)',
+                   opacity: isSavingBug ? 0.7 : 1,
+                 }}
+                 disabled={isSavingBug}

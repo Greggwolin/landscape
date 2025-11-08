@@ -198,6 +198,104 @@ export default function ProjectTab({
     steps: StepRow[];
     createdAt: Date;
   }>>([]);
+
+  const addressFields: (keyof Project)[] = ['street_address', 'city', 'county', 'state', 'zip_code'];
+
+  const isMissingCoordinates = (projectWithCoords: Project) =>
+    projectWithCoords.location_lat === null ||
+    projectWithCoords.location_lat === undefined ||
+    projectWithCoords.location_lon === null ||
+    projectWithCoords.location_lon === undefined;
+
+  const hasLocationEdits = (changes: Partial<Project>) =>
+    addressFields.some(field => Object.prototype.hasOwnProperty.call(changes, field));
+
+  const buildProfileAddressPayload = (latestProject: Project, changes: Partial<Project>) => {
+    const needsCoordinates = isMissingCoordinates(latestProject);
+
+    if (!hasLocationEdits(changes) && !needsCoordinates) {
+      return null;
+    }
+
+    const normalizeValue = (value?: string | number | null) => {
+      if (value === undefined || value === null) return undefined;
+      const strValue = typeof value === 'string' ? value : String(value);
+      const trimmed = strValue.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
+    const address =
+      normalizeValue(
+        Object.prototype.hasOwnProperty.call(changes, 'street_address')
+          ? changes.street_address
+          : latestProject.street_address
+      );
+
+    const city =
+      normalizeValue(
+        Object.prototype.hasOwnProperty.call(changes, 'city')
+          ? changes.city
+          : latestProject.city ?? latestProject.jurisdiction_city
+      );
+
+    const county =
+      normalizeValue(
+        Object.prototype.hasOwnProperty.call(changes, 'county')
+          ? changes.county
+          : latestProject.county ?? latestProject.jurisdiction_county
+      );
+
+    const state =
+      normalizeValue(
+        Object.prototype.hasOwnProperty.call(changes, 'state')
+          ? changes.state
+          : latestProject.state ?? latestProject.jurisdiction_state
+      );
+
+    const zipCode =
+      normalizeValue(
+        Object.prototype.hasOwnProperty.call(changes, 'zip_code')
+          ? changes.zip_code
+          : latestProject.zip_code
+      );
+
+    if (!address || !city) {
+      return null;
+    }
+
+    const payload: { address: string; city: string; county?: string; state?: string; zip_code?: string } = { address, city };
+    if (county) {
+      payload.county = county;
+    }
+    if (state) {
+      payload.state = state;
+    }
+    if (zipCode) {
+      payload.zip_code = zipCode;
+    }
+    return payload;
+  };
+
+  const maybeUpdateProfileCoordinates = async (latestProject: Project, changes: Partial<Project>) => {
+    const payload = buildProfileAddressPayload(latestProject, changes);
+    if (!payload) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${latestProject.project_id}/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        console.error('Failed to update project profile with location fields');
+      }
+    } catch (error) {
+      console.error('Error updating project profile with location fields:', error);
+    }
+  };
   const [originalInflationSteps, setOriginalInflationSteps] = useState<StepRow[]>([]);
   const scheduleNameInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -401,15 +499,17 @@ export default function ProjectTab({
   // Handle save for location
   const handleSaveLocation = async () => {
     try {
+      const pendingChanges = { ...editedProject };
       const response = await fetch(`/api/projects/${project.project_id}/details`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedProject)
+        body: JSON.stringify(pendingChanges)
       });
 
       if (response.ok) {
         const updated = await response.json();
         setProject(updated);
+        void maybeUpdateProfileCoordinates(updated, pendingChanges);
         setEditingLocation(false);
         setEditedProject({});
       }
@@ -421,15 +521,17 @@ export default function ProjectTab({
   // Handle save for profile
   const handleSaveProfile = async () => {
     try {
+      const pendingChanges = { ...editedProject };
       const response = await fetch(`/api/projects/${project.project_id}/details`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedProject)
+        body: JSON.stringify(pendingChanges)
       });
 
       if (response.ok) {
         const updated = await response.json();
         setProject(updated);
+        void maybeUpdateProfileCoordinates(updated, pendingChanges);
         setEditingProfile(false);
         setEditedProject({});
       }

@@ -355,8 +355,8 @@
 
 .edit-chip {
   padding: 2px 8px;
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--chip-info);
+  color: var(--text-inverse);
   border: none;
   border-radius: 10px;
   font-size: 11px;
@@ -368,7 +368,7 @@
 }
 
 .edit-chip:hover {
-  background-color: #2563eb;
+  background-color: color-mix(in srgb, var(--chip-info) 85%, black);
 }
 
 .delete-button {
@@ -387,11 +387,11 @@
 
 @media (prefers-color-scheme: dark) {
   .edit-chip {
-    background-color: #3b82f6;
+    background-color: var(--chip-info);
   }
 
   .edit-chip:hover {
-    background-color: #2563eb;
+    background-color: color-mix(in srgb, var(--chip-info) 85%, black);
   }
 }
 

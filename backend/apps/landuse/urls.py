@@ -2,12 +2,13 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import InventoryItemViewSet, FamilyViewSet, TypeViewSet
+from .views import InventoryItemViewSet, FamilyViewSet, TypeViewSet, LotProductViewSet
 
 router = DefaultRouter()
 router.register(r'inventory', InventoryItemViewSet, basename='inventory-item')
 router.register(r'families', FamilyViewSet, basename='family')
 router.register(r'types', TypeViewSet, basename='type')
+router.register(r'products', LotProductViewSet, basename='lotproduct')
 
 urlpatterns = [
     path('', include(router.urls)),

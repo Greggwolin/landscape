@@ -20,6 +20,8 @@ export interface ProjectProfile {
   address?: string;
   city?: string;
   county?: string;
+  state?: string;
+  zip_code?: string;
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
@@ -45,6 +47,7 @@ export interface MSA {
 // ============================================================================
 
 export interface ProjectProfileFormData {
+  project_name?: string;
   analysis_type: AnalysisType;
   property_subtype?: PropertySubtype;
   target_units?: number;
@@ -52,6 +55,8 @@ export interface ProjectProfileFormData {
   address?: string;
   city?: string;
   county?: string;
+  state?: string;
+  zip_code?: string;
   msa_id?: number;
   apn?: string;
   ownership_type?: OwnershipType;

@@ -65,8 +65,11 @@ class Project(models.Model):
 
     # Financial Configuration
     calculation_frequency = models.CharField(max_length=20, blank=True, null=True)
+    planning_efficiency = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
     discount_rate_pct = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
     cost_of_capital_pct = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
+    market_velocity_annual = models.IntegerField(blank=True, null=True)
+    velocity_override_reason = models.TextField(blank=True, null=True)
 
     # GIS & AI
     gis_metadata = models.JSONField(blank=True, null=True)

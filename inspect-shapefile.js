@@ -5,7 +5,7 @@ const shapefile = require("shapefile");
 async function inspectShapefile() {
     console.log("🔍 Inspecting shapefile fields...");
 
-    const shapefilePath = "./src/app/GIS/Pinal_County_Tax_Parcels_viewer.shp";
+    const shapefilePath = process.env.PINAL_PARCELS_SOURCE_PATH || "./data/external/pinal-county/raw/Pinal_County_Tax_Parcels_viewer.shp";
 
     try {
         const source = await shapefile.open(shapefilePath);

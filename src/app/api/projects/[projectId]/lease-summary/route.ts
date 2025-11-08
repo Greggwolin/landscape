@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 
 import { getLeaseSummary, getRentRoll } from '@/lib/financial-engine/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 /**
  * GET /api/projects/[projectId]/lease-summary
  * Get lease summary and rent roll for a project
  */
-export const GET = async (_request: Request, { params }: { params: { projectId: string } }) => {
+export const GET = async (_request: Request, context: Params) => {
   try {
-    const projectId = parseInt(params.projectId, 10);
+    const projectId = parseInt((await context.params).projectId, 10);
 
     if (isNaN(projectId)) {
       return NextResponse.json(

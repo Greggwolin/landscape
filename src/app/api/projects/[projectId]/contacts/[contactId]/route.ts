@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string; contactId: string }> };
+
 /**
  * PATCH /api/projects/[projectId]/contacts/[contactId]
  * Update existing contact
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string; contactId: string } }
+  context: Params
 ) {
   try {
-    const contactId = parseInt(params.contactId);
+    const contactId = parseInt((await context.params).contactId);
     const body = await request.json();
 
     // Build dynamic update query
@@ -91,10 +93,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string; contactId: string } }
+  context: Params
 ) {
   try {
-    const contactId = parseInt(params.contactId);
+    const contactId = parseInt((await context.params).contactId);
 
     const { rowCount } = await sql`
       DELETE FROM landscape.tbl_contacts

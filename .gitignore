@@ -66,7 +66,21 @@ src/app/GIS/*.shx
 src/app/GIS/*.sbn
 src/app/GIS/*.sbx
 public/pinal_parcels.geojson
-*.geojson
+data/external/**/*.geojson
+data/external/**/*.zip
+data/external/**/*.shp
+data/external/**/*.dbf
+data/external/**/*.shx
+data/external/**/*.sbn
+data/external/**/*.sbx
+data/external/**/*.prj
+data/external/**/*.cpg
+data/external/**/*.gpkg
+data/external/**/*.sqlite
+data/external/**/*.mbtiles
+data/external/**/*.parquet
+!data/external/**/.gitkeep
+!data/external/**/*.md
 
 # Temporary backups
 *_backup

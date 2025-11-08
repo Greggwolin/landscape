@@ -1,0 +1,6 @@
+category_name,item_name,default_uom,market_geography,project_type_code,typical_low,typical_mid,typical_high,created_from_project_id
+Grading / Site Prep,Monthly Rental of Fence (per LF per mo),Mo.,"Maricopa County, AZ",LAND,1200,1500,1800,7
+Grading / Site Prep,Grade out Temp Basin,CY,"Maricopa County, AZ",LAND,4.5,5.25,6.0,7
+Grading / Site Prep,Project completion lot spin,Days,"Maricopa County, AZ",LAND,750,900,1100,7
+Storm Drain,Clean and inspect existing storm drain,EA,"Maricopa County, AZ",LAND,320,410,525,7
+Dry Utilities,Temporary power service setup,LS,"Maricopa County, AZ",LAND,2800,3000,3250,7

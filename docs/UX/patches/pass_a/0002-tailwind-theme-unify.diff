@@ -1,0 +1,304 @@
+diff --git a/tailwind.config.js b/tailwind.config.js
+--- a/tailwind.config.js
++++ b/tailwind.config.js
+@@ -1,4 +1,5 @@
+ module.exports = {
++  darkMode: ['class', '.dark-theme'],
+   content: [
+     './pages/**/*.{js,ts,jsx,tsx,mdx}',
+     './components/**/*.{js,ts,jsx,tsx,mdx}',
+@@ -8,38 +9,50 @@
+   theme: {
+     extend: {
+       colors: {
+-        border: "hsl(var(--border))",
+-        input: "hsl(var(--input))",
+-        ring: "hsl(var(--ring))",
+-        background: "hsl(var(--background))",
+-        foreground: "hsl(var(--foreground))",
++        border: "var(--border)",
++        input: "var(--input)",
++        ring: "var(--ring)",
++        background: "var(--background)",
++        foreground: "var(--foreground)",
+         primary: {
+-          DEFAULT: "hsl(var(--primary))",
+-          foreground: "hsl(var(--primary-foreground))",
++          DEFAULT: "var(--primary)",
++          foreground: "var(--primary-foreground)",
+         },
+         secondary: {
+-          DEFAULT: "hsl(var(--secondary))",
+-          foreground: "hsl(var(--secondary-foreground))",
++          DEFAULT: "var(--secondary)",
++          foreground: "var(--secondary-foreground)",
+         },
+         destructive: {
+-          DEFAULT: "hsl(var(--destructive))",
+-          foreground: "hsl(var(--destructive-foreground))",
++          DEFAULT: "var(--destructive)",
++          foreground: "var(--destructive-foreground)",
+         },
+         muted: {
+-          DEFAULT: "hsl(var(--muted))",
+-          foreground: "hsl(var(--muted-foreground))",
++          DEFAULT: "var(--muted)",
++          foreground: "var(--muted-foreground)",
+         },
+         accent: {
+-          DEFAULT: "hsl(var(--accent))",
+-          foreground: "hsl(var(--accent-foreground))",
++          DEFAULT: "var(--accent)",
++          foreground: "var(--accent-foreground)",
+         },
+         popover: {
+-          DEFAULT: "hsl(var(--popover))",
+-          foreground: "hsl(var(--popover-foreground))",
++          DEFAULT: "var(--popover)",
++          foreground: "var(--popover-foreground)",
+         },
+         card: {
+-          DEFAULT: "hsl(var(--card))",
+-          foreground: "hsl(var(--card-foreground))",
++          DEFAULT: "var(--card)",
++          foreground: "var(--card-foreground)",
++        },
++        success: {
++          DEFAULT: "var(--success)",
++          foreground: "var(--success-foreground)",
++        },
++        warning: {
++          DEFAULT: "var(--warning)",
++          foreground: "var(--warning-foreground)",
++        },
++        info: {
++          DEFAULT: "var(--info)",
++          foreground: "var(--info-foreground)",
+         },
+       },
+       borderRadius: {
+diff --git a/src/app/globals.css b/src/app/globals.css
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -8,11 +8,69 @@
+ :root {
+   --background: #ffffff;
+   --foreground: #1e293b;
++  --border: #dbdfe6;
++  --input: #dbdfe6;
++  --ring: #3399ff;
++  --radius: 0.375rem;
++  --primary: #3399ff;
++  --primary-foreground: #ffffff;
++  --secondary: #e7eaee;
++  --secondary-foreground: rgba(37, 42.92, 54.02, 0.681);
++  --muted: #f0f1f2;
++  --muted-foreground: #6b7280;
++  --accent: #6366f1;
++  --accent-foreground: #ffffff;
++  --destructive: #ef4444;
++  --destructive-foreground: #ffffff;
++  --success: #16a34a;
++  --success-foreground: #0f172a;
++  --warning: #f59e0b;
++  --warning-foreground: #0f172a;
++  --info: #3b82f6;
++  --info-foreground: #0f172a;
++  --popover: #ffffff;
++  --popover-foreground: #1e293b;
++  --card: #ffffff;
++  --card-foreground: #1e293b;
++  --sidebar-surface: #1f2937;
++  --sidebar-border: #374151;
++  --sidebar-link: #d1d5db;
++  --header-surface: #ffffff;
++  --header-border: #9ca3af;
+ }
+ 
+-.dark {
+-  --background: #0f172a;
+-  --foreground: #f1f5f9;
++.dark,
++.dark-theme {
++  --background: #111827;
++  --foreground: #f3f4f6;
++  --border: #374151;
++  --input: #4b5563;
++  --ring: #818cf8;
++  --primary: #818cf8;
++  --primary-foreground: #111827;
++  --secondary: #1f2937;
++  --secondary-foreground: #d1d5db;
++  --muted: #374151;
++  --muted-foreground: #9ca3af;
++  --accent: #818cf8;
++  --accent-foreground: #111827;
++  --destructive: #ef4444;
++  --destructive-foreground: #111827;
++  --success: #16a34a;
++  --success-foreground: #0f172a;
++  --warning: #f59e0b;
++  --warning-foreground: #0f172a;
++  --info: #3b82f6;
++  --info-foreground: #0f172a;
++  --popover: #1f2937;
++  --popover-foreground: #f3f4f6;
++  --card: #1f2937;
++  --card-foreground: #f3f4f6;
++  --sidebar-surface: #1f2937;
++  --sidebar-border: #374151;
++  --sidebar-link: #d1d5db;
++  --header-surface: #1f2937;
++  --header-border: #374151;
+ }
+ 
+ @theme inline {
+diff --git a/src/styles/coreui-theme.css b/src/styles/coreui-theme.css
+--- a/src/styles/coreui-theme.css
++++ b/src/styles/coreui-theme.css
+@@ -57,6 +57,38 @@
+   --cui-box-shadow: 0 0.5rem 1rem rgba(8, 10, 12, 0.15);
+   --cui-box-shadow-sm: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075);
+   --cui-box-shadow-lg: 0 1rem 3rem rgba(8, 10, 12, 0.175);
++
++  --background: var(--cui-body-bg);
++  --foreground: var(--cui-body-color);
++  --border: var(--cui-border-color);
++  --input: var(--cui-input-border-color);
++  --ring: var(--cui-primary);
++  --primary: var(--cui-primary);
++  --primary-foreground: #ffffff;
++  --secondary: var(--cui-secondary-bg);
++  --secondary-foreground: var(--cui-secondary-color);
++  --muted: var(--cui-tertiary-bg);
++  --muted-foreground: var(--cui-tertiary-color);
++  --accent: #6366f1;
++  --accent-foreground: #ffffff;
++  --destructive: #ef4444;
++  --destructive-foreground: #ffffff;
++  --success: #16a34a;
++  --success-foreground: #0f172a;
++  --warning: #f59e0b;
++  --warning-foreground: #0f172a;
++  --info: #3b82f6;
++  --info-foreground: #0f172a;
++  --popover: var(--cui-card-bg);
++  --popover-foreground: var(--cui-body-color);
++  --card: var(--cui-card-bg);
++  --card-foreground: var(--cui-body-color);
++  --sidebar-surface: var(--cui-sidebar-bg);
++  --sidebar-border: var(--cui-sidebar-border-color);
++  --sidebar-link: var(--cui-sidebar-nav-link-color);
++  --header-surface: var(--cui-header-bg);
++  --header-border: var(--cui-header-border-color);
++  --radius: 0.375rem;
+ }
+ 
+ /* Dark Theme */
+@@ -106,19 +138,51 @@
+   /* Shadows */
+   --cui-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+   --cui-box-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
++
++  --background: var(--cui-body-bg);
++  --foreground: var(--cui-body-color);
++  --border: var(--cui-border-color);
++  --input: var(--cui-input-border-color);
++  --ring: var(--cui-primary);
++  --primary: var(--cui-primary);
++  --primary-foreground: #111827;
++  --secondary: #1f2937;
++  --secondary-foreground: #d1d5db;
++  --muted: #374151;
++  --muted-foreground: #9ca3af;
++  --accent: #818cf8;
++  --accent-foreground: #111827;
++  --destructive: #ef4444;
++  --destructive-foreground: #111827;
++  --success: #16a34a;
++  --success-foreground: #0f172a;
++  --warning: #f59e0b;
++  --warning-foreground: #0f172a;
++  --info: #3b82f6;
++  --info-foreground: #0f172a;
++  --popover: var(--cui-card-bg);
++  --popover-foreground: var(--cui-body-color);
++  --card: var(--cui-card-bg);
++  --card-foreground: var(--cui-body-color);
++  --sidebar-surface: var(--cui-sidebar-bg);
++  --sidebar-border: var(--cui-sidebar-border-color);
++  --sidebar-link: var(--cui-sidebar-nav-link-color);
++  --header-surface: var(--cui-header-bg);
++  --header-border: var(--cui-header-border-color);
++  --radius: 0.375rem;
+ }
+ 
+ /* Body background */
+ body {
+-  background-color: var(--cui-body-bg);
+-  color: var(--cui-body-color);
++  background-color: var(--background);
++  color: var(--foreground);
+   transition: background-color 0.3s ease, color 0.3s ease;
+ }
+ 
+ /* Card customization */
+ .card {
+-  background-color: var(--cui-card-bg);
+-  border-color: var(--cui-card-border-color);
++  background-color: var(--card);
++  border-color: var(--border);
+   box-shadow: var(--cui-box-shadow-sm);
+   border-radius: 0.375rem;
+ }
+@@ -126,7 +190,7 @@
+ .card-header,
+ .card > .card-header {
+   background-color: var(--cui-card-cap-bg) !important;
+-  border-bottom-color: var(--cui-border-color);
++  border-bottom-color: var(--border);
+ }
+ 
+ /* Ensure light theme card headers use the correct background */
+@@ -200,12 +264,12 @@
+ 
+ /* Sidebar */
+ .sidebar {
+-  background-color: var(--cui-sidebar-bg);
+-  border-right-color: var(--cui-sidebar-border-color);
++  background-color: var(--sidebar-surface);
++  border-right-color: var(--sidebar-border);
+ }
+ 
+ .sidebar-nav .nav-link {
+-  color: var(--cui-sidebar-nav-link-color);
++  color: var(--sidebar-link);
+ }
+ 
+ .sidebar-nav .nav-link:hover {
+@@ -219,19 +283,19 @@
+ 
+ /* Header */
+ .header {
+-  background-color: var(--cui-header-bg);
+-  border-bottom-color: var(--cui-header-border-color);
++  background-color: var(--header-surface);
++  border-bottom-color: var(--header-border);
+ }
+ 
+ /* Buttons */
+ .btn-primary {
+-  background-color: var(--cui-primary);
+-  border-color: var(--cui-primary);
++  background-color: var(--primary);
++  border-color: var(--primary);
+ }
+ 
+ .btn-primary:hover {
+-  background-color: color-mix(in srgb, var(--cui-primary) 85%, black);
+-  border-color: color-mix(in srgb, var(--cui-primary) 85%, black);
++  background-color: color-mix(in srgb, var(--primary) 85%, black);
++  border-color: color-mix(in srgb, var(--primary) 85%, black);
+ }
+ 
+ /* Smooth transitions for theme changes */

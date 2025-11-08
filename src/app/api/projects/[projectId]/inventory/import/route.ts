@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
@@ -15,8 +15,11 @@ interface ImportRow {
 
 // POST /api/projects/:projectId/inventory/import
 // Bulk import inventory items from CSV data
-export async function POST(request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

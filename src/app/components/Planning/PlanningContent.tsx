@@ -5,6 +5,8 @@ import ParcelDetailCard from '../PlanningWizard/cards/ParcelDetailCard'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { fetchJson } from '@/lib/fetchJson'
 import type { Parcel as WizardParcel, Phase as WizardPhase, Area as WizardArea } from '../PlanningWizard/PlanningWizard'
+import PlanningOverviewControls from './PlanningOverviewControls'
+import CollapsibleSection from './CollapsibleSection'
 
 interface Parcel {
   parcel_id: number;
@@ -38,6 +40,14 @@ interface Phase {
   label?: string;
 }
 
+interface PlanningDefaults {
+  standard_id: number;
+  default_planning_efficiency: number | null;
+  default_street_row_pct?: number | null;
+  default_park_dedication_pct?: number | null;
+  updated_at?: string;
+}
+
 type ParcelDetailUpdates = {
   acres: number;
   units: number;
@@ -45,6 +55,8 @@ type ParcelDetailUpdates = {
   frontage?: number | null;
   landUse?: string;
   actualLanduseCode?: string;
+  type_code?: string;
+  family_name?: string;
 }
 
 type DetailContext = {
@@ -58,6 +70,11 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const [parcels, setParcels] = useState<Parcel[]>([])
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
+  const [planningStandard, setPlanningStandard] = useState<PlanningDefaults | null>(null)
+  const [useGlobalPlanning, setUseGlobalPlanning] = useState(true)
+  const [projectPlanningEfficiency, setProjectPlanningEfficiency] = useState<string>('')
+  const [savingPlanningEfficiency, setSavingPlanningEfficiency] = useState(false)
+  const [planningMessage, setPlanningMessage] = useState<string | null>(null)
   const fetcher = (url: string) => fetchJson(url)
   const { data: parcelsData, error: parcelsError, mutate: mutateParcels } = useSWR(
     projectId ? `/api/parcels?project_id=${projectId}` : null,
@@ -84,6 +101,52 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     }
   }, [projectId, mutateParcels, mutatePhases])
 
+  useEffect(() => {
+    const loadGlobalPlanningStandards = async () => {
+      try {
+        const response = await fetch('/api/planning-standards')
+        if (!response.ok) return
+        const payload = await response.json()
+        if (payload && payload.standard) {
+          setPlanningStandard(payload.standard as PlanningDefaults)
+        }
+      } catch (error) {
+        console.error('Failed to load planning standards', error)
+      }
+    }
+
+    void loadGlobalPlanningStandards()
+  }, [])
+
+  useEffect(() => {
+    if (!projectId) return
+
+    const loadProjectPlanningEfficiency = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`)
+        if (!response.ok) return
+        const payload = await response.json()
+        const efficiency =
+          payload?.planning_efficiency ??
+          payload?.planningEfficiency ??
+          null
+
+        if (efficiency !== null && efficiency !== undefined) {
+          setProjectPlanningEfficiency(String(efficiency))
+          setUseGlobalPlanning(false)
+        } else {
+          setProjectPlanningEfficiency('')
+          setUseGlobalPlanning(true)
+        }
+        setPlanningMessage(null)
+      } catch (error) {
+        console.error('Failed to load project planning efficiency', error)
+      }
+    }
+
+    void loadProjectPlanningEfficiency()
+  }, [projectId])
+
   // Listen for data changes from other components
   useEffect(() => {
     const handleDataChange = (e: CustomEvent) => {
@@ -109,24 +172,21 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
   const { level1Label, level2Label, level3Label, level1LabelPlural, level2LabelPlural, level3LabelPlural } = labels
 
-  // Format Parcel ID display: "1.1.02" → "1.1.2" (strip leading zeros)
+  // Format Parcel ID display: should be {area}.{parcel_number} with single decimal
   const formatParcelIdDisplay = useCallback((dbId: string): string => {
     if (!dbId) return '';
 
-    // Split by dots
+    // If the database value contains multiple decimals (e.g., "1.1.02"),
+    // reformat to single decimal: area.parcel (e.g., "1.102")
     const parts = dbId.split('.');
-
-    // 3-level format: area.phase.counter
     if (parts.length === 3) {
-      return `${parts[0]}.${parts[1]}.${parseInt(parts[2], 10)}`;
+      // Format: area.phase.parcel → area.parcel (combine last two parts)
+      const area = parts[0];
+      const parcelNum = parts[1] + parts[2]; // "1" + "02" = "102"
+      return `${area}.${parcelNum}`;
     }
 
-    // 2-level format: phase.counter
-    if (parts.length === 2) {
-      return `${parts[0]}.${parseInt(parts[1], 10)}`;
-    }
-
-    // Return as-is if format doesn't match
+    // Already in correct format or single number
     return dbId;
   }, []);
 
@@ -192,6 +252,37 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   // Land use filter for Phasing tile
   const [selectedLandUseFilter, setSelectedLandUseFilter] = useState<string>('')
 
+  // Shared land use data cache for EditableParcelRow - prevents loading on every edit
+  const [sharedFamilies, setSharedFamilies] = useState<{ family_id: string; name: string }[]>([])
+  const [sharedFamiliesLoading, setSharedFamiliesLoading] = useState(false)
+
+  // Load families data once for all parcel rows
+  useEffect(() => {
+    if (projectId && !sharedFamiliesLoading && sharedFamilies.length === 0) {
+      setSharedFamiliesLoading(true)
+      fetch('/api/landuse/families')
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          const normalized = (Array.isArray(data) ? data : [])
+            .map(entry => {
+              if (typeof entry !== 'object' || entry === null) return null
+              const record = entry as Record<string, unknown>
+              const idValue = record.family_id ?? record.id
+              const nameValue = record.name ?? record.family_name ?? record.code
+              if (idValue == null || typeof nameValue !== 'string') return null
+              const family_id = String(idValue)
+              const name = nameValue.trim()
+              if (!family_id || !name) return null
+              return { family_id, name }
+            })
+            .filter((value): value is { family_id: string; name: string } => Boolean(value))
+          setSharedFamilies(normalized)
+        })
+        .catch(e => console.error('Failed to load shared families', e))
+        .finally(() => setSharedFamiliesLoading(false))
+    }
+  }, [projectId, sharedFamiliesLoading, sharedFamilies.length])
+
   // Get unique land use codes across all parcels
   const allLandUseCodes = useMemo(() => {
     return Array.from(new Set(parcels.map(p => p.type_code).filter(Boolean))).sort()
@@ -219,9 +310,17 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     return filtered
   }, [parcels, selectedAreaFilters, selectedPhaseFilters, selectedLandUseFilter])
 
-  // Filter phases based on area filters only
+  // Filter phases based on area filters only, and exclude empty phases (with no parcels)
   const filteredPhases = useMemo(() => {
     let filtered = phases
+
+    // Filter out phases with no parcels
+    const phasesWithParcels = phases.filter(phase => {
+      const parcelCount = parcels.filter(p => p.phase_name === phase.phase_name).length
+      return parcelCount > 0
+    })
+
+    filtered = phasesWithParcels
 
     // Apply area filters
     if (selectedAreaFilters.length > 0) {
@@ -229,7 +328,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     }
 
     return filtered
-  }, [phases, selectedAreaFilters])
+  }, [phases, parcels, selectedAreaFilters])
 
   // Toggle area filter - multi-select like phase filters
   const toggleAreaFilter = (areaNo: number) => {
@@ -254,6 +353,73 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     setSelectedAreaFilters([])
     setSelectedPhaseFilters([])
     setSelectedLandUseFilter('')
+  }
+
+  const handleEnablePlanningOverride = () => {
+    setUseGlobalPlanning(false)
+    setPlanningMessage(null)
+    if (!projectPlanningEfficiency && planningStandard?.default_planning_efficiency != null) {
+      setProjectPlanningEfficiency(String(planningStandard.default_planning_efficiency))
+    }
+  }
+
+  const handleSavePlanningOverride = async () => {
+    if (!projectId) return
+    const value = Number(projectPlanningEfficiency)
+    if (!Number.isFinite(value) || value <= 0 || value > 1.5) {
+      setPlanningMessage('Enter a valid efficiency between 0 and 1.5.')
+      return
+    }
+
+    setSavingPlanningEfficiency(true)
+    setPlanningMessage(null)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planning_efficiency: value })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error || 'Failed to update planning efficiency')
+      }
+
+      setUseGlobalPlanning(false)
+      setPlanningMessage('Project planning efficiency override saved.')
+    } catch (error) {
+      console.error('Failed to save planning efficiency override', error)
+      setPlanningMessage(error instanceof Error ? error.message : 'Failed to save planning efficiency')
+    } finally {
+      setSavingPlanningEfficiency(false)
+    }
+  }
+
+  const handleUseGlobalPlanningDefault = async () => {
+    if (!projectId) return
+    setSavingPlanningEfficiency(true)
+    setPlanningMessage(null)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planning_efficiency: null })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error || 'Failed to revert to global default')
+      }
+
+      setProjectPlanningEfficiency('')
+      setUseGlobalPlanning(true)
+      setPlanningMessage('Project now uses the global planning efficiency.')
+    } catch (error) {
+      console.error('Failed to apply global planning default', error)
+      setPlanningMessage(error instanceof Error ? error.message : 'Failed to apply global default')
+    } finally {
+      setSavingPlanningEfficiency(false)
+    }
   }
 
   // Add Phase function
@@ -538,6 +704,11 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       efficiency: Number(p.efficiency ?? 0),
       frontage: p.frontfeet ?? 0,
       dbId: p.parcel_id,
+      areaNo,
+      phaseNo,
+      familyName: p.family_name,
+      subtypeName: p.type_code,
+      landuseCode: p.usecode,
     }
     setDetailCtx({ parcel, phase, area })
     setDetailOpen(true)
@@ -561,17 +732,80 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
   return (
     <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'rgb(230, 231, 235)' }}>
-      {/* Page Title */}
-      <div className="rounded border p-4" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
-        <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-          The Parcel Detail table is the source of truth for all planning data. Enter parcels with their Plan Area and Phase assignments below.
-          Plan Areas and Phases Overview sections automatically roll up from your parcel entries.
-        </p>
-      </div>
+      {/* Planning Overview with Granularity Controls */}
+      <PlanningOverviewControls projectId={projectId} />
 
-      {/* NOTE: In MVP workflow, Parcel Detail should be HERE at top, but keeping current layout for now
-          TODO: Physically reorder sections - move Parcel Detail section (line ~640) to here */}
+      <div className="rounded border border-slate-300 bg-white/90 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Planning Efficiency</h2>
+            <p className="text-sm text-slate-500">
+              Global default:&nbsp;
+              <span className="font-medium text-slate-700">
+                {planningStandard?.default_planning_efficiency != null
+                  ? planningStandard.default_planning_efficiency.toFixed(2)
+                  : '—'}
+              </span>
+            </p>
+          </div>
+          {planningStandard?.updated_at && (
+            <span className="text-xs text-slate-400">
+              Updated {new Date(planningStandard.updated_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1.5"
+            disabled={useGlobalPlanning}
+            value={useGlobalPlanning
+              ? planningStandard?.default_planning_efficiency?.toString() ?? ''
+              : projectPlanningEfficiency}
+            onChange={(event) => setProjectPlanningEfficiency(event.target.value)}
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-300 disabled:bg-slate-100"
+            placeholder="0.75"
+          />
+          {useGlobalPlanning ? (
+            <button
+              type="button"
+              onClick={handleEnablePlanningOverride}
+              className="inline-flex items-center justify-center rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            >
+              Override for this project
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleSavePlanningOverride}
+                disabled={savingPlanningEfficiency}
+                className="inline-flex items-center justify-center rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-500/70"
+              >
+                {savingPlanningEfficiency ? 'Saving…' : 'Save Override'}
+              </button>
+              <button
+                type="button"
+                onClick={handleUseGlobalPlanningDefault}
+                disabled={savingPlanningEfficiency}
+                className="inline-flex items-center justify-center rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Use Global Default
+              </button>
+            </div>
+          )}
+        </div>
+        {planningMessage && (
+          <div className="mt-3 text-sm text-emerald-600">{planningMessage}</div>
+        )}
+        {!useGlobalPlanning && (
+          <p className="mt-2 text-xs text-slate-500">
+            Override applies only to this project. Setting the global default will update all projects unless overridden here.
+          </p>
+        )}
+      </div>
 
       {/* Plan Areas and Phases Overview - Read-only rollups from Parcel Detail */}
       <div className={`grid gap-4 transition-all duration-300 ${
@@ -579,11 +813,12 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           ? 'grid-cols-1 lg:grid-cols-[20%_1fr]'
           : 'grid-cols-1 lg:grid-cols-[40%_1fr]'
       }`}>
-        {/* Level 1 summary */}
-        <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>{level1LabelPlural}</h3>
-          </div>
+        {/* Level 1 summary - Wrapped with CollapsibleSection */}
+        <CollapsibleSection
+          title={level1LabelPlural}
+          itemCount={areaCards.length}
+          defaultExpanded={areaCards.length > 0}
+        >
           <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {areaCards.map(({ key, areaNo, title, stats }) => (
@@ -644,13 +879,14 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
               ))}
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
-        {/* Level 2 summary */}
-        <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="px-4 py-3 border-b" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Phasing</h3>
-          </div>
+        {/* Level 2 summary - Wrapped with CollapsibleSection */}
+        <CollapsibleSection
+          title={level2LabelPlural}
+          itemCount={filteredPhases.length}
+          defaultExpanded={true}
+        >
           <div className="p-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -660,7 +896,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                     <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '35%' }}>Land Uses</th>
                     <th className="text-center py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>Acres</th>
                     <th className="text-center py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>Units</th>
-                    <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '29%' }}>Description</th>
+                    <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '140px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -680,18 +916,20 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
               </table>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
       </div>
 
       {/* Parcel Detail Section */}
-      <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <div className="px-4 py-3 border-b flex items-center justify-between" style={{ backgroundColor: 'rgb(241, 242, 246)', borderColor: 'var(--cui-border-color)' }}>
-          <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Parcel Detail</h3>
-          <div className="flex items-center gap-3">
+      <CollapsibleSection
+        title={`${level3Label} Detail Table`}
+        itemCount={filteredParcels.length}
+        defaultExpanded={true}
+        headerActions={
+          <>
             {(selectedAreaFilters.length > 0 || selectedPhaseFilters.length > 0 || selectedLandUseFilter) && (
               <button
                 onClick={clearFilters}
-                className="px-3 py-1.5 text-white text-sm rounded-full transition-colors"
+                className="px-2.5 py-1 text-white text-xs rounded-full transition-colors"
                 style={{ backgroundColor: 'var(--cui-danger)' }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
@@ -701,75 +939,61 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             )}
             <button
               onClick={() => setShowImportPdfModal(true)}
-              className="px-3 py-1.5 text-xs text-white rounded transition-colors"
+              className="px-2.5 py-1 text-xs text-white rounded transition-colors"
               style={{ backgroundColor: 'var(--cui-info)' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
               Import PDF
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Land Use:</span>
-              <select
-                className="rounded px-2 py-1 text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  border: '1px solid'
-                }}
-                value={selectedLandUseFilter}
-                onChange={(e) => setSelectedLandUseFilter(e.target.value)}
-              >
-                <option value="">All</option>
-                {allLandUseCodes.map((code) => (
-                  <option key={code} value={code}>{code}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Add {level3Label}:</span>
-              <select
-                className="rounded px-2 py-1 text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  border: '1px solid'
-                }}
-                onChange={async (e) => {
-                  if (e.target.value) {
-                    const phaseId = parseInt(e.target.value)
-                    await addParcel(phaseId)
-                    e.target.value = ''
-                  }
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>Select {level2Label}...</option>
-                {filteredPhases.map((phase) => (
-                  <option key={phase.phase_id} value={phase.phase_id}>
-                    {phase.phase_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-        <div className={detailOpen ? 'p-2 grid grid-cols-3 gap-4' : 'overflow-x-auto'}>
-          <div className={detailOpen ? 'col-span-2 overflow-x-auto' : ''}>
+            <button
+              onClick={() => {
+                // JX116: Open blank flyout immediately, no phase selection required
+                // User fills Area/Phase within the flyout
+                setDetailCtx({
+                  parcel: {
+                    id: 'new-parcel',
+                    name: '',
+                    landUse: 'MDR',
+                    acres: 0,
+                    units: 0,
+                    efficiency: 0.85,
+                    frontage: 0,
+                    dbId: 0,
+                    areaNo: 0,
+                    phaseNo: 0
+                  },
+                  phase: { id: 'new-phase', name: '', parcels: [], phaseDbId: 0, areaId: '', areaNo: 0, phaseNo: 0 },
+                  area: { id: 'new-area', name: '', phases: [], areaDbId: 0, areaNo: 0 }
+                })
+                setDetailOpen(true)
+              }}
+              className="px-2.5 py-1 text-xs font-medium rounded"
+              style={{
+                backgroundColor: 'var(--cui-primary)',
+                color: 'white',
+                border: 'none'
+              }}
+            >
+              + Add {level3Label}
+            </button>
+          </>
+        }
+      >
+        <div className={detailOpen ? 'p-4 grid grid-cols-3 gap-4' : 'p-4'}>
+          <div className={detailOpen ? 'col-span-2' : ''}>
           <table className="w-full text-sm">
             <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
               <tr>
-                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level1Label}</th>
-                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
-                <th className="text-left px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>{level3Label} ID</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Product</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Units</th>
-                <th className="text-center px-2 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Area</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Parcel</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Product</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Units</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -781,6 +1005,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                   getFamilyName={getFamilyName}
                   formatParcelIdDisplay={formatParcelIdDisplay}
                   projectId={projectId}
+                  sharedFamilies={sharedFamilies}
                 />
               ))}
             </tbody>
@@ -801,6 +1026,19 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                       frontfeet: updates.frontage ?? null
                     }
 
+                    // Add type_code and family_name if provided
+                    if (updates.type_code) {
+                      payload.type_code = updates.type_code
+                    }
+                    if (updates.family_name) {
+                      payload.family_name = updates.family_name
+                    }
+
+                    // Add product if provided
+                    if (updates.product !== undefined) {
+                      payload.lot_product = updates.product || null
+                    }
+
                     // Use actualLanduseCode (the real land use code) instead of landUse (planning type)
                     if (updates.actualLanduseCode && updates.actualLanduseCode.trim() !== '') {
                       payload.landuse_code = updates.actualLanduseCode
@@ -809,13 +1047,13 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                       const isResidential = ['SFD', 'BTR', 'SFA', 'CONDO', 'MF', 'HDR', 'MHDR', 'MDR', 'MLDR'].includes(updates.actualLanduseCode)
                       if (isResidential) {
                         // Keep product for residential uses
-                        payload.lot_product = updates.product ?? null
+                        if (updates.product !== undefined) {
+                          payload.lot_product = updates.product ?? null
+                        }
                       } else {
                         // Clear product for non-residential uses (Commercial, Industrial, etc.)
                         payload.lot_product = null
                       }
-                    } else {
-                      payload.lot_product = updates.product ?? null
                     }
 
                     console.log('💾 PATCH payload being sent:', payload)
@@ -843,7 +1081,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             </div>
           )}
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Import PDF Modal - Coming Soon */}
       {showImportPdfModal && (
@@ -883,7 +1121,17 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
 
 // Filter helper UI
 // Inline-editable parcel row
-const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: Parcel) => void; onOpenDetail?: () => void; onDelete?: (parcelId: number) => void; getFamilyName: (parcel: Parcel) => string; formatParcelIdDisplay: (dbId: string) => string; projectId?: number | null }> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId }) => {
+const EditableParcelRow: React.FC<{
+  parcel: Parcel;
+  index: number;
+  onSaved: (p: Parcel) => void;
+  onOpenDetail?: () => void;
+  onDelete?: (parcelId: number) => void;
+  getFamilyName: (parcel: Parcel) => string;
+  formatParcelIdDisplay: (dbId: string) => string;
+  projectId?: number | null;
+  sharedFamilies?: { family_id: string; name: string }[];
+}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [] }) => {
   const [editing, setEditing] = useState(false)
   const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
@@ -1016,11 +1264,8 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
             product: parcel.product
           })
 
-          // Load families data
-          const famRes = await fetch('/api/landuse/families')
-          const familiesData = famRes.ok ? await famRes.json() : []
-          const normalizedFamilies = normalizeFamilies(familiesData)
-          setFamilies(normalizedFamilies)
+          // Use shared families data (already loaded at parent level)
+          setFamilies(sharedFamilies)
 
           // Set the draft values to current parcel values
           setDraft({
@@ -1031,9 +1276,9 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
           })
 
           // Pre-populate dropdowns from existing parcel data
-          if (parcel.family_name) {
+          if (parcel.family_name && sharedFamilies.length > 0) {
             // Find the family by name
-            const matchedFamily = normalizedFamilies.find(f =>
+            const matchedFamily = sharedFamilies.find(f =>
               f.name.toLowerCase() === parcel.family_name?.toLowerCase()
             )
 
@@ -1073,7 +1318,7 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
             }
           }
 
-          console.log('Loaded families:', normalizedFamilies.length)
+          console.log('Using shared families:', sharedFamilies.length)
         } catch (e) {
           console.error('Failed to load land use lists', e)
         }
@@ -1085,7 +1330,7 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
       setTypes([])
       setProducts([])
     }
-  }, [editing])
+  }, [editing, sharedFamilies])
 
   const cancel = () => {
     // Reset all state to original parcel values
@@ -1213,17 +1458,17 @@ const EditableParcelRow: React.FC<{ parcel: Parcel; index: number; onSaved: (p: 
   return (
     <tr className={`border-b transition-colors`} style={{
       borderColor: 'var(--cui-border-color)',
-      backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'
+      backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)'
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
     }}
     onMouseLeave={(e) => {
-      e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+      e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)';
     }}>
-      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
-      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{parcel.phase_name}</td>
-      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{formatParcelIdDisplay(parcel.parcel_name)}</td>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{parcel.phase_name}</td>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatParcelIdDisplay(parcel.parcel_name)}</td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <select
@@ -1532,33 +1777,53 @@ const PhaseRow: React.FC<{
         {/* Units column */}
         <td className="py-2 px-2 text-center" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }}>{new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(phase.units_total)}</td>
 
-        {/* Description column - icon and truncated text (moved to last) */}
+        {/* Actions column - Notes and Reports chips (JX116 Fix #6) */}
         <td className="py-2 px-2">
           <div className="flex items-center gap-2">
+            {/* Notes chip - outlined if no notes, solid if notes exist */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);
               }}
-              className="transition-colors flex-shrink-0"
-              style={{ color: isSelected ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = isSelected ? 'white' : 'var(--cui-body-color)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = isSelected ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)'}
-              title={expanded ? 'Collapse' : 'Expand'}
+              className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+              style={{
+                backgroundColor: phase.description && phase.description.trim() !== '' ? '#1976d2' : 'transparent',
+                color: phase.description && phase.description.trim() !== '' ? 'white' : '#1976d2',
+                border: phase.description && phase.description.trim() !== '' ? 'none' : '1px solid #1976d2'
+              }}
+              onMouseEnter={(e) => {
+                if (phase.description && phase.description.trim() !== '') {
+                  e.currentTarget.style.backgroundColor = '#1565c0'
+                } else {
+                  e.currentTarget.style.backgroundColor = '#e3f2fd'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (phase.description && phase.description.trim() !== '') {
+                  e.currentTarget.style.backgroundColor = '#1976d2'
+                } else {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }
+              }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {expanded ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                )}
-              </svg>
+              Notes
             </button>
-            {phase.description && phase.description.trim().length > 0 && (
-              <span className="text-xs truncate max-w-[200px]" style={{ color: isSelected ? 'white' : 'var(--cui-body-color)' }} title={phase.description}>
-                {phase.description}
-              </span>
-            )}
+
+            {/* Reports chip */}
+            <button
+              className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help transition-all"
+              style={{
+                backgroundColor: '#f5f5f5',
+                color: '#666',
+                border: 'none'
+              }}
+              title="Coming soon"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e0e0e0'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+            >
+              Reports
+            </button>
           </div>
         </td>
       </tr>

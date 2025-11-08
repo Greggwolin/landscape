@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 // GET /api/projects/:projectId/assumptions/expenses
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
 
     const [opexData, capexData] = await Promise.all([
       sql`SELECT * FROM landscape.tbl_operating_expense WHERE project_id = ${projectId} AND expense_category IS NULL LIMIT 1`,
@@ -31,10 +33,10 @@ export async function GET(
 // POST /api/projects/:projectId/assumptions/expenses
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId);
+    const projectId = parseInt((await context.params).projectId);
     const data = await request.json();
 
     const results: Record<string, unknown> = {};

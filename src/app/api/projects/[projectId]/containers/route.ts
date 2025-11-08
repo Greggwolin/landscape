@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { ContainerNode } from '@/types'
 
@@ -73,13 +73,19 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   return roots
 }
 
-export async function GET(_request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid project id' }, { status: 400 })
   }
+
+  const { searchParams } = new URL(request.url)
+  const includeCosts = searchParams.get('includeCosts') === 'true'
 
   try {
     // Step 1: Get all containers with their direct inventory data
@@ -115,11 +121,27 @@ export async function GET(_request: Request, context: { params: Params }) {
       LEFT JOIN landscape.lu_family f ON i.family_id = f.family_id
       LEFT JOIN landscape.lu_type t ON i.type_id = t.type_id
       WHERE c.project_id = ${id}
+        AND c.is_active = true
       GROUP BY c.container_id, c.project_id, c.parent_container_id, c.container_level,
                c.container_code, c.display_name, c.sort_order, c.attributes,
                c.is_active, c.created_at, c.updated_at
       ORDER BY c.container_level, c.sort_order NULLS LAST, c.container_id
     `
+
+    // Step 1.5: Get budget costs if requested
+    const costMap: Map<number, number> = new Map()
+    if (includeCosts) {
+      const costs = await sql<Array<{ container_id: number; total_cost: number }>>`
+        SELECT
+          container_id,
+          COALESCE(SUM(amount), 0) as total_cost
+        FROM landscape.core_fin_fact_budget
+        WHERE project_id = ${id}
+          AND container_id IS NOT NULL
+        GROUP BY container_id
+      `
+      costs.forEach(row => costMap.set(row.container_id, Number(row.total_cost)))
+    }
 
     // Step 2: Build tree structure
     const tree = buildTree(rows)
@@ -133,6 +155,7 @@ export async function GET(_request: Request, context: { params: Params }) {
         // Then aggregate their data
         let totalUnits = 0
         let totalAcres = 0
+        let totalChildCosts = 0
         let hasData = false
 
         node.children.forEach(child => {
@@ -142,11 +165,16 @@ export async function GET(_request: Request, context: { params: Params }) {
             totalUnits += childUnits
             totalAcres += childAcres
             if (childUnits > 0 || childAcres > 0) hasData = true
+
+            // Aggregate child costs
+            if (includeCosts && child.attributes.total_cost !== undefined) {
+              totalChildCosts += Number(child.attributes.total_cost || 0)
+            }
           }
         })
 
         // Update parent's attributes with aggregated data
-        if (hasData) {
+        if (hasData || includeCosts) {
           node.attributes = {
             ...(node.attributes || {}),
             units_total: totalUnits,
@@ -155,6 +183,23 @@ export async function GET(_request: Request, context: { params: Params }) {
             acres: totalAcres,
             status: 'active'
           }
+
+          // Add cost data if requested
+          if (includeCosts) {
+            const directCost = costMap.get(node.container_id) || 0
+            node.attributes.direct_cost = directCost
+            node.attributes.child_cost = totalChildCosts
+            node.attributes.total_cost = directCost + totalChildCosts
+          }
+        }
+      } else if (includeCosts) {
+        // Leaf node - just add direct cost
+        const directCost = costMap.get(node.container_id) || 0
+        node.attributes = {
+          ...(node.attributes || {}),
+          direct_cost: directCost,
+          child_cost: 0,
+          total_cost: directCost
         }
       }
     }
@@ -173,8 +218,11 @@ export async function GET(_request: Request, context: { params: Params }) {
   }
 }
 
-export async function POST(request: Request, context: { params: Params }) {
-  const { projectId } = await context.params
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId } = await params
   const id = Number(projectId)
 
   if (!Number.isFinite(id)) {

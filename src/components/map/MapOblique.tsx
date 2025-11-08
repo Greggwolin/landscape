@@ -329,7 +329,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             el.style.height = '32px';
             el.innerHTML = `
               <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="16" cy="16" r="14" fill="white" stroke="#dc2626" stroke-width="3"/>
+                <circle cx="16" cy="16" r="14" fill="#FFD700" stroke="#000000" stroke-width="3"/>
               </svg>
             `;
           } else {

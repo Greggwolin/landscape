@@ -1,71 +1,51 @@
+const withVar = (v) => `var(${v})`;
+
 module.exports = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{ts,tsx}',
+    './src/components/**/*.{ts,tsx}',
+    './src/styles/**/*.{css}',
   ],
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+        surface: {
+          bg: withVar('--surface-bg'),
+          card: withVar('--surface-card'),
+          tile: withVar('--surface-tile'),
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+        text: {
+          primary: withVar('--text-primary'),
+          secondary: withVar('--text-secondary'),
+          inverse: withVar('--text-inverse'),
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+        line: {
+          soft: withVar('--line-soft'),
+          strong: withVar('--line-strong'),
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+        brand: {
+          primary: withVar('--brand-primary'),
+          accent: withVar('--brand-accent'),
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        parcel: {
+          residential: withVar('--parcel-residential'),
+          commercial: withVar('--parcel-commercial'),
+          other: withVar('--parcel-other'),
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+        chip: {
+          info: withVar('--chip-info'),
+          success: withVar('--chip-success'),
+          warning: withVar('--chip-warning'),
+          error: withVar('--chip-error'),
+          muted: withVar('--chip-muted'),
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
       },
     },
   },
+  darkMode: ['class', '[data-theme="dark"]'],
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
-    require("tailwindcss-animate"),
+    require('tailwindcss-animate'),
   ],
-}
+};

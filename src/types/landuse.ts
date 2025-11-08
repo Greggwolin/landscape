@@ -124,3 +124,17 @@ export interface ParcelWithTaxonomy {
   description?: string;
   notes?: string;
 }
+
+export interface LotProduct {
+  product_id: number;
+  code: string;
+  lot_w_ft?: number | null;
+  lot_d_ft?: number | null;
+  lot_area_sf?: number | null;
+  type_id?: number | null;
+  type_name?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  density_per_acre?: number | null;
+}

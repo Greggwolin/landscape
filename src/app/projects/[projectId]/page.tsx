@@ -57,29 +57,29 @@ export default function ProjectPage() {
   }
 
   return (
-    <CContainer fluid className="p-4" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-            {/* Universal tabs */}
-            {activeTab === 'project' && <ProjectTab project={project} />}
-            {activeTab === 'capitalization' && <CapitalizationTab project={project} />}
-            {activeTab === 'reports' && <ReportsTab project={project} />}
-            {activeTab === 'documents' && <DocumentsTab project={project} />}
+    <div className="p-4">
+      {/* Universal tabs */}
+      {activeTab === 'project' && <ProjectTab project={project} />}
+      {activeTab === 'capitalization' && <CapitalizationTab project={project} />}
+      {activeTab === 'reports' && <ReportsTab project={project} />}
+      {activeTab === 'documents' && <DocumentsTab project={project} />}
 
-            {/* Land Development specific tabs */}
-            {activeTab === 'planning' && <PlanningTab project={project} />}
-            {activeTab === 'budget' && <BudgetTab project={project} />}
-            {activeTab === 'sales' && <SalesTab project={project} />}
-            {activeTab === 'feasibility' && <FeasibilityTab project={project} />}
+      {/* Land Development specific tabs */}
+      {activeTab === 'planning' && <PlanningTab project={project} />}
+      {activeTab === 'budget' && <BudgetTab project={project} />}
+      {activeTab === 'sales' && <SalesTab project={project} />}
+      {activeTab === 'feasibility' && <FeasibilityTab project={project} />}
 
-            {/* Income Property specific tabs */}
-            {activeTab === 'property' && <PropertyTab project={project} />}
-            {activeTab === 'operations' && <OperationsTab project={project} mode={complexityMode} onModeChange={setComplexityMode} />}
-            {activeTab === 'valuation' && <ValuationTab project={project} />}
+      {/* Income Property specific tabs */}
+      {activeTab === 'property' && <PropertyTab project={project} />}
+      {activeTab === 'operations' && <OperationsTab project={project} mode={complexityMode} onModeChange={setComplexityMode} />}
+      {activeTab === 'valuation' && <ValuationTab project={project} />}
 
-            {/* Legacy tab mappings for backwards compatibility */}
-            {activeTab === 'overview' && <ProjectTab project={project} />}
-            {activeTab === 'sources' && <SourcesTab project={project} />}
-            {activeTab === 'uses' && <UsesTab project={project} />}
-            {activeTab === 'gis' && <GISTab project={project} />}
-    </CContainer>
+      {/* Legacy tab mappings for backwards compatibility */}
+      {activeTab === 'overview' && <ProjectTab project={project} />}
+      {activeTab === 'sources' && <SourcesTab project={project} />}
+      {activeTab === 'uses' && <UsesTab project={project} />}
+      {activeTab === 'gis' && <GISTab project={project} />}
+    </div>
   );
 }

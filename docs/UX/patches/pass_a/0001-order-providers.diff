@@ -1,0 +1,71 @@
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -1,7 +1,7 @@
+ import type { Metadata } from "next";
+ import { ReactNode } from "react";
++import '@/styles/coreui-theme.css';
+ import './globals.css';
+-import '@/styles/coreui-theme.css';
+ import { IssueReporterProvider } from "@/components/IssueReporter";
+ import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
+ import { ProjectProvider } from "@/app/components/ProjectProvider";
+@@ -21,10 +21,15 @@
+ 
+ export default function RootLayout({ children }: { children: ReactNode }) {
+   return (
+-    <html lang="en" data-scroll-behavior="smooth">
++    <html
++      lang="en"
++      data-scroll-behavior="smooth"
++      className="light-theme"
++      data-coreui-theme="light"
++    >
+       <body>
+-        <QueryProvider>
+-          <CoreUIThemeProvider>
++        <CoreUIThemeProvider>
++          <QueryProvider>
+             <ProjectProvider>
+               <IssueReporterProvider>
+                 <NavigationLayout>
+@@ -32,8 +37,8 @@
+                 </NavigationLayout>
+               </IssueReporterProvider>
+             </ProjectProvider>
+-          </CoreUIThemeProvider>
+-        </QueryProvider>
++          </QueryProvider>
++        </CoreUIThemeProvider>
+       </body>
+     </html>
+   );
+diff --git a/src/app/property/[id]/page.tsx b/src/app/property/[id]/page.tsx
+--- a/src/app/property/[id]/page.tsx
++++ b/src/app/property/[id]/page.tsx
+@@ -6,7 +6,6 @@
+ import '@/styles/property.css';
+ 
+ import Header from '@/app/components/Header';
+-import { ProjectProvider } from '@/app/components/ProjectProvider';
+ import PropertyHeader from '../components/PropertyHeader';
+ import PropertySidebar from '../components/PropertySidebar';
+ import PropertyDetails from '../components/PropertyDetails';
+@@ -152,7 +151,7 @@
+   }
+ 
+   return (
+-    <ProjectProvider>
++    <>
+       <Header />
+       <div className="property-app">
+         <div className="property-wrapper">
+@@ -172,7 +171,7 @@
+           </div>
+         </div>
+       </div>
+-    </ProjectProvider>
++    </>
+   );
+ };
+ 

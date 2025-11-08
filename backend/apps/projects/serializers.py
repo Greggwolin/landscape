@@ -13,6 +13,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     Main serializer for Project model.
     """
 
+    market_velocity_annual = serializers.IntegerField(required=False, allow_null=True)
+    velocity_override_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Project
         fields = '__all__'

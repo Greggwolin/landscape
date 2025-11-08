@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     "apps.projects",
     "apps.containers",
     "apps.financial",
+    "apps.benchmarks",
+    "apps.sales_absorption",
     "apps.calculations",
     "apps.multifamily",
     "apps.commercial",

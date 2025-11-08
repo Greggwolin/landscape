@@ -1,0 +1,48 @@
+# Rent roll validation rules
+
+fields:
+  unit_id:
+    data_type: string
+    required: true
+
+  sqft:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 300
+        max: 5000
+
+  market_rent:
+    data_type: number
+    required: true
+    confidence_rules:
+      - type: range_check
+        min: 500
+        max: 10000
+
+  current_rent:
+    data_type: number
+    required: true
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 10000
+
+rules:
+  - type: required_field
+    field: unit_id
+    severity: error
+    message: "Unit ID is required"
+
+  - type: logical_check
+    field: current_rent
+    condition: "current_rent <= market_rent"
+    severity: warning
+    message: "Current rent exceeds market rent"
+
+  - type: logical_check
+    field: current_rent
+    condition: "(current_rent > 0 and status == 'Occupied') or (current_rent == 0 and status == 'Vacant')"
+    severity: error
+    message: "Rent and status mismatch"

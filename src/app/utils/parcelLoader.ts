@@ -18,6 +18,12 @@ interface MapBounds {
 export class LocalParcelLoader {
   private parcelsData: FeatureCollection | null = null
   private isLoading = false
+  private readonly dataUrl: string
+
+  constructor() {
+    const envUrl = process.env.NEXT_PUBLIC_PARCEL_DATA_URL
+    this.dataUrl = envUrl && envUrl.trim().length > 0 ? envUrl : '/samples/pinal-parcels-sample.json'
+  }
 
   async loadParcelsData(): Promise<FeatureCollection> {
     if (this.parcelsData) {
@@ -34,14 +40,16 @@ export class LocalParcelLoader {
 
     this.isLoading = true
     try {
-      console.log('Loading local parcel data...')
-      const response = await fetch('/pinal_parcels.geojson')
+      console.log(`Loading parcel data from ${this.dataUrl} ...`)
+      const response = await fetch(this.dataUrl, {
+        cache: 'no-store',
+      })
       if (!response.ok) {
-        throw new Error(`Failed to load parcel data: ${response.status}`)
+        throw new Error(`Failed to load parcel data (${response.status})`)
       }
 
       this.parcelsData = await response.json()
-      console.log(`Loaded ${this.parcelsData!.features.length} parcels from local file`)
+      console.log(`Loaded ${this.parcelsData!.features.length} parcels from ${this.dataUrl}`)
       return this.parcelsData!
     } finally {
       this.isLoading = false

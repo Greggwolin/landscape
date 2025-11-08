@@ -24,8 +24,23 @@ export interface ProjectConfig {
   level1_label: string
   level2_label: string
   level3_label: string
+  land_use_level1_label?: string
+  land_use_level1_label_plural?: string
+  land_use_level2_label?: string
+  land_use_level2_label_plural?: string
+  land_use_level3_label?: string
+  land_use_level3_label_plural?: string
   created_at?: string
   updated_at?: string
+}
+
+export interface LandUseLabels {
+  level1Label: string
+  level1LabelPlural: string
+  level2Label: string
+  level2LabelPlural: string
+  level3Label: string
+  level3LabelPlural: string
 }
 
 export interface ProjectSettings {

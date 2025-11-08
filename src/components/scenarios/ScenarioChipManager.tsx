@@ -30,16 +30,16 @@ export default function ScenarioChipManager() {
 
   if (loading) {
     return (
-      <div className="scenario-manager bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="text-gray-400 text-sm">Loading scenarios...</div>
+      <div className="scenario-manager bg-surface-card border-b border-line-strong px-6 py-4 text-text-primary">
+        <div className="text-text-secondary text-sm">Loading scenarios...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="scenario-manager bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="text-red-400 text-sm">Failed to load scenarios: {error.message}</div>
+      <div className="scenario-manager bg-surface-card border-b border-line-strong px-6 py-4 text-text-primary">
+        <div className="text-chip-error text-sm">Failed to load scenarios: {error.message}</div>
       </div>
     );
   }
@@ -73,7 +73,7 @@ export default function ScenarioChipManager() {
   };
 
   return (
-    <div className="scenario-manager bg-gray-800 border-b border-gray-700 px-6 py-4">
+    <div className="scenario-manager bg-surface-card border-b border-line-strong px-6 py-4 text-text-primary">
       {/* Chip Row */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {scenarios.map((scenario) => (
@@ -108,7 +108,7 @@ export default function ScenarioChipManager() {
         {!isCreating && (
           <button
             onClick={() => setIsCreating(true)}
-            className="chip chip-add bg-transparent text-gray-400 border-2 border-dashed border-gray-600 hover:border-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+            className="chip chip-add bg-transparent text-text-secondary border-2 border-dashed border-line-strong hover:border-brand-primary hover:text-brand-primary hover:bg-[var(--hover-overlay)]"
           >
             <span className="text-xl">+</span>
             <span className="ml-1">New Scenario</span>
@@ -118,13 +118,13 @@ export default function ScenarioChipManager() {
 
       {/* Create Form (if active) */}
       {isCreating && (
-        <div className="create-form bg-gray-900 p-4 rounded-lg mb-3 border border-gray-700">
+        <div className="create-form bg-surface-tile p-4 rounded-lg mb-3 border border-line-strong">
           <input
             type="text"
             value={newScenarioName}
             onChange={(e) => setNewScenarioName(e.target.value)}
             placeholder="Scenario name..."
-            className="form-control bg-gray-800 border-gray-600 text-white placeholder-gray-500 w-full mb-2"
+            className="form-control bg-surface-card border-line-soft text-text-primary placeholder:text-text-secondary w-full mb-2"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleCreate();
@@ -157,7 +157,7 @@ export default function ScenarioChipManager() {
       {/* Action Buttons */}
       <div className="flex gap-4">
         <button
-          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          className="text-sm text-brand-primary hover:opacity-80 transition-colors"
           onClick={() => {
             // TODO: Open comparison modal
             alert('Comparison view coming soon');
@@ -168,7 +168,7 @@ export default function ScenarioChipManager() {
 
         {activeScenario && (
           <button
-            className="text-sm text-green-400 hover:text-green-300 transition-colors"
+            className="text-sm text-chip-success hover:opacity-80 transition-colors"
             onClick={handleCloneActive}
           >
             Clone Active
@@ -176,7 +176,7 @@ export default function ScenarioChipManager() {
         )}
 
         <button
-          className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
+          className="text-sm text-text-secondary hover:opacity-80 transition-colors"
           onClick={() => {
             // TODO: Open scenario management modal
             alert('Scenario management coming soon');
@@ -206,23 +206,23 @@ function ScenarioChip({
 }: ScenarioChipProps) {
   const [showMenu, setShowMenu] = useState(false);
 
-  const getChipColor = () => {
-    const colors: Record<string, string> = {
-      base: 'bg-blue-600 hover:bg-blue-500',
-      optimistic: 'bg-green-600 hover:bg-green-500',
-      conservative: 'bg-yellow-600 hover:bg-yellow-500',
-      stress: 'bg-red-600 hover:bg-red-500',
-      custom: 'bg-gray-600 hover:bg-gray-500',
+  const getChipTone = () => {
+    const tones: Record<string, string> = {
+      base: 'bg-chip-info hover:opacity-90',
+      optimistic: 'bg-chip-success hover:opacity-90',
+      conservative: 'bg-chip-warning hover:opacity-90',
+      stress: 'bg-chip-error hover:opacity-90',
+      custom: 'bg-chip-muted hover:opacity-90',
     };
-    return colors[scenario.scenario_type] || colors.custom;
+    return tones[scenario.scenario_type] || tones.custom;
   };
 
   return (
     <div className="relative">
       <button
         onClick={onActivate}
-        className={`chip ${getChipColor()} text-white font-semibold ${
-          isActive ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-800' : ''
+        className={`chip ${getChipTone()} text-text-inverse font-semibold ${
+          isActive ? 'ring-2 ring-text-inverse ring-offset-2 ring-offset-surface-bg' : ''
         }`}
       >
         <span className="chip-label">{scenario.scenario_name}</span>
@@ -243,7 +243,7 @@ function ScenarioChip({
             e.stopPropagation();
             setShowMenu(!showMenu);
           }}
-          className="chip-menu-trigger ml-2 px-1 rounded hover:bg-white/20"
+          className="chip-menu-trigger ml-2 px-1 rounded hover:bg-[var(--hover-overlay)]"
           aria-label="Scenario menu"
         >
           ⋮
@@ -257,13 +257,13 @@ function ScenarioChip({
             className="fixed inset-0 z-10"
             onClick={() => setShowMenu(false)}
           />
-          <div className="chip-dropdown-menu absolute top-full right-0 mt-2 min-w-[180px] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+          <div className="chip-dropdown-menu absolute top-full right-0 mt-2 min-w-[180px] bg-surface-tile border border-line-strong rounded-lg shadow-xl z-20 overflow-hidden">
             <button
               onClick={() => {
                 onClone();
                 setShowMenu(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+              className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-[var(--hover-overlay)] transition-colors"
             >
               Clone Scenario
             </button>
@@ -273,7 +273,7 @@ function ScenarioChip({
                   onDelete();
                   setShowMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-800 transition-colors"
+                className="w-full px-4 py-2 text-left text-sm text-chip-error hover:bg-[var(--hover-overlay)] transition-colors"
               >
                 Delete
               </button>

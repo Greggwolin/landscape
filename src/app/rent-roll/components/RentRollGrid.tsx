@@ -878,7 +878,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
       {/* AG-Grid */}
       <div className="flex-1 px-6 pb-6 overflow-auto">
-        <div className="ag-theme-alpine-dark" style={{ height: '600px', minWidth: '1200px', width: '100%' }}>
+        <div className="ag-theme-alpine" style={{ height: '600px', minWidth: '1200px', width: '100%' }}>
           <AgGridReact<Lease>
             rowData={leases}
             columnDefs={columnDefs}

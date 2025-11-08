@@ -24,6 +24,8 @@ import {
   checkPythonEngineAvailable,
 } from '@/lib/python-calculations';
 
+type Params = { params: Promise<{ property_id: string }> };
+
 const sql = neon(process.env.DATABASE_URL!);
 
 interface MetricsRequest {
@@ -162,10 +164,10 @@ async function fetchPropertyData(propertyId: number): Promise<PropertyData | nul
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { property_id: string } }
+  context: Params
 ) {
   try {
-    const propertyId = parseInt(params.property_id);
+    const propertyId = parseInt((await context.params).property_id);
 
     if (isNaN(propertyId)) {
       return NextResponse.json(
@@ -365,7 +367,7 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { property_id: string } }
+  context: Params
 ) {
   return NextResponse.json({
     message: 'Use POST method to calculate investment metrics',

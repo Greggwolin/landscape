@@ -1,30 +1,31 @@
 /* MapLibre GL CSS - must be first */
 @import 'maplibre-gl/dist/maplibre-gl.css';
+@import '../styles/tokens.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #1e293b;
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
 }
 
 .dark {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--surface-bg);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface-bg);
+  color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -32,15 +33,15 @@ body {
 /* Force all dropdown and input styling */
 .parcel-inline-select,
 .parcel-inline-input,
-select[class*="parcel-inline"],
-input[class*="parcel-inline"] {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
-  background-color: #ffffff !important;
+select[class*='parcel-inline'],
+input[class*='parcel-inline'] {
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  background-color: var(--surface-card) !important;
   color-scheme: light !important;
   -webkit-appearance: menulist !important;
   appearance: menulist !important;
-  border: 1px solid #6b7280 !important;
+  border: 1px solid var(--line-strong) !important;
   line-height: 1.2 !important;
   padding: 2px 4px !important;
   font-size: 12px !important;
@@ -49,12 +50,12 @@ input[class*="parcel-inline"] {
 /* Target option elements with maximum specificity */
 .parcel-inline-select option,
 select.parcel-inline-select option,
-select[class*="parcel-inline"] option,
+select[class*='parcel-inline'] option,
 option {
-  color: #000 !important;
-  background-color: #ffffff !important;
-  -webkit-text-fill-color: #000 !important;
-  background: #ffffff !important;
+  color: var(--text-primary) !important;
+  background-color: var(--surface-card) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  background: var(--surface-card) !important;
 }
 
 /* Force all states of select elements */
@@ -63,25 +64,25 @@ select.parcel-inline-select:focus,
 select.parcel-inline-select:active,
 select.parcel-inline-select:hover,
 select.parcel-inline-select:visited,
-select[class*="parcel-inline"] {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
-  background-color: #ffffff !important;
-  background: #ffffff !important;
+select[class*='parcel-inline'] {
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  background-color: var(--surface-card) !important;
+  background: var(--surface-card) !important;
 }
 
 /* Override any inherited styles from parent containers */
 .parcel-inline-select *,
-select[class*="parcel-inline"] * {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
+select[class*='parcel-inline'] * {
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
 }
 
 /* Global option override for dropdown visibility */
-div[class*="planning"] select option,
-div[class*="wizard"] select option,
-div[class*="parcel"] select option {
-  color: #000 !important;
-  background-color: #ffffff !important;
-  -webkit-text-fill-color: #000 !important;
+div[class*='planning'] select option,
+div[class*='wizard'] select option,
+div[class*='parcel'] select option {
+  color: var(--text-primary) !important;
+  background-color: var(--surface-card) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
 }

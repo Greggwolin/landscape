@@ -18,7 +18,7 @@
   border-radius: 20px;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--text-inverse);
   cursor: pointer;
   transition: all 200ms ease;
   border: none;
@@ -50,7 +50,7 @@
 }
 
 .chip-menu-trigger:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--hover-overlay);
   border-radius: 4px;
 }
 
@@ -61,21 +61,21 @@
 .form-control {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #4B5563;
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   font-size: 14px;
-  background: #1F2937;
-  color: white;
+  background: var(--surface-card);
+  color: var(--text-primary);
 }
 
 .form-control::placeholder {
-  color: #6B7280;
+  color: var(--text-secondary);
 }
 
 .form-control:focus {
   outline: none;
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 15%, transparent);
 }
 
 /* ============================================================================
@@ -93,30 +93,30 @@
 }
 
 .btn-primary {
-  background: #3B82F6;
-  color: white;
+  background: var(--chip-info);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
-  background: #2563EB;
+  background: color-mix(in srgb, var(--chip-info) 85%, black);
 }
 
 .btn-primary:active {
-  background: #1D4ED8;
+  background: color-mix(in srgb, var(--chip-info) 70%, black);
 }
 
 .btn-secondary {
-  background: #374151;
-  color: #D1D5DB;
-  border: 1px solid #4B5563;
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--line-strong);
 }
 
 .btn-secondary:hover {
-  background: #4B5563;
+  background: color-mix(in srgb, var(--surface-card) 85%, var(--surface-bg));
 }
 
 .btn-secondary:active {
-  background: #1F2937;
+  background: var(--surface-bg);
 }
 
 /* ============================================================================
@@ -143,19 +143,19 @@
    ============================================================================ */
 
 .chip:focus-visible {
-  outline: 2px solid #3B82F6;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 .btn:focus-visible {
-  outline: 2px solid #3B82F6;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 .form-control:focus-visible {
   outline: none;
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
 }
 
 /* ============================================================================

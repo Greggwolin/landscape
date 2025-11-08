@@ -37,6 +37,11 @@ interface LandUseCode {
   has_programming: boolean
 }
 
+interface ProductType {
+  type_code: string
+  product: string
+}
+
 interface ParcelDetailCardProps {
   parcel: Parcel | null
   phase: Phase | null
@@ -49,6 +54,10 @@ interface ParcelDetailCardProps {
     units: number
     description: string
     landuse_code_id?: number
+    type_code?: string
+    family_name?: string
+    product?: string
+    frontage?: number
   }) => void
   onClose: () => void
   onDelete?: (areaId: string, phaseId: string, parcelId: string) => void
@@ -91,6 +100,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
   const [selectedFamily, setSelectedFamily] = useState<number | null>(null)
   const [selectedSubtype, setSelectedSubtype] = useState<number | null>(null)
+  const [products, setProducts] = useState<ProductType[]>([])
+  const [selectedSubtypeCode, setSelectedSubtypeCode] = useState<string>('')
 
   // Load land use data
   useEffect(() => {
@@ -126,9 +137,44 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
         density_gross: parcel.density_gross || (parcel.acres > 0 ? parcel.units / parcel.acres : 0),
         ff_per_acre: parcel.ff_per_acre || (parcel.frontage && parcel.acres > 0 ? parcel.frontage / parcel.acres : 0)
       })
-      
-      // Set family and subtype if landuse_code_id exists
-      if ((parcel as any).landuse_code_id) {
+
+      // Set family and subtype from parcel data
+      // First try using familyName directly
+      if (parcel.familyName && landUseData.families.length > 0) {
+        console.log('ParcelDetailCard - Looking up family:', parcel.familyName)
+        const family = landUseData.families.find(f => f.name === parcel.familyName)
+        console.log('ParcelDetailCard - Found family:', family)
+        if (family) {
+          // Convert family_id to number (database returns strings)
+          const familyIdNum = typeof family.family_id === 'string' ? parseInt(family.family_id) : family.family_id
+          setSelectedFamily(familyIdNum)
+
+          // Then try to set subtype using subtypeName (which is type_code)
+          if (parcel.subtypeName && landUseData.subtypes.length > 0) {
+            console.log('ParcelDetailCard - Looking up subtype:', parcel.subtypeName, 'for family_id:', family.family_id)
+            // Convert family_id to number for comparison (database returns strings)
+            const familyIdNum = typeof family.family_id === 'string' ? parseInt(family.family_id) : family.family_id
+            console.log('ParcelDetailCard - Available subtypes:', landUseData.subtypes.filter(st => {
+              const stFamilyId = typeof st.family_id === 'string' ? parseInt(st.family_id) : st.family_id
+              return stFamilyId === familyIdNum
+            }))
+            const subtype = landUseData.subtypes.find(st => {
+              const stFamilyId = typeof st.family_id === 'string' ? parseInt(st.family_id) : st.family_id
+              return st.code === parcel.subtypeName && stFamilyId === familyIdNum
+            })
+            console.log('ParcelDetailCard - Found subtype:', subtype)
+            if (subtype) {
+              const subtypeIdNum = typeof subtype.subtype_id === 'string' ? parseInt(subtype.subtype_id) : subtype.subtype_id
+              setSelectedSubtype(subtypeIdNum)
+            } else {
+              console.warn('ParcelDetailCard - Subtype not found for code:', parcel.subtypeName)
+            }
+          }
+        } else {
+          console.warn('ParcelDetailCard - Family not found:', parcel.familyName)
+        }
+      } else if ((parcel as any).landuse_code_id) {
+        // Fallback: Set family and subtype if landuse_code_id exists
         const code = landUseData.codes.find(c => c.landuse_id === (parcel as any).landuse_code_id)
         if (code) {
           setSelectedFamily(code.family_id)
@@ -138,7 +184,29 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
       setHasChanges(false)
     }
-  }, [parcel, landUseData.codes])
+  }, [parcel, landUseData.families, landUseData.subtypes, landUseData.codes])
+
+  // Fetch products when subtype changes
+  useEffect(() => {
+    if (selectedSubtype && landUseData.subtypes.length > 0) {
+      const subtype = landUseData.subtypes.find(st => {
+        const stId = typeof st.subtype_id === 'string' ? parseInt(st.subtype_id) : st.subtype_id
+        return stId === selectedSubtype
+      })
+
+      if (subtype) {
+        setSelectedSubtypeCode(subtype.code)
+        // Fetch products for this subtype
+        fetch(`/api/landuse/products?subtype_code=${subtype.code}`)
+          .then(res => res.json())
+          .then(data => setProducts(data || []))
+          .catch(err => console.error('Failed to fetch products:', err))
+      }
+    } else {
+      setProducts([])
+      setSelectedSubtypeCode('')
+    }
+  }, [selectedSubtype, landUseData.subtypes])
 
   // ESC key handling
   useEffect(() => {
@@ -201,20 +269,41 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
   // Get filtered subtypes based on selected family
   const getFilteredSubtypes = () => {
-    return landUseData.subtypes.filter(st => st.family_id === selectedFamily)
+    return landUseData.subtypes.filter(st => {
+      const stFamilyId = typeof st.family_id === 'string' ? parseInt(st.family_id) : st.family_id
+      return stFamilyId === selectedFamily
+    })
   }
 
   // Get filtered codes based on selected family and subtype
   const getFilteredCodes = () => {
-    return landUseData.codes.filter(c => 
-      c.family_id === selectedFamily && 
-      (!selectedSubtype || c.subtype_id === selectedSubtype)
-    )
+    return landUseData.codes.filter(c => {
+      const cFamilyId = typeof c.family_id === 'string' ? parseInt(c.family_id) : c.family_id
+      const cSubtypeId = typeof c.subtype_id === 'string' ? parseInt(c.subtype_id) : c.subtype_id
+      return cFamilyId === selectedFamily &&
+        (!selectedSubtype || cSubtypeId === selectedSubtype)
+    })
   }
 
   const handleSave = () => {
     if (parcel && phase && area) {
-      onSave(area.id, phase.id, parcel.id, formData)
+      // Get type_code and family_name from selected subtype and family
+      const family = landUseData.families.find(f => {
+        const fId = typeof f.family_id === 'string' ? parseInt(f.family_id) : f.family_id
+        return fId === selectedFamily
+      })
+      const subtype = landUseData.subtypes.find(st => {
+        const stId = typeof st.subtype_id === 'string' ? parseInt(st.subtype_id) : st.subtype_id
+        return stId === selectedSubtype
+      })
+
+      const updates = {
+        ...formData,
+        type_code: subtype?.code,
+        family_name: family?.name
+      }
+
+      onSave(area.id, phase.id, parcel.id, updates)
       onClose()
     }
   }
@@ -367,6 +456,37 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                 </div>
               )}
 
+              {/* Row 3.5: Product Type - AFTER Land Use Type, BEFORE Acres/Units */}
+              {selectedSubtype && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Product Type
+                  </label>
+                  <select
+                    value={formData.product}
+                    onChange={(e) => handleFormChange('product', e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((prod, idx) => (
+                      <option key={idx} value={prod.product}>
+                        {prod.product}
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Add Custom...</option>
+                  </select>
+                  {formData.product === '__custom__' && (
+                    <input
+                      type="text"
+                      placeholder="Enter custom product type"
+                      onChange={(e) => handleFormChange('product', e.target.value)}
+                      className="w-full mt-2 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Row 4: Acres & Units - SAME ROW, NO SPINNERS */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -377,8 +497,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                     type="number"
                     step="0.01"
                     min="0"
-                    value={formData.acres}
-                    onChange={(e) => handleFormChange('acres', parseFloat(e.target.value) || 0)}
+                    value={formData.acres === 0 ? '' : formData.acres}
+                    onChange={(e) => handleFormChange('acres', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
@@ -390,74 +510,36 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                   <input
                     type="number"
                     min="0"
-                    value={formData.units}
-                    onChange={(e) => handleFormChange('units', parseInt(e.target.value) || 0)}
+                    value={formData.units === 0 ? '' : formData.units}
+                    onChange={(e) => handleFormChange('units', e.target.value === '' ? 0 : parseInt(e.target.value))}
                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     disabled={['OS'].includes(formData.landUse)}
                   />
+                  {/* Density display */}
+                  {formData.acres > 0 && formData.units > 0 && !['C', 'OS'].includes(formData.landUse) && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Density: {calculateDensity()} units/acre
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Density display */}
-              {formData.acres && formData.units && !['C', 'OS'].includes(formData.landUse) && (
-                <p className="text-gray-400 text-xs -mt-3">
-                  Density: {calculateDensity()} units/acre
-                </p>
-              )}
-
-              {/* Row 5: Product & Frontage - PRODUCT FIRST */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Row 5: Frontage - Only show for SFD products (not TH) */}
+              {formData.product &&
+               formData.product.startsWith('SF') &&
+               !formData.product.toUpperCase().includes('TH') &&
+               !formData.product.toUpperCase().includes('TOWNHOME') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Product Type
+                    Frontage (ft)
                   </label>
                   <input
                     type="text"
-                    value={formData.product}
-                    onChange={(e) => handleFormChange('product', e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="<Add>"
+                    value={formData.frontage ? formData.frontage.toLocaleString('en-US') : ''}
+                    readOnly
+                    className="w-full bg-gray-600 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-300 cursor-default"
+                    placeholder="Calculated"
                   />
-                </div>
-
-                {/* Frontage - Only show for SFD products */}
-                {formData.product &&
-                 formData.product.startsWith('SF') &&
-                 !formData.product.toUpperCase().includes('TH') &&
-                 !formData.product.toUpperCase().includes('TOWNHOME') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Frontage (ft)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.frontage ? formData.frontage.toLocaleString('en-US') : ''}
-                      readOnly
-                      className="w-full bg-gray-600 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-300 cursor-default"
-                      placeholder="Calculated"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Land Use Code - Optional detailed selection */}
-              {selectedFamily && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Land Use Code (Optional)
-                  </label>
-                  <select
-                    value={formData.landuse_code_id || ''}
-                    onChange={(e) => handleCodeChange(parseInt(e.target.value))}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  >
-                    <option value="">Select Code</option>
-                    {getFilteredCodes().map(code => (
-                      <option key={code.landuse_id} value={code.landuse_id}>
-                        {code.landuse_code} - {code.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               )}
 

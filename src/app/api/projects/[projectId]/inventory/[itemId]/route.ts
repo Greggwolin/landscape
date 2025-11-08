@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
@@ -29,8 +29,11 @@ interface InventoryItem {
 
 // PATCH /api/projects/:projectId/inventory/:itemId
 // Updates an inventory item
-export async function PATCH(request: Request, context: { params: Params }) {
-  const { projectId, itemId } = await context.params
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId, itemId } = await params
   const projId = Number(projectId)
   const itmId = Number(itemId)
 
@@ -186,8 +189,11 @@ export async function PATCH(request: Request, context: { params: Params }) {
 
 // DELETE /api/projects/:projectId/inventory/:itemId
 // Soft deletes an inventory item (sets is_active = false)
-export async function DELETE(request: Request, context: { params: Params }) {
-  const { projectId, itemId } = await context.params
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { projectId, itemId } = await params
   const projId = Number(projectId)
   const itmId = Number(itemId)
 

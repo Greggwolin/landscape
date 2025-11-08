@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { BudgetTag } from '@/types'
 
@@ -7,9 +7,13 @@ type Params = {
   tagId: string
 }
 
-export async function PUT(_request: Request, context: { params: Params }) {
-  const factId = Number(context.params.factId)
-  const tagId = Number(context.params.tagId)
+export async function PUT(
+  _request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  const { factId: factIdParam, tagId: tagIdParam } = await params
+  const factId = Number(factIdParam)
+  const tagId = Number(tagIdParam)
 
   if (!Number.isFinite(factId) || !Number.isFinite(tagId)) {
     return NextResponse.json({ error: 'Invalid fact or tag id' }, { status: 400 })

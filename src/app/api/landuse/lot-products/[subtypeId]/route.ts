@@ -4,12 +4,14 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 
+type Params = { params: Promise<{ subtypeId: string }> };
+
 export async function GET(
   request: Request,
-  { params }: { params: { subtypeId: string } }
+  context: Params
 ) {
   try {
-    const { subtypeId: subtypeIdStr } = await params;
+    const { subtypeId: subtypeIdStr } = await context.params;
     const subtypeId = parseInt(subtypeIdStr);
 
     if (!subtypeId || isNaN(subtypeId)) {

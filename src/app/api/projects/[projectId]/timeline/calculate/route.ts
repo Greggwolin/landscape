@@ -7,6 +7,8 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 const sql = neon(process.env.DATABASE_URL!);
 
 interface Dependency {
@@ -33,10 +35,10 @@ interface BudgetItem {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const { projectId } = params;
+    const {  projectId  } = await context.params;
     const body = await request.json().catch(() => ({}));
     const { dry_run = false } = body;
 
@@ -275,10 +277,10 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const { projectId } = params;
+    const {  projectId  } = await context.params;
 
     // Use the view to get dependency status with calculated start periods
     const result = await sql`
