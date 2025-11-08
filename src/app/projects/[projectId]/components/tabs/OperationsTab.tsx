@@ -51,6 +51,9 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 ];
 
 function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
+  // Check if this is a supported project type (Multifamily only for now)
+  const isMultifamily = project.project_type_code === 'MF';
+
   // Use prop mode if provided, otherwise use local state
   const [localMode, setLocalMode] = useState<ComplexityTier>('standard');
   const mode = propMode || localMode;
@@ -74,15 +77,20 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
   // Load property data on mount
   useEffect(() => {
+    // Skip data loading for non-multifamily projects
+    if (!isMultifamily) {
+      setIsLoading(false);
+      return;
+    }
     loadPropertyData();
-  }, [project.project_id]);
+  }, [project.project_id, isMultifamily]);
 
   // Load expenses when property data is available
   useEffect(() => {
-    if (propertyData) {
+    if (propertyData && isMultifamily) {
       loadExpenses();
     }
-  }, [project.project_id, propertyData]);
+  }, [project.project_id, propertyData, isMultifamily]);
 
   const loadPropertyData = async () => {
     try {
@@ -231,18 +239,16 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           console.log('[OperationsTab] Mapped expenses from Chart of Accounts:', mappedExpenses);
           setExpenses(mappedExpenses);
         } else {
-          console.log('[OperationsTab] API returned empty, using mock data');
-          const mockData = generateMockExpenses();
-          console.log('[OperationsTab] Mock data:', mockData);
-          setExpenses(mockData);
+          console.log('[OperationsTab] API returned empty, no expenses for this project');
+          setExpenses([]);
         }
       } else {
-        console.log('[OperationsTab] API failed, using mock data');
-        setExpenses(generateMockExpenses());
+        console.log('[OperationsTab] API failed, setting empty expenses');
+        setExpenses([]);
       }
     } catch (error) {
       console.error('Error loading expenses:', error);
-      setExpenses(generateMockExpenses());
+      setExpenses([]);
     } finally {
       setIsLoading(false);
     }
@@ -363,6 +369,93 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
+      </div>
+    );
+  }
+
+  // Show "Coming Soon" for non-multifamily projects
+  if (!isMultifamily) {
+    const projectTypeLabels: Record<string, string> = {
+      'OFF': 'Office',
+      'RET': 'Retail',
+      'IND': 'Industrial',
+      'MXD': 'Mixed-Use',
+      'LAND': 'Land Development',
+      'HOT': 'Hospitality'
+    };
+
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-2xl mx-auto text-center p-8">
+          <CCard>
+            <CCardBody>
+              <div className="mb-6">
+                <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-3">
+                {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Operations Tab Coming Soon
+              </h2>
+              <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                This project is a <strong>{projectTypeLabels[project.project_type_code || ''] || project.project_type_code}</strong> asset type.
+              </p>
+              <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
+                The Operations tab is currently designed for multifamily projects only.
+                A dedicated template for {projectTypeLabels[project.project_type_code || '']?.toLowerCase() || 'this asset type'} properties is under development.
+              </p>
+              <div className="p-4 rounded" style={{ backgroundColor: 'var(--cui-info-bg)', borderLeft: '4px solid var(--cui-info)' }}>
+                <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
+                  <strong>For now, use these alternatives:</strong>
+                </p>
+                <ul className="text-sm text-left ml-4" style={{ color: 'var(--cui-body-color)', listStyleType: 'disc' }}>
+                  <li>Budget tab for operating expense planning</li>
+                  <li>Financial Analysis for cash flow modeling</li>
+                  <li>Assumptions & Factors for expense inputs</li>
+                </ul>
+              </div>
+            </CCardBody>
+          </CCard>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state for multifamily projects with no operating expense data
+  if (expenses.length === 0 && hierarchicalRows.length === 0) {
+    return (
+      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+          <div className="text-6xl mb-6">📊</div>
+          <h2 className="text-2xl font-semibold text-white mb-3">
+            No Operating Expenses Data Yet
+          </h2>
+          <p className="text-gray-400 mb-6">
+            This multifamily project doesn't have any operating expenses configured yet.
+          </p>
+          <div
+            className="p-4 rounded text-left"
+            style={{
+              backgroundColor: 'var(--cui-info-bg)',
+              borderLeft: '4px solid var(--cui-info)'
+            }}
+          >
+            <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
+              <strong>To add operating expenses:</strong>
+            </p>
+            <ul
+              className="text-sm ml-4"
+              style={{
+                color: 'var(--cui-body-color)',
+                listStyleType: 'disc'
+              }}
+            >
+              <li>Use the Budget tab to configure development and operating costs</li>
+              <li>Add expense categories like management fees, utilities, insurance, etc.</li>
+              <li>Operating expenses will be calculated on a per-unit and per-SF basis</li>
+            </ul>
+          </div>
+        </div>
       </div>
     );
   }

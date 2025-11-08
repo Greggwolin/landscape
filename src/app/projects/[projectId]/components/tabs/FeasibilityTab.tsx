@@ -17,6 +17,7 @@ interface FeasibilityTabProps {
 
 function FeasibilityTab({ project }: FeasibilityTabProps) {
   const projectId = project.project_id;
+  const isLandDevelopment = project.project_type_code === 'LAND';
   const [activeTab, setActiveTab] = useState<Tab>('sales-comparison');
 
   const tabs: { id: Tab; label: string; enabled: boolean }[] = [
@@ -24,6 +25,72 @@ function FeasibilityTab({ project }: FeasibilityTabProps) {
     { id: 'residual', label: 'Residual Land Value', enabled: false },
     { id: 'cash-flow', label: 'Cash Flow Analysis', enabled: false }
   ];
+
+  // Show message for non-land development projects
+  if (!isLandDevelopment) {
+    const projectTypeLabels: Record<string, string> = {
+      'MF': 'Multifamily',
+      'OFF': 'Office',
+      'RET': 'Retail',
+      'IND': 'Industrial',
+      'MXD': 'Mixed-Use',
+      'HOT': 'Hospitality'
+    };
+
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-2xl mx-auto text-center p-8">
+          <div
+            className="rounded-lg border p-12"
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              borderColor: 'var(--cui-border-color)'
+            }}
+          >
+            <div className="text-6xl mb-6">🏗️</div>
+            <h2
+              className="text-2xl font-semibold mb-3"
+              style={{ color: 'var(--cui-body-color)' }}
+            >
+              {projectTypeLabels[project.project_type_code] || 'Commercial'} Feasibility Tab Not Available
+            </h2>
+            <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+              This project is a <strong>{projectTypeLabels[project.project_type_code] || project.project_type_code}</strong> asset type.
+            </p>
+            <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
+              The Feasibility tab is specifically designed for <strong>Land Development</strong> projects only.
+              It includes Sales Comparison, Residual Land Value, and Cash Flow (DCF) analysis for raw land and finished lots.
+            </p>
+            <div
+              className="p-4 rounded text-left"
+              style={{
+                backgroundColor: 'var(--cui-info-bg)',
+                borderLeft: '4px solid var(--cui-info)'
+              }}
+            >
+              <p
+                className="text-sm mb-2"
+                style={{ color: 'var(--cui-info)' }}
+              >
+                <strong>For {projectTypeLabels[project.project_type_code]?.toLowerCase() || 'this asset type'} properties, use:</strong>
+              </p>
+              <ul
+                className="text-sm ml-4"
+                style={{
+                  color: 'var(--cui-body-color)',
+                  listStyleType: 'disc'
+                }}
+              >
+                <li>Valuation tab for property appraisal</li>
+                <li>Budget tab for development cost planning</li>
+                <li>Financial Analysis for cash flow modeling</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

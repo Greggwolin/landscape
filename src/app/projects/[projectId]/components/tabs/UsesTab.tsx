@@ -14,7 +14,7 @@ interface UsesTabProps {
 }
 
 export default function UsesTab({ project }: UsesTabProps) {
-  const isMultifamily = project.project_type_code?.toUpperCase() === 'MULTIFAMILY';
+  const isMultifamily = project.project_type_code === 'MF';
 
   // For multifamily projects, show Operating Expenses content
   if (isMultifamily) {

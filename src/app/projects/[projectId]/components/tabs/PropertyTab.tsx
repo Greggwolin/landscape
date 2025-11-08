@@ -126,6 +126,10 @@ const defaultColumns: ColumnConfig[] = [
 
 export default function PropertyTab({ project }: PropertyTabProps) {
   const projectId = project.project_id;
+  const projectType = project.project_type_code;
+
+  // Check if this is a supported project type (Multifamily only for now)
+  const isMultifamily = projectType === 'MF';
 
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [comparables] = useState<ComparableRental[]>(mockComparables);
@@ -141,6 +145,12 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   // Load real data from database
   useEffect(() => {
     const loadData = async () => {
+      // Skip data loading for non-multifamily projects
+      if (!isMultifamily) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
 
@@ -189,27 +199,22 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           };
         });
 
-        // If no data, fall back to mock data
-        if (transformedFloorPlans.length === 0) {
-          setFloorPlans(mockFloorPlans);
-          setUnits(mockUnits);
-        } else {
-          setFloorPlans(transformedFloorPlans);
-          setUnits(transformedUnits);
-        }
+        // Always use real data (even if empty)
+        setFloorPlans(transformedFloorPlans);
+        setUnits(transformedUnits);
 
         setLoading(false);
       } catch (error) {
         console.error('Failed to load data:', error);
-        // Fall back to mock data on error
-        setFloorPlans(mockFloorPlans);
-        setUnits(mockUnits);
+        // On error, set empty arrays instead of mock data
+        setFloorPlans([]);
+        setUnits([]);
         setLoading(false);
       }
     };
 
     loadData();
-  }, [projectId]);
+  }, [projectId, isMultifamily]);
 
   // Get visible columns
   const visibleColumns = useMemo(() => {
@@ -475,6 +480,82 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
           <p className="text-gray-400">Loading rent roll data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "Coming Soon" for non-multifamily projects
+  if (!isMultifamily) {
+    const projectTypeLabels: Record<string, string> = {
+      'OFF': 'Office',
+      'RET': 'Retail',
+      'IND': 'Industrial',
+      'MXD': 'Mixed-Use',
+      'LAND': 'Land Development',
+      'HOT': 'Hospitality'
+    };
+
+    return (
+      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-3">
+            {projectTypeLabels[projectType || ''] || 'Commercial'} Property Tab Coming Soon
+          </h2>
+          <p className="text-gray-400 mb-2">
+            This project is a <strong className="text-white">{projectTypeLabels[projectType || ''] || projectType}</strong> asset type.
+          </p>
+          <p className="text-gray-400 mb-6">
+            The Property tab is currently designed for multifamily projects only.
+            A dedicated template for {projectTypeLabels[projectType || '']?.toLowerCase() || 'this asset type'} properties is under development.
+          </p>
+          <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 text-left">
+            <p className="text-sm text-blue-300 mb-2">
+              <strong>For now, use these alternatives:</strong>
+            </p>
+            <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+              <li>Financial Analysis tab for cash flow modeling</li>
+              <li>Assumptions & Factors for market rent inputs</li>
+              <li>Reports tab for PDF rent roll generation</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no data for multifamily project
+  if (units.length === 0 && floorPlans.length === 0) {
+    return (
+      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-3">
+            No Rent Roll Data Yet
+          </h2>
+          <p className="text-gray-400 mb-6">
+            This multifamily project doesn't have any unit or floorplan data yet.
+            Upload a rent roll or manually add unit information to get started.
+          </p>
+          <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 text-left">
+            <p className="text-sm text-blue-300 mb-2">
+              <strong>To add data:</strong>
+            </p>
+            <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+              <li>Navigate to the Rent Roll page to upload a rent roll spreadsheet</li>
+              <li>Use the Django admin panel to manually add unit types and units</li>
+              <li>Import data via the API endpoints</li>
+            </ul>
+          </div>
         </div>
       </div>
     );

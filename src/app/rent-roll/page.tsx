@@ -15,6 +15,7 @@ export default function RentRollPage() {
   const [uploading, setUploading] = useState(false)
 
   const projectId = activeProject?.project_id ?? null
+  const isMultifamily = activeProject?.project_type_code === 'MF'
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -89,6 +90,50 @@ export default function RentRollPage() {
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center max-w-md">
           <h2 className="text-xl font-semibold text-white mb-2">No Project Selected</h2>
           <p className="text-gray-400">Please select a project from the header to view the rent roll.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show warning for non-multifamily projects
+  if (!isMultifamily) {
+    const projectTypeLabels: Record<string, string> = {
+      'OFF': 'Office',
+      'RET': 'Retail',
+      'IND': 'Industrial',
+      'MXD': 'Mixed-Use',
+      'LAND': 'Land Development',
+      'HOT': 'Hospitality'
+    };
+
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-3">
+            Wrong Asset Type
+          </h2>
+          <p className="text-gray-400 mb-2">
+            This is the <strong className="text-white">Multifamily Rent Roll Analysis</strong> page.
+          </p>
+          <p className="text-gray-400 mb-6">
+            Current project "<strong className="text-white">{activeProject?.project_name}</strong>"
+            is a <strong className="text-white">{projectTypeLabels[activeProject?.project_type_code || ''] || activeProject?.project_type_code}</strong> ({activeProject?.project_type_code}) asset.
+          </p>
+          <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 text-left">
+            <p className="text-sm text-blue-300 mb-2">
+              <strong>For {projectTypeLabels[activeProject?.project_type_code || '']?.toLowerCase() || 'this asset type'} properties, use:</strong>
+            </p>
+            <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+              <li>CRE Property Analysis page for lease management</li>
+              <li>Financial Analysis tab for cash flow modeling</li>
+              <li>Project tab within the project detail view</li>
+            </ul>
+          </div>
         </div>
       </div>
     )

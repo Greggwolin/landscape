@@ -14,7 +14,7 @@ interface SourcesTabProps {
 }
 
 export default function SourcesTab({ project }: SourcesTabProps) {
-  const isMultifamily = project.project_type_code?.toUpperCase() === 'MULTIFAMILY';
+  const isMultifamily = project.project_type_code === 'MF';
 
   // For multifamily projects, embed the rent roll prototype content in an iframe
   if (isMultifamily) {

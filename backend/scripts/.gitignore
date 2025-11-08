@@ -1,0 +1,21 @@
+
+# Runtime files
+*.log
+*.pid
+dev.log
+auto-commit.log
+.auto-commit.pid
+
+# Build artifacts  
+tsconfig.tsbuildinfo
+.DS_Store
+
+# Archives
+/archive/
+
+# Backend Python
+__pycache__/
+*.pyc
+.pytest_cache/
+/backend/venv/
+/backend/.coverage

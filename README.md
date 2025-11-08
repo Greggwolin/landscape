@@ -34,8 +34,8 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 ### Quick Links
 
 - **[Complete Documentation Index](docs/README.md)** - Master navigation guide
-- **[CHANGELOG](CHANGELOG.md)** - Version history and recent changes
-- **[Migration 013 Report](MIGRATION_013_EXECUTION_REPORT.md)** ⭐ NEW - Project type code standardization (Nov 2025)
+- **[CHANGELOG](archive/docs/CHANGELOG.md)** - Version history and recent changes
+- **[Migration 013 Report](archive/docs/MIGRATION_013_EXECUTION_REPORT.md)** - Project type code standardization (Nov 2025)
 - **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** - Django setup & admin panel
 - **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
 - **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
@@ -65,6 +65,18 @@ docs/
 ├── 08-migration-history/    # Historical records
 └── 09-technical-dd/         # Due diligence
 ```
+
+## 📦 Archive
+
+Historical documentation and deprecated code is stored in `/archive/` for reference but is not actively maintained. This includes:
+
+- **Phase completion documents** - Historical implementation status reports
+- **Migration iterations** - SQL script iterations and experiments
+- **Implementation reports** - Detailed phase and feature completion documentation
+- **Setup guides** - Legacy machine setup instructions
+- **Zip backups** - Historical code archives
+
+> **Note:** If you need to reference historical implementation details, check the `/archive/` directory first. These files are gitignored and not deployed to production.
 
 ## 🚀 Quick Start
 
