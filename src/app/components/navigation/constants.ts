@@ -8,7 +8,6 @@
 export const GLOBAL_NAV_LINKS = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
   { id: 'dms', label: 'Documents', href: '/dms' },
-  { id: 'dev-status', label: '🐛 Issues', href: '/dev-status' },
 ] as const;
 
 // Sandbox dropdown pages (developer/prototype reference)

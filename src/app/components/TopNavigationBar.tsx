@@ -3,13 +3,15 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
 import SettingsDropdown from './navigation/SettingsDropdown';
 import LandscaperChatModal from './LandscaperChatModal';
+import CIcon from '@coreui/icons-react';
+import { cilBug } from '@coreui/icons';
 
 /**
  * TopNavigationBar - Tier 1 Global Navigation
@@ -29,6 +31,7 @@ import LandscaperChatModal from './LandscaperChatModal';
  */
 export default function TopNavigationBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [isLandscaperOpen, setLandscaperOpen] = useState(false);
   const logoSrc = theme === 'light' ? '/logo-color.png' : '/logo-invert.png';
@@ -106,6 +109,20 @@ export default function TopNavigationBar() {
             {/* Dropdowns */}
             <SandboxDropdown />
             <UserMenuDropdown />
+
+            {/* Bug/Issues Icon Button */}
+            <button
+              type="button"
+              onClick={() => router.push('/dev-status')}
+              className="rounded-full p-2 transition-colors"
+              style={{ color: 'var(--nav-text)' }}
+              {...navHoverHandlers()}
+              aria-label="View Issues and Bug Reports"
+              title="Issues & Bug Reports"
+            >
+              <CIcon icon={cilBug} size="lg" />
+            </button>
+
             <SettingsDropdown />
 
             {/* Theme Toggle */}
