@@ -46,6 +46,12 @@
   color: var(--nav-text) !important;
 }
 
+[data-theme="dark"] .app-header a,
+[data-coreui-theme="dark"] .app-header a,
+.navbar-dark a {
+  color: var(--nav-text) !important;
+}
+
 [data-theme='dark'] {
   --bs-body-bg: var(--surface-bg);
   --bs-body-color: var(--text-primary);
