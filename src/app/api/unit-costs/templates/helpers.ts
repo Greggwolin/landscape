@@ -21,7 +21,7 @@ export type TemplateRow = {
 };
 
 export const templateSelectFields = `
-  t.template_id,
+  t.item_id as template_id,
   t.category_id,
   c.category_name,
   t.item_name,
@@ -39,7 +39,7 @@ export const templateSelectFields = `
   t.created_from_project_id,
   EXISTS (
     SELECT 1 FROM landscape.core_template_benchmark_link l
-    WHERE l.template_id = t.template_id
+    WHERE l.template_id = t.item_id as template_id
   ) AS has_benchmarks
 `;
 

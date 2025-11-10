@@ -1,12 +1,24 @@
 # Landscape Implementation Status
 
-**Version:** 5.2
-**Last Updated:** 2025-11-08
+**Version:** 5.3
+**Last Updated:** 2025-11-09
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (October 28 - November 8, 2025)
+## 🆕 Recent Updates (October 28 - November 9, 2025)
+
+### Category Taxonomy Database Schema Migration Fixes (Nov 9, 2025) ⭐ NEW
+- ✅ **Schema Mismatch Resolved** - Fixed complete disconnect between code expectations and database reality
+- ✅ **Junction Table Migration** - Migrated from `cost_scope`/`cost_type` to `core_category_lifecycle_stages` many-to-many
+- ✅ **Tags Array** - Changed from enum `cost_type` to flexible JSONB `tags` array
+- ✅ **Table Rename** - Updated all references from `core_unit_cost_template` to `core_unit_cost_item`
+- ✅ **API Route Fixes** - Rewrote SQL queries with ARRAY_AGG, JSONB casting, and junction table joins
+- ✅ **Frontend Filter Fixes** - Updated filtering logic for array-based `lifecycle_stages` and `tags`
+- ✅ **Fallback Data** - Updated mock data structure to match new schema
+- 📁 Files: [categories route](../../src/app/api/unit-costs/categories/route.ts), [templates route](../../src/app/api/unit-costs/templates/route.ts), [helpers](../../src/app/api/unit-costs/templates/helpers.ts), [UnitCostsPanel](../../src/components/benchmarks/unit-costs/UnitCostsPanel.tsx), [CategoryManager](../../src/app/admin/preferences/components/UnitCostCategoryManager.tsx), [fallback](../../src/lib/unitCostFallback.ts)
+- 📖 Session Notes: [docs/session-notes/2025-11-09-category-taxonomy-schema-migration-fixes.md](../session-notes/2025-11-09-category-taxonomy-schema-migration-fixes.md)
+- 🎯 Status: Complete - Both Cost Line Item Library and Admin Preferences pages fully functional
 
 ### Land Use Taxonomy Products Panel Enhancements (Nov 8, 2025) ⭐ NEW
 - ✅ **Wider Products Column** - Expanded from 260px to 380px for better visibility (+46% increase)
@@ -27,6 +39,12 @@
 - ✅ **Top Nav UX** – Refreshed `TopNavigationBar` plus Sandbox/User/Settings dropdowns to rely on nav tokens, added hover/active overlays, and swapped the logo to `logo-color.png` when in light mode.
 - 📁 Key Files: `src/styles/tokens.css`, `src/app/globals.css`, `tailwind.config.js`, `src/styles/coreui-theme.css`, `src/components/scenarios/ScenarioChipManager.tsx`, `src/app/components/TopNavigationBar.tsx`, `src/app/components/navigation/*.tsx`, `public/logo-color.png`.
 - 🎯 Status: Complete – All production pages now share a single color system with verified light/dark parity.
+- 🧪 Manual QA Checklist (v1.2):
+  - [ ] Top nav (light & dark): hover/active backgrounds visible and text remains legible.
+  - [ ] Scenario chips: info/success/warning/error/muted labels readable with visible hover state.
+  - [ ] Parcel tiles: residential, commercial, and other fills keep labels readable.
+  - [ ] Budget edit chips: text legible, hover/focus ring visible in both themes.
+  - [ ] Base surfaces: `text-primary` on `surface-bg` and `text-secondary` on `surface-card` meet readability expectations.
 
 ### Budget Modal Redesign & Container Cleanup (Nov 7, 2025) ⭐ NEW
 - ✅ **Compact 3-Row Modal** - Redesigned budget item modal with simplified layout

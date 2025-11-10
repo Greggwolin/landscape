@@ -14,7 +14,7 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL;
 async function fetchTemplatesViaDjango(searchParams: URLSearchParams) {
   if (!DJANGO_API_URL) return null;
 
-  const url = new URL(`${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/`);
+  const url = new URL(`${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/`);
   searchParams.forEach((value, key) => {
     if (value !== null) {
       url.searchParams.set(key, value);
@@ -83,7 +83,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
   const query = `
     SELECT
       ${templateSelectFields}
-    FROM landscape.core_unit_cost_template t
+    FROM landscape.core_unit_cost_item t
     JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
     WHERE ${whereParts.join(' AND ')}
     ORDER BY t.item_name
@@ -100,7 +100,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
 
   const result = await sql<TemplateRow>`
     SELECT
-      t.template_id,
+      t.item_id as template_id,
       t.category_id,
       c.category_name,
       t.item_name,
@@ -117,7 +117,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
       t.created_from_ai,
       t.created_from_project_id,
       false AS has_benchmarks
-    FROM landscape.core_unit_cost_template t
+    FROM landscape.core_unit_cost_item t
     JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
     WHERE t.is_active = true
       AND t.category_id = ${categoryIdVal}
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
 
   if (DJANGO_API_URL) {
     try {
-      const response = await fetch(`${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/`, {
+      const response = await fetch(`${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

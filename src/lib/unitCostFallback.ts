@@ -18,11 +18,14 @@ const CATEGORY_ALIAS: Record<string, string> = {
 
 type FallbackCategory = {
   category_id: number;
+  parent?: number;
+  parent_name?: string;
   category_name: string;
-  cost_scope: 'development';
-  cost_type: 'hard' | 'soft' | 'deposit' | 'other';
+  lifecycle_stages: string[];
+  tags: string[];
   sort_order: number;
-  template_count: number;
+  is_active: boolean;
+  item_count: number;
 };
 
 type FallbackData = {
@@ -82,24 +85,28 @@ function generateStableId(seed: string, offset: number): number {
   return base;
 }
 
-function resolveCostType(categoryName: string): 'hard' | 'soft' | 'deposit' | 'other' {
+function resolveTags(categoryName: string): string[] {
+  const tags: string[] = [];
   const lower = categoryName.toLowerCase();
-  if (
+
+  if (lower.includes('deposit') || lower.includes('bond')) {
+    tags.push('Deposits');
+  } else if (
     lower.includes('permit') ||
-    lower.includes('bond') ||
     lower.includes('insurance') ||
     lower.includes('testing') ||
-    lower.includes('warranty')
+    lower.includes('warranty') ||
+    lower.includes('tax') ||
+    lower.includes('contractor')
   ) {
-    return 'soft';
+    tags.push('Soft');
+  } else if (lower.includes('other')) {
+    tags.push('Other');
+  } else {
+    tags.push('Hard');
   }
-  if (lower.includes('deposit')) {
-    return 'deposit';
-  }
-  if (lower.includes('tax')) {
-    return 'other';
-  }
-  return 'hard';
+
+  return tags;
 }
 
 async function loadWorkbook(): Promise<UnitCostTemplateSummary[]> {
@@ -191,17 +198,18 @@ async function buildFallbackData(): Promise<FallbackData> {
   templates.forEach((template) => {
     const existing = categoryMap.get(template.category_id);
     if (existing) {
-      existing.template_count += 1;
+      existing.item_count += 1;
       return;
     }
 
     categoryMap.set(template.category_id, {
       category_id: template.category_id,
       category_name: template.category_name,
-      cost_scope: 'development',
-      cost_type: resolveCostType(template.category_name),
+      lifecycle_stages: ['Development'],
+      tags: resolveTags(template.category_name),
       sort_order: categoryMap.size,
-      template_count: 1
+      is_active: true,
+      item_count: 1
     });
   });
 

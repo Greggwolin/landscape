@@ -417,7 +417,7 @@ export default function UnitCostsPanel() {
   const loadCategoriesData = useCallback(async () => {
     try {
       setError(null);
-      const params = new URLSearchParams({ cost_scope: COST_SCOPE });
+      const params = new URLSearchParams({ lifecycle_stage: 'Development' });
       if (projectTypeFilter) {
         params.set('project_type_code', projectTypeFilter);
       }
@@ -778,10 +778,22 @@ export default function UnitCostsPanel() {
     [templatesByCategory, setCategoryRows, loadCategoriesData, loadTemplates]
   );
 
-  const filteredCategories = useMemo(
-    () => categories.filter((category) => category.cost_type === activeCostType),
-    [categories, activeCostType]
-  );
+  const filteredCategories = useMemo(() => {
+    // Map cost type tabs to tag names
+    const tagForCostType: Record<UnitCostType, string> = {
+      hard: 'Hard',
+      soft: 'Soft',
+      deposit: 'Deposits',
+      other: 'Other',
+    };
+
+    const requiredTag = tagForCostType[activeCostType];
+    return categories.filter((category) => {
+      const hasTags = Array.isArray(category.tags);
+      const hasRequiredTag = hasTags && category.tags.includes(requiredTag);
+      return hasRequiredTag;
+    });
+  }, [categories, activeCostType]);
 
   // Auto-load all categories when they change
   useEffect(() => {

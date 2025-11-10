@@ -7,11 +7,14 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL;
 
 type CategoryRow = {
   category_id: number;
+  parent?: number;
+  parent_name?: string;
   category_name: string;
-  cost_scope: string;
-  cost_type: string;
+  lifecycle_stages: string[];
+  tags: string[];
   sort_order: number;
-  template_count: number;
+  is_active: boolean;
+  item_count: number;
 };
 
 async function fetchCategoriesViaDjango(searchParams: URLSearchParams) {
@@ -43,49 +46,77 @@ async function fetchCategoriesViaDjango(searchParams: URLSearchParams) {
 }
 
 async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<CategoryRow[]> {
-  const costScope = searchParams.get('cost_scope') ?? null;
-  const costType = searchParams.get('cost_type') ?? null;
+  const lifecycleStage = searchParams.get('lifecycle_stage') ?? searchParams.get('cost_scope') ?? null;
+  const tag = searchParams.get('tag') ?? null;
+  const parentId = searchParams.get('parent') ?? null;
   const projectTypeCode = searchParams.get('project_type_code') ?? null;
 
-  const whereParts: string[] = ['c.is_active = true'];
-  const values: Array<string | null> = [];
+  let result: CategoryRow[];
 
-  if (costScope) {
-    values.push(costScope);
-    whereParts.push(`c.cost_scope = $${values.length}`);
+  if (lifecycleStage && !tag && !parentId) {
+    // Filter by lifecycle stage using junction table
+    const templateCountFilter = projectTypeCode
+      ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
+      : sql``;
+
+    result = await sql<CategoryRow>`
+      SELECT
+        c.category_id,
+        c.parent_id as parent,
+        p.category_name as parent_name,
+        c.category_name,
+        COALESCE(
+          ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+          ARRAY[]::varchar[]
+        ) as lifecycle_stages,
+        COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
+        c.sort_order,
+        c.is_active,
+        CAST(COUNT(*) FILTER (WHERE t.is_active = true ${templateCountFilter}) AS INTEGER) AS item_count
+      FROM landscape.core_unit_cost_category c
+      INNER JOIN landscape.core_category_lifecycle_stages cls
+        ON c.category_id = cls.category_id AND cls.lifecycle_stage = ${lifecycleStage}
+      LEFT JOIN landscape.core_unit_cost_category p
+        ON p.category_id = c.parent_id
+      LEFT JOIN landscape.core_unit_cost_item t
+        ON t.category_id = c.category_id
+      WHERE c.is_active = true
+      GROUP BY c.category_id, c.parent_id, p.category_name, c.category_name, c.tags, c.sort_order, c.is_active
+      ORDER BY c.sort_order, c.category_name
+    `;
+  } else {
+    // No filters - return all categories with their lifecycle stages
+    const templateCountFilter = projectTypeCode
+      ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
+      : sql``;
+
+    result = await sql<CategoryRow>`
+      SELECT
+        c.category_id,
+        c.parent_id as parent,
+        p.category_name as parent_name,
+        c.category_name,
+        COALESCE(
+          ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+          ARRAY[]::varchar[]
+        ) as lifecycle_stages,
+        COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
+        c.sort_order,
+        c.is_active,
+        CAST(COUNT(*) FILTER (WHERE t.is_active = true ${templateCountFilter}) AS INTEGER) AS item_count
+      FROM landscape.core_unit_cost_category c
+      LEFT JOIN landscape.core_category_lifecycle_stages cls
+        ON c.category_id = cls.category_id
+      LEFT JOIN landscape.core_unit_cost_category p
+        ON p.category_id = c.parent_id
+      LEFT JOIN landscape.core_unit_cost_item t
+        ON t.category_id = c.category_id
+      WHERE c.is_active = true
+      GROUP BY c.category_id, c.parent_id, p.category_name, c.category_name, c.tags, c.sort_order, c.is_active
+      ORDER BY c.sort_order, c.category_name
+    `;
   }
 
-  if (costType) {
-    values.push(costType);
-    whereParts.push(`c.cost_type = $${values.length}`);
-  }
-
-  let templateCountExpr = 'COUNT(*) FILTER (WHERE t.is_active = true';
-  if (projectTypeCode) {
-    values.push(projectTypeCode);
-    const idx = values.length;
-    templateCountExpr += ` AND LOWER(t.project_type_code) = LOWER($${idx})`;
-  }
-  templateCountExpr += ')';
-
-  const query = `
-    SELECT
-      c.category_id,
-      c.category_name,
-      c.cost_scope,
-      c.cost_type,
-      c.sort_order,
-      ${templateCountExpr} AS template_count
-    FROM landscape.core_unit_cost_category c
-    LEFT JOIN landscape.core_unit_cost_template t
-      ON t.category_id = c.category_id
-    WHERE ${whereParts.join(' AND ')}
-    GROUP BY c.category_id, c.category_name, c.cost_scope, c.cost_type, c.sort_order
-    ORDER BY c.sort_order, c.category_name;
-  `;
-
-  const result = await sql.query<CategoryRow>(query, values);
-  // Neon serverless returns rows directly, not as result.rows
   return result;
 }
 
@@ -100,22 +131,47 @@ export async function GET(request: NextRequest) {
     const categoryName =
       entry.category_name ?? entry.name ?? entry.categoryName ?? entry.label ?? '';
     if (!categoryId || !categoryName) return null;
-    const costScope = entry.cost_scope ?? 'development';
-    const costType = entry.cost_type ?? entry.type ?? 'hard';
+
+    // Handle both old and new schema
+    let lifecycleStages: string[];
+    if (Array.isArray(entry.lifecycle_stages)) {
+      lifecycleStages = entry.lifecycle_stages;
+    } else if (entry.lifecycle_stage) {
+      lifecycleStages = [entry.lifecycle_stage];
+    } else if (entry.cost_scope) {
+      // Map old cost_scope to lifecycle_stage
+      const scopeMap: Record<string, string> = {
+        'development': 'Development',
+        'acquisition': 'Acquisition',
+        'operations': 'Operations',
+        'disposition': 'Disposition',
+      };
+      lifecycleStages = [scopeMap[entry.cost_scope.toLowerCase()] || 'Development'];
+    } else {
+      lifecycleStages = ['Development'];
+    }
+
+    const tags = Array.isArray(entry.tags) ? entry.tags : [];
+    const parent = entry.parent ? Number(entry.parent) : undefined;
+    const parentName = entry.parent_name ?? undefined;
     const sortOrder = Number.isFinite(Number(entry.sort_order))
       ? Number(entry.sort_order)
       : index;
-    const templateCount = Number.isFinite(Number(entry.template_count ?? entry.count))
-      ? Number(entry.template_count ?? entry.count)
+    const itemCount = Number.isFinite(Number(entry.item_count ?? entry.template_count ?? entry.count))
+      ? Number(entry.item_count ?? entry.template_count ?? entry.count)
       : 0;
+    const isActive = entry.is_active ?? true;
 
     return {
       category_id: categoryId,
+      parent,
+      parent_name: parentName,
       category_name: categoryName,
-      cost_scope: costScope,
-      cost_type: costType,
+      lifecycle_stages: lifecycleStages,
+      tags,
       sort_order: sortOrder,
-      template_count: templateCount
+      is_active: isActive,
+      item_count: itemCount
     };
   };
 
