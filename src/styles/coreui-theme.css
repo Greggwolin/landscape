@@ -31,6 +31,21 @@
   --cui-header-brand-color: var(--nav-brand);
 }
 
+/* v1.0 · Dark header contrast fix — keep near other CoreUI var bridges */
+[data-theme="dark"] .app-header,
+[data-coreui-theme="dark"] .app-header,
+.navbar-dark,
+.navbar[data-coreui-theme="dark"] {
+  --cui-navbar-color: var(--nav-text);
+  --cui-navbar-active-color: #ffffff;
+  --cui-navbar-brand-color: var(--nav-text);
+  --cui-navbar-brand-hover-color: #ffffff;
+  --cui-header-brand-color: var(--nav-text);
+  --cui-header-brand-hover-color: #ffffff;
+  background-color: var(--nav-bg) !important;
+  color: var(--nav-text) !important;
+}
+
 [data-theme='dark'] {
   --bs-body-bg: var(--surface-bg);
   --bs-body-color: var(--text-primary);
