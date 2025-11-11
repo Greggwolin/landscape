@@ -9,8 +9,12 @@ export interface GroupedRow {
   // For parent rows
   category_level?: number;
   category_id?: number;
+  parent_category_id?: number | null;
   category_name?: string;
   category_breadcrumb?: string;
+  category_full_breadcrumb?: string;
+  category_path_ids?: number[];
+  category_path_names?: string[];
   amount_subtotal?: number;
   child_count?: number;
   descendant_depth?: number; // How many levels of descendants this category has
@@ -315,19 +319,23 @@ export function useBudgetGrouping(projectId: number) {
    */
   const flattenTree = useCallback((
     groups: Map<number, CategoryGroup>,
-    depth: number = 0
+    depth: number = 0,
+    parentPathIds: number[] = [],
+    parentPathNames: string[] = []
   ): GroupedRow[] => {
     const result: GroupedRow[] = [];
 
     groups.forEach(group => {
       const hasDirectItems = group.items.length > 0;
       const totalItems = countItems(group);
+      const currentPathIds = [...parentPathIds, group.category_id];
+      const currentPathNames = [...parentPathNames, group.category_name];
 
       // Only include parent row if it has direct items
       if (!hasDirectItems) {
         // Skip this level, but recurse to children
         if (group.children.size > 0) {
-          result.push(...flattenTree(group.children, depth));
+          result.push(...flattenTree(group.children, depth, currentPathIds, currentPathNames));
         }
         return;
       }
@@ -336,19 +344,22 @@ export function useBudgetGrouping(projectId: number) {
       const isExpanded = expandedCategories.has(categoryKey);
       const descendantDepth = getMaxDescendantDepth(group);
 
-      // For child rows (L2+), remove L1 from breadcrumb
-      // For L1 rows, keep as is
+      const fullBreadcrumb = currentPathNames.join(' → ');
       const displayBreadcrumb = group.level > 1
-        ? group.breadcrumb.split(' → ').slice(1).join(' → ')
-        : group.breadcrumb;
+        ? currentPathNames.slice(1).join(' → ')
+        : currentPathNames[0];
 
       // Add parent row
       result.push({
         row_type: 'parent',
         category_level: group.level,
         category_id: group.category_id,
+        parent_category_id: group.parent_category_id ?? null,
         category_name: group.category_name,
         category_breadcrumb: displayBreadcrumb,
+        category_full_breadcrumb: fullBreadcrumb,
+        category_path_ids: currentPathIds,
+        category_path_names: currentPathNames,
         amount_subtotal: calculateSubtotal(group),
         child_count: totalItems,
         descendant_depth: descendantDepth,
@@ -366,7 +377,7 @@ export function useBudgetGrouping(projectId: number) {
 
         // Add child groups (recursive)
         if (group.children.size > 0) {
-          result.push(...flattenTree(group.children, depth + 1));
+          result.push(...flattenTree(group.children, depth + 1, currentPathIds, currentPathNames));
         }
       }
     });

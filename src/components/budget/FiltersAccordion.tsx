@@ -18,6 +18,9 @@ interface Props {
   onAreaSelect: (areaId: number | null) => void
   onPhaseSelect: (phaseId: number | null) => void
   onClearFilters: () => void
+  includeProjectLevel: boolean
+  projectLevelItemCount: number
+  onProjectLevelToggle: (include: boolean) => void
 }
 
 /**
@@ -64,7 +67,10 @@ export default function FiltersAccordion({
   selectedPhaseIds,
   onAreaSelect,
   onPhaseSelect,
-  onClearFilters
+  onClearFilters,
+  includeProjectLevel,
+  projectLevelItemCount,
+  onProjectLevelToggle
 }: Props) {
   const { areas, phases, isLoading } = useContainers({ projectId, includeCosts: true })
   const { labels } = useProjectConfig(projectId)
@@ -119,75 +125,105 @@ export default function FiltersAccordion({
         {/* Area Tiles */}
         <div>
           <h6 className="text-sm font-semibold text-gray-600 mb-2">{labels.level1LabelPlural}</h6>
-          {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="animate-pulse">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+            <div
+              className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
+                includeProjectLevel ? 'shadow-lg' : ''
+              }`}
+              style={{
+                borderColor: includeProjectLevel ? '#0d6efd' : '#E0E0E0',
+                backgroundColor: includeProjectLevel ? 'rgba(13,110,253,0.08)' : '#f8f9fa'
+              }}
+              onClick={() => onProjectLevelToggle(!includeProjectLevel)}
+            >
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div
+                  className="text-base font-bold"
+                  style={{ color: includeProjectLevel ? '#0d6efd' : '#424242' }}
+                >
+                  Project Level
+                </div>
+                <CBadge color={includeProjectLevel ? 'primary' : 'secondary'}>
+                  {projectLevelItemCount}
+                </CBadge>
+              </div>
+              <div className="text-xs text-secondary">
+                Items without {labels.level1Label.toLowerCase()} / {labels.level2Label.toLowerCase()}
+              </div>
+              {includeProjectLevel && (
+                <div className="mt-2 pt-2 border-top border-gray-300 text-xs text-primary text-center fw-semibold">
+                  ✓ Selected
+                </div>
+              )}
+            </div>
+
+            {isLoading &&
+              [...Array(4)].map((_, i) => (
+                <div key={`area-skel-${i}`} className="animate-pulse">
                   <div className="h-32 bg-gray-200 rounded border-2"></div>
                 </div>
               ))}
-            </div>
-          ) : validAreas.length === 0 ? (
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded text-gray-600">
-              <p>No {labels.level1LabelPlural.toLowerCase()} defined for this project</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-              {validAreas.map((area, index) => {
-                const color = AREA_COLORS[index % AREA_COLORS.length]
-                const isSelected = selectedAreaIds.includes(area.container_id)
 
-                return (
-                  <div
-                    key={area.container_id}
-                    className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
-                      isSelected ? 'shadow-lg' : ''
-                    }`}
-                    style={{
-                      borderColor: isSelected ? '#0d6efd' : '#E0E0E0',
-                      backgroundColor: isSelected ? `${color}40` : `${color}20`
-                    }}
-                    onClick={() => onAreaSelect(area.container_id)}
-                  >
-                    <div className="text-center">
-                      <div
-                        className="text-base font-bold mb-1"
-                        style={{ color: isSelected ? color : '#424242' }}
-                      >
-                        {labels.level1Label} {area.name}
-                      </div>
+            {!isLoading && validAreas.length > 0 && validAreas.map((area, index) => {
+              const color = AREA_COLORS[index % AREA_COLORS.length]
+              const isSelected = selectedAreaIds.includes(area.container_id)
 
-                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                        {Math.round(area.acres).toLocaleString()} ac
-                      </div>
-
-                      {area.phaseCount !== undefined && area.phaseCount > 0 && (
-                        <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                          {area.phaseCount} {labels.level2Label}{area.phaseCount > 1 ? 's' : ''}
-                        </div>
-                      )}
-
-                      {area.units > 0 && (
-                        <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                          {Math.round(area.units).toLocaleString()} units
-                        </div>
-                      )}
-
-                      <div className="text-xs mt-1 font-medium" style={{ color: color }}>
-                        {formatCurrency(area.totalCost)}
-                      </div>
+              return (
+                <div
+                  key={area.container_id}
+                  className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
+                    isSelected ? 'shadow-lg' : ''
+                  }`}
+                  style={{
+                    borderColor: isSelected ? '#0d6efd' : '#E0E0E0',
+                    backgroundColor: isSelected ? `${color}40` : `${color}20`
+                  }}
+                  onClick={() => onAreaSelect(area.container_id)}
+                >
+                  <div className="text-center">
+                    <div
+                      className="text-base font-bold mb-1"
+                      style={{ color: isSelected ? color : '#424242' }}
+                    >
+                      {labels.level1Label} {area.name}
                     </div>
 
-                    {isSelected && (
-                      <div className="mt-2 pt-2 border-t border-gray-300">
-                        <div className="text-xs font-medium text-center" style={{ color }}>
-                          ✓ Selected
-                        </div>
+                    <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
+                      {Math.round(area.acres).toLocaleString()} ac
+                    </div>
+
+                    {area.phaseCount !== undefined && area.phaseCount > 0 && (
+                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
+                        {area.phaseCount} {labels.level2Label}{area.phaseCount > 1 ? 's' : ''}
                       </div>
                     )}
+
+                    {area.units > 0 && (
+                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
+                        {Math.round(area.units).toLocaleString()} units
+                      </div>
+                    )}
+
+                    <div className="text-xs mt-1 font-medium" style={{ color: color }}>
+                      {formatCurrency(area.totalCost)}
+                    </div>
                   </div>
-                )
-              })}
+
+                  {isSelected && (
+                    <div className="mt-2 pt-2 border-t border-gray-300">
+                      <div className="text-xs font-medium text-center" style={{ color }}>
+                        ✓ Selected
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {!isLoading && validAreas.length === 0 && (
+            <div className="p-4 mt-3 bg-gray-50 border border-gray-200 rounded text-gray-600">
+              <p>No {labels.level1LabelPlural.toLowerCase()} defined for this project</p>
             </div>
           )}
         </div>

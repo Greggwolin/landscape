@@ -1,7 +1,11 @@
 // v1.0 · 2025-11-02 · Column sets by mode
 import { ColumnDef } from '@tanstack/react-table';
+import { CButton } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilPlus, cilTrash } from '@coreui/icons';
 import EditableCell from './custom/EditableCell';
 import ColoredDotIndicator from './custom/ColoredDotIndicator';
+import PhaseCell from './custom/PhaseCell';
 import type { BudgetMode } from './ModeSelector';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
@@ -10,6 +14,9 @@ export interface BudgetItem {
   fact_id: number;
   container_id?: number | null;
   project_id?: number;
+  // Container display fields
+  container_name?: string | null;
+  container_display?: string | null; // e.g., "Area A Phase 1" or "Project-Level"
   // Legacy category field (for backward compatibility)
   category_id: number;
   category_name?: string;
@@ -64,6 +71,8 @@ type ColumnHandlers = {
   mode?: BudgetMode;
   onCategoryClick?: (item: BudgetItem) => void;
   isGrouped?: boolean;
+  onRowAdd?: (item: BudgetItem) => void;
+  onRowDelete?: (item: BudgetItem) => void;
 };
 
 const editableCell = (ctx: any) => <EditableCell {...ctx} />;
@@ -97,7 +106,25 @@ export function getColumnsByMode(
     },
   });
 
-  const napkin: ColumnDef<BudgetItem>[] = [
+  const napkinColumns: ColumnDef<BudgetItem>[] = [
+    {
+      accessorKey: 'container_id',
+      header: 'Phase',
+      size: 180,
+      minSize: 150,
+      maxSize: 300,
+      cell: (ctx) => (
+        <PhaseCell
+          row={ctx.row}
+          projectId={handlers.projectId}
+          onCommit={async (value: number | null) => {
+            if (handlers.onInlineCommit) {
+              await handlers.onInlineCommit(ctx.row.original, 'container_id', value);
+            }
+          }}
+        />
+      ),
+    },
     {
       accessorKey: 'category_l1_id',
       header: 'Category',
@@ -175,7 +202,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'rate',
-      header: 'Rate',
+      header: () => <div className="text-end">Rate</div>,
       size: 120,
       meta: {
         ...createMeta('rate', 'currency'),
@@ -185,7 +212,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'amount',
-      header: 'Amount',
+      header: () => <div className="text-end">Amount</div>,
       size: 130,
       cell: ({ getValue }) => (
         <span className="text-success fw-semibold text-end d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -215,8 +242,49 @@ export function getColumnsByMode(
     },
   ];
 
+  const actionsColumn: ColumnDef<BudgetItem> = {
+    id: 'actions',
+    header: '',
+    size: 80,
+    minSize: 70,
+    maxSize: 100,
+    enableResizing: false,
+    cell: ({ row }) => (
+      <div className="d-flex justify-content-end gap-2">
+        <CButton
+          color="primary"
+          size="sm"
+          variant="ghost"
+          className="p-1"
+          onClick={(event) => {
+            event.stopPropagation();
+            handlers.onRowAdd?.(row.original);
+          }}
+          title="Add item from this row"
+        >
+          <CIcon icon={cilPlus} size="sm" />
+        </CButton>
+        <CButton
+          color="danger"
+          size="sm"
+          variant="ghost"
+          className="p-1"
+          onClick={(event) => {
+            event.stopPropagation();
+            handlers.onRowDelete?.(row.original);
+          }}
+          title="Delete this budget item"
+        >
+          <CIcon icon={cilTrash} size="sm" />
+        </CButton>
+      </div>
+    ),
+  };
+
+  const napkinWithActions = [...napkinColumns, actionsColumn];
+
   if (mode === 'napkin') {
-    return napkin;
+    return napkinWithActions;
   }
 
   const openModalCell = (ctx: any) => {
@@ -268,13 +336,19 @@ export function getColumnsByMode(
   };
 
   // Create standard columns by replacing the category column
-  const napkinWithoutCategory = napkin.filter(col => col.accessorKey !== 'category_l1_id');
+  const napkinWithoutCategory = napkinColumns.filter(col => col.accessorKey !== 'category_l1_id');
 
-  // Split napkin columns to insert variance after amount
-  const napkinBeforeAmount = napkinWithoutCategory.filter(col => col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete');
-  const napkinTimingColumns = napkinWithoutCategory.filter(col => col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete');
+  // Extract phase column and other columns separately
+  const phaseColumn = napkinColumns.find(col => col.accessorKey === 'container_id');
+  const napkinWithoutCategoryAndPhase = napkinWithoutCategory.filter(col => col.accessorKey !== 'container_id');
+
+  // Split remaining columns to insert variance after amount
+  const napkinBeforeAmount = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete');
+  const napkinTimingColumns = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete');
 
   const standard: ColumnDef<BudgetItem>[] = [
+    // Phase column comes first
+    ...(phaseColumn ? [phaseColumn] : []),
     // Add clickable category column for standard/detail modes
     {
       accessorKey: 'category_l1_id',
@@ -288,8 +362,8 @@ export function getColumnsByMode(
     // Variance column - positioned after Amount (Standard and Detail modes only)
     {
       accessorKey: 'variance_amount',
-      header: 'Variance',
-      size: 140,
+      header: 'Var',
+      size: 100,
       cell: () => (
         <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
           -
@@ -297,71 +371,13 @@ export function getColumnsByMode(
       ),
     },
     ...napkinTimingColumns,
-    {
-      accessorKey: 'confidence_level',
-      header: 'Confidence',
-      size: 130,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'escalation_rate',
-      header: 'Escalation %',
-      size: 120,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'contingency_pct',
-      header: 'Contingency %',
-      size: 130,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'timing_method',
-      header: 'Timing',
-      size: 120,
-      cell: openModalCell,
-    },
   ];
 
-  if (mode === 'standard') {
+  // Standard and Detail modes now use expandable rows for additional fields
+  // No need to add extra columns here
+  if (mode === 'standard' || mode === 'detail') {
     return standard;
   }
 
-  return [
-    ...standard,
-    {
-      accessorKey: 'funding_id',
-      header: 'Funding',
-      size: 110,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'curve_id',
-      header: 'Curve',
-      size: 100,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'milestone_id',
-      header: 'Milestone',
-      size: 130,
-      cell: openModalCell,
-    },
-    {
-      accessorKey: 'cf_start_flag',
-      header: 'CF Start',
-      size: 90,
-      cell: ({ getValue, row }) => (
-        <span className="text-center d-inline-block" style={{ minWidth: '1.5rem' }}>
-          <span
-            role="button"
-            onClick={() => handlers.onOpenModal?.(row.original)}
-            style={{ cursor: 'pointer' }}
-          >
-            {(getValue() as boolean | null) ? '✓' : '-'}
-          </span>
-        </span>
-      ),
-    },
-  ];
+  return standard;
 }

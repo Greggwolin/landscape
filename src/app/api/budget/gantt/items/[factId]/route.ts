@@ -83,6 +83,38 @@ export async function PUT(
       await sql`UPDATE landscape.core_fin_fact_budget SET category_l4_id = ${updates.category_l4_id} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
+    if ('container_id' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET container_id = ${updates.container_id} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('start_period' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET start_period = ${updates.start_period} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('periods_to_complete' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET periods_to_complete = ${updates.periods_to_complete} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('vendor_name' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET vendor_name = ${updates.vendor_name} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('funding_id' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET funding_id = ${updates.funding_id} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('curve_id' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET curve_id = ${updates.curve_id} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('milestone_id' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET milestone_id = ${updates.milestone_id} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('cf_start_flag' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET cf_start_flag = ${updates.cf_start_flag} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
 
     if (!hasUpdates) {
       return NextResponse.json(

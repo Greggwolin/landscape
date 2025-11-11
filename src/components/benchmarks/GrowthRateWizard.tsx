@@ -120,12 +120,12 @@ export default function GrowthRateWizard({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg w-[480px] shadow-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">
+      <div className="bg-surface-card rounded-lg w-[480px] shadow-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-line-strong">
+          <h2 className="text-lg font-semibold text-text-primary">
             {isEditMode ? 'Edit Inflation Factor' : 'New Inflation Factor'}
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-text-secondary mt-1">
             {isEditMode
               ? 'Update the name or flat rate for this inflation factor.'
               : 'Follow the quick steps to add a flat or variable growth rate.'}
@@ -137,22 +137,22 @@ export default function GrowthRateWizard({
 
           {step === 1 && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white">
-                Name <span className="text-red-400">*</span>
+              <label className="text-sm font-medium text-text-primary">
+                Name <span className="text-chip-error">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter a name"
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded focus:border-blue-500 focus:outline-none text-sm text-white placeholder:text-slate-500"
+                className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-text-primary placeholder:text-text-secondary focus:border-brand-primary focus:outline-none"
               />
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-300">Choose how this rate behaves over time.</p>
+              <p className="text-sm text-text-secondary">Choose how this rate behaves over time.</p>
               <div className="flex gap-3">
                 <ChipButton
                   label="Flat"
@@ -173,31 +173,31 @@ export default function GrowthRateWizard({
 
           {step === 3 && (
             <div className="space-y-3">
-              <label className="text-sm font-medium text-white">Flat Rate (%)</label>
+              <label className="text-sm font-medium text-text-primary">Flat Rate (%)</label>
               <input
                 type="number"
                 step="0.01"
                 value={flatRate}
                 onChange={(e) => setFlatRate(e.target.value)}
                 placeholder="Enter rate, e.g., 3"
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded focus:border-blue-500 focus:outline-none text-sm text-white placeholder:text-slate-500"
+                className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-text-primary placeholder:text-text-secondary focus:border-brand-primary focus:outline-none"
               />
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-text-secondary">
                 Flat rates apply to every period with no adjustments.
               </p>
             </div>
           )}
 
           {error && (
-            <div className="text-sm text-red-300 bg-red-900/40 border border-red-600 px-3 py-2 rounded">
+            <div className="rounded border border-chip-error/60 bg-chip-error/10 px-3 py-2 text-sm text-chip-error">
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-700 flex justify-between">
+        <div className="px-6 py-4 border-t border-line-strong flex justify-between">
           <button
-            className="text-sm text-slate-300 hover:text-white transition-colors"
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
             onClick={onClose}
             disabled={saving}
           >
@@ -206,7 +206,7 @@ export default function GrowthRateWizard({
 
           {step === 1 && (
             <button
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium disabled:bg-slate-700"
+              className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 rounded text-sm font-medium disabled:bg-surface-card"
               onClick={handleContinueFromStep1}
               disabled={!canContinueFromStep1}
             >
@@ -215,12 +215,12 @@ export default function GrowthRateWizard({
           )}
 
           {step === 2 && (
-            <span className="text-sm text-slate-400">Select a rate type above.</span>
+            <span className="text-sm text-text-secondary">Select a rate type above.</span>
           )}
 
           {step === 3 && (
             <button
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium disabled:bg-slate-700 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 rounded text-sm font-medium disabled:bg-surface-card disabled:cursor-not-allowed"
               onClick={handleCreateFlat}
               disabled={saving}
             >
@@ -241,19 +241,19 @@ function StepIndicator({ currentStep }: { currentStep: WizardStep }) {
   ];
 
   return (
-    <div className="flex justify-between text-xs text-slate-400">
+    <div className="flex justify-between text-xs text-text-secondary">
       {steps.map((step) => (
         <div key={step.id} className="flex-1 flex items-center gap-2">
           <div
-            className={`w-6 h-6 flex items-center justify-center rounded-full border ${
+            className={`flex h-6 w-6 items-center justify-center rounded-full border ${
               currentStep >= step.id
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-slate-900 border-slate-700 text-slate-500'
+                ? 'bg-brand-primary border-brand-primary text-text-inverse'
+                : 'bg-surface-card border-line-strong text-text-secondary'
             }`}
           >
             {step.id}
           </div>
-          <span className={currentStep >= step.id ? 'text-white' : ''}>{step.label}</span>
+          <span className={currentStep >= step.id ? 'text-text-primary' : 'text-text-secondary'}>{step.label}</span>
         </div>
       ))}
     </div>
@@ -279,12 +279,12 @@ function ChipButton({
       disabled={disabled}
       className={`flex-1 border rounded-lg px-3 py-2 text-left transition-colors ${
         isActive
-          ? 'border-blue-500 bg-blue-600/20 text-white'
-          : 'border-slate-700 bg-slate-900 text-slate-300'
+          ? 'border-brand-primary bg-brand-primary/15 text-text-primary'
+          : 'border-line-strong bg-surface-card text-text-secondary'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <div className="text-sm font-medium">{label}</div>
-      <div className="text-xs text-slate-400 mt-1">{description}</div>
+      <div className="text-xs text-text-secondary mt-1">{description}</div>
     </button>
   );
 }

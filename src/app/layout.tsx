@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { ReactNode } from "react";
 import './globals.css';
 import '@/styles/coreui-theme.css';
+import '@/styles/budget-color-audit.css';
 import { IssueReporterProvider } from "@/components/IssueReporter";
 import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
 import { ProjectProvider } from "@/app/components/ProjectProvider";
 import { QueryProvider } from "@/app/components/QueryProvider";
+import { ToastProvider } from "@/components/ui/toast";
 import NavigationLayout from "@/app/components/NavigationLayout";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
@@ -25,13 +27,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <QueryProvider>
           <CoreUIThemeProvider>
-            <ProjectProvider>
-              <IssueReporterProvider>
-                <NavigationLayout>
-                  {children}
-                </NavigationLayout>
-              </IssueReporterProvider>
-            </ProjectProvider>
+            <ToastProvider>
+              <ProjectProvider>
+                <IssueReporterProvider>
+                  <NavigationLayout>
+                    {children}
+                  </NavigationLayout>
+                </IssueReporterProvider>
+              </ProjectProvider>
+            </ToastProvider>
           </CoreUIThemeProvider>
         </QueryProvider>
       </body>

@@ -36,7 +36,7 @@ export default function TopNavigationBar() {
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
   const [isLandscaperOpen, setLandscaperOpen] = useState(false);
   const [showBugHint, setShowBugHint] = useState(false);
-  const logoSrc = theme === 'light' ? '/logo-color.png' : '/logo-invert.png';
+  const logoSrc = '/logo-invert.png';
 
   const navHoverHandlers = (isActive = false) => ({
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
@@ -79,11 +79,11 @@ export default function TopNavigationBar() {
             <Image
               src={logoSrc}
               alt="Landscape"
-              width={140}
-              height={32}
+              width={176}
+              height={40}
               priority
               className="object-contain"
-              sizes="140px"
+              sizes="176px"
             />
           </Link>
 

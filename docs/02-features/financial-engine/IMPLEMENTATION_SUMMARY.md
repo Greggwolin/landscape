@@ -163,6 +163,7 @@ Views created: v_lease_summary, v_rent_roll
 | Budget Structure | `tbl_budget` (existing + enhanced) | ✅ Complete |
 | S-Curve Distribution | Schema ready, engine pending | ⧗ Phase 3A |
 | Absorption Modeling | Schema ready, engine pending | ⧗ Phase 3A |
+| Timeline & Dependencies | `tbl_project_milestone`, `tbl_dependency`, `tbl_timeline_calculation_log`, `src/lib/timeline-engine/cpm-calculator.ts`, `src/app/api/projects/[projectId]/timeline/calculate` | ✅ Schema + CPM engine + API ready; UI & integration next |
 
 ### Financial Modeling
 

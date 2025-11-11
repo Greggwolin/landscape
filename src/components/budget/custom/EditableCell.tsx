@@ -351,6 +351,7 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       ) : (
         <div
           onClick={() => editable && !saving && setEditing(true)}
+          className={inputType === 'currency' || inputType === 'number' ? 'text-end' : ''}
           style={{ cursor: editable ? 'pointer' : 'default', minHeight: '1.5rem' }}
         >
           {formatDisplay(getValue())}

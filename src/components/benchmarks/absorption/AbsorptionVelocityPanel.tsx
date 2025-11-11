@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import clsx from 'clsx';
 import type { AbsorptionVelocity, ProjectScale } from '@/types/benchmarks';
 
 interface AbsorptionVelocityPanelProps {
   onCountUpdate?: (count: number) => void;
+  onSelect?: (velocity: AbsorptionVelocity) => void;
+  selectedVelocityId?: number | null;
 }
 
-export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVelocityPanelProps) {
+export default function AbsorptionVelocityPanel({ onCountUpdate, onSelect, selectedVelocityId }: AbsorptionVelocityPanelProps) {
   const [velocities, setVelocities] = useState<AbsorptionVelocity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +136,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-400">
+      <div className="p-8 text-center text-text-secondary">
         Loading absorption velocities...
       </div>
     );
@@ -141,7 +144,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
 
   if (error) {
     return (
-      <div className="p-8 text-center text-red-400">
+      <div className="p-8 text-center text-chip-error">
         {error}
       </div>
     );
@@ -152,7 +155,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Absorption Velocity</h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-text-secondary">
             Global MPC velocity defaults for project-level assumptions
           </p>
         </div>
@@ -163,7 +166,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
             }
             setIsAdding((prev) => !prev);
           }}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-700"
+          className="rounded bg-brand-primary px-3 py-1.5 text-sm hover:bg-brand-primary/90"
         >
           {isAdding ? 'Close' : '+ Add Velocity'}
         </button>
@@ -172,12 +175,12 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
       {isAdding && (
         <form
           onSubmit={handleCreate}
-          className="mb-4 space-y-3 rounded border border-slate-700 bg-slate-900/40 p-4"
+          className="mb-4 space-y-3 rounded border border-line-strong bg-surface-card/40 p-4"
         >
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300">
-                Annual velocity <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-text-secondary">
+                Annual velocity <span className="text-chip-error">*</span>
               </label>
               <input
                 type="number"
@@ -185,27 +188,27 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                 required
                 value={newVelocity}
                 onChange={(event) => setNewVelocity(event.target.value)}
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="mt-1 w-full rounded border border-line-strong bg-surface-card px-3 py-2 text-sm focus:border-brand-primary focus:outline-none"
                 placeholder="250"
               />
-              <p className="mt-1 text-xs text-slate-500">Units per year</p>
+              <p className="mt-1 text-xs text-text-secondary">Units per year</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">Market geography</label>
+              <label className="block text-sm font-medium text-text-secondary">Market geography</label>
               <input
                 type="text"
                 value={newMarketGeography}
                 onChange={(event) => setNewMarketGeography(event.target.value)}
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="mt-1 w-full rounded border border-line-strong bg-surface-card px-3 py-2 text-sm focus:border-brand-primary focus:outline-none"
                 placeholder="Phoenix Metro"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">Project scale</label>
+              <label className="block text-sm font-medium text-text-secondary">Project scale</label>
               <select
                 value={newProjectScale}
                 onChange={(event) => setNewProjectScale(event.target.value as ProjectScale | '')}
-                className="mt-1 w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="mt-1 w-full rounded border border-line-strong bg-surface-card px-3 py-2 text-sm focus:border-brand-primary focus:outline-none"
               >
                 <option value="">-- Optional --</option>
                 <option value="small">Small</option>
@@ -221,14 +224,14 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                 resetAddForm();
                 setIsAdding(false);
               }}
-              className="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
+              className="rounded bg-surface-card px-3 py-1.5 text-sm hover:bg-surface-card"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingNew}
-              className="rounded bg-green-600 px-3 py-1.5 text-sm hover:bg-green-700 disabled:opacity-70"
+              className="rounded bg-chip-success px-3 py-1.5 text-sm text-white hover:bg-chip-success/85 disabled:opacity-70"
             >
               {savingNew ? 'Saving...' : 'Save Velocity'}
             </button>
@@ -237,17 +240,31 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
       )}
 
       {velocities.length === 0 ? (
-        <div className="py-8 text-center text-slate-400">
+        <div className="py-8 text-center text-text-secondary">
           No velocity benchmarks defined. Add one to get started.
         </div>
       ) : (
         <div className="space-y-3">
-          {velocities.map((velocity) => (
-            <div
-              key={velocity.absorption_velocity_id}
-              className="rounded border border-slate-700 bg-slate-800 p-3"
-            >
-              <div className="flex items-center justify-between gap-4">
+          {velocities.map((velocity) => {
+            const isSelected = selectedVelocityId === velocity.absorption_velocity_id;
+            return (
+              <div
+                key={velocity.absorption_velocity_id}
+                className={clsx(
+                  'rounded border bg-surface-card p-3 transition-colors cursor-pointer',
+                  isSelected ? 'border-brand-primary shadow-sm' : 'border-line-strong'
+                )}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect?.(velocity)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelect?.(velocity);
+                  }
+                }}
+              >
+                <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                   {editingId === velocity.absorption_velocity_id ? (
                     <div className="flex items-center gap-2">
@@ -255,10 +272,10 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                         type="number"
                         value={Number.isFinite(editValue) ? editValue : 0}
                         onChange={(event) => setEditValue(Number(event.target.value))}
-                        className="w-28 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm"
+                        className="w-28 rounded border border-line-strong bg-surface-card px-2 py-1 text-sm"
                         autoFocus
                       />
-                      <span className="text-sm text-slate-300">units/year</span>
+                      <span className="text-sm text-text-secondary">units/year</span>
                     </div>
                   ) : (
                     <div>
@@ -266,17 +283,17 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                         {velocity.velocity_annual.toLocaleString()} units/year
                       </div>
                       {velocity.market_geography && (
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-text-secondary">
                           {velocity.market_geography}
                         </div>
                       )}
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-text-secondary">
                         {velocity.detail_count} supporting records • Sources:{' '}
                         {velocity.data_sources.length > 0
                           ? velocity.data_sources.join(', ')
                           : 'n/a'}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-text-secondary">
                         Updated {new Date(velocity.last_updated).toLocaleDateString()}
                       </div>
                     </div>
@@ -287,14 +304,20 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                   {editingId === velocity.absorption_velocity_id ? (
                     <>
                       <button
-                        onClick={() => handleSave(velocity.absorption_velocity_id)}
-                        className="rounded bg-green-600 px-3 py-1 text-sm hover:bg-green-700"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSave(velocity.absorption_velocity_id);
+                        }}
+                        className="rounded bg-chip-success px-3 py-1 text-sm text-white hover:bg-chip-success/80"
                       >
                         Save
                       </button>
                       <button
-                        onClick={cancelEditing}
-                        className="rounded bg-slate-600 px-3 py-1 text-sm hover:bg-slate-500"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          cancelEditing();
+                        }}
+                        className="rounded bg-surface-card px-3 py-1 text-sm hover:bg-surface-card/80"
                       >
                         Cancel
                       </button>
@@ -302,14 +325,21 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                   ) : (
                     <>
                       <button
-                        onClick={() => startEditing(velocity)}
-                        className="rounded bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startEditing(velocity);
+                          onSelect?.(velocity);
+                        }}
+                        className="rounded bg-surface-card px-3 py-1 text-sm hover:bg-surface-card"
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(velocity.absorption_velocity_id)}
-                        className="rounded bg-red-600/20 px-3 py-1 text-sm text-red-400 hover:bg-red-600/30"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDelete(velocity.absorption_velocity_id);
+                        }}
+                        className="rounded bg-chip-error/10 px-3 py-1 text-sm text-chip-error hover:bg-chip-error/20"
                       >
                         Delete
                       </button>
@@ -318,7 +348,8 @@ export default function AbsorptionVelocityPanel({ onCountUpdate }: AbsorptionVel
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

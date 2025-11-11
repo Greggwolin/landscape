@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import type {
   BenchmarkCategory,
@@ -25,6 +26,8 @@ interface Props {
   loading?: boolean;
   onToggle: () => void;
   onRefresh: () => void;
+  onSelectSet?: (set: GrowthRateSet) => void;
+  selectedSetId?: number | null;
 }
 
 type RateMode = 'flat' | 'stepped';
@@ -48,70 +51,75 @@ export default function GrowthRateCategoryPanel({
   isExpanded,
   loading = false,
   onToggle,
-  onRefresh
+  onRefresh,
+  onSelectSet,
+  selectedSetId
 }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
 
   return (
-    <div className="border-b border-slate-700">
+    <div className="border-b border-line-strong">
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-800 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-card transition-colors"
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown size={20} className="text-slate-400" />
+            <ChevronDown size={20} className="text-text-secondary" />
           ) : (
-            <ChevronRight size={20} className="text-slate-400" />
+            <ChevronRight size={20} className="text-text-secondary" />
           )}
           <span className="font-medium">{category.label}</span>
         </div>
-        <span className="text-sm text-slate-400">{sets.length}</span>
+        <span className="text-sm text-text-secondary">{sets.length}</span>
       </button>
 
       {isExpanded && (
-        <div className="bg-slate-850 px-4 py-4 space-y-4">
+        <div className="bg-surface-card px-4 py-4 space-y-4">
+          {loading ? (
+            <div className="py-6 text-center text-sm text-text-secondary">
+              Loading growth rates...
+            </div>
+          ) : sets.length === 0 ? (
+            <div className="py-6 text-center text-sm text-text-secondary">
+              No growth rates yet. Click &ldquo;Add New Growth Rate&rdquo; to begin.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sets.map((set) => (
+                <GrowthRateListItem
+                  key={set.set_id}
+                  set={set}
+                  onRefresh={onRefresh}
+                  onSelect={() => onSelectSet?.(set)}
+                  isSelected={selectedSetId === set.set_id}
+                />
+              ))}
+            </div>
+          )}
+
           {showAddForm ? (
             <GrowthRateForm
               mode="create"
               existingSets={sets}
               onCancel={() => {
-                console.log('Growth rate form cancelled');
                 setShowAddForm(false);
               }}
               onSuccess={() => {
-                console.log('Growth rate save succeeded, hiding form and refreshing data');
                 setShowAddForm(false);
                 onRefresh();
               }}
               onSubmit={async (payload) => {
-                console.log('onSubmit called with payload:', payload);
                 await saveGrowthRateSet(payload);
               }}
             />
           ) : (
             <button
               onClick={() => setShowAddForm(true)}
-              className="w-full px-3 py-2 border border-blue-500 text-blue-200 rounded text-sm hover:bg-blue-500/10 transition-colors"
+              className="w-full rounded border border-brand-primary bg-surface-bg px-3 py-2 text-sm font-medium text-brand-primary transition-colors hover:bg-brand-primary/10"
             >
               + Add New Growth Rate
             </button>
-          )}
-
-          {loading ? (
-            <div className="py-6 text-center text-sm text-slate-400">
-              Loading growth rates...
-            </div>
-          ) : sets.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-400">
-              No growth rates yet. Click &ldquo;Add New Growth Rate&rdquo; to begin.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {sets.map((set) => (
-                <GrowthRateListItem key={set.set_id} set={set} onRefresh={onRefresh} />
-              ))}
-            </div>
           )}
         </div>
       )}
@@ -119,13 +127,32 @@ export default function GrowthRateCategoryPanel({
   );
 }
 
-function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh: () => void }) {
+function GrowthRateListItem({
+  set,
+  onRefresh,
+  onSelect,
+  isSelected = false
+}: {
+  set: GrowthRateSet;
+  onRefresh: () => void;
+  onSelect?: () => void;
+  isSelected?: boolean;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditingInline, setIsEditingInline] = useState(false);
   const [inlineRate, setInlineRate] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
   const canEdit = set.rate_type !== 'auto_updated' && !set.is_system;
+  const handleTileSelect = () => {
+    onSelect?.();
+  };
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect?.();
+    }
+  };
 
   const initialSteps = useMemo(() => {
     if (!set.steps || set.steps.length === 0) return undefined;
@@ -156,6 +183,7 @@ function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh:
 
   const handleInlineEdit = () => {
     if (set.rate_type === 'flat' && typeof set.current_rate === 'number') {
+      onSelect?.();
       setInlineRate(roundToTwo(set.current_rate * 100).toString());
       setIsEditingInline(true);
     }
@@ -218,12 +246,21 @@ function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh:
   }
 
   const rateChip = deriveRateChip(set);
-  console.log('GrowthRateListItem rendering:', { set_name: set.set_name, rate_type: set.rate_type, current_rate: set.current_rate, step_count: set.step_count });
+  const tileClasses = clsx(
+    'w-full rounded border px-4 py-3 transition-colors cursor-pointer',
+    isSelected ? 'border-brand-primary bg-brand-primary/5 shadow-sm' : 'border-line-strong bg-surface-card'
+  );
 
   return (
-    <div className="w-full px-4 py-3 rounded bg-slate-800 border border-slate-700">
+    <div
+      className={tileClasses}
+      role="button"
+      tabIndex={0}
+      onClick={handleTileSelect}
+      onKeyDown={handleRowKeyDown}
+    >
       <div className="flex items-center">
-        <div className="text-sm font-medium text-white min-w-[200px]">{set.set_name}</div>
+        <div className="min-w-[200px] text-sm font-medium text-text-primary">{set.set_name}</div>
         {set.rate_type === 'flat' && typeof set.current_rate === 'number' ? (
           isEditingInline ? (
             <div className="flex items-center gap-2">
@@ -231,23 +268,29 @@ function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh:
                 type="number"
                 value={inlineRate}
                 onChange={(e) => setInlineRate(e.target.value)}
-                className="w-20 px-2 py-1 bg-slate-900 border border-blue-500 rounded text-sm text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-20 px-2 py-1 bg-surface-card border border-brand-primary rounded text-sm text-text-primary focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleInlineSave();
                   if (e.key === 'Escape') handleInlineCancel();
                 }}
               />
-              <span className="text-sm text-slate-400">%</span>
+              <span className="text-sm text-text-secondary">%</span>
               <button
-                onClick={handleInlineSave}
-                className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleInlineSave();
+                }}
+                className="text-xs rounded bg-brand-primary px-2 py-1 text-text-inverse hover:bg-brand-primary/90 transition-colors"
               >
                 Save
               </button>
               <button
-                onClick={handleInlineCancel}
-                className="text-xs px-2 py-1 rounded border border-slate-500 text-slate-200 hover:bg-slate-700 transition-colors"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleInlineCancel();
+                }}
+                className="text-xs rounded border border-line-strong px-2 py-1 text-text-primary hover:bg-surface-card transition-colors"
               >
                 Cancel
               </button>
@@ -256,7 +299,7 @@ function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh:
             <button
               onClick={handleInlineEdit}
               disabled={!canEdit || isDeleting}
-              className={`text-sm font-medium text-blue-300 ${canEdit ? 'cursor-pointer hover:text-blue-200 transition-colors' : 'cursor-default'}`}
+              className={`text-sm font-medium text-brand-primary ${canEdit ? 'cursor-pointer hover:text-brand-primary/80 transition-colors' : 'cursor-default'}`}
             >
               {roundToTwo(set.current_rate * 100)}%
             </button>
@@ -271,18 +314,25 @@ function GrowthRateListItem({ set, onRefresh }: { set: GrowthRateSet; onRefresh:
         <div className="ml-auto flex items-center gap-2">
           {canEdit && set.rate_type === 'stepped' && (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsEditing(true);
+                onSelect?.();
+              }}
               disabled={isDeleting}
-              className="text-xs px-3 py-1 rounded border border-slate-500 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="text-xs rounded border border-line-strong px-3 py-1 text-text-primary hover:bg-surface-card/80 transition-colors disabled:opacity-50"
             >
               Edit
             </button>
           )}
           {canEdit && (
             <button
-              onClick={handleDelete}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleDelete();
+              }}
               disabled={isDeleting}
-              className="text-xs px-3 py-1 rounded border border-red-500 text-red-200 hover:bg-red-900/30 transition-colors disabled:opacity-50"
+              className="text-xs px-3 py-1 rounded border border-chip-error text-chip-error hover:bg-chip-error/10 transition-colors disabled:opacity-50"
             >
               {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
@@ -480,21 +530,21 @@ function GrowthRateForm({
   };
 
   return (
-    <div className="w-full min-w-[520px] px-4 py-4 rounded bg-slate-800 border border-slate-600">
+    <div className="w-full min-w-[520px] px-4 py-4 rounded bg-surface-card border border-line-strong">
       <div className="space-y-4">
         <div className="flex items-end gap-4 flex-nowrap">
           <div className="flex flex-col gap-1 flex-[1_0_150px] min-w-[150px]">
-            <label className="text-xs font-semibold text-slate-300">Name</label>
+            <label className="text-xs font-semibold text-text-secondary">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Custom"
-              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-white focus:border-blue-500 focus:outline-none"
+              className="flex-1 px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-text-primary focus:border-brand-primary focus:outline-none"
             />
           </div>
           <div className="flex flex-col items-center gap-1 flex-[0_0_200px]">
-            <span className="text-xs font-semibold text-slate-300">Rate Type</span>
+            <span className="text-xs font-semibold text-text-secondary">Rate Type</span>
             <div className="flex items-center gap-2 justify-center">
               <RateChip
                 label="Flat"
@@ -510,7 +560,7 @@ function GrowthRateForm({
           </div>
           {rateType === 'flat' && (
             <div className="flex flex-col items-center gap-1 flex-[0_0_90px]">
-              <span className="text-xs font-semibold text-slate-300 text-center">Rate</span>
+              <span className="text-xs font-semibold text-text-secondary text-center">Rate</span>
               <PercentageInput
                 value={flatRate}
                 onChange={setFlatRate}
@@ -525,13 +575,13 @@ function GrowthRateForm({
         {rateType === 'stepped' && (
           <div>
             <div className="flex items-center justify-between mb-3">
-            <label className="block text-xs font-semibold text-slate-300">
+            <label className="block text-xs font-semibold text-text-secondary">
               Step Schedule
             </label>
               <button
                 type="button"
                 onClick={handleAddStep}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md text-xs font-medium transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-brand-primary hover:bg-brand-primary/90 rounded-md text-xs font-medium transition-colors"
               >
                 <Plus size={14} /> Add Step
               </button>
@@ -542,7 +592,7 @@ function GrowthRateForm({
               onRateChange={(index, value) => updateStep(index, 'rate', value)}
               onRemoveStep={handleRemoveStep}
             />
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-text-secondary mt-2">
               Enter numbers for months or use &ldquo;E&rdquo; to carry the rate through the end.
             </p>
           </div>
@@ -555,7 +605,7 @@ function GrowthRateForm({
         )}
 
         {(error || apiError) && (
-          <div className="text-xs text-red-300 bg-red-900/40 border border-red-600 px-3 py-2 rounded">
+          <div className="text-xs text-chip-error bg-chip-error/10 border border-chip-error px-3 py-2 rounded">
             {error || apiError}
           </div>
         )}
@@ -565,14 +615,14 @@ function GrowthRateForm({
         <button
           onClick={onCancel}
           disabled={saving}
-          className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+          className="px-3 py-1.5 text-xs bg-surface-card hover:bg-surface-card rounded"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:bg-slate-700 disabled:text-slate-400"
+          className="px-3 py-1.5 text-xs bg-brand-primary hover:bg-brand-primary/90 rounded disabled:bg-surface-card disabled:text-text-secondary"
         >
           {saving
             ? 'Saving…'
@@ -604,7 +654,7 @@ function GrowthRateStepTable({
         header: '#',
         accessorKey: 'step_number',
         cell: ({ row }) => (
-          <span className="block text-slate-300 text-center">{row.original.step_number}</span>
+          <span className="block text-text-secondary text-center">{row.original.step_number}</span>
         ),
         size: 50
       },
@@ -612,7 +662,7 @@ function GrowthRateStepTable({
         header: 'From',
         accessorKey: 'from_period',
         cell: ({ row }) => (
-          <span className="block px-1 text-center text-slate-200">{row.original.from_period}</span>
+          <span className="block px-1 text-center text-text-inverse">{row.original.from_period}</span>
         ),
         size: 80
       },
@@ -647,7 +697,7 @@ function GrowthRateStepTable({
                 }
               }
             }}
-            className="w-full h-8 px-2 bg-slate-900 border border-slate-600 text-white text-center focus:border-blue-500 focus:outline-none rounded-sm"
+            className="w-full h-8 px-2 bg-surface-card border border-line-strong text-text-primary text-center focus:border-brand-primary focus:outline-none rounded-sm"
             placeholder="12 or E"
           />
         ),
@@ -657,7 +707,7 @@ function GrowthRateStepTable({
         header: 'Thru',
         accessorKey: 'thru_period',
         cell: ({ row }) => (
-          <span className="block px-1 text-center text-slate-200">{row.original.thru_period}</span>
+          <span className="block px-1 text-center text-text-inverse">{row.original.thru_period}</span>
         ),
         size: 80
       },
@@ -669,7 +719,7 @@ function GrowthRateStepTable({
             <button
               onClick={() => onRemoveStep(row.index)}
               disabled={steps.length <= 1}
-              className="text-red-400 hover:text-red-300 disabled:text-slate-600"
+              className="text-chip-error hover:text-red-300 disabled:text-text-secondary"
               title="Remove step"
               type="button"
             >
@@ -690,9 +740,9 @@ function GrowthRateStepTable({
   });
 
   return (
-    <div className="border border-slate-600 rounded overflow-hidden">
+    <div className="border border-line-strong rounded overflow-hidden">
       <table className="w-full text-xs border-collapse">
-        <thead className="bg-slate-900 text-slate-300">
+        <thead className="bg-surface-card text-text-secondary">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
@@ -711,7 +761,7 @@ function GrowthRateStepTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="border-t border-slate-700">
+            <tr key={row.id} className="border-t border-line-strong">
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id} className="px-2 py-1 align-middle text-center">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -741,11 +791,11 @@ function RateChip({
       className={`w-24 py-1.5 rounded text-xs font-semibold border text-center transition-colors ${
         isActive
           ? label === 'Flat'
-            ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400'
+            ? 'bg-brand-accent/20 text-emerald-200 border-emerald-400'
             : 'bg-purple-500/20 text-purple-200 border-purple-400'
           : label === 'Flat'
-          ? 'bg-slate-900 text-emerald-200/70 border-emerald-500/40 hover:bg-emerald-500/10'
-          : 'bg-slate-900 text-purple-200/70 border-purple-500/40 hover:bg-purple-500/10'
+          ? 'bg-surface-card text-emerald-200/70 border-emerald-500/40 hover:bg-brand-accent/10'
+          : 'bg-surface-card text-purple-200/70 border-purple-500/40 hover:bg-purple-500/10'
       }`}
     >
       {label}
@@ -794,7 +844,7 @@ function PercentageInput({
         }
       }}
       placeholder={placeholder}
-      className={`${widthClass} px-2 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-white ${alignClass} focus:border-blue-500 focus:outline-none`}
+      className={`${widthClass} px-2 py-2 bg-surface-card border border-line-strong rounded text-sm text-text-primary ${alignClass} focus:border-brand-primary focus:outline-none`}
     />
   );
 }
@@ -987,20 +1037,20 @@ function deriveRateChip(set: GrowthRateSet) {
     const percent = roundToTwo(set.current_rate * 100);
     return {
       label: `${percent}%`,
-      className: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400'
+      className: 'border border-brand-accent bg-brand-accent/15 text-brand-accent'
     };
   }
 
   if (set.rate_type === 'auto_updated') {
     return {
       label: 'Auto',
-      className: 'bg-sky-500/20 text-sky-200 border border-sky-400'
+      className: 'border border-brand-primary bg-brand-primary/15 text-brand-primary'
     };
   }
 
   return {
     label: 'Custom',
-    className: 'bg-purple-500/20 text-purple-200 border border-purple-400'
+    className: 'border border-chip-info bg-chip-info/15 text-chip-info'
   };
 }
 

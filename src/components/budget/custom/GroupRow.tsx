@@ -4,6 +4,7 @@
 'use client';
 
 import React from 'react';
+import { CButton } from '@coreui/react';
 import { formatMoney } from '@/utils/formatters/number';
 import type { BudgetMode } from '../ModeSelector';
 import type { CategoryVariance } from '@/hooks/useBudgetVariance';
@@ -20,7 +21,7 @@ interface GroupRowProps {
   onToggle: () => void;
   mode: BudgetMode;
   variance?: CategoryVariance;
-  onReconcile?: (variance: CategoryVariance) => void;
+  onAddItem?: () => void;
 }
 
 const LEVEL_COLORS = {
@@ -42,7 +43,7 @@ export default function GroupRow({
   onToggle,
   mode,
   variance,
-  onReconcile,
+  onAddItem,
 }: GroupRowProps) {
   // Calculate indentation based on level (starting at 0px for L1)
   const indentPx = (categoryLevel - 1) * 8;
@@ -108,21 +109,6 @@ export default function GroupRow({
 
   const varianceDisplay = formatVarianceDisplay();
 
-  // Show reconcile button if there's material variance (>5%) and reconciliation handler exists
-  const showReconcileButton =
-    onReconcile &&
-    variance &&
-    variance.has_children &&
-    !variance.is_reconciled &&
-    variance.variance_pct !== null &&
-    Math.abs(variance.variance_pct) > 5;
-
-  const handleReconcileClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row toggle
-    if (variance && onReconcile) {
-      onReconcile(variance);
-    }
-  };
 
   return (
     <tr
@@ -142,67 +128,87 @@ export default function GroupRow({
           overflow: 'visible',
         }}
       >
-        <div className="d-flex align-items-center gap-2" style={{ overflow: 'visible' }}>
-          {/* Chevron */}
-          <span style={{ fontSize: '0.875rem', width: '12px', flexShrink: 0 }}>
-            {isExpanded ? '▼' : '▶'}
-          </span>
+        <div
+          className="d-flex align-items-center justify-content-between"
+          style={{ overflow: 'visible', gap: '0.5rem' }}
+        >
+          <div className="d-flex align-items-center gap-2" style={{ overflow: 'visible' }}>
+            {/* Chevron */}
+            <span style={{ fontSize: '0.875rem', width: '12px', flexShrink: 0 }}>
+              {isExpanded ? '▼' : '▶'}
+            </span>
 
-          {/* Breadcrumb - allows overflow into next column */}
-          <span
-            title={
-              variance && variance.has_children
-                ? `${categoryBreadcrumb}\n\n💡 This category has ${variance.child_categories.length} child categories.\nEditing items here may create variances.\nCurrent variance: ${variance.variance_amount > 0 ? '+' : ''}$${Math.abs(variance.variance_amount).toLocaleString()}`
-                : categoryBreadcrumb
-            }
-            style={{
-              whiteSpace: 'nowrap',
-              overflow: 'visible',
-              fontWeight: isExpanded ? 'bold' : 'normal',
-            }}
-          >
-            {categoryBreadcrumb}
-            {variance && variance.has_children && !variance.is_reconciled && (
-              <span className="ms-1" style={{ fontSize: '0.75rem' }} title="This category has children">
-                📊
-              </span>
+            {/* Breadcrumb - allows overflow into next column */}
+            <span
+              title={
+                variance && variance.has_children
+                  ? `${categoryBreadcrumb}\n\n💡 This category has ${variance.child_categories.length} child categories.\nEditing items here may create variances.\nCurrent variance: ${variance.variance_amount > 0 ? '+' : ''}$${Math.abs(variance.variance_amount).toLocaleString()}`
+                  : categoryBreadcrumb
+              }
+              style={{
+                whiteSpace: 'nowrap',
+                overflow: 'visible',
+                fontWeight: isExpanded ? 'bold' : 'normal',
+              }}
+            >
+              {categoryBreadcrumb}
+              {variance && variance.has_children && !variance.is_reconciled && (
+                <span className="ms-1" style={{ fontSize: '0.75rem' }} title="This category has children">
+                  📊
+                </span>
+              )}
+            </span>
+
+            {/* Descendant depth indicators - show one line per sub-level AFTER text */}
+            {descendantDepth > 0 && (
+              <div className="d-flex align-items-center ms-2" style={{ gap: '2px' }}>
+                {Array.from({ length: descendantDepth }).map((_, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      width: '3px',
+                      height: '1em',
+                      backgroundColor: LEVEL_COLORS[Math.min(categoryLevel + idx + 1, 4) as keyof typeof LEVEL_COLORS] || '#6c757d',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }}
+                  />
+                ))}
+              </div>
             )}
-          </span>
 
-          {/* Descendant depth indicators - show one line per sub-level AFTER text */}
-          {descendantDepth > 0 && (
-            <div className="d-flex align-items-center ms-2" style={{ gap: '2px' }}>
-              {Array.from({ length: descendantDepth }).map((_, idx) => (
-                <span
-                  key={idx}
-                  style={{
-                    width: '3px',
-                    height: '1em',
-                    backgroundColor: LEVEL_COLORS[Math.min(categoryLevel + idx + 1, 4) as keyof typeof LEVEL_COLORS] || '#6c757d',
-                    display: 'inline-block',
-                    flexShrink: 0,
-                  }}
-                />
-              ))}
-            </div>
+            {/* Child count badge */}
+            <span className="badge bg-secondary ms-1" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
+              {childCount}
+            </span>
+          </div>
+
+          {isExpanded && onAddItem && (
+            <CButton
+              color="primary"
+              size="sm"
+              variant="ghost"
+              className="text-nowrap"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddItem();
+              }}
+            >
+              + Add Item
+            </CButton>
           )}
-
-          {/* Child count badge */}
-          <span className="badge bg-secondary ms-1" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
-            {childCount}
-          </span>
         </div>
       </td>
 
-      {/* Empty cells before Amount column */}
-      {mode === 'napkin' && (<><td></td><td></td><td></td><td></td></>)}
-      {mode === 'standard' && (<><td></td><td></td><td></td><td></td></>)}
-      {mode === 'detail' && (<><td></td><td></td><td></td><td></td></>)}
+      {/* Empty cells before Amount column: Phase, Category, Description, Qty, UOM, Rate */}
+      {mode === 'napkin' && (<><td></td><td></td><td></td><td></td><td></td><td></td></>)}
+      {mode === 'standard' && (<><td></td><td></td><td></td><td></td><td></td><td></td></>)}
+      {mode === 'detail' && (<><td></td><td></td><td></td><td></td><td></td><td></td></>)}
 
       {/* Amount column with subtotal */}
-      <td>
+      <td className="text-end">
         <span
-          className="text-success fw-bold text-end d-block tnum"
+          className="text-success fw-bold tnum"
           style={{ fontVariantNumeric: 'tabular-nums' }}
         >
           {formatMoney(amountSubtotal)}
@@ -212,29 +218,17 @@ export default function GroupRow({
       {/* Variance column (only shown in Standard and Detail modes) */}
       {(mode === 'standard' || mode === 'detail') && (
         <td>
-          <div className="d-flex align-items-center justify-content-between gap-2">
-            <span
-              className={`fw-semibold text-end tnum ${varianceDisplay.colorClass}`}
-              style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.875rem' }}
-              title={varianceDisplay.title}
-            >
-              {varianceDisplay.text}
-            </span>
-            {showReconcileButton && (
-              <button
-                className="btn btn-sm btn-outline-primary"
-                style={{ fontSize: '0.75rem', padding: '2px 8px' }}
-                onClick={handleReconcileClick}
-                title="Reconcile this variance"
-              >
-                Reconcile
-              </button>
-            )}
-          </div>
+          <span
+            className={`fw-semibold text-end d-block tnum ${varianceDisplay.colorClass}`}
+            style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.875rem' }}
+            title={varianceDisplay.title}
+          >
+            {varianceDisplay.text}
+          </span>
         </td>
       )}
 
-      {/* Remaining empty columns */}
+      {/* Remaining empty columns: Start, Duration */}
       {mode === 'napkin' && (<><td></td><td></td></>)}
       {mode === 'standard' && (<><td></td><td></td></>)}
       {mode === 'detail' && (<><td></td><td></td><td></td><td></td></>)}

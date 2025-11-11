@@ -19,6 +19,15 @@ Narrative describing what changed since the prior entry.
 ```
 
 ---
+### 2025-11-10 18:04 PT
+Implemented the milestone/dependency system plus CPM-driven timeline API so downstream delays flow automatically: added the milestone/dependency/log/drop queue schema, built the graph + forward/backward passes with float/critical path, and wired both POST/GET `/api/projects/[projectId]/timeline/calculate` to the new engine with preview/dry-run support.
+**Files Updated**
+- `db/migrations/015_milestone_dependency_system.sql` — milestone/dependency schemas, timeline log, recalculation queue, and validation triggers
+- `src/lib/timeline-engine/cpm-calculator.ts` — dependency graph builder, cycle detection, forward/backward passes, float/critical-path, and persistence
+- `src/app/api/projects/[projectId]/timeline/calculate/route.ts` — new Next.js handler calling the engine with dry-run overrides and better error handling
+**Sources**
+- `docs/session-notes/2025-11-10-budget-phase-column-fixes.md`
+
 ### 2025-11-09 18:33 PT
 Fixed database schema mismatch between API/frontend expectations and actual database structure for the unit cost category taxonomy—migrated from development-stage enums to lifecycle-based junction tables, updated 6 files to query the new schema with ARRAY_AGG and JSONB tags, and corrected filtering logic so both Cost Library and Admin Preferences pages load data.
 **Files Updated**

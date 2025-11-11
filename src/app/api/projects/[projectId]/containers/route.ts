@@ -22,10 +22,10 @@ type ContainerRow = {
 
 function buildTree(rows: ContainerRow[]): ContainerNode[] {
   const nodes = rows.map<ContainerNode>((row) => ({
-    container_id: row.container_id,
-    project_id: row.project_id,
-    parent_container_id: row.parent_container_id,
-    container_level: row.container_level as ContainerNode['container_level'],
+    container_id: Number(row.container_id),
+    project_id: Number(row.project_id),
+    parent_container_id: row.parent_container_id ? Number(row.parent_container_id) : null,
+    container_level: Number(row.container_level) as ContainerNode['container_level'],
     container_code: row.container_code,
     display_name: row.display_name,
     sort_order: row.sort_order ?? null,

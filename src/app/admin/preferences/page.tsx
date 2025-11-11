@@ -15,6 +15,12 @@ const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
   ssr: false,
 });
 
+// Dynamically import UnitCostCategoryManager to avoid SSR issues
+const UnitCostCategoryManager = dynamic(
+  () => import('./components/UnitCostCategoryManager'),
+  { ssr: false }
+);
+
 // Preference categories
 interface PreferenceCategory {
   key: string;
@@ -27,7 +33,7 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
   {
     key: 'unit_cost_categories',
     label: 'Unit Cost Categories',
-    description: 'Define category taxonomy for all development phases',
+    description: 'Manage global cost categories across all lifecycle stages',
     icon: 'FolderTree'
   },
   {
@@ -45,8 +51,7 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
 ];
 
 export default function SystemPreferencesPage() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('land_use_taxonomy');
-  const [activeStageTab, setActiveStageTab] = useState<number>(1);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>('unit_cost_categories');
 
   const toggleCategory = (key: string) => {
     setExpandedCategory(expandedCategory === key ? null : key);
@@ -121,63 +126,8 @@ export default function SystemPreferencesPage() {
                         <TaxonomyPage />
                       </div>
                     ) : category.key === 'unit_cost_categories' ? (
-                      <div>
-                        {/* Stage Tabs */}
-                        <div className="flex border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
-                          {[
-                            { stage: 1, label: 'Stage 1: Entitlements' },
-                            { stage: 2, label: 'Stage 2: Engineering' },
-                            { stage: 3, label: 'Stage 3: Development' }
-                          ].map(({ stage, label }) => (
-                            <button
-                              key={stage}
-                              onClick={() => setActiveStageTab(stage)}
-                              className="px-6 py-3 text-sm font-medium transition-colors"
-                              style={{
-                                color: activeStageTab === stage ? 'var(--cui-primary)' : 'var(--cui-secondary-color)',
-                                borderBottom: activeStageTab === stage ? '2px solid var(--cui-primary)' : '2px solid transparent',
-                                backgroundColor: 'transparent'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (activeStageTab !== stage) {
-                                  e.currentTarget.style.color = 'var(--cui-body-color)';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (activeStageTab !== stage) {
-                                  e.currentTarget.style.color = 'var(--cui-secondary-color)';
-                                }
-                              }}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Tab Content */}
-                        <div className="px-6 py-4 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                          <div className="p-4 rounded border" style={{
-                            backgroundColor: 'var(--cui-info-bg)',
-                            borderColor: 'var(--cui-info)',
-                            color: 'var(--cui-info)'
-                          }}>
-                            <p className="font-medium mb-2">Category Taxonomy Management - Stage {activeStageTab}</p>
-                            <p className="text-xs mb-3">
-                              This section manages the category definitions for {
-                                activeStageTab === 1 ? 'Entitlements phase (e.g., "Planning Fees," "Legal," etc.)' :
-                                activeStageTab === 2 ? 'Engineering phase (e.g., "Civil Engineering," "Surveys," etc.)' :
-                                'Development phase (e.g., "Sewer," "Grading," "Landscaping," etc.)'
-                              } and their properties (development stage, hard/soft classification, sort order).
-                            </p>
-                            <p className="text-xs">
-                              <strong>Note:</strong> This does NOT manage the actual cost line items with pricing.
-                              For benchmark cost data, use the <a href="/admin/benchmarks/cost-library" style={{ color: 'var(--cui-primary)', textDecoration: 'underline' }}>Cost Line Item Library</a>.
-                            </p>
-                          </div>
-                          <div className="mt-4 p-4 rounded border" style={{ borderColor: 'var(--cui-border-color)' }}>
-                            <p className="text-xs italic">Category taxonomy editor for Stage {activeStageTab} coming soon...</p>
-                          </div>
-                        </div>
+                      <div style={{ minHeight: '600px' }}>
+                        <UnitCostCategoryManager />
                       </div>
                     ) : category.key === 'planning_standards' ? (
                       <div className="px-6 py-4 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>

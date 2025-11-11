@@ -63,6 +63,8 @@ export function useBudgetData(projectId: number) {
       category_l4_name: raw.category_l4_name ?? raw.categoryL4Name ?? null,
       category_breadcrumb: raw.category_breadcrumb ?? raw.categoryBreadcrumb ?? null,
       container_id: raw.container_id !== undefined ? Number(raw.container_id) : raw.containerId ?? null,
+      container_name: raw.container_name ?? raw.containerName ?? null,
+      container_display: raw.container_display ?? raw.containerDisplay ?? null,
       project_id:
         raw.project_id !== undefined && raw.project_id !== null
           ? Number(raw.project_id)
@@ -157,11 +159,19 @@ export function useBudgetData(projectId: number) {
         'amount',
         'start_date',
         'end_date',
+        'start_period',
+        'periods_to_complete',
         'notes',
         'uom_code',
+        'container_id',
+        'vendor_name',
         'escalation_rate',
         'contingency_pct',
         'timing_method',
+        'funding_id',
+        'curve_id',
+        'milestone_id',
+        'cf_start_flag',
         'category_l1_id',
         'category_l2_id',
         'category_l3_id',

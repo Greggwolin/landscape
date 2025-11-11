@@ -194,13 +194,13 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg w-[900px] max-h-[90vh] overflow-hidden shadow-xl">
+      <div className="bg-surface-card rounded-lg w-[900px] max-h-[90vh] overflow-hidden shadow-xl">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-line-strong flex items-center justify-between">
           <h2 className="text-xl font-bold">
             {mode === 'create' ? 'Create' : 'Edit'} Growth Rate Set
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
             <X size={24} />
           </button>
         </div>
@@ -208,7 +208,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
         {/* Form */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-600 rounded text-red-200 text-sm">
+            <div className="mb-4 rounded border border-chip-error/60 bg-chip-error/10 p-3 text-sm text-chip-error">
               {error}
             </div>
           )}
@@ -217,14 +217,14 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
           <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium mb-1">
-                Name <span className="text-red-400">*</span>
+                Name <span className="text-chip-error">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                 placeholder="e.g., Phoenix Multifamily 2025"
               />
             </div>
@@ -236,7 +236,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                   type="text"
                   value={formData.geography}
                   onChange={(e) => setFormData({ ...formData, geography: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   placeholder="e.g., Phoenix, Los Angeles"
                 />
               </div>
@@ -246,7 +246,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   placeholder="Optional notes"
                 />
               </div>
@@ -257,20 +257,20 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium">
-                Growth Rate Steps <span className="text-red-400">*</span>
+                Growth Rate Steps <span className="text-chip-error">*</span>
               </label>
               <button
                 onClick={addStep}
                 disabled={steps[steps.length - 1]?.thru_period === 'E'}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded text-sm transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-surface-card disabled:cursor-not-allowed rounded text-sm transition-colors"
               >
                 <Plus size={16} /> Add Step
               </button>
             </div>
 
-            <div className="border border-slate-600 rounded overflow-hidden">
+            <div className="border border-line-strong rounded overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-slate-900">
+                <thead className="bg-surface-card">
                   <tr>
                     <th className="px-3 py-2 text-left w-16">Step</th>
                     <th className="px-3 py-2 text-left w-24">From Period</th>
@@ -282,14 +282,14 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                 </thead>
                 <tbody>
                   {steps.map((step, index) => (
-                    <tr key={index} className="border-t border-slate-700">
-                      <td className="px-3 py-2 text-slate-400">{step.step_number}</td>
+                    <tr key={index} className="border-t border-line-strong">
+                      <td className="px-3 py-2 text-text-secondary">{step.step_number}</td>
                       <td className="px-3 py-2">
                         <input
                           type="number"
                           value={step.from_period}
                           disabled
-                          className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-400 cursor-not-allowed"
+                          className="w-full px-2 py-1 bg-surface-card border border-line-strong rounded text-text-secondary cursor-not-allowed"
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -298,7 +298,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                           step="0.1"
                           value={step.rate}
                           onChange={(e) => handleStepChange(index, 'rate', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                          className="w-full px-2 py-1 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                           placeholder="3.0"
                         />
                       </td>
@@ -317,7 +317,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                               }
                             }
                           }}
-                          className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                          className="w-full px-2 py-1 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                           placeholder="12 or E"
                         />
                       </td>
@@ -326,14 +326,14 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
                           type="text"
                           value={step.thru_period}
                           disabled
-                          className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-400 cursor-not-allowed"
+                          className="w-full px-2 py-1 bg-surface-card border border-line-strong rounded text-text-secondary cursor-not-allowed"
                         />
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button
                           onClick={() => removeStep(index)}
                           disabled={steps.length <= 1}
-                          className="text-red-400 hover:text-red-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          className="text-chip-error hover:text-red-300 disabled:text-text-secondary disabled:cursor-not-allowed"
                           title="Remove step"
                         >
                           <Trash2 size={16} />
@@ -345,7 +345,7 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
               </table>
             </div>
 
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-xs text-text-secondary mt-2">
               • <strong>From Period</strong> is auto-calculated based on previous step<br />
               • <strong>Thru Period</strong> is auto-calculated (from + periods - 1)<br />
               • Enter <strong>"E"</strong> for Periods to indicate "End" (remaining periods)<br />
@@ -355,19 +355,19 @@ export default function GrowthRateStepEditor({ mode, existingSet, onClose, onSuc
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-700 flex gap-3 justify-end">
+        <div className="px-6 py-4 border-t border-line-strong flex gap-3 justify-end">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+            className="px-4 py-2 bg-surface-card hover:bg-surface-card rounded transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded transition-colors"
+            className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-surface-card disabled:cursor-not-allowed rounded transition-colors"
           >
             {saving ? 'Saving...' : mode === 'create' ? 'Create Set' : 'Update Set'}
           </button>

@@ -1,0 +1,98 @@
+/**
+ * Budget Tab – Color Audit Fix Patch (v1)
+ * Scope: /projects/7?tab=budget
+ * Intent: Resolve contrast and token/CoreUI drift in light/dark themes.
+ * How to use: import LAST in your global CSS (after CoreUI + tokens) or as a module override.
+ */
+
+/* --- A. Token corrections (dark theme) ---------------------------------- */
+/* In dark mode, inverse text must be light. Current value is #111827 (too dark). */
+[data-theme="dark"] {
+  --text-inverse: #ffffff;            /* was #111827 */
+}
+
+/* Strengthen dark surface backgrounds to maintain 4.5:1 on body text */
+[data-theme="dark"] {
+  --surface-bg:   #0b1220;            /* ok, keep */
+  --surface-card: #121826;            /* was #111827: tiny lift for contrast on borders */
+  --surface-tile: #0f172a;            /* ok */
+  --line-soft:    #263242;            /* was #1f2937: slightly brighter for visibility */
+  --line-strong:  #3b4a5f;            /* was #374151 */
+}
+
+/* --- B. CoreUI button readable text colors ------------------------------ */
+/* Danger/Success/Info buttons set text to nearly-black in both themes.
+   Force readable foregrounds. Use white for strong chroma backgrounds. */
+.btn-danger,
+.btn-success,
+.btn-info,
+[data-coreui-theme="dark"] .btn-danger,
+[data-coreui-theme="dark"] .btn-success,
+[data-coreui-theme="dark"] .btn-info {
+  --cui-btn-color: #ffffff !important;      /* override #080a0c */
+  --cui-btn-hover-color: #ffffff !important;
+  --cui-btn-active-color: #ffffff !important;
+  --cui-btn-disabled-color: #ffffff !important;
+}
+
+/* Light variant buttons should not use near-black text on pale backgrounds in dark mode */
+[data-coreui-theme="dark"] .btn-light,
+.btn-light {
+  --cui-btn-color: #0f172a !important;      /* readable on #f3f4f7 */
+}
+
+/* --- C. Link color tuning for dark -------------------------------------- */
+/* Ensure link hover increases contrast against dark bg */
+[data-coreui-theme="dark"] {
+  --cui-link-color:       #91a1ff;   /* was #5e5cd0 */
+  --cui-link-hover-color: #b8c1ff;   /* was #7e7dd9 */
+}
+
+/* --- D. Prose (Tailwind typography) dark fixes -------------------------- */
+.prose {
+  --tw-prose-invert-body:    #e5e7eb;  /* keep */
+  --tw-prose-invert-headings:#ffffff;  /* ensure headings pop */
+  --tw-prose-invert-links:   #b8c1ff;  /* align with link hover color */
+}
+
+/* --- E. Focus ring offsets ---------------------------------------------- */
+/* Keep ring offset dark-aware; white halos on dark bg look jagged. */
+:where([data-theme="dark"]) *:focus {
+  --tw-ring-offset-color: #0b1220;     /* match --surface-bg */
+}
+
+/* --- F. Token↔CoreUI bridge (minimal) ----------------------------------- */
+/* Map your shared tokens into CoreUI so components inherit the same palette. */
+:root,[data-coreui-theme="light"]{
+  --cui-body-bg: var(--surface-bg);
+  --cui-tertiary-bg: var(--surface-card);
+  --cui-border-color: var(--line-soft);
+  --cui-emphasis-color: var(--text-primary);
+}
+[data-coreui-theme="dark"]{
+  --cui-body-bg: var(--surface-bg);
+  --cui-tertiary-bg: var(--surface-card);
+  --cui-border-color: var(--line-strong);
+  --cui-emphasis-color: var(--text-primary);
+}
+
+/* --- G. Quick contrast helpers (optional classes) ----------------------- */
+/* Apply .c-on-strong to any strong chroma bg to guarantee readable text */
+.c-on-strong { color: #ffffff !important; }
+
+/* Apply .c-on-light for text on very light grays */
+.c-on-light { color: #0f172a !important; }
+
+/* --- H. Button outline variants in dark: avoid white text on pale borders */
+[data-coreui-theme="dark"] .btn-outline-light {
+  --cui-btn-color: #e5e7eb;
+  --cui-btn-hover-color: #0f172a;
+  --cui-btn-hover-bg: #e5e7eb; /* keep */
+}
+
+/* --- I. Sanity checks ---------------------------------------------------- */
+/* Ensure inverse text is actually used for chips/pills on dark tiles. */
+[data-theme="dark"] .badge,
+[data-coreui-theme="dark"] .badge {
+  --cui-badge-color: var(--text-inverse);
+}

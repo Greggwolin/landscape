@@ -505,6 +505,7 @@ If you find errors or gaps in documentation:
 ### Phase 2 ✅ 70% Complete
 - [x] Lease APIs
 - [x] Dependency APIs
+- [x] Milestone/dependency timeline schema + CPM engine
 - [x] Timeline calculation API
 - [x] Absorption APIs
 - [ ] Finance APIs

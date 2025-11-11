@@ -19,7 +19,7 @@ async function fetchTemplateViaDjango(id: string) {
 
   try {
     const response = await fetch(
-      `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/${id}/`,
+      `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/${id}/`,
       { headers: { 'Content-Type': 'application/json' } }
     );
 
@@ -290,7 +290,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (DJANGO_API_URL) {
     try {
       const response = await fetch(
-        `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/${id}/`,
+        `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/${id}/`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -345,7 +345,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (DJANGO_API_URL) {
     try {
       const response = await fetch(
-        `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/${id}/`,
+        `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/${id}/`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -396,7 +396,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   if (DJANGO_API_URL) {
     try {
       const response = await fetch(
-        `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/${id}/`,
+        `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/${id}/`,
         { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
       );
 

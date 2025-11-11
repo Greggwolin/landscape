@@ -112,11 +112,11 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg w-[600px] max-h-[90vh] overflow-hidden shadow-xl">
+      <div className="bg-surface-card rounded-lg w-[600px] max-h-[90vh] overflow-hidden shadow-xl">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-line-strong flex items-center justify-between">
           <h2 className="text-xl font-bold">Add New {categoryLabel}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
             <X size={24} />
           </button>
         </div>
@@ -124,7 +124,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-600 rounded text-red-200 text-sm">
+            <div className="mb-4 rounded border border-chip-error/60 bg-chip-error/10 p-3 text-sm text-chip-error">
               {error}
             </div>
           )}
@@ -136,12 +136,12 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                 {/* Cost Type */}
                 <div className="flex-1">
                   <label className="block text-sm font-medium mb-1">
-                    Cost Type <span className="text-red-400">*</span>
+                    Cost Type <span className="text-chip-error">*</span>
                   </label>
                   <select
                     value={formData.cost_type}
                     onChange={(e) => setFormData({ ...formData, cost_type: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   >
                     <option value="">-- Select Cost Type --</option>
                     <option value="closing_costs">Closing Costs</option>
@@ -156,7 +156,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                 {/* Value */}
                 <div className="w-32">
                   <label className="block text-sm font-medium mb-1 text-center">
-                    Value <span className="text-red-400">*</span>
+                    Value <span className="text-chip-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -164,7 +164,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                     required
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none text-right"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none text-right"
                     placeholder="2.50"
                   />
                 </div>
@@ -172,12 +172,12 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                 {/* Unit */}
                 <div className="w-32">
                   <label className="block text-sm font-medium mb-1 text-center">
-                    Unit <span className="text-red-400">*</span>
+                    Unit <span className="text-chip-error">*</span>
                   </label>
                   <select
                     value={formData.value_type}
                     onChange={(e) => setFormData({ ...formData, value_type: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   >
                     <option value="flat_fee">$$</option>
                     <option value="percentage">% of</option>
@@ -191,14 +191,14 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
             {(category === 'transaction_cost' && formData.cost_type === 'other') && (
               <div className="w-[40%]">
                 <label className="block text-sm font-medium mb-1">
-                  Name <span className="text-red-400">*</span>
+                  Name <span className="text-chip-error">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.benchmark_name}
                   onChange={(e) => setFormData({ ...formData, benchmark_name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   placeholder="e.g., Custom transaction cost"
                 />
               </div>
@@ -208,14 +208,14 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
             {category !== 'transaction_cost' && (
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Name <span className="text-red-400">*</span>
+                  Name <span className="text-chip-error">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.benchmark_name}
                   onChange={(e) => setFormData({ ...formData, benchmark_name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   placeholder="e.g., Grading - Standard"
                 />
               </div>
@@ -226,7 +226,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Value <span className="text-red-400">*</span>
+                    Value <span className="text-chip-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -234,18 +234,18 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                     required
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                     placeholder="2.50"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Unit <span className="text-red-400">*</span>
+                    Unit <span className="text-chip-error">*</span>
                   </label>
                   <select
                     value={formData.uom_code}
                     onChange={(e) => setFormData({ ...formData, uom_code: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   >
                     <option value="$/SF">$/SF</option>
                     <option value="$/FF">$/FF</option>
@@ -261,10 +261,10 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
             {/* Conditional fields for % of and $/Unit */}
             {category === 'transaction_cost' && formData.value_type === 'percentage' && (
               <div className="w-[40%] ml-0 pl-4 border-l-2 border-blue-500">
-                <label className="block text-sm font-medium mb-1 text-slate-400">
+                <label className="block text-sm font-medium mb-1 text-text-secondary">
                   % of (what item)
                 </label>
-                <div className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-slate-400 text-sm italic">
+                <div className="px-3 py-2 bg-surface-card border border-line-strong rounded text-text-secondary text-sm italic">
                   To Come
                 </div>
               </div>
@@ -272,10 +272,10 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
 
             {category === 'transaction_cost' && formData.value_type === 'per_unit' && (
               <div className="w-[40%] ml-0 pl-4 border-l-2 border-blue-500">
-                <label className="block text-sm font-medium mb-1 text-slate-400">
+                <label className="block text-sm font-medium mb-1 text-text-secondary">
                   $/Unit applies to
                 </label>
-                <div className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-slate-400 text-sm italic">
+                <div className="px-3 py-2 bg-surface-card border border-line-strong rounded text-text-secondary text-sm italic">
                   To Come
                 </div>
               </div>
@@ -289,7 +289,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                   <select
                     value={formData.cost_phase}
                     onChange={(e) => setFormData({ ...formData, cost_phase: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                   >
                     <option value="">-- Select --</option>
                     <option value="planning">Planning</option>
@@ -305,7 +305,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                     type="text"
                     value={formData.work_type}
                     onChange={(e) => setFormData({ ...formData, work_type: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                     placeholder="e.g., grading, excavation"
                   />
                 </div>
@@ -319,7 +319,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
                 <select
                   value={formData.confidence_level}
                   onChange={(e) => setFormData({ ...formData, confidence_level: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                 >
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
@@ -334,7 +334,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded focus:border-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-card border border-line-strong rounded focus:border-brand-primary focus:outline-none"
                 rows={3}
                 placeholder="Optional notes or context"
               />
@@ -343,19 +343,19 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-700 flex gap-3 justify-end">
+        <div className="px-6 py-4 border-t border-line-strong flex gap-3 justify-end">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+            className="px-4 py-2 bg-surface-card hover:bg-surface-card rounded transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded transition-colors"
+            className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-surface-card disabled:cursor-not-allowed rounded transition-colors"
           >
             {saving ? 'Creating...' : 'Create Benchmark'}
           </button>

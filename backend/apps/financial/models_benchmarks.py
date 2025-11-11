@@ -10,25 +10,51 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 
 
+class CategoryTagLibrary(models.Model):
+    """
+    System and user-defined tags for categorizing cost items.
+    Maps to landscape.core_category_tag_library
+    """
+    tag_id = models.AutoField(primary_key=True)
+    tag_name = models.CharField(max_length=50, unique=True)
+    tag_context = models.CharField(max_length=50)  # Which lifecycle_stage(s) this applies to
+    is_system_default = models.BooleanField(default=True)
+    description = models.TextField(blank=True, null=True)
+    display_order = models.IntegerField(default=999)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_category_tag_library'
+        ordering = ['display_order', 'tag_name']
+        verbose_name = 'Category Tag'
+        verbose_name_plural = 'Category Tags'
+
+    def __str__(self):
+        return f"{self.tag_name} ({self.tag_context})"
+
+
 class UnitCostCategory(models.Model):
     """
-    Category hierarchy for unit cost templates.
+    Universal category taxonomy for cost/revenue items across all property types.
+    Categories can belong to multiple lifecycle stages via many-to-many relationship.
+    Uses flexible tag-based categorization.
     Maps to landscape.core_unit_cost_category
     """
 
     category_id = models.AutoField(primary_key=True)
     parent = models.ForeignKey(
         'self',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         db_column='parent_id',
         related_name='children',
         null=True,
         blank=True
     )
-    category_name = models.CharField(max_length=100)
-    cost_scope = models.CharField(max_length=20)
-    cost_type = models.CharField(max_length=20)
-    development_stage = models.CharField(max_length=50, default='stage3_development')
+    category_name = models.CharField(max_length=255)
+    tags = models.JSONField(default=list)  # JSONB array of tag strings
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -37,26 +63,112 @@ class UnitCostCategory(models.Model):
     class Meta:
         managed = False
         db_table = 'core_unit_cost_category'
-        ordering = ['development_stage', 'sort_order', 'category_name']
+        ordering = ['sort_order', 'category_name']
         verbose_name = 'Unit Cost Category'
         verbose_name_plural = 'Unit Cost Categories'
 
     def __str__(self):
-        return self.category_name
+        stages = self.get_lifecycle_stages()
+        stages_str = ', '.join(stages) if stages else 'No stages'
+        return f"{self.category_name} ({stages_str})"
+
+    def get_lifecycle_stages(self):
+        """Get list of lifecycle stages this category belongs to."""
+        return list(
+            CategoryLifecycleStage.objects.filter(
+                category_id=self.category_id
+            ).values_list('lifecycle_stage', flat=True).order_by('lifecycle_stage')
+        )
+
+    def has_tag(self, tag_name):
+        """Check if category has a specific tag."""
+        return tag_name in self.tags if isinstance(self.tags, list) else False
+
+    def add_tag(self, tag_name):
+        """Add tag if not already present."""
+        if not isinstance(self.tags, list):
+            self.tags = []
+        if tag_name not in self.tags:
+            self.tags.append(tag_name)
+            self.save(update_fields=['tags', 'updated_at'])
+
+    def remove_tag(self, tag_name):
+        """Remove tag if present."""
+        if isinstance(self.tags, list) and tag_name in self.tags:
+            self.tags.remove(tag_name)
+            self.save(update_fields=['tags', 'updated_at'])
+
+    @property
+    def depth(self):
+        """Calculate depth in hierarchy."""
+        if not self.parent:
+            return 0
+        return 1 + self.parent.depth
+
+    def get_ancestors(self):
+        """Get all ancestor categories."""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+
+    def get_descendants(self):
+        """Get all descendant categories recursively."""
+        descendants = list(self.children.all())
+        for child in self.children.all():
+            descendants.extend(child.get_descendants())
+        return descendants
 
 
-class UnitCostTemplate(models.Model):
+class CategoryLifecycleStage(models.Model):
     """
-    Template library for budget line items.
-    Maps to landscape.core_unit_cost_template
+    Many-to-many pivot table linking categories to lifecycle stages.
+    A category can belong to multiple lifecycle stages.
+    Maps to landscape.core_category_lifecycle_stages
     """
 
-    template_id = models.AutoField(primary_key=True)
+    LIFECYCLE_CHOICES = [
+        ('Acquisition', 'Acquisition'),
+        ('Development', 'Development'),
+        ('Operations', 'Operations'),
+        ('Disposition', 'Disposition'),
+        ('Financing', 'Financing'),
+    ]
+
+    category_id = models.IntegerField()
+    lifecycle_stage = models.CharField(max_length=50, choices=LIFECYCLE_CHOICES)
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_category_lifecycle_stages'
+        unique_together = [['category_id', 'lifecycle_stage']]
+        ordering = ['lifecycle_stage', 'sort_order']
+        verbose_name = 'Category Lifecycle Stage'
+        verbose_name_plural = 'Category Lifecycle Stages'
+
+    def __str__(self):
+        return f"Category {self.category_id} → {self.lifecycle_stage}"
+
+
+class UnitCostItem(models.Model):
+    """
+    Individual cost line items within categories.
+    Renamed from UnitCostTemplate in migration 0018 to eliminate confusion
+    with page templates. Each item represents a specific cost element.
+    Maps to landscape.core_unit_cost_item
+    """
+
+    item_id = models.AutoField(primary_key=True)  # Renamed from template_id
     category = models.ForeignKey(
         UnitCostCategory,
         on_delete=models.CASCADE,
         db_column='category_id',
-        related_name='templates'
+        related_name='items'  # Changed from 'templates'
     )
     item_name = models.CharField(max_length=200)
     default_uom_code = models.CharField(max_length=10)
@@ -75,7 +187,7 @@ class UnitCostTemplate(models.Model):
         db_column='created_from_project_id',
         null=True,
         blank=True,
-        related_name='created_unit_cost_templates'
+        related_name='created_unit_cost_items'  # Changed from 'created_unit_cost_templates'
     )
     created_from_ai = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -83,13 +195,17 @@ class UnitCostTemplate(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'core_unit_cost_template'
+        db_table = 'core_unit_cost_item'  # Changed from 'core_unit_cost_template'
         ordering = ['item_name']
-        verbose_name = 'Unit Cost Template'
-        verbose_name_plural = 'Unit Cost Templates'
+        verbose_name = 'Unit Cost Item'
+        verbose_name_plural = 'Unit Cost Items'
 
     def __str__(self):
         return self.item_name
+
+
+# Backward compatibility alias - will be removed in future version
+UnitCostTemplate = UnitCostItem
 
 
 class GlobalBenchmark(models.Model):
@@ -114,36 +230,41 @@ class GlobalBenchmark(models.Model):
         return self.benchmark_name
 
 
-class TemplateBenchmarkLink(models.Model):
+class ItemBenchmarkLink(models.Model):
     """
-    Link table between unit cost templates and global benchmarks.
-    Maps to landscape.core_template_benchmark_link
+    Link table between unit cost items and global benchmarks.
+    Renamed from TemplateBenchmarkLink in migration 0018.
+    Maps to landscape.core_item_benchmark_link
     """
 
     link_id = models.AutoField(primary_key=True)
-    template = models.ForeignKey(
-        UnitCostTemplate,
+    item = models.ForeignKey(
+        UnitCostItem,
         on_delete=models.CASCADE,
-        db_column='template_id',
+        db_column='item_id',  # Changed from 'template_id'
         related_name='benchmark_links'
     )
     benchmark = models.ForeignKey(
         GlobalBenchmark,
         on_delete=models.CASCADE,
         db_column='benchmark_id',
-        related_name='template_links'
+        related_name='item_links'  # Changed from 'template_links'
     )
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         managed = False
-        db_table = 'core_template_benchmark_link'
-        verbose_name = 'Template Benchmark Link'
-        verbose_name_plural = 'Template Benchmark Links'
+        db_table = 'core_item_benchmark_link'  # Changed from 'core_template_benchmark_link'
+        verbose_name = 'Item Benchmark Link'
+        verbose_name_plural = 'Item Benchmark Links'
 
     def __str__(self):
-        return f'{self.template_id} → {self.benchmark_id}'
+        return f'{self.item_id} → {self.benchmark_id}'
+
+
+# Backward compatibility alias - will be removed in future version
+TemplateBenchmarkLink = ItemBenchmarkLink
 
 
 class PlanningStandard(models.Model):

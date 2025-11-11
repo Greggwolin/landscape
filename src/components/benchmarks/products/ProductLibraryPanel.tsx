@@ -321,14 +321,14 @@ export default function ProductLibraryPanel() {
 
           <div className="overflow-x-auto px-5 py-4">
             {loading ? (
-              <div className="py-6 text-center text-sm text-slate-400">Loading products…</div>
+              <div className="py-6 text-center text-sm text-text-secondary">Loading products…</div>
             ) : filteredProducts.length === 0 ? (
-              <div className="rounded border border-dashed border-slate-700 px-4 py-8 text-center text-sm text-slate-400">
+              <div className="rounded border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-secondary">
                 No products match your filters. Add a new product to get started.
               </div>
             ) : (
               <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-400">
+                <thead className="bg-surface-card/70 text-xs uppercase tracking-wide text-text-secondary">
                   <tr>
                     <th className="px-3 py-2 font-medium">Code</th>
                     <th className="px-3 py-2 font-medium">Width (ft)</th>
@@ -342,21 +342,21 @@ export default function ProductLibraryPanel() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {filteredProducts.map((product) => (
-                    <tr key={product.product_id} className="hover:bg-slate-900/70">
+                    <tr key={product.product_id} className="hover:bg-surface-card/70">
                       <td className="px-3 py-2 font-medium text-white">{product.code}</td>
-                      <td className="px-3 py-2 text-slate-200">{product.lot_w_ft ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-200">{product.lot_d_ft ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-200">{product.lot_area_sf ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-200">
+                      <td className="px-3 py-2 text-text-inverse">{product.lot_w_ft ?? '—'}</td>
+                      <td className="px-3 py-2 text-text-inverse">{product.lot_d_ft ?? '—'}</td>
+                      <td className="px-3 py-2 text-text-inverse">{product.lot_area_sf ?? '—'}</td>
+                      <td className="px-3 py-2 text-text-inverse">
                         {product.density_per_acre ? `${product.density_per_acre}` : '—'}
                       </td>
-                      <td className="px-3 py-2 text-slate-300">{product.type_name ?? '—'}</td>
+                      <td className="px-3 py-2 text-text-secondary">{product.type_name ?? '—'}</td>
                       <td className="px-3 py-2">
                         <span
                           className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
                             product.is_active
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : 'bg-slate-700 text-slate-300'
+                              ? 'bg-brand-accent/20 text-emerald-300'
+                              : 'bg-surface-card text-text-secondary'
                           }`}
                         >
                           {product.is_active ? 'Active' : 'Archived'}
@@ -366,13 +366,13 @@ export default function ProductLibraryPanel() {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => openEditModal(product)}
-                            className="rounded border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                            className="rounded border border-line-strong px-3 py-1 text-xs font-medium text-text-inverse hover:bg-surface-card focus:outline-none focus:ring-1 focus:ring-emerald-400"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product)}
-                            className="rounded border border-red-500 px-3 py-1 text-xs font-medium text-red-300 hover:bg-red-500/10 focus:outline-none focus:ring-1 focus:ring-red-400"
+                            className="rounded border border-red-500 px-3 py-1 text-xs font-medium text-red-300 hover:bg-chip-error/10 focus:outline-none focus:ring-1 focus:ring-red-400"
                           >
                             Archive
                           </button>
@@ -387,9 +387,9 @@ export default function ProductLibraryPanel() {
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-5 py-4">
+          <div className="rounded-lg border border-line-strong bg-surface-card/60 px-5 py-4">
             <h2 className="text-lg font-semibold text-white">Planning Standards</h2>
-            <p className="mb-4 text-xs text-slate-400">
+            <p className="mb-4 text-xs text-text-secondary">
               Global defaults for density calculations and ROW / park allocations.
             </p>
 
@@ -399,7 +399,7 @@ export default function ProductLibraryPanel() {
               </div>
             )}
 
-            <div className="space-y-3 text-sm text-slate-200">
+            <div className="space-y-3 text-sm text-text-inverse">
               <label className="flex flex-col gap-1">
                 Planning Efficiency
                 <input
@@ -412,7 +412,7 @@ export default function ProductLibraryPanel() {
                       default_planning_efficiency: event.target.value
                     }))
                   }
-                  className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -427,7 +427,7 @@ export default function ProductLibraryPanel() {
                       default_street_row_pct: event.target.value
                     }))
                   }
-                  className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -442,7 +442,7 @@ export default function ProductLibraryPanel() {
                       default_park_dedication_pct: event.target.value
                     }))
                   }
-                  className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 />
               </label>
             </div>
@@ -450,27 +450,27 @@ export default function ProductLibraryPanel() {
             <button
               onClick={handleSavePlanning}
               disabled={savingPlanning}
-              className="mt-4 w-full rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-500/60"
+              className="mt-4 w-full rounded bg-brand-accent px-4 py-2 text-sm font-semibold text-text-primary hover:bg-brand-accent/85 focus:outline-none focus:ring-2 focus:ring-brand-accent/50 disabled:cursor-not-allowed disabled:bg-brand-accent/60"
             >
               {savingPlanning ? 'Saving…' : 'Save Planning Defaults'}
             </button>
             {planningStandard && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-text-secondary">
                 Last updated: {new Date(planningStandard.updated_at).toLocaleString()}
               </p>
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-5 py-4">
+          <div className="rounded-lg border border-line-strong bg-surface-card/60 px-5 py-4">
             <h2 className="text-lg font-semibold text-white">Density Guidance</h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-text-secondary">
               Density per acre is calculated with the global planning efficiency:
             </p>
-            <p className="mt-3 rounded border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+            <p className="mt-3 rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-text-inverse">
               <span className="font-medium text-white">Density/Acre</span> = (43,560 / Lot SF) ×
               Planning Efficiency
             </p>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-text-secondary">
               Update the global defaults to instantly refresh project density assumptions.
             </p>
           </div>
@@ -515,20 +515,20 @@ function ProductModal({
   saving
 }: ProductModalProps) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-lg border border-slate-800 bg-slate-900 shadow-xl">
-        <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-surface-card/80 backdrop-blur-sm">
+      <div className="w-full max-w-xl rounded-lg border border-line-strong bg-surface-card shadow-xl">
+        <header className="flex items-center justify-between border-b border-line-strong px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-white">
               {mode === 'create' ? 'Add Lot Product' : `Edit ${product?.code}`}
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-text-secondary">
               Lot dimensions feed density calculations and planning defaults.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-sm text-slate-400 hover:text-white focus:outline-none"
+            className="text-sm text-text-secondary hover:text-white focus:outline-none"
           >
             Close
           </button>
@@ -536,15 +536,15 @@ function ProductModal({
 
         <div className="px-6 py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm text-slate-300">
+            <label className="flex flex-col gap-1 text-sm text-text-secondary">
               Product Code
               <input
                 value={form.code}
                 onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-slate-300">
+            <label className="flex flex-col gap-1 text-sm text-text-secondary">
               Type
               <select
                 value={form.type_id ?? ''}
@@ -554,7 +554,7 @@ function ProductModal({
                     type_id: event.target.value ? Number(event.target.value) : null
                   }))
                 }
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
               >
                 <option value="">None</option>
                 {types.map((type) => (
@@ -564,7 +564,7 @@ function ProductModal({
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-sm text-slate-300">
+            <label className="flex flex-col gap-1 text-sm text-text-secondary">
               Lot Width (ft)
               <input
                 type="number"
@@ -572,11 +572,11 @@ function ProductModal({
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, lot_w_ft: event.target.value }))
                 }
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 min={0}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-slate-300">
+            <label className="flex flex-col gap-1 text-sm text-text-secondary">
               Lot Depth (ft)
               <input
                 type="number"
@@ -584,39 +584,39 @@ function ProductModal({
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, lot_d_ft: event.target.value }))
                 }
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="rounded border border-line-strong bg-surface-card px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 min={0}
               />
             </label>
-            <label className="mt-2 flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
+            <label className="mt-2 flex items-center gap-2 text-sm text-text-secondary sm:col-span-2">
               <input
                 type="checkbox"
                 checked={form.is_active}
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, is_active: event.target.checked }))
                 }
-                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-400"
+                className="h-4 w-4 rounded border-line-strong bg-surface-card text-emerald-500 focus:ring-emerald-400"
               />
               Active in library
             </label>
           </div>
         </div>
 
-        <footer className="flex items-center justify-between border-t border-slate-800 px-6 py-4">
-          <span className="text-xs text-slate-500">
+        <footer className="flex items-center justify-between border-t border-line-strong px-6 py-4">
+          <span className="text-xs text-text-secondary">
             Lot area is calculated automatically from width × depth.
           </span>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="rounded border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="rounded border border-line-strong px-4 py-2 text-sm text-text-inverse hover:bg-surface-card focus:outline-none focus:ring-1 focus:ring-slate-500"
             >
               Cancel
             </button>
             <button
               onClick={onSave}
               disabled={saving}
-              className="rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-500/60"
+              className="rounded bg-brand-accent px-4 py-2 text-sm font-semibold text-text-primary hover:bg-brand-accent/85 focus:outline-none focus:ring-2 focus:ring-brand-accent/50 disabled:cursor-not-allowed disabled:bg-brand-accent/60"
             >
               {saving ? 'Saving…' : mode === 'create' ? 'Create Product' : 'Save Changes'}
             </button>
