@@ -6,6 +6,7 @@ Converts Django ORM models to/from JSON for the REST API.
 
 from rest_framework import serializers
 from .models import Project
+from .models_user import UserPreference
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -56,3 +57,105 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['project_id', 'created_at', 'updated_at']
+
+
+class UserPreferenceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserPreference model.
+    Handles CRUD operations for user preferences with flexible JSON storage.
+    """
+
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = UserPreference
+        fields = [
+            'id',
+            'user_id',
+            'user_email',
+            'preference_key',
+            'preference_value',
+            'scope_type',
+            'scope_id',
+            'created_at',
+            'updated_at',
+            'last_accessed_at',
+        ]
+        read_only_fields = ['id', 'user_id', 'user_email', 'created_at', 'updated_at', 'last_accessed_at']
+
+    def validate_preference_key(self, value):
+        """Validate preference key format."""
+        if not value or len(value) > 255:
+            raise serializers.ValidationError("preference_key must be between 1 and 255 characters")
+        return value
+
+    def validate_scope_type(self, value):
+        """Validate scope type is in allowed choices."""
+        if value not in dict(UserPreference.SCOPE_CHOICES):
+            raise serializers.ValidationError(f"Invalid scope_type: {value}")
+        return value
+
+    def validate(self, data):
+        """Cross-field validation."""
+        scope_type = data.get('scope_type', UserPreference.SCOPE_GLOBAL)
+        scope_id = data.get('scope_id')
+
+        # If scope is not global, scope_id must be provided
+        if scope_type != UserPreference.SCOPE_GLOBAL and not scope_id:
+            raise serializers.ValidationError({
+                'scope_id': f'scope_id is required when scope_type is {scope_type}'
+            })
+
+        return data
+
+
+class UserPreferenceListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for listing user preferences.
+    """
+
+    class Meta:
+        model = UserPreference
+        fields = [
+            'id',
+            'preference_key',
+            'preference_value',
+            'scope_type',
+            'scope_id',
+            'updated_at',
+        ]
+
+
+class UserPreferenceBulkSerializer(serializers.Serializer):
+    """
+    Serializer for bulk preference operations.
+    Allows setting multiple preferences at once.
+    """
+
+    preferences = serializers.ListField(
+        child=serializers.DictField(),
+        allow_empty=False,
+        help_text="List of preference objects to set"
+    )
+
+    def validate_preferences(self, value):
+        """Validate each preference in the list."""
+        required_keys = {'preference_key', 'preference_value'}
+        optional_keys = {'scope_type', 'scope_id'}
+
+        for pref in value:
+            pref_keys = set(pref.keys())
+
+            # Check required keys
+            if not required_keys.issubset(pref_keys):
+                missing = required_keys - pref_keys
+                raise serializers.ValidationError(f"Missing required keys: {missing}")
+
+            # Check for extra keys
+            allowed_keys = required_keys | optional_keys
+            extra = pref_keys - allowed_keys
+            if extra:
+                raise serializers.ValidationError(f"Unexpected keys: {extra}")
+
+        return value
