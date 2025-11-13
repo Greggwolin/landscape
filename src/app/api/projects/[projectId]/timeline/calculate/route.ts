@@ -69,6 +69,5 @@ export async function POST(request: NextRequest, context: Params) {
 
 export async function GET(request: NextRequest, context: Params) {
   const { projectId } = await context.params;
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  return handleCalculation(projectId, body, { dryRun: true, triggerEvent: 'preview' });
+  return handleCalculation(projectId, {}, { dryRun: true, triggerEvent: 'preview' });
 }
