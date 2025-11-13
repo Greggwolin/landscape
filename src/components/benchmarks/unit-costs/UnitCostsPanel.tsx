@@ -836,33 +836,29 @@ export default function UnitCostsPanel() {
   }, []);
 
   return (
-    <div style={{ color: 'var(--cui-body-color)' }}>
+    <div className="text-text-primary">
       {/* Breadcrumb Header */}
-      <div className="flex justify-between items-center px-6 py-4 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
-        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-          <a href="/preferences" style={{ color: 'var(--cui-primary)', textDecoration: 'none' }}>Global Preferences</a>
-          <span style={{ color: 'var(--cui-border-color)' }}>/</span>
+      <div className="flex items-center justify-between border-b border-line-soft bg-surface-card px-6 py-4">
+        <div className="flex items-center gap-2 text-sm text-text-secondary">
+          <a href="/preferences" className="text-brand-primary no-underline">Global Preferences</a>
+          <span className="text-line-soft">/</span>
           <span>Cost Library</span>
         </div>
       </div>
 
       {/* Title Header */}
-      <header className="border-b px-6 py-4 flex flex-wrap items-center justify-between gap-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft bg-surface-card px-6 py-4">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--cui-body-color)' }}>Unit Cost Library · Development</h1>
+          <h1 className="text-xl font-semibold">Unit Cost Library · Development</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>Project Type</label>
+            <label className="text-xs uppercase tracking-wide text-text-secondary">Project Type</label>
             <select
               value={projectTypeFilter}
               onChange={(event) => setProjectTypeFilter(event.target.value)}
               className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-1"
-              style={{
-                backgroundColor: 'var(--cui-body-bg)',
-                borderColor: 'var(--cui-border-color)',
-                color: 'var(--cui-body-color)'
-              }}
+                className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary shadow-sm focus:border-brand-primary focus:outline-none"
             >
               {PROJECT_TYPE_OPTIONS.map((code) => (
                 <option key={code} value={code}>
@@ -874,28 +870,19 @@ export default function UnitCostsPanel() {
         </div>
       </header>
 
-      <main className="px-6 py-6 space-y-6" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <main className="space-y-6 bg-surface-card px-6 py-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex space-x-2">
             {COST_TYPE_TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveCostType(tab.key)}
-                className="rounded px-4 py-2 text-sm font-medium transition"
-                style={{
-                  backgroundColor: activeCostType === tab.key ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
-                  color: activeCostType === tab.key ? 'white' : 'var(--cui-body-color)',
-                }}
-                onMouseEnter={(e) => {
-                  if (activeCostType !== tab.key) {
-                    e.currentTarget.style.backgroundColor = 'var(--cui-border-color)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (activeCostType !== tab.key) {
-                    e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
-                  }
-                }}
+                className={clsx(
+                  'rounded border px-4 py-2 text-sm font-medium transition-colors',
+                  activeCostType === tab.key
+                    ? 'border-brand-primary bg-brand-primary text-text-inverse shadow'
+                    : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+                )}
               >
                 {tab.label}
               </button>
@@ -907,19 +894,14 @@ export default function UnitCostsPanel() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search unit costs…"
-              className="w-72 rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1"
-              style={{
-                backgroundColor: 'var(--cui-body-bg)',
-                borderColor: 'var(--cui-border-color)',
-                color: 'var(--cui-body-color)'
-              }}
+              className="w-72 rounded border border-line-soft bg-surface-bg px-3 py-2 text-sm text-text-primary shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary/30"
             />
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>Filter Categories:</span>
+            <span className="text-xs uppercase tracking-wide text-text-secondary">Filter Categories:</span>
             {filteredCategories
               .slice()
               .sort((a, b) => a.sort_order - b.sort_order)
@@ -929,69 +911,74 @@ export default function UnitCostsPanel() {
                   <button
                     key={category.category_id}
                     onClick={() => toggleCategoryFilter(category.category_id)}
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition border"
-                    style={{
-                      backgroundColor: isSelected ? 'rgba(251, 191, 36, 0.1)' : 'var(--cui-tertiary-bg)',
-                      color: isSelected ? '#f59e0b' : 'var(--cui-secondary-color)',
-                      borderColor: isSelected ? '#f59e0b' : 'var(--cui-border-color)'
-                    }}
+                    className={clsx(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+                      isSelected
+                        ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                        : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+                    )}
                   >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isSelected ? '#fbbf24' : 'var(--cui-border-color)' }} />
+                    <span
+                      className={clsx(
+                        'h-1.5 w-1.5 rounded-full',
+                        isSelected ? 'bg-brand-primary' : 'bg-line-soft'
+                      )}
+                    />
                     {category.category_name}
                   </button>
                 );
               })}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>Show Columns:</span>
-            <button
-              onClick={() => setVisibleColumns((prev) => ({ ...prev, quantity: !prev.quantity }))}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition border"
-              style={{
-                backgroundColor: visibleColumns.quantity ? 'rgba(59, 130, 246, 0.1)' : 'var(--cui-tertiary-bg)',
-                color: visibleColumns.quantity ? '#3b82f6' : 'var(--cui-secondary-color)',
-                borderColor: visibleColumns.quantity ? '#3b82f6' : 'var(--cui-border-color)'
-              }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: visibleColumns.quantity ? '#60a5fa' : 'var(--cui-border-color)' }} />
-              Qty
-            </button>
-            <button
-              onClick={() => setVisibleColumns((prev) => ({ ...prev, location: !prev.location }))}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition border"
-              style={{
-                backgroundColor: visibleColumns.location ? 'rgba(34, 197, 94, 0.1)' : 'var(--cui-tertiary-bg)',
-                color: visibleColumns.location ? '#22c55e' : 'var(--cui-secondary-color)',
-                borderColor: visibleColumns.location ? '#22c55e' : 'var(--cui-border-color)'
-              }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: visibleColumns.location ? '#4ade80' : 'var(--cui-border-color)' }} />
-              Location
-            </button>
-            <button
-              onClick={() => setVisibleColumns((prev) => ({ ...prev, source: !prev.source }))}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition border"
-              style={{
-                backgroundColor: visibleColumns.source ? 'rgba(168, 85, 247, 0.1)' : 'var(--cui-tertiary-bg)',
-                color: visibleColumns.source ? '#a855f7' : 'var(--cui-secondary-color)',
-                borderColor: visibleColumns.source ? '#a855f7' : 'var(--cui-border-color)'
-              }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: visibleColumns.source ? '#c084fc' : 'var(--cui-border-color)' }} />
-              Source
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wide text-text-secondary">Show Columns:</span>
+          <button
+            onClick={() => setVisibleColumns((prev) => ({ ...prev, quantity: !prev.quantity }))}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              visibleColumns.quantity
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+            )}
+          >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', visibleColumns.quantity ? 'bg-brand-primary' : 'bg-line-soft')} />
+            Qty
+          </button>
+          <button
+            onClick={() => setVisibleColumns((prev) => ({ ...prev, location: !prev.location }))}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              visibleColumns.location
+                ? 'border-chip-success bg-chip-success/10 text-chip-success'
+                : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+            )}
+          >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', visibleColumns.location ? 'bg-chip-success' : 'bg-line-soft')} />
+            Location
+          </button>
+          <button
+            onClick={() => setVisibleColumns((prev) => ({ ...prev, source: !prev.source }))}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              visibleColumns.source
+                ? 'border-brand-accent bg-brand-accent/10 text-brand-accent'
+                : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+            )}
+          >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', visibleColumns.source ? 'bg-brand-accent' : 'bg-line-soft')} />
+            Source
+          </button>
         </div>
+      </div>
 
-        {error && (
-          <div className="rounded border px-4 py-3 text-sm" style={{ borderColor: 'var(--cui-danger)', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}>
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="rounded border border-chip-error/60 bg-chip-error/10 px-4 py-3 text-sm text-chip-error">
+          {error}
+        </div>
+      )}
 
         {filteredCategories.length === 0 ? (
-          <div className="rounded border border-dashed border-slate-700 bg-slate-800/60 px-6 py-12 text-center text-slate-400">
+          <div className="rounded border border-dashed border-line-strong bg-surface-card/60 px-6 py-12 text-center text-text-secondary">
             No categories available for this filter. Adjust the project type or seed additional data.
           </div>
         ) : (
@@ -1065,7 +1052,7 @@ function UnifiedUnitCostTable({
         size: 150,
         enableSorting: true,
         cell: ({ getValue }) => (
-          <div className="px-1.5 py-0.5 text-sm text-slate-900">
+          <div className="px-1.5 py-0.5 text-sm text-text-primary">
             {String(getValue())}
           </div>
         )
@@ -1123,7 +1110,7 @@ function UnifiedUnitCostTable({
                 const meta = table.options.meta as TableMeta | undefined;
                 meta?.startEdit(row.original.rowKey, 'item_name');
               }}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-300 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-line-soft text-text-secondary hover:bg-surface-card focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
               title="Edit row"
             >
               <Pencil size={12} />
@@ -1131,7 +1118,7 @@ function UnifiedUnitCostTable({
             <button
               type="button"
               onClick={() => onDeleteRow(row.original)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
               title="Archive row"
             >
               <Trash2 size={12} />
@@ -1180,20 +1167,20 @@ function UnifiedUnitCostTable({
   return (
     <div className="space-y-3">
       {rows.length === 0 ? (
-        <div className="rounded border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+        <div className="rounded border border-dashed border-line-soft bg-surface-card px-4 py-6 text-sm text-text-secondary">
           No unit costs yet. Add line items to seed this category.
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded border border-slate-700">
-            <table className="min-w-full border-collapse bg-white">
+          <div className="overflow-x-auto rounded border border-line-strong">
+            <table className="min-w-full border-collapse bg-surface-card">
               <thead className="sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="border border-slate-300 bg-slate-100 px-1.5 py-1 text-xs font-semibold text-slate-700"
+                        className="border border-line-soft bg-surface-card px-1.5 py-1 text-xs font-semibold text-text-primary"
                         style={{ width: header.column.getSize() }}
                       >
                         {header.isPlaceholder ? null : (
@@ -1213,11 +1200,11 @@ function UnifiedUnitCostTable({
               </thead>
               <tbody>
                 {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
+                  <tr key={row.id} className="hover:bg-surface-card">
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="border border-slate-300 bg-white px-1.5 py-0.5 text-sm text-slate-900"
+                        className="border border-line-soft bg-surface-card px-1.5 py-0.5 text-sm text-text-primary"
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
@@ -1229,7 +1216,7 @@ function UnifiedUnitCostTable({
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm text-slate-400">
+            <div className="flex items-center justify-between text-sm text-text-secondary">
               <div>
                 Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
                 {Math.min(
@@ -1242,14 +1229,14 @@ function UnifiedUnitCostTable({
                 <button
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  className="rounded border border-slate-700 px-3 py-1 text-xs disabled:opacity-50"
+                  className="rounded border border-line-strong px-3 py-1 text-xs disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  className="rounded border border-slate-700 px-3 py-1 text-xs disabled:opacity-50"
+                  className="rounded border border-line-strong px-3 py-1 text-xs disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -1360,7 +1347,7 @@ function UnitCostCategoryTable({
                 const meta = table.options.meta as TableMeta | undefined;
                 meta?.startEdit(row.original.rowKey, 'item_name');
               }}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-300 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-line-soft text-text-secondary hover:bg-surface-card focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
               title="Edit row"
             >
               <Pencil size={12} />
@@ -1368,7 +1355,7 @@ function UnitCostCategoryTable({
             <button
               type="button"
               onClick={() => onDeleteRow(row.original)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
               title="Archive row"
             >
               <Trash2 size={12} />
@@ -1417,12 +1404,12 @@ function UnitCostCategoryTable({
   return (
     <div className="space-y-3">
       {rows.length === 0 ? (
-        <div className="rounded border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+        <div className="rounded border border-dashed border-line-soft bg-surface-card px-4 py-6 text-sm text-text-secondary">
           No unit costs yet. Add line items to seed this category.
           <div className="mt-4">
             <button
               onClick={onAddRow}
-              className="inline-flex items-center gap-2 rounded border border-blue-500 bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="inline-flex items-center gap-2 rounded border border-blue-500 bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
             >
               <Plus size={14} />
               Add Row
@@ -1430,8 +1417,8 @@ function UnitCostCategoryTable({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded border border-slate-700">
-          <table className="min-w-full border-collapse bg-white">
+        <div className="overflow-x-auto rounded border border-line-strong">
+          <table className="min-w-full border-collapse bg-surface-card">
             <thead className="sticky top-0 z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -1439,7 +1426,7 @@ function UnitCostCategoryTable({
                     <th
                       key={header.id}
                       style={{ width: header.getSize() }}
-                      className="border border-slate-300 bg-slate-100 px-1.5 py-1 text-left text-xs font-semibold text-slate-700"
+                      className="border border-line-soft bg-surface-card px-1.5 py-1 text-left text-xs font-semibold text-text-primary"
                     >
                       {header.isPlaceholder
                         ? null
@@ -1454,14 +1441,14 @@ function UnitCostCategoryTable({
                 <React.Fragment key={row.id}>
                   <tr className="hover:bg-blue-50/50">
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="border border-slate-300 bg-white px-1.5 py-0.5 text-sm text-slate-900">
+                      <td key={cell.id} className="border border-line-soft bg-surface-card px-1.5 py-0.5 text-sm text-text-primary">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                   {row.original.rowError && (
                     <tr>
-                      <td colSpan={table.getVisibleLeafColumns().length} className="border-x border-b border-slate-300 px-3 py-2">
+                      <td colSpan={table.getVisibleLeafColumns().length} className="border-x border-b border-line-soft px-3 py-2">
                         <div className="rounded border border-red-500/50 bg-red-50 px-3 py-2 text-xs text-red-700">
                           {row.original.rowError}
                         </div>
@@ -1476,16 +1463,16 @@ function UnitCostCategoryTable({
       )}
 
       {rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-end gap-2 text-xs text-slate-700">
+        <div className="flex items-center justify-end gap-2 text-xs text-text-primary">
           <button
-            className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            className="rounded border border-line-soft px-2 py-1 hover:bg-surface-card disabled:opacity-40"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
           >
             First
           </button>
           <button
-            className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            className="rounded border border-line-soft px-2 py-1 hover:bg-surface-card disabled:opacity-40"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
@@ -1495,14 +1482,14 @@ function UnitCostCategoryTable({
             Page {pagination.pageIndex + 1} of {totalPages}
           </span>
           <button
-            className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            className="rounded border border-line-soft px-2 py-1 hover:bg-surface-card disabled:opacity-40"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
             Next
           </button>
           <button
-            className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            className="rounded border border-line-soft px-2 py-1 hover:bg-surface-card disabled:opacity-40"
             onClick={() => table.setPageIndex(totalPages - 1)}
             disabled={!table.getCanNextPage()}
           >
@@ -1532,7 +1519,7 @@ function IndeterminateCheckbox({
       type="checkbox"
       ref={ref}
       className={clsx(
-        'h-4 w-4 rounded border border-slate-400 bg-white text-blue-600 focus:ring-blue-300',
+        'h-4 w-4 rounded border border-slate-400 bg-surface-card text-blue-600 focus:ring-brand-primary/40',
         className
       )}
       {...rest}
@@ -1644,9 +1631,9 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
           maxLength={maxLength}
           placeholder={placeholder}
           className={clsx(
-            'w-full border bg-white px-1.5 py-0.5 text-sm text-slate-900 focus:outline-none focus:ring-2',
+            'w-full border bg-surface-card px-1.5 py-0.5 text-sm text-text-primary focus:outline-none focus:ring-2',
             alignClass,
-            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-blue-300'
+            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-brand-primary/40'
           )}
           inputMode={type === 'number' || type === 'currency' ? 'decimal' : undefined}
           type={type === 'date' ? 'date' : 'text'}
@@ -1656,12 +1643,12 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
           className={clsx(
             'w-full px-1.5 py-0.5 text-sm',
             alignClass,
-            error ? 'text-red-600' : 'text-slate-900',
+            error ? 'text-chip-error' : 'text-text-primary',
             (required && !row.original[field]) ? 'font-medium' : ''
           )}
         >
           {displayValue || (
-            <span className={clsx('text-slate-400', required ? 'italic' : undefined)}>
+            <span className={clsx('text-text-secondary', required ? 'italic' : undefined)}>
               {required ? 'Required' : '—'}
             </span>
           )}
@@ -1669,7 +1656,7 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
       )}
       {(error || isSaving) && (
         <div className="flex items-center justify-between px-1.5">
-          {error && <span className="text-xs text-red-600">{error}</span>}
+          {error && <span className="text-xs text-chip-error">{error}</span>}
           {isSaving && <span className="text-xs text-green-600">Saving…</span>}
         </div>
       )}
@@ -1757,8 +1744,8 @@ function EditableSelectCell({ context, field, options, required = false }: Edita
           }}
           onBlur={handleBlur}
           className={clsx(
-            'w-full border bg-white px-1.5 py-0.5 text-center text-sm text-slate-900 focus:outline-none focus:ring-2',
-            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-blue-300'
+            'w-full border bg-surface-card px-1.5 py-0.5 text-center text-sm text-text-primary focus:outline-none focus:ring-2',
+            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-brand-primary/40'
           )}
         >
           {!required && <option value="">—</option>}
@@ -1769,13 +1756,13 @@ function EditableSelectCell({ context, field, options, required = false }: Edita
           ))}
         </select>
       ) : (
-        <div className="w-full px-1.5 py-0.5 text-center text-sm text-slate-900">
+        <div className="w-full px-1.5 py-0.5 text-center text-sm text-text-primary">
           {displayValue}
         </div>
       )}
       {(error || isSaving) && (
         <div className="flex items-center justify-between px-1.5">
-          {error && <span className="text-xs text-red-600">{error}</span>}
+          {error && <span className="text-xs text-chip-error">{error}</span>}
           {isSaving && <span className="text-xs text-green-600">Saving…</span>}
         </div>
       )}

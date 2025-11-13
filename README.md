@@ -271,3 +271,10 @@ DATABASE_URL=postgres://... npm run schema:md
 - API:
   - `GET /api/assumptions?project_id=7`
   - `POST /api/assumptions` with `{ project_id, commission_basis, demand_unit, uom }`
+
+# Optional (use at your own risk):
+# 1) Remove quarantine flags (post-install)
+xattr -dr com.apple.quarantine ~/Library/Caches/ms-playwright
+# 2) Ad-hoc sign cached Chromium app bundles (deep) to stabilize helpers
+#   Note: this is not notarized; may still fail under strict sandbox.
+find "$HOME/Library/Caches/ms-playwright" -type d -name "*.app" -maxdepth 3 -exec codesign --force --deep --sign - {} \;

@@ -8,6 +8,7 @@ import { getColumnsByMode, type BudgetItem } from './ColumnDefinitions';
 import type { BudgetMode } from './ModeSelector';
 import CategoryEditorRow from './custom/CategoryEditorRow';
 import GroupRow from './custom/GroupRow';
+import ExpandableDetailsRow from './custom/ExpandableDetailsRow';
 import { useBudgetGrouping } from '@/hooks/useBudgetGrouping';
 import { useBudgetVariance, getCategoryVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
 
@@ -23,8 +24,14 @@ interface Props {
     value: unknown
   ) => Promise<void> | void;
   onOpenModal?: (item: BudgetItem) => void;
-  onReconcile?: (variance: CategoryVariance) => void;
   projectTypeCode?: string;
+  onRequestRowAdd?: (item: BudgetItem) => void;
+  onRequestRowDelete?: (item: BudgetItem) => void;
+  onRequestGroupAdd?: (context: {
+    level: number;
+    pathIds: number[];
+    pathNames: string[];
+  }) => void;
 }
 
 export default function BudgetDataGrid({
@@ -35,10 +42,13 @@ export default function BudgetDataGrid({
   onRowSelect,
   onInlineCommit,
   onOpenModal,
-  onReconcile,
   projectTypeCode,
+  onRequestRowAdd,
+  onRequestRowDelete,
+  onRequestGroupAdd,
 }: Props) {
-  const [expandedFactId, setExpandedFactId] = useState<number | null>(null);
+  const [expandedFactId, setExpandedFactId] = useState<number | null>(null); // For category editor
+  const [expandedDetailsFactId, setExpandedDetailsFactId] = useState<number | null>(null); // For details row
 
   // Grouping functionality
   const {
@@ -113,6 +123,8 @@ export default function BudgetDataGrid({
       mode,
       isGrouped,
       projectTypeCode,
+      onRowAdd: onRequestRowAdd,
+      onRowDelete: onRequestRowDelete,
       onCategoryClick: mode === 'napkin' ? undefined : (item: BudgetItem) => {
         // Show editor row only in standard and detail modes (napkin uses inline editing)
         setExpandedFactId(expandedFactId === item.fact_id ? null : item.fact_id);
@@ -229,6 +241,14 @@ export default function BudgetDataGrid({
                   groupedRow.category_level!,
                   varianceData?.variances
                 );
+                const handleGroupAdd = onRequestGroupAdd
+                  ? () =>
+                      onRequestGroupAdd({
+                        level: groupedRow.category_level!,
+                        pathIds: groupedRow.category_path_ids ?? [],
+                        pathNames: groupedRow.category_path_names ?? [],
+                      })
+                  : undefined;
 
                 return (
                   <GroupRow
@@ -244,7 +264,7 @@ export default function BudgetDataGrid({
                     onToggle={() => toggleCategory(categoryKey)}
                     mode={mode}
                     variance={categoryVariance}
-                    onReconcile={onReconcile}
+                    onAddItem={handleGroupAdd}
                   />
                 );
               } else {
@@ -260,6 +280,8 @@ export default function BudgetDataGrid({
 
                 if (!tableRow) return null;
 
+                const isDetailsExpanded = expandedDetailsFactId === item.fact_id;
+
                 return (
                   <React.Fragment key={`item-${item.fact_id}`}>
                     <tr
@@ -267,9 +289,26 @@ export default function BudgetDataGrid({
                       className={isSelected ? 'table-active' : undefined}
                       style={{ cursor: 'pointer' }}
                     >
-                      {tableRow.getVisibleCells().map((cell) => (
+                      {tableRow.getVisibleCells().map((cell, cellIndex) => (
                         <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          <div className="d-flex align-items-center gap-2">
+                            {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
+                              <button
+                                className="btn btn-sm btn-link p-0 text-decoration-none"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
+                                }}
+                                title="Toggle details"
+                                style={{ fontSize: '0.875rem', lineHeight: 1 }}
+                              >
+                                {isDetailsExpanded ? '▼' : '▶'}
+                              </button>
+                            )}
+                            <div className="flex-grow-1">
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </div>
+                          </div>
                         </td>
                       ))}
                     </tr>
@@ -286,6 +325,14 @@ export default function BudgetDataGrid({
                         </td>
                       </tr>
                     )}
+                    {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
+                      <ExpandableDetailsRow
+                        item={item}
+                        mode={mode}
+                        columnCount={tableRow.getVisibleCells().length}
+                        onInlineCommit={onInlineCommit}
+                      />
+                    )}
                   </React.Fragment>
                 );
               }
@@ -295,6 +342,7 @@ export default function BudgetDataGrid({
             table.getRowModel().rows.map((row) => {
               const isSelected = selectedItem?.fact_id === row.original.fact_id;
               const isExpanded = expandedFactId === row.original.fact_id;
+              const isDetailsExpanded = expandedDetailsFactId === row.original.fact_id;
 
               return (
                 <React.Fragment key={row.id}>
@@ -303,9 +351,26 @@ export default function BudgetDataGrid({
                     className={isSelected ? 'table-active' : undefined}
                     style={{ cursor: 'pointer' }}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell, cellIndex) => (
                       <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        <div className="d-flex align-items-center gap-2">
+                          {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
+                            <button
+                              className="btn btn-sm btn-link p-0 text-decoration-none"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
+                              }}
+                              title="Toggle details"
+                              style={{ fontSize: '0.875rem', lineHeight: 1 }}
+                            >
+                              {isDetailsExpanded ? '▼' : '▶'}
+                            </button>
+                          )}
+                          <div className="flex-grow-1">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                        </div>
                       </td>
                     ))}
                   </tr>
@@ -321,6 +386,14 @@ export default function BudgetDataGrid({
                         />
                       </td>
                     </tr>
+                  )}
+                  {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
+                    <ExpandableDetailsRow
+                      item={row.original}
+                      mode={mode}
+                      columnCount={row.getVisibleCells().length}
+                      onInlineCommit={onInlineCommit}
+                    />
                   )}
                 </React.Fragment>
               );

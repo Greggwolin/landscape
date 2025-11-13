@@ -1,102 +1,279 @@
-"""ViewSets for unit cost templates, categories, and planning standards."""
+"""ViewSets for unit cost items, categories, and planning standards.
+
+Renamed from "templates" to "items" in migration 0018 to eliminate confusion
+with page templates. These ViewSets handle individual cost line items.
+"""
 
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models_benchmarks import (
+    CategoryTagLibrary,
+    CategoryLifecycleStage,
     UnitCostCategory,
-    UnitCostTemplate,
-    TemplateBenchmarkLink,
+    UnitCostItem,  # Renamed from UnitCostTemplate in migration 0018
+    ItemBenchmarkLink,  # Renamed from TemplateBenchmarkLink in migration 0018
     PlanningStandard,
     BenchmarkAISuggestion,
 )
 from .serializers_unit_costs import (
+    CategoryTagLibrarySerializer,
     UnitCostCategorySerializer,
-    StageGroupedCategoriesSerializer,
-    UnitCostTemplateListSerializer,
-    UnitCostTemplateDetailSerializer,
-    UnitCostTemplateWriteSerializer,
+    UnitCostCategoryHierarchySerializer,
+    UnitCostItemListSerializer,  # Renamed from UnitCostTemplateListSerializer
+    UnitCostItemDetailSerializer,  # Renamed from UnitCostTemplateDetailSerializer
+    UnitCostItemWriteSerializer,  # Renamed from UnitCostTemplateWriteSerializer
     PlanningStandardSerializer,
 )
 
 
-class UnitCostCategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """Expose unit cost categories with template counts for UI filters."""
+class CategoryTagLibraryViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing category tags."""
+
+    queryset = CategoryTagLibrary.objects.all()
+    serializer_class = CategoryTagLibrarySerializer
+    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
+
+    def get_queryset(self):
+        """Filter tags by context and active status."""
+        qs = super().get_queryset()
+        tag_context = self.request.query_params.get('tag_context')
+        is_system_default = self.request.query_params.get('is_system_default')
+        is_active = self.request.query_params.get('is_active', 'true')
+
+        if tag_context:
+            qs = qs.filter(tag_context__icontains=tag_context)
+        if is_system_default is not None:
+            qs = qs.filter(is_system_default=(is_system_default.lower() == 'true'))
+        if is_active.lower() == 'true':
+            qs = qs.filter(is_active=True)
+
+        return qs.order_by('display_order', 'tag_name')
+
+
+class UnitCostCategoryViewSet(viewsets.ModelViewSet):
+    """Full CRUD for unit cost categories with lifecycle stages and tag-based filtering."""
 
     serializer_class = UnitCostCategorySerializer
     queryset = UnitCostCategory.objects.filter(is_active=True)
+    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
+
+    def perform_update(self, serializer):
+        """Custom update to handle lifecycle_stages many-to-many relationship."""
+        from django.db import connection
+
+        instance = serializer.save()
+
+        # Handle lifecycle_stages update if provided in request data
+        if 'lifecycle_stages' in self.request.data:
+            new_stages = self.request.data.get('lifecycle_stages', [])
+
+            # Clear existing lifecycle stages
+            CategoryLifecycleStage.objects.filter(category_id=instance.category_id).delete()
+
+            # Add new lifecycle stages using raw SQL (table has no id column)
+            if new_stages:
+                with connection.cursor() as cursor:
+                    for stage in new_stages:
+                        cursor.execute(
+                            """
+                            INSERT INTO landscape.core_category_lifecycle_stages
+                            (category_id, lifecycle_stage, sort_order, created_at, updated_at)
+                            VALUES (%s, %s, 0, NOW(), NOW())
+                            ON CONFLICT (category_id, lifecycle_stage) DO NOTHING
+                            """,
+                            [instance.category_id, stage]
+                        )
+
+            instance.updated_at = timezone.now()
+            instance.save(update_fields=['updated_at'])
+
+    def perform_destroy(self, instance):
+        """Soft delete categories by toggling is_active."""
+        instance.is_active = False
+        instance.updated_at = timezone.now()
+        instance.save(update_fields=['is_active', 'updated_at'])
 
     def get_queryset(self):
-        """Apply filters and annotate template counts."""
+        """Apply filters and annotate item counts."""
         qs = super().get_queryset()
-        cost_scope = self.request.query_params.get('cost_scope')
-        cost_type = self.request.query_params.get('cost_type')
-        development_stage = self.request.query_params.get('development_stage')
+        lifecycle_stage = self.request.query_params.get('lifecycle_stage')
+        tag = self.request.query_params.get('tag')
+        parent_id = self.request.query_params.get('parent')
         project_type_code = self.request.query_params.get('project_type_code')
 
-        if cost_scope:
-            qs = qs.filter(cost_scope=cost_scope)
-        if cost_type:
-            qs = qs.filter(cost_type=cost_type)
-        if development_stage:
-            qs = qs.filter(development_stage=development_stage)
+        # Filter by lifecycle stage (using pivot table)
+        if lifecycle_stage:
+            qs = qs.filter(
+                category_id__in=CategoryLifecycleStage.objects.filter(
+                    lifecycle_stage=lifecycle_stage
+                ).values_list('category_id', flat=True)
+            )
 
-        template_filter = Q(templates__is_active=True)
+        # Filter by tag (categories containing this tag)
+        if tag:
+            qs = qs.filter(tags__contains=[tag])
+
+        # Filter by parent (for hierarchy navigation)
+        if parent_id:
+            if parent_id.lower() == 'null':
+                qs = qs.filter(parent__isnull=True)
+            else:
+                qs = qs.filter(parent_id=parent_id)
+
+        # Build item filter
+        item_filter = Q(items__is_active=True)
         if project_type_code:
-            template_filter &= Q(templates__project_type_code__iexact=project_type_code)
+            item_filter &= Q(items__project_type_code__iexact=project_type_code)
 
         return qs.annotate(
-            template_count=Count('templates', filter=template_filter, distinct=True)
-        ).order_by('development_stage', 'sort_order', 'category_name')
+            item_count=Count('items', filter=item_filter, distinct=True)
+        ).order_by('sort_order', 'category_name')
 
-    @action(detail=False, methods=['get'], url_path='by-stage')
-    def by_stage(self, request):
+    @action(detail=False, methods=['get'])
+    def hierarchy(self, request):
         """
-        Get all categories grouped by development stage.
+        Return categories as nested hierarchy.
 
-        Returns:
-            {
-                "stage1_entitlements": [...],
-                "stage2_engineering": [...],
-                "stage3_development": [...]
-            }
+        Query params:
+            ?lifecycle_stage=Development (optional)
         """
+        lifecycle_stage = request.query_params.get('lifecycle_stage')
+
+        queryset = UnitCostCategory.objects.filter(parent__isnull=True, is_active=True)
+        if lifecycle_stage:
+            # Filter by lifecycle stage using pivot table
+            queryset = queryset.filter(
+                category_id__in=CategoryLifecycleStage.objects.filter(
+                    lifecycle_stage=lifecycle_stage
+                ).values_list('category_id', flat=True)
+            )
+
+        queryset = queryset.order_by('sort_order', 'category_name')
+        serializer = UnitCostCategoryHierarchySerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='by-tag')
+    def by_tag(self, request):
+        """
+        Get categories filtered by tag.
+
+        Query params:
+            ?tag=Hard (required)
+            ?lifecycle_stage=Development (optional)
+        """
+        tag = request.query_params.get('tag')
+        if not tag:
+            return Response(
+                {'error': 'tag parameter required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        lifecycle_stage = request.query_params.get('lifecycle_stage')
+
+        queryset = UnitCostCategory.objects.filter(
+            tags__contains=[tag],
+            is_active=True
+        )
+
+        if lifecycle_stage:
+            # Filter by lifecycle stage using pivot table
+            queryset = queryset.filter(
+                category_id__in=CategoryLifecycleStage.objects.filter(
+                    lifecycle_stage=lifecycle_stage
+                ).values_list('category_id', flat=True)
+            )
+
+        queryset = queryset.order_by('sort_order', 'category_name')
+
+        # Annotate with item counts
         project_type_code = request.query_params.get('project_type_code')
-
-        # Build template filter
-        template_filter = Q(templates__is_active=True)
+        item_filter = Q(items__is_active=True)
         if project_type_code:
-            template_filter &= Q(templates__project_type_code__iexact=project_type_code)
+            item_filter &= Q(items__project_type_code__iexact=project_type_code)
 
-        # Get categories annotated with template counts
-        categories = UnitCostCategory.objects.filter(is_active=True).annotate(
-            template_count=Count('templates', filter=template_filter, distinct=True)
-        ).order_by('development_stage', 'sort_order', 'category_name')
+        queryset = queryset.annotate(
+            item_count=Count('items', filter=item_filter, distinct=True)
+        )
 
-        # Group by stage
-        grouped = {
-            'stage1_entitlements': [],
-            'stage2_engineering': [],
-            'stage3_development': []
-        }
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
-        for cat in categories:
-            stage = cat.development_stage
-            if stage in grouped:
-                serialized = UnitCostCategorySerializer(cat).data
-                grouped[stage].append(serialized)
+    @action(detail=True, methods=['post'], url_path='add-tag')
+    def add_tag(self, request, pk=None):
+        """Add a tag to this category."""
+        category = self.get_object()
+        tag_name = request.data.get('tag_name')
 
-        return Response(grouped)
+        if not tag_name:
+            return Response(
+                {'error': 'tag_name required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category.add_tag(tag_name)
+        serializer = self.get_serializer(category)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='remove-tag')
+    def remove_tag(self, request, pk=None):
+        """Remove a tag from this category."""
+        category = self.get_object()
+        tag_name = request.data.get('tag_name')
+
+        if not tag_name:
+            return Response(
+                {'error': 'tag_name required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category.remove_tag(tag_name)
+        serializer = self.get_serializer(category)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='deletion-impact')
+    def deletion_impact(self, request, pk=None):
+        """Get impact analysis before deleting a category."""
+        category = self.get_object()
+
+        # Get child categories
+        children = UnitCostCategory.objects.filter(
+            parent_id=category.category_id,
+            is_active=True
+        ).values('category_id', 'category_name')
+
+        # Get item count
+        item_count = UnitCostItem.objects.filter(
+            category_id=category.category_id,
+            is_active=True
+        ).count()
+
+        # Get project usage count (if budget items reference this category)
+        # This would require checking core_budget_item table
+        project_usage_count = 0  # Placeholder
+
+        return Response({
+            'category_id': category.category_id,
+            'category_name': category.category_name,
+            'child_categories': list(children),
+            'item_count': item_count,
+            'project_usage_count': project_usage_count,
+        })
 
 
-class UnitCostTemplateViewSet(viewsets.ModelViewSet):
-    """Full CRUD for unit cost templates, including AI ingestion."""
+class UnitCostItemViewSet(viewsets.ModelViewSet):
+    """Full CRUD for unit cost items, with lifecycle and tag-based filtering.
 
-    queryset = UnitCostTemplate.objects.select_related('category', 'created_from_project')
+    Renamed from UnitCostTemplateViewSet in migration 0018.
+    """
+
+    queryset = UnitCostItem.objects.select_related('category', 'created_from_project')
+    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def get_queryset(self):
         qs = self.queryset
@@ -108,10 +285,19 @@ class UnitCostTemplateViewSet(viewsets.ModelViewSet):
         if category_id:
             qs = qs.filter(category_id=category_id)
 
-        # Filter by development stage (via category relationship)
-        development_stage = self.request.query_params.get('development_stage')
-        if development_stage:
-            qs = qs.filter(category__development_stage=development_stage)
+        # Filter by lifecycle stage (via category pivot table)
+        lifecycle_stage = self.request.query_params.get('lifecycle_stage')
+        if lifecycle_stage:
+            qs = qs.filter(
+                category_id__in=CategoryLifecycleStage.objects.filter(
+                    lifecycle_stage=lifecycle_stage
+                ).values_list('category_id', flat=True)
+            )
+
+        # Filter by tag (via category relationship)
+        tag = self.request.query_params.get('tag')
+        if tag:
+            qs = qs.filter(category__tags__contains=[tag])
 
         project_type_code = self.request.query_params.get('project_type_code')
         if project_type_code:
@@ -127,45 +313,19 @@ class UnitCostTemplateViewSet(viewsets.ModelViewSet):
 
         return qs.annotate(
             has_benchmarks=Exists(
-                TemplateBenchmarkLink.objects.filter(template_id=OuterRef('template_id'))
+                ItemBenchmarkLink.objects.filter(item_id=OuterRef('item_id'))
             )
         ).order_by('item_name')
 
-    @action(detail=False, methods=['get'], url_path='by-stage')
-    def by_stage(self, request):
-        """
-        Get templates filtered by development stage.
-
-        Query params:
-            ?stage=stage1_entitlements
-            ?stage=stage2_engineering
-            ?stage=stage3_development
-            ?project_type_code=LAND (optional)
-            ?search=keyword (optional)
-        """
-        stage = request.query_params.get('stage')
-
-        if not stage:
-            return Response(
-                {'error': 'stage parameter required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Get templates for this stage via category relationship
-        qs = self.get_queryset().filter(category__development_stage=stage)
-
-        serializer = UnitCostTemplateListSerializer(qs, many=True)
-        return Response(serializer.data)
-
     def get_serializer_class(self):
         if self.action == 'list':
-            return UnitCostTemplateListSerializer
+            return UnitCostItemListSerializer
         if self.action in {'create', 'update', 'partial_update', 'from_ai'}:
-            return UnitCostTemplateWriteSerializer
-        return UnitCostTemplateDetailSerializer
+            return UnitCostItemWriteSerializer
+        return UnitCostItemDetailSerializer
 
     def perform_destroy(self, instance):
-        """Soft delete templates by toggling is_active."""
+        """Soft delete items by toggling is_active."""
         instance.is_active = False
         instance.updated_at = timezone.now()
         instance.save(update_fields=['is_active', 'updated_at'])
@@ -173,15 +333,15 @@ class UnitCostTemplateViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='from-ai')
     def from_ai(self, request):
         """
-        Accept an AI-generated suggestion and persist as a template.
+        Accept an AI-generated suggestion and persist as an item.
 
-        Expects the same payload as POST /templates plus optional suggestion_id.
+        Expects the same payload as POST /items plus optional suggestion_id.
         """
         data = request.data.copy()
         suggestion_id = data.pop('suggestion_id', None)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        template = serializer.save(created_from_ai=True)
+        item = serializer.save(created_from_ai=True)
 
         if suggestion_id:
             reviewer = None
@@ -193,15 +353,21 @@ class UnitCostTemplateViewSet(viewsets.ModelViewSet):
                 status='accepted',
                 reviewed_at=timezone.now(),
                 reviewed_by=reviewer,
-                created_benchmark_id=template.template_id,
+                created_benchmark_id=item.item_id,
             )
 
-        detail = UnitCostTemplateDetailSerializer(template, context=self.get_serializer_context())
+        detail = UnitCostItemDetailSerializer(item, context=self.get_serializer_context())
         return Response(detail.data, status=status.HTTP_201_CREATED)
+
+
+# Backward compatibility alias
+UnitCostTemplateViewSet = UnitCostItemViewSet
 
 
 class PlanningStandardView(APIView):
     """Retrieve and update the global planning defaults."""
+
+    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def get(self, request):
         standard = PlanningStandard.objects.filter(is_active=True).order_by('standard_id').first()

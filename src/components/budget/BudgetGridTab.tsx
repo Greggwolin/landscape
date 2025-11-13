@@ -1,12 +1,23 @@
 // v1.5 · 2025-11-07 · Added area/phase filters
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { CButton, CCard, CCardBody, CNav, CNavItem, CNavLink } from '@coreui/react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  CButton,
+  CCard,
+  CCardBody,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
+  CNav,
+  CNavItem,
+  CNavLink,
+} from '@coreui/react';
 import ModeSelector, { type BudgetMode } from './ModeSelector';
 import BudgetDataGrid from './BudgetDataGrid';
 import TimelineChart from './custom/TimelineChart';
-import BudgetHealthWidget from './BudgetHealthWidget';
 import FiltersAccordion from './FiltersAccordion';
 import { useBudgetData } from './hooks/useBudgetData';
 import type { BudgetItem } from './ColumnDefinitions';
@@ -15,10 +26,11 @@ import TimelineTab from './TimelineTab';
 import AssumptionsTab from './AssumptionsTab';
 import AnalysisTab from './AnalysisTab';
 import CostCategoriesTab from './CostCategoriesTab';
-import VarianceAlertModal from './VarianceAlertModal';
-import ReconciliationModal from './ReconciliationModal';
-import { useBudgetVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
+import QuickAddCategoryModal from './QuickAddCategoryModal';
+import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
+import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
+import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
 
 interface Props {
   projectId: number;
@@ -26,22 +38,61 @@ interface Props {
 
 type SubTab = 'grid' | 'timeline' | 'assumptions' | 'analysis' | 'categories';
 
+// Helper to check if project is Land Development type
+function isLandDevelopmentProject(projectTypeCode?: string): boolean {
+  if (!projectTypeCode) return false;
+  // Check if the project type code matches any Land Development subtype
+  return LAND_DEVELOPMENT_SUBTYPES.some(
+    subtype => projectTypeCode.toUpperCase() === subtype.toUpperCase()
+  );
+}
+
 export default function BudgetGridTab({ projectId }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('grid');
   const [mode, setMode] = useState<BudgetMode>('napkin');
-  const [pendingMode, setPendingMode] = useState<BudgetMode | null>(null);
   const [selected, setSelected] = useState<BudgetItem | undefined>();
   const [showGantt, setShowGantt] = useState(false);
-  const [showHealthWidget, setShowHealthWidget] = useState(true);
-  const [showVarianceAlert, setShowVarianceAlert] = useState(false);
-  const [showReconciliationModal, setShowReconciliationModal] = useState(false);
-  const [varianceToReconcile, setVarianceToReconcile] = useState<CategoryVariance | null>(null);
   const [projectTypeCode, setProjectTypeCode] = useState<string | undefined>(undefined);
-  const previousMode = useRef<BudgetMode>('napkin');
+
+  const filterStorageKey = `budget_filters_${projectId}`;
+  const getStoredFilters = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(filterStorageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
 
   // Container filtering state
-  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
-  const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
+  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>(() => getStoredFilters()?.areas ?? []);
+  const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>(() => getStoredFilters()?.phases ?? []);
+  const [includeProjectLevel, setIncludeProjectLevel] = useState<boolean>(() => {
+    const stored = getStoredFilters();
+    return stored?.includeProjectLevel ?? true;
+  });
+
+  useEffect(() => {
+    const stored = getStoredFilters();
+    setSelectedAreaIds(stored?.areas ?? []);
+    setSelectedPhaseIds(stored?.phases ?? []);
+    setIncludeProjectLevel(stored?.includeProjectLevel ?? true);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      areas: selectedAreaIds,
+      phases: selectedPhaseIds,
+      includeProjectLevel,
+    };
+    try {
+      window.localStorage.setItem(filterStorageKey, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Unable to persist budget filters', err);
+    }
+  }, [selectedAreaIds, selectedPhaseIds, includeProjectLevel, filterStorageKey]);
 
   const {
     data: rawData,
@@ -56,146 +107,112 @@ export default function BudgetGridTab({ projectId }: Props) {
   // Get container hierarchy for filtering
   const { phases } = useContainers({ projectId, includeCosts: false });
 
+  const projectLevelCount = useMemo(
+    () => rawData.filter(item => !item.container_id).length,
+    [rawData]
+  );
+
   // Filter budget data by selected containers
   const data = useMemo(() => {
-    if (selectedAreaIds.length === 0 && selectedPhaseIds.length === 0) {
-      return rawData;
-    }
+    const containerFilterActive = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
 
-    // Build set of container IDs to include
     const containerIds = new Set<number>();
-
-    // Add selected areas
     selectedAreaIds.forEach(id => containerIds.add(id));
-
-    // Add selected phases
     selectedPhaseIds.forEach(id => containerIds.add(id));
 
-    // If areas are selected but no specific phases, include all phases in those areas
     if (selectedAreaIds.length > 0 && selectedPhaseIds.length === 0) {
       phases
         .filter(phase => selectedAreaIds.includes(phase.parent_id!))
         .forEach(phase => containerIds.add(phase.container_id));
     }
 
-    // Filter budget items by container_id
     return rawData.filter(item => {
-      if (!item.container_id) return true; // Always show project-level items
+      if (!item.container_id) {
+        return includeProjectLevel;
+      }
+      if (!containerFilterActive) {
+        return true;
+      }
       return containerIds.has(item.container_id);
     });
-  }, [rawData, selectedAreaIds, selectedPhaseIds, phases]);
+  }, [rawData, selectedAreaIds, selectedPhaseIds, phases, includeProjectLevel]);
 
   const [modalState, setModalState] = useState<{
     open: boolean;
     mode: 'create' | 'edit';
     item?: BudgetItem | null;
-  }>({ open: false, mode: 'create', item: undefined });
+    initialValues?: Partial<BudgetItemFormValues>;
+  }>({ open: false, mode: 'create', item: undefined, initialValues: undefined });
+  const [pendingDelete, setPendingDelete] = useState<BudgetItem | null>(null);
 
-  // Fetch variance data (only when switching to napkin mode from standard/detail)
-  const { data: varianceData } = useBudgetVariance(
-    projectId,
-    5, // min_variance_pct = 5% for alerts
-    pendingMode === 'napkin' && (previousMode.current === 'standard' || previousMode.current === 'detail')
-  );
+  const activeContainerContext = useMemo(() => {
+    if (selectedPhaseIds.length === 1) {
+      return selectedPhaseIds[0];
+    }
+    if (selectedAreaIds.length === 1 && selectedPhaseIds.length === 0) {
+      return selectedAreaIds[0];
+    }
+    return null;
+  }, [selectedAreaIds, selectedPhaseIds]);
+
+  // Quick-add category modal state
+  const [quickAddCategoryOpen, setQuickAddCategoryOpen] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<BudgetCategory[]>([]);
 
   // Check if any items have dates (to determine if Gantt should be available)
   const hasDateData = data.some(
     (item) => item.start_date || item.end_date || item.start_period || item.periods_to_complete
   );
 
-  // Mode change handler with variance alert
+  // Mode change handler
   const handleModeChange = (newMode: BudgetMode) => {
-    const isFromStandardOrDetail = mode === 'standard' || mode === 'detail';
-    const isToNapkin = newMode === 'napkin';
-
-    // Check if alert has been dismissed for this session
-    const sessionKey = `variance_alert_dismissed_${projectId}`;
-    const alertDismissed = sessionStorage.getItem(sessionKey) === 'true';
-
-    if (isFromStandardOrDetail && isToNapkin && !alertDismissed) {
-      // Store pending mode change and fetch variance data
-      setPendingMode(newMode);
-    } else {
-      // No alert needed, just change mode
-      previousMode.current = mode;
-      setMode(newMode);
-    }
+    setMode(newMode);
   };
 
-  // Show variance alert when variance data is loaded
-  useEffect(() => {
-    if (pendingMode === 'napkin' && varianceData) {
-      const materialVariances = varianceData.variances.filter(
-        v => v.variance_pct !== null && Math.abs(v.variance_pct) > 5
-      );
+  const handleProjectLevelToggle = (value: boolean) => {
+    setIncludeProjectLevel(value);
+  };
 
-      if (materialVariances.length > 0) {
-        setShowVarianceAlert(true);
-      } else {
-        // No material variances, proceed with mode change
-        previousMode.current = mode;
-        setMode(pendingMode);
-        setPendingMode(null);
+  const handleAddFromRow = (item: BudgetItem) => {
+    openCreateModalWithDefaults({
+      container_id: item.container_id ?? null,
+      category_l1_id: item.category_l1_id ?? null,
+      category_l2_id: item.category_l2_id ?? null,
+      category_l3_id: item.category_l3_id ?? null,
+      category_l4_id: item.category_l4_id ?? null,
+    });
+  };
+
+  const handleGroupAdd = (context: { level: number; pathIds: number[]; pathNames: string[] }) => {
+    openCreateModalWithDefaults({
+      container_id: activeContainerContext ?? null,
+      category_l1_id: context.pathIds[0] ?? null,
+      category_l2_id: context.pathIds[1] ?? null,
+      category_l3_id: context.pathIds[2] ?? null,
+      category_l4_id: context.pathIds[3] ?? null,
+    });
+  };
+
+  const handleRequestDelete = (item: BudgetItem) => {
+    setPendingDelete(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await deleteItem(pendingDelete.fact_id);
+      if (selected?.fact_id === pendingDelete.fact_id) {
+        setSelected(undefined);
       }
+    } catch (err) {
+      console.error('Failed to delete budget item', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete budget item, please try again.');
+    } finally {
+      setPendingDelete(null);
     }
-  }, [varianceData, pendingMode, mode]);
-
-  // Variance alert handlers
-  const handleVarianceAlertClose = () => {
-    setShowVarianceAlert(false);
-    setPendingMode(null);
   };
 
-  const handleReconcileNow = () => {
-    // Switch to standard mode instead (where variance is visible)
-    previousMode.current = mode;
-    setMode('standard');
-    setShowVarianceAlert(false);
-    setPendingMode(null);
-
-    // Mark alert as dismissed for this session
-    sessionStorage.setItem(`variance_alert_dismissed_${projectId}`, 'true');
-  };
-
-  const handleSwitchToStandard = () => {
-    // Switch to standard mode
-    previousMode.current = mode;
-    setMode('standard');
-    setShowVarianceAlert(false);
-    setPendingMode(null);
-
-    // Mark alert as dismissed for this session
-    sessionStorage.setItem(`variance_alert_dismissed_${projectId}`, 'true');
-  };
-
-  const handleContinueAnyway = () => {
-    // Proceed with napkin mode change
-    if (pendingMode) {
-      previousMode.current = mode;
-      setMode(pendingMode);
-    }
-    setShowVarianceAlert(false);
-    setPendingMode(null);
-
-    // Mark alert as dismissed for this session
-    sessionStorage.setItem(`variance_alert_dismissed_${projectId}`, 'true');
-  };
-
-  // Reconciliation modal handlers
-  const handleReconcileVariance = (variance: CategoryVariance) => {
-    setVarianceToReconcile(variance);
-    setShowReconciliationModal(true);
-  };
-
-  const handleReconciliationComplete = () => {
-    // Refresh budget data after reconciliation
-    refetch();
-  };
-
-  const handleReconciliationModalClose = () => {
-    setShowReconciliationModal(false);
-    setVarianceToReconcile(null);
-  };
+  const handleCancelDelete = () => setPendingDelete(null);
 
   // Container filter handlers
   const handleAreaSelect = (areaId: number | null) => {
@@ -227,6 +244,9 @@ export default function BudgetGridTab({ projectId }: Props) {
     setSelectedAreaIds([]);
     setSelectedPhaseIds([]);
   };
+
+  // Note: QuickAddCategoryModal fetches its own categories from /api/budget/categories if needed
+  // The legacy /api/financial/budget-categories endpoint has been deprecated
 
   useEffect(() => {
     const fetchProjectMetadata = async () => {
@@ -262,6 +282,19 @@ export default function BudgetGridTab({ projectId }: Props) {
       'rate',
       'uom_code',
       'notes',
+      'container_id',
+      'start_period',
+      'periods_to_complete',
+      'start_date',
+      'end_date',
+      'vendor_name',
+      'escalation_rate',
+      'contingency_pct',
+      'timing_method',
+      'funding_id',
+      'curve_id',
+      'milestone_id',
+      'cf_start_flag',
       'category_l1_id',
       'category_l2_id',
       'category_l3_id',
@@ -313,16 +346,21 @@ export default function BudgetGridTab({ projectId }: Props) {
     }
   };
 
+  const openCreateModalWithDefaults = (initialValues?: Partial<BudgetItemFormValues>) => {
+    setModalState({ open: true, mode: 'create', item: undefined, initialValues });
+  };
+
   const openCreateModal = () => {
-    setModalState({ open: true, mode: 'create', item: undefined });
+    openCreateModalWithDefaults();
   };
 
   const openEditModal = (item: BudgetItem) => {
     setSelected(item);
-    setModalState({ open: true, mode: 'edit', item });
+    setModalState({ open: true, mode: 'edit', item, initialValues: undefined });
   };
 
-  const closeModal = () => setModalState((prev) => ({ ...prev, open: false }));
+  const closeModal = () =>
+    setModalState((prev) => ({ ...prev, open: false, initialValues: undefined }));
 
   const handleModalSave = async (values: BudgetItemFormValues) => {
     if (modalState.mode === 'create') {
@@ -341,6 +379,15 @@ export default function BudgetGridTab({ projectId }: Props) {
         vendor_name: values.vendor_name ?? null,
         notes: values.notes,
         uom_code: values.uom_code,
+        escalation_rate: values.escalation_rate ?? null,
+        contingency_pct: values.contingency_pct ?? null,
+        timing_method: values.timing_method ?? null,
+        funding_id: values.funding_id ?? null,
+        curve_id: values.curve_id ?? null,
+        milestone_id: values.milestone_id ?? null,
+        cf_start_flag: values.cf_start_flag ?? null,
+        start_date: values.start_date ?? null,
+        end_date: values.end_date ?? null,
       });
     } else if (modalState.item) {
       const patch: Partial<BudgetItem> = {
@@ -352,6 +399,15 @@ export default function BudgetGridTab({ projectId }: Props) {
         vendor_name: values.vendor_name ?? null,
         notes: values.notes,
         uom_code: values.uom_code,
+        escalation_rate: values.escalation_rate ?? null,
+        contingency_pct: values.contingency_pct ?? null,
+        timing_method: values.timing_method ?? null,
+        funding_id: values.funding_id ?? null,
+        curve_id: values.curve_id ?? null,
+        milestone_id: values.milestone_id ?? null,
+        cf_start_flag: values.cf_start_flag ?? null,
+        start_date: values.start_date ?? null,
+        end_date: values.end_date ?? null,
       };
 
       await updateItem(modalState.item.fact_id, patch);
@@ -372,6 +428,12 @@ export default function BudgetGridTab({ projectId }: Props) {
     if (selected?.fact_id === modalState.item.fact_id) {
       setSelected(undefined);
     }
+  };
+
+  const handleQuickAddSuccess = (newCategory: QuickAddCategoryResponse) => {
+    // Add new category to available categories
+    setAvailableCategories((prev) => [...prev, newCategory]);
+    // Could also auto-select this category in the grid if needed
   };
 
   if (loading) {
@@ -437,6 +499,9 @@ export default function BudgetGridTab({ projectId }: Props) {
         {/* Tab Content */}
         {activeSubTab === 'grid' && (
           <>
+            {/* Incomplete Categories Reminder */}
+            <IncompleteCategoriesReminder projectId={projectId} className="mb-3" />
+
             {/* Filters Accordion */}
             <div className="mb-3">
               <FiltersAccordion
@@ -446,6 +511,9 @@ export default function BudgetGridTab({ projectId }: Props) {
                 onAreaSelect={handleAreaSelect}
                 onPhaseSelect={handlePhaseSelect}
                 onClearFilters={handleClearFilters}
+                includeProjectLevel={includeProjectLevel}
+                projectLevelItemCount={projectLevelCount}
+                onProjectLevelToggle={handleProjectLevelToggle}
               />
             </div>
 
@@ -471,25 +539,14 @@ export default function BudgetGridTab({ projectId }: Props) {
                     </label>
                   </div>
                 )}
-                {(mode === 'standard' || mode === 'detail') && (
-                  <div className="form-check form-switch">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="healthToggle"
-                      checked={showHealthWidget}
-                      onChange={(e) => setShowHealthWidget(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <label
-                      className="form-check-label text-secondary small"
-                      htmlFor="healthToggle"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      Health
-                    </label>
-                  </div>
-                )}
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuickAddCategoryOpen(true)}
+                >
+                  + Quick Add Category
+                </CButton>
                 <CButton color="primary" size="sm" onClick={openCreateModal}>
                   + Add Item
                 </CButton>
@@ -497,9 +554,7 @@ export default function BudgetGridTab({ projectId }: Props) {
             </div>
             <div className="row g-3">
               <div className={
-                (hasDateData && showGantt) || (showHealthWidget && (mode === 'standard' || mode === 'detail'))
-                  ? 'col-lg-9'
-                  : 'col-12'
+                hasDateData && showGantt ? 'col-lg-9' : 'col-12'
               }>
                 <BudgetDataGrid
                   data={data}
@@ -509,29 +564,17 @@ export default function BudgetGridTab({ projectId }: Props) {
                   onRowSelect={setSelected}
                   onInlineCommit={handleInlineCommit}
                   onOpenModal={mode === 'napkin' ? undefined : openEditModal}
-                  onReconcile={handleReconcileVariance}
                   projectTypeCode={projectTypeCode}
+                  onRequestRowAdd={handleAddFromRow}
+                  onRequestRowDelete={handleRequestDelete}
+                  onRequestGroupAdd={handleGroupAdd}
                 />
               </div>
-              {((hasDateData && showGantt) || (showHealthWidget && (mode === 'standard' || mode === 'detail'))) && (
+              {hasDateData && showGantt && (
                 <div className="col-lg-3">
-                  {hasDateData && showGantt && (
-                    <div className="mb-3">
-                      <TimelineChart data={data} selectedItem={selected} onItemSelect={setSelected} />
-                    </div>
-                  )}
-                  {showHealthWidget && (mode === 'standard' || mode === 'detail') && (
-                    <BudgetHealthWidget
-                      projectId={projectId}
-                      onViewDetails={() => {
-                        // Switch to standard mode if not already there
-                        if (mode !== 'standard') {
-                          previousMode.current = mode;
-                          setMode('standard');
-                        }
-                      }}
-                    />
-                  )}
+                  <div className="mb-3">
+                    <TimelineChart data={data} selectedItem={selected} onItemSelect={setSelected} />
+                  </div>
                 </div>
               )}
             </div>
@@ -552,27 +595,43 @@ export default function BudgetGridTab({ projectId }: Props) {
         mode={modalState.mode}
         projectId={projectId}
         initialItem={modalState.item ?? null}
+        initialFormValues={modalState.initialValues}
+        activeBudgetMode={mode}
         onClose={closeModal}
         onSave={handleModalSave}
         onDelete={modalState.mode === 'edit' ? handleModalDelete : undefined}
       />
 
-      <VarianceAlertModal
-        visible={showVarianceAlert}
-        onClose={handleVarianceAlertClose}
-        variances={varianceData?.variances || []}
-        onReconcile={handleReconcileNow}
-        onSwitchToStandard={handleSwitchToStandard}
-        onContinueAnyway={handleContinueAnyway}
+      {/* Quick Add Category Modal */}
+      <QuickAddCategoryModal
+        isOpen={quickAddCategoryOpen}
+        onClose={() => setQuickAddCategoryOpen(false)}
+        onSuccess={handleQuickAddSuccess}
+        projectId={projectId}
+        availableCategories={availableCategories}
       />
 
-      <ReconciliationModal
-        visible={showReconciliationModal}
-        onClose={handleReconciliationModalClose}
-        variance={varianceToReconcile}
-        projectId={projectId}
-        onReconciled={handleReconciliationComplete}
-      />
+      <CModal visible={Boolean(pendingDelete)} onClose={handleCancelDelete}>
+        <CModalHeader>
+          <CModalTitle>Delete this budget item?</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <p className="mb-1">
+            {pendingDelete?.notes || '(No description)'}
+          </p>
+          <p className="text-muted small mb-0">
+            This action cannot be undone.
+          </p>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="outline" onClick={handleCancelDelete}>
+            Cancel
+          </CButton>
+          <CButton color="danger" onClick={handleConfirmDelete}>
+            Delete
+          </CButton>
+        </CModalFooter>
+      </CModal>
     </CCard>
   );
 }

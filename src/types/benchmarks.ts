@@ -130,30 +130,73 @@ export interface LandscaperAbsorptionDetail {
 }
 
 // =============================================================================
-// UNIT COST TEMPLATE LIBRARY (Phase 2)
+// UNIT COST TEMPLATE LIBRARY (Phase 2) - Universal Lifecycle Taxonomy
 // =============================================================================
 
-export type UnitCostScope = 'development' | 'operations';
-export type UnitCostType = 'hard' | 'soft' | 'deposit' | 'other';
-export type DevelopmentStage = 'stage1_entitlements' | 'stage2_engineering' | 'stage3_development';
+/**
+ * Universal lifecycle stages that work across ALL property types
+ * (land, multifamily, office, retail, industrial, etc.)
+ */
+export type LifecycleStage =
+  | 'Acquisition'
+  | 'Development'
+  | 'Operations'
+  | 'Disposition'
+  | 'Financing';
 
+/**
+ * Category tag for flexible classification
+ * Tags can be context-specific (Development: Hard/Soft, Operations: OpEx/CapEx, etc.)
+ */
+export interface CategoryTag {
+  tag_id: number;
+  tag_name: string;
+  tag_context: string; // Which lifecycle_stage(s) this applies to
+  is_system_default: boolean;
+  description?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Unit cost category with lifecycle stages and flexible tags
+ */
 export interface UnitCostCategoryReference {
   category_id: number;
+  parent?: number;
+  parent_name?: string;
   category_name: string;
-  cost_scope: UnitCostScope;
-  cost_type: UnitCostType;
-  development_stage: DevelopmentStage;
+  lifecycle_stages: LifecycleStage[]; // Categories can belong to multiple lifecycle stages
+  tags: string[]; // Array of tag names (e.g., ["Hard", "Professional Services"])
   sort_order: number;
-  template_count: number;
+  is_active: boolean;
+  depth?: number;
+  has_children?: boolean;
+  item_count: number;  // Renamed from template_count in migration 0018
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface StageGroupedCategories {
-  stage1_entitlements: UnitCostCategoryReference[];
-  stage2_engineering: UnitCostCategoryReference[];
-  stage3_development: UnitCostCategoryReference[];
+/**
+ * Category hierarchy with nested children
+ */
+export interface UnitCostCategoryHierarchy {
+  category_id: number;
+  category_name: string;
+  lifecycle_stages: LifecycleStage[]; // Categories can belong to multiple lifecycle stages
+  tags: string[];
+  sort_order: number;
+  is_active: boolean;
+  children: UnitCostCategoryHierarchy[];
 }
 
-export interface TemplateBenchmarkLink {
+/**
+ * Link between unit cost items and benchmarks.
+ * Renamed from TemplateBenchmarkLink in migration 0018.
+ */
+export interface ItemBenchmarkLink {
   link_id: number;
   benchmark_id: number;
   benchmark_name: string;
@@ -162,8 +205,15 @@ export interface TemplateBenchmarkLink {
   is_primary: boolean;
 }
 
-export interface UnitCostTemplateSummary {
-  template_id: number;
+// Backward compatibility alias
+export type TemplateBenchmarkLink = ItemBenchmarkLink;
+
+/**
+ * Summary of a unit cost item (individual cost line item within a category).
+ * Renamed from UnitCostTemplateSummary in migration 0018.
+ */
+export interface UnitCostItemSummary {
+  item_id: number;  // Renamed from template_id
   category_id: number;
   category_name: string;
   item_name: string;
@@ -182,11 +232,21 @@ export interface UnitCostTemplateSummary {
   is_active: boolean;
 }
 
-export interface UnitCostTemplateDetail extends UnitCostTemplateSummary {
+// Backward compatibility alias
+export type UnitCostTemplateSummary = UnitCostItemSummary;
+
+/**
+ * Detailed view of a unit cost item including benchmark links.
+ * Renamed from UnitCostTemplateDetail in migration 0018.
+ */
+export interface UnitCostItemDetail extends UnitCostItemSummary {
   created_at?: string;
   updated_at?: string;
-  benchmarks?: TemplateBenchmarkLink[];
+  benchmarks?: ItemBenchmarkLink[];
 }
+
+// Backward compatibility alias
+export type UnitCostTemplateDetail = UnitCostItemDetail;
 
 // =============================================================================
 // UNIT COST BENCHMARKS

@@ -1,12 +1,41 @@
 # Landscape Implementation Status
 
-**Version:** 5.3
-**Last Updated:** 2025-11-09
+**Version:** 5.4
+**Last Updated:** 2025-11-12
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (October 28 - November 9, 2025)
+## 🆕 Recent Updates (October 28 - November 12, 2025)
+
+### S-Curve Distribution Backend (Nov 12, 2025) ⭐ NEW
+- ✅ **Database profile catalog** - Added `core_fin_curve_profile` plus `curve_steepness` on `core_fin_fact_budget` with constraints, indexes, and seed data for S/S1-S4 curves.
+- ✅ **Allocation engine** - `src/lib/financial-engine/scurve-allocation.ts` now fetches active profiles, blends the 0-100 steepness modifier, interpolates cumulative percentages, reconciles rounding, and writes period-by-period rows inside a transaction.
+- ✅ **API surface** - Implemented `POST /api/budget/allocate`, `GET /api/budget/curve-profiles`, and `GET /api/budget/:factId/allocations` plus defensive validation for missing timing/amount data.
+- ✅ **Quality coverage** - Added Jest tests, a manual `scripts/test-scurve-allocation.ts`, and graceful fallback to builtin curves when Neon is unavailable; also guarded `tbl_debt_draw_schedule.debt_facility_id` before indexing to prevent migration failures.
+- 📁 Files: `db/migrations/013_scurve_profiles.sql`, `db/migrations/012_multifamily_assumptions.up.sql`, `src/lib/financial-engine/scurve-allocation.ts`, `src/app/api/budget/allocate/route.ts`, `src/app/api/budget/curve-profiles/route.ts`, `src/app/api/budget/[factId]/allocations/route.ts`, `src/__tests__/scurve-allocation.test.ts`, `scripts/test-scurve-allocation.ts`
+- 📖 Session Notes: [docs/session-notes/2025-11-12-scurve-distribution-backend.md](../session-notes/2025-11-12-scurve-distribution-backend.md)
+- 🎯 Status: Complete – backend is ready for UI wiring and cash-flow reporting.
+
+### Milestone & Dependency Timeline System (Nov 10, 2025) ⭐ NEW
+- ✅ **Milestone & dependency schema** - Added `tbl_project_milestone`, `tbl_dependency`, timeline logging (`tbl_timeline_calculation_log`), and recalculation queue tables with constraints/triggers to protect baselines and prevent cycles.
+- ✅ **CPM engine** - `src/lib/timeline-engine/cpm-calculator.ts` builds the graph, detects cycles, performs forward/backward passes for FS/SS/FF/SF relationships, calculates float/critical-path, and persists early/late dates for budget items and milestones.
+- ✅ **API surface** - `POST|GET /api/projects/[projectId]/timeline/calculate` now invokes the engine, supports dry-run previews, handles validation/circular dependency errors, and records audit logs.
+- ✅ **Status wiring** - Baseline locking, status-change queueing, and timeline recalculation logging ensure delays cascade and critical path info stays current.
+- 📁 Files: `db/migrations/015_milestone_dependency_system.sql`, `src/lib/timeline-engine/cpm-calculator.ts`, `src/app/api/projects/[projectId]/timeline/calculate/route.ts`
+- 📖 Session Notes: [docs/session-notes/2025-11-10-budget-phase-column-fixes.md](../session-notes/2025-11-10-budget-phase-column-fixes.md)
+- 🎯 Status: In Progress – Core schema/engine/API are in place; next is UI wiring, S-curve/cash-flow refresh, and stakeholder validation.
+
+### Budget Phase Column Type Fix (Nov 10, 2025) ⭐ NEW
+- ✅ **Container ID Type Conversion** - Fixed API returning string IDs instead of numbers
+- ✅ **Phase Dropdown Fixed** - Now correctly displays "Phase 2.1" instead of "Invalid (ID: 435)"
+- ✅ **Type Safety** - Added `Number()` conversion in `/api/projects/[projectId]/containers` buildTree function
+- ✅ **Console Error Cleanup** - Removed noisy "Failed to fetch incomplete categories" error
+- ✅ **Toast Hook Fix** - Created `/src/hooks/use-toast.ts` re-export for IncompleteCategoriesReminder
+- 📁 Files: `src/app/api/projects/[projectId]/containers/route.ts:25-28`, `src/components/budget/IncompleteCategoriesReminder.tsx:56-60`, `src/hooks/use-toast.ts` (NEW)
+- 📖 Session Notes: [docs/session-notes/2025-11-10-budget-phase-column-fixes.md](../session-notes/2025-11-10-budget-phase-column-fixes.md)
+- 🐛 Root Cause: PostgreSQL returned IDs as strings, causing strict equality checks to fail in PhaseCell
+- 🎯 Status: Complete - Phase selector fully functional with all 8 active phases visible
 
 ### Category Taxonomy Database Schema Migration Fixes (Nov 9, 2025) ⭐ NEW
 - ✅ **Schema Mismatch Resolved** - Fixed complete disconnect between code expectations and database reality

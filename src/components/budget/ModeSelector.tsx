@@ -25,9 +25,9 @@ export default function ModeSelector({ activeMode, onModeChange }: Props) {
 
   return (
     <CButtonGroup role="group" className="mb-3">
-      {renderButton('napkin', 'Napkin (7 fields)', 'success')}
-      {renderButton('standard', 'Standard (11)', 'warning')}
-      {renderButton('detail', 'Detail (15)', 'danger')}
+      {renderButton('napkin', 'Napkin (9 fields)', 'success')}
+      {renderButton('standard', 'Standard (10 cols)', 'warning')}
+      {renderButton('detail', 'Detail (10 cols)', 'danger')}
     </CButtonGroup>
   );
 }

@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import BenchmarkAccordion from '@/components/benchmarks/BenchmarkAccordion';
-import LandscaperPanel from '@/components/benchmarks/LandscaperPanel';
+import BenchmarksFlyout, { BenchmarksFlyoutSelection } from '@/components/benchmarks/BenchmarksFlyout';
 import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
 import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
 import AbsorptionVelocityPanel from '@/components/benchmarks/absorption/AbsorptionVelocityPanel';
@@ -19,7 +19,8 @@ import type {
   AISuggestion,
   BenchmarkCategory,
   LandscaperMode,
-  GrowthRateSet
+  GrowthRateSet,
+  AbsorptionVelocity
 } from '@/types/benchmarks';
 
 // Category definitions - Cost Factors only (no stage links)
@@ -51,6 +52,7 @@ export default function GlobalBenchmarksPage() {
   const [totalCostLineItems, setTotalCostLineItems] = useState(0);
   const [leftPanelWidth, setLeftPanelWidth] = useState(33); // Percentage
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
 
   // Load data on mount
   useEffect(() => {
@@ -160,6 +162,18 @@ export default function GlobalBenchmarksPage() {
     setIsDragging(false);
   };
 
+  const handleBenchmarkSelect = (category: BenchmarkCategory, benchmark: Benchmark) => {
+    setSelectedTile({ kind: 'benchmark', category, benchmark });
+  };
+
+  const handleGrowthRateSelect = (set: GrowthRateSet) => {
+    setSelectedTile({ kind: 'growth_rate', set });
+  };
+
+  const handleAbsorptionSelect = (record: AbsorptionVelocity) => {
+    setSelectedTile({ kind: 'absorption', record });
+  };
+
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove as any);
@@ -183,36 +197,31 @@ export default function GlobalBenchmarksPage() {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+    <div className="admin-benchmarks min-h-screen bg-surface-card text-text-primary">
       <AdminNavBar />
       <div className="p-4 space-y-4">
-        <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="rounded-lg shadow-sm border overflow-hidden">
+        <div className="rounded-lg border border-line-soft bg-surface-card shadow-sm overflow-hidden">
           {/* Header */}
-        <div className="p-6" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+        <div className="border-b border-line-soft p-6">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>Global Benchmarks</h1>
-            <span style={{ color: 'var(--cui-body-color)', fontSize: '1.5rem', fontWeight: 'bold', lineHeight: 1 }}>·</span>
-            <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+            <h1 className="text-2xl font-bold whitespace-nowrap">Global Benchmarks</h1>
+            <span className="text-xl font-bold leading-none text-text-secondary">·</span>
+            <span className="text-sm text-text-secondary">
               Market intelligence: cost factors, rates, and timing standards
             </span>
           </div>
         </div>
 
         {/* Landscaper and Refresh Controls */}
-        <div className="px-6 py-3 flex items-center justify-end gap-3" style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+        <div className="flex items-center justify-end gap-3 border-b border-line-soft bg-surface-card px-6 py-3">
           <div className="flex items-center gap-3">
             {/* Landscaper Mode Selector */}
             <div className="flex items-center gap-2">
-              <label className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Landscaper:</label>
+              <label className="text-sm text-text-secondary">Landscaper:</label>
               <select
                 value={landscaperMode}
                 onChange={(e) => setLandscaperMode(e.target.value as LandscaperMode)}
-                className="border rounded px-3 py-1.5 text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)'
-                }}
+                className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/30 focus:outline-none"
               >
                 <option value="silent">Silent Mode</option>
                 <option value="helpful">Helpful Mode</option>
@@ -221,11 +230,7 @@ export default function GlobalBenchmarksPage() {
             </div>
             <button
               onClick={loadData}
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{
-                backgroundColor: 'var(--cui-primary)',
-                color: 'white'
-              }}
+              className="btn btn-primary text-sm font-medium"
               disabled={loading}
             >
               {loading ? 'Loading...' : 'Refresh'}
@@ -233,65 +238,22 @@ export default function GlobalBenchmarksPage() {
           </div>
         </div>
 
-        {/* Cost Library Card - Prominent Link */}
-        <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
-          <Link
-            href="/admin/benchmarks/cost-library"
-            className="block rounded-lg border-2 p-4 transition-all hover:shadow-lg"
-            style={{
-              borderColor: 'var(--cui-primary)',
-              backgroundColor: 'var(--cui-card-bg)',
-              textDecoration: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--cui-primary)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--cui-primary)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg p-2" style={{ backgroundColor: 'var(--cui-primary-bg)' }}>
-                  <svg className="w-6 h-6" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: 'var(--cui-body-color)' }}>
-                    Cost Line Item Library →
-                  </h3>
-                  <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                    View and manage cost benchmark database ({totalCostLineItems.toLocaleString()} line items)
-                  </p>
-                </div>
-              </div>
-              <ChevronRight size={24} style={{ color: 'var(--cui-primary)' }} />
-            </div>
-          </Link>
-        </div>
-
         {/* Error State */}
         {error && (
-          <div className="m-4 p-4 border rounded" style={{ backgroundColor: 'var(--cui-danger-bg)', borderColor: 'var(--cui-danger)', color: 'var(--cui-danger)' }}>
+          <div className="m-4 rounded border border-chip-error/60 bg-chip-error/10 p-4 text-chip-error">
             <strong>Error:</strong> {error}
           </div>
         )}
 
         {/* Split Panel Layout */}
-        <div className="flex h-[calc(100vh-200px)] relative">
+        <div className="relative flex h-[calc(100vh-200px)]">
           {/* Left Panel - Accordion */}
           <div
-            className="overflow-y-auto"
-            style={{
-              width: `${leftPanelWidth}%`,
-              borderRight: '1px solid var(--cui-border-color)'
-            }}
+            className="overflow-y-auto border-r border-line-soft"
+            style={{ width: `${leftPanelWidth}%` }}
           >
             {loading ? (
-              <div className="p-8 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+              <div className="p-8 text-center text-text-secondary">
                 Loading benchmarks...
               </div>
             ) : (
@@ -304,12 +266,14 @@ export default function GlobalBenchmarksPage() {
                       sets={growthRateSets}
                       isExpanded={selectedCategory?.key === category.key}
                       loading={loading}
+                      selectedSetId={selectedTile?.kind === 'growth_rate' ? selectedTile.set.set_id : null}
                       onToggle={() =>
                         setSelectedCategory(
                           selectedCategory?.key === category.key ? null : category
                         )
                       }
                       onRefresh={loadData}
+                      onSelectSet={handleGrowthRateSelect}
                     />
                   );
                 }
@@ -317,34 +281,36 @@ export default function GlobalBenchmarksPage() {
                 if (category.key === 'absorption') {
                   const isExpanded = selectedCategory?.key === category.key;
                   return (
-                    <div key={category.key} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                    <div key={category.key} className="border-b border-line-soft">
                       <button
                         onClick={() =>
                           setSelectedCategory(isExpanded ? null : category)
                         }
-                        className="flex w-full items-center justify-between px-4 py-3 transition-colors"
-                        style={{
-                          color: 'var(--cui-body-color)',
-                          backgroundColor: 'transparent'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left text-text-primary transition-colors hover:bg-surface-card/80"
                       >
                         <div className="flex items-center gap-3">
                           {isExpanded ? (
-                            <ChevronDown size={20} style={{ color: 'var(--cui-secondary-color)' }} />
+                            <ChevronDown size={20} className="text-text-secondary" />
                           ) : (
-                            <ChevronRight size={20} style={{ color: 'var(--cui-secondary-color)' }} />
+                            <ChevronRight size={20} className="text-text-secondary" />
                           )}
                           <span className="font-medium">{category.label}</span>
                         </div>
-                        <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                        <span className="text-sm text-text-secondary">
                           {category.count}
                         </span>
                       </button>
                       {isExpanded && (
-                        <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                          <AbsorptionVelocityPanel onCountUpdate={setAbsorptionCount} />
+                        <div className="bg-surface-bg">
+                          <AbsorptionVelocityPanel
+                            onCountUpdate={setAbsorptionCount}
+                            onSelect={handleAbsorptionSelect}
+                            selectedVelocityId={
+                              selectedTile?.kind === 'absorption'
+                                ? selectedTile.record.absorption_velocity_id
+                                : null
+                            }
+                          />
                         </div>
                       )}
                     </div>
@@ -362,9 +328,7 @@ export default function GlobalBenchmarksPage() {
                         selectedCategory?.key === category.key ? null : category
                       )
                     }
-                    onBenchmarkClick={() => {
-                      // Inline editing now - no modal needed
-                    }}
+                    onBenchmarkClick={(benchmark) => handleBenchmarkSelect(category, benchmark)}
                     onAddNew={() => {
                       setAddingToCategory(category);
                       setShowAddModal(true);
@@ -377,28 +341,21 @@ export default function GlobalBenchmarksPage() {
 
           {/* Resizer */}
           <div
-            className="absolute top-0 bottom-0 w-1 cursor-col-resize transition-colors"
-            style={{
-              left: `${leftPanelWidth}%`,
-              backgroundColor: isDragging ? 'var(--cui-primary)' : 'var(--cui-border-color)'
-            }}
+            className={`absolute top-0 bottom-0 w-1 cursor-col-resize transition-colors ${isDragging ? 'bg-brand-primary' : 'bg-line-soft'} hover:bg-line-strong`}
+            style={{ left: `${leftPanelWidth}%` }}
             onMouseDown={handleMouseDown}
-            onMouseEnter={(e) => !isDragging && (e.currentTarget.style.backgroundColor = 'var(--cui-secondary-color)')}
-            onMouseLeave={(e) => !isDragging && (e.currentTarget.style.backgroundColor = 'var(--cui-border-color)')}
           >
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-12 rounded-full pointer-events-none" style={{ backgroundColor: 'var(--cui-secondary-color)' }} />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line-strong" />
           </div>
 
-          {/* Right Panel - Landscaper Assistant */}
+          {/* Right Panel - Flyout */}
           <div
             className="overflow-y-auto"
             style={{ width: `${100 - leftPanelWidth}%` }}
           >
-            <LandscaperPanel
-              selectedCategory={selectedCategory}
-              aiSuggestions={aiSuggestions.filter(s =>
-                !selectedCategory || s.category === selectedCategory.key
-              )}
+            <BenchmarksFlyout
+              selection={selectedTile}
+              aiSuggestions={aiSuggestions}
               mode={landscaperMode}
               onRefresh={loadData}
             />

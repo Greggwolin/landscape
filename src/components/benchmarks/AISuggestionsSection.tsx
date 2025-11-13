@@ -82,7 +82,7 @@ export default function AISuggestionsSection({ suggestions, mode, onRefresh }: P
         <button
           onClick={handleBulkApprove}
           disabled={selectedIds.size === 0 || processing}
-          className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded text-sm font-medium transition-colors"
+          className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-surface-card disabled:cursor-not-allowed rounded text-sm font-medium transition-colors"
         >
           {processing
             ? 'Processing...'
@@ -92,7 +92,7 @@ export default function AISuggestionsSection({ suggestions, mode, onRefresh }: P
         <button
           onClick={handleDismissAll}
           disabled={processing}
-          className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm font-medium transition-colors"
+          className="flex-1 px-4 py-2 bg-surface-card hover:bg-surface-card rounded text-sm font-medium transition-colors"
         >
           Dismiss All
         </button>
@@ -154,7 +154,7 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
     : 'bg-yellow-900 text-yellow-200';
 
   return (
-    <div className="p-4 bg-slate-800 rounded border border-slate-600">
+    <div className="p-4 bg-surface-card rounded border border-line-strong">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
@@ -172,10 +172,10 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
               </span>
             )}
           </div>
-          <div className="text-sm text-slate-300">
+          <div className="text-sm text-text-secondary">
             {suggestion.suggested_value} {suggestion.suggested_uom}
           </div>
-          <div className="text-xs text-slate-400 mt-1">
+          <div className="text-xs text-text-secondary mt-1">
             Source: {suggestion.document_name}
             {suggestion.project_name && ` • ${suggestion.project_name}`}
           </div>
@@ -190,14 +190,14 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
 
       {/* Comparison */}
       {suggestion.inflation_adjusted_comparison && (
-        <div className="mt-2 p-2 bg-slate-900 rounded text-xs">
+        <div className="mt-2 p-2 bg-surface-card rounded text-xs">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-slate-400">vs Benchmark:</span>
+            <span className="text-text-secondary">vs Benchmark:</span>
             <span
               className={
                 Math.abs(suggestion.inflation_adjusted_comparison.variance_percentage || 0) > 10
                   ? 'text-yellow-400'
-                  : 'text-green-400'
+                  : 'text-chip-success'
               }
             >
               {(suggestion.inflation_adjusted_comparison.variance_percentage || 0) > 0 ? '+' : ''}
@@ -205,7 +205,7 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
             </span>
           </div>
           {mode === 'teaching' && suggestion.inflation_adjusted_comparison.message && (
-            <div className="text-slate-400 mt-1">
+            <div className="text-text-secondary mt-1">
               {suggestion.inflation_adjusted_comparison.message}
             </div>
           )}
@@ -214,10 +214,10 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
 
       {/* Expanded Context */}
       {isExpanded && suggestion.extraction_context && (
-        <div className="mt-3 pt-3 border-t border-slate-700 space-y-2 text-xs">
+        <div className="mt-3 pt-3 border-t border-line-strong space-y-2 text-xs">
           <div>
-            <span className="text-slate-400">Context: </span>
-            <span className="text-slate-300">
+            <span className="text-text-secondary">Context: </span>
+            <span className="text-text-secondary">
               {JSON.stringify(suggestion.extraction_context, null, 2)}
             </span>
           </div>
@@ -229,21 +229,21 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
         <button
           onClick={() => handleReview('approved')}
           disabled={processing}
-          className="flex-1 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 rounded text-xs transition-colors"
+          className="flex-1 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-surface-card rounded text-xs transition-colors"
         >
           Approve
         </button>
         <button
           onClick={() => handleReview('variant')}
           disabled={processing}
-          className="flex-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 rounded text-xs transition-colors"
+          className="flex-1 px-3 py-1 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-surface-card rounded text-xs transition-colors"
         >
           Create Variant
         </button>
         <button
           onClick={() => handleReview('rejected')}
           disabled={processing}
-          className="flex-1 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors"
+          className="flex-1 px-3 py-1 bg-surface-card hover:bg-surface-card rounded text-xs transition-colors"
         >
           Reject
         </button>

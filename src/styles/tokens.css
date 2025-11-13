@@ -24,7 +24,7 @@
 
   /* Parcels (tiles) */
   --parcel-residential: #16a34a;
-  --parcel-commercial: #ea580c;
+  --parcel-commercial: #c2410c;
   --parcel-other: #6366f1;
 
   /* Chips (semantic) */
@@ -34,12 +34,12 @@
   --chip-error: #dc2626;
   --chip-muted: #4b5563;
 
-  /* Top Navigation */
-  --nav-bg: var(--surface-card);
-  --nav-border: var(--line-strong);
-  --nav-text: var(--text-primary);
-  --nav-hover-bg: var(--hover-overlay);
-  --nav-active-bg: var(--active-overlay);
+  /* Top Navigation - forced dark palette */
+  --nav-bg: #111827;
+  --nav-border: #1f2937;
+  --nav-text: #e5e7eb;
+  --nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
 }
 
@@ -61,11 +61,11 @@
 
   /* Keep parcel/chip hues stable for recognizability; adjust only if contrast fails */
 
-  /* Top Navigation */
+  /* Top Navigation stays dark; reuse root values */
   --nav-bg: #111827;
   --nav-border: #1f2937;
-  --nav-text: var(--text-primary);
-  --nav-hover-bg: rgba(255, 255, 255, 0.06);
-  --nav-active-bg: rgba(255, 255, 255, 0.12);
+  --nav-text: #e5e7eb;
+  --nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
 }

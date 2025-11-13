@@ -39,6 +39,12 @@ export interface BudgetCategory {
   icon: string | null;
   color: string | null;
 
+  // Completion Tracking (for quick-add workflow)
+  is_incomplete: boolean;
+  created_from: string | null;         // 'budget_quick_add', 'admin_panel', 'ai_import', etc.
+  reminder_dismissed_at: string | null;
+  last_reminded_at: string | null;
+
   // Metadata
   is_active: boolean;
   created_at: string;
@@ -48,6 +54,11 @@ export interface BudgetCategory {
   // Computed (from hierarchy view)
   path?: string;                       // "Acquisition > Due Diligence > Environmental"
   code_path?: string;                  // "LAND_ACQ.LAND_ACQ_DD.LAND_ACQ_DD_ENV"
+  missing_fields?: string[];           // Fields that need completion
+  is_complete_computed?: boolean;      // Computed from missing_fields
+  should_remind?: boolean;             // Whether to show reminders
+  has_children?: boolean;              // Has child categories
+  usage_count?: number;                // Times used in budget items
 
   // Client-side only
   children?: BudgetCategory[];         // For tree rendering
@@ -155,7 +166,7 @@ export interface CategorySelectionState {
 }
 
 /**
- * Category Create/Update Request
+ * Category Create/Update Request (Full)
  */
 export interface CategoryMutationRequest {
   code: string;
@@ -170,6 +181,71 @@ export interface CategoryMutationRequest {
   sort_order?: number;
   icon?: string;
   color?: string;
+}
+
+/**
+ * Quick-Add Category Request (Minimal)
+ *
+ * Used for creating categories from budget grid with minimal info.
+ * Missing fields will flag the category as incomplete.
+ */
+export interface QuickAddCategoryRequest {
+  name: string;                        // Required: category name
+  level: CategoryLevel;                // Required: hierarchy level
+  parent_id?: number | null;           // Optional: parent category (recommended for L2-4)
+  project_id: number;                  // Required: project ID
+}
+
+/**
+ * Quick-Add Category Response
+ */
+export interface QuickAddCategoryResponse extends BudgetCategory {
+  // Inherits all fields from BudgetCategory
+  // Will have is_incomplete = true
+  // Will have created_from = 'budget_quick_add'
+}
+
+/**
+ * Incomplete Category Status
+ *
+ * Category that needs completion (from quick-add workflow).
+ * Returned by /api/budget-categories/incomplete/ endpoint.
+ */
+export interface IncompleteCategoryStatus {
+  category_id: number;
+  category_name: string;
+  category_code: string;
+  category_level: CategoryLevel;
+  parent_name: string;
+  usage_count: number;                 // Times used in budget
+  missing_fields: string[];            // ['description', 'icon', 'color', 'parent']
+  created_at: string;
+  last_reminded_at: string | null;
+  days_since_created: number;
+  admin_url: string;                   // URL to edit in admin panel
+}
+
+/**
+ * Incomplete Categories Response
+ */
+export interface IncompleteCategoriesResponse {
+  project_id: number;
+  count: number;
+  categories: IncompleteCategoryStatus[];
+}
+
+/**
+ * Dismiss Reminder Request
+ */
+export interface DismissReminderRequest {
+  days?: number;                       // Number of days to dismiss (default 7, max 30)
+}
+
+/**
+ * Mark Complete Request
+ */
+export interface MarkCompleteRequest {
+  force?: boolean;                     // Force complete even if fields missing
 }
 
 /**

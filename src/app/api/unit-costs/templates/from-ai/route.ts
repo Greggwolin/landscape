@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   if (DJANGO_API_URL) {
     try {
       const response = await fetch(
-        `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial/unit-costs/templates/from-ai/`,
+        `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/templates/from-ai/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

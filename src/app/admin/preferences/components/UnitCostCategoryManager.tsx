@@ -13,7 +13,6 @@ import LifecycleStageFilter from './LifecycleStageFilter';
 import CategoryTree from './CategoryTree';
 import CategoryDetailPanel from './CategoryDetailPanel';
 import AddCategoryModal from './AddCategoryModal';
-import CreateTagModal from './CreateTagModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import MobileWarning from './MobileWarning';
 import './category-taxonomy.css';
@@ -25,6 +24,66 @@ const LIFECYCLE_STAGES: LifecycleStage[] = [
   'Disposition',
   'Financing',
 ];
+
+const LIFECYCLE_STAGE_ALIASES: Record<string, LifecycleStage> = {
+  acquisition: 'Acquisition',
+  acquisitions: 'Acquisition',
+  due_diligence: 'Acquisition',
+  development: 'Development',
+  predevelopment: 'Development',
+  construction: 'Development',
+  operations: 'Operations',
+  operating: 'Operations',
+  disposition: 'Disposition',
+  exit: 'Disposition',
+  financing: 'Financing',
+  finance: 'Financing',
+  capital: 'Financing',
+};
+
+const normalizeLifecycleStages = (rawStages?: (string | null)[]): LifecycleStage[] => {
+  if (!rawStages || rawStages.length === 0) {
+    return ['Development'];
+  }
+
+  const normalized = rawStages
+    .map((stage) => {
+      if (!stage) return null;
+      const trimmed = stage.toString().trim();
+      if (!trimmed) return null;
+      const lower = trimmed.toLowerCase();
+      if (LIFECYCLE_STAGE_ALIASES[lower]) {
+        return LIFECYCLE_STAGE_ALIASES[lower];
+      }
+      if (LIFECYCLE_STAGES.includes(trimmed as LifecycleStage)) {
+        return trimmed as LifecycleStage;
+      }
+      return null;
+    })
+    .filter((stage): stage is LifecycleStage => stage !== null);
+
+  if (normalized.length === 0) {
+    return ['Development'];
+  }
+
+  return Array.from(new Set(normalized));
+};
+
+const normalizeCategory = (category: UnitCostCategoryReference): UnitCostCategoryReference => {
+  const lifecycleStages = normalizeLifecycleStages(
+    category.lifecycle_stages && category.lifecycle_stages.length > 0
+      ? category.lifecycle_stages
+      : (category as any).lifecycle_stage
+        ? [(category as any).lifecycle_stage as string]
+        : []
+  );
+
+  return {
+    ...category,
+    lifecycle_stages: lifecycleStages,
+    tags: Array.isArray(category.tags) ? category.tags : [],
+  };
+};
 
 export default function UnitCostCategoryManager() {
   const { showToast } = useToast();
@@ -40,7 +99,6 @@ export default function UnitCostCategoryManager() {
 
   // Modal states
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-  const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<UnitCostCategoryReference | null>(null);
 
@@ -76,7 +134,7 @@ export default function UnitCostCategoryManager() {
         fetchCategories(),
         fetchTags(),
       ]);
-      setCategories(categoriesData);
+      setCategories(categoriesData.map((cat) => normalizeCategory(cat)));
       setTags(tagsData);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
@@ -89,9 +147,12 @@ export default function UnitCostCategoryManager() {
 
   // Filter categories by selected lifecycle stages
   const filteredCategories = useMemo(() => {
-    return categories.filter((cat) =>
-      cat.lifecycle_stages.some((stage) => selectedStages.includes(stage))
-    );
+    return categories.filter((cat) => {
+      const stages = cat.lifecycle_stages && cat.lifecycle_stages.length > 0
+        ? cat.lifecycle_stages
+        : ['Development'];
+      return stages.some((stage) => selectedStages.includes(stage));
+    });
   }, [categories, selectedStages]);
 
   // Build hierarchy from filtered categories
@@ -109,7 +170,12 @@ export default function UnitCostCategoryManager() {
       Financing: 0,
     };
     categories.forEach((cat) => {
-      counts[cat.lifecycle_stage] = (counts[cat.lifecycle_stage] || 0) + 1;
+      const stages = cat.lifecycle_stages && cat.lifecycle_stages.length > 0
+        ? cat.lifecycle_stages
+        : ['Development'];
+      stages.forEach((stage) => {
+        counts[stage] = (counts[stage] || 0) + 1;
+      });
     });
     return counts;
   }, [categories]);
@@ -154,27 +220,23 @@ export default function UnitCostCategoryManager() {
 
   // Handle category update
   const handleCategoryUpdated = (updated: UnitCostCategoryReference) => {
+    const normalized = normalizeCategory(updated);
     setCategories((prev) =>
-      prev.map((cat) => (cat.category_id === updated.category_id ? updated : cat))
+      prev.map((cat) => (cat.category_id === normalized.category_id ? normalized : cat))
     );
-    setSelectedCategory(updated);
+    setSelectedCategory(normalized);
     showToast('Category updated successfully', 'success');
   };
 
   // Handle category creation
   const handleCategoryCreated = (newCategory: UnitCostCategoryReference) => {
-    setCategories((prev) => [...prev, newCategory]);
-    setSelectedCategory(newCategory);
+    const normalized = normalizeCategory(newCategory);
+    setCategories((prev) => [...prev, normalized]);
+    setSelectedCategory(normalized);
     setShowAddCategoryModal(false);
     showToast('Category created successfully', 'success');
   };
 
-  // Handle tag creation
-  const handleTagCreated = (newTag: CategoryTag) => {
-    setTags((prev) => [...prev, newTag]);
-    setShowCreateTagModal(false);
-    showToast('Tag created successfully', 'success');
-  };
 
   // Handle delete category request
   const handleDeleteRequest = (category: UnitCostCategoryReference) => {
@@ -384,7 +446,7 @@ export default function UnitCostCategoryManager() {
             tags={tags}
             onUpdate={handleCategoryUpdated}
             onDelete={handleDeleteRequest}
-            onCreateTag={() => setShowCreateTagModal(true)}
+            onCreateTag={() => {}} // No-op since we use inline tag input now
           />
         </div>
       </div>
@@ -396,13 +458,6 @@ export default function UnitCostCategoryManager() {
           categories={categories}
           onClose={() => setShowAddCategoryModal(false)}
           onCreated={handleCategoryCreated}
-        />
-      )}
-
-      {showCreateTagModal && (
-        <CreateTagModal
-          onClose={() => setShowCreateTagModal(false)}
-          onCreated={handleTagCreated}
         />
       )}
 

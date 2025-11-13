@@ -18,26 +18,24 @@ import AdminNavBar from '@/app/components/AdminNavBar';
 
 export default function CostLibraryPage() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+    <div className="min-h-screen bg-surface-card text-text-primary">
       <AdminNavBar />
       <div className="p-4 space-y-4">
-        <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="rounded-lg shadow-sm border">
+        <div className="rounded-lg border border-line-soft bg-surface-card shadow-sm">
           {/* Header */}
-          <div className="p-6" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div className="border-b border-line-soft p-6">
             <div className="flex items-center gap-3">
-              <Database size={24} style={{ color: 'var(--cui-primary)', flexShrink: 0 }} />
-              <h1 className="text-2xl font-bold whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>Cost Line Item Library</h1>
-              <span style={{ color: 'var(--cui-body-color)', fontSize: '1.5rem', fontWeight: 'bold', lineHeight: 1 }}>·</span>
-              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+              <Database size={24} className="text-brand-primary" />
+              <h1 className="text-2xl font-bold whitespace-nowrap">Cost Line Item Library</h1>
+              <span className="text-xl font-bold leading-none text-text-secondary">·</span>
+              <span className="text-sm text-text-secondary">
                 Development cost templates and benchmark database
               </span>
             </div>
           </div>
 
           {/* Main Content - UnitCostsPanel */}
-          <div>
-            <UnitCostsPanel />
-          </div>
+          <UnitCostsPanel />
         </div>
       </div>
     </div>

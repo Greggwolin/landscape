@@ -1,25 +1,34 @@
-"""Serializers for unit cost templates, categories, and planning standards."""
+"""Serializers for unit cost items, categories, and planning standards.
+
+Renamed from "templates" to "items" in migration 0018 to eliminate confusion
+with page templates. These serializers handle individual cost line items.
+"""
 
 from rest_framework import serializers
 
 from apps.projects.models import Project
 from .models_benchmarks import (
+    CategoryTagLibrary,
+    CategoryLifecycleStage,
     UnitCostCategory,
-    UnitCostTemplate,
-    TemplateBenchmarkLink,
+    UnitCostItem,  # Renamed from UnitCostTemplate in migration 0018
+    ItemBenchmarkLink,  # Renamed from TemplateBenchmarkLink in migration 0018
     PlanningStandard,
 )
 
 
-class TemplateBenchmarkLinkSerializer(serializers.ModelSerializer):
-    """Expose basic benchmark metadata linked to a unit cost template."""
+class ItemBenchmarkLinkSerializer(serializers.ModelSerializer):
+    """Expose basic benchmark metadata linked to a unit cost item.
+
+    Renamed from TemplateBenchmarkLinkSerializer in migration 0018.
+    """
 
     benchmark_name = serializers.CharField(source='benchmark.benchmark_name', read_only=True)
     benchmark_type = serializers.CharField(source='benchmark.benchmark_type', read_only=True)
     market_geography = serializers.CharField(source='benchmark.market_geography', read_only=True)
 
     class Meta:
-        model = TemplateBenchmarkLink
+        model = ItemBenchmarkLink
         fields = [
             'link_id',
             'benchmark_id',
@@ -31,52 +40,121 @@ class TemplateBenchmarkLinkSerializer(serializers.ModelSerializer):
         read_only_fields = ['link_id', 'benchmark_id', 'benchmark_name', 'benchmark_type', 'market_geography']
 
 
-class UnitCostCategorySerializer(serializers.ModelSerializer):
-    """Serializer for unit cost categories with template counts."""
+# Backward compatibility alias
+TemplateBenchmarkLinkSerializer = ItemBenchmarkLinkSerializer
 
-    template_count = serializers.IntegerField(read_only=True)
+
+class CategoryTagLibrarySerializer(serializers.ModelSerializer):
+    """Serializer for category tags."""
+
+    class Meta:
+        model = CategoryTagLibrary
+        fields = [
+            'tag_id',
+            'tag_name',
+            'tag_context',
+            'is_system_default',
+            'description',
+            'display_order',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['tag_id', 'created_at', 'updated_at']
+
+
+class UnitCostCategorySerializer(serializers.ModelSerializer):
+    """Serializer for unit cost categories with lifecycle stages and tags."""
+
+    parent_name = serializers.CharField(source='parent.category_name', read_only=True)
+    depth = serializers.IntegerField(read_only=True)
+    has_children = serializers.SerializerMethodField()
+    item_count = serializers.IntegerField(read_only=True)  # Renamed from template_count
+    lifecycle_stages = serializers.SerializerMethodField()  # NEW: array of stages
+
+    class Meta:
+        model = UnitCostCategory
+        fields = [
+            'category_id',
+            'parent',
+            'parent_name',
+            'category_name',
+            'lifecycle_stages',  # CHANGED: from lifecycle_stage to lifecycle_stages (array)
+            'tags',
+            'sort_order',
+            'is_active',
+            'depth',
+            'has_children',
+            'item_count',  # Renamed from template_count
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['category_id', 'lifecycle_stages', 'depth', 'has_children', 'item_count', 'created_at', 'updated_at']
+
+    def get_lifecycle_stages(self, obj):
+        """Get all lifecycle stages this category belongs to."""
+        if hasattr(obj, '_lifecycle_stages'):
+            # Use prefetched data if available
+            return obj._lifecycle_stages
+        return obj.get_lifecycle_stages()
+
+    def get_has_children(self, obj):
+        """Check if category has child categories."""
+        if hasattr(obj, 'has_children'):
+            return obj.has_children
+        return obj.children.exists()
+
+    def validate_tags(self, value):
+        """Ensure tags is a list."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Tags must be a list.")
+        return value
+
+
+class UnitCostCategoryHierarchySerializer(serializers.ModelSerializer):
+    """Serializer with nested children for tree display."""
+
+    children = serializers.SerializerMethodField()
+    lifecycle_stages = serializers.SerializerMethodField()
 
     class Meta:
         model = UnitCostCategory
         fields = [
             'category_id',
             'category_name',
-            'cost_scope',
-            'cost_type',
-            'development_stage',
+            'lifecycle_stages',
+            'tags',
             'sort_order',
-            'template_count',
-        ]
-        read_only_fields = [
-            'category_id',
-            'category_name',
-            'cost_scope',
-            'cost_type',
-            'development_stage',
-            'sort_order',
-            'template_count',
+            'is_active',
+            'children',
         ]
 
+    def get_lifecycle_stages(self, obj):
+        """Get all lifecycle stages this category belongs to."""
+        if hasattr(obj, '_lifecycle_stages'):
+            return obj._lifecycle_stages
+        return obj.get_lifecycle_stages()
 
-class StageGroupedCategoriesSerializer(serializers.Serializer):
-    """Serializer for categories grouped by development stage."""
-
-    stage1_entitlements = UnitCostCategorySerializer(many=True)
-    stage2_engineering = UnitCostCategorySerializer(many=True)
-    stage3_development = UnitCostCategorySerializer(many=True)
+    def get_children(self, obj):
+        """Get nested children recursively."""
+        children = obj.children.filter(is_active=True).order_by('sort_order', 'category_name')
+        return UnitCostCategoryHierarchySerializer(children, many=True).data
 
 
-class UnitCostTemplateListSerializer(serializers.ModelSerializer):
-    """List serializer for templates; used for accordion views and autocomplete."""
+class UnitCostItemListSerializer(serializers.ModelSerializer):
+    """List serializer for unit cost items; used for accordion views and autocomplete.
+
+    Renamed from UnitCostTemplateListSerializer in migration 0018.
+    """
 
     category_name = serializers.CharField(source='category.category_name', read_only=True)
     has_benchmarks = serializers.SerializerMethodField()
     created_from_project_id = serializers.IntegerField(source='created_from_project.project_id', read_only=True)
 
     class Meta:
-        model = UnitCostTemplate
+        model = UnitCostItem
         fields = [
-            'template_id',
+            'item_id',  # Renamed from template_id
             'category_id',
             'category_name',
             'item_name',
@@ -95,7 +173,7 @@ class UnitCostTemplateListSerializer(serializers.ModelSerializer):
             'is_active',
         ]
         read_only_fields = [
-            'template_id',
+            'item_id',
             'category_id',
             'category_name',
             'usage_count',
@@ -107,32 +185,46 @@ class UnitCostTemplateListSerializer(serializers.ModelSerializer):
         ]
 
     def get_has_benchmarks(self, obj) -> bool:
-        """Return whether template has any active benchmark links."""
+        """Return whether item has any active benchmark links."""
         if hasattr(obj, 'has_benchmarks'):
             return bool(obj.has_benchmarks)
         return obj.benchmark_links.exists()
 
 
-class UnitCostTemplateDetailSerializer(UnitCostTemplateListSerializer):
-    """Detail serializer returns benchmark metadata."""
+# Backward compatibility alias
+UnitCostTemplateListSerializer = UnitCostItemListSerializer
 
-    benchmarks = TemplateBenchmarkLinkSerializer(source='benchmark_links', many=True, read_only=True)
 
-    class Meta(UnitCostTemplateListSerializer.Meta):
-        fields = UnitCostTemplateListSerializer.Meta.fields + [
+class UnitCostItemDetailSerializer(UnitCostItemListSerializer):
+    """Detail serializer returns benchmark metadata.
+
+    Renamed from UnitCostTemplateDetailSerializer in migration 0018.
+    """
+
+    benchmarks = ItemBenchmarkLinkSerializer(source='benchmark_links', many=True, read_only=True)
+
+    class Meta(UnitCostItemListSerializer.Meta):
+        fields = UnitCostItemListSerializer.Meta.fields + [
             'created_at',
             'updated_at',
             'benchmarks',
         ]
-        read_only_fields = UnitCostTemplateListSerializer.Meta.read_only_fields + [
+        read_only_fields = UnitCostItemListSerializer.Meta.read_only_fields + [
             'created_at',
             'updated_at',
             'benchmarks',
         ]
 
 
-class UnitCostTemplateWriteSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating templates."""
+# Backward compatibility alias
+UnitCostTemplateDetailSerializer = UnitCostItemDetailSerializer
+
+
+class UnitCostItemWriteSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating unit cost items.
+
+    Renamed from UnitCostTemplateWriteSerializer in migration 0018.
+    """
 
     category_id = serializers.PrimaryKeyRelatedField(
         source='category',
@@ -147,9 +239,9 @@ class UnitCostTemplateWriteSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = UnitCostTemplate
+        model = UnitCostItem
         fields = [
-            'template_id',
+            'item_id',  # Renamed from template_id
             'category_id',
             'item_name',
             'default_uom_code',
@@ -165,7 +257,7 @@ class UnitCostTemplateWriteSerializer(serializers.ModelSerializer):
             'created_from_project_id',
             'created_from_ai',
         ]
-        read_only_fields = ['template_id', 'usage_count', 'last_used_date', 'created_from_ai']
+        read_only_fields = ['item_id', 'usage_count', 'last_used_date', 'created_from_ai']
 
     def validate_quantity(self, value):
         """Ensure quantity, when provided, is non-negative."""
@@ -182,6 +274,10 @@ class UnitCostTemplateWriteSerializer(serializers.ModelSerializer):
         if upper and upper not in allowed:
             raise serializers.ValidationError(f"project_type_code must be one of {', '.join(sorted(allowed))}")
         return upper or 'LAND'
+
+
+# Backward compatibility alias
+UnitCostTemplateWriteSerializer = UnitCostItemWriteSerializer
 
 
 class PlanningStandardSerializer(serializers.ModelSerializer):

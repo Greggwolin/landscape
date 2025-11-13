@@ -26,16 +26,19 @@ from .views_variance import (
     reconcile_category_variance,
 )
 from .views_unit_costs import (
+    CategoryTagLibraryViewSet,
     UnitCostCategoryViewSet,
-    UnitCostTemplateViewSet,
+    UnitCostItemViewSet,  # Renamed from UnitCostTemplateViewSet in migration 0018
     PlanningStandardView,
 )
+from .views_budget_categories import BudgetCategoryViewSet
 
 router = DefaultRouter()
 
 # Budget and Actual endpoints
 router.register(r'budget-items', BudgetItemViewSet, basename='budgetitem')
 router.register(r'actual-items', ActualItemViewSet, basename='actualitem')
+router.register(r'budget-categories', BudgetCategoryViewSet, basename='budgetcategory')
 
 # Finance Structure endpoints
 router.register(r'finance-structures', FinanceStructureViewSet, basename='financestructure')
@@ -55,8 +58,11 @@ router.register(r'valuation/cost-approach', CostApproachViewSet, basename='costa
 router.register(r'valuation/income-approach', IncomeApproachViewSet, basename='incomeapproach')
 router.register(r'valuation/reconciliation', ValuationReconciliationViewSet, basename='valuationreconciliation')
 router.register(r'valuation/summary', ValuationSummaryViewSet, basename='valuationsummary')
+
+# Unit Costs and Category Taxonomy endpoints
+router.register(r'unit-costs/tags', CategoryTagLibraryViewSet, basename='categorytags')
 router.register(r'unit-costs/categories', UnitCostCategoryViewSet, basename='unitcostcategories')
-router.register(r'unit-costs/templates', UnitCostTemplateViewSet, basename='unitcosttemplates')
+router.register(r'unit-costs/items', UnitCostItemViewSet, basename='unitcostitems')  # Renamed from templates to items in migration 0018
 
 urlpatterns = [
     path('', include(router.urls)),

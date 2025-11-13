@@ -263,6 +263,53 @@ export type FinCurveInsert = {
   pointsJson: any;
 };
 
+// landscape.core_fin_curve_profile
+// Primary Key: curve_id
+export interface FinCurveProfile {
+  /** Default: nextval('core_fin_curve_profile_curve_id_seq'::regclass) */
+  curveId: number;
+  curveName: string;
+  curveCode: string;
+  description: string | null;
+  pctAt10: number;
+  pctAt20: number;
+  pctAt30: number;
+  pctAt40: number;
+  pctAt50: number;
+  pctAt60: number;
+  pctAt70: number;
+  pctAt80: number;
+  pctAt90: number;
+  pctAt100: number;
+  /** Default: true */
+  isActive: boolean | null;
+  /** Default: true */
+  isSystem: boolean | null;
+  /** Default: now() */
+  createdAt: string | null;
+  /** Default: now() */
+  updatedAt: string | null;
+}
+
+// Insert type for landscape.core_fin_curve_profile (excludes auto-generated fields)
+export type FinCurveProfileInsert = {
+  curveName: string;
+  curveCode: string;
+  description?: string | null;
+  pctAt10: number;
+  pctAt20: number;
+  pctAt30: number;
+  pctAt40: number;
+  pctAt50: number;
+  pctAt60: number;
+  pctAt70: number;
+  pctAt80: number;
+  pctAt90: number;
+  pctAt100?: number;
+  isActive?: boolean | null;
+  isSystem?: boolean | null;
+};
+
 // landscape.core_fin_fact_actual
 // Primary Key: fact_id
 // Foreign Keys: category_id -> landscape.core_fin_category.category_id, container_id -> landscape.tbl_container.container_id, uom_code -> landscape.core_fin_uom.uom_code
@@ -313,6 +360,7 @@ export interface FinFactBudget {
   startDate: string | null;
   endDate: string | null;
   curveId: number | null;
+  curveSteepness: number | null;
   notes: string | null;
   /** Default: now() */
   createdAt: string;
@@ -342,6 +390,7 @@ export type FinFactBudgetInsert = {
   startDate?: string | null;
   endDate?: string | null;
   curveId?: number | null;
+  curveSteepness?: number | null;
   notes?: string | null;
   containerId?: number | null;
   projectId?: number | null;
@@ -1802,6 +1851,7 @@ export const TABLE_NAMES = {
   CORE_FIN_CROSSWALK_AD: 'landscape.core_fin_crosswalk_ad' as const,
   CORE_FIN_CROSSWALK_AE: 'landscape.core_fin_crosswalk_ae' as const,
   CORE_FIN_CURVE: 'landscape.core_fin_curve' as const,
+  CORE_FIN_CURVE_PROFILE: 'landscape.core_fin_curve_profile' as const,
   CORE_FIN_FACT_ACTUAL: 'landscape.core_fin_fact_actual' as const,
   CORE_FIN_FACT_BUDGET: 'landscape.core_fin_fact_budget' as const,
   CORE_FIN_FACT_TAGS: 'landscape.core_fin_fact_tags' as const,

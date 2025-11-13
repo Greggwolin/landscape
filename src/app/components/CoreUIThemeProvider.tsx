@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 
 interface ThemeContextValue {
   theme: 'light' | 'dark';
@@ -13,18 +13,29 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
+  const themeRef = useRef(theme);
 
   // Load theme from localStorage on mount
   useEffect(() => {
     setMounted(true);
     const storedTheme = localStorage.getItem('coreui-theme') as 'light' | 'dark' | null;
-    if (storedTheme) {
+    if (storedTheme === 'light' || storedTheme === 'dark') {
       setThemeState(storedTheme);
-    } else {
-      // Default to light mode
-      setThemeState('light');
+      return;
     }
+
+    const domTheme = document.documentElement.getAttribute('data-theme');
+    if (domTheme === 'light' || domTheme === 'dark') {
+      setThemeState(domTheme);
+      return;
+    }
+
+    setThemeState('light');
   }, []);
+
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   // Apply theme to document
   useEffect(() => {
@@ -45,6 +56,21 @@ export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // Persist to localStorage
     localStorage.setItem('coreui-theme', theme);
   }, [theme, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      const attrTheme = root.getAttribute('data-theme');
+      if ((attrTheme === 'light' || attrTheme === 'dark') && attrTheme !== themeRef.current) {
+        setThemeState(attrTheme);
+      }
+    });
+
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, [mounted]);
 
   const toggleTheme = () => {
     setThemeState(prev => prev === 'light' ? 'dark' : 'light');

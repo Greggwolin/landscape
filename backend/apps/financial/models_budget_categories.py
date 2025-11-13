@@ -111,6 +111,28 @@ class BudgetCategory(models.Model):
         help_text='Display color (hex or CSS color name)'
     )
 
+    # Completion Tracking (for quick-add workflow)
+    is_incomplete = models.BooleanField(
+        default=False,
+        help_text='True if created via quick-add and missing optional fields'
+    )
+    created_from = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='Source: budget_quick_add, admin_panel, ai_import, template, seed_data'
+    )
+    reminder_dismissed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When user dismissed reminder (7-day cooldown)'
+    )
+    last_reminded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Last time Landscaper showed a reminder'
+    )
+
     # Metadata
     is_active = models.BooleanField(
         default=True,
@@ -144,6 +166,110 @@ class BudgetCategory(models.Model):
         if self.is_template:
             return f"[{self.template_name}] {self.name} (L{self.level})"
         return f"{self.name} (L{self.level})"
+
+    def get_missing_fields(self):
+        """
+        Get list of fields that need completion.
+
+        Returns:
+            list: Field names that are missing (description, icon, color, parent)
+        """
+        from django.utils import timezone
+
+        missing = []
+
+        # Check optional fields
+        if not self.description or not self.description.strip():
+            missing.append('description')
+
+        if not self.icon or not self.icon.strip():
+            missing.append('icon')
+
+        if not self.color or not self.color.strip():
+            missing.append('color')
+
+        # Level 2-4 categories need a valid parent
+        if self.level > 1:
+            if not self.parent_id:
+                missing.append('parent')
+            else:
+                # Verify parent exists and is at correct level
+                try:
+                    if self.parent.level != self.level - 1 or not self.parent.is_active:
+                        missing.append('parent')
+                except BudgetCategory.DoesNotExist:
+                    missing.append('parent')
+
+        return missing
+
+    def is_complete(self):
+        """
+        Check if category has all optional fields filled.
+
+        Returns:
+            bool: True if complete, False if missing fields
+        """
+        return len(self.get_missing_fields()) == 0
+
+    def mark_complete(self):
+        """
+        Mark category as complete and clear reminders.
+        Also clears completion status records.
+        """
+        self.is_incomplete = False
+        self.reminder_dismissed_at = None
+        self.last_reminded_at = None
+        self.save(update_fields=['is_incomplete', 'reminder_dismissed_at', 'last_reminded_at', 'updated_at'])
+
+        # Delete completion status records
+        CategoryCompletionStatus.objects.filter(category_id=self.pk).delete()
+
+    def dismiss_reminders(self, days=7):
+        """
+        Dismiss reminders for specified number of days.
+
+        Args:
+            days (int): Number of days to dismiss (default 7)
+        """
+        from django.utils import timezone
+
+        self.reminder_dismissed_at = timezone.now()
+        self.save(update_fields=['reminder_dismissed_at', 'updated_at'])
+
+    def should_remind(self):
+        """
+        Check if this category should show reminders.
+
+        Returns:
+            bool: True if reminders should be shown
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not self.is_incomplete:
+            return False
+
+        if self.reminder_dismissed_at is None:
+            return True
+
+        # Check if 7-day cooldown has passed
+        cooldown_end = self.reminder_dismissed_at + timedelta(days=7)
+        return timezone.now() >= cooldown_end
+
+    def update_completion_status(self):
+        """
+        Update completion status records based on current field values.
+        """
+        # Delete existing records
+        CategoryCompletionStatus.objects.filter(category=self).delete()
+
+        # Add records for missing fields
+        missing_fields = self.get_missing_fields()
+        for field in missing_fields:
+            CategoryCompletionStatus.objects.create(
+                category=self,
+                missing_field=field
+            )
 
     def clean(self):
         """
@@ -444,5 +570,44 @@ class BudgetCategory(models.Model):
         }
 
 
+class CategoryCompletionStatus(models.Model):
+    """
+    Tracks specific fields missing for incomplete categories.
+    Maps to landscape.core_category_completion_status table.
+
+    This is a denormalized tracking table that helps generate
+    user-friendly completion prompts.
+    """
+
+    category = models.ForeignKey(
+        BudgetCategory,
+        on_delete=models.CASCADE,
+        db_column='category_id',
+        related_name='completion_status'
+    )
+    missing_field = models.CharField(
+        max_length=50,
+        choices=[
+            ('description', 'Description'),
+            ('icon', 'Icon'),
+            ('color', 'Color'),
+            ('parent', 'Parent Category'),
+        ],
+        help_text='Field that needs to be completed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False  # Managed by SQL migrations
+        db_table = 'core_category_completion_status'
+        unique_together = [['category', 'missing_field']]
+        ordering = ['created_at']
+        verbose_name = 'Category Completion Status'
+        verbose_name_plural = 'Category Completion Statuses'
+
+    def __str__(self):
+        return f"{self.category.name} - missing {self.missing_field}"
+
+
 # Re-export for convenience
-__all__ = ['BudgetCategory']
+__all__ = ['BudgetCategory', 'CategoryCompletionStatus']
