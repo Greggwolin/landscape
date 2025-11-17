@@ -79,24 +79,24 @@ export default function AreaTiles({
             className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
             onClick={() => onAreaSelect(area.container_id)}
           >
-            <div className="planning-tile-header">
-              Village {area.name}
+            <div className="planning-tile-header mb-3">
+              {area.name} #{area.code}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="planning-tile-stat">
                 {Math.round(area.acres).toLocaleString()} acres
               </div>
 
               {area.phaseCount !== undefined && area.phaseCount > 0 && (
                 <div className="planning-tile-stat">
-                  {area.phaseCount} {area.phaseCount === 1 ? 'Phase' : 'Phases'}
+                  {area.phaseCount} {area.phaseCount === 1 ? 'phase' : 'phases'}
                 </div>
               )}
 
               {area.parcelCount !== undefined && area.parcelCount > 0 && (
                 <div className="planning-tile-stat">
-                  {area.parcelCount} {area.parcelCount === 1 ? 'Parcel' : 'Parcels'}
+                  {area.parcelCount} {area.parcelCount === 1 ? 'parcel' : 'parcels'}
                 </div>
               )}
 
@@ -108,7 +108,7 @@ export default function AreaTiles({
 
               {showCosts && (
                 <>
-                  <div className="planning-tile-stat mt-2">
+                  <div className="planning-tile-stat mt-3">
                     Area: {formatCurrency(area.directCost)}
                   </div>
                   <div className="planning-tile-stat">
@@ -119,7 +119,7 @@ export default function AreaTiles({
             </div>
 
             {isSelected && (
-              <div className="mt-2 pt-2 border-t border-subtle">
+              <div className="mt-3 pt-3 border-t border-subtle">
                 <div className="text-xs font-medium" style={{ color: 'var(--cui-primary)' }}>
                   ✓ Selected
                 </div>
