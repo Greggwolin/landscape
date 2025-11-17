@@ -56,9 +56,20 @@ function enqueueOfflineIssue(entry: OfflineIssueEntry): boolean {
   if (typeof window === 'undefined') return false
   try {
     const raw = window.localStorage.getItem(OFFLINE_QUEUE_KEY)
-    const queue = raw ? (JSON.parse(raw) as OfflineIssueEntry[]) : []
-    if (!Array.isArray(queue)) {
-      throw new Error('Offline queue is corrupted')
+    let queue: OfflineIssueEntry[] = []
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          queue = parsed as OfflineIssueEntry[]
+        } else {
+          console.warn('Offline issue queue was not an array; resetting.')
+          window.localStorage.removeItem(OFFLINE_QUEUE_KEY)
+        }
+      } catch (parseError) {
+        console.warn('Offline issue queue is corrupted; resetting.', parseError)
+        window.localStorage.removeItem(OFFLINE_QUEUE_KEY)
+      }
     }
     queue.unshift(entry)
     window.localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(0, 200)))
@@ -67,6 +78,33 @@ function enqueueOfflineIssue(entry: OfflineIssueEntry): boolean {
     console.error('Failed to store offline issue entry', error)
     return false
   }
+}
+
+function extractServerErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const errorShape = (payload as { error?: unknown }).error
+  if (!errorShape) return null
+  if (typeof errorShape === 'string') {
+    return errorShape
+  }
+  if (typeof errorShape !== 'object' || errorShape === null) {
+    return null
+  }
+  const formErrors = Array.isArray((errorShape as { formErrors?: unknown }).formErrors)
+    ? ((errorShape as { formErrors?: string[] }).formErrors ?? []).filter(Boolean)
+    : []
+  if (formErrors.length > 0) {
+    return formErrors.join(', ')
+  }
+  const fieldErrors = (errorShape as { fieldErrors?: Record<string, unknown> }).fieldErrors
+  if (fieldErrors && typeof fieldErrors === 'object') {
+    for (const value of Object.values(fieldErrors)) {
+      if (Array.isArray(value) && value.length > 0) {
+        return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).join(', ')
+      }
+    }
+  }
+  return null
 }
 
 export function IssueReporterDialog({
@@ -160,12 +198,7 @@ export function IssueReporterDialog({
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        const message =
-          typeof data?.error === 'string'
-            ? data.error
-            : Array.isArray(data?.error?.formErrors)
-              ? data.error.formErrors.join(', ')
-              : 'Could not submit your report.'
+        const message = extractServerErrorMessage(data) ?? 'Could not submit your report.'
         throw new Error(message)
       }
 
@@ -177,7 +210,10 @@ export function IssueReporterDialog({
       }, 1200)
     } catch (error) {
       console.error('Failed to submit issue report', error)
-      const fallbackMessage = error instanceof Error ? error.message : 'Unexpected error occurred.'
+      const fallbackMessage =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'Unexpected error occurred.'
       const offlineSaved = enqueueOfflineIssue({
         issueId: Date.now(),
         issueType,

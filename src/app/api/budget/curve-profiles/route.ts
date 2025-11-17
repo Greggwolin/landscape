@@ -4,11 +4,20 @@
  * Fetch available S-curve profiles for dropdown selection.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
-export async function GET() {
+function parseBoolean(value: string | null): boolean {
+  if (!value) return false;
+  return ['true', '1', 'yes'].includes(value.toLowerCase());
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const includeInactive = parseBoolean(
+      request.nextUrl.searchParams.get('includeInactive')
+    );
+
     const rows = await sql<{
       curveId: number;
       curveName: string;
@@ -28,7 +37,7 @@ export async function GET() {
         ] AS deciles,
         is_system AS "isSystem"
       FROM landscape.core_fin_curve_profile
-      WHERE is_active = TRUE
+      WHERE ${includeInactive} OR is_active = TRUE
       ORDER BY
         CASE curve_code
           WHEN 'S' THEN 1
@@ -41,10 +50,19 @@ export async function GET() {
         curve_name
     `;
 
-    const profiles = rows.map(row => ({
-      ...row,
-      deciles: row.deciles.map(value => Number(value))
-    }));
+    const labels = ['10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
+    const profiles = rows.map(row => {
+      const deciles = row.deciles.map(value => Number(value));
+      return {
+        ...row,
+        curveCode: row.curveCode?.toUpperCase() ?? 'S',
+        deciles,
+        chartData: {
+          labels,
+          values: deciles
+        }
+      };
+    });
 
     return NextResponse.json({
       success: true,

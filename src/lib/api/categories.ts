@@ -31,7 +31,7 @@ export async function fetchCategories(
   if (params?.parent !== undefined) queryParams.set('parent', String(params.parent));
   if (params?.project_type_code) queryParams.set('project_type_code', params.project_type_code);
 
-  const url = `${API_BASE}/categories/${queryParams.toString() ? `?${queryParams}` : ''}`;
+  const url = `${API_BASE}/categories${queryParams.toString() ? `?${queryParams}` : ''}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -54,7 +54,7 @@ export interface CreateCategoryData {
 export async function createCategory(
   data: CreateCategoryData
 ): Promise<UnitCostCategoryReference> {
-  const response = await fetch(`${API_BASE}/categories/`, {
+  const response = await fetch(`${API_BASE}/categories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -76,18 +76,49 @@ export async function updateCategory(
   categoryId: number,
   data: UpdateCategoryData
 ): Promise<UnitCostCategoryReference> {
-  const response = await fetch(`${API_BASE}/categories/${categoryId}/`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+  const attemptEndpoints = [
+    `${API_BASE}/categories/update?id=${categoryId}`,
+    `${API_BASE}/categories/${categoryId}/`,
+    `${API_BASE}/categories/${categoryId}`,
+  ];
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Failed to update category: ${response.statusText}`);
+  let lastError: string | null = null;
+
+  for (const endpoint of attemptEndpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, category_id: categoryId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || errorData.error || `Failed to update category: ${response.statusText}`;
+
+        // Try next endpoint if this one is missing
+        if (response.status === 404) {
+          lastError = errorMessage;
+          continue;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error && !error.message.includes('Failed to fetch')) {
+        lastError = error.message;
+      } else if (typeof error === 'string') {
+        lastError = error;
+      } else {
+        lastError = 'Failed to update category';
+      }
+    }
   }
 
-  return await response.json();
+  throw new Error(lastError || 'Failed to update category');
 }
 
 export async function deleteCategory(categoryId: number): Promise<void> {
@@ -155,7 +186,7 @@ export async function getCategoryDeletionImpact(
 
 export async function fetchTags(): Promise<CategoryTag[]> {
   try {
-    const response = await fetch(`${API_BASE}/tags/`);
+    const response = await fetch(`${API_BASE}/tags`);
 
     if (!response.ok) {
       console.warn('Failed to fetch tags:', response.status, response.statusText);
@@ -179,7 +210,7 @@ export interface CreateTagData {
 }
 
 export async function createTag(data: CreateTagData): Promise<CategoryTag> {
-  const response = await fetch(`${API_BASE}/tags/`, {
+  const response = await fetch(`${API_BASE}/tags`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -195,6 +226,17 @@ export async function createTag(data: CreateTagData): Promise<CategoryTag> {
   }
 
   return await response.json();
+}
+
+export async function deleteTag(tagId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/tags/${tagId}/`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Failed to delete tag: ${response.statusText}`);
+  }
 }
 
 // =============================================================================

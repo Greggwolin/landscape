@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react'
 import DropZone from './DropZone'
 import type { Project, Area, Phase, Parcel } from './PlanningWizard'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
+import { LandscapeButton } from '@/components/ui/landscape'
 
 interface ProjectCanvasInlineProps {
   project: Project
@@ -178,12 +179,13 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
     <div className="flex flex-1 flex-col gap-4 p-6 bg-gray-950 min-h-screen">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-white">{project.name}</h1>
-        <button
+        <LandscapeButton
+          color="primary"
+          size="sm"
           onClick={onAddArea}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
         >
           Add {labels.level1Label}
-        </button>
+        </LandscapeButton>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -227,13 +229,13 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
                   <div className="flex flex-col gap-2 ml-3 text-xs">
                     {isEditing ? (
                       <>
-                        <button onClick={() => saveArea(area.id)} className="px-2 py-1 bg-green-600 text-white rounded">Save</button>
-                        <button onClick={cancelAreaEdit} className="px-2 py-1 bg-gray-600 text-white rounded">Cancel</button>
+                        <LandscapeButton color="success" size="sm" onClick={() => saveArea(area.id)}>Save</LandscapeButton>
+                        <LandscapeButton color="secondary" size="sm" onClick={cancelAreaEdit}>Cancel</LandscapeButton>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => beginEditArea(area)} className="px-2 py-1 bg-gray-700 text-white rounded">Edit</button>
-                        <button onClick={() => onAddPhase(area.id)} className="px-2 py-1 bg-blue-600 text-white rounded">Add {labels.level2Label}</button>
+                        <LandscapeButton color="secondary" size="sm" variant="outline" onClick={() => beginEditArea(area)}>Edit</LandscapeButton>
+                        <LandscapeButton color="primary" size="sm" onClick={() => onAddPhase(area.id)}>Add {labels.level2Label}</LandscapeButton>
                       </>
                     )}
                   </div>
@@ -277,13 +279,13 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
                           <div className="flex flex-col gap-2 ml-3 text-[11px]">
                             {phaseEditing ? (
                               <>
-                                <button onClick={() => savePhase(phase.id)} className="px-2 py-1 bg-green-600 text-white rounded">Save</button>
-                                <button onClick={cancelPhaseEdit} className="px-2 py-1 bg-gray-600 text-white rounded">Cancel</button>
+                                <LandscapeButton color="success" size="sm" onClick={() => savePhase(phase.id)}>Save</LandscapeButton>
+                                <LandscapeButton color="secondary" size="sm" onClick={cancelPhaseEdit}>Cancel</LandscapeButton>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => onOpenPhase(area.id, phase.id)} className="px-2 py-1 bg-blue-600 text-white rounded">Open</button>
-                                <button onClick={() => beginEditPhase(area.id, phase)} className="px-2 py-1 bg-gray-700 text-white rounded">Edit</button>
+                                <LandscapeButton color="primary" size="sm" onClick={() => onOpenPhase(area.id, phase.id)}>Open</LandscapeButton>
+                                <LandscapeButton color="secondary" size="sm" variant="outline" onClick={() => beginEditPhase(area.id, phase)}>Edit</LandscapeButton>
                               </>
                             )}
                           </div>

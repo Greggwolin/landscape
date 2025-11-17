@@ -40,6 +40,6 @@ cd "$ROOT_DIR"
 # Give the backend a moment to boot so first frontend requests succeed.
 sleep 2
 
-echo "Starting Next.js frontend (http://localhost:3000 or configured port)..."
+echo "Starting Next.js frontend (http://localhost:3000)..."
 echo "Press Ctrl+C to stop both servers."
 env NEXT_PUBLIC_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8001}" npm run dev

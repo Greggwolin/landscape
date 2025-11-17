@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import type { SalesComparable } from '@/types/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface AdjustmentMatrixProps {
   comparables: SalesComparable[];
@@ -46,17 +47,13 @@ export function AdjustmentMatrix({ comparables }: AdjustmentMatrixProps) {
       }}
     >
       {/* Header */}
-      <button
+      <LandscapeButton
+        variant="ghost"
+        color="secondary"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-5 py-4 flex items-center justify-between transition-colors"
+        className="w-full px-5 py-4 flex items-center justify-between"
         style={{
           backgroundColor: 'var(--cui-tertiary-bg)'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = '0.9';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '1';
         }}
       >
         <div className="flex items-center gap-3">
@@ -88,7 +85,7 @@ export function AdjustmentMatrix({ comparables }: AdjustmentMatrixProps) {
         >
           <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
         </svg>
-      </button>
+      </LandscapeButton>
 
       {/* Content */}
       {isExpanded && (

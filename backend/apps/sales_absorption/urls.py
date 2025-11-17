@@ -13,8 +13,20 @@ from .views import (
     ProjectPricingAssumptionViewSet,
     ProjectTimingAssumptionsViewSet,
     annual_inventory_gauge,
+    assign_parcel_to_phase,
+    calculate_sale_preview,
+    create_sale_phase,
+    get_all_uoms,
+    get_available_uoms,
+    global_sale_benchmarks,
     parcel_product_types,
+    parcel_sale_assumptions,
+    parcel_sale_benchmarks,
     parcels_with_sales,
+    sale_benchmarks,
+    save_parcel_overrides,
+    update_parcel_sale_date,
+    update_sale_benchmark,
 )
 
 router = DefaultRouter()
@@ -86,5 +98,68 @@ urlpatterns = [
             {'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}
         ),
         name='project-pricing-assumptions-detail',
+    ),
+    # Sale Phase Management Endpoints
+    path(
+        'projects/<int:project_id>/sale-phases/',
+        create_sale_phase,
+        name='create-sale-phase',
+    ),
+    path(
+        'projects/<int:project_id>/parcel-sale-phase/',
+        assign_parcel_to_phase,
+        name='assign-parcel-to-phase',
+    ),
+    path(
+        'projects/<int:project_id>/parcel-sales/overrides/',
+        save_parcel_overrides,
+        name='save-parcel-overrides',
+    ),
+    path(
+        'projects/<int:project_id>/parcel-sales/date/',
+        update_parcel_sale_date,
+        name='update-parcel-sale-date',
+    ),
+    # UOM Calculation Registry Endpoints
+    path(
+        'uoms/',
+        get_all_uoms,
+        name='get-all-uoms',
+    ),
+    path(
+        'projects/<int:project_id>/parcels/<int:parcel_id>/available-uoms/',
+        get_available_uoms,
+        name='get-available-uoms',
+    ),
+    # Sale Calculation Endpoints
+    path(
+        'sale-benchmarks/global/',
+        global_sale_benchmarks,
+        name='global-sale-benchmarks',
+    ),
+    path(
+        'sale-benchmarks/<int:benchmark_id>/',
+        update_sale_benchmark,
+        name='update-sale-benchmark',
+    ),
+    path(
+        'projects/<int:project_id>/sale-benchmarks/',
+        sale_benchmarks,
+        name='sale-benchmarks',
+    ),
+    path(
+        'projects/<int:project_id>/parcels/<int:parcel_id>/sale-benchmarks/',
+        parcel_sale_benchmarks,
+        name='parcel-sale-benchmarks',
+    ),
+    path(
+        'projects/<int:project_id>/parcels/<int:parcel_id>/calculate-sale/',
+        calculate_sale_preview,
+        name='calculate-sale-preview',
+    ),
+    path(
+        'projects/<int:project_id>/parcels/<int:parcel_id>/sale-assumptions/',
+        parcel_sale_assumptions,
+        name='parcel-sale-assumptions',
     ),
 ]

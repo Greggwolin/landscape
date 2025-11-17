@@ -23,7 +23,7 @@ export type BenchmarkCategoryKey =
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export type SourceType = 'user_input' | 'document_extraction' | 'project_data' | 'system_default';
+export type SourceType = 'user_input' | 'document_extraction' | 'project_data' | 'system_default' | 'global_default';
 
 export type PropertyType = 'multifamily' | 'retail' | 'office' | 'industrial' | 'mixed_use' | 'land';
 

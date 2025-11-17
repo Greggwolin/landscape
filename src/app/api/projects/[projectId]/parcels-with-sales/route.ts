@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const DJANGO_API_URL = process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8001';
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
+    // Hardcoded for now - env vars not loading correctly
+    const DJANGO_API_URL = 'http://127.0.0.1:8001';
+
     const { projectId } = await params;
     const { searchParams } = new URL(request.url);
     const phaseId = searchParams.get('phase_id');
@@ -18,6 +19,10 @@ export async function GET(
     } else if (phaseId) {
       url += `?phase_id=${phaseId}`;
     }
+
+    console.log('[parcels-with-sales] Fetching from:', url);
+    console.log('[parcels-with-sales] DJANGO_API_URL:', DJANGO_API_URL);
+    console.log('[parcels-with-sales] process.env.NEXT_PUBLIC_DJANGO_API_URL:', process.env.NEXT_PUBLIC_DJANGO_API_URL);
 
     const response = await fetch(url, {
       headers: {

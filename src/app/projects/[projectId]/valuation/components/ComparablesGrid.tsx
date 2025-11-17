@@ -12,6 +12,7 @@ import type { SalesComparable, AIAdjustmentSuggestion, SalesCompAdjustment, Adju
 import { AdjustmentCell } from './AdjustmentCell';
 import { AdjustmentAnalysisPanel } from './AdjustmentAnalysisPanel';
 import { acceptAISuggestion, updateUserAdjustment } from '@/lib/api/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface ComparablesGridProps {
   comparables: SalesComparable[];
@@ -299,26 +300,20 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
               className="px-6 py-4 border-t flex justify-end gap-3"
               style={{ borderColor: 'var(--cui-border-color)' }}
             >
-              <button
+              <LandscapeButton
+                color="secondary"
+                size="sm"
                 onClick={() => setDeleteModalOpen(null)}
-                className="px-4 py-2 rounded text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-secondary)',
-                  color: 'white'
-                }}
               >
                 Cancel
-              </button>
-              <button
+              </LandscapeButton>
+              <LandscapeButton
+                color="danger"
+                size="sm"
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 rounded text-sm"
-                style={{
-                  backgroundColor: 'var(--cui-danger)',
-                  color: 'white'
-                }}
               >
                 Delete Comparable
-              </button>
+              </LandscapeButton>
             </div>
           </div>
         </>
@@ -387,22 +382,18 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 >
                   <div className="flex items-center gap-2">
                     <span>Comparable Sale</span>
-                    <button
+                    <LandscapeButton
+                      variant="ghost"
+                      color="primary"
+                      size="sm"
                       onClick={onAddComp}
-                      className="flex items-center justify-center transition-opacity hover:opacity-70"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        color: 'var(--cui-primary)'
-                      }}
+                      className="!p-0 transition-opacity hover:opacity-70"
                       title="Add Comparable"
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/>
                       </svg>
-                    </button>
+                    </LandscapeButton>
                   </div>
                 </th>
                 {comparables.map((comp, idx) => (
@@ -417,15 +408,12 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     <div className="flex items-center gap-3" style={{ whiteSpace: 'nowrap' }}>
                       <span>Comp {idx + 1}</span>
                       <div className="flex items-center gap-2">
-                        <button
+                        <LandscapeButton
+                          variant="ghost"
+                          color="secondary"
+                          size="sm"
                           onClick={() => handleEditToggle(comp.comparable_id)}
-                          className="flex items-center justify-center transition-opacity hover:opacity-70"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer'
-                          }}
+                          className="!p-0 transition-opacity hover:opacity-70"
                           title={editingCompId === comp.comparable_id ? 'Save changes' : 'Edit comparable'}
                         >
                           {editingCompId === comp.comparable_id ? (
@@ -437,16 +425,13 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                               <path fill="var(--cui-secondary-color)" d="M453.3125,120.99609,391.00391,58.6875a54.32117,54.32117,0,0,0-76.81641,0l-270.293,270.29688a7.99971,7.99971,0,0,0-2.34375,5.65625L32.00391,460.34766A7.99922,7.99922,0,0,0,40,468.00391l125.70312-9.55078a7.99971,7.99971,0,0,0,5.65625-2.34375L441.65234,185.8125l11.66016-11.66016A54.27776,54.27776,0,0,0,453.3125,120.99609ZM164.89844,440.918,47.41016,449.32422l8.40625-117.48828L243.26953,144.38281l109.08594,109.08594ZM442.03516,162.82422,430.37891,174.48047,321.29688,65.39844,332.95312,53.74219a38.35946,38.35946,0,1,1,54.24609,54.24609l.00391.00391Z"/>
                             </svg>
                           )}
-                        </button>
-                        <button
+                        </LandscapeButton>
+                        <LandscapeButton
+                          variant="ghost"
+                          color="secondary"
+                          size="sm"
                           onClick={() => handleDeleteClick(comp.comparable_id)}
-                          className="flex items-center justify-center transition-opacity hover:opacity-70"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer'
-                          }}
+                          className="!p-0 transition-opacity hover:opacity-70"
                           title="Delete comparable"
                         >
                           <svg className="icon" width="14" height="14" viewBox="0 0 512 512" style={{ opacity: 0.5 }}>
@@ -459,7 +444,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                             <path fill="var(--cui-danger)" d="M192,160c-8.284,0-15,6.716-15,15v241c0,8.284,6.716,15,15,15s15-6.716,15-15V175C207,166.716,200.284,160,192,160z"/>
                             <path fill="var(--cui-danger)" d="M320,160c-8.284,0-15,6.716-15,15v241c0,8.284,6.716,15,15,15s15-6.716,15-15V175C335,166.716,328.284,160,320,160z"/>
                           </svg>
-                        </button>
+                        </LandscapeButton>
                       </div>
                     </div>
                   </th>

@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import type { AIAdjustmentSuggestion, SalesComparable } from '@/types/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -282,13 +283,15 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
             </p>
           </div>
         </div>
-        <button
+        <LandscapeButton
+          variant="ghost"
+          color="secondary"
+          size="sm"
           onClick={onClose}
-          className="text-xl hover:opacity-70 transition-opacity"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="!p-0 text-xl hover:opacity-70 transition-opacity"
         >
           ✕
-        </button>
+        </LandscapeButton>
       </div>
 
       {/* Messages */}
@@ -334,22 +337,13 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
         {/* Revised Suggestion Button */}
         {revisedValue !== null && (
           <div className="flex justify-center pt-2">
-            <button
+            <LandscapeButton
+              color="success"
+              size="sm"
               onClick={handleAcceptRevised}
-              className="px-4 py-2 rounded font-medium text-sm transition-opacity"
-              style={{
-                backgroundColor: 'var(--cui-success)',
-                color: 'white'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '0.8';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '1';
-              }}
             >
               Accept Revised Suggestion: {((revisedValue || 0) * 100).toFixed(0)}%
-            </button>
+            </LandscapeButton>
           </div>
         )}
       </div>
@@ -370,25 +364,16 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
         </div>
         <div className="space-y-2">
           {quickActions.map((action, idx) => (
-            <button
+            <LandscapeButton
               key={idx}
+              variant="outline"
+              color="secondary"
+              size="sm"
               onClick={() => handleQuickAction(action)}
-              className="w-full text-left px-3 py-2 text-xs rounded transition-colors"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)',
-                border: '1px solid',
-                color: 'var(--cui-body-color)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--cui-body-bg)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--cui-card-bg)';
-              }}
+              className="w-full text-left px-3 py-2 text-xs"
             >
               {action.label}
-            </button>
+            </LandscapeButton>
           ))}
         </div>
       </div>

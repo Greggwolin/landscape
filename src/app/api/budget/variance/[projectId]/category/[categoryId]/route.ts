@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
+const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://127.0.0.1:8001';
 
 type Params = { params: Promise<{ projectId: string; categoryId: string }> };
 

@@ -27,6 +27,32 @@ type PostgresError = Error & { code?: string }
 
 const TABLE_NOT_FOUND = '42P01'
 
+function serializeMetadataPayload(metadataPayload: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(metadataPayload ?? {})
+  } catch (error) {
+    console.warn('Failed to serialize issue metadata payload; using empty object.', error)
+    return '{}'
+  }
+}
+
+function parseMetadataValue(metadata: unknown): Record<string, unknown> {
+  if (!metadata) return {}
+  if (typeof metadata === 'string') {
+    try {
+      const parsed = JSON.parse(metadata)
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+    } catch (error) {
+      console.warn('Failed to parse metadata payload from storage; returning empty object.', error)
+      return {}
+    }
+  }
+  if (typeof metadata === 'object') {
+    return metadata as Record<string, unknown>
+  }
+  return {}
+}
+
 const ensureDevIssueLogTable = (() => {
   let ensurePromise: Promise<void> | null = null
   return () => {
@@ -88,8 +114,10 @@ async function insertIssueRow(params: {
     commitSha,
     reporterName,
     reporterEmail,
-    metadataPayload,
-  } = params
+  metadataPayload,
+} = params
+
+  const metadataJson = serializeMetadataPayload(metadataPayload)
 
   const [result] = await sql<
     { issue_id: number; created_at: string }
@@ -115,7 +143,7 @@ async function insertIssueRow(params: {
         ${commitSha ?? null},
         ${reporterName ?? null},
         ${reporterEmail ?? null},
-        ${metadataPayload}
+        ${metadataJson}
       )
       RETURNING issue_id, created_at`
 
@@ -266,7 +294,7 @@ export async function GET(request: NextRequest) {
       commitSha: row.commit_sha,
       reporterName: row.reporter_name,
       reporterEmail: row.reporter_email,
-      metadata: row.metadata ?? {},
+      metadata: parseMetadataValue(row.metadata),
       createdAt: row.created_at,
       resolvedAt: row.resolved_at,
     })),

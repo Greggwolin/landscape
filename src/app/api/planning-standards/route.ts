@@ -15,11 +15,63 @@ const mapStandardRow = (row: any) => ({
 });
 
 async function fetchStandardDirect() {
-  const result = await sql.query(
-    `SELECT * FROM landscape.core_planning_standards WHERE is_active = true ORDER BY standard_id LIMIT 1`
-  );
-  const row = result.rows?.[0];
+  const result = await sql`
+    SELECT * FROM landscape.core_planning_standards
+    WHERE is_active = true
+    ORDER BY standard_id
+    LIMIT 1
+  `;
+  const row = result[0];
   return row ? mapStandardRow(row) : null;
+}
+
+async function ensureStandardId(): Promise<number> {
+  const active = await sql`
+    SELECT standard_id
+    FROM landscape.core_planning_standards
+    WHERE is_active = true
+    ORDER BY standard_id
+    LIMIT 1
+  `;
+  const activeId = active[0]?.standard_id;
+  if (activeId != null) {
+    return Number(activeId);
+  }
+
+  try {
+    const insertResult = await sql`
+      INSERT INTO landscape.core_planning_standards (standard_name, default_planning_efficiency, is_active)
+      VALUES ('Global Default', 0.75, true)
+      RETURNING standard_id
+    `;
+    const newId = insertResult[0]?.standard_id;
+    if (newId != null) {
+      return Number(newId);
+    }
+  } catch (error: any) {
+    if (error?.code !== '23505') {
+      throw error;
+    }
+    // fall through to reuse existing record
+  }
+
+  const fallback = await sql`
+    SELECT standard_id
+    FROM landscape.core_planning_standards
+    ORDER BY standard_id
+    LIMIT 1
+  `;
+  const fallbackId = fallback[0]?.standard_id;
+  if (fallbackId != null) {
+    await sql`
+      UPDATE landscape.core_planning_standards
+      SET is_active = true
+      WHERE standard_id = ${fallbackId}
+    `;
+    return Number(fallbackId);
+  }
+
+  throw new Error('NO_STANDARD');
 }
 
 export async function GET() {
@@ -99,52 +151,80 @@ export async function PUT(request: NextRequest) {
     }
   }
 
+  const normalized: {
+    default_planning_efficiency?: number | null
+    default_street_row_pct?: number | null
+    default_park_dedication_pct?: number | null
+  } = {}
+
+  const updates: string[] = [];
+  const values: Array<number | null> = [];
+
+  if ('default_planning_efficiency' in body) {
+    const value = Number(body.default_planning_efficiency);
+    if (!Number.isFinite(value) || value <= 0 || value > 1.5) {
+      return NextResponse.json({ error: 'default_planning_efficiency must be between 0 and 1.5' }, { status: 400 });
+    }
+    normalized.default_planning_efficiency = value;
+    values.push(value);
+    updates.push(`default_planning_efficiency = $${values.length}`);
+  }
+
+  if ('default_street_row_pct' in body) {
+    const value = body.default_street_row_pct === null || body.default_street_row_pct === undefined
+      ? null
+      : Number(body.default_street_row_pct);
+    if (value !== null && !Number.isFinite(value)) {
+      return NextResponse.json({ error: 'default_street_row_pct must be numeric' }, { status: 400 });
+    }
+    normalized.default_street_row_pct = value;
+    values.push(value);
+    updates.push(`default_street_row_pct = $${values.length}`);
+  }
+
+  if ('default_park_dedication_pct' in body) {
+    const value = body.default_park_dedication_pct === null || body.default_park_dedication_pct === undefined
+      ? null
+      : Number(body.default_park_dedication_pct);
+    if (value !== null && !Number.isFinite(value)) {
+      return NextResponse.json({ error: 'default_park_dedication_pct must be numeric' }, { status: 400 });
+    }
+    normalized.default_park_dedication_pct = value;
+    values.push(value);
+    updates.push(`default_park_dedication_pct = $${values.length}`);
+  }
+
+  if (updates.length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  }
+
   try {
-    const standardResult = await sql.query(
-      `SELECT standard_id FROM landscape.core_planning_standards WHERE is_active = true ORDER BY standard_id LIMIT 1`
-    );
-    const standardId = standardResult.rows?.[0]?.standard_id;
-
-    if (!standardId) {
-      return NextResponse.json({ error: 'No planning standard configured' }, { status: 404 });
-    }
-
-    const updates: string[] = [];
-    const values: Array<number | null> = [];
-
-    if ('default_planning_efficiency' in body) {
-      const value = Number(body.default_planning_efficiency);
-      if (!Number.isFinite(value) || value <= 0 || value > 1.5) {
-        return NextResponse.json({ error: 'default_planning_efficiency must be between 0 and 1.5' }, { status: 400 });
+    let standardId: number;
+    try {
+      standardId = await ensureStandardId();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NO_STANDARD') {
+        const efficiency = normalized.default_planning_efficiency ?? 0.75;
+        const street = normalized.default_street_row_pct ?? null;
+        const park = normalized.default_park_dedication_pct ?? null;
+        const created = await sql`
+          INSERT INTO landscape.core_planning_standards (
+            standard_name,
+            default_planning_efficiency,
+            default_street_row_pct,
+            default_park_dedication_pct,
+            is_active
+          )
+          VALUES ('Global Default', ${efficiency}, ${street}, ${park}, true)
+          RETURNING *
+        `;
+        const row = created[0];
+        if (!row) {
+          return NextResponse.json({ error: 'Failed to create planning standard' }, { status: 500 });
+        }
+        return NextResponse.json({ standard: mapStandardRow(row) });
       }
-      values.push(value);
-      updates.push(`default_planning_efficiency = $${values.length}`);
-    }
-
-    if ('default_street_row_pct' in body) {
-      const value = body.default_street_row_pct === null || body.default_street_row_pct === undefined
-        ? null
-        : Number(body.default_street_row_pct);
-      if (value !== null && !Number.isFinite(value)) {
-        return NextResponse.json({ error: 'default_street_row_pct must be numeric' }, { status: 400 });
-      }
-      values.push(value);
-      updates.push(`default_street_row_pct = $${values.length}`);
-    }
-
-    if ('default_park_dedication_pct' in body) {
-      const value = body.default_park_dedication_pct === null || body.default_park_dedication_pct === undefined
-        ? null
-        : Number(body.default_park_dedication_pct);
-      if (value !== null && !Number.isFinite(value)) {
-        return NextResponse.json({ error: 'default_park_dedication_pct must be numeric' }, { status: 400 });
-      }
-      values.push(value);
-      updates.push(`default_park_dedication_pct = $${values.length}`);
-    }
-
-    if (updates.length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+      throw error;
     }
 
     values.push(standardId);
@@ -159,11 +239,9 @@ export async function PUT(request: NextRequest) {
     );
 
     const row = result.rows?.[0];
-    if (!row) {
-      throw new Error('Planning standard not found');
-    }
-
-    return NextResponse.json({ standard: mapStandardRow(row) });
+    return NextResponse.json({
+      standard: row ? mapStandardRow(row) : { standard_id: standardId }
+    });
   } catch (error) {
     console.error('Direct SQL error updating planning standards:', error);
     return NextResponse.json(

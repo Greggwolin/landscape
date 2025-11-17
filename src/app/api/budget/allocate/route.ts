@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { allocateBudgetItem } from '@/lib/financial-engine/scurve-allocation';
 import { sql } from '@/lib/db';
+import { derivePeriodRangeFromDates } from '@/lib/financial-engine/period-utils';
+import { fetchCurveProfileSummary } from '@/lib/financial-engine/curve-profiles';
 
 interface BudgetRow {
   fact_id: number;
@@ -22,28 +24,8 @@ interface BudgetRow {
   timing_method: string | null;
   curve_id: number | null;
   curve_steepness: string | number | null;
-}
-
-async function deriveTimingFromDates(projectId: number, startDate: string | null, endDate: string | null) {
-  if (!startDate || !endDate) return null;
-
-  const periods = await sql<{ periodSequence: string | number }>`
-    SELECT period_sequence AS "periodSequence"
-    FROM landscape.tbl_calculation_period
-    WHERE project_id = ${projectId}
-      AND period_end_date >= ${startDate}
-      AND period_start_date <= ${endDate}
-    ORDER BY period_sequence
-  `;
-
-  if (periods.length === 0) {
-    return null;
-  }
-
-  return {
-    startPeriod: Number(periods[0].periodSequence),
-    duration: periods.length
-  };
+  curveCode: string | null;
+  curveName: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -66,21 +48,24 @@ export async function POST(request: NextRequest) {
 
     const rows = await sql<BudgetRow>`
       SELECT
-        fact_id,
-        project_id,
-        amount,
-        qty,
-        rate,
-        start_date,
-        end_date,
-        start_period,
-        periods,
-        periods_to_complete,
-        timing_method,
-        curve_id,
-        curve_steepness
-      FROM landscape.core_fin_fact_budget
-      WHERE fact_id = ${factId}
+        fb.fact_id,
+        fb.project_id,
+        fb.amount,
+        fb.qty,
+        fb.rate,
+        fb.start_date,
+        fb.end_date,
+        fb.start_period,
+        fb.periods,
+        fb.periods_to_complete,
+        fb.timing_method,
+        fb.curve_id,
+        fb.curve_steepness,
+        cp.curve_code AS "curveCode",
+        cp.curve_name AS "curveName"
+      FROM landscape.core_fin_fact_budget fb
+      LEFT JOIN landscape.core_fin_curve_profile cp ON fb.curve_id = cp.curve_id
+      WHERE fb.fact_id = ${factId}
       LIMIT 1
     `;
 
@@ -139,7 +124,7 @@ export async function POST(request: NextRequest) {
           : null;
 
     if (startPeriod == null || duration == null) {
-      const derived = await deriveTimingFromDates(
+      const derived = await derivePeriodRangeFromDates(
         resolvedProjectId,
         budgetItem.start_date,
         budgetItem.end_date
@@ -178,19 +163,64 @@ export async function POST(request: NextRequest) {
         ? Number(curveId)
         : budgetItem.curve_id != null
           ? Number(budgetItem.curve_id)
-          : undefined;
+          : null;
+
+    const requestedCurveCode =
+      typeof curveProfile === 'string' && curveProfile.trim() !== ''
+        ? curveProfile.trim().toUpperCase()
+        : null;
+
+    let curveSummary = null;
+    if (requestedCurveCode) {
+      curveSummary = await fetchCurveProfileSummary({ curveCode: requestedCurveCode });
+    } else if (resolvedCurveId) {
+      curveSummary = await fetchCurveProfileSummary({ curveId: resolvedCurveId });
+    } else if (budgetItem.curveCode) {
+      curveSummary = await fetchCurveProfileSummary({ curveCode: budgetItem.curveCode });
+    }
+
+    const effectiveCurveCode =
+      curveSummary?.curveCode ??
+      requestedCurveCode ??
+      (budgetItem.curveCode ? budgetItem.curveCode.toUpperCase() : 'S');
 
     const result = await allocateBudgetItem(resolvedProjectId, {
       factId,
       totalAmount,
       startPeriod,
       duration,
-      curveProfile,
-      curveId: resolvedCurveId,
+      curveProfile: requestedCurveCode ?? undefined,
+      curveId: !requestedCurveCode && resolvedCurveId ? resolvedCurveId : undefined,
       steepness: numericSteepness
     });
 
-    return NextResponse.json(result);
+    const periods = result.allocations.map(allocation => ({
+      periodSequence: allocation.periodSequence,
+      periodId: allocation.periodId ?? null,
+      periodLabel: allocation.periodLabel ?? `Period ${allocation.periodSequence}`,
+      periodStartDate: allocation.periodStartDate ?? null,
+      periodEndDate: allocation.periodEndDate ?? null,
+      amount: allocation.amount,
+      cumulativeAmount: allocation.cumulativeAmount,
+      cumulativePercent: allocation.cumulativePercent
+    }));
+
+    return NextResponse.json({
+      success: true,
+      factId,
+      allocation: {
+        totalAmount,
+        allocatedAmount: result.summary.allocatedAmount,
+        periodCount: result.summary.periodCount,
+        avgPerPeriod: result.summary.avgPerPeriod,
+        peakPeriod: result.summary.peakPeriod,
+        peakAmount: result.summary.peakAmount,
+        curveProfile: effectiveCurveCode,
+        curveName: curveSummary?.curveName ?? effectiveCurveCode,
+        steepness: numericSteepness
+      },
+      periods
+    });
   } catch (error) {
     console.error('Allocation error:', error);
     return NextResponse.json(

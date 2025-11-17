@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import UnitCostsPanel from '@/components/benchmarks/unit-costs/UnitCostsPanel';
+import UnitCostsPanel, { DEFAULT_PROJECT_TYPE } from '@/components/benchmarks/unit-costs/UnitCostsPanel';
 import UnitCostTemplateModal from '@/components/benchmarks/unit-costs/UnitCostTemplateModal';
 import InlineEditableCell from '@/components/benchmarks/unit-costs/InlineEditableCell';
 import InlineEditableUOMCell from '@/components/benchmarks/unit-costs/InlineEditableUOMCell';
@@ -14,6 +14,8 @@ const STAGE_LABELS: Record<DevelopmentStage, string> = {
   stage2_engineering: 'Stage 2 - Engineering',
   stage3_development: 'Stage 3 - Development'
 };
+
+const PROJECT_TYPE_OPTIONS = ['LAND'];
 
 // Formatters for display
 const formatCurrency = (value: number | null): string => {
@@ -50,6 +52,7 @@ export default function UnitCostsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingTemplate, setEditingTemplate] = useState<UnitCostTemplateSummary | undefined>(undefined);
+  const [projectTypeFilter, setProjectTypeFilter] = useState<string>(DEFAULT_PROJECT_TYPE);
 
   // Update stage when URL changes
   useEffect(() => {
@@ -191,9 +194,29 @@ export default function UnitCostsPage() {
       <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="rounded-lg shadow-sm border overflow-hidden">
 
         {/* Header */}
-        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--cui-body-color)' }}>Unit Cost Library</h1>
+        <div className="p-4" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-4">
+              <h1 className="text-xl font-bold" style={{ color: 'var(--cui-body-color)' }}>Unit Cost Library</h1>
+              {selectedStage === 'stage3_development' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+                    Project Type
+                  </label>
+                  <select
+                    value={projectTypeFilter}
+                    onChange={(event) => setProjectTypeFilter(event.target.value)}
+                    className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary shadow-sm focus:border-brand-primary focus:outline-none"
+                  >
+                    {PROJECT_TYPE_OPTIONS.map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
               Development cost templates and benchmarks
             </p>
@@ -224,7 +247,7 @@ export default function UnitCostsPage() {
         <div>
           {selectedStage === 'stage3_development' ? (
             // Stage 3: Show existing full UI with Hard/Soft/Deposits/Other tabs
-            <UnitCostsPanel />
+            <UnitCostsPanel projectTypeFilter={projectTypeFilter} />
           ) : (
             // Stage 1 & 2: Show simple table view
             <div className="p-4">

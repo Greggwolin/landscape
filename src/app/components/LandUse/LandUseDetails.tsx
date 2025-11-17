@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Edit, Plus, Building, Home, Map } from 'lucide-react';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface ResSpec {
   res_spec_id: number;

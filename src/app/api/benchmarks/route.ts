@@ -37,14 +37,15 @@ export async function GET(request: NextRequest) {
           r.updated_at,
           CURRENT_DATE - r.as_of_date AS age_days,
           CASE WHEN CURRENT_DATE - r.as_of_date > 730 THEN true ELSE false END AS is_stale,
-          COALESCE(uc.value, tc.value) AS value,
-          COALESCE(uc.uom_code, tc.value_type) AS uom_code,
+          COALESCE(uc.value, tc.value, co.percentage) AS value,
+          COALESCE(uc.uom_code, tc.value_type, 'percentage') AS uom_code,
           tc.cost_type,
           tc.value_type,
           tc.basis
         FROM landscape.tbl_global_benchmark_registry r
         LEFT JOIN landscape.tbl_benchmark_unit_cost uc ON r.benchmark_id = uc.benchmark_id
         LEFT JOIN landscape.tbl_benchmark_transaction_cost tc ON r.benchmark_id = tc.benchmark_id
+        LEFT JOIN landscape.tbl_benchmark_contingency co ON r.benchmark_id = co.benchmark_id
         WHERE r.user_id = '1'
           AND r.is_active = true
         ORDER BY r.created_at DESC
@@ -91,11 +92,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Start transaction
-    await sql`BEGIN`;
-
     try {
       // Insert into benchmark registry
+      // Note: Neon Database doesn't support explicit transactions via HTTP
+      // Each query is auto-committed
       const registryResult = await sql`
         INSERT INTO landscape.tbl_global_benchmark_registry (
           user_id,
@@ -182,9 +182,17 @@ export async function POST(request: NextRequest) {
             ${body.deal_size_max || null}
           )
         `;
+      } else if (body.category === 'contingency') {
+        await sql`
+          INSERT INTO landscape.tbl_benchmark_contingency (
+            benchmark_id,
+            percentage
+          ) VALUES (
+            ${benchmarkId},
+            ${body.percentage}
+          )
+        `;
       }
-
-      await sql`COMMIT`;
 
       return NextResponse.json({
         benchmark_id: benchmarkId,
@@ -192,7 +200,8 @@ export async function POST(request: NextRequest) {
       }, { status: 201 });
 
     } catch (error) {
-      await sql`ROLLBACK`;
+      // Note: With Neon, we can't rollback. Each insert is auto-committed.
+      // In case of error, we may have partial data (registry row without detail row)
       throw error;
     }
 

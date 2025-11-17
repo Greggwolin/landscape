@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const configuredApiBase =
   process.env.DJANGO_API_URL ?? process.env.NEXT_PUBLIC_DJANGO_API_URL ?? null;
-const API_BASE = (configuredApiBase ?? 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE = (configuredApiBase ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
   if (!configuredApiBase) {
     console.warn(
-      'DJANGO_API_URL is not set. Falling back to http://localhost:8000 for absorption velocities.',
+      'DJANGO_API_URL is not set. Falling back to http://127.0.0.1:8001 for absorption velocities.',
     );
   }
 

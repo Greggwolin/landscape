@@ -11,6 +11,14 @@ import type {
   PricingAssumption,
   SingleClosingSaleForm,
   ParcelProductType,
+  ParcelSalesDataset,
+  CreateSalePhasePayload,
+  AssignParcelToPhasePayload,
+  ParcelSaleOverridePayload,
+  UpdateParcelSaleDatePayload,
+  CreateParcelSalePayload,
+  UpdateParcelSalePayload,
+  UpdateClosingPayload,
 } from '@/types/sales-absorption';
 
 /**
@@ -45,7 +53,11 @@ export function useParcelsWithSales(
 ) {
   return useQuery({
     queryKey: ['parcels-with-sales', projectId, phaseIds],
-    queryFn: async (): Promise<ParcelWithSale[]> => {
+    queryFn: async (): Promise<ParcelSalesDataset> => {
+      if (!projectId) {
+        throw new Error('Project id is required');
+      }
+
       let url = `/api/projects/${projectId}/parcels-with-sales/`;
 
       // Handle multiple phase filters
@@ -62,131 +74,145 @@ export function useParcelsWithSales(
       return response.json();
     },
     enabled: !!projectId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds (reduced from 2 minutes)
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
 }
 
+
 /**
- * Create a new parcel sale event
+ * Create a new sale phase scoped to the project
  */
-export function useCreateParcelSale() {
+export function useCreateSalePhase(projectId: number | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (saleData: Partial<ParcelSaleEvent>): Promise<ParcelSaleEvent> => {
-      const response = await fetch('/api/parcel-sales/', {
+    mutationFn: async (payload: CreateSalePhasePayload) => {
+      if (!projectId) {
+        throw new Error('Project id is required to create a sale phase');
+      }
+
+      const response = await fetch(`/api/projects/${projectId}/sale-phases/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(saleData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create parcel sale');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create sale phase');
       }
 
       return response.json();
     },
-    onSuccess: (data) => {
-      // Invalidate parcels-with-sales query to refetch with new sale
-      queryClient.invalidateQueries({
-        queryKey: ['parcels-with-sales', data.project_id],
-      });
+    onSuccess: () => {
+      if (!projectId) return;
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['phase-stats', projectId] });
     },
   });
 }
 
 /**
- * Create a closing event for a sale
+ * Assign or clear a parcel's sale phase
  */
-export function useCreateClosing() {
+export function useAssignParcelToPhase(projectId: number | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (closingData: Partial<ClosingEvent>): Promise<ClosingEvent> => {
-      const response = await fetch('/api/closings/', {
-        method: 'POST',
+    mutationFn: async (payload: AssignParcelToPhasePayload) => {
+      if (!projectId) {
+        throw new Error('Project id is required to assign sale phases');
+      }
+
+      const response = await fetch(`/api/projects/${projectId}/parcel-sale-phase/`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(closingData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create closing event');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update sale phase');
       }
 
       return response.json();
     },
-    onSuccess: (data) => {
-      // Invalidate queries that might show closing data
-      queryClient.invalidateQueries({
-        queryKey: ['closings', data.sale_event_id],
-      });
+    onSuccess: () => {
+      if (!projectId) return;
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
     },
   });
 }
 
 /**
- * Combined hook to create a single closing sale
- * Creates both the sale event and the closing in one transaction
+ * Save parcel-level benchmark overrides (custom detail rows)
  */
-export function useCreateSingleClosingSale() {
+export function useSaveParcelOverrides(projectId: number | null) {
   const queryClient = useQueryClient();
-  const createSale = useCreateParcelSale();
-  const createClosing = useCreateClosing();
 
   return useMutation({
-    mutationFn: async (formData: SingleClosingSaleForm & { project_id: number }) => {
-      // Step 1: Create the sale event
-      const saleEventData: Partial<ParcelSaleEvent> = {
-        project_id: formData.project_id,
-        parcel_id: formData.parcel_id,
-        sale_type: 'single_closing',
-        buyer_entity: formData.buyer_entity,
-        contract_date: formData.contract_date,
-        total_lots_contracted: formData.total_lots,
-        base_price_per_lot: formData.price_per_lot,
-        deposit_amount: 0,
-        deposit_applied_to_purchase: false,
-        has_escrow_holdback: false,
-        sale_status: 'pending',
-      };
+    mutationFn: async (payload: ParcelSaleOverridePayload) => {
+      if (!projectId) {
+        throw new Error('Project id is required to save overrides');
+      }
 
-      const saleEvent = await createSale.mutateAsync(saleEventData);
-
-      // Step 2: Calculate proceeds
-      const gross_proceeds = formData.total_lots * formData.price_per_lot;
-      const commissions = formData.commissions_amount || 0;
-      const closing_costs = formData.closing_costs || 0;
-      const net_proceeds = gross_proceeds - commissions - closing_costs;
-
-      // Step 3: Create the closing event
-      const closingEventData: Partial<ClosingEvent> = {
-        sale_event_id: saleEvent.sale_event_id,
-        closing_sequence: 1,
-        closing_date: formData.closing_date,
-        lots_closed: formData.total_lots,
-        gross_proceeds,
-        less_commissions_amount: commissions,
-        less_closing_costs: closing_costs,
-        net_proceeds,
-        cumulative_lots_closed: formData.total_lots,
-        lots_remaining: 0,
-      };
-
-      const closingEvent = await createClosing.mutateAsync(closingEventData);
-
-      return { saleEvent, closingEvent };
-    },
-    onSuccess: (data) => {
-      // Invalidate parcels query to show new sale
-      queryClient.invalidateQueries({
-        queryKey: ['parcels-with-sales', data.saleEvent.project_id],
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/overrides/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save parcel overrides');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      if (!projectId) return;
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
+  });
+}
+
+/**
+ * Update sale date for parcels that are not yet tied to a sale phase
+ */
+export function useUpdateParcelSaleDate(projectId: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateParcelSaleDatePayload) => {
+      if (!projectId) {
+        throw new Error('Project id is required to update sale date');
+      }
+
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/date/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update sale date');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      if (!projectId) return;
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
     },
   });
 }
@@ -221,10 +247,15 @@ export function usePricingAssumptions(projectId: number | null) {
       if (!response.ok) {
         throw new Error('Failed to fetch pricing assumptions');
       }
-      return response.json();
+      const data = await response.json();
+      console.log('[usePricingAssumptions] Received data type:', Array.isArray(data) ? `Array[${data.length}]` : typeof data);
+      console.log('[usePricingAssumptions] First item:', data[0]);
+      console.log('[usePricingAssumptions] First item has id?:', data[0]?.id);
+      return data;
     },
     enabled: !!projectId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds (reduced from 2 minutes)
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
 }
 
@@ -244,11 +275,17 @@ export function useSavePricingAssumptions() {
     }) => {
       // Save each assumption individually
       const promises = assumptions.map(async (assumption) => {
+        console.log('[useSavePricingAssumptions] Full assumption object:', assumption);
+        console.log('[useSavePricingAssumptions] Keys:', Object.keys(assumption));
+        console.log('[useSavePricingAssumptions] ID value:', assumption.id, 'Type:', typeof assumption.id);
+
         const url = assumption.id
           ? `/api/projects/${projectId}/pricing-assumptions/${assumption.id}/`
           : `/api/projects/${projectId}/pricing-assumptions/`;
 
         const method = assumption.id ? 'PUT' : 'POST';
+
+        console.log(`[useSavePricingAssumptions] Will use ${method} to ${url}`);
 
         const response = await fetch(url, {
           method,
@@ -313,20 +350,168 @@ export function useDeletePricingAssumption() {
 
 /**
  * Fetch unique parcel product types for auto-populating pricing table
+ * Optionally filter by phase(s)
  */
-export function useParcelProductTypes(projectId: number | null) {
+export function useParcelProductTypes(
+  projectId: number | null,
+  phaseIds?: number[] | number | null
+) {
   return useQuery({
-    queryKey: ['parcel-product-types', projectId],
+    queryKey: ['parcel-product-types', projectId, phaseIds],
     queryFn: async (): Promise<ParcelProductType[]> => {
       if (!projectId) return [];
 
-      const response = await fetch(`/api/projects/${projectId}/parcel-product-types/`);
+      let url = `/api/projects/${projectId}/parcel-product-types/`;
+
+      // Handle multiple phase filters
+      if (Array.isArray(phaseIds) && phaseIds.length > 0) {
+        url += `?phase_ids=${phaseIds.join(',')}`;
+      } else if (typeof phaseIds === 'number') {
+        url += `?phase_id=${phaseIds}`;
+      }
+
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch parcel product types');
       }
       return response.json();
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - this data doesn't change often
+    staleTime: 30 * 1000, // 30 seconds (reduced from 5 minutes)
+    refetchOnMount: 'always', // Always refetch when component mounts
+  });
+}
+
+/**
+ * Fetch global growth rate benchmarks for dropdowns
+ */
+export function useGrowthRateBenchmarks() {
+  return useQuery({
+    queryKey: ['growth-rate-benchmarks'],
+    queryFn: async () => {
+      const response = await fetch('/api/benchmarks/growth-rates');
+      if (!response.ok) {
+        throw new Error('Failed to fetch growth rate benchmarks');
+      }
+      const data = await response.json();
+      return data.sets || [];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes (benchmarks change infrequently)
+  });
+}
+
+// ============================================================================
+// PARCEL SALE EVENT HOOKS (New Closing Model)
+// ============================================================================
+
+/**
+ * Create a new parcel sale with closings
+ * For single closing: closings array has one item
+ * For multi-closing: closings array has multiple items
+ */
+export function useCreateParcelSale(projectId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: CreateParcelSalePayload) => {
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        // Handle error.details being an object
+        const errorMessage = typeof error.details === 'string'
+          ? error.details
+          : error.error || error.message || JSON.stringify(error);
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate parcels query to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
+  });
+}
+
+/**
+ * Update an existing parcel sale (change sale type or overrides)
+ */
+export function useUpdateParcelSale(projectId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ saleEventId, payload }: { saleEventId: number; payload: UpdateParcelSalePayload }) => {
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/${saleEventId}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to update parcel sale');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
+  });
+}
+
+/**
+ * Update a specific closing event
+ */
+export function useUpdateClosing(projectId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ closingId, payload }: { closingId: number; payload: UpdateClosingPayload }) => {
+      const response = await fetch(`/api/closings/${closingId}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to update closing');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
+  });
+}
+
+/**
+ * Delete a parcel sale event (and all its closings)
+ */
+export function useDeleteParcelSale(projectId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleEventId: number) => {
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/${saleEventId}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete parcel sale');
+      }
+
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
   });
 }

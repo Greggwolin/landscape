@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const DJANGO_API_URL = process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8001';
+// Hardcoded for now - env vars not loading correctly with Turbopack
+const DJANGO_API_URL = 'http://127.0.0.1:8001';
 
 export async function GET(
   request: NextRequest,
@@ -8,12 +9,21 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
+    const url = `${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`;
 
-    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`, {
+    console.log('[pricing-assumptions] Attempting to fetch:', url);
+    console.log('[pricing-assumptions] DJANGO_API_URL:', DJANGO_API_URL);
+
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store',
+      // @ts-ignore - keepalive for Node.js fetch
+      keepalive: true,
     });
+
+    console.log('[pricing-assumptions] Response status:', response.status);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -24,7 +34,12 @@ export async function GET(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    // Django returns paginated response, extract results array
+    const results = data.results || data;
+    console.log('[GET pricing-assumptions] Django response keys:', Object.keys(data));
+    console.log('[GET pricing-assumptions] Results count:', Array.isArray(results) ? results.length : 'not an array');
+    console.log('[GET pricing-assumptions] First result sample:', results[0]);
+    return NextResponse.json(results);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Pricing assumptions proxy error:', error);
@@ -43,6 +58,9 @@ export async function POST(
     const { projectId } = await params;
     const body = await request.json();
 
+    console.log('[POST pricing-assumptions] Received body:', JSON.stringify(body, null, 2));
+    console.log('[POST pricing-assumptions] URL:', `${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`);
+
     const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`, {
       method: 'POST',
       headers: {
@@ -53,6 +71,7 @@ export async function POST(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[POST pricing-assumptions] Django error:', response.status, errorData);
       return NextResponse.json(
         { error: 'Failed to create pricing assumption', details: errorData },
         { status: response.status }

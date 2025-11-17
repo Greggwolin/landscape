@@ -41,7 +41,7 @@ export default function AdminNavBar() {
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         borderColor: 'var(--cui-border-color)',
-        top: '0px',
+        top: '58px',
         zIndex: 40
       }}
     >

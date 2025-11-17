@@ -7,6 +7,7 @@
 'use client';
 
 import type { SalesComparable } from '@/types/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface ComparableCardProps {
   comparable: SalesComparable;
@@ -194,42 +195,24 @@ export function ComparableCard({ comparable, onEdit, onDelete }: ComparableCardP
 
       {/* Action Buttons */}
       <div className="flex gap-2 pt-3 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
-        <button
+        <LandscapeButton
+          color="primary"
+          size="sm"
           onClick={() => onEdit?.(comparable)}
-          className="px-3 py-1.5 text-xs font-medium rounded transition-colors"
-          style={{
-            backgroundColor: 'var(--cui-primary)',
-            color: 'white'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
         >
           View Details
-        </button>
-        <button
+        </LandscapeButton>
+        <LandscapeButton
+          color="danger"
+          size="sm"
           onClick={() => {
             if (window.confirm(`Delete comparable "${comparable.property_name}"?`)) {
               onDelete?.(comparable.comparable_id);
             }
           }}
-          className="px-3 py-1.5 text-xs font-medium rounded transition-colors"
-          style={{
-            backgroundColor: 'var(--cui-danger)',
-            color: 'white'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
         >
           Delete
-        </button>
+        </LandscapeButton>
       </div>
     </div>
   );

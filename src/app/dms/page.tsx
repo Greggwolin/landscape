@@ -10,6 +10,7 @@ import Dropzone from '@/components/dms/upload/Dropzone';
 import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import type { DMSDocument } from '@/types/dms';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 type TabType = 'documents' | 'upload';
 
@@ -258,16 +259,19 @@ export default function DMSPage() {
   return (
     <div className="h-screen flex flex-col">
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
         <div className="px-6">
           <nav className="flex space-x-8" aria-label="Tabs">
-            <button
+            <LandscapeButton
               onClick={() => setActiveTab('documents')}
+              color={activeTab === 'documents' ? 'primary' : 'secondary'}
+              variant="ghost"
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'documents'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'border-blue-500'
+                  : 'border-transparent'
               }`}
+              style={{ borderBottomColor: activeTab === 'documents' ? undefined : 'var(--cui-border-color)' }}
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -275,15 +279,18 @@ export default function DMSPage() {
                 </svg>
                 Documents
               </div>
-            </button>
+            </LandscapeButton>
 
-            <button
+            <LandscapeButton
               onClick={() => setActiveTab('upload')}
+              color={activeTab === 'upload' ? 'primary' : 'secondary'}
+              variant="ghost"
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'upload'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'border-blue-500'
+                  : 'border-transparent'
               }`}
+              style={{ borderBottomColor: activeTab === 'upload' ? undefined : 'var(--cui-border-color)' }}
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,7 +298,7 @@ export default function DMSPage() {
                 </svg>
                 Upload
               </div>
-            </button>
+            </LandscapeButton>
           </nav>
         </div>
       </div>
@@ -300,50 +307,56 @@ export default function DMSPage() {
       <div className="flex-1 overflow-hidden">
         {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+          <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
             {/* Breadcrumb */}
-            <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <div className="flex items-center gap-2 text-sm">
-                <button className="text-blue-600 dark:text-blue-400 hover:underline">Home</button>
-                <span className="text-gray-400">{'>'}</span>
-                <button className="text-blue-600 dark:text-blue-400 hover:underline">Projects</button>
-                <span className="text-gray-400">{'>'}</span>
-                <span className="text-gray-900 dark:text-gray-100 truncate">
+                <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-0 hover:underline">
+                  Home
+                </LandscapeButton>
+                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-0 hover:underline">
+                  Projects
+                </LandscapeButton>
+                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
                   {currentProject.project_name}
                 </span>
               </div>
             </div>
 
             {/* Toolbar */}
-            <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <div className="flex items-center gap-4">
-                <button className="text-blue-600 dark:text-blue-400">🔻</button>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-1">
+                  🔻
+                </LandscapeButton>
+                <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                   {totalItemCount} items | 0 selected
                 </span>
                 <div className="ml-auto flex items-center gap-3 text-sm">
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     🤖 Ask AI
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     ✏️ Rename
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-1">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" className="flex items-center gap-1">
                     <CIcon icon={cilFilterSquare} className="w-4 h-4" />
                     Move/Copy
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     📧 Email copy
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     ✏️ Edit profile
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     ✅ Check in
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                  </LandscapeButton>
+                  <LandscapeButton color="secondary" variant="ghost" size="sm">
                     ⋯ More
-                  </button>
+                  </LandscapeButton>
                 </div>
               </div>
             </div>
@@ -352,8 +365,8 @@ export default function DMSPage() {
               <div className={`flex-1 overflow-y-auto ${selectedFilterType ? 'lg:w-2/3' : 'w-full'}`}>
                 {isLoadingFilters ? (
                   <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-3 text-gray-600 dark:text-gray-400">Loading filters...</span>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
+                    <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
                   </div>
                 ) : allFilters.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">

@@ -13,6 +13,7 @@ import { IndicatedValueSummary } from './IndicatedValueSummary';
 import { LandscaperChatPanel } from './LandscaperChatPanel';
 import { ComparablesMap } from './ComparablesMap';
 import ValuationSalesCompMap from '@/components/map/ValuationSalesCompMap';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface SalesComparisonApproachProps {
   projectId: number;
@@ -126,16 +127,13 @@ export function SalesComparisonApproach({
           >
             Add comparable sales to begin the valuation analysis
           </p>
-          <button
+          <LandscapeButton
+            color="primary"
+            size="sm"
             onClick={handleAddComp}
-            className="px-4 py-2 text-sm font-medium rounded"
-            style={{
-              backgroundColor: 'var(--cui-primary)',
-              color: 'white'
-            }}
           >
             Add First Comparable
-          </button>
+          </LandscapeButton>
         </div>
       ) : (
         <>

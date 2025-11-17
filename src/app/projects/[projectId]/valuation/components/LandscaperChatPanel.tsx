@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import type { SalesComparable } from '@/types/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -348,25 +349,16 @@ Focus on NOI growth through:
         </div>
         <div className="space-y-2">
           {quickActions.map((action, idx) => (
-            <button
+            <LandscapeButton
               key={idx}
+              variant="outline"
+              color="secondary"
+              size="sm"
               onClick={() => handleQuickAction(action)}
-              className="w-full text-left px-3 py-2 text-sm rounded transition-colors"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)',
-                border: '1px solid',
-                color: 'var(--cui-body-color)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--cui-body-bg)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--cui-card-bg)';
-              }}
+              className="w-full text-left px-3 py-2 text-sm"
             >
               {action.label}
-            </button>
+            </LandscapeButton>
           ))}
         </div>
 

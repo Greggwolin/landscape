@@ -28,7 +28,7 @@ export default function NavigationLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <TopNavigationBar />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

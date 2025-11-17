@@ -30,7 +30,7 @@ export default function ContactRoleCard({
       <div
         className="flex items-center justify-between px-4 py-2 cursor-pointer transition-colors"
         style={{
-          backgroundColor: '#f1f2f6',
+          backgroundColor: 'var(--cui-tertiary-bg)',
           color: 'var(--cui-body-color)'
         }}
         onClick={() => setIsExpanded(!isExpanded)}

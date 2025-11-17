@@ -1,4 +1,8 @@
 import { sql } from '@/lib/db';
+import {
+  allocateBudgetItem,
+  type AllocationParams
+} from '@/lib/financial-engine/scurve-allocation';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -445,6 +449,14 @@ async function applyCalculatedDates(
     return;
   }
 
+  const curveNodes = Array.from(nodes.values()).filter(
+    node => node.type === 'budget' && isCurveTiming(node)
+  );
+  const curveBudgetDetails = await loadCurveBudgetDetails(
+    curveNodes.map(node => node.dbId)
+  );
+  const curveCodeCache = new Map<number, string>();
+
   await sql`BEGIN`;
   try {
     for (const node of nodes.values()) {
@@ -463,6 +475,10 @@ async function applyCalculatedDates(
             end_date = CASE WHEN ${isMilestoneTiming} THEN ${formatDate(node.earlyFinish)} ELSE end_date END
           WHERE fact_id = ${node.dbId}
         `;
+
+        if (isCurveTiming(node)) {
+          await regenerateCurveAllocation(node, curveBudgetDetails, curveCodeCache);
+        }
       } else {
         await sql`
           UPDATE landscape.tbl_project_milestone
@@ -482,6 +498,199 @@ async function applyCalculatedDates(
     await sql`ROLLBACK`;
     throw error;
   }
+}
+
+type CurveBudgetDetail = {
+  factId: number;
+  amount: number | null;
+  qty: number | null;
+  rate: number | null;
+  curveId: number | null;
+  curveSteepness: number | null;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+function isCurveTiming(node: GraphNode): boolean {
+  return (node.timingMethod ?? '').toLowerCase() === 'curve';
+}
+
+function resolveTotalAmount(detail: CurveBudgetDetail): number | null {
+  if (detail.amount != null) {
+    return detail.amount;
+  }
+  if (detail.qty != null && detail.rate != null) {
+    return detail.qty * detail.rate;
+  }
+  return null;
+}
+
+async function loadCurveBudgetDetails(factIds: number[]): Promise<Map<number, CurveBudgetDetail>> {
+  const uniqueIds = Array.from(new Set(factIds));
+  const map = new Map<number, CurveBudgetDetail>();
+
+  if (uniqueIds.length === 0) {
+    return map;
+  }
+
+  const rows = await sql<{
+    factId: number;
+    amount: string | number | null;
+    qty: string | number | null;
+    rate: string | number | null;
+    curveId: number | null;
+    curveSteepness: string | number | null;
+    startDate: string | null;
+    endDate: string | null;
+  }>`
+    SELECT
+      fact_id AS "factId",
+      amount,
+      qty,
+      rate,
+      curve_id AS "curveId",
+      curve_steepness AS "curveSteepness",
+      start_date AS "startDate",
+      end_date AS "endDate"
+    FROM landscape.core_fin_fact_budget
+    WHERE fact_id = ANY(${uniqueIds})
+  `;
+
+  for (const row of rows) {
+    map.set(Number(row.factId), {
+      factId: Number(row.factId),
+      amount: row.amount != null ? Number(row.amount) : null,
+      qty: row.qty != null ? Number(row.qty) : null,
+      rate: row.rate != null ? Number(row.rate) : null,
+      curveId: row.curveId != null ? Number(row.curveId) : null,
+      curveSteepness: row.curveSteepness != null ? Number(row.curveSteepness) : null,
+      startDate: row.startDate,
+      endDate: row.endDate
+    });
+  }
+
+  return map;
+}
+
+async function regenerateCurveAllocation(
+  node: GraphNode,
+  budgetDetails: Map<number, CurveBudgetDetail>,
+  curveCodeCache: Map<number, string>
+): Promise<void> {
+  if (!budgetDetails.has(node.dbId) || !node.projectId) {
+    return;
+  }
+
+  const detail = budgetDetails.get(node.dbId)!;
+  const startDate =
+    node.earlyStart ??
+    node.fixedStartDate ??
+    node.originalStartDate ??
+    (detail.startDate ? parseDate(detail.startDate) : undefined);
+  const endDate =
+    node.earlyFinish ??
+    node.fixedFinishDate ??
+    node.originalFinishDate ??
+    (detail.endDate ? parseDate(detail.endDate) : undefined);
+
+  if (!startDate || !endDate) {
+    console.warn(`Skipping S-curve regeneration for ${node.dbId}: missing start or end date`);
+    return;
+  }
+
+  const duration = await calculateDurationInPeriods(startDate, endDate, node.projectId);
+  if (!duration || duration <= 0) {
+    console.warn(`Skipping S-curve regeneration for ${node.dbId}: no calculation periods found`);
+    return;
+  }
+
+  const startPeriod = await getStartPeriod(startDate, node.projectId);
+  const totalAmount = resolveTotalAmount(detail);
+  if (!totalAmount || totalAmount <= 0) {
+    console.warn(`Skipping S-curve regeneration for ${node.dbId}: invalid total amount`);
+    return;
+  }
+
+  let curveProfile = 'S';
+  if (detail.curveId) {
+    if (curveCodeCache.has(detail.curveId)) {
+      curveProfile = curveCodeCache.get(detail.curveId)!;
+    } else {
+      const resolved = await getCurveCode(detail.curveId);
+      curveCodeCache.set(detail.curveId, resolved);
+      curveProfile = resolved;
+    }
+  }
+
+  const allocationParams: AllocationParams = {
+    factId: node.dbId,
+    totalAmount,
+    startPeriod,
+    duration,
+    curveProfile,
+    steepness: detail.curveSteepness ?? 50
+  };
+
+  try {
+    await allocateBudgetItem(node.projectId, allocationParams, { transactional: false });
+    console.log(
+      `Regenerated S-curve allocation for ${node.dbId}: ${duration} periods starting ${startPeriod}`
+    );
+  } catch (error) {
+    console.error(`Failed to regenerate S-curve for ${node.dbId}:`, error);
+  }
+}
+
+async function calculateDurationInPeriods(
+  startDate: Date,
+  endDate: Date,
+  projectId: number
+): Promise<number> {
+  const formattedStart = formatDate(startDate);
+  const formattedEnd = formatDate(endDate);
+  if (!formattedStart || !formattedEnd) {
+    return 0;
+  }
+
+  const rows = await sql<{ duration: number }>`
+    SELECT COUNT(*)::int AS duration
+    FROM landscape.tbl_calculation_period
+    WHERE project_id = ${projectId}
+      AND period_end_date >= ${formattedStart}
+      AND period_start_date <= ${formattedEnd}
+  `;
+
+  const value = rows[0]?.duration ? Number(rows[0].duration) : 0;
+  return value > 0 ? value : 0;
+}
+
+async function getStartPeriod(date: Date, projectId: number): Promise<number> {
+  const formattedDate = formatDate(date);
+  if (!formattedDate) {
+    return 1;
+  }
+
+  const rows = await sql<{ periodSequence: number }>`
+    SELECT period_sequence AS "periodSequence"
+    FROM landscape.tbl_calculation_period
+    WHERE project_id = ${projectId}
+      AND period_start_date <= ${formattedDate}
+      AND period_end_date >= ${formattedDate}
+    LIMIT 1
+  `;
+
+  return rows[0]?.periodSequence ? Number(rows[0].periodSequence) : 1;
+}
+
+async function getCurveCode(curveId: number): Promise<string> {
+  const rows = await sql<{ curveCode: string | null }>`
+    SELECT curve_code AS "curveCode"
+    FROM landscape.core_fin_curve_profile
+    WHERE curve_id = ${curveId}
+    LIMIT 1
+  `;
+
+  return rows[0]?.curveCode ?? 'S';
 }
 
 export async function recalculateProjectTimeline(

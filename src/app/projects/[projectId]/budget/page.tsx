@@ -11,6 +11,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import BudgetGridWithTimeline from '@/components/budget/custom/BudgetGridWithTimeline';
 import '@/components/budget/custom/BudgetGrid.css';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 export default function BudgetPage() {
   const params = useParams();
@@ -46,72 +47,85 @@ export default function BudgetPage() {
           Project Budget
         </h1>
         <div className="budget-header-actions">
-          <button className="btn-secondary">
+          <LandscapeButton color="secondary" variant="outline">
             Import from Excel
-          </button>
-          <button className="btn-secondary">
+          </LandscapeButton>
+          <LandscapeButton color="secondary" variant="outline">
             Export to PDF
-          </button>
-          <button className="btn-primary">
+          </LandscapeButton>
+          <LandscapeButton color="primary">
             Save Budget
-          </button>
+          </LandscapeButton>
         </div>
       </div>
 
       {/* Organizational Level Tabs */}
       <div className="budget-tabs">
-        <button
-          className={`tab ${activeTab === 'project' ? 'active' : ''}`}
+        <LandscapeButton
+          color={activeTab === 'project' ? 'primary' : 'secondary'}
+          variant={activeTab === 'project' ? undefined : 'ghost'}
           onClick={() => setActiveTab('project')}
         >
           Project Level
-        </button>
-        <button
-          className={`tab ${activeTab === 'area-1' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeTab === 'area-1' ? 'primary' : 'secondary'}
+          variant={activeTab === 'area-1' ? undefined : 'ghost'}
           onClick={() => setActiveTab('area-1')}
         >
           Area 1
-        </button>
-        <button
-          className={`tab ${activeTab === 'phase-1-1' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeTab === 'phase-1-1' ? 'primary' : 'secondary'}
+          variant={activeTab === 'phase-1-1' ? undefined : 'ghost'}
           onClick={() => setActiveTab('phase-1-1')}
         >
           Phase 1.1
-        </button>
+        </LandscapeButton>
       </div>
 
       {/* Scope Sub-tabs */}
       <div className="budget-subtabs">
-        <button
-          className={`subtab ${activeScope === 'all' ? 'active' : ''}`}
+        <LandscapeButton
+          color={activeScope === 'all' ? 'primary' : 'secondary'}
+          variant={activeScope === 'all' ? undefined : 'outline'}
+          size="sm"
           onClick={() => setActiveScope('all')}
         >
           All Costs
-        </button>
-        <button
-          className={`subtab ${activeScope === 'Acquisition' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeScope === 'Acquisition' ? 'primary' : 'secondary'}
+          variant={activeScope === 'Acquisition' ? undefined : 'outline'}
+          size="sm"
           onClick={() => setActiveScope('Acquisition')}
         >
           Acquisition
-        </button>
-        <button
-          className={`subtab ${activeScope === 'Stage 1' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeScope === 'Stage 1' ? 'primary' : 'secondary'}
+          variant={activeScope === 'Stage 1' ? undefined : 'outline'}
+          size="sm"
           onClick={() => setActiveScope('Stage 1')}
         >
           Stage 1
-        </button>
-        <button
-          className={`subtab ${activeScope === 'Stage 2' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeScope === 'Stage 2' ? 'primary' : 'secondary'}
+          variant={activeScope === 'Stage 2' ? undefined : 'outline'}
+          size="sm"
           onClick={() => setActiveScope('Stage 2')}
         >
           Stage 2
-        </button>
-        <button
-          className={`subtab ${activeScope === 'Stage 3' ? 'active' : ''}`}
+        </LandscapeButton>
+        <LandscapeButton
+          color={activeScope === 'Stage 3' ? 'primary' : 'secondary'}
+          variant={activeScope === 'Stage 3' ? undefined : 'outline'}
+          size="sm"
           onClick={() => setActiveScope('Stage 3')}
         >
           Stage 3
-        </button>
+        </LandscapeButton>
       </div>
 
       {/* Budget Summary Bar */}
@@ -144,7 +158,7 @@ export default function BudgetPage() {
         />
       </div>
 
-      {/* Inline styles for now - move to CSS file later */}
+      {/* Theme-aware styles using CoreUI CSS variables */}
       <style jsx>{`
         .budget-gantt-loading {
           display: flex;
@@ -152,14 +166,14 @@ export default function BudgetPage() {
           align-items: center;
           justify-content: center;
           height: 500px;
-          color: #94a3b8;
+          color: var(--cui-secondary-color);
         }
 
         .budget-gantt-loading .spinner {
           width: 40px;
           height: 40px;
-          border: 4px solid #334155;
-          border-top-color: #3b82f6;
+          border: 4px solid var(--cui-border-color);
+          border-top-color: var(--cui-primary);
           border-radius: 50%;
           animation: spin 1s linear infinite;
           margin-bottom: 16px;
@@ -173,7 +187,7 @@ export default function BudgetPage() {
 
         .budget-page {
           padding: 24px;
-          background: #f8fafc;
+          background: var(--cui-body-bg);
           min-height: 100vh;
         }
 
@@ -199,29 +213,29 @@ export default function BudgetPage() {
         }
 
         .btn-primary {
-          background: #3b82f6;
+          background: var(--cui-primary);
           color: white;
           border: none;
         }
 
         .btn-primary:hover {
-          background: #2563eb;
+          background: rgba(var(--cui-primary-rgb), 0.9);
         }
 
         .btn-secondary {
-          background: white;
-          color: #374151;
-          border: 1px solid #d1d5db;
+          background: var(--cui-card-bg);
+          color: var(--cui-body-color);
+          border: 1px solid var(--cui-border-color);
         }
 
         .btn-secondary:hover {
-          background: #f9fafb;
+          background: var(--cui-tertiary-bg);
         }
 
         .budget-tabs {
           display: flex;
           gap: 4px;
-          background: white;
+          background: var(--cui-card-bg);
           border-radius: 8px;
           padding: 4px;
           margin-bottom: 16px;
@@ -233,19 +247,19 @@ export default function BudgetPage() {
           border-radius: 6px;
           background: transparent;
           border: none;
-          color: #6b7280;
+          color: var(--cui-secondary-color);
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .tab:hover {
-          color: #374151;
-          background: #f3f4f6;
+          color: var(--cui-body-color);
+          background: var(--cui-tertiary-bg);
         }
 
         .tab.active {
-          background: #3b82f6;
+          background: var(--cui-primary);
           color: white;
         }
 
@@ -258,29 +272,29 @@ export default function BudgetPage() {
         .subtab {
           padding: 8px 16px;
           border-radius: 6px;
-          background: white;
-          border: 1px solid #e5e7eb;
-          color: #6b7280;
+          background: var(--cui-card-bg);
+          border: 1px solid var(--cui-border-color);
+          color: var(--cui-secondary-color);
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .subtab:hover {
-          border-color: #3b82f6;
-          color: #3b82f6;
+          border-color: var(--cui-primary);
+          color: var(--cui-primary);
         }
 
         .subtab.active {
-          background: #3b82f6;
+          background: var(--cui-primary);
           color: white;
-          border-color: #3b82f6;
+          border-color: var(--cui-primary);
         }
 
         .budget-summary {
           display: flex;
           gap: 24px;
-          background: white;
+          background: var(--cui-card-bg);
           padding: 20px;
           border-radius: 8px;
           margin-bottom: 16px;
@@ -295,64 +309,28 @@ export default function BudgetPage() {
 
         .summary-label {
           font-size: 14px;
-          color: #6b7280;
+          color: var(--cui-secondary-color);
         }
 
         .summary-value {
           font-size: 20px;
           font-weight: 600;
-          color: #111827;
+          color: var(--cui-body-color);
         }
 
         .summary-value.positive {
-          color: #10b981;
+          color: var(--cui-success);
         }
 
         .summary-value.negative {
-          color: #ef4444;
+          color: var(--cui-danger);
         }
 
         .budget-grid-wrapper {
-          background: white;
+          background: var(--cui-card-bg);
           border-radius: 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           overflow: hidden;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          .budget-page {
-            background: #0f172a;
-          }
-
-          .budget-tabs,
-          .budget-summary,
-          .budget-grid-wrapper {
-            background: #1e293b;
-          }
-
-          .btn-secondary {
-            background: #1e293b;
-            color: #e2e8f0;
-            border-color: #334155;
-          }
-
-          .btn-secondary:hover {
-            background: #334155;
-          }
-
-          .subtab {
-            background: #1e293b;
-            border-color: #334155;
-            color: #94a3b8;
-          }
-
-          .summary-label {
-            color: #94a3b8;
-          }
-
-          .summary-value {
-            color: #e2e8f0;
-          }
         }
       `}</style>
     </div>

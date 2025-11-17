@@ -9,6 +9,10 @@
  */
 
 import { sql } from '@/lib/db';
+import {
+  fetchPeriodsBySequences,
+  type PeriodMetadata
+} from '@/lib/financial-engine/period-utils';
 
 const DEFAULT_CURVE_CODE = 'S';
 
@@ -41,6 +45,9 @@ export interface AllocationParams {
 export interface PeriodAllocation {
   periodSequence: number;
   periodId?: number;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  periodLabel?: string;
   amount: number;
   cumulativeAmount: number;
   cumulativePercent: number;
@@ -254,36 +261,38 @@ export async function calculateSCurveAllocation(
 export async function savePeriodAllocations(
   projectId: number,
   factId: number,
-  allocations: PeriodAllocation[]
-): Promise<void> {
+  allocations: PeriodAllocation[],
+  options?: { useTransaction?: boolean }
+): Promise<PeriodMetadata[]> {
   if (allocations.length === 0) {
     throw new Error('Allocation list is empty');
   }
 
   const sequences = allocations.map(a => a.periodSequence);
-  const periods = await sql<{ periodId: number; periodSequence: number }>`
-    SELECT period_id AS "periodId", period_sequence AS "periodSequence"
-    FROM landscape.tbl_calculation_period
-    WHERE project_id = ${projectId}
-      AND period_sequence = ANY(${sequences})
-    ORDER BY period_sequence
-  `;
+  const periodMetadata = await fetchPeriodsBySequences(projectId, sequences);
 
-  if (periods.length !== allocations.length) {
+  if (periodMetadata.length !== allocations.length) {
     const missing = allocations
-      .filter(a => !periods.find(p => p.periodSequence === a.periodSequence))
+      .filter(a => !periodMetadata.find(p => p.periodSequence === a.periodSequence))
       .map(a => a.periodSequence);
     throw new Error(
       `Missing calculation periods for sequences: ${missing.join(', ')}`
     );
   }
 
-  await sql`BEGIN`;
+  const periodBySequence = new Map(
+    periodMetadata.map(period => [period.periodSequence, period])
+  );
+
+  const useTransaction = options?.useTransaction !== false;
+  if (useTransaction) {
+    await sql`BEGIN`;
+  }
   try {
     await sql`DELETE FROM landscape.tbl_budget_timing WHERE fact_id = ${factId}`;
 
     for (const allocation of allocations) {
-      const periodId = periods.find(p => p.periodSequence === allocation.periodSequence)?.periodId;
+      const periodId = periodBySequence.get(allocation.periodSequence)?.periodId;
       if (!periodId) {
         throw new Error(`Period ${allocation.periodSequence} not found for project ${projectId}`);
       }
@@ -303,16 +312,22 @@ export async function savePeriodAllocations(
       `;
     }
 
-    await sql`COMMIT`;
+    if (useTransaction) {
+      await sql`COMMIT`;
+    }
+    return periodMetadata;
   } catch (error) {
-    await sql`ROLLBACK`;
+    if (useTransaction) {
+      await sql`ROLLBACK`;
+    }
     throw error;
   }
 }
 
 export async function allocateBudgetItem(
   projectId: number,
-  params: AllocationParams
+  params: AllocationParams,
+  options?: { transactional?: boolean }
 ): Promise<{
   success: boolean;
   allocations: PeriodAllocation[];
@@ -330,7 +345,11 @@ export async function allocateBudgetItem(
   }
 
   const allocations = await calculateSCurveAllocation(params);
-  await savePeriodAllocations(projectId, params.factId, allocations);
+  const transactional = options?.transactional !== false;
+  const periodMetadata = await savePeriodAllocations(projectId, params.factId, allocations, {
+    useTransaction: transactional
+  });
+  const metadataBySequence = new Map(periodMetadata.map(period => [period.periodSequence, period]));
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
   const peakAllocation = allocations.reduce(
@@ -340,7 +359,16 @@ export async function allocateBudgetItem(
 
   return {
     success: true,
-    allocations,
+    allocations: allocations.map(allocation => {
+      const metadata = metadataBySequence.get(allocation.periodSequence);
+      return {
+        ...allocation,
+        periodId: metadata?.periodId,
+        periodStartDate: metadata?.periodStartDate,
+        periodEndDate: metadata?.periodEndDate,
+        periodLabel: metadata?.periodLabel
+      };
+    }),
     summary: {
       totalAmount: params.totalAmount,
       allocatedAmount: totalAllocated,

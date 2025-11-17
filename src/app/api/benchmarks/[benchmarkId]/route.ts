@@ -69,6 +69,12 @@ export async function GET(request: NextRequest, context: Params) {
         WHERE benchmark_id = ${benchmarkId}::bigint
       `;
       detail = detailResult[0] || null;
+    } else if (benchmark.category === 'contingency') {
+      const detailResult = await sql`
+        SELECT * FROM landscape.tbl_benchmark_contingency
+        WHERE benchmark_id = ${benchmarkId}::bigint
+      `;
+      detail = detailResult[0] || null;
     }
 
     // Fetch source information
@@ -139,55 +145,53 @@ export async function PATCH(request: NextRequest, context: Params) {
 
     const category = categoryResult[0].category;
 
-    await sql`BEGIN`;
+    // Update registry (only fields provided)
+    await sql`
+      UPDATE landscape.tbl_global_benchmark_registry
+      SET
+        benchmark_name = COALESCE(${body.benchmark_name}, benchmark_name),
+        description = COALESCE(${body.description}, description),
+        updated_at = NOW()
+      WHERE benchmark_id = ${benchmarkId}::bigint
+    `;
 
-    try {
-      // Update registry (only fields provided)
+    // Update category-specific tables
+    if (category === 'transaction_cost' && body.value !== undefined) {
       await sql`
-        UPDATE landscape.tbl_global_benchmark_registry
+        UPDATE landscape.tbl_benchmark_transaction_cost
         SET
-          benchmark_name = COALESCE(${body.benchmark_name}, benchmark_name),
-          description = COALESCE(${body.description}, description),
+          cost_type = COALESCE(${body.cost_type}, cost_type),
+          value = ${body.value},
+          value_type = COALESCE(${body.value_type}, value_type),
+          basis = COALESCE(${body.basis}, basis),
           updated_at = NOW()
         WHERE benchmark_id = ${benchmarkId}::bigint
       `;
-
-      // Update category-specific tables
-      if (category === 'transaction_cost' && body.value !== undefined) {
-        await sql`
-          UPDATE landscape.tbl_benchmark_transaction_cost
-          SET
-            cost_type = COALESCE(${body.cost_type}, cost_type),
-            value = ${body.value},
-            value_type = COALESCE(${body.value_type}, value_type),
-            basis = COALESCE(${body.basis}, basis),
-            updated_at = NOW()
-          WHERE benchmark_id = ${benchmarkId}::bigint
-        `;
-      } else if (category === 'unit_cost' && body.value !== undefined) {
-        await sql`
-          UPDATE landscape.tbl_benchmark_unit_cost
-          SET
-            value = ${body.value},
-            uom_code = COALESCE(${body.uom_code}, uom_code),
-            cost_phase = COALESCE(${body.cost_phase}, cost_phase),
-            work_type = COALESCE(${body.work_type}, work_type),
-            updated_at = NOW()
-          WHERE benchmark_id = ${benchmarkId}::bigint
-        `;
-      }
-
-      await sql`COMMIT`;
-
-      return NextResponse.json({
-        success: true,
-        message: 'Benchmark updated successfully'
-      });
-
-    } catch (error) {
-      await sql`ROLLBACK`;
-      throw error;
+    } else if (category === 'unit_cost' && body.value !== undefined) {
+      await sql`
+        UPDATE landscape.tbl_benchmark_unit_cost
+        SET
+          value = ${body.value},
+          uom_code = COALESCE(${body.uom_code}, uom_code),
+          cost_phase = COALESCE(${body.cost_phase}, cost_phase),
+          work_type = COALESCE(${body.work_type}, work_type),
+          updated_at = NOW()
+        WHERE benchmark_id = ${benchmarkId}::bigint
+      `;
+    } else if (category === 'contingency' && body.percentage !== undefined) {
+      await sql`
+        UPDATE landscape.tbl_benchmark_contingency
+        SET
+          percentage = ${body.percentage},
+          updated_at = NOW()
+        WHERE benchmark_id = ${benchmarkId}::bigint
+      `;
     }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Benchmark updated successfully'
+    });
 
   } catch (error: any) {
     console.error('Error updating benchmark:', error);
@@ -205,67 +209,65 @@ export async function PUT(request: NextRequest, context: Params) {
     const body = await request.json();
     const userId = body.user_id || '1'; // TODO: Get from auth
 
-    await sql`BEGIN`;
+    // Update registry
+    await sql`
+      UPDATE landscape.tbl_global_benchmark_registry
+      SET
+        benchmark_name = ${body.benchmark_name || sql`benchmark_name`},
+        description = ${body.description !== undefined ? body.description : sql`description`},
+        market_geography = ${body.market_geography !== undefined ? body.market_geography : sql`market_geography`},
+        property_type = ${body.property_type !== undefined ? body.property_type : sql`property_type`},
+        confidence_level = ${body.confidence_level || sql`confidence_level`},
+        as_of_date = ${body.as_of_date || sql`as_of_date`},
+        cpi_index_value = ${body.cpi_index_value !== undefined ? body.cpi_index_value : sql`cpi_index_value`},
+        context_metadata = ${body.context_metadata ? JSON.stringify(body.context_metadata) : sql`context_metadata`},
+        updated_at = NOW(),
+        updated_by = ${userId}
+      WHERE benchmark_id = ${benchmarkId}::bigint
+    `;
 
-    try {
-      // Update registry
+    // Update category-specific details
+    if (body.category === 'unit_cost' && body.value !== undefined) {
       await sql`
-        UPDATE landscape.tbl_global_benchmark_registry
+        UPDATE landscape.tbl_benchmark_unit_cost
         SET
-          benchmark_name = ${body.benchmark_name || sql`benchmark_name`},
-          description = ${body.description !== undefined ? body.description : sql`description`},
-          market_geography = ${body.market_geography !== undefined ? body.market_geography : sql`market_geography`},
-          property_type = ${body.property_type !== undefined ? body.property_type : sql`property_type`},
-          confidence_level = ${body.confidence_level || sql`confidence_level`},
-          as_of_date = ${body.as_of_date || sql`as_of_date`},
-          cpi_index_value = ${body.cpi_index_value !== undefined ? body.cpi_index_value : sql`cpi_index_value`},
-          context_metadata = ${body.context_metadata ? JSON.stringify(body.context_metadata) : sql`context_metadata`},
-          updated_at = NOW(),
-          updated_by = ${userId}
+          value = ${body.value},
+          uom_code = ${body.uom_code || sql`uom_code`},
+          uom_alt_code = ${body.uom_alt_code !== undefined ? body.uom_alt_code : sql`uom_alt_code`},
+          low_value = ${body.low_value !== undefined ? body.low_value : sql`low_value`},
+          high_value = ${body.high_value !== undefined ? body.high_value : sql`high_value`},
+          cost_phase = ${body.cost_phase !== undefined ? body.cost_phase : sql`cost_phase`},
+          work_type = ${body.work_type !== undefined ? body.work_type : sql`work_type`},
+          updated_at = NOW()
         WHERE benchmark_id = ${benchmarkId}::bigint
       `;
-
-      // Update category-specific details
-      if (body.category === 'unit_cost' && body.value !== undefined) {
-        await sql`
-          UPDATE landscape.tbl_benchmark_unit_cost
-          SET
-            value = ${body.value},
-            uom_code = ${body.uom_code || sql`uom_code`},
-            uom_alt_code = ${body.uom_alt_code !== undefined ? body.uom_alt_code : sql`uom_alt_code`},
-            low_value = ${body.low_value !== undefined ? body.low_value : sql`low_value`},
-            high_value = ${body.high_value !== undefined ? body.high_value : sql`high_value`},
-            cost_phase = ${body.cost_phase !== undefined ? body.cost_phase : sql`cost_phase`},
-            work_type = ${body.work_type !== undefined ? body.work_type : sql`work_type`},
-            updated_at = NOW()
-          WHERE benchmark_id = ${benchmarkId}::bigint
-        `;
-      } else if (body.category === 'transaction_cost' && body.value !== undefined) {
-        await sql`
-          UPDATE landscape.tbl_benchmark_transaction_cost
-          SET
-            cost_type = ${body.cost_type || sql`cost_type`},
-            value = ${body.value},
-            value_type = ${body.value_type || sql`value_type`},
-            basis = ${body.basis !== undefined ? body.basis : sql`basis`},
-            deal_size_min = ${body.deal_size_min !== undefined ? body.deal_size_min : sql`deal_size_min`},
-            deal_size_max = ${body.deal_size_max !== undefined ? body.deal_size_max : sql`deal_size_max`},
-            updated_at = NOW()
-          WHERE benchmark_id = ${benchmarkId}::bigint
-        `;
-      }
-
-      await sql`COMMIT`;
-
-      return NextResponse.json({
-        success: true,
-        message: 'Benchmark updated successfully'
-      });
-
-    } catch (error) {
-      await sql`ROLLBACK`;
-      throw error;
+    } else if (body.category === 'transaction_cost' && body.value !== undefined) {
+      await sql`
+        UPDATE landscape.tbl_benchmark_transaction_cost
+        SET
+          cost_type = ${body.cost_type || sql`cost_type`},
+          value = ${body.value},
+          value_type = ${body.value_type || sql`value_type`},
+          basis = ${body.basis !== undefined ? body.basis : sql`basis`},
+          deal_size_min = ${body.deal_size_min !== undefined ? body.deal_size_min : sql`deal_size_min`},
+          deal_size_max = ${body.deal_size_max !== undefined ? body.deal_size_max : sql`deal_size_max`},
+          updated_at = NOW()
+        WHERE benchmark_id = ${benchmarkId}::bigint
+      `;
+    } else if (body.category === 'contingency' && body.percentage !== undefined) {
+      await sql`
+        UPDATE landscape.tbl_benchmark_contingency
+        SET
+          percentage = ${body.percentage},
+          updated_at = NOW()
+        WHERE benchmark_id = ${benchmarkId}::bigint
+      `;
     }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Benchmark updated successfully'
+    });
 
   } catch (error: any) {
     console.error('Error updating benchmark:', error);

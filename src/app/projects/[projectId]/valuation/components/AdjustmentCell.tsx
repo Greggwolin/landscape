@@ -13,6 +13,7 @@ import type {
   SalesCompAdjustment,
   ConfidenceLevel
 } from '@/types/valuation';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface AdjustmentCellProps {
   comparableId: number;
@@ -126,7 +127,10 @@ export function AdjustmentCell({
         }}
       >
         <div className="flex items-center justify-center gap-1">
-          <button
+          <LandscapeButton
+            variant="ghost"
+            color="secondary"
+            size="sm"
             onClick={() => {
               // Always allow clicking AI button to open chat
               if (hasAiSuggestion) {
@@ -146,7 +150,7 @@ export function AdjustmentCell({
                 onAiClick(comparableId, adjustmentType, contextSuggestion);
               }
             }}
-            className="text-xs font-semibold px-1 py-0.5 rounded transition-opacity hover:opacity-80"
+            className="text-xs font-semibold px-1 py-0.5"
             style={{
               backgroundColor: hasAiSuggestion ? style.buttonBg : 'var(--cui-secondary)',
               color: 'white',
@@ -155,7 +159,7 @@ export function AdjustmentCell({
             title={hasAiSuggestion ? `AI suggests ${aiSuggestion.suggested_pct! > 0 ? '+' : ''}${(aiSuggestion.suggested_pct! * 100).toFixed(0)}% (${aiSuggestion.confidence_level} confidence)` : 'Click to discuss this adjustment with AI'}
           >
             Ai
-          </button>
+          </LandscapeButton>
           <input
             type="checkbox"
             checked={isAccepted}

@@ -149,10 +149,10 @@ class BudgetItem(models.Model):
         db_column='start_period',
         help_text='Starting period number (1, 2, 3, etc.)'
     )
-    periods = models.IntegerField(
+    periods_to_complete = models.IntegerField(
         null=True,
         blank=True,
-        db_column='periods',
+        db_column='periods_to_complete',
         help_text='Duration in number of periods'
     )
     end_period = models.IntegerField(
@@ -207,6 +207,437 @@ class BudgetItem(models.Model):
         blank=True,
         db_column='vendor_name',
         help_text='Vendor or source for this line item'
+    )
+
+    # STANDARD MODE: Timing & Escalation
+    escalation_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='escalation_rate',
+        help_text='Annual escalation rate (%)'
+    )
+    escalation_method = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='escalation_method',
+        choices=[
+            ('to_start', 'To Start'),
+            ('through_duration', 'Through Duration'),
+        ],
+        help_text='How escalation compounds'
+    )
+    start_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='start_date',
+        help_text='Budget item start date'
+    )
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='end_date',
+        help_text='Budget item end date'
+    )
+    timing_method = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='timing_method',
+        choices=[
+            ('even', 'Even'),
+            ('curve', 'S-Curve'),
+        ],
+        help_text='How costs allocate over time'
+    )
+    curve_profile = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='curve_profile',
+        choices=[
+            ('standard', 'Standard'),
+            ('front_loaded', 'Front Loaded'),
+            ('back_loaded', 'Back Loaded'),
+        ],
+        help_text='S-curve shape'
+    )
+    curve_steepness = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='curve_steepness',
+        help_text='Curve steepness 0-100'
+    )
+    curve_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='curve_id',
+        help_text='Reference to custom curve profile'
+    )
+
+    # STANDARD MODE: Cost Controls
+    contingency_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='contingency_pct',
+        help_text='Contingency percentage'
+    )
+    confidence_level = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='confidence_level',
+        help_text='Confidence level (high/medium/low)'
+    )
+    contract_number = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        db_column='contract_number',
+        help_text='Contract reference number'
+    )
+    purchase_order = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        db_column='purchase_order',
+        help_text='Purchase order number'
+    )
+    is_committed = models.BooleanField(
+        default=False,
+        db_column='is_committed',
+        help_text='True if costs are committed'
+    )
+
+    # STANDARD MODE: Classification
+    scope_override = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        db_column='scope_override',
+        help_text='Force budget item into different scope/container'
+    )
+    cost_type = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='cost_type',
+        choices=[
+            ('direct', 'Direct'),
+            ('indirect', 'Indirect'),
+            ('soft', 'Soft'),
+            ('financing', 'Financing'),
+        ],
+        help_text='Cost classification'
+    )
+    tax_treatment = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='tax_treatment',
+        choices=[
+            ('capitalizable', 'Capitalizable'),
+            ('deductible', 'Deductible'),
+            ('non_deductible', 'Non-Deductible'),
+        ],
+        help_text='Tax accounting treatment'
+    )
+    internal_memo = models.TextField(
+        null=True,
+        blank=True,
+        db_column='internal_memo',
+        help_text='Internal notes not included in exports'
+    )
+
+    # DETAIL MODE: Advanced Timing / CPM
+    baseline_start_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='baseline_start_date',
+        help_text='Baseline start date from CPM'
+    )
+    baseline_end_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='baseline_end_date',
+        help_text='Baseline end date from CPM'
+    )
+    actual_start_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='actual_start_date',
+        help_text='Actual start date'
+    )
+    actual_end_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='actual_end_date',
+        help_text='Actual end date'
+    )
+    percent_complete = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='percent_complete',
+        help_text='Progress tracking 0-100%'
+    )
+    status = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='status',
+        choices=[
+            ('not_started', 'Not Started'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('cancelled', 'Cancelled'),
+        ],
+        help_text='Work status'
+    )
+    is_critical = models.BooleanField(
+        default=False,
+        db_column='is_critical',
+        help_text='True if on critical path (CPM computed)'
+    )
+    float_days = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='float_days',
+        help_text='Schedule slack in days (CPM computed)'
+    )
+    early_start_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='early_start_date',
+        help_text='Early start from CPM'
+    )
+    late_finish_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='late_finish_date',
+        help_text='Late finish from CPM'
+    )
+    milestone_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='milestone_id',
+        help_text='Associated milestone'
+    )
+
+    # DETAIL MODE: Financial Controls
+    budget_version = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='budget_version',
+        choices=[
+            ('original', 'Original'),
+            ('revised', 'Revised'),
+            ('forecast', 'Forecast'),
+        ],
+        help_text='Version type'
+    )
+    version_as_of_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='version_as_of_date',
+        help_text='Version snapshot date'
+    )
+    funding_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='funding_id',
+        help_text='Funding source reference'
+    )
+    funding_draw_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='funding_draw_pct',
+        help_text='Percentage drawn from this funding source (0-100)'
+    )
+    draw_schedule = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='draw_schedule',
+        choices=[
+            ('as_incurred', 'As Incurred'),
+            ('monthly', 'Monthly'),
+            ('milestone', 'Milestone'),
+        ],
+        help_text='Draw schedule type'
+    )
+    retention_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='retention_pct',
+        help_text='Holdback percentage (0-100)'
+    )
+    payment_terms = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        db_column='payment_terms',
+        help_text='Payment terms'
+    )
+    invoice_frequency = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='invoice_frequency',
+        choices=[
+            ('monthly', 'Monthly'),
+            ('milestone', 'Milestone'),
+            ('completion', 'Completion'),
+        ],
+        help_text='Invoice frequency'
+    )
+    cost_allocation = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='cost_allocation',
+        choices=[
+            ('direct', 'Direct'),
+            ('shared', 'Shared'),
+            ('pro_rata', 'Pro-Rata'),
+        ],
+        help_text='Cost allocation method'
+    )
+    is_reimbursable = models.BooleanField(
+        default=False,
+        db_column='is_reimbursable',
+        help_text='True if reimbursable'
+    )
+
+    # DETAIL MODE: Period Allocation
+    allocation_method = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='allocation_method',
+        choices=[
+            ('even', 'Even'),
+            ('curve', 'Curve'),
+            ('custom', 'Custom'),
+        ],
+        help_text='How costs allocate across periods'
+    )
+    cf_start_flag = models.BooleanField(
+        default=False,
+        db_column='cf_start_flag',
+        help_text='Marks cash flow beginning'
+    )
+    cf_distribution = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        db_column='cf_distribution',
+        help_text='Cash flow distribution pattern'
+    )
+    allocated_total = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='allocated_total',
+        help_text='Sum of all period allocations'
+    )
+    allocation_variance = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='allocation_variance',
+        help_text='allocated_total - amount (should be 0)'
+    )
+
+    # DETAIL MODE: Documentation & Audit
+    bid_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='bid_date',
+        help_text='Bid submission date'
+    )
+    bid_amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='bid_amount',
+        help_text='Original bid amount'
+    )
+    bid_variance = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_column='bid_variance',
+        help_text='amount - bid_amount'
+    )
+    change_order_count = models.IntegerField(
+        default=0,
+        db_column='change_order_count',
+        help_text='Number of change orders'
+    )
+    change_order_total = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        db_column='change_order_total',
+        help_text='Total change order amount'
+    )
+    approval_status = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        db_column='approval_status',
+        choices=[
+            ('pending', 'Pending'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected'),
+        ],
+        help_text='Approval workflow status'
+    )
+    approved_by = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='approved_by',
+        help_text='User who approved'
+    )
+    approval_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='approval_date',
+        help_text='Approval date'
+    )
+    document_count = models.IntegerField(
+        default=0,
+        db_column='document_count',
+        help_text='Number of attached documents'
+    )
+    last_modified_by = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='last_modified_by',
+        help_text='User who last modified'
+    )
+    last_modified_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_column='last_modified_date',
+        help_text='Last modification timestamp'
     )
 
     # Hierarchy and Rollup

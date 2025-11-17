@@ -414,7 +414,68 @@ PostgreSQL Database (landscape.core_unit_cost_category)
 
 ---
 
-**Implementation Date:** January 8, 2025
+## Recent Updates
+
+### Theme Migration (November 16, 2025)
+
+**Status:** ✅ Complete
+
+#### Tag Chip Styling Overhaul
+**File:** `CategoryDetailPanel.tsx`
+
+**Problem:**
+- Tag chips had thick, double-width borders
+- Hardcoded color palettes prevented theme switching
+- Inline styles overrode CSS classes
+
+**Changes Made:**
+1. **Removed hardcoded color constants:**
+   - `TAG_COLORS` array (11 color options)
+   - `CHIP_COLORS` object with hardcoded hex values
+   - `getTagColor()` hash-based color assignment function
+
+2. **Simplified tag chip rendering:**
+   - Removed all inline `style` attribute overrides
+   - Now relies purely on CSS classes: `.tag-chip.filled` and `.tag-chip.outline`
+   - Tag chips automatically adapt to theme via CSS variables
+
+3. **CSS fixes in `category-taxonomy.css`:**
+   ```css
+   /* Before: Base class with border, causing double-border effect */
+   .tag-chip { border: 1px solid transparent; }
+   .tag-chip.filled { border-color: #7C3AED; }
+   .tag-chip.outline { border-color: rgba(50, 31, 219, 0.35); }
+
+   /* After: No base border, full declaration in modifier classes */
+   .tag-chip { /* no border */ }
+   .tag-chip.filled { border: 1px solid var(--cui-primary); }
+   .tag-chip.outline { border: 1px solid var(--cui-border-color); }
+   ```
+
+**Result:**
+- ✅ Thin, consistent 1px borders on all tag chips
+- ✅ Theme-aware colors using `var(--cui-border-color)` and `var(--cui-primary)`
+- ✅ Proper rendering in both light and dark modes
+- ✅ Cleaner codebase with ~50 fewer lines of unused color logic
+
+**Files Modified:**
+- `src/app/admin/preferences/components/CategoryDetailPanel.tsx` (lines 23-29, 706-733)
+- `src/app/admin/preferences/components/category-taxonomy.css` (lines 746-795)
+
+#### Additional Theme Fixes
+**File:** `taxonomy.css`
+- Updated `.type-card.active` background from hardcoded `#e0f2fe` to `var(--cui-primary-bg)`
+- All loading states now use `var(--cui-secondary-color)`
+
+**Files:** `FamilyDetails.tsx`, `ProductsList.tsx`
+- Replaced emoji icons (✏️, 🗑️) with CoreUI `<CIcon>` components
+- Added imports: `cilPencil`, `cilTrash` from `@coreui/icons`
+- Applied `.btn-edit` class for consistent styling
+
+---
+
+**Original Implementation Date:** January 8, 2025
+**Theme Migration Date:** November 16, 2025
 **Implemented By:** Claude Code Assistant
 **Reviewed By:** [Pending]
-**Status:** ✅ Ready for Testing
+**Status:** ✅ Complete & Theme-Aware

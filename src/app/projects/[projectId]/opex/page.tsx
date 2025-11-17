@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useComplexityMode } from '@/contexts/ComplexityModeContext';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { multifamilyOpExFields, getVisibleFields, fieldCounts } from '@/config/opex/multifamily-fields';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 interface ExpenseData {
   [key: string]: {
@@ -141,19 +142,19 @@ export default function OperatingExpensesPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-lg text-gray-600">Loading operating expenses...</div>
+        <div className="text-lg" style={{ color: 'var(--cui-secondary-color)' }}>Loading operating expenses...</div>
       </div>
     );
   }
 
   return (
-    <div className="operating-expenses-page min-h-screen bg-gray-50">
+    <div className="operating-expenses-page min-h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       {/* Page Header */}
-      <div className="page-header border-b bg-white px-8 py-6 sticky top-0 z-10 shadow-sm">
+      <div className="page-header border-b px-8 py-6 sticky top-0 z-10 shadow-sm" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Operating Expenses</h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>Operating Expenses</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
               Annual property operating costs and escalation assumptions
             </p>
           </div>
@@ -171,45 +172,46 @@ export default function OperatingExpensesPage() {
               size="md"
             />
 
-            <button
+            <LandscapeButton
+              color="primary"
               onClick={handleSave}
               disabled={!hasUnsavedChanges || isSaving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors font-medium"
+              loading={isSaving}
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+            </LandscapeButton>
           </div>
         </div>
       </div>
 
       {/* Summary Metrics */}
-      <div className="bg-blue-50 border-b px-8 py-6">
+      <div className="border-b px-8 py-6" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
         <div className="grid grid-cols-4 gap-6">
           <div>
-            <div className="text-xs text-gray-600 uppercase font-medium mb-1">Total Operating Expenses</div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-xs uppercase font-medium mb-1" style={{ color: 'var(--cui-secondary-color)' }}>Total Operating Expenses</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
               ${totalAnnual.toLocaleString()}
             </div>
-            <div className="text-xs text-gray-500">per year</div>
+            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>per year</div>
           </div>
           <div>
-            <div className="text-xs text-gray-600 uppercase font-medium mb-1">Per Unit</div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-xs uppercase font-medium mb-1" style={{ color: 'var(--cui-secondary-color)' }}>Per Unit</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
               ${Math.round(totalPerUnit).toLocaleString()}
             </div>
-            <div className="text-xs text-gray-500">annual</div>
+            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>annual</div>
           </div>
           <div>
-            <div className="text-xs text-gray-600 uppercase font-medium mb-1">Per SF</div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-xs uppercase font-medium mb-1" style={{ color: 'var(--cui-secondary-color)' }}>Per SF</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
               ${totalPerSF.toFixed(2)}
             </div>
-            <div className="text-xs text-gray-500">annual</div>
+            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>annual</div>
           </div>
           <div>
-            <div className="text-xs text-gray-600 uppercase font-medium mb-1">Expense Ratio</div>
-            <div className="text-2xl font-bold text-gray-900">--</div>
-            <div className="text-xs text-gray-500">of EGI (TBD)</div>
+            <div className="text-xs uppercase font-medium mb-1" style={{ color: 'var(--cui-secondary-color)' }}>Expense Ratio</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>--</div>
+            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>of EGI (TBD)</div>
           </div>
         </div>
       </div>
@@ -220,25 +222,25 @@ export default function OperatingExpensesPage() {
           const expenseData = expenses[field.key] || { annualAmount: 0, perUnit: 0, perSF: 0, escalationRate: field.defaultEscalation || 0.03 };
 
           return (
-            <div key={field.key} className="border border-gray-200 rounded-lg p-5 bg-white hover:shadow-md transition-shadow">
+            <div key={field.key} className="border rounded-lg p-5 hover:shadow-md transition-shadow" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1">
-                  <label className="block text-sm font-semibold text-gray-900 mb-1">
+                  <label className="block text-sm font-semibold mb-1" style={{ color: 'var(--cui-body-color)' }}>
                     {field.label}
                     {field.tier !== 'basic' && (
-                      <span className="ml-2 text-xs font-normal text-gray-500 uppercase">
+                      <span className="ml-2 text-xs font-normal uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
                         {field.tier}
                       </span>
                     )}
                   </label>
-                  <p className="text-xs text-gray-600 leading-relaxed">
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
                     {field.helpText[currentMode]}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1 font-medium">Annual Amount</div>
+                    <div className="text-xs mb-1 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Annual Amount</div>
                     <input
                       type="text"
                       value={expenseData.annualAmount?.toLocaleString() || '0'}
@@ -246,19 +248,20 @@ export default function OperatingExpensesPage() {
                         const value = parseInt(e.target.value.replace(/,/g, '')) || 0;
                         handleFieldChange(field.key, value);
                       }}
-                      className="w-36 px-3 py-2 border border-gray-300 rounded-md text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-36 px-3 py-2 border rounded-md text-right font-mono text-sm focus:ring-2"
+                      style={{ borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-body-bg)' }}
                     />
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
                       ${expenseData.perUnit?.toLocaleString() || 0}/unit
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1 font-medium">Escalation</div>
-                    <div className="text-base font-semibold text-gray-700">
+                    <div className="text-xs mb-1 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Escalation</div>
+                    <div className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>
                       {((expenseData.escalationRate || 0) * 100).toFixed(1)}%
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">annual</div>
+                    <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>annual</div>
                   </div>
                 </div>
               </div>
@@ -269,15 +272,17 @@ export default function OperatingExpensesPage() {
 
       {/* Save reminder */}
       {hasUnsavedChanges && (
-        <div className="fixed bottom-4 right-4 bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg shadow-lg">
+        <div className="fixed bottom-4 right-4 border px-4 py-3 rounded-lg shadow-lg" style={{ backgroundColor: 'rgba(255, 138, 0, 0.1)', borderColor: 'var(--cui-warning)', color: 'var(--cui-warning)' }}>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">You have unsaved changes</span>
-            <button
+            <LandscapeButton
+              color="warning"
+              size="sm"
               onClick={handleSave}
-              className="ml-2 px-3 py-1 bg-orange-600 text-white rounded text-sm font-medium hover:bg-orange-700"
+              className="ml-2"
             >
               Save Now
-            </button>
+            </LandscapeButton>
           </div>
         </div>
       )}

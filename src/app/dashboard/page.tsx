@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CButton, CRow, CCol } from '@coreui/react';
+import { CContainer, CCard, CCardHeader, CCardBody, CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell, CBadge, CRow, CCol } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import CIcon from '@coreui/icons-react';
 import { cilChartPie } from '@coreui/icons';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import UserTile from '@/app/components/dashboard/UserTile';
 import DashboardMap from '@/app/components/dashboard/DashboardMap';
+import { LandscapeButton, StatusChip } from '@/components/ui/landscape';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   // Standardized codes (Migration 013)
@@ -219,12 +220,10 @@ export default function DashboardPage() {
                     )}
                   </CTableDataCell>
                   <CTableDataCell>
-                    <CBadge color={project.is_active ? 'success' : 'secondary'}>
-                      {project.is_active ? 'Active' : 'Inactive'}
-                    </CBadge>
+                    <StatusChip status={project.is_active ? 'active' : 'inactive'} />
                   </CTableDataCell>
                   <CTableDataCell>
-                    <CButton
+                    <LandscapeButton
                       color="primary"
                       variant="ghost"
                       size="sm"
@@ -234,7 +233,7 @@ export default function DashboardPage() {
                       }}
                     >
                       Open
-                    </CButton>
+                    </LandscapeButton>
                   </CTableDataCell>
                 </CTableRow>
               ))}

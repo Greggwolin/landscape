@@ -5,6 +5,7 @@ export const formatNumber = (
   opts?: Intl.NumberFormatOptions
 ): string => {
   if (v == null) return '';
+  if (v === 0) return '—'; // Render zero as dash
   return new Intl.NumberFormat(undefined, {
     useGrouping: true,
     maximumFractionDigits: 0,
@@ -17,6 +18,7 @@ export const formatMoney = (
   opts?: Intl.NumberFormatOptions
 ): string => {
   if (v == null) return '';
+  if (v === 0) return '—'; // Render zero as dash
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: 'USD',
@@ -31,6 +33,7 @@ export const formatPercent = (
   digits = 0
 ): string => {
   if (v == null) return '';
+  if (v === 0) return '—'; // Render zero as dash
   return `${new Intl.NumberFormat(undefined, {
     useGrouping: true,
     minimumFractionDigits: digits,

@@ -415,7 +415,8 @@ export default function TopNavProjectPrototype() {
               alt="Landscape"
               width={140}
               height={32}
-              className="h-8 w-auto object-contain"
+              className="object-contain"
+              style={{ width: 'auto', height: 'auto' }}
             />
           </Link>
 

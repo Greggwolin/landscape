@@ -31,8 +31,33 @@ class BudgetItemSerializer(serializers.ModelSerializer):
         allow_null=True,
         read_only=True
     )
+    finance_structure_id = serializers.IntegerField(
+        source='finance_structure.finance_structure_id',
+        allow_null=True,
+        read_only=True
+    )
     parent_budget_item_id = serializers.IntegerField(
         source='parent_budget_item.budget_item_id',
+        allow_null=True,
+        read_only=True
+    )
+    category_l1_id = serializers.IntegerField(
+        source='category_l1.category_id',
+        allow_null=True,
+        read_only=True
+    )
+    category_l2_id = serializers.IntegerField(
+        source='category_l2.category_id',
+        allow_null=True,
+        read_only=True
+    )
+    category_l3_id = serializers.IntegerField(
+        source='category_l3.category_id',
+        allow_null=True,
+        read_only=True
+    )
+    category_l4_id = serializers.IntegerField(
+        source='category_l4.category_id',
         allow_null=True,
         read_only=True
     )
@@ -41,21 +66,114 @@ class BudgetItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetItem
         fields = [
+            # IDs and References
             'budget_item_id',
             'project_id',
             'container_id',
+            'finance_structure_id',
+
+            # Classification (Legacy)
             'category',
             'subcategory',
             'line_item_name',
             'account_code',
+
+            # Category Hierarchy
+            'category_l1_id',
+            'category_l2_id',
+            'category_l3_id',
+            'category_l4_id',
+
+            # Time Period
             'fiscal_year',
             'fiscal_period',
             'period_type',
+            'start_period',
+            'periods_to_complete',
+            'end_period',
+
+            # Financial Values
+            'qty',
+            'rate',
+            'uom_code',
             'budgeted_amount',
             'variance_amount',
+            'vendor_name',
+
+            # STANDARD MODE: Timing & Escalation
+            'escalation_rate',
+            'escalation_method',
+            'start_date',
+            'end_date',
+            'timing_method',
+            'curve_profile',
+            'curve_steepness',
+            'curve_id',
+
+            # STANDARD MODE: Cost Controls
+            'contingency_pct',
+            'confidence_level',
+            'contract_number',
+            'purchase_order',
+            'is_committed',
+
+            # STANDARD MODE: Classification
+            'scope_override',
+            'cost_type',
+            'tax_treatment',
+            'internal_memo',
+
+            # DETAIL MODE: Advanced Timing / CPM
+            'baseline_start_date',
+            'baseline_end_date',
+            'actual_start_date',
+            'actual_end_date',
+            'percent_complete',
+            'status',
+            'is_critical',
+            'float_days',
+            'early_start_date',
+            'late_finish_date',
+            'milestone_id',
+
+            # DETAIL MODE: Financial Controls
+            'budget_version',
+            'version_as_of_date',
+            'funding_id',
+            'funding_draw_pct',
+            'draw_schedule',
+            'retention_pct',
+            'payment_terms',
+            'invoice_frequency',
+            'cost_allocation',
+            'is_reimbursable',
+
+            # DETAIL MODE: Period Allocation
+            'allocation_method',
+            'cf_start_flag',
+            'cf_distribution',
+            'allocated_total',
+            'allocation_variance',
+
+            # DETAIL MODE: Documentation & Audit
+            'bid_date',
+            'bid_amount',
+            'bid_variance',
+            'change_order_count',
+            'change_order_total',
+            'approval_status',
+            'approved_by',
+            'approval_date',
+            'document_count',
+            'last_modified_by',
+            'last_modified_date',
+
+            # Hierarchy
             'is_rollup',
             'parent_budget_item_id',
             'children_total',
+
+            # Metadata
             'notes',
             'attributes',
             'is_active',

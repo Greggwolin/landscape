@@ -1,6 +1,8 @@
 """Serializers for Sales & Absorption models."""
 
 from typing import Any, Dict
+from decimal import Decimal
+from datetime import date
 
 from rest_framework import serializers
 
@@ -13,6 +15,13 @@ from .models import (
     ProjectAbsorptionAssumption,
     ProjectPricingAssumption,
     ProjectTimingAssumption,
+)
+from .utils import (
+    calculate_inflated_price,
+    calculate_gross_value,
+    calculate_net_proceeds,
+    validate_closing_units,
+    validate_closing_dates,
 )
 
 
@@ -141,8 +150,65 @@ class ParcelSaleEventSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
         sale_type = attrs.get("sale_type")
-        if sale_type not in {"single_closing", "structured_sale", "bulk_assignment"}:
+        if sale_type not in {"single_closing", "multi_closing", "structured_sale", "bulk_assignment"}:
             raise serializers.ValidationError({"sale_type": "Invalid sale type."})
+        return attrs
+
+
+class CreateParcelSaleSerializer(serializers.Serializer):
+    """Serializer for creating a parcel sale event with nested closings."""
+
+    parcel_id = serializers.IntegerField(required=True)
+    sale_type = serializers.ChoiceField(
+        choices=["single_closing", "multi_closing"],
+        required=True
+    )
+    buyer_entity = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    contract_date = serializers.DateField(required=False, allow_null=True)
+
+    # Custom overrides (apply to all closings)
+    commission_pct = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False, allow_null=True
+    )
+    closing_cost_per_unit = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True
+    )
+    onsite_cost_pct = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False, allow_null=True
+    )
+    has_custom_overrides = serializers.BooleanField(default=False, required=False)
+
+    # Nested closings array
+    closings = serializers.ListField(
+        child=serializers.DictField(),
+        required=True,
+        min_length=1
+    )
+
+    def validate_closings(self, closings_data):
+        """Validate closings array structure."""
+        for closing in closings_data:
+            if "closing_number" not in closing:
+                raise serializers.ValidationError("Each closing must have a closing_number")
+            if "closing_date" not in closing:
+                raise serializers.ValidationError("Each closing must have a closing_date")
+            if "units_closing" not in closing:
+                raise serializers.ValidationError("Each closing must have units_closing")
+
+            if closing["units_closing"] <= 0:
+                raise serializers.ValidationError("units_closing must be greater than zero")
+
+        return closings_data
+
+    def validate(self, attrs):
+        """Validate the complete payload including cross-field validation."""
+        closings_data = attrs.get("closings", [])
+
+        # Validate closing dates are in chronological order
+        is_valid, error_msg = validate_closing_dates(closings_data)
+        if not is_valid:
+            raise serializers.ValidationError({"closings": error_msg})
+
         return attrs
 
 

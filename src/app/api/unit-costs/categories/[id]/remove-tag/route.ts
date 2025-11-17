@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL;
+const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
+  ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
+  : null;
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!DJANGO_API_URL) {
+  if (!DJANGO_FINANCIAL_BASE) {
     return NextResponse.json(
       { error: 'Django API not configured' },
       { status: 500 }
@@ -15,7 +18,7 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const url = `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/categories/${params.id}/remove-tag/`;
+    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/remove-tag/`;
 
     const response = await fetch(url, {
       method: 'POST',

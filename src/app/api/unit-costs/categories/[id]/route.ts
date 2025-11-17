@@ -1,43 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { processCategoryUpdate } from '../update-handler';
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL;
+const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
+  ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
+  : null;
 
-// PUT - Update category
+// PUT - Update category (kept for backwards compatibility)
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!DJANGO_API_URL) {
-    return NextResponse.json(
-      { error: 'Django API not configured' },
-      { status: 500 }
-    );
-  }
-
-  try {
-    const body = await request.json();
-    const url = `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/categories/${params.id}/`;
-
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to update category' }));
-      return NextResponse.json(error, { status: response.status });
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error updating category:', error);
-    return NextResponse.json(
-      { error: 'Failed to update category' },
-      { status: 500 }
-    );
-  }
+  return processCategoryUpdate(request, params.id);
 }
 
 // DELETE - Delete category (soft delete)
@@ -45,7 +19,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!DJANGO_API_URL) {
+  if (!DJANGO_FINANCIAL_BASE) {
     return NextResponse.json(
       { error: 'Django API not configured' },
       { status: 500 }
@@ -53,7 +27,7 @@ export async function DELETE(
   }
 
   try {
-    const url = `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/categories/${params.id}/`;
+    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/`;
 
     const response = await fetch(url, {
       method: 'DELETE',
@@ -84,7 +58,7 @@ export async function GET(
   const action = searchParams.get('action');
 
   if (action === 'deletion-impact') {
-    if (!DJANGO_API_URL) {
+    if (!DJANGO_FINANCIAL_BASE) {
       return NextResponse.json(
         { error: 'Django API not configured' },
         { status: 500 }
@@ -92,7 +66,7 @@ export async function GET(
     }
 
     try {
-      const url = `${DJANGO_API_URL.replace(/\/$/, '')}/api/unit-costs/categories/${params.id}/deletion-impact/`;
+      const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/deletion-impact/`;
 
       const response = await fetch(url, {
         method: 'GET',

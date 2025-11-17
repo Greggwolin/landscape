@@ -83,6 +83,7 @@ export default function TopNavigationBar() {
               height={40}
               priority
               className="object-contain"
+              style={{ width: 'auto', height: 'auto' }}
               sizes="176px"
             />
           </Link>
