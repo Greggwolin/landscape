@@ -5,45 +5,20 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, TrendingUp, CheckCircle, Info } from 'lucide-react';
-import type { BenchmarkCategory, AISuggestion, LandscaperMode } from '@/types/benchmarks';
+import type { BenchmarkCategory, AISuggestion } from '@/types/benchmarks';
 import AISuggestionsSection from './AISuggestionsSection';
 
 interface Props {
   selectedCategory: BenchmarkCategory | null;
   aiSuggestions: AISuggestion[];
-  mode: LandscaperMode;
   onRefresh: () => void;
 }
 
 export default function LandscaperPanel({
   selectedCategory,
   aiSuggestions,
-  mode,
   onRefresh
 }: Props) {
-  // Silent mode - minimal UI
-  if (mode === 'silent') {
-    return (
-      <div className="p-6 text-center text-text-secondary">
-        <div className="max-w-md mx-auto">
-          <AlertCircle size={48} className="mx-auto mb-4 text-text-secondary" />
-          <h3 className="text-lg font-semibold mb-2 text-text-secondary">Silent Mode Active</h3>
-          <p className="mb-4">
-            Landscaper suggestions are queued for later review
-          </p>
-          {aiSuggestions.length > 0 && (
-            <button
-              onClick={onRefresh}
-              className="px-4 py-2 bg-brand-primary text-text-inverse hover:bg-brand-primary/90 rounded font-medium"
-            >
-              Review {aiSuggestions.length} Queued Suggestion{aiSuggestions.length !== 1 ? 's' : ''}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6">
       {/* Context Header */}
@@ -60,7 +35,6 @@ export default function LandscaperPanel({
       {aiSuggestions.length > 0 ? (
         <AISuggestionsSection
           suggestions={aiSuggestions}
-          mode={mode}
           onRefresh={onRefresh}
         />
       ) : (

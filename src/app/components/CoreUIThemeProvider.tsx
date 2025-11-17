@@ -11,7 +11,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+  const [theme, setThemeState] = useState<'light' | 'dark'>('dark'); // Phase 1: Changed default to dark
   const [mounted, setMounted] = useState(false);
   const themeRef = useRef(theme);
 
@@ -30,7 +30,8 @@ export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return;
     }
 
-    setThemeState('light');
+    // Phase 1: Default to dark mode
+    setThemeState('dark');
   }, []);
 
   useEffect(() => {

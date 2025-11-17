@@ -85,13 +85,66 @@ const normalizeCategory = (category: UnitCostCategoryReference): UnitCostCategor
   };
 };
 
+const hashTagName = (tagName: string): number => {
+  let hash = 0;
+  for (let i = 0; i < tagName.length; i++) {
+    hash = (hash << 5) - hash + tagName.charCodeAt(i);
+    hash |= 0; // Convert to 32-bit integer
+  }
+  return hash;
+};
+
+const ensureTagCoverage = (
+  baseTags: CategoryTag[],
+  categoriesToMerge: UnitCostCategoryReference[]
+): CategoryTag[] => {
+  if (!categoriesToMerge.length) return baseTags;
+  const tagMap = new Map<string, CategoryTag>();
+
+  baseTags.forEach((tag) => {
+    const key = tag.tag_name.trim().toLowerCase();
+    if (key) tagMap.set(key, tag);
+  });
+
+  let updated = false;
+
+  categoriesToMerge.forEach((category) => {
+    (category.tags || []).forEach((tagName) => {
+      const normalized = tagName?.trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (tagMap.has(key)) return;
+      updated = true;
+      const hash = hashTagName(normalized);
+      tagMap.set(key, {
+        tag_id: hash === 0 ? -(tagMap.size + 1) : -Math.abs(hash),
+        tag_name: normalized,
+        tag_context: 'All',
+        is_system_default: false,
+        description: 'Imported from existing category assignment',
+        display_order: 999,
+        is_active: true,
+      });
+    });
+  });
+
+  if (!updated) return baseTags;
+
+  return Array.from(tagMap.values()).sort((a, b) => {
+    if (a.display_order !== b.display_order) {
+      return a.display_order - b.display_order;
+    }
+    return a.tag_name.localeCompare(b.tag_name);
+  });
+};
+
 export default function UnitCostCategoryManager() {
   const { showToast } = useToast();
 
   // State management
   const [categories, setCategories] = useState<UnitCostCategoryReference[]>([]);
   const [tags, setTags] = useState<CategoryTag[]>([]);
-  const [selectedStages, setSelectedStages] = useState<LifecycleStage[]>(LIFECYCLE_STAGES);
+  const [selectedStages, setSelectedStages] = useState<LifecycleStage[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<UnitCostCategoryReference | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -134,8 +187,9 @@ export default function UnitCostCategoryManager() {
         fetchCategories(),
         fetchTags(),
       ]);
-      setCategories(categoriesData.map((cat) => normalizeCategory(cat)));
-      setTags(tagsData);
+      const normalizedCategories = categoriesData.map((cat) => normalizeCategory(cat));
+      setCategories(normalizedCategories);
+      setTags(ensureTagCoverage(tagsData, normalizedCategories));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
       setError(message);
@@ -225,6 +279,7 @@ export default function UnitCostCategoryManager() {
       prev.map((cat) => (cat.category_id === normalized.category_id ? normalized : cat))
     );
     setSelectedCategory(normalized);
+    setTags((prev) => ensureTagCoverage(prev, [normalized]));
     showToast('Category updated successfully', 'success');
   };
 
@@ -233,8 +288,31 @@ export default function UnitCostCategoryManager() {
     const normalized = normalizeCategory(newCategory);
     setCategories((prev) => [...prev, normalized]);
     setSelectedCategory(normalized);
+    setTags((prev) => ensureTagCoverage(prev, [normalized]));
     setShowAddCategoryModal(false);
     showToast('Category created successfully', 'success');
+  };
+
+  const handleTagDeleted = (tagName: string) => {
+    setTags((prev) => prev.filter((tag) => tag.tag_name.toLowerCase() !== tagName.toLowerCase()));
+    setCategories((prev) =>
+      prev.map((cat) =>
+        cat.tags.some((tag) => tag.toLowerCase() === tagName.toLowerCase())
+          ? {
+              ...cat,
+              tags: cat.tags.filter((tag) => tag.toLowerCase() !== tagName.toLowerCase()),
+            }
+          : cat
+      )
+    );
+    setSelectedCategory((prev) =>
+      prev
+        ? {
+            ...prev,
+            tags: prev.tags.filter((tag) => tag.toLowerCase() !== tagName.toLowerCase()),
+          }
+        : prev
+    );
   };
 
 
@@ -443,10 +521,12 @@ export default function UnitCostCategoryManager() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <CategoryDetailPanel
             category={selectedCategory}
+            allCategories={categories}
             tags={tags}
             onUpdate={handleCategoryUpdated}
             onDelete={handleDeleteRequest}
-            onCreateTag={() => {}} // No-op since we use inline tag input now
+            onCreateTag={() => {}} // legacy prop
+            onTagDeleted={handleTagDeleted}
           />
         </div>
       </div>

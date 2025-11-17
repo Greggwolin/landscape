@@ -5,10 +5,11 @@
  * Configure app-level taxonomy, categories, and default settings
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import AdminNavBar from '@/app/components/AdminNavBar';
+import { LandscapeButton } from '@/components/ui/landscape';
 
 // Dynamically import TaxonomyPage to avoid SSR issues
 const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
@@ -81,8 +82,10 @@ export default function SystemPreferencesPage() {
 
             return (
               <div key={category.key}>
-                <button
+                <LandscapeButton
                   onClick={() => toggleCategory(category.key)}
+                  variant="ghost"
+                  color="secondary"
                   className="flex w-full items-center justify-between px-6 py-4 transition-colors"
                   style={{
                     color: 'var(--cui-body-color)',
@@ -116,7 +119,7 @@ export default function SystemPreferencesPage() {
                       </span>
                     </div>
                   </div>
-                </button>
+                </LandscapeButton>
 
                 {/* Expanded Content */}
                 {isExpanded && (
@@ -130,10 +133,8 @@ export default function SystemPreferencesPage() {
                         <UnitCostCategoryManager />
                       </div>
                     ) : category.key === 'planning_standards' ? (
-                      <div className="px-6 py-4 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                        <div className="p-4 rounded border" style={{ borderColor: 'var(--cui-border-color)' }}>
-                          <p className="text-xs italic">Planning standards configuration interface coming soon...</p>
-                        </div>
+                      <div className="px-6 py-4">
+                        <PlanningStandardsPanel />
                       </div>
                     ) : null}
                   </div>
@@ -146,4 +147,197 @@ export default function SystemPreferencesPage() {
       </div>
     </div>
   );
+}
+
+type PlanningStandard = {
+  standard_id: number
+  default_planning_efficiency: number | null
+  default_street_row_pct?: number | null
+  default_park_dedication_pct?: number | null
+  updated_at?: string
+}
+
+const formatPercent = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function PlanningStandardsPanel() {
+  const [standard, setStandard] = useState<PlanningStandard | null>(null)
+  const [efficiencyInput, setEfficiencyInput] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const loadStandard = async () => {
+    try {
+      setLoading(true)
+      setStatusMessage(null)
+      const response = await fetch('/api/planning-standards')
+      if (!response.ok) {
+        throw new Error('Unable to fetch planning standards')
+      }
+      const payload = await response.json()
+      const current = payload?.standard ?? null
+      setStandard(current)
+      setEfficiencyInput(
+        current?.default_planning_efficiency != null
+          ? (current.default_planning_efficiency * 100).toFixed(1)
+          : ''
+      )
+    } catch (error) {
+      console.error('Failed to load planning standards', error)
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to load planning standards.'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadStandard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleSave = async () => {
+    const percentValue = Number(efficiencyInput)
+    if (!Number.isFinite(percentValue) || percentValue <= 0 || percentValue > 150) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Enter a valid efficiency between 0% and 150%.'
+      })
+      return
+    }
+    const value = percentValue / 100
+
+    try {
+      setSaving(true)
+      setStatusMessage(null)
+      const response = await fetch('/api/planning-standards', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_planning_efficiency: value })
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Failed to update planning standards')
+      }
+
+      const payload = await response.json()
+      const updated = payload?.standard ?? null
+      setStandard(updated)
+      setEfficiencyInput(
+        updated?.default_planning_efficiency != null
+          ? (updated.default_planning_efficiency * 100).toFixed(1)
+          : ''
+      )
+      setStatusMessage({
+        type: 'success',
+        text: 'Planning efficiency updated.'
+      })
+    } catch (error) {
+      console.error('Failed to update planning standards', error)
+      setStatusMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to update planning standards.'
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tileStyle: React.CSSProperties = {
+    border: '1px solid var(--cui-border-color)',
+    borderRadius: '16px',
+    backgroundColor: 'var(--surface-card)',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.08)'
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4 rounded border text-sm" style={{ borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
+        Loading planning standards…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {statusMessage && (
+        <div
+          className="px-3 py-2 rounded text-sm"
+          style={{
+            backgroundColor: statusMessage.type === 'success' ? 'var(--cui-success-bg)' : 'var(--cui-danger-bg)',
+            border: `1px solid ${statusMessage.type === 'success' ? 'var(--cui-success)' : 'var(--cui-danger)'}`,
+            color: statusMessage.type === 'success' ? 'var(--cui-success)' : 'var(--cui-danger)'
+          }}
+        >
+          {statusMessage.text}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="p-4 space-y-3" style={tileStyle}>
+          <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+            Planning Efficiency
+          </h3>
+          <p className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
+            Global density multiplier used when calculating lot-product densities across projects.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={efficiencyInput}
+                min={0}
+                max={150}
+                step={1}
+                onChange={(event) => setEfficiencyInput(event.target.value)}
+                className="h-9 w-20 rounded border px-2 text-sm text-center"
+                style={{ borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-body-bg)' }}
+                placeholder="75"
+              />
+              <span className="text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>%</span>
+            </div>
+            <LandscapeButton
+              color="primary"
+              size="sm"
+              onClick={handleSave}
+              disabled={saving}
+              loading={saving}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </LandscapeButton>
+          </div>
+          <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            Last updated:{' '}
+            {standard?.updated_at
+              ? new Date(standard.updated_at).toLocaleDateString()
+              : '—'}
+          </div>
+          <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            Current value: {formatPercent(standard?.default_planning_efficiency ?? null)}
+          </div>
+        </section>
+
+        <section className="p-4 space-y-3" style={tileStyle}>
+          <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+            Guidance
+          </h3>
+          <p className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
+            Planning efficiency scales density calculations for land use products. For example,
+            a 6,000 SF lot with an efficiency of 0.75 results in roughly 5.4 units/acre.
+          </p>
+          <ul className="text-xs space-y-1" style={{ color: 'var(--cui-secondary-color)' }}>
+            <li>• Keep efficiency between 0 and 1.5</li>
+            <li>• Applies by default to all projects unless overridden per product</li>
+            <li>• Impacts density-per-acre fields in the Land Use taxonomy</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  )
 }

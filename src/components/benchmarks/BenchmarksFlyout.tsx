@@ -10,7 +10,6 @@ import type {
   GrowthRateSet,
   GrowthRateStep,
   AbsorptionVelocity,
-  LandscaperMode,
 } from '@/types/benchmarks';
 
 export type BenchmarksFlyoutSelection =
@@ -21,17 +20,15 @@ export type BenchmarksFlyoutSelection =
 interface BenchmarksFlyoutProps {
   selection: BenchmarksFlyoutSelection | null;
   aiSuggestions: AISuggestion[];
-  mode: LandscaperMode;
   onRefresh: () => void;
 }
 
-export default function BenchmarksFlyout({ selection, aiSuggestions, mode, onRefresh }: BenchmarksFlyoutProps) {
+export default function BenchmarksFlyout({ selection, aiSuggestions, onRefresh }: BenchmarksFlyoutProps) {
   if (!selection) {
     return (
       <LandscaperPanel
         selectedCategory={null}
         aiSuggestions={aiSuggestions}
-        mode={mode}
         onRefresh={onRefresh}
       />
     );
@@ -154,11 +151,21 @@ function formatThru(value: number | null | undefined) {
   return value;
 }
 
-function formatRate(rate: number) {
-  return (Math.round(rate * 100) / 100).toFixed(2);
+function formatRate(rate: number | null | undefined) {
+  // Rate comes as decimal (0.03 = 3%), convert to percentage for display
+  if (rate === null || rate === undefined) {
+    return '0.00';
+  }
+  // Convert to number if it's a string
+  const numRate = typeof rate === 'string' ? parseFloat(rate) : rate;
+  if (typeof numRate !== 'number' || isNaN(numRate)) {
+    return '0.00';
+  }
+  // Multiply by 100 to convert decimal to percentage (0.03 -> 3.00)
+  return (numRate * 100).toFixed(2);
 }
 
-function LandScaperAnalysis({ selection, suggestions }: { selection: BenchmarksFlyoutSelection; suggestions: AISuggestion[] }) {
+function LandscaperAnalysis({ selection, suggestions }: { selection: BenchmarksFlyoutSelection; suggestions: AISuggestion[] }) {
   return (
     <div className="rounded border border-line-soft bg-surface-card p-4">
       <h3 className="text-sm font-semibold text-text-primary">Landscaper Analysis</h3>

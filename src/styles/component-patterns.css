@@ -1,0 +1,384 @@
+/**
+ * LANDSCAPE COMPONENT PATTERNS
+ * Global CSS classes for consistent theming across all components
+ * All colors use CoreUI CSS variables for automatic light/dark mode support
+ *
+ * Created: 2025-01-16
+ * Purpose: Eliminate hardcoded colors and inline styles across the application
+ */
+
+/* ============================================================================
+   ACCORDION HEADERS
+   Used in: ExpandableDetailsRow, any component with expandable sections
+   ============================================================================ */
+
+.accordion-header-base {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  transition: background-color 0.2s ease;
+}
+
+.accordion-header-standard {
+  composes: accordion-header-base;
+  background-color: rgba(var(--cui-warning-rgb), 0.1);
+  color: var(--cui-body-color);
+}
+
+.accordion-header-detail {
+  composes: accordion-header-base;
+  background-color: rgba(var(--cui-danger-rgb), 0.1);
+  color: var(--cui-body-color);
+}
+
+.accordion-header-neutral {
+  composes: accordion-header-base;
+  background-color: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+}
+
+/* ============================================================================
+   PLANNING TILES (Village/Phase Cards)
+   Used in: ProjectCanvas, AreaTiles, any planning view
+   NOTE: These styles are also duplicated in globals.css @layer utilities
+   for proper specificity over Tailwind utilities
+   ============================================================================ */
+
+.planning-tile {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid var(--cui-border-color);
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.planning-tile:hover {
+  border-color: var(--cui-primary);
+  background-color: var(--cui-card-cap-bg);
+}
+
+.planning-tile-active {
+  border-color: var(--cui-primary);
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--cui-primary-rgb), 0.2);
+  color: var(--cui-body-color) !important;
+}
+
+.planning-tile-header {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cui-body-color) !important;
+  margin-bottom: 0.5rem;
+}
+
+/* Ensure active state doesn't override header color */
+.planning-tile.planning-tile-active .planning-tile-header,
+.planning-tile-active .planning-tile-header,
+div.planning-tile-active .planning-tile-header,
+div.planning-tile-active > .planning-tile-header {
+  color: var(--cui-body-color) !important;
+}
+
+.planning-tile-stat {
+  font-size: 0.875rem;
+  color: var(--cui-secondary-color);
+  margin-top: 0.25rem;
+}
+
+.planning-tile-stat-positive {
+  font-size: 0.875rem;
+  color: var(--cui-success);
+  margin-top: 0.25rem;
+  font-weight: 600;
+}
+
+.planning-tile-highlighted {
+  border-color: var(--cui-warning);
+  opacity: 0.85;
+}
+
+/* ============================================================================
+   BUDGET GRID HEADERS
+   Used in: BudgetDataGrid, any table with section headers
+   ============================================================================ */
+
+.budget-section-header {
+  padding: 0.75rem 1rem;
+  background-color: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 2px solid var(--cui-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.budget-group-header {
+  padding: 0.5rem 1rem;
+  background-color: var(--cui-body-bg);
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--cui-border-color-translucent);
+}
+
+.budget-category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background-color: rgba(var(--cui-info-rgb), 0.1);
+  color: var(--cui-info-text-emphasis);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ============================================================================
+   DATA CARDS (Summary Cards, Stat Cards)
+   Used in: Dashboard, Reports, Analytics views
+   ============================================================================ */
+
+.data-card {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[data-coreui-theme='dark'] .data-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.data-card-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.5rem;
+}
+
+.data-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  line-height: 1.2;
+}
+
+.data-card-subtitle {
+  font-size: 0.875rem;
+  color: var(--cui-secondary-color);
+  margin-top: 0.25rem;
+}
+
+/* ============================================================================
+   TABLE ROW STATES
+   Used in: Any table with selectable/expandable rows
+   ============================================================================ */
+
+.table-row-expandable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.table-row-expandable:hover {
+  background-color: var(--cui-table-hover-bg);
+}
+
+.table-row-expanded {
+  background-color: rgba(var(--cui-primary-rgb), 0.05);
+}
+
+.table-row-selected {
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+  border-left: 3px solid var(--cui-primary);
+}
+
+/* ============================================================================
+   FILTER PANELS
+   Used in: Budget filters, Market filters, any filter UI
+   ============================================================================ */
+
+.filter-panel {
+  padding: 1rem;
+  background-color: var(--cui-tertiary-bg);
+  border-radius: 0.5rem;
+  border: 1px solid var(--cui-border-color);
+}
+
+.filter-section {
+  margin-bottom: 1rem;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin-bottom: 0.5rem;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+  color: var(--cui-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================================================
+   EMPTY STATES
+   Used in: Any component with no data to display
+   ============================================================================ */
+
+.empty-state {
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--cui-secondary-color);
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: var(--cui-border-color);
+  margin-bottom: 1rem;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+  font-size: 0.875rem;
+  color: var(--cui-secondary-color);
+  max-width: 400px;
+  margin: 0 auto 1.5rem;
+}
+
+/* ============================================================================
+   LOADING STATES
+   Used in: Any component with loading spinner
+   ============================================================================ */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(var(--cui-body-bg-rgb), 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+}
+
+.loading-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--cui-border-color);
+  border-top-color: var(--cui-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   Common patterns used across multiple components
+   ============================================================================ */
+
+.text-muted {
+  color: var(--cui-secondary-color);
+}
+
+.text-emphasis {
+  color: var(--cui-emphasis-color);
+  font-weight: 600;
+}
+
+.border-subtle {
+  border-color: var(--cui-border-color-translucent);
+}
+
+.bg-subtle {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.bg-emphasis {
+  background-color: var(--cui-card-cap-bg);
+}
+
+.shadow-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[data-coreui-theme='dark'] .shadow-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================================
+   BUDGET MODE BADGES (Napkin/Standard/Detail)
+   Used in: ModeSelector component on Budget page
+   ============================================================================ */
+
+.budget-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.budget-mode-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.budget-mode-badge[data-active="true"] {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.budget-mode-badge-text {
+  line-height: 1;
+}
+
+.budget-mode-badge-remove {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  border-radius: 999px;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  margin-left: 0.25rem;
+}
+
+.budget-mode-badge-remove:hover {
+  background: rgba(255, 255, 255, 0.4);
+}

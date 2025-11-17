@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -17,12 +17,16 @@ import {
   useSavePricingAssumptions,
   useDeletePricingAssumption,
   useParcelProductTypes,
+  useGrowthRateBenchmarks,
 } from '@/hooks/useSalesAbsorption';
+import { useMeasureOptions } from '@/hooks/useMeasures';
 import type { PricingAssumption } from '@/types/sales-absorption';
 import { formatMoney } from '@/utils/formatters/number';
+import { Trash2, Plus, Save, X } from 'lucide-react';
 
 interface Props {
   projectId: number;
+  phaseFilters?: number[];
 }
 
 // Hardcoded growth rate options
@@ -35,26 +39,126 @@ const GROWTH_RATES = [
   { value: 0.050, label: '5.0%' },
 ];
 
-// Hardcoded UOM options
-const UOM_OPTIONS = [
-  { value: 'FF', label: 'FF (Front Foot)' },
-  { value: 'SF', label: 'SF (Square Foot)' },
-  { value: 'AC', label: 'AC (Acre)' },
-  { value: 'EA', label: 'EA (Each)' },
+// Hardcoded UOM options (fallback if API fails)
+const UOM_OPTIONS_FALLBACK = [
+  { value: 'FF', label: 'FF - Front Foot' },
+  { value: 'SF', label: 'SF - Square Foot' },
+  { value: 'AC', label: 'AC - Acre' },
+  { value: 'EA', label: 'EA - Each' },
 ];
 
-export default function PricingTable({ projectId }: Props) {
+// Extracted component for editable price cell to avoid hooks-in-render-prop violation
+function EditablePriceCell({
+  value,
+  onSave
+}: {
+  value: number | null;
+  onSave: (newValue: number | null) => void;
+}) {
+  const [localValue, setLocalValue] = React.useState<string>('');
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // Sync from prop value when not actively editing
+  React.useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(value ? String(value) : '');
+    }
+  }, [value, isFocused]);
+
+  // Format display value with currency formatting
+  const getDisplayValue = () => {
+    if (isFocused) {
+      return localValue;
+    }
+    if (!value) return '';
+
+    // Format as currency: show decimals only if value has them
+    const numValue = Number(value);
+    const hasDecimals = numValue % 1 !== 0;
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: hasDecimals ? 2 : 0,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const numValue = localValue === '' ? null : parseFloat(localValue.replace(/,/g, ''));
+    if (numValue !== value) {
+      onSave(numValue);
+    }
+  };
+
+  return (
+    <div className="text-right px-2">
+      <div className="relative inline-flex items-center w-full">
+        <span className="absolute left-2 text-gray-500 text-sm pointer-events-none">$</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={getDisplayValue()}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={handleBlur}
+          style={{
+            textAlign: 'right',
+            paddingLeft: '1.5rem',
+            width: '100%',
+          }}
+          className="border border-gray-300 rounded px-2 py-1 text-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function PricingTable({ projectId, phaseFilters }: Props) {
   const { data: assumptions, isLoading, error } = usePricingAssumptions(projectId);
-  const { data: parcelProducts, isLoading: isLoadingProducts } = useParcelProductTypes(projectId);
+  const { data: parcelProducts, isLoading: isLoadingProducts } = useParcelProductTypes(
+    projectId,
+    phaseFilters && phaseFilters.length > 0 ? phaseFilters : null
+  );
+  const { options: uomOptions, isLoading: isLoadingMeasures } = useMeasureOptions(true);
+  const { data: growthRateBenchmarks } = useGrowthRateBenchmarks();
   const saveMutation = useSavePricingAssumptions();
   const deleteMutation = useDeletePricingAssumption();
 
   const [editingRows, setEditingRows] = useState<PricingAssumption[]>([]);
+  const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [customGrowthRate, setCustomGrowthRate] = useState<string>('');
+
+  // Use API UOM options or fallback
+  const uomChoices = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS_FALLBACK;
+
+  // Build growth rate options: combine hardcoded + benchmarks
+  const growthRateOptions = useMemo(() => {
+    const options = [...GROWTH_RATES]; // Start with hardcoded
+
+    // Add flat-rate benchmarks from API
+    if (growthRateBenchmarks && Array.isArray(growthRateBenchmarks)) {
+      growthRateBenchmarks.forEach((benchmark: any) => {
+        if (benchmark.rate_type === 'flat' && benchmark.current_rate !== null) {
+          const rate = Number(benchmark.current_rate);
+          // Only add if not already in list
+          if (!options.some(opt => Math.abs(opt.value - rate) < 0.0001)) {
+            options.push({
+              value: rate,
+              label: `${(rate * 100).toFixed(1)}% (${benchmark.set_name})`,
+            });
+          }
+        }
+      });
+    }
+
+    // Sort by value
+    return options.sort((a, b) => a.value - b.value);
+  }, [growthRateBenchmarks]);
 
   // Initialize editing rows: merge parcel products with existing pricing assumptions
-  useMemo(() => {
-    if (!parcelProducts || editingRows.length > 0) return;
+  useEffect(() => {
+    if (!parcelProducts) return;
 
     if (parcelProducts.length > 0) {
       // Create rows for each actual parcel product combination
@@ -90,11 +194,14 @@ export default function PricingTable({ projectId }: Props) {
       });
 
       setEditingRows(rows);
-      // Only mark as unsaved if we created new rows without existing data
-      const hasNewRows = rows.some(r => !r.id);
-      setHasUnsavedChanges(hasNewRows);
+      // Don't auto-mark as unsaved on initial load
+      setHasUnsavedChanges(false);
+    } else {
+      // Clear rows when no parcel products (e.g., filtered to nothing)
+      setEditingRows([]);
+      setHasUnsavedChanges(false);
     }
-  }, [assumptions, parcelProducts, editingRows.length, projectId]);
+  }, [assumptions, parcelProducts, projectId]);
 
   const handleCellChange = (rowIndex: number, field: keyof PricingAssumption, value: any) => {
     setEditingRows(prev => {
@@ -102,7 +209,8 @@ export default function PricingTable({ projectId }: Props) {
       updated[rowIndex] = { ...updated[rowIndex], [field]: value };
       return updated;
     });
-    setHasUnsavedChanges(true);
+    // Defer setting unsaved changes to avoid immediate re-render during typing
+    setTimeout(() => setHasUnsavedChanges(true), 0);
   };
 
   const handleAddRow = () => {
@@ -151,26 +259,28 @@ export default function PricingTable({ projectId }: Props) {
       return;
     }
 
+    setIsSaving(true);
     try {
       await saveMutation.mutateAsync({
         projectId,
         assumptions: editingRows,
       });
       setHasUnsavedChanges(false);
+      setEditingRowId(null);
+      // Success toast would go here
     } catch (err) {
       alert('Failed to save pricing assumptions');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Calculate inflated value client-side for display
-  const calculateInflated = (price: number, growthRate: number, createdAt?: string): number => {
-    if (!createdAt || growthRate === 0) return price;
-
-    const created = new Date(createdAt);
-    const now = new Date();
-    const yearsElapsed = (now.getTime() - created.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-
-    return price * Math.pow(1 + growthRate, yearsElapsed);
+  const handleCancel = () => {
+    if (hasUnsavedChanges && !confirm('Discard unsaved changes?')) {
+      return;
+    }
+    // Reset to original data
+    window.location.reload();
   };
 
   const columns = useMemo<ColumnDef<PricingAssumption>[]>(
@@ -181,6 +291,9 @@ export default function PricingTable({ projectId }: Props) {
         size: 100,
         cell: ({ row }) => {
           const value = row.original.lu_type_code;
+          const rowIndex = row.index;
+          const isEditing = editingRowId === rowIndex;
+
           // Get family_name from parcelProducts for color coding
           const product = parcelProducts?.find(
             p => p.type_code === value &&
@@ -220,11 +333,32 @@ export default function PricingTable({ projectId }: Props) {
       {
         accessorKey: 'unit_of_measure',
         header: () => <div className="text-center">UOM</div>,
-        size: 80,
+        size: 100,
         cell: ({ row }) => {
           const value = row.original.unit_of_measure;
+          const rowIndex = row.index;
+          const isEditing = editingRowId === rowIndex;
+
+          if (isEditing) {
+            return (
+              <div className="text-center">
+                <select
+                  value={value || 'FF'}
+                  onChange={(e) => handleCellChange(rowIndex, 'unit_of_measure', e.target.value)}
+                  className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
+                >
+                  {uomChoices.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          }
+
           return (
-            <div className="text-center text-sm">
+            <div className="text-center text-sm cursor-pointer" onClick={() => setEditingRowId(rowIndex)}>
               {value || '—'}
             </div>
           );
@@ -233,73 +367,105 @@ export default function PricingTable({ projectId }: Props) {
       {
         accessorKey: 'price_per_unit',
         header: () => <div className="text-right">Current<br />Price</div>,
-        size: 120,
+        size: 140,
         cell: ({ row }) => {
           const value = row.original.price_per_unit;
-          const uom = row.original.unit_of_measure;
-
-          if (!value || value === 0) {
-            return (
-              <div className="text-right text-sm text-gray-400 italic px-2">
-                Not set
-              </div>
-            );
-          }
+          const rowIndex = row.index;
 
           return (
-            <div className="text-right tnum text-sm px-2">
-              {formatMoney(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              {uom && <span className="text-gray-500 ml-1">/{uom}</span>}
-            </div>
+            <EditablePriceCell
+              value={value}
+              onSave={(newValue) => handleCellChange(rowIndex, 'price_per_unit', newValue || 0)}
+            />
           );
         },
       },
       {
         accessorKey: 'growth_rate',
         header: () => <div className="text-center">Growth<br />Rate</div>,
-        size: 90,
+        size: 110,
         cell: ({ row }) => {
           const value = row.original.growth_rate;
+          const rowIndex = row.index;
+          const isEditing = editingRowId === rowIndex;
+
+          if (isEditing) {
+            // Check if current value is in options list
+            const isCustomRate = !growthRateOptions.some(opt => Math.abs(opt.value - (value || 0)) < 0.0001);
+
+            return (
+              <div className="text-center flex flex-col gap-1">
+                <select
+                  value={isCustomRate ? 'custom' : String(value || 0.035)}
+                  onChange={(e) => {
+                    if (e.target.value === 'custom') {
+                      setCustomGrowthRate(String((value || 0.035) * 100));
+                    } else {
+                      handleCellChange(rowIndex, 'growth_rate', parseFloat(e.target.value));
+                      setCustomGrowthRate('');
+                    }
+                  }}
+                  className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
+                >
+                  {growthRateOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                  <option value="custom">Custom...</option>
+                </select>
+                {(isCustomRate || customGrowthRate !== '') && (
+                  <div className="flex justify-center">
+                    <input
+                      type="text"
+                      value={isCustomRate ? ((value || 0) * 100).toFixed(2) : customGrowthRate}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/%/g, '');
+                        if (rawValue === '' || !isNaN(Number(rawValue))) {
+                          const numValue = Number(rawValue) / 100;
+                          handleCellChange(rowIndex, 'growth_rate', numValue);
+                          setCustomGrowthRate(rawValue);
+                        }
+                      }}
+                      placeholder="%"
+                      className="w-1/2 px-2 py-1 text-sm text-center border rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const percentage = ((value || 0) * 100).toFixed(1);
           return (
-            <div className="text-center text-sm tnum">
+            <div className="text-center text-sm tnum cursor-pointer" onClick={() => setEditingRowId(rowIndex)}>
               {percentage}%
             </div>
           );
         },
       },
       {
-        id: 'inflated_value',
-        header: () => <div className="text-right">Inflated<br />Value</div>,
-        size: 140,
+        id: 'actions',
+        header: '',
+        size: 60,
         cell: ({ row }) => {
-          const price = row.original.price_per_unit;
-          const growthRate = row.original.growth_rate;
-          const createdAt = row.original.created_at;
-          const uom = row.original.unit_of_measure;
-
-          if (!price || price === 0) {
-            return (
-              <div className="text-right text-sm text-gray-400 italic px-2">
-                —
-              </div>
-            );
-          }
-
-          const inflated = calculateInflated(price, growthRate, createdAt);
-          const displayValue = inflated > 0
-            ? `${formatMoney(inflated, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /${uom}`
-            : '—';
-
+          const rowIndex = row.index;
           return (
-            <div className="text-right tnum text-sm px-2">
-              {displayValue}
+            <div className="text-center">
+              <button
+                onClick={() => handleDeleteRow(rowIndex)}
+                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                title="Delete pricing"
+                disabled={isSaving}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           );
         },
       },
     ],
-    [parcelProducts]
+    [parcelProducts, editingRowId, uomChoices, isSaving, growthRateOptions, customGrowthRate]
   );
 
   const table = useReactTable({
@@ -343,10 +509,39 @@ export default function PricingTable({ projectId }: Props) {
 
   return (
     <div className="bg-white rounded border overflow-hidden">
+      {/* Header with action buttons */}
+      <div className="px-4 py-3 bg-gray-50 border-b flex justify-between items-center">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Land Use Pricing Assumptions
+        </h3>
+        <div className="flex gap-2">
+          {hasUnsavedChanges && (
+            <>
+              <button
+                onClick={handleCancel}
+                disabled={isSaving}
+                className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Saving...' : `Save Changes (${editingRows.filter(r => !r.id || hasUnsavedChanges).length})`}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+          <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 {headerGroup.headers.map((header) => (
@@ -365,22 +560,46 @@ export default function PricingTable({ projectId }: Props) {
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b transition-colors hover:bg-gray-50" style={{ borderColor: 'var(--cui-border-color)' }}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map((row) => {
+              const isEditing = editingRowId === row.index;
+              const isNew = !row.original.id;
+              const rowClass = isEditing
+                ? 'bg-blue-50'
+                : isNew
+                ? 'bg-green-50'
+                : 'hover:bg-gray-50';
+
+              return (
+                <tr
+                  key={row.id}
+                  className={`border-b transition-colors ${rowClass}`}
+                  style={{ borderColor: 'var(--cui-border-color)' }}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Footer info */}
-      <div className="px-4 py-3 bg-gray-50 border-t text-sm text-gray-600">
-        {editingRows.length} pricing assumption(s)
+      {/* Footer with Add button */}
+      <div className="px-4 py-3 bg-gray-50 border-t flex justify-between items-center">
+        <span className="text-sm text-gray-600">
+          {editingRows.length} pricing assumption(s)
+        </span>
+        <button
+          onClick={handleAddRow}
+          disabled={isSaving}
+          className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded disabled:opacity-50 flex items-center gap-1"
+        >
+          <Plus className="w-4 h-4" />
+          Add Pricing
+        </button>
       </div>
     </div>
   );

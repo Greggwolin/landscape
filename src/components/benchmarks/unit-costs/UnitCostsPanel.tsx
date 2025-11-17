@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   flexRender,
@@ -24,7 +25,7 @@ const COST_SCOPE = 'development';
 const AUTO_SAVE_DELAY_MS = 500;
 const DEFAULT_LOCATION = 'Maricopa, AZ';
 const DEFAULT_SOURCE = 'Copper Nail Development';
-const DEFAULT_PROJECT_TYPE = 'LAND';
+export const DEFAULT_PROJECT_TYPE = 'LAND';
 const ALLOWED_UOMS: ReadonlyArray<string> = ['EA', 'LF', 'CY', 'SF', 'SY', 'LS', 'MO', 'DAY', '%'];
 const ALLOWED_UOM_SET = new Set(ALLOWED_UOMS);
 
@@ -35,9 +36,8 @@ const COST_TYPE_TABS: Array<{ key: UnitCostType; label: string }> = [
   { key: 'other', label: 'Other' }
 ];
 
-const PROJECT_TYPE_OPTIONS = ['LAND'];
-
 type EditableField =
+  | 'category_id'
   | 'item_name'
   | 'default_uom_code'
   | 'quantity'
@@ -64,11 +64,38 @@ type UomOption = {
 type TableMeta = {
   categoryId: number;
   activeCell: { rowKey: string; field: EditableField } | null;
+  editingRowKey: string | null;
   startEdit: (rowKey: string, field: EditableField) => void;
   clearActiveCell: () => void;
+  setEditingRow: (rowKey: string | null, focusField?: EditableField) => void;
   onCommitField: (rowKey: string, field: EditableField, rawValue: string) => void;
   uomOptions: UomOption[];
 };
+
+type UnitCostsPanelProps = {
+  projectTypeFilter: string;
+};
+
+const CATEGORY_COLOR_PALETTE = ['#2563EB', '#7C3AED', '#059669', '#DB2777', '#D97706', '#0EA5E9', '#F43F5E', '#14B8A6'];
+
+const UnitCostCategoryManager = dynamic(
+  () => import('@/app/admin/preferences/components/UnitCostCategoryManager'),
+  { ssr: false }
+);
+
+function getCategoryColor(categoryId: number): string {
+  const index = Math.abs(categoryId) % CATEGORY_COLOR_PALETTE.length;
+  return CATEGORY_COLOR_PALETTE[index];
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const sanitized = hex.replace('#', '');
+  const bigint = parseInt(sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 async function fetchJSON<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -136,6 +163,14 @@ function normalizeNumericInput(raw: string): number | null | typeof NaN {
 function normalizeFieldInput(field: EditableField, rawValue: string): string | number | null | typeof NaN {
   const trimmed = (rawValue ?? '').trim();
   switch (field) {
+    case 'category_id': {
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed)) {
+        return Number.NaN;
+      }
+      return parsed;
+    }
     case 'item_name':
       return trimmed;
     case 'default_uom_code':
@@ -173,6 +208,14 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 
 function validateField(field: EditableField, value: string | number | null | typeof NaN): string | null {
   switch (field) {
+    case 'category_id':
+      if (value === null || value === undefined || value === '') {
+        return 'Select a category.';
+      }
+      if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+        return 'Select a valid category.';
+      }
+      return null;
     case 'item_name':
       if (!value || (typeof value === 'string' && !value.trim())) {
         return 'Item name is required.';
@@ -396,10 +439,9 @@ function toInputString(field: EditableField, row: TemplateRowState): string {
   return String(value);
 }
 
-export default function UnitCostsPanel() {
+export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProps) {
   const [categories, setCategories] = useState<UnitCostCategoryReference[]>([]);
   const [activeCostType, setActiveCostType] = useState<UnitCostType>('hard');
-  const [projectTypeFilter, setProjectTypeFilter] = useState<string>(DEFAULT_PROJECT_TYPE);
   const [openCategories, setOpenCategories] = useState<number[]>([]);
   const [templatesByCategory, setTemplatesByCategory] = useState<TemplatesByCategory>({});
   const [templateLoading, setTemplateLoading] = useState<Record<number, boolean>>({});
@@ -412,6 +454,7 @@ export default function UnitCostsPanel() {
     source: false
   });
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const templatesByCategoryRef = useRef<TemplatesByCategory>({});
 
   const loadCategoriesData = useCallback(async () => {
@@ -628,6 +671,49 @@ export default function UnitCostsPanel() {
     [setCategoryRows, loadCategoriesData]
   );
 
+  const handleCloseCategoryManager = useCallback(() => {
+    setShowCategoryManager(false);
+    void loadCategoriesData();
+    setOpenCategories([]);
+    setTemplatesByCategory({});
+    setSelectedCategories([]);
+  }, [loadCategoriesData]);
+
+  const filteredCategories = useMemo(() => {
+    // Map cost type tabs to tag names
+    const tagForCostType: Record<UnitCostType, string> = {
+      hard: 'Hard',
+      soft: 'Soft',
+      deposit: 'Deposits',
+      other: 'Other',
+    };
+
+    const requiredTag = tagForCostType[activeCostType];
+    return categories.filter((category) => {
+      const hasTags = Array.isArray(category.tags);
+      const hasRequiredTag = hasTags && category.tags.includes(requiredTag);
+      return hasRequiredTag;
+    });
+  }, [categories, activeCostType]);
+
+  const categoryNameLookup = useMemo(() => {
+    const lookup = new Map<number, string>();
+    categories.forEach((category) => {
+      lookup.set(category.category_id, category.category_name);
+    });
+    return lookup;
+  }, [categories]);
+
+  const categorySelectOptions = useMemo<UomOption[]>(() => {
+    return filteredCategories
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((category) => ({
+        value: String(category.category_id),
+        label: category.category_name
+      }));
+  }, [filteredCategories]);
+
   const handleCommitField = useCallback(
     async (categoryId: number, rowKey: string, field: EditableField, rawValue: string) => {
       const rows = templatesByCategory[categoryId] ?? [];
@@ -658,6 +744,11 @@ export default function UnitCostsPanel() {
       const normalizedValue =
         typeof normalizedInput === 'number' && Number.isNaN(normalizedInput) ? null : normalizedInput;
 
+      const nextCategoryId =
+        field === 'category_id' && typeof normalizedValue === 'number' ? normalizedValue : null;
+      const nextCategoryName =
+        nextCategoryId !== null ? categoryNameLookup.get(nextCategoryId) ?? currentRow.category_name : undefined;
+
       if (valuesEqual(currentRow[field], normalizedValue)) {
         setCategoryRows(categoryId, (entries) =>
           entries.map((entry) =>
@@ -681,10 +772,14 @@ export default function UnitCostsPanel() {
           const nextRow = {
             ...entry,
             [field]: normalizedValue,
+            ...(nextCategoryName ? { category_name: nextCategoryName } : {}),
             fieldErrors: clearFieldError(entry.fieldErrors, field),
             savingFields: addSavingField(entry.savingFields, field),
             rowError: null
           } as TemplateRowState;
+          if (nextCategoryName) {
+            nextRow.category_name = nextCategoryName;
+          }
           updatedRowSnapshot = nextRow;
           return nextRow;
         })
@@ -717,6 +812,9 @@ export default function UnitCostsPanel() {
           );
           void loadCategoriesData();
           void loadTemplates(categoryId, true);
+          if (nextCategoryId !== null && nextCategoryId !== categoryId) {
+            void loadTemplates(nextCategoryId, true);
+          }
         } catch (err) {
           console.error('Failed to create unit cost', err);
           const message = err instanceof Error ? err.message : 'Failed to save unit cost';
@@ -750,10 +848,15 @@ export default function UnitCostsPanel() {
             body: JSON.stringify(payload)
           }
         );
-        const normalizedRow = mapServerRow(updated, updatedRowSnapshot.category_name);
-        setCategoryRows(categoryId, (entries) =>
-          entries.map((entry) => (entry.rowKey === rowKey ? normalizedRow : entry))
-        );
+        if (nextCategoryId !== null && nextCategoryId !== categoryId) {
+          void loadTemplates(categoryId, true);
+          void loadTemplates(nextCategoryId, true);
+        } else {
+          const normalizedRow = mapServerRow(updated, nextCategoryName ?? updatedRowSnapshot.category_name);
+          setCategoryRows(categoryId, (entries) =>
+            entries.map((entry) => (entry.rowKey === rowKey ? normalizedRow : entry))
+          );
+        }
       } catch (err) {
         console.error('Failed to update unit cost', err);
         const message = err instanceof Error ? err.message : 'Failed to update unit cost';
@@ -775,25 +878,9 @@ export default function UnitCostsPanel() {
         setError(message);
       }
     },
-    [templatesByCategory, setCategoryRows, loadCategoriesData, loadTemplates]
+    [templatesByCategory, setCategoryRows, loadCategoriesData, loadTemplates, categoryNameLookup]
   );
 
-  const filteredCategories = useMemo(() => {
-    // Map cost type tabs to tag names
-    const tagForCostType: Record<UnitCostType, string> = {
-      hard: 'Hard',
-      soft: 'Soft',
-      deposit: 'Deposits',
-      other: 'Other',
-    };
-
-    const requiredTag = tagForCostType[activeCostType];
-    return categories.filter((category) => {
-      const hasTags = Array.isArray(category.tags);
-      const hasRequiredTag = hasTags && category.tags.includes(requiredTag);
-      return hasRequiredTag;
-    });
-  }, [categories, activeCostType]);
 
   // Auto-load all categories when they change
   useEffect(() => {
@@ -837,39 +924,6 @@ export default function UnitCostsPanel() {
 
   return (
     <div className="text-text-primary">
-      {/* Breadcrumb Header */}
-      <div className="flex items-center justify-between border-b border-line-soft bg-surface-card px-6 py-4">
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <a href="/preferences" className="text-brand-primary no-underline">Global Preferences</a>
-          <span className="text-line-soft">/</span>
-          <span>Cost Library</span>
-        </div>
-      </div>
-
-      {/* Title Header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft bg-surface-card px-6 py-4">
-        <div>
-          <h1 className="text-xl font-semibold">Unit Cost Library · Development</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs uppercase tracking-wide text-text-secondary">Project Type</label>
-            <select
-              value={projectTypeFilter}
-              onChange={(event) => setProjectTypeFilter(event.target.value)}
-              className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-1"
-                className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary shadow-sm focus:border-brand-primary focus:outline-none"
-            >
-              {PROJECT_TYPE_OPTIONS.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </header>
-
       <main className="space-y-6 bg-surface-card px-6 py-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex space-x-2">
@@ -899,36 +953,54 @@ export default function UnitCostsPanel() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-wide text-text-secondary">Filter Categories:</span>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-text-secondary whitespace-nowrap">Filter Categories:</span>
+            <button
+              type="button"
+              onClick={() => setShowCategoryManager(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-line-soft px-3 py-1 text-xs font-semibold text-text-secondary transition-colors hover:border-brand-primary hover:text-brand-primary"
+            >
+              <Pencil size={12} />
+              Manage Categories
+            </button>
+            <span className="text-[11px] text-text-secondary">
+              Categories sync from Admin &gt; Preferences &gt; Unit Cost Categories.
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {filteredCategories
               .slice()
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((category) => {
                 const isSelected = selectedCategories.includes(category.category_id);
+                const chipColor = getCategoryColor(category.category_id);
                 return (
                   <button
                     key={category.category_id}
                     onClick={() => toggleCategoryFilter(category.category_id)}
                     className={clsx(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
-                      isSelected
-                        ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                        : 'border-line-soft bg-surface-card text-text-secondary hover:bg-surface-card/80'
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors whitespace-nowrap',
+                      isSelected ? 'shadow-sm' : 'opacity-90 hover:opacity-100'
                     )}
+                    style={{
+                      borderColor: chipColor,
+                      color: chipColor,
+                      backgroundColor: hexToRgba(chipColor, isSelected ? 0.25 : 0.08),
+                      outline: `2px solid ${hexToRgba(chipColor, isSelected ? 0.75 : 0.45)}`,
+                      outlineOffset: '2px'
+                    }}
                   >
                     <span
-                      className={clsx(
-                        'h-1.5 w-1.5 rounded-full',
-                        isSelected ? 'bg-brand-primary' : 'bg-line-soft'
-                      )}
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: chipColor }}
                     />
                     {category.category_name}
                   </button>
                 );
               })}
           </div>
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs uppercase tracking-wide text-text-secondary">Show Columns:</span>
@@ -969,7 +1041,6 @@ export default function UnitCostsPanel() {
             Source
           </button>
         </div>
-      </div>
 
       {error && (
         <div className="rounded border border-chip-error/60 bg-chip-error/10 px-4 py-3 text-sm text-chip-error">
@@ -977,14 +1048,15 @@ export default function UnitCostsPanel() {
         </div>
       )}
 
-        {filteredCategories.length === 0 ? (
-          <div className="rounded border border-dashed border-line-strong bg-surface-card/60 px-6 py-12 text-center text-text-secondary">
-            No categories available for this filter. Adjust the project type or seed additional data.
-          </div>
-        ) : (
+      {filteredCategories.length === 0 ? (
+        <div className="rounded border border-dashed border-line-strong bg-surface-card/60 px-6 py-12 text-center text-text-secondary">
+          No categories available for this filter. Adjust the project type or seed additional data.
+        </div>
+      ) : (
           <UnifiedUnitCostTable
             rows={displayedRows}
             uomOptions={uomOptions}
+            categoryOptions={categorySelectOptions}
             visibleColumns={visibleColumns}
             onCommitField={(rowKey, field, value) => {
               const row = displayedRows.find((r) => r.rowKey === rowKey);
@@ -994,8 +1066,35 @@ export default function UnitCostsPanel() {
             }}
             onDeleteRow={(row) => handleDeleteRow(row.category_id, row)}
           />
-        )}
+      )}
       </main>
+
+      {showCategoryManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+          <div className="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-line-soft bg-surface-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line-soft px-4 py-3">
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary">Manage Unit Cost Categories</h2>
+                <p className="text-xs text-text-secondary">
+                  These categories load from Admin &gt; Preferences &gt; Unit Cost Categories.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseCategoryManager}
+                className="rounded-full border border-line-soft px-3 py-1 text-xs font-semibold text-text-secondary transition-colors hover:border-brand-primary hover:text-brand-primary"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-auto bg-surface-card p-4">
+                <UnitCostCategoryManager />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1003,6 +1102,7 @@ export default function UnitCostsPanel() {
 interface UnifiedTableProps {
   rows: Array<TemplateRowState & { category_name: string; category_id: number }>;
   uomOptions: UomOption[];
+  categoryOptions: UomOption[];
   visibleColumns: { quantity: boolean; location: boolean; source: boolean };
   onCommitField: (rowKey: string, field: EditableField, rawValue: string) => void;
   onDeleteRow: (row: TemplateRowState) => void;
@@ -1011,6 +1111,7 @@ interface UnifiedTableProps {
 function UnifiedUnitCostTable({
   rows,
   uomOptions,
+  categoryOptions,
   visibleColumns,
   onCommitField,
   onDeleteRow
@@ -1019,6 +1120,7 @@ function UnifiedUnitCostTable({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [activeCell, setActiveCell] = useState<{ rowKey: string; field: EditableField } | null>(null);
+  const [editingRowKey, setEditingRowKey] = useState<string | null>(null);
 
   const columns = useMemo<ColumnDef<TemplateRowState & { category_name: string }, unknown>[]>(() => {
     const configureEditable = (
@@ -1047,14 +1149,19 @@ function UnifiedUnitCostTable({
 
     const allColumns: ColumnDef<TemplateRowState & { category_name: string }, unknown>[] = [
       {
-        accessorKey: 'category_name',
+        accessorKey: 'category_id',
         header: () => <div className="text-left">Category</div>,
-        size: 150,
+        size: 220,
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <div className="px-1.5 py-0.5 text-sm text-text-primary">
-            {String(getValue())}
-          </div>
+        meta: { align: 'left' },
+        cell: (context) => (
+          <EditableSelectCell
+            context={context as CellContext<TemplateRowState, unknown>}
+            field="category_id"
+            options={categoryOptions}
+            required
+            align="left"
+          />
         )
       },
       {
@@ -1102,34 +1209,46 @@ function UnifiedUnitCostTable({
         header: '',
         size: 70,
         enableSorting: false,
-        cell: ({ row, table }) => (
-          <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                const meta = table.options.meta as TableMeta | undefined;
-                meta?.startEdit(row.original.rowKey, 'item_name');
-              }}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-line-soft text-text-secondary hover:bg-surface-card focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
-              title="Edit row"
-            >
-              <Pencil size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onDeleteRow(row.original)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
-              title="Archive row"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        )
+        cell: ({ row, table }) => {
+          const meta = table.options.meta as TableMeta | undefined;
+          const isEditing = meta?.editingRowKey === row.original.rowKey;
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    meta?.setEditingRow(null);
+                  } else {
+                    meta?.setEditingRow(row.original.rowKey);
+                  }
+                }}
+                className={clsx(
+                  'inline-flex h-6 w-6 items-center justify-center rounded border text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary/30',
+                  isEditing
+                    ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                    : 'border-line-soft text-text-secondary hover:bg-surface-card'
+                )}
+                title={isEditing ? 'Stop editing row' : 'Edit entire row'}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteRow(row.original)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+                title="Archive row"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        }
       }
     ];
 
     return allColumns;
-  }, [uomOptions, onDeleteRow, visibleColumns]);
+  }, [uomOptions, categoryOptions, onDeleteRow, visibleColumns]);
 
   const table = useReactTable<TemplateRowState & { category_name: string }>({
     data: rows,
@@ -1148,11 +1267,21 @@ function UnifiedUnitCostTable({
     meta: {
       categoryId: 0,
       activeCell,
+      editingRowKey,
       startEdit: (rowKey: string, field: EditableField) => {
         setActiveCell({ rowKey, field });
       },
       clearActiveCell: () => {
         setActiveCell(null);
+      },
+      setEditingRow: (rowKey: string | null, focusField?: EditableField) => {
+        setEditingRowKey(rowKey);
+        if (rowKey && focusField) {
+          setActiveCell({ rowKey, field: focusField });
+        }
+        if (!rowKey) {
+          setActiveCell(null);
+        }
       },
       onCommitField: (rowKey: string, field: EditableField, rawValue: string) => {
         setActiveCell({ rowKey, field });
@@ -1163,6 +1292,15 @@ function UnifiedUnitCostTable({
   });
 
   const totalPages = table.getPageCount();
+
+  useEffect(() => {
+    if (!editingRowKey) return;
+    const stillExists = rows.some((row) => row.rowKey === editingRowKey);
+    if (!stillExists) {
+      setEditingRowKey(null);
+      setActiveCell(null);
+    }
+  }, [rows, editingRowKey, setActiveCell]);
 
   return (
     <div className="space-y-3">
@@ -1272,6 +1410,7 @@ function UnitCostCategoryTable({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [activeCell, setActiveCell] = useState<{ rowKey: string; field: EditableField } | null>(null);
+  const [editingRowKey, setEditingRowKey] = useState<string | null>(null);
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
@@ -1339,29 +1478,41 @@ function UnitCostCategoryTable({
         header: '',
         size: 70,
         enableSorting: false,
-        cell: ({ row, table }) => (
-          <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                const meta = table.options.meta as TableMeta | undefined;
-                meta?.startEdit(row.original.rowKey, 'item_name');
-              }}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-line-soft text-text-secondary hover:bg-surface-card focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
-              title="Edit row"
-            >
-              <Pencil size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onDeleteRow(row.original)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
-              title="Archive row"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        )
+        cell: ({ row, table }) => {
+          const meta = table.options.meta as TableMeta | undefined;
+          const isEditing = meta?.editingRowKey === row.original.rowKey;
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                if (isEditing) {
+                  meta?.setEditingRow(null);
+                } else {
+                  meta?.setEditingRow(row.original.rowKey);
+                }
+                }}
+                className={clsx(
+                  'inline-flex h-6 w-6 items-center justify-center rounded border text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary/30',
+                  isEditing
+                    ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                    : 'border-line-soft text-text-secondary hover:bg-surface-card'
+                )}
+                title={isEditing ? 'Stop editing row' : 'Edit entire row'}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteRow(row.original)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+                title="Archive row"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        }
       }
     ];
 
@@ -1389,8 +1540,18 @@ function UnitCostCategoryTable({
     meta: {
       categoryId: category.category_id,
       activeCell,
+      editingRowKey,
       startEdit: (rowKey: string, field: EditableField) => setActiveCell({ rowKey, field }),
       clearActiveCell: () => setActiveCell(null),
+      setEditingRow: (rowKey: string | null, focusField?: EditableField) => {
+        setEditingRowKey(rowKey);
+        if (rowKey && focusField) {
+          setActiveCell({ rowKey, field: focusField });
+        }
+        if (!rowKey) {
+          setActiveCell(null);
+        }
+      },
       onCommitField: (rowKey: string, field: EditableField, rawValue: string) => {
         setActiveCell({ rowKey, field });
         onCommitField(rowKey, field, rawValue);
@@ -1540,33 +1701,36 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
   const tableMeta = table.options.meta as TableMeta | undefined;
   const isActive =
     tableMeta?.activeCell?.rowKey === row.original.rowKey && tableMeta.activeCell.field === field;
+  const rowIsEditing = tableMeta?.editingRowKey === row.original.rowKey;
 
-  const [editing, setEditing] = useState<boolean>(Boolean(isActive));
+  const [editing, setEditing] = useState<boolean>(false);
   const [inputValue, setInputValue] = useState<string>(() => toInputString(field, row.original));
   const timeoutRef = React.useRef<number | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setEditing(Boolean(isActive));
-    if (isActive) {
+    if (!rowIsEditing) {
+      setEditing(false);
+      setInputValue(toInputString(field, row.original));
+      return;
+    }
+    const currentlyActive = Boolean(isActive);
+    setEditing(currentlyActive);
+    if (!currentlyActive) {
+      setInputValue(toInputString(field, row.original));
+    } else {
       setInputValue(toInputString(field, row.original));
     }
-  }, [isActive, row.original, field]);
+  }, [rowIsEditing, isActive, row.original, field]);
 
   useEffect(() => {
-    if (!editing) return;
+    if (!rowIsEditing || !editing || !isActive) return;
     const id = window.setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     }, 0);
     return () => window.clearTimeout(id);
-  }, [editing]);
-
-  useEffect(() => {
-    if (!editing) {
-      setInputValue(toInputString(field, row.original));
-    }
-  }, [row.original, field, editing]);
+  }, [editing, isActive, rowIsEditing]);
 
   useEffect(
     () => () => {
@@ -1619,9 +1783,11 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
   const displayValue = getDisplayValue(field, row.original) || (placeholder ?? '—');
   const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
 
+  const showEditor = rowIsEditing;
+
   return (
     <div className="flex flex-col">
-      {editing ? (
+      {showEditor ? (
         <input
           ref={inputRef}
           value={inputValue}
@@ -1669,40 +1835,55 @@ interface EditableSelectCellProps {
   field: EditableField;
   options: UomOption[];
   required?: boolean;
+  align?: 'left' | 'center' | 'right';
 }
 
-function EditableSelectCell({ context, field, options, required = false }: EditableSelectCellProps) {
+const toSelectString = (input: unknown): string => {
+  if (input === null || input === undefined) return '';
+  return String(input);
+};
+
+function EditableSelectCell({
+  context,
+  field,
+  options,
+  required = false,
+  align = 'center'
+}: EditableSelectCellProps) {
   const { row, table } = context;
   const tableMeta = table.options.meta as TableMeta | undefined;
   const isActive =
     tableMeta?.activeCell?.rowKey === row.original.rowKey && tableMeta.activeCell.field === field;
+  const rowIsEditing = tableMeta?.editingRowKey === row.original.rowKey;
 
-  const [editing, setEditing] = useState<boolean>(Boolean(isActive));
-  const [value, setValue] = useState<string>(() => (row.original[field] as string) ?? '');
+  const [editing, setEditing] = useState<boolean>(false);
+  const [value, setValue] = useState<string>(() => toSelectString(row.original[field]));
   const timeoutRef = React.useRef<number | null>(null);
   const selectRef = React.useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    setEditing(Boolean(isActive));
-    if (isActive) {
-      setValue((row.original[field] as string) ?? '');
+    if (!rowIsEditing) {
+      setEditing(false);
+      setValue(toSelectString(row.original[field]));
+      return;
     }
-  }, [isActive, row.original, field]);
+    const currentlyActive = Boolean(isActive);
+    setEditing(currentlyActive);
+    if (!currentlyActive) {
+      setValue(toSelectString(row.original[field]));
+    } else {
+      setValue(toSelectString(row.original[field]));
+    }
+  }, [rowIsEditing, isActive, row.original, field]);
 
   useEffect(() => {
-    if (!editing) {
-      setValue((row.original[field] as string) ?? '');
-    }
-  }, [row.original, field, editing]);
-
-  useEffect(() => {
-    if (editing) {
+    if (editing && isActive && rowIsEditing) {
       const id = window.setTimeout(() => {
         selectRef.current?.focus();
       }, 0);
       return () => window.clearTimeout(id);
     }
-  }, [editing]);
+  }, [editing, isActive, rowIsEditing]);
 
   useEffect(
     () => () => {
@@ -1730,11 +1911,14 @@ function EditableSelectCell({ context, field, options, required = false }: Edita
     tableMeta?.clearActiveCell();
   };
 
-  const displayValue = value || '—';
+  const displayValue =
+    value ? options.find((option) => option.value === value)?.label ?? value : '—';
+  const showEditor = rowIsEditing;
+  const alignClass = align === 'right' ? 'text-right' : align === 'left' ? 'text-left' : 'text-center';
 
   return (
     <div className="flex flex-col">
-      {editing ? (
+      {showEditor ? (
         <select
           ref={selectRef}
           value={value}
@@ -1744,7 +1928,8 @@ function EditableSelectCell({ context, field, options, required = false }: Edita
           }}
           onBlur={handleBlur}
           className={clsx(
-            'w-full border bg-surface-card px-1.5 py-0.5 text-center text-sm text-text-primary focus:outline-none focus:ring-2',
+            'w-full border bg-surface-card px-1.5 py-0.5 text-sm text-text-primary focus:outline-none focus:ring-2',
+            alignClass,
             error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-brand-primary/40'
           )}
         >
@@ -1756,7 +1941,7 @@ function EditableSelectCell({ context, field, options, required = false }: Edita
           ))}
         </select>
       ) : (
-        <div className="w-full px-1.5 py-0.5 text-center text-sm text-text-primary">
+        <div className={clsx('w-full px-1.5 py-0.5 text-sm text-text-primary', alignClass)}>
           {displayValue}
         </div>
       )}

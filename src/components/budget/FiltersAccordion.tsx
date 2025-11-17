@@ -37,29 +37,7 @@ function formatCurrency(value: number): string {
   return `$${Math.round(value).toLocaleString()}`
 }
 
-// Much darker colors for Areas (level 1) - high contrast
-const AREA_COLORS = [
-  '#1A237E', // Very Deep Indigo
-  '#004D40', // Very Dark Teal
-  '#BF360C', // Very Deep Orange Red
-  '#3E2723', // Very Dark Brown
-  '#263238', // Very Dark Blue Grey
-  '#880E4F', // Very Dark Pink
-  '#1B5E20', // Very Dark Green
-  '#E65100', // Very Dark Orange
-]
-
-// Lighter colors for Phases (level 2) - pastel variants
-const PHASE_COLORS = [
-  '#CE93D8', // Lighter Purple
-  '#A5D6A7', // Lighter Green
-  '#FFCC80', // Lighter Orange
-  '#D7CCC8', // Lighter Brown
-  '#CFD8DC', // Lighter Blue Grey
-  '#F8BBD0', // Lighter Pink
-  '#B2EBF2', // Lighter Cyan
-  '#FFE082', // Lighter Yellow
-]
+// Color arrays removed - now using global planning-tile classes from component-patterns.css
 
 export default function FiltersAccordion({
   projectId,
@@ -92,14 +70,6 @@ export default function FiltersAccordion({
     return validPhases.filter(phase => selectedAreaIds.includes(phase.parent_id!))
   }, [validPhases, selectedAreaIds])
 
-  // Map phases to their parent area index for color coordination
-  const areaIndexMap = React.useMemo(() => {
-    const map = new Map<number, number>()
-    validAreas.forEach((area, index) => {
-      map.set(area.container_id, index)
-    })
-    return map
-  }, [validAreas])
 
   return (
     <CollapsibleSection
@@ -124,30 +94,21 @@ export default function FiltersAccordion({
       <div className="p-4 space-y-4">
         {/* Area Tiles */}
         <div>
-          <h6 className="text-sm font-semibold text-gray-600 mb-2">{labels.level1LabelPlural}</h6>
+          <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>{labels.level1LabelPlural}</h6>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
             <div
-              className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
-                includeProjectLevel ? 'shadow-lg' : ''
-              }`}
-              style={{
-                borderColor: includeProjectLevel ? '#0d6efd' : '#E0E0E0',
-                backgroundColor: includeProjectLevel ? 'rgba(13,110,253,0.08)' : '#f8f9fa'
-              }}
+              className={`planning-tile ${includeProjectLevel ? 'planning-tile-active' : ''}`}
               onClick={() => onProjectLevelToggle(!includeProjectLevel)}
             >
               <div className="d-flex justify-content-between align-items-start mb-2">
-                <div
-                  className="text-base font-bold"
-                  style={{ color: includeProjectLevel ? '#0d6efd' : '#424242' }}
-                >
+                <div className="planning-tile-header">
                   Project Level
                 </div>
                 <CBadge color={includeProjectLevel ? 'primary' : 'secondary'}>
                   {projectLevelItemCount}
                 </CBadge>
               </div>
-              <div className="text-xs text-secondary">
+              <div className="planning-tile-stat">
                 Items without {labels.level1Label.toLowerCase()} / {labels.level2Label.toLowerCase()}
               </div>
               {includeProjectLevel && (
@@ -164,54 +125,42 @@ export default function FiltersAccordion({
                 </div>
               ))}
 
-            {!isLoading && validAreas.length > 0 && validAreas.map((area, index) => {
-              const color = AREA_COLORS[index % AREA_COLORS.length]
+            {!isLoading && validAreas.length > 0 && validAreas.map((area) => {
               const isSelected = selectedAreaIds.includes(area.container_id)
 
               return (
                 <div
                   key={area.container_id}
-                  className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
-                    isSelected ? 'shadow-lg' : ''
-                  }`}
-                  style={{
-                    borderColor: isSelected ? '#0d6efd' : '#E0E0E0',
-                    backgroundColor: isSelected ? `${color}40` : `${color}20`
-                  }}
+                  className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
                   onClick={() => onAreaSelect(area.container_id)}
                 >
-                  <div className="text-center">
-                    <div
-                      className="text-base font-bold mb-1"
-                      style={{ color: isSelected ? color : '#424242' }}
-                    >
-                      {labels.level1Label} {area.name}
+                  <div className="planning-tile-header">
+                    {labels.level1Label} {area.name}
+                  </div>
+
+                  <div className="planning-tile-stat">
+                    {Math.round(area.acres).toLocaleString()} ac
+                  </div>
+
+                  {area.phaseCount !== undefined && area.phaseCount > 0 && (
+                    <div className="planning-tile-stat">
+                      {area.phaseCount} {labels.level2Label}{area.phaseCount > 1 ? 's' : ''}
                     </div>
+                  )}
 
-                    <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                      {Math.round(area.acres).toLocaleString()} ac
+                  {area.units > 0 && (
+                    <div className="planning-tile-stat">
+                      {Math.round(area.units).toLocaleString()} units
                     </div>
+                  )}
 
-                    {area.phaseCount !== undefined && area.phaseCount > 0 && (
-                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                        {area.phaseCount} {labels.level2Label}{area.phaseCount > 1 ? 's' : ''}
-                      </div>
-                    )}
-
-                    {area.units > 0 && (
-                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                        {Math.round(area.units).toLocaleString()} units
-                      </div>
-                    )}
-
-                    <div className="text-xs mt-1 font-medium" style={{ color: color }}>
-                      {formatCurrency(area.totalCost)}
-                    </div>
+                  <div className="planning-tile-stat font-medium mt-1">
+                    {formatCurrency(area.totalCost)}
                   </div>
 
                   {isSelected && (
-                    <div className="mt-2 pt-2 border-t border-gray-300">
-                      <div className="text-xs font-medium text-center" style={{ color }}>
+                    <div className="mt-2 pt-2 border-t border-subtle">
+                      <div className="text-xs font-medium text-center">
                         ✓ Selected
                       </div>
                     </div>
@@ -222,7 +171,7 @@ export default function FiltersAccordion({
           </div>
 
           {!isLoading && validAreas.length === 0 && (
-            <div className="p-4 mt-3 bg-gray-50 border border-gray-200 rounded text-gray-600">
+            <div className="p-4 mt-3 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
               <p>No {labels.level1LabelPlural.toLowerCase()} defined for this project</p>
             </div>
           )}
@@ -230,7 +179,7 @@ export default function FiltersAccordion({
 
         {/* Phase Tiles */}
         <div>
-          <h6 className="text-sm font-semibold text-gray-600 mb-2">{labels.level2LabelPlural}</h6>
+          <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>{labels.level2LabelPlural}</h6>
           {isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
               {[...Array(3)].map((_, i) => (
@@ -240,63 +189,48 @@ export default function FiltersAccordion({
               ))}
             </div>
           ) : filteredPhases.length === 0 ? (
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded text-gray-600">
+            <div className="p-4 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
               <p>No {labels.level2LabelPlural.toLowerCase()} {selectedAreaIds.length > 0 ? `in selected ${labels.level1LabelPlural.toLowerCase()}` : 'defined for this project'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
               {filteredPhases.map((phase) => {
-                // Use parent area's color index for color coordination
-                const areaIndex = areaIndexMap.get(phase.parent_id!) ?? 0
-                const color = PHASE_COLORS[areaIndex % PHASE_COLORS.length]
                 const isSelected = selectedPhaseIds.includes(phase.container_id)
                 const isHighlighted = !isSelected && selectedAreaIds.includes(phase.parent_id!)
 
                 return (
                   <div
                     key={phase.container_id}
-                    className={`rounded p-3 border-2 cursor-pointer transition-all hover:shadow-md ${
-                      isSelected ? 'shadow-lg' : ''
-                    }`}
-                    style={{
-                      borderColor: isSelected ? '#212121' : isHighlighted ? '#ffc107' : '#E0E0E0',
-                      backgroundColor: isSelected ? `${color}60` : `${color}40`,
-                      opacity: isHighlighted ? 0.85 : 1
-                    }}
+                    className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''} ${isHighlighted ? 'planning-tile-highlighted' : ''}`}
                     onClick={() => onPhaseSelect(phase.container_id)}
                   >
-                    <div className="text-center">
-                      <div
-                        className="text-base font-bold mb-1"
-                        style={{ color: isSelected ? '#212121' : '#424242' }}
-                      >
-                        {labels.level2Label} {phase.name}
+                    <div className="planning-tile-header">
+                      {labels.level2Label} {phase.name}
+                    </div>
+
+                    <div className="planning-tile-stat">
+                      {Math.round(phase.acres).toLocaleString()} ac
+                    </div>
+
+                    {phase.parcelCount !== undefined && phase.parcelCount > 0 && (
+                      <div className="planning-tile-stat">
+                        {phase.parcelCount} Parcel{phase.parcelCount > 1 ? 's' : ''}
                       </div>
+                    )}
 
-                      <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                        {Math.round(phase.acres).toLocaleString()} ac
+                    {phase.units > 0 && (
+                      <div className="planning-tile-stat">
+                        {Math.round(phase.units).toLocaleString()} units
                       </div>
+                    )}
 
-                      {phase.parcelCount !== undefined && phase.parcelCount > 0 && (
-                        <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                          {phase.parcelCount} Parcel{phase.parcelCount > 1 ? 's' : ''}
-                        </div>
-                      )}
-
-                      {phase.units > 0 && (
-                        <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-                          {Math.round(phase.units).toLocaleString()} units
-                        </div>
-                      )}
-
-                      <div className="text-xs mt-1 font-medium" style={{ color: '#424242' }}>
-                        {formatCurrency(phase.totalCost)}
-                      </div>
+                    <div className="planning-tile-stat font-medium mt-1">
+                      {formatCurrency(phase.totalCost)}
                     </div>
 
                     {isSelected && (
-                      <div className="mt-2 pt-2 border-t border-gray-300">
-                        <div className="text-xs font-medium text-center" style={{ color: '#212121' }}>
+                      <div className="mt-2 pt-2 border-t border-subtle">
+                        <div className="text-xs font-medium text-center">
                           ✓ Selected
                         </div>
                       </div>

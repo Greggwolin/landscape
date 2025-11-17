@@ -40,14 +40,6 @@ interface Phase {
   label?: string;
 }
 
-interface PlanningDefaults {
-  standard_id: number;
-  default_planning_efficiency: number | null;
-  default_street_row_pct?: number | null;
-  default_park_dedication_pct?: number | null;
-  updated_at?: string;
-}
-
 type ParcelDetailUpdates = {
   acres: number;
   units: number;
@@ -70,11 +62,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const [parcels, setParcels] = useState<Parcel[]>([])
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
-  const [planningStandard, setPlanningStandard] = useState<PlanningDefaults | null>(null)
-  const [useGlobalPlanning, setUseGlobalPlanning] = useState(true)
-  const [projectPlanningEfficiency, setProjectPlanningEfficiency] = useState<string>('')
-  const [savingPlanningEfficiency, setSavingPlanningEfficiency] = useState(false)
-  const [planningMessage, setPlanningMessage] = useState<string | null>(null)
   const fetcher = (url: string) => fetchJson(url)
   const { data: parcelsData, error: parcelsError, mutate: mutateParcels } = useSWR(
     projectId ? `/api/parcels?project_id=${projectId}` : null,
@@ -100,52 +87,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       mutatePhases()
     }
   }, [projectId, mutateParcels, mutatePhases])
-
-  useEffect(() => {
-    const loadGlobalPlanningStandards = async () => {
-      try {
-        const response = await fetch('/api/planning-standards')
-        if (!response.ok) return
-        const payload = await response.json()
-        if (payload && payload.standard) {
-          setPlanningStandard(payload.standard as PlanningDefaults)
-        }
-      } catch (error) {
-        console.error('Failed to load planning standards', error)
-      }
-    }
-
-    void loadGlobalPlanningStandards()
-  }, [])
-
-  useEffect(() => {
-    if (!projectId) return
-
-    const loadProjectPlanningEfficiency = async () => {
-      try {
-        const response = await fetch(`/api/projects/${projectId}`)
-        if (!response.ok) return
-        const payload = await response.json()
-        const efficiency =
-          payload?.planning_efficiency ??
-          payload?.planningEfficiency ??
-          null
-
-        if (efficiency !== null && efficiency !== undefined) {
-          setProjectPlanningEfficiency(String(efficiency))
-          setUseGlobalPlanning(false)
-        } else {
-          setProjectPlanningEfficiency('')
-          setUseGlobalPlanning(true)
-        }
-        setPlanningMessage(null)
-      } catch (error) {
-        console.error('Failed to load project planning efficiency', error)
-      }
-    }
-
-    void loadProjectPlanningEfficiency()
-  }, [projectId])
 
   // Listen for data changes from other components
   useEffect(() => {
@@ -355,72 +296,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     setSelectedLandUseFilter('')
   }
 
-  const handleEnablePlanningOverride = () => {
-    setUseGlobalPlanning(false)
-    setPlanningMessage(null)
-    if (!projectPlanningEfficiency && planningStandard?.default_planning_efficiency != null) {
-      setProjectPlanningEfficiency(String(planningStandard.default_planning_efficiency))
-    }
-  }
 
-  const handleSavePlanningOverride = async () => {
-    if (!projectId) return
-    const value = Number(projectPlanningEfficiency)
-    if (!Number.isFinite(value) || value <= 0 || value > 1.5) {
-      setPlanningMessage('Enter a valid efficiency between 0 and 1.5.')
-      return
-    }
-
-    setSavingPlanningEfficiency(true)
-    setPlanningMessage(null)
-    try {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planning_efficiency: value })
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error?.error || 'Failed to update planning efficiency')
-      }
-
-      setUseGlobalPlanning(false)
-      setPlanningMessage('Project planning efficiency override saved.')
-    } catch (error) {
-      console.error('Failed to save planning efficiency override', error)
-      setPlanningMessage(error instanceof Error ? error.message : 'Failed to save planning efficiency')
-    } finally {
-      setSavingPlanningEfficiency(false)
-    }
-  }
-
-  const handleUseGlobalPlanningDefault = async () => {
-    if (!projectId) return
-    setSavingPlanningEfficiency(true)
-    setPlanningMessage(null)
-    try {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planning_efficiency: null })
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error?.error || 'Failed to revert to global default')
-      }
-
-      setProjectPlanningEfficiency('')
-      setUseGlobalPlanning(true)
-      setPlanningMessage('Project now uses the global planning efficiency.')
-    } catch (error) {
-      console.error('Failed to apply global planning default', error)
-      setPlanningMessage(error instanceof Error ? error.message : 'Failed to apply global default')
-    } finally {
-      setSavingPlanningEfficiency(false)
-    }
-  }
 
   // Add Phase function
   const addPhase = async (areaNo: number) => {
@@ -731,81 +607,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   }
 
   return (
-    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'rgb(230, 231, 235)' }}>
+    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       {/* Planning Overview with Granularity Controls */}
       <PlanningOverviewControls projectId={projectId} />
-
-      <div className="rounded border border-slate-300 bg-white/90 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">Planning Efficiency</h2>
-            <p className="text-sm text-slate-500">
-              Global default:&nbsp;
-              <span className="font-medium text-slate-700">
-                {planningStandard?.default_planning_efficiency != null
-                  ? planningStandard.default_planning_efficiency.toFixed(2)
-                  : '—'}
-              </span>
-            </p>
-          </div>
-          {planningStandard?.updated_at && (
-            <span className="text-xs text-slate-400">
-              Updated {new Date(planningStandard.updated_at).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1.5"
-            disabled={useGlobalPlanning}
-            value={useGlobalPlanning
-              ? planningStandard?.default_planning_efficiency?.toString() ?? ''
-              : projectPlanningEfficiency}
-            onChange={(event) => setProjectPlanningEfficiency(event.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-300 disabled:bg-slate-100"
-            placeholder="0.75"
-          />
-          {useGlobalPlanning ? (
-            <button
-              type="button"
-              onClick={handleEnablePlanningOverride}
-              className="inline-flex items-center justify-center rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-            >
-              Override for this project
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleSavePlanningOverride}
-                disabled={savingPlanningEfficiency}
-                className="inline-flex items-center justify-center rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-500/70"
-              >
-                {savingPlanningEfficiency ? 'Saving…' : 'Save Override'}
-              </button>
-              <button
-                type="button"
-                onClick={handleUseGlobalPlanningDefault}
-                disabled={savingPlanningEfficiency}
-                className="inline-flex items-center justify-center rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Use Global Default
-              </button>
-            </div>
-          )}
-        </div>
-        {planningMessage && (
-          <div className="mt-3 text-sm text-emerald-600">{planningMessage}</div>
-        )}
-        {!useGlobalPlanning && (
-          <p className="mt-2 text-xs text-slate-500">
-            Override applies only to this project. Setting the global default will update all projects unless overridden here.
-          </p>
-        )}
-      </div>
 
       {/* Plan Areas and Phases Overview - Read-only rollups from Parcel Detail */}
       <div className={`grid gap-4 transition-all duration-300 ${
@@ -824,56 +628,22 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
               {areaCards.map(({ key, areaNo, title, stats }) => (
                 <div
                   key={key}
-                  className="rounded p-3 border-2 transition-all min-w-[140px] relative"
-                  style={selectedAreaFilters.includes(areaNo) ? {
-                    backgroundColor: 'var(--cui-primary)',
-                    borderColor: 'var(--cui-primary)',
-                    opacity: 0.9
-                  } : {
-                    backgroundColor: 'var(--cui-card-bg)',
-                    borderColor: 'var(--cui-border-color)'
-                  }}
+                  className={`planning-tile text-center min-w-[140px] ${
+                    selectedAreaFilters.includes(areaNo) ? 'planning-tile-active' : ''
+                  }`}
+                  onClick={() => toggleAreaFilter(areaNo)}
                 >
                   <div
-                    className="text-center cursor-pointer"
-                    onClick={() => toggleAreaFilter(areaNo)}
-                    onMouseEnter={(e) => {
-                      const parent = e.currentTarget.parentElement
-                      if (parent) {
-                        if (selectedAreaFilters.includes(areaNo)) {
-                          parent.style.opacity = '1';
-                        } else {
-                          parent.style.borderColor = 'var(--cui-primary)';
-                          parent.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
-                        }
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      const parent = e.currentTarget.parentElement
-                      if (parent) {
-                        if (selectedAreaFilters.includes(areaNo)) {
-                          parent.style.opacity = '0.9';
-                        } else {
-                          parent.style.borderColor = 'var(--cui-border-color)';
-                          parent.style.backgroundColor = 'var(--cui-card-bg)';
-                        }
-                      }
-                    }}
+                    className="planning-tile-header whitespace-nowrap"
+                    title={title}
                   >
-                    <div className="text-lg font-bold mb-1 whitespace-nowrap"
-                      style={{ color: selectedAreaFilters.includes(areaNo) ? 'white' : 'var(--cui-body-color)' }}
-                      title={title}
-                    >
-                      {title}
-                    </div>
-                    <div className="space-y-1 text-xs"
-                      style={{ color: selectedAreaFilters.includes(areaNo) ? 'rgba(255, 255, 255, 0.9)' : 'var(--cui-secondary-color)' }}
-                    >
-                      <div>{stats.grossAcres} acres</div>
-                      <div>{stats.phases} {level2LabelPlural}</div>
-                      <div>{stats.parcels} {level3LabelPlural}</div>
-                      <div>{stats.units} units</div>
-                    </div>
+                    {title}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="planning-tile-stat">{stats.grossAcres} acres</div>
+                    <div className="planning-tile-stat">{stats.phases} {level2LabelPlural}</div>
+                    <div className="planning-tile-stat">{stats.parcels} {level3LabelPlural}</div>
+                    <div className="planning-tile-stat">{stats.units} units</div>
                   </div>
                 </div>
               ))}
@@ -890,7 +660,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           <div className="p-4">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+                <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                     <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>{level2Label}</th>
                     <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '35%' }}>Land Uses</th>
@@ -983,7 +753,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         <div className={detailOpen ? 'p-4 grid grid-cols-3 gap-4' : 'p-4'}>
           <div className={detailOpen ? 'col-span-2' : ''}>
           <table className="w-full text-sm">
-            <thead style={{ backgroundColor: 'rgb(241, 242, 246)' }}>
+            <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <tr>
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Area</th>
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
@@ -1786,25 +1556,14 @@ const PhaseRow: React.FC<{
                 e.stopPropagation();
                 setExpanded(!expanded);
               }}
-              className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                phase.description && phase.description.trim() !== ''
+                  ? 'bg-primary text-white border-0 hover:opacity-90'
+                  : 'bg-transparent border hover:bg-primary/10'
+              }`}
               style={{
-                backgroundColor: phase.description && phase.description.trim() !== '' ? '#1976d2' : 'transparent',
-                color: phase.description && phase.description.trim() !== '' ? 'white' : '#1976d2',
-                border: phase.description && phase.description.trim() !== '' ? 'none' : '1px solid #1976d2'
-              }}
-              onMouseEnter={(e) => {
-                if (phase.description && phase.description.trim() !== '') {
-                  e.currentTarget.style.backgroundColor = '#1565c0'
-                } else {
-                  e.currentTarget.style.backgroundColor = '#e3f2fd'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (phase.description && phase.description.trim() !== '') {
-                  e.currentTarget.style.backgroundColor = '#1976d2'
-                } else {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }
+                borderColor: phase.description && phase.description.trim() !== '' ? 'transparent' : 'var(--cui-primary)',
+                color: phase.description && phase.description.trim() !== '' ? 'var(--text-inverse)' : 'var(--cui-primary)'
               }}
             >
               Notes
@@ -1812,15 +1571,12 @@ const PhaseRow: React.FC<{
 
             {/* Reports chip */}
             <button
-              className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help transition-all"
+              className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help transition-all border-0 hover:opacity-80"
               style={{
-                backgroundColor: '#f5f5f5',
-                color: '#666',
-                border: 'none'
+                backgroundColor: 'var(--cui-tertiary-bg)',
+                color: 'var(--cui-secondary-color)'
               }}
               title="Coming soon"
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e0e0e0'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
             >
               Reports
             </button>

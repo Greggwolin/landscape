@@ -24,7 +24,7 @@ export default function CollapsibleSection({
   return (
     <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
       {/* Header */}
-      <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: isExpanded ? 'rgb(241, 242, 246)' : 'transparent' }}>
+      <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: isExpanded ? 'var(--cui-tertiary-bg)' : 'transparent' }}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-2 hover:opacity-70 transition-opacity"

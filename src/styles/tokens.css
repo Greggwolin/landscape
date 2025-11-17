@@ -43,8 +43,8 @@
   --nav-brand: var(--brand-primary);
 }
 
-/* Dark theme scope */
-[data-theme='dark'] {
+/* Dark theme scope - matches CoreUI theme attribute */
+[data-coreui-theme='dark'] {
   --surface-bg: #0b1220;
   --surface-card: #111827;
   --surface-tile: #0f172a;

@@ -1,4 +1,4 @@
-// v1.0 · 2025-11-02 · Column sets by mode
+// v2.0 · 2025-11-15 · Column sets by mode with expanded type support
 import { ColumnDef } from '@tanstack/react-table';
 import { CButton } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
@@ -6,54 +6,12 @@ import { cilPlus, cilTrash } from '@coreui/icons';
 import EditableCell from './custom/EditableCell';
 import ColoredDotIndicator from './custom/ColoredDotIndicator';
 import PhaseCell from './custom/PhaseCell';
-import type { BudgetMode } from './ModeSelector';
+import type { BudgetMode, BudgetItem } from '@/types/budget';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 
-export interface BudgetItem {
-  fact_id: number;
-  container_id?: number | null;
-  project_id?: number;
-  // Container display fields
-  container_name?: string | null;
-  container_display?: string | null; // e.g., "Area A Phase 1" or "Project-Level"
-  // Legacy category field (for backward compatibility)
-  category_id: number;
-  category_name?: string;
-  category_code?: string;
-  // New category hierarchy fields
-  category_l1_id?: number | null;
-  category_l2_id?: number | null;
-  category_l3_id?: number | null;
-  category_l4_id?: number | null;
-  // Category names for display
-  category_l1_name?: string | null;
-  category_l2_name?: string | null;
-  category_l3_name?: string | null;
-  category_l4_name?: string | null;
-  // Category breadcrumb for display
-  category_breadcrumb?: string;
-  scope?: string | null;
-  qty: number | null;
-  rate: number | null;
-  amount: number | null;
-  uom_code: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  start_period: number | null;
-  periods_to_complete: number | null;
-  end_period?: number | null;
-  vendor_name?: string | null;
-  notes: string | null;
-  confidence_level?: string | null;
-  escalation_rate?: number | null;
-  contingency_pct?: number | null;
-  timing_method?: string | null;
-  funding_id?: number | null;
-  curve_id?: number | null;
-  milestone_id?: number | null;
-  cf_start_flag?: boolean | null;
-}
+// Re-export BudgetItem for backward compatibility
+export type { BudgetItem };
 
 // Use standard formatters from UI_STANDARDS_v1.0.md
 const moneyFmt = (value?: number | null) => formatMoney(value);

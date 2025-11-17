@@ -35,7 +35,7 @@ export default function AddCategoryModal({
 
   const [formData, setFormData] = useState({
     category_name: '',
-    lifecycle_stages: ['Development'] as LifecycleStage[],
+    lifecycle_stages: [] as LifecycleStage[],
     parent_id: null as number | null,
     tags: [] as string[],
     sort_order: 0,

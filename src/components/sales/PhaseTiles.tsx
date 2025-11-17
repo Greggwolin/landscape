@@ -28,17 +28,6 @@ interface Phase {
   parcel_count?: number; // Will be calculated
 }
 
-const PHASE_COLORS = [
-  '#3F51B5', // Indigo
-  '#009688', // Teal
-  '#FF5722', // Deep Orange
-  '#795548', // Brown
-  '#607D8B', // Blue Grey
-  '#E91E63', // Pink
-  '#00BCD4', // Cyan
-  '#FF9800', // Orange
-];
-
 /**
  * Format currency for display
  */
@@ -61,15 +50,23 @@ export default function PhaseTiles({
   showCosts = false
 }: Props) {
   const { data: phases, isLoading, error } = usePhaseStats(projectId);
-  const { data: parcels } = useParcelsWithSales(projectId, null);
+  const { data: parcelDataset } = useParcelsWithSales(projectId, null);
   const { phases: containerPhases } = useContainers({ projectId, includeCosts: showCosts });
 
   // Calculate parcel counts per phase and merge with container data
   const phasesWithCounts = useMemo(() => {
-    if (!phases || !parcels) return phases;
+    if (!phases || !parcelDataset) return phases;
+
+    const parcels = parcelDataset.parcels || [];
 
     return phases.map((phase: Phase) => {
-      const parcelCount = parcels.filter(p => p.phase_id === phase.phase_id).length;
+      const phaseParcels = parcels.filter(p => p.phase_id === phase.phase_id);
+      const parcelCount = phaseParcels.length;
+
+      // Calculate total net proceeds for parcels in this phase
+      const netProceeds = phaseParcels.reduce((sum, p) => {
+        return sum + (p.net_proceeds || 0);
+      }, 0);
 
       // Find matching container phase for cost data
       const containerPhase = containerPhases.find(cp => cp.container_id === phase.phase_id);
@@ -77,10 +74,11 @@ export default function PhaseTiles({
       return {
         ...phase,
         parcel_count: parcelCount,
-        total_cost: containerPhase?.totalCost || 0
+        total_cost: containerPhase?.totalCost || 0,
+        net_proceeds: netProceeds
       };
     });
-  }, [phases, parcels, containerPhases]);
+  }, [phases, parcelDataset, containerPhases]);
 
   // Filter phases by selected areas
   const filteredPhases = useMemo(() => {
@@ -96,7 +94,7 @@ export default function PhaseTiles({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="h-32 bg-gray-200 rounded border-2"></div>
@@ -123,60 +121,58 @@ export default function PhaseTiles({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {filteredPhases.map((phase: Phase & { total_cost?: number }, index: number) => {
-        const color = PHASE_COLORS[index % PHASE_COLORS.length];
+    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      {filteredPhases.map((phase: Phase & { total_cost?: number; net_proceeds?: number }) => {
         const isSelected = selectedPhaseIds.includes(phase.phase_id);
 
         // Check if parent area is selected (for highlighting)
         const containerPhase = containerPhases.find(cp => cp.container_id === phase.phase_id);
         const isHighlighted = !isSelected && containerPhase && selectedAreaIds.includes(containerPhase.parent_id!);
 
+        // Build className dynamically
+        let tileClassName = 'planning-tile text-center';
+        if (isSelected) tileClassName += ' planning-tile-active';
+        if (isHighlighted) tileClassName += ' planning-tile-highlighted';
+
         return (
           <div
             key={phase.phase_id}
-            className={`rounded p-4 border-2 cursor-pointer transition-all hover:shadow-md ${
-              isSelected ? 'shadow-lg' : ''
-            }`}
-            style={{
-              borderColor: isSelected ? '#212121' : isHighlighted ? '#ffc107' : '#E0E0E0',
-              backgroundColor: isSelected ? `${color}40` : `${color}20`,
-              opacity: isHighlighted ? 0.85 : 1
-            }}
+            className={tileClassName}
             onClick={() => onPhaseSelect(phase.phase_id)}
           >
-            <div className="text-center">
-              <div
-                className="text-lg font-bold mb-1"
-                style={{ color: isSelected ? color : '#424242' }}
-              >
-                Phase {phase.phase_name}
-              </div>
-
-              <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
-                {Math.round(phase.gross_acres).toLocaleString()} acres
-              </div>
-
-              {phase.parcel_count !== undefined && (
-                <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
-                  {phase.parcel_count.toLocaleString()} {phase.parcel_count === 1 ? 'Parcel' : 'Parcels'}
-                </div>
-              )}
-
-              <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
-                {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()} units
-              </div>
-
-              {showCosts && phase.total_cost !== undefined && (
-                <div className="text-sm mt-1" style={{ color: 'var(--cui-body-color)' }}>
-                  {formatCurrency(phase.total_cost)}
-                </div>
-              )}
+            <div className="planning-tile-header">
+              Phase {phase.phase_name}
             </div>
 
+            <div className="planning-tile-stat">
+              {Math.round(phase.gross_acres).toLocaleString()} acres
+            </div>
+
+            {phase.parcel_count !== undefined && (
+              <div className="planning-tile-stat">
+                {phase.parcel_count.toLocaleString()} {phase.parcel_count === 1 ? 'Parcel' : 'Parcels'}
+              </div>
+            )}
+
+            <div className="planning-tile-stat">
+              {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()} units
+            </div>
+
+            {showCosts && phase.total_cost !== undefined && (
+              <div className="planning-tile-stat">
+                {formatCurrency(phase.total_cost)}
+              </div>
+            )}
+
+            {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
+              <div className="planning-tile-stat-positive">
+                Net: {formatCurrency(phase.net_proceeds)}
+              </div>
+            )}
+
             {isSelected && (
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="text-xs font-medium" style={{ color }}>
+              <div className="mt-2 pt-2 border-t border-subtle">
+                <div className="text-xs font-medium" style={{ color: 'var(--cui-primary)' }}>
                   ✓ Selected
                 </div>
               </div>

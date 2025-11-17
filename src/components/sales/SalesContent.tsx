@@ -61,7 +61,7 @@ export default function SalesContent({ projectId }: Props) {
   return (
     <div
       className="p-4 space-y-4 min-h-screen"
-      style={{ backgroundColor: 'rgb(230, 231, 235)' }}
+      style={{ backgroundColor: 'var(--cui-body-bg)' }}
     >
       {/* Annual Inventory Gauge */}
       <CollapsibleSection
@@ -71,17 +71,6 @@ export default function SalesContent({ projectId }: Props) {
       >
         <div className="p-4">
           <AnnualInventoryGauge projectId={projectId} />
-        </div>
-      </CollapsibleSection>
-
-      {/* Land Use Pricing */}
-      <CollapsibleSection
-        title="Land Use Pricing"
-        itemCount={1}
-        defaultExpanded={true}
-      >
-        <div className="p-4">
-          <PricingTable projectId={projectId} />
         </div>
       </CollapsibleSection>
 
@@ -108,7 +97,7 @@ export default function SalesContent({ projectId }: Props) {
         <div className="p-4 space-y-4">
           {/* Area Tiles */}
           <div>
-            <h6 className="text-sm font-semibold text-gray-600 mb-2">Areas</h6>
+            <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>Areas</h6>
             <AreaTiles
               projectId={projectId}
               selectedAreaIds={selectedAreaIds}
@@ -119,7 +108,7 @@ export default function SalesContent({ projectId }: Props) {
 
           {/* Phase Tiles */}
           <div>
-            <h6 className="text-sm font-semibold text-gray-600 mb-2">Phases</h6>
+            <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>Phases</h6>
             <PhaseTiles
               projectId={projectId}
               selectedPhaseIds={selectedPhaseIds}
@@ -128,6 +117,21 @@ export default function SalesContent({ projectId }: Props) {
               showCosts={true}
             />
           </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Land Use Pricing - Filtered by selected phases */}
+      <CollapsibleSection
+        title={
+          selectedPhaseIds.length > 0
+            ? `Land Use Pricing (Filtered by ${selectedPhaseIds.length} Phase${selectedPhaseIds.length > 1 ? 's' : ''})`
+            : 'Land Use Pricing'
+        }
+        itemCount={1}
+        defaultExpanded={true}
+      >
+        <div className="p-4">
+          <PricingTable projectId={projectId} phaseFilters={selectedPhaseIds} />
         </div>
       </CollapsibleSection>
 

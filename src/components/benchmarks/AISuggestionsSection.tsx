@@ -5,15 +5,14 @@
 
 import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import type { AISuggestion, LandscaperMode } from '@/types/benchmarks';
+import type { AISuggestion } from '@/types/benchmarks';
 
 interface Props {
   suggestions: AISuggestion[];
-  mode: LandscaperMode;
   onRefresh: () => void;
 }
 
-export default function AISuggestionsSection({ suggestions, mode, onRefresh }: Props) {
+export default function AISuggestionsSection({ suggestions, onRefresh }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [processing, setProcessing] = useState(false);
 
@@ -70,7 +69,6 @@ export default function AISuggestionsSection({ suggestions, mode, onRefresh }: P
         <AISuggestionCard
           key={suggestion.suggestion_id}
           suggestion={suggestion}
-          mode={mode}
           isSelected={selectedIds.has(suggestion.suggestion_id)}
           onToggleSelect={() => toggleSelection(suggestion.suggestion_id)}
           onRefresh={onRefresh}
@@ -104,13 +102,12 @@ export default function AISuggestionsSection({ suggestions, mode, onRefresh }: P
 // AI Suggestion Card
 interface CardProps {
   suggestion: AISuggestion;
-  mode: LandscaperMode;
   isSelected: boolean;
   onToggleSelect: () => void;
   onRefresh: () => void;
 }
 
-function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefresh }: CardProps) {
+function AISuggestionCard({ suggestion, isSelected, onToggleSelect, onRefresh }: CardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -204,7 +201,7 @@ function AISuggestionCard({ suggestion, mode, isSelected, onToggleSelect, onRefr
               {(suggestion.inflation_adjusted_comparison.variance_percentage || 0).toFixed(1)}%
             </span>
           </div>
-          {mode === 'teaching' && suggestion.inflation_adjusted_comparison.message && (
+          {suggestion.inflation_adjusted_comparison.message && (
             <div className="text-text-secondary mt-1">
               {suggestion.inflation_adjusted_comparison.message}
             </div>

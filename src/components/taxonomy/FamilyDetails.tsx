@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/toast';
+import CIcon from '@coreui/icons-react';
+import { cilPencil, cilTrash } from '@coreui/icons';
 
 interface Family {
   family_id: number;
@@ -198,15 +200,10 @@ export default function FamilyDetails({ family, selectedType, onSelectType, onRe
                 {selectedType && (
                   <>
                     <button className="btn-edit" onClick={() => handleEdit(selectedType)} title="Edit Type">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
+                      <CIcon icon={cilPencil} size="sm" />
                     </button>
                     <button className="btn-edit" onClick={() => handleDelete(selectedType)} title="Delete Type" style={{ marginRight: '8px' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
+                      <CIcon icon={cilTrash} size="sm" />
                     </button>
                   </>
                 )}

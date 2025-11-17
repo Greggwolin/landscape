@@ -22,6 +22,16 @@
   --cui-primary: var(--brand-primary);
   --cui-primary-rgb: 14, 165, 233;
 
+  /* CoreUI semantic colors */
+  --cui-success: #198754;
+  --cui-success-rgb: 25, 135, 84;
+  --cui-warning: #ffc107;
+  --cui-warning-rgb: 255, 193, 7;
+  --cui-danger: #dc3545;
+  --cui-danger-rgb: 220, 53, 69;
+  --cui-info: #0dcaf0;
+  --cui-info-rgb: 13, 202, 240;
+
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
   --cui-header-color: var(--nav-text);
@@ -61,10 +71,154 @@
   --cui-card-border-color: var(--line-strong);
   --cui-footer-bg: var(--surface-card);
 
+  /* CoreUI semantic colors - same in dark mode */
+  --cui-success: #198754;
+  --cui-success-rgb: 25, 135, 84;
+  --cui-warning: #ffc107;
+  --cui-warning-rgb: 255, 193, 7;
+  --cui-danger: #dc3545;
+  --cui-danger-rgb: 220, 53, 69;
+  --cui-info: #0dcaf0;
+  --cui-info-rgb: 13, 202, 240;
+
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
   --cui-header-color: var(--nav-text);
   --cui-header-border-color: var(--nav-border);
+}
+
+/* [data-coreui-theme] attribute selectors for theme switching */
+[data-coreui-theme='light'] {
+  --cui-body-bg: var(--surface-bg);
+  --cui-body-color: var(--text-primary);
+  --cui-border-color: var(--line-soft);
+  --cui-tertiary-bg: var(--surface-card);
+  --cui-secondary-color: var(--text-secondary);
+  --cui-card-bg: var(--surface-card);
+}
+
+[data-coreui-theme='dark'] {
+  --cui-body-bg: var(--surface-bg);
+  --cui-body-color: var(--text-primary);
+  --cui-border-color: var(--line-strong);
+  --cui-tertiary-bg: var(--surface-card);
+  --cui-secondary-color: var(--text-secondary);
+  --cui-card-bg: var(--surface-card);
+}
+
+/* Dark mode button overrides - direct rules, not variables */
+[data-coreui-theme='dark'] .btn-warning {
+  background-color: rgba(255, 193, 7, 0.2) !important;
+  border-color: #ffc107 !important;
+  color: #ffc107 !important;
+}
+
+[data-coreui-theme='dark'] .btn-warning:hover {
+  background-color: rgba(255, 193, 7, 0.3) !important;
+  color: #ffc107 !important;
+}
+
+[data-coreui-theme='dark'] .btn-success {
+  background-color: rgba(25, 135, 84, 0.2) !important;
+  border-color: #198754 !important;
+  color: #198754 !important;
+}
+
+[data-coreui-theme='dark'] .btn-success:hover {
+  background-color: rgba(25, 135, 84, 0.3) !important;
+  color: #198754 !important;
+}
+
+[data-coreui-theme='dark'] .btn-danger {
+  background-color: rgba(220, 53, 69, 0.2) !important;
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+}
+
+[data-coreui-theme='dark'] .btn-danger:hover {
+  background-color: rgba(220, 53, 69, 0.3) !important;
+  color: #dc3545 !important;
+}
+
+/* Outline buttons get special treatment */
+[data-coreui-theme='dark'] .btn-outline-warning {
+  border-color: #ffc107 !important;
+  color: #ffc107 !important;
+  background-color: transparent !important;
+}
+
+[data-coreui-theme='dark'] .btn-outline-success {
+  border-color: #198754 !important;
+  color: #198754 !important;
+  background-color: transparent !important;
+}
+
+[data-coreui-theme='dark'] .btn-outline-danger {
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+  background-color: transparent !important;
+}
+
+/* Active state for outline buttons in dark mode */
+[data-coreui-theme='dark'] .btn-outline-warning.active {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+  font-weight: 600 !important;
+}
+
+[data-coreui-theme='dark'] .btn-outline-success.active {
+  background-color: rgba(25, 135, 84, 0.15) !important;
+  font-weight: 600 !important;
+}
+
+[data-coreui-theme='dark'] .btn-outline-danger.active {
+  background-color: rgba(220, 53, 69, 0.15) !important;
+  font-weight: 600 !important;
+}
+
+/* Ghost button variants in dark mode */
+[data-coreui-theme='dark'] .btn-ghost-primary {
+  background-color: transparent !important;
+  color: var(--cui-body-color) !important;
+  border: none !important;
+}
+
+[data-coreui-theme='dark'] .btn-ghost-primary:hover {
+  background-color: rgba(var(--cui-primary-rgb), 0.1) !important;
+  color: var(--cui-primary) !important;
+}
+
+[data-coreui-theme='dark'] .btn-ghost-secondary {
+  background-color: transparent !important;
+  color: var(--cui-body-color) !important;
+  border: none !important;
+}
+
+[data-coreui-theme='dark'] .btn-ghost-secondary:hover {
+  background-color: var(--cui-tertiary-bg) !important;
+  color: var(--cui-body-color) !important;
+}
+
+/* Light mode ghost buttons */
+.btn-ghost-primary {
+  background-color: transparent !important;
+  color: var(--cui-body-color) !important;
+  border: none !important;
+}
+
+.btn-ghost-primary:hover {
+  background-color: rgba(var(--cui-primary-rgb), 0.1) !important;
+  color: var(--cui-primary) !important;
+}
+
+.btn-ghost-secondary {
+  background-color: transparent !important;
+  color: var(--cui-body-color) !important;
+  border: none !important;
+}
+
+.btn-ghost-secondary:hover {
+  background-color: var(--cui-tertiary-bg) !important;
+  color: var(--cui-body-color) !important;
 }
 
 /* UI Standards v1.0 · 2025-11-02 */

@@ -113,145 +113,89 @@ export default function PlanningOverviewControls({ projectId }: Props) {
     );
   }
 
+  const tileStyle: React.CSSProperties = {
+    border: '1px solid var(--cui-border-color)',
+    borderRadius: '16px',
+    backgroundColor: 'var(--surface-card)',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.08)'
+  }
+
   return (
     <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-      <div className="px-4 py-2 border-b" style={{ backgroundColor: 'var(--surface-card)', borderColor: 'var(--cui-border-color)' }}>
+      <div className="px-4 py-3 border-b" style={{ backgroundColor: 'var(--surface-card)', borderColor: 'var(--cui-border-color)' }}>
         <h2 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
       </div>
 
-      <div className="grid grid-cols-2 divide-x" style={{ borderColor: 'var(--cui-border-color)' }}>
-        {/* Left Panel - Explanation */}
-        <div className="p-6 space-y-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h3 className="font-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>What This Does</h3>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
-                The Parcel Detail table is the source of truth for your plan.
-                Choose your hierarchy levels to organize your project.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3 text-sm">
-            <div>
-              <strong style={{ color: 'var(--cui-body-color)' }}>Level 1:</strong>
-              <span style={{ color: 'var(--cui-secondary-color)' }}> Areas, Villages, Neighborhoods, Districts</span>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--cui-body-color)' }}>Level 2:</strong>
-              <span style={{ color: 'var(--cui-secondary-color)' }}> Phases, Timing Groups, Development Stages</span>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--cui-body-color)' }}>Level 3:</strong>
-              <span style={{ color: 'var(--cui-secondary-color)' }}> Parcels, Lots, Units, Pads (required)</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
-            <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-              Labels you choose here will appear throughout the app in headers,
-              filters, and navigation. Changes apply after clicking "Apply Changes".
+      <div className="p-6 space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+              Configure hierarchy labels, numbering, and efficiency guidance for this project.
             </p>
           </div>
+          {hasChanges && (
+            <span className="text-xs font-medium" style={{ color: 'var(--cui-warning)' }}>
+              Unsaved changes
+            </span>
+          )}
         </div>
 
-        {/* Right Panel - Controls */}
-        <div className="p-6 space-y-6">
-          <div>
-            <h3 className="font-semibold mb-4" style={{ color: 'var(--cui-body-color)' }}>Project Structure</h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Hierarchy tile */}
+          <section className="p-4 space-y-3" style={tileStyle}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+              Hierarchy
+            </h3>
 
-            {/* Level 1 */}
-            <div className="flex items-center gap-3 mb-3">
-              <input
-                type="checkbox"
-                checked={settings.level1Enabled}
-                onChange={(e) => updateSetting('level1Enabled', e.target.checked)}
-                className="w-4 h-4 rounded flex-shrink-0"
-                style={{ accentColor: 'var(--cui-primary)' }}
-              />
-              <span className="text-sm font-medium flex-shrink-0" style={{ color: 'var(--cui-body-color)', width: '90px' }}>Level 1:</span>
-              <select
-                value={settings.level1Label}
-                onChange={(e) => updateSetting('level1Label', e.target.value)}
-                disabled={!settings.level1Enabled}
-                className="px-3 py-1.5 text-sm border rounded-md flex-1"
-                style={{
-                  backgroundColor: settings.level1Enabled ? 'var(--cui-body-bg)' : 'rgb(243, 244, 246)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  cursor: settings.level1Enabled ? 'pointer' : 'not-allowed'
-                }}
-              >
-                {LABEL_OPTIONS.level1.map(label => (
-                  <option key={label} value={label}>{label}</option>
-                ))}
-              </select>
-            </div>
+            {[1, 2, 3].map((level) => {
+              const key = (`level${level}Label`) as keyof GranularitySettings;
+              const enabledKey = (`level${level}Enabled`) as keyof GranularitySettings;
+              const isLevel3 = level === 3;
+              const enabled = isLevel3 ? true : (settings[enabledKey] as boolean);
+              const options = LABEL_OPTIONS[`level${level as 1|2|3}`];
 
-            {/* Level 2 */}
-            <div className="flex items-center gap-3 mb-3">
-              <input
-                type="checkbox"
-                checked={settings.level2Enabled}
-                onChange={(e) => updateSetting('level2Enabled', e.target.checked)}
-                className="w-4 h-4 rounded flex-shrink-0"
-                style={{ accentColor: 'var(--cui-primary)' }}
-              />
-              <span className="text-sm font-medium flex-shrink-0" style={{ color: 'var(--cui-body-color)', width: '90px' }}>Level 2:</span>
-              <select
-                value={settings.level2Label}
-                onChange={(e) => updateSetting('level2Label', e.target.value)}
-                disabled={!settings.level2Enabled}
-                className="px-3 py-1.5 text-sm border rounded-md flex-1"
-                style={{
-                  backgroundColor: settings.level2Enabled ? 'var(--cui-body-bg)' : 'rgb(243, 244, 246)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)',
-                  cursor: settings.level2Enabled ? 'pointer' : 'not-allowed'
-                }}
-              >
-                {LABEL_OPTIONS.level2.map(label => (
-                  <option key={label} value={label}>{label}</option>
-                ))}
-              </select>
-            </div>
+              return (
+                <div key={level} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(e) => !isLevel3 && updateSetting(enabledKey, e.target.checked)}
+                    disabled={isLevel3}
+                    className="w-4 h-4 rounded flex-shrink-0"
+                    style={{ accentColor: 'var(--cui-primary)', cursor: isLevel3 ? 'not-allowed' : 'pointer' }}
+                  />
+                  <div className="flex-1 flex items-center gap-2">
+                    <label className="text-xs font-medium w-16" style={{ color: 'var(--cui-body-color)' }}>
+                      Level {level}{isLevel3 && <span className="text-[10px] text-slate-400"> (req)</span>}
+                    </label>
+                    <select
+                      value={settings[key] as string}
+                      onChange={(e) => updateSetting(key, e.target.value)}
+                      disabled={!enabled}
+                      className="h-8 flex-1 rounded border px-2 text-sm"
+                      style={{
+                        borderColor: 'var(--cui-border-color)',
+                        backgroundColor: enabled ? 'var(--cui-body-bg)' : 'rgb(243,244,246)',
+                        color: 'var(--cui-body-color)',
+                        cursor: enabled ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      {options.map((label) => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )
+            })}
+          </section>
 
-            {/* Level 3 - Always enabled */}
-            <div className="flex items-center gap-3 mb-3">
-              <input
-                type="checkbox"
-                checked={true}
-                disabled={true}
-                className="w-4 h-4 rounded cursor-not-allowed flex-shrink-0"
-                style={{ accentColor: 'var(--cui-primary)' }}
-              />
-              <span className="text-sm font-medium flex-shrink-0" style={{ color: 'var(--cui-body-color)', width: '90px' }}>
-                Level 3: <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>(req)</span>
-              </span>
-              <select
-                value={settings.level3Label}
-                onChange={(e) => updateSetting('level3Label', e.target.value)}
-                className="px-3 py-1.5 text-sm border rounded-md flex-1"
-                style={{
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                  color: 'var(--cui-body-color)'
-                }}
-              >
-                {LABEL_OPTIONS.level3.map(label => (
-                  <option key={label} value={label}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Numbering Options */}
-          <div className="pt-4 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
-            <h3 className="font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Numbering Options</h3>
-            <label className="flex items-center gap-3 cursor-pointer">
+          {/* Numbering tile */}
+          <section className="p-4 space-y-3" style={tileStyle}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+              Numbering
+            </h3>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={settings.autoNumber}
@@ -259,28 +203,41 @@ export default function PlanningOverviewControls({ projectId }: Props) {
                 className="w-4 h-4 rounded"
                 style={{ accentColor: 'var(--cui-primary)' }}
               />
-              <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>Auto-number parcels</span>
+              <span style={{ color: 'var(--cui-body-color)' }}>Auto-number parcels</span>
             </label>
-            <p className="text-xs mt-2 ml-7" style={{ color: 'var(--cui-secondary-color)' }}>
-              Automatically assign sequential parcel IDs based on hierarchy
+            <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              Automatically assign sequential parcel IDs based on your hierarchy selections.
             </p>
-          </div>
+          </section>
 
-          {/* Apply Button */}
-          <div className="pt-4">
-            <button
-              onClick={handleSave}
-              disabled={!hasChanges || saving}
-              className="w-full px-4 py-2 text-sm font-medium text-white rounded-md transition-colors"
-              style={{
-                backgroundColor: hasChanges && !saving ? 'var(--cui-primary)' : 'rgb(209, 213, 219)',
-                cursor: hasChanges && !saving ? 'pointer' : 'not-allowed',
-                opacity: hasChanges && !saving ? 1 : 0.6
-              }}
-            >
-              {saving ? 'Applying...' : 'Apply Changes'}
-            </button>
-          </div>
+          {/* Guidance + Apply tile */}
+          <section className="p-4 space-y-3 flex flex-col" style={tileStyle}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+              Guidance
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
+              Level labels cascade throughout filters, tables, and reports. Keep naming concise and consistent with your project taxonomy.
+            </p>
+            <ul className="text-xs space-y-1" style={{ color: 'var(--cui-secondary-color)' }}>
+              <li>• Level 1: Areas, Villages, Districts</li>
+              <li>• Level 2: Phases, Stages, Blocks</li>
+              <li>• Level 3: Parcels, Lots, Units</li>
+            </ul>
+            <div className="mt-auto pt-2">
+              <button
+                onClick={handleSave}
+                disabled={!hasChanges || saving}
+                className="w-full px-4 py-2 text-sm font-medium text-white rounded-md transition-colors"
+                style={{
+                  backgroundColor: hasChanges && !saving ? 'var(--cui-primary)' : 'rgb(209, 213, 219)',
+                  cursor: hasChanges && !saving ? 'pointer' : 'not-allowed',
+                  opacity: hasChanges && !saving ? 1 : 0.6
+                }}
+              >
+                {saving ? 'Applying...' : 'Apply Changes'}
+              </button>
+            </div>
+          </section>
         </div>
       </div>
     </div>

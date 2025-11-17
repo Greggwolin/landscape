@@ -1,21 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Pencil } from 'lucide-react';
 import type {
   UnitCostCategoryReference,
   CategoryTag,
   LifecycleStage,
 } from '@/types/benchmarks';
-import { updateCategory, addTagToCategory, removeTagFromCategory } from '@/lib/api/categories';
+import { updateCategory, createTag, deleteTag } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
 
 interface CategoryDetailPanelProps {
   category: UnitCostCategoryReference | null;
+  allCategories: UnitCostCategoryReference[];
   tags: CategoryTag[];
   onUpdate: (updated: UnitCostCategoryReference) => void;
   onDelete: (category: UnitCostCategoryReference) => void;
   onCreateTag: () => void;
+  onTagDeleted: (tagName: string) => void;
 }
 
 const LIFECYCLE_STAGES: LifecycleStage[] = [
@@ -25,25 +27,6 @@ const LIFECYCLE_STAGES: LifecycleStage[] = [
   'Disposition',
   'Financing',
 ];
-
-// Tag color palette for smart hash-based coloring
-const TAG_COLORS = [
-  'primary', 'success', 'warning', 'danger', 'info',
-  'purple', 'teal', 'orange', 'pink', 'indigo', 'cyan'
-];
-
-/**
- * Deterministic hash-based color assignment for tags
- * Same tag name will always get the same color
- */
-const getTagColor = (tagName: string): string => {
-  const hash = tagName.split('').reduce(
-    (acc, char) => char.charCodeAt(0) + ((acc << 5) - acc),
-    0
-  );
-  const index = Math.abs(hash) % TAG_COLORS.length;
-  return TAG_COLORS[index];
-};
 
 /**
  * Generate AI insight based on assigned tags
@@ -62,12 +45,50 @@ const generateTagInsight = (tags: string[]): string => {
   return `This category is tagged with ${tagList}. These tags can be used to filter budget items and group related categories across lifecycle stages for analysis and reporting.`;
 };
 
+const buildSortedTags = (
+  tagLibrary: CategoryTag[],
+  categoryTags: string[]
+): CategoryTag[] => {
+  const tagMap = new Map<string, CategoryTag>();
+
+  tagLibrary.forEach((tag) => {
+    const key = tag.tag_name.trim().toLowerCase();
+    if (key) {
+      tagMap.set(key, tag);
+    }
+  });
+
+  categoryTags.forEach((tagName, index) => {
+    const trimmed = tagName.trim();
+    const key = trimmed.toLowerCase();
+    if (!key || tagMap.has(key)) return;
+    tagMap.set(key, {
+      tag_id: -(index + 1),
+      tag_name: trimmed,
+      tag_context: 'All',
+      is_system_default: false,
+      description: 'Previously assigned tag',
+      display_order: 999,
+      is_active: true,
+    });
+  });
+
+  return Array.from(tagMap.values()).sort((a, b) => {
+    if (a.display_order !== b.display_order) {
+      return a.display_order - b.display_order;
+    }
+    return a.tag_name.localeCompare(b.tag_name);
+  });
+};
+
 export default function CategoryDetailPanel({
   category,
+  allCategories,
   tags,
   onUpdate,
   onDelete,
   onCreateTag,
+  onTagDeleted,
 }: CategoryDetailPanelProps) {
   const { showToast } = useToast();
 
@@ -86,7 +107,12 @@ export default function CategoryDetailPanel({
   const [tagInputValue, setTagInputValue] = useState('');
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [selectedTagIndex, setSelectedTagIndex] = useState(-1);
-  const tagInputRef = React.useRef<HTMLInputElement>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const lifecyclePickerRef = useRef<HTMLDivElement>(null);
+  const [isLifecycleUpdating, setIsLifecycleUpdating] = useState(false);
+  const [showLifecyclePicker, setShowLifecyclePicker] = useState(false);
+  const [isTagUpdating, setIsTagUpdating] = useState(false);
+  const [localTags, setLocalTags] = useState<CategoryTag[]>(tags);
 
   useEffect(() => {
     if (category) {
@@ -100,6 +126,8 @@ export default function CategoryDetailPanel({
       setIsEditing(false);
       setShowTagInput(false);
       setTagInputValue('');
+      setShowLifecyclePicker(false);
+      setIsLifecycleUpdating(false);
     }
   }, [category]);
 
@@ -109,6 +137,24 @@ export default function CategoryDetailPanel({
       tagInputRef.current.focus();
     }
   }, [showTagInput]);
+
+  useEffect(() => {
+    setLocalTags(tags);
+  }, [tags]);
+
+  useEffect(() => {
+    if (!showLifecyclePicker) return;
+    const handleClick = (event: MouseEvent) => {
+      if (
+        lifecyclePickerRef.current &&
+        !lifecyclePickerRef.current.contains(event.target as Node)
+      ) {
+        setShowLifecyclePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showLifecyclePicker]);
 
   if (!category) {
     return (
@@ -167,25 +213,94 @@ export default function CategoryDetailPanel({
     }
   };
 
-  const handleRemoveTag = async (tagName: string) => {
+  const applyTagChanges = async (nextTags: string[], successMessage?: string) => {
+    setIsTagUpdating(true);
     try {
-      await removeTagFromCategory(category.category_id, tagName);
-      const updated = { ...category, tags: category.tags.filter((t) => t !== tagName) };
+      const updated = await updateCategory(category.category_id, {
+        category_name: category.category_name,
+        lifecycle_stages: category.lifecycle_stages,
+        tags: nextTags,
+        sort_order: category.sort_order,
+        parent: category.parent ?? null,
+        is_active: category.is_active,
+      });
       onUpdate(updated);
+      if (successMessage) {
+        showToast(successMessage, 'success');
+      }
+      return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to remove tag';
+      const message = error instanceof Error ? error.message : 'Failed to update tags';
       showToast(message, 'error');
+      return false;
+    } finally {
+      setIsTagUpdating(false);
     }
+  };
+
+  const assignTag = async (tagName: string, showSuccessToast = false) => {
+    const trimmed = tagName.trim();
+    if (!trimmed) return false;
+
+    if (category.tags.some((tag) => tag.toLowerCase() === trimmed.toLowerCase())) {
+      if (showSuccessToast) {
+        showToast('Tag already assigned to this category', 'error');
+      }
+      return false;
+    }
+
+    let canonicalTagName = trimmed;
+    let tagRecord = localTags.find(
+      (tag) => tag.tag_name.toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (!tagRecord) {
+      try {
+        const newTag = await createTag({
+          tag_name: trimmed,
+          tag_context: 'All',
+          description: undefined,
+        });
+        tagRecord = newTag;
+        canonicalTagName = newTag.tag_name;
+        setLocalTags((prev) => [...prev, newTag]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create tag';
+        showToast(message, 'error');
+        return false;
+      }
+    } else {
+      canonicalTagName = tagRecord.tag_name;
+    }
+
+    const nextTags = [...category.tags, canonicalTagName];
+    return applyTagChanges(
+      nextTags,
+      showSuccessToast ? `Tag "${canonicalTagName}" added successfully` : undefined
+    );
+  };
+
+  const unassignTag = async (tagName: string, showSuccessToast = false) => {
+    if (!category.tags.includes(tagName)) return false;
+
+    const nextTags = category.tags.filter((t) => t !== tagName);
+    return applyTagChanges(
+      nextTags,
+      showSuccessToast ? `Tag "${tagName}" removed successfully` : undefined
+    );
   };
 
   const handleDelete = () => {
     onDelete(category);
   };
 
+  const sortedTags = buildSortedTags(localTags, category.tags);
+  const assignedTagSet = new Set(category.tags.map((tag) => tag.toLowerCase()));
+
   // Filter available tags for autocomplete
-  const availableTagsForInput = tags.filter((tag) => {
+  const availableTagsForInput = sortedTags.filter((tag) => {
     const matchesInput = tag.tag_name.toLowerCase().includes(tagInputValue.toLowerCase());
-    const notAssigned = !category.tags.includes(tag.tag_name);
+    const notAssigned = !assignedTagSet.has(tag.tag_name.toLowerCase());
     const matchesLifecycle = category.lifecycle_stages.some(stage =>
       tag.tag_context.split(',').map(c => c.trim()).includes(stage)
     ) || tag.tag_context === 'All';
@@ -198,26 +313,146 @@ export default function CategoryDetailPanel({
     setSelectedTagIndex(-1);
   };
 
-  const handleAddTagFromInput = async (tagName: string) => {
-    if (!tagName.trim()) return;
+  const handleToggleTagInput = () => {
+    setShowTagInput((prev) => {
+      const next = !prev;
+      if (next) {
+        setTimeout(() => tagInputRef.current?.focus(), 0);
+      } else {
+        setTagInputValue('');
+        setShowTagSuggestions(false);
+      }
+      return next;
+    });
+  };
 
-    // Check if already assigned
-    if (category.tags.includes(tagName)) {
-      showToast('Tag already assigned to this category', 'error');
+  const availableLifecycleStages = LIFECYCLE_STAGES.filter(
+    (stage) => !category.lifecycle_stages.includes(stage)
+  );
+
+  const persistLifecycleStages = async (
+    nextStages: LifecycleStage[],
+    actionMessage: string
+  ) => {
+    if (nextStages.length === 0) {
+      showToast('A category must have at least one lifecycle stage', 'error');
       return;
     }
 
+    setIsLifecycleUpdating(true);
     try {
-      await addTagToCategory(category.category_id, tagName);
-      const updated = { ...category, tags: [...category.tags, tagName] };
+      const updated = await updateCategory(category.category_id, {
+        category_name: category.category_name,
+        lifecycle_stages: nextStages,
+        tags: category.tags,
+        sort_order: category.sort_order,
+        parent: category.parent ?? null,
+        is_active: category.is_active,
+      });
       onUpdate(updated);
+      showToast(actionMessage, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update lifecycle stages';
+      showToast(message, 'error');
+    } finally {
+      setIsLifecycleUpdating(false);
+      setShowLifecyclePicker(false);
+    }
+  };
+
+  const handleRemoveLifecycleStage = (stage: LifecycleStage) => {
+    if (category.lifecycle_stages.length <= 1) {
+      showToast('At least one lifecycle stage is required', 'error');
+      return;
+    }
+    const nextStages = category.lifecycle_stages.filter((s) => s !== stage);
+    persistLifecycleStages(nextStages, `Removed ${stage}`);
+  };
+
+  const handleAddLifecycleStage = (stage: LifecycleStage) => {
+    if (category.lifecycle_stages.includes(stage)) {
+      setShowLifecyclePicker(false);
+      return;
+    }
+    const nextStages = [...category.lifecycle_stages, stage];
+    persistLifecycleStages(nextStages, `Added ${stage}`);
+  };
+
+  const handleTagChipToggle = async (tagName: string) => {
+    if (isTagUpdating) return;
+    if (category.tags.includes(tagName)) {
+      await unassignTag(tagName);
+    } else {
+      await assignTag(tagName);
+    }
+  };
+
+  const handleAddTagFromInput = async (tagName: string) => {
+    if (!tagName.trim()) return;
+    const success = await assignTag(tagName, true);
+    if (success) {
       setTagInputValue('');
       setShowTagInput(false);
       setShowTagSuggestions(false);
-      showToast(`Tag "${tagName}" added successfully`, 'success');
+    }
+  };
+
+  const handleDeleteTag = async (tag: CategoryTag) => {
+    if (isTagUpdating) return;
+    if (!tag || !tag.tag_name) return;
+
+    const otherCategories = allCategories.filter(
+      (cat) =>
+        cat.category_id !== category.category_id &&
+        cat.tags.some((t) => t.toLowerCase() === tag.tag_name.toLowerCase())
+    );
+
+    let confirmMessage = `Delete the tag "${tag.tag_name}"? This will remove it from all categories.`;
+    if (otherCategories.length > 0) {
+      const primary = otherCategories[0].category_name;
+      const extraCount = otherCategories.length - 1;
+      const suffix = extraCount > 0 ? ` and ${extraCount} other category${extraCount > 1 ? 'ies' : ''}` : '';
+      confirmMessage = `The tag "${tag.tag_name}" is used in "${primary}"${suffix}. Do you still want to delete it for all categories?`;
+    }
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsTagUpdating(true);
+    try {
+      const removed = await removeTagFromAssignedCategories(
+        tag.tag_name,
+        allCategories,
+        showToast
+      );
+      if (!removed) {
+        setIsTagUpdating(false);
+        return;
+      }
+
+      const tagIdNumber =
+        typeof tag.tag_id === 'string' ? Number(tag.tag_id) : tag.tag_id ?? 0;
+
+      if (!tagIdNumber || tagIdNumber <= 0) {
+        setLocalTags((prev) =>
+          prev.filter((t) => t.tag_name.toLowerCase() !== tag.tag_name.toLowerCase())
+        );
+        onTagDeleted(tag.tag_name);
+        showToast(`Tag "${tag.tag_name}" deleted`, 'success');
+        setIsTagUpdating(false);
+        return;
+      }
+
+      await deleteTag(tagIdNumber);
+      setLocalTags((prev) =>
+        prev.filter((t) => t.tag_name.toLowerCase() !== tag.tag_name.toLowerCase())
+      );
+      onTagDeleted(tag.tag_name);
+      showToast(`Tag "${tag.tag_name}" deleted`, 'success');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to add tag';
+      const message = error instanceof Error ? error.message : 'Failed to delete tag';
       showToast(message, 'error');
+    } finally {
+      setIsTagUpdating(false);
     }
   };
 
@@ -244,13 +479,7 @@ export default function CategoryDetailPanel({
       // No suggestions - user wants to create new tag
       const trimmedValue = tagInputValue.trim();
       if (trimmedValue) {
-        // Check if tag exists in master list (case insensitive)
-        const existingTag = tags.find(t => t.tag_name.toLowerCase() === trimmedValue.toLowerCase());
-        if (existingTag) {
-          handleAddTagFromInput(existingTag.tag_name);
-        } else {
-          showToast('Tag does not exist. Please select from suggestions or contact admin to create new tags.', 'error');
-        }
+        handleAddTagFromInput(trimmedValue);
       }
     } else if (e.key === 'Escape') {
       setShowTagInput(false);
@@ -258,13 +487,6 @@ export default function CategoryDetailPanel({
       setShowTagSuggestions(false);
     }
   };
-
-  // For edit mode: filter tags by selected lifecycle stages (show all matching tags)
-  const relevantTagsForEdit = tags.filter((tag) => {
-    const contexts = tag.tag_context.split(',').map((c) => c.trim());
-    const matches = formData.lifecycle_stages.some(stage => contexts.includes(stage)) || contexts.includes('All');
-    return matches;
-  });
 
   return (
     <div className="category-detail-panel">
@@ -380,10 +602,55 @@ export default function CategoryDetailPanel({
             <div className="form-value">
               <div className="lifecycle-badges-container">
                 {category.lifecycle_stages.map((stage) => (
-                  <span key={stage} className="lifecycle-badge-large" data-stage={stage}>
-                    {stage}
-                  </span>
+                  <div key={stage} className="lifecycle-badge-large" data-stage={stage}>
+                    <span>{stage}</span>
+                    <button
+                      type="button"
+                      className="lifecycle-badge-remove"
+                      onClick={() => handleRemoveLifecycleStage(stage)}
+                      disabled={isLifecycleUpdating || category.lifecycle_stages.length <= 1}
+                      aria-label={`Remove ${stage} stage`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ))}
+                {availableLifecycleStages.length > 0 && (
+                  <div className="lifecycle-add-wrapper" ref={lifecyclePickerRef}>
+                    {showLifecyclePicker ? (
+                      <div className="lifecycle-add-menu">
+                        {availableLifecycleStages.map((stage) => (
+                          <button
+                            key={stage}
+                            type="button"
+                            onClick={() => handleAddLifecycleStage(stage)}
+                            disabled={isLifecycleUpdating}
+                          >
+                            <Plus size={12} />
+                            {stage}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="lifecycle-add-cancel"
+                          onClick={() => setShowLifecyclePicker(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="lifecycle-add-chip"
+                        onClick={() => setShowLifecyclePicker(true)}
+                        disabled={isLifecycleUpdating}
+                      >
+                        <Plus size={14} />
+                        {isLifecycleUpdating ? 'Updating...' : 'Add Stage'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -395,185 +662,124 @@ export default function CategoryDetailPanel({
             <label className="form-label">Tags</label>
           </div>
 
-          {isEditing ? (
-            <div className="tags-selection">
-              {relevantTagsForEdit.length === 0 ? (
-                <p className="text-muted">No tags available for the selected lifecycle stages</p>
-              ) : (
-                <div className="tags-grid">
-                  {relevantTagsForEdit.map((tag) => (
-                    <div
-                      key={tag.tag_id}
-                      className={`tag-option ${
-                        formData.tags.includes(tag.tag_name) ? 'selected' : ''
-                      }`}
-                      onClick={() => {
-                        if (formData.tags.includes(tag.tag_name)) {
-                          setFormData({
-                            ...formData,
-                            tags: formData.tags.filter((t) => t !== tag.tag_name),
-                          });
-                        } else {
-                          setFormData({
-                            ...formData,
-                            tags: [...formData.tags, tag.tag_name],
-                          });
-                        }
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.tags.includes(tag.tag_name)}
-                        onChange={() => {}}
-                        className="form-check-input me-2"
-                      />
-                      <div className="tag-option-content">
-                        <div className="tag-option-name">{tag.tag_name}</div>
-                        {tag.description && (
-                          <div className="tag-option-desc">{tag.description}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="tags-list">
-              <div className="tags-grid">
-                {category.tags.map((tagName) => {
-                  const tagColor = getTagColor(tagName);
-                  return (
-                    <div
-                      key={tagName}
-                      className="tag-item tag-item-colored"
-                      style={{
-                        backgroundColor: `rgba(var(--cui-${tagColor}-rgb), 0.15)`,
-                        borderColor: `rgba(var(--cui-${tagColor}-rgb), 0.4)`,
-                        color: `var(--cui-${tagColor})`,
-                      }}
-                    >
-                      <span className="tag-name">{tagName}</span>
-                      <button
-                        className="tag-remove"
-                        onClick={() => handleRemoveTag(tagName)}
-                        aria-label="Remove tag"
-                        style={{
-                          color: `rgba(var(--cui-${tagColor}-rgb), 0.7)`,
-                        }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
+          <div className="tags-chip-row">
+            {sortedTags.length === 0 ? (
+              <p className="text-muted mb-0">No tags have been created yet.</p>
+            ) : (
+              sortedTags.map((tag) => {
+                const isAssigned = assignedTagSet.has(tag.tag_name.toLowerCase());
 
-                {/* Inline Tag Input */}
-                {showTagInput ? (
-                  <div style={{ position: 'relative', minWidth: '200px' }}>
-                    <input
-                      ref={tagInputRef}
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={tagInputValue}
-                      onChange={(e) => handleTagInputChange(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      onBlur={() => {
-                        // Delay to allow click on suggestion
-                        setTimeout(() => {
-                          setShowTagInput(false);
-                          setTagInputValue('');
-                          setShowTagSuggestions(false);
-                        }, 200);
-                      }}
-                      placeholder="Type to search tags..."
-                      autoComplete="off"
-                      style={{
-                        fontSize: '0.8125rem',
-                        padding: '0.375rem 0.75rem',
-                      }}
-                    />
-
-                    {/* Autocomplete Suggestions */}
-                    {showTagSuggestions && availableTagsForInput.length > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          zIndex: 1000,
-                          marginTop: '4px',
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          background: 'var(--cui-card-bg, #fff)',
-                          border: '1px solid var(--cui-border-color, #d8dbe0)',
-                          borderRadius: '6px',
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                        }}
-                      >
-                        {availableTagsForInput.map((tag, index) => (
-                          <div
-                            key={tag.tag_id}
-                            onClick={() => handleAddTagFromInput(tag.tag_name)}
-                            onMouseDown={(e) => e.preventDefault()} // Prevent blur
-                            style={{
-                              padding: '0.5rem 0.75rem',
-                              cursor: 'pointer',
-                              borderBottom:
-                                index < availableTagsForInput.length - 1
-                                  ? '1px solid var(--cui-border-color, #d8dbe0)'
-                                  : 'none',
-                              background:
-                                index === selectedTagIndex
-                                  ? 'var(--cui-primary-bg, #e7e4f9)'
-                                  : 'transparent',
-                              fontSize: '0.8125rem',
-                            }}
-                            onMouseEnter={() => setSelectedTagIndex(index)}
-                          >
-                            <div
-                              style={{
-                                fontWeight: 600,
-                                color: 'var(--cui-body-color, #4f5d73)',
-                              }}
-                            >
-                              {tag.tag_name}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
+                return (
                   <button
-                    className="tag-item tag-item-add"
-                    onClick={() => setShowTagInput(true)}
+                    key={tag.tag_id}
+                    type="button"
+                    className={`tag-chip ${isAssigned ? 'filled' : 'outline'}`}
+                    onClick={() => handleTagChipToggle(tag.tag_name)}
+                    disabled={isTagUpdating}
+                    aria-pressed={isAssigned}
+                  >
+                    <span className="tag-chip-label">{tag.tag_name}</span>
+                    <span
+                      className="tag-chip-delete"
+                      role="button"
+                      aria-label={`Delete ${tag.tag_name}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteTag(tag);
+                      }}
+                    >
+                      <X size={12} />
+                    </span>
+                  </button>
+                );
+              })
+            )}
+
+            <button
+              type="button"
+              className="tag-chip tag-chip-add"
+              onClick={handleToggleTagInput}
+              disabled={isTagUpdating}
+            >
+              <Plus size={12} />
+              Add Tag
+            </button>
+          </div>
+
+          {showTagInput && (
+            <div className="tags-inline-input">
+              <div style={{ position: 'relative' }}>
+                <input
+                  ref={tagInputRef}
+                  type="text"
+                  className="form-control form-control-sm"
+                  value={tagInputValue}
+                  onChange={(e) => handleTagInputChange(e.target.value)}
+                  onKeyDown={handleTagInputKeyDown}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setShowTagInput(false);
+                      setTagInputValue('');
+                      setShowTagSuggestions(false);
+                    }, 200);
+                  }}
+                  placeholder="Type to search tags..."
+                  autoComplete="off"
+                  style={{
+                    fontSize: '0.8125rem',
+                    padding: '0.375rem 0.75rem',
+                  }}
+                />
+
+                {showTagSuggestions && availableTagsForInput.length > 0 && (
+                  <div
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.375rem 0.75rem',
-                      background: 'transparent',
-                      border: '1px dashed var(--cui-border-color, #d8dbe0)',
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      background: 'var(--cui-card-bg, #fff)',
+                      border: '1px solid var(--cui-border-color, #d8dbe0)',
                       borderRadius: '6px',
-                      fontSize: '0.8125rem',
-                      color: 'var(--cui-primary, #321fdb)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--cui-primary-bg, #e7e4f9)';
-                      e.currentTarget.style.borderColor = 'var(--cui-primary, #321fdb)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.borderColor = 'var(--cui-border-color, #d8dbe0)';
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                     }}
                   >
-                    <Plus size={12} />
-                    <span>Add Tag</span>
-                  </button>
+                    {availableTagsForInput.map((tag, index) => (
+                      <div
+                        key={tag.tag_id}
+                        onClick={() => handleAddTagFromInput(tag.tag_name)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        style={{
+                          padding: '0.5rem 0.75rem',
+                          cursor: 'pointer',
+                          borderBottom:
+                            index < availableTagsForInput.length - 1
+                              ? '1px solid var(--cui-border-color, #d8dbe0)'
+                              : 'none',
+                          background:
+                            index === selectedTagIndex
+                              ? 'var(--cui-primary-bg, #e7e4f9)'
+                              : 'transparent',
+                          fontSize: '0.8125rem',
+                        }}
+                        onMouseEnter={() => setSelectedTagIndex(index)}
+                      >
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: 'var(--cui-body-color, #4f5d73)',
+                          }}
+                        >
+                          {tag.tag_name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -620,3 +826,36 @@ export default function CategoryDetailPanel({
     </div>
   );
 }
+
+const removeTagFromAssignedCategories = async (
+  tagName: string,
+  allCategories: UnitCostCategoryReference[],
+  showToast: ReturnType<typeof useToast>['showToast']
+) => {
+  const normalized = tagName.toLowerCase();
+  const targets = allCategories.filter((cat) =>
+    cat.tags.some((tag) => tag.toLowerCase() === normalized)
+  );
+
+  if (targets.length === 0) return true;
+
+  try {
+    for (const cat of targets) {
+      const nextTags = cat.tags.filter((tag) => tag.toLowerCase() !== normalized);
+      await updateCategory(cat.category_id, {
+        category_name: cat.category_name,
+        lifecycle_stages: cat.lifecycle_stages,
+        tags: nextTags,
+        sort_order: cat.sort_order,
+        parent: cat.parent ?? null,
+        is_active: cat.is_active,
+      });
+    }
+    return true;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to remove tag from categories';
+    showToast(message, 'error');
+    return false;
+  }
+};

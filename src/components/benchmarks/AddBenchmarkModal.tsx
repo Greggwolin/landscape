@@ -39,9 +39,12 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
     setSaving(true);
     setError(null);
 
+    console.log('[AddBenchmarkModal] Form submitted with data:', formData);
+
     try {
       // Validation for transaction costs
       if (category === 'transaction_cost' && !formData.cost_type) {
+        console.log('[AddBenchmarkModal] Validation failed: cost_type required');
         setError('Please select a cost type');
         setSaving(false);
         return;
@@ -90,17 +93,23 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
         body.cost_type = formData.cost_type;
       }
 
+      console.log('[AddBenchmarkModal] Sending to API:', body);
+
       const response = await fetch('/api/benchmarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
+      console.log('[AddBenchmarkModal] Response:', response.status, response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('[AddBenchmarkModal] Error response:', errorData);
         throw new Error(errorData.error || 'Failed to create benchmark');
       }
 
+      console.log('[AddBenchmarkModal] Success! Calling onSuccess and onClose');
       onSuccess();
       onClose();
     } catch (err) {

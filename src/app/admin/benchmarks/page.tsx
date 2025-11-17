@@ -14,11 +14,11 @@ import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
 import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
 import AbsorptionVelocityPanel from '@/components/benchmarks/absorption/AbsorptionVelocityPanel';
 import AdminNavBar from '@/app/components/AdminNavBar';
+import { LandscapeButton } from '@/components/ui/landscape';
 import type {
   Benchmark,
   AISuggestion,
   BenchmarkCategory,
-  LandscaperMode,
   GrowthRateSet,
   AbsorptionVelocity
 } from '@/types/benchmarks';
@@ -42,7 +42,6 @@ export default function GlobalBenchmarksPage() {
   const [selectedCategory, setSelectedCategory] = useState<BenchmarkCategory | null>(null);
   const [benchmarks, setBenchmarks] = useState<Record<string, Benchmark[]>>({});
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
-  const [landscaperMode, setLandscaperMode] = useState<LandscaperMode>('helpful');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -65,8 +64,9 @@ export default function GlobalBenchmarksPage() {
     setError(null);
 
     try {
-      const [benchmarkRes, suggestionsRes, absorptionRes, unitCostTemplatesRes] = await Promise.all([
+      const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes] = await Promise.all([
         fetch('/api/benchmarks'),
+        fetch('/api/sale-benchmarks/global'),
         fetch('/api/benchmarks/ai-suggestions'),
         fetch('/api/benchmarks/absorption-velocity'),
         fetch('/api/unit-costs/templates'),
@@ -77,6 +77,19 @@ export default function GlobalBenchmarksPage() {
       }
 
       const benchmarkData = await benchmarkRes.json();
+
+      // Fetch sale benchmarks (global transaction costs from tbl_sale_benchmarks)
+      let saleBenchmarks: any[] = [];
+      if (saleBenchmarksRes.ok) {
+        const saleBenchmarksData = await saleBenchmarksRes.json();
+        saleBenchmarks = saleBenchmarksData.benchmarks || [];
+        console.log('Sale benchmarks loaded:', saleBenchmarks);
+      } else {
+        console.warn('Failed to load sale benchmarks:', {
+          status: saleBenchmarksRes.status,
+          statusText: saleBenchmarksRes.statusText
+        });
+      }
 
       let suggestionsData: { suggestions?: AISuggestion[] } = {};
       if (!suggestionsRes.ok) {
@@ -122,6 +135,48 @@ export default function GlobalBenchmarksPage() {
         totalCostLineItems: templateCount
       });
 
+      // Convert sale benchmarks to Benchmark format and add to transaction_cost category
+      // Use large offset (1000000) to ensure unique IDs across different tables
+      // Sale benchmarks are from tbl_sale_benchmarks, regular benchmarks are from tbl_benchmark_registry
+      const convertedSaleBenchmarks: Benchmark[] = saleBenchmarks.map((sb: any) => {
+        // Determine value and value_type based on what fields are set
+        let value: number | undefined;
+        let value_type: 'flat_fee' | 'percentage' | 'per_unit' = 'flat_fee';
+
+        if (sb.fixed_amount !== null && sb.fixed_amount !== undefined) {
+          value = sb.fixed_amount;
+          value_type = 'flat_fee';
+        } else if (sb.rate_pct !== null && sb.rate_pct !== undefined) {
+          value = sb.rate_pct * 100; // Convert 0.03 to 3
+          value_type = 'percentage';
+        } else if (sb.amount_per_uom !== null && sb.amount_per_uom !== undefined) {
+          value = sb.amount_per_uom;
+          value_type = 'per_unit';
+        }
+
+        return {
+          benchmark_id: sb.benchmark_id + 1000000, // Add offset to avoid ID collision with tbl_benchmark_registry
+          user_id: '1',
+          category: 'transaction_cost',
+          benchmark_name: sb.benchmark_name || `${sb.benchmark_type} Benchmark`,
+          description: sb.description,
+          source_type: 'global_default',
+          confidence_level: 'high',
+          usage_count: 0,
+          as_of_date: sb.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+          is_active: true,
+          is_global: true,
+          created_at: sb.created_at || new Date().toISOString(),
+          updated_at: sb.updated_at || new Date().toISOString(),
+          value,
+          uom_code: sb.uom_code,
+          cost_type: sb.benchmark_type,
+          value_type,
+          age_days: 0,
+          is_stale: false
+        } as Benchmark;
+      });
+
       // Group benchmarks by category
       const grouped: Record<string, Benchmark[]> = {};
       benchmarkData.benchmarks.forEach((b: Benchmark) => {
@@ -130,6 +185,15 @@ export default function GlobalBenchmarksPage() {
         }
         grouped[b.category].push(b);
       });
+
+      // Add converted sale benchmarks to transaction_cost category
+      if (convertedSaleBenchmarks.length > 0) {
+        if (!grouped['transaction_cost']) {
+          grouped['transaction_cost'] = [];
+        }
+        // Add sale benchmarks at the beginning (they are global defaults)
+        grouped['transaction_cost'] = [...convertedSaleBenchmarks, ...grouped['transaction_cost']];
+      }
 
       setBenchmarks(grouped);
       setAiSuggestions(suggestionsData.suggestions || []);
@@ -212,32 +276,6 @@ export default function GlobalBenchmarksPage() {
           </div>
         </div>
 
-        {/* Landscaper and Refresh Controls */}
-        <div className="flex items-center justify-end gap-3 border-b border-line-soft bg-surface-card px-6 py-3">
-          <div className="flex items-center gap-3">
-            {/* Landscaper Mode Selector */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-text-secondary">Landscaper:</label>
-              <select
-                value={landscaperMode}
-                onChange={(e) => setLandscaperMode(e.target.value as LandscaperMode)}
-                className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/30 focus:outline-none"
-              >
-                <option value="silent">Silent Mode</option>
-                <option value="helpful">Helpful Mode</option>
-                <option value="teaching">Teaching Mode</option>
-              </select>
-            </div>
-            <button
-              onClick={loadData}
-              className="btn btn-primary text-sm font-medium"
-              disabled={loading}
-            >
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
-          </div>
-        </div>
-
         {/* Error State */}
         {error && (
           <div className="m-4 rounded border border-chip-error/60 bg-chip-error/10 p-4 text-chip-error">
@@ -282,7 +320,9 @@ export default function GlobalBenchmarksPage() {
                   const isExpanded = selectedCategory?.key === category.key;
                   return (
                     <div key={category.key} className="border-b border-line-soft">
-                      <button
+                      <LandscapeButton
+                        variant="ghost"
+                        color="secondary"
                         onClick={() =>
                           setSelectedCategory(isExpanded ? null : category)
                         }
@@ -299,7 +339,7 @@ export default function GlobalBenchmarksPage() {
                         <span className="text-sm text-text-secondary">
                           {category.count}
                         </span>
-                      </button>
+                      </LandscapeButton>
                       {isExpanded && (
                         <div className="bg-surface-bg">
                           <AbsorptionVelocityPanel
@@ -333,6 +373,7 @@ export default function GlobalBenchmarksPage() {
                       setAddingToCategory(category);
                       setShowAddModal(true);
                     }}
+                    onRefresh={loadData}
                   />
                 );
               })
@@ -356,7 +397,6 @@ export default function GlobalBenchmarksPage() {
             <BenchmarksFlyout
               selection={selectedTile}
               aiSuggestions={aiSuggestions}
-              mode={landscaperMode}
               onRefresh={loadData}
             />
           </div>

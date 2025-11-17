@@ -4,8 +4,9 @@
 import React, { useState, useMemo } from 'react';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { CButton } from '@coreui/react';
+import { LandscapeButton } from '@/components/ui/landscape';
 import { getColumnsByMode, type BudgetItem } from './ColumnDefinitions';
-import type { BudgetMode } from './ModeSelector';
+import type { BudgetMode } from '@/types/budget';
 import CategoryEditorRow from './custom/CategoryEditorRow';
 import GroupRow from './custom/GroupRow';
 import ExpandableDetailsRow from './custom/ExpandableDetailsRow';
@@ -155,7 +156,7 @@ export default function BudgetDataGrid({
   return (
     <div className="table-responsive border rounded">
       <table className="table table-hover align-middle mb-0" style={{ tableLayout: 'fixed' }}>
-        <thead className="table-light">
+        <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
@@ -293,17 +294,19 @@ export default function BudgetDataGrid({
                         <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
                           <div className="d-flex align-items-center gap-2">
                             {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
-                              <button
-                                className="btn btn-sm btn-link p-0 text-decoration-none"
+                              <LandscapeButton
+                                color="secondary"
+                                variant="ghost"
+                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
                                 }}
                                 title="Toggle details"
-                                style={{ fontSize: '0.875rem', lineHeight: 1 }}
+                                className="p-0"
                               >
                                 {isDetailsExpanded ? '▼' : '▶'}
-                              </button>
+                              </LandscapeButton>
                             )}
                             <div className="flex-grow-1">
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -355,17 +358,19 @@ export default function BudgetDataGrid({
                       <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
                         <div className="d-flex align-items-center gap-2">
                           {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
-                            <button
-                              className="btn btn-sm btn-link p-0 text-decoration-none"
+                            <LandscapeButton
+                              color="secondary"
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
                               }}
                               title="Toggle details"
-                              style={{ fontSize: '0.875rem', lineHeight: 1 }}
+                              className="p-0"
                             >
                               {isDetailsExpanded ? '▼' : '▶'}
-                            </button>
+                            </LandscapeButton>
                           )}
                           <div className="flex-grow-1">
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

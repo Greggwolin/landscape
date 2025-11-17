@@ -25,10 +25,10 @@ interface GroupRowProps {
 }
 
 const LEVEL_COLORS = {
-  1: '#0d6efd', // Blue
-  2: '#198754', // Green
-  3: '#ffc107', // Yellow/Amber
-  4: '#dc3545', // Red
+  1: 'var(--cui-primary)', // Blue
+  2: 'var(--cui-success)', // Green
+  3: 'var(--cui-warning)', // Yellow/Amber
+  4: 'var(--cui-danger)', // Red
 };
 
 export default function GroupRow({
@@ -55,7 +55,7 @@ export default function GroupRow({
   // Amount column is always second to last in napkin mode, and varies in others
   // We'll use a simple approach: show breadcrumb in first cell, subtotal in specific position
 
-  const levelColor = LEVEL_COLORS[categoryLevel as keyof typeof LEVEL_COLORS] || '#6c757d';
+  const levelColor = LEVEL_COLORS[categoryLevel as keyof typeof LEVEL_COLORS] || 'var(--cui-secondary)';
 
   // Format variance display
   const formatVarianceDisplay = () => {
@@ -112,9 +112,9 @@ export default function GroupRow({
 
   return (
     <tr
-      className="table-light"
       style={{
         cursor: 'pointer',
+        backgroundColor: 'var(--cui-tertiary-bg)',
         borderTop: '2px solid var(--cui-border-color)',
         borderBottom: '1px solid var(--cui-border-color)',
       }}

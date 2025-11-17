@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/toast';
+import CIcon from '@coreui/icons-react';
+import { cilPencil, cilTrash } from '@coreui/icons';
 
 interface Type {
   type_id: number;
@@ -28,14 +30,43 @@ interface ProductsListProps {
 export default function ProductsList({ type, onClose }: ProductsListProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [efficiencyLoading, setEfficiencyLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({ code: '', lot_w_ft: '', lot_d_ft: '' });
+  const [planningEfficiency, setPlanningEfficiency] = useState<number | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     loadProducts(type.type_id);
   }, [type]);
+
+  useEffect(() => {
+    const loadEfficiency = async () => {
+      setEfficiencyLoading(true);
+      try {
+        const response = await fetch('/api/planning-standards');
+        if (response.ok) {
+          const data = await response.json();
+          const value = data?.standard?.default_planning_efficiency;
+          if (typeof value === 'number') {
+            setPlanningEfficiency(value);
+          } else {
+            setPlanningEfficiency(0.75);
+          }
+        } else {
+          setPlanningEfficiency(0.75);
+        }
+      } catch (error) {
+        console.error('Failed to load planning efficiency', error);
+        setPlanningEfficiency(0.75);
+      } finally {
+        setEfficiencyLoading(false);
+      }
+    };
+
+    void loadEfficiency();
+  }, []);
 
   const loadProducts = async (typeId: number) => {
     setLoading(true);
@@ -116,6 +147,13 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
     }
   };
 
+  const computeDensity = (product: { lot_area_sf: number }, efficiency: number | null) => {
+    if (!efficiency || !product.lot_area_sf || product.lot_area_sf <= 0) return null;
+    const density = (43560 / product.lot_area_sf) * efficiency;
+    if (!Number.isFinite(density)) return null;
+    return Math.round(density * 100) / 100;
+  };
+
   return (
     <div className="products-panel">
       {/* Header */}
@@ -158,27 +196,58 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
           <div className="empty-state">
             <div className="empty-state-icon">📦</div>
             <div className="empty-state-text">No products defined for this type</div>
-            <button onClick={handleAddNew} style={{ marginTop: '12px', padding: '8px 16px', borderRadius: '4px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer' }}>
+            <button
+              onClick={handleAddNew}
+              style={{
+                marginTop: '12px',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: 'var(--cui-primary)',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
               + Add Product
             </button>
           </div>
         ) : (
-          products.map((product) => (
-            <div key={product.product_id} className="product-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span className="product-code">{product.code}</span>
-                <span className="product-size" style={{ marginLeft: '8px', color: '#666' }}>{product.lot_area_sf.toLocaleString()} SF</span>
+          products.map((product) => {
+            const density = computeDensity(product, planningEfficiency);
+            return (
+              <div key={product.product_id} className="product-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div>
+                    <span className="product-code">{product.code}</span>
+                    <span className="product-size" style={{ marginLeft: '8px', color: 'var(--cui-secondary-color)' }}>
+                      {product.lot_area_sf.toLocaleString()} SF
+                    </span>
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--cui-secondary-color)', marginTop: '4px' }}>
+                    Density:{' '}
+                    {efficiencyLoading
+                      ? 'Loading…'
+                      : density != null
+                        ? `${density} u/ac`
+                        : '—'}{' '}
+                    {planningEfficiency != null && !efficiencyLoading && (
+                      <span style={{ color: 'var(--cui-body-color)' }}>
+                        (eff {Math.round(planningEfficiency * 100)}%)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => handleEdit(product)} title="Edit" className="btn-edit">
+                    <CIcon icon={cilPencil} size="sm" />
+                  </button>
+                  <button onClick={() => handleDelete(product)} title="Delete" className="btn-edit">
+                    <CIcon icon={cilTrash} size="sm" />
+                  </button>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button onClick={() => handleEdit(product)} title="Edit" style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', cursor: 'pointer' }}>
-                  ✏️
-                </button>
-                <button onClick={() => handleDelete(product)} title="Delete" style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', cursor: 'pointer' }}>
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -197,60 +266,121 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
           zIndex: 1100
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--cui-card-bg)',
             padding: '24px',
             borderRadius: '8px',
             width: '90%',
             maxWidth: '500px'
           }}>
-            <h3 style={{ marginTop: 0 }}>{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
+            <h3 style={{ marginTop: 0, color: 'var(--cui-body-color)' }}>{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Code</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Code</label>
                 <input
                   type="text"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)'
+                  }}
                   placeholder="e.g., 50x100"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Width (ft)</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Width (ft)</label>
                 <input
                   type="number"
                   value={formData.lot_w_ft}
                   onChange={(e) => setFormData({ ...formData, lot_w_ft: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)'
+                  }}
                   placeholder="e.g., 50"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Depth (ft)</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Depth (ft)</label>
                 <input
                   type="number"
                   value={formData.lot_d_ft}
                   onChange={(e) => setFormData({ ...formData, lot_d_ft: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)'
+                  }}
                   placeholder="e.g., 100"
                 />
               </div>
-              {formData.lot_w_ft && formData.lot_d_ft && (
-                <div style={{ padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '4px' }}>
-                  <strong>Calculated Area:</strong> {(parseInt(formData.lot_w_ft) * parseInt(formData.lot_d_ft)).toLocaleString()} SF
-                </div>
-              )}
+              {formData.lot_w_ft && formData.lot_d_ft && (() => {
+                const width = Number(formData.lot_w_ft)
+                const depth = Number(formData.lot_d_ft)
+                const area = Number.isFinite(width) && Number.isFinite(depth) && width > 0 && depth > 0
+                  ? width * depth
+                  : null
+                if (!area) return null
+                const projectedDensity = planningEfficiency != null
+                  ? (() => {
+                      const density = (43560 / area) * planningEfficiency
+                      return Number.isFinite(density) ? Math.round(density * 100) / 100 : null
+                    })()
+                  : null
+
+                return (
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: 'var(--cui-tertiary-bg)',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: 'var(--cui-body-color)'
+                  }}>
+                    <div>
+                      <strong>Calculated Area:</strong> {area.toLocaleString()} SF
+                    </div>
+                    <div style={{ marginTop: '6px' }}>
+                      <strong>Projected Density:</strong> {projectedDensity != null ? `${projectedDensity} u/ac` : '—'}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', cursor: 'pointer' }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--cui-border-color)',
+                  backgroundColor: 'var(--cui-body-bg)',
+                  color: 'var(--cui-body-color)',
+                  cursor: 'pointer'
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer' }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: 'var(--cui-primary)',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
               >
                 Save
               </button>

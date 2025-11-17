@@ -1,7 +1,5 @@
-// v1.0 · 2025-11-02 · CoreUI-based mode selector
+// v2.0 · 2025-01-16 · Badge/chip style mode selector
 'use client';
-
-import { CButton, CButtonGroup } from '@coreui/react';
 
 export type BudgetMode = 'napkin' | 'standard' | 'detail';
 
@@ -10,24 +8,60 @@ interface Props {
   onModeChange: (mode: BudgetMode) => void;
 }
 
+const MODE_CONFIG = {
+  napkin: {
+    label: 'Napkin',
+    fields: 9,
+    color: 'success',
+    cssVar: '--cui-success'
+  },
+  standard: {
+    label: 'Standard',
+    fields: 28,
+    color: 'warning',
+    cssVar: '--cui-warning'
+  },
+  detail: {
+    label: 'Detail',
+    fields: 49,
+    color: 'danger',
+    cssVar: '--cui-danger'
+  }
+} as const;
+
 export default function ModeSelector({ activeMode, onModeChange }: Props) {
-  const renderButton = (mode: BudgetMode, label: string, color: 'success' | 'warning' | 'danger') => (
-    <CButton
-      key={mode}
-      color={color}
-      variant={activeMode === mode ? undefined : 'outline'}
-      onClick={() => onModeChange(mode)}
-      size="sm"
-    >
-      {label}
-    </CButton>
-  );
+  const modes = Object.entries(MODE_CONFIG) as [BudgetMode, typeof MODE_CONFIG[BudgetMode]][];
 
   return (
-    <CButtonGroup role="group" className="mb-3">
-      {renderButton('napkin', 'Napkin (9 fields)', 'success')}
-      {renderButton('standard', 'Standard (10 cols)', 'warning')}
-      {renderButton('detail', 'Detail (10 cols)', 'danger')}
-    </CButtonGroup>
+    <div className="flex flex-wrap gap-2 mb-3">
+      {modes.map(([mode, config]) => {
+        const isActive = activeMode === mode;
+
+        // Warning badges need dark text for contrast
+        const textColor = isActive
+          ? (config.color === 'warning' ? '#000' : '#fff')
+          : `var(${config.cssVar})`;
+
+        return (
+          <button
+            key={mode}
+            type="button"
+            className="budget-mode-badge"
+            data-active={isActive}
+            data-color={config.color}
+            style={{
+              background: isActive ? `var(${config.cssVar})` : 'transparent',
+              borderColor: `var(${config.cssVar})`,
+              color: textColor
+            }}
+            onClick={() => onModeChange(mode)}
+          >
+            <span className="budget-mode-badge-text">
+              {config.label} ({config.fields} fields)
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

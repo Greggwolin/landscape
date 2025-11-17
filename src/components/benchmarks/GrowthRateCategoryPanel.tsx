@@ -5,7 +5,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import CIcon from '@coreui/icons-react';
+import { cilPencil, cilX } from '@coreui/icons';
 import type {
   BenchmarkCategory,
   GrowthRateSet,
@@ -259,58 +261,60 @@ function GrowthRateListItem({
       onClick={handleTileSelect}
       onKeyDown={handleRowKeyDown}
     >
-      <div className="flex items-center">
+      <div className="flex items-center w-full">
         <div className="min-w-[200px] text-sm font-medium text-text-primary">{set.set_name}</div>
-        {set.rate_type === 'flat' && typeof set.current_rate === 'number' ? (
-          isEditingInline ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={inlineRate}
-                onChange={(e) => setInlineRate(e.target.value)}
-                className="w-20 px-2 py-1 bg-surface-card border border-brand-primary rounded text-sm text-text-primary focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleInlineSave();
-                  if (e.key === 'Escape') handleInlineCancel();
-                }}
-              />
-              <span className="text-sm text-text-secondary">%</span>
+        <div className="flex-1 flex justify-end items-center">
+          {set.rate_type === 'flat' && typeof set.current_rate === 'number' ? (
+            isEditingInline ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={inlineRate}
+                  onChange={(e) => setInlineRate(e.target.value)}
+                  className="w-20 px-2 py-1 bg-surface-card border border-brand-primary rounded text-sm text-right text-text-primary focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleInlineSave();
+                    if (e.key === 'Escape') handleInlineCancel();
+                  }}
+                />
+                <span className="text-sm text-text-secondary">%</span>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleInlineSave();
+                  }}
+                  className="text-xs rounded bg-brand-primary px-2 py-1 text-text-inverse hover:bg-brand-primary/90 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleInlineCancel();
+                  }}
+                  className="text-xs rounded border border-line-strong px-2 py-1 text-text-primary hover:bg-surface-card transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleInlineSave();
-                }}
-                className="text-xs rounded bg-brand-primary px-2 py-1 text-text-inverse hover:bg-brand-primary/90 transition-colors"
+                onClick={handleInlineEdit}
+                disabled={!canEdit || isDeleting}
+                className={`text-sm font-medium text-brand-primary text-right ${canEdit ? 'cursor-pointer hover:text-brand-primary/80 transition-colors' : 'cursor-default'}`}
               >
-                Save
+                {roundToTwo(set.current_rate * 100)}%
               </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleInlineCancel();
-                }}
-                className="text-xs rounded border border-line-strong px-2 py-1 text-text-primary hover:bg-surface-card transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+            )
           ) : (
-            <button
-              onClick={handleInlineEdit}
-              disabled={!canEdit || isDeleting}
-              className={`text-sm font-medium text-brand-primary ${canEdit ? 'cursor-pointer hover:text-brand-primary/80 transition-colors' : 'cursor-default'}`}
-            >
-              {roundToTwo(set.current_rate * 100)}%
-            </button>
-          )
-        ) : (
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${rateChip.className}`}>
-            {set.rate_type === 'stepped'
-              ? `${set.step_count || (set.steps?.length ?? 0)} steps`
-              : rateChip.label}
-          </span>
-        )}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${rateChip.className}`}>
+              {set.rate_type === 'stepped'
+                ? `${set.step_count || (set.steps?.length ?? 0)} steps`
+                : rateChip.label}
+            </span>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {canEdit && set.rate_type === 'stepped' && (
             <button
@@ -320,9 +324,10 @@ function GrowthRateListItem({
                 onSelect?.();
               }}
               disabled={isDeleting}
-              className="text-xs rounded border border-line-strong px-3 py-1 text-text-primary hover:bg-surface-card/80 transition-colors disabled:opacity-50"
+              className="p-1 rounded hover:bg-surface-card/80 transition-colors disabled:opacity-50"
+              title="Edit"
             >
-              Edit
+              <CIcon icon={cilPencil} size="sm" className="text-text-primary" />
             </button>
           )}
           {canEdit && (
@@ -332,9 +337,10 @@ function GrowthRateListItem({
                 handleDelete();
               }}
               disabled={isDeleting}
-              className="text-xs px-3 py-1 rounded border border-chip-error text-chip-error hover:bg-chip-error/10 transition-colors disabled:opacity-50"
+              className="p-1 rounded hover:bg-chip-error/10 transition-colors disabled:opacity-50"
+              title={isDeleting ? 'Deleting...' : 'Delete'}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              <CIcon icon={cilX} size="sm" className="text-chip-error" />
             </button>
           )}
         </div>
@@ -719,11 +725,11 @@ function GrowthRateStepTable({
             <button
               onClick={() => onRemoveStep(row.index)}
               disabled={steps.length <= 1}
-              className="text-chip-error hover:text-red-300 disabled:text-text-secondary"
+              className="p-1 rounded hover:bg-chip-error/10 transition-colors disabled:opacity-50"
               title="Remove step"
               type="button"
             >
-              <Trash2 size={14} />
+              <CIcon icon={cilX} size="sm" className={steps.length <= 1 ? 'text-text-secondary' : 'text-chip-error'} />
             </button>
           </div>
         ),

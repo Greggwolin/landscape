@@ -431,7 +431,7 @@
 
 .type-card.active {
   border-color: var(--cui-primary);
-  background-color: #e0f2fe;
+  background-color: var(--cui-primary-bg);
 }
 
 .type-card-content {
