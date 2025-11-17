@@ -80,7 +80,7 @@ export default function AreaTiles({
             onClick={() => onAreaSelect(area.container_id)}
           >
             <div className="planning-tile-header">
-              {area.name} #{area.code}
+              Village {area.name}
             </div>
 
             <div className="space-y-1">
