@@ -141,7 +141,7 @@ export default function PhaseTiles({
             onClick={() => onPhaseSelect(phase.phase_id)}
           >
             <div className="planning-tile-header">
-              {phase.phase_name} #{phase.phase_code}
+              Phase {phase.phase_name}
             </div>
 
             <div className="planning-tile-stat">
