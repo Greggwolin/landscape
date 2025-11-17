@@ -59,12 +59,24 @@ export async function PUT(
       await sql`UPDATE landscape.core_fin_fact_budget SET escalation_rate = ${updates.escalation_rate} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
+    if ('escalation_method' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET escalation_method = ${updates.escalation_method} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
     if ('contingency_pct' in updates) {
       await sql`UPDATE landscape.core_fin_fact_budget SET contingency_pct = ${updates.contingency_pct} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
     if ('timing_method' in updates) {
       await sql`UPDATE landscape.core_fin_fact_budget SET timing_method = ${updates.timing_method} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('curve_profile' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET curve_profile = ${updates.curve_profile} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('curve_steepness' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET curve_steepness = ${updates.curve_steepness} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
     if ('category_l1_id' in updates) {

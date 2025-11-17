@@ -1,11 +1,17 @@
 // ExpandableDetailsRow - Shows additional budget item fields in accordion pattern
-// v1.1 · 2025-11-10 · Compact always-visible inputs with color indicators
+// v2.6 · 2025-11-16 · Balanced inline layout with improved spacing
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import type { BudgetItem } from '../ColumnDefinitions';
-import type { BudgetMode } from '../ModeSelector';
+import React, { useState } from 'react';
+import {
+  CBadge,
+  CFormLabel,
+} from '@coreui/react';
+import type { BudgetItem } from '@/types/budget';
+import type { BudgetMode } from '@/types/budget';
+import { getFieldGroupsByMode } from '../config/fieldGroups';
+import { FieldRenderer } from '../fields/FieldRenderer';
 
 interface ExpandableDetailsRowProps {
   item: BudgetItem;
@@ -18,206 +24,183 @@ interface ExpandableDetailsRowProps {
   ) => Promise<void> | void;
 }
 
-interface FieldConfig {
-  key: keyof BudgetItem;
-  label: string;
-  type: 'number' | 'text' | 'boolean';
-}
-
-export default function ExpandableDetailsRow({
+function ExpandableDetailsRow({
   item,
   mode,
   columnCount,
   onInlineCommit,
 }: ExpandableDetailsRowProps) {
-  // Don't show for napkin mode
+  // Initialize state before any conditional logic (React Hooks rules)
+  const fieldGroups = getFieldGroupsByMode(mode);
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(() =>
+    new Set(fieldGroups.map((_, index) => index))
+  );
+
+  // Don't show for napkin mode (early return AFTER hooks)
   if (mode === 'napkin') return null;
 
-  // Define fields to show based on mode
-  const standardFields: FieldConfig[] = [
-    { key: 'start_period', label: 'Start Period', type: 'number' },
-    { key: 'periods_to_complete', label: 'Duration', type: 'number' },
-    { key: 'escalation_rate', label: 'Escalation %', type: 'number' },
-    { key: 'contingency_pct', label: 'Contingency %', type: 'number' },
-    { key: 'timing_method', label: 'Timing', type: 'text' },
-    { key: 'vendor_name', label: 'Vendor', type: 'text' },
-  ];
+  const handleFieldChange = async (fieldName: keyof BudgetItem, value: any) => {
+    if (onInlineCommit) {
+      await onInlineCommit(item, fieldName, value);
+    }
+  };
 
-  const detailOnlyFields: FieldConfig[] = [
-    { key: 'start_date', label: 'Start Date', type: 'text' },
-    { key: 'end_date', label: 'End Date', type: 'text' },
-    { key: 'funding_id', label: 'Funding', type: 'number' },
-    { key: 'curve_id', label: 'Curve', type: 'number' },
-    { key: 'milestone_id', label: 'Milestone', type: 'number' },
-    { key: 'cf_start_flag', label: 'CF Start', type: 'boolean' },
-  ];
-
-  const fieldsToShow = mode === 'detail'
-    ? [...standardFields, ...detailOnlyFields]
-    : standardFields;
-
-  // Color indicator based on mode
-  const indicatorColor = mode === 'standard' ? '#ffc107' : '#dc3545'; // Yellow for Standard, Red for Detail
+  const toggleSection = (index: number) => {
+    setExpandedSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
 
   return (
-    <>
-      {/* Standard fields row - shown in Standard and Detail modes */}
-      <tr className="expandable-details-row">
-        <td colSpan={columnCount} style={{ padding: '0.5rem 0.75rem', backgroundColor: 'var(--cui-table-bg)' }}>
-          <div className="d-flex align-items-center gap-2">
-            {/* Yellow indicator for Standard fields */}
-            <div
-              style={{
-                width: '4px',
-                height: '24px',
-                backgroundColor: '#ffc107',
-                borderRadius: '2px',
-                flexShrink: 0,
-              }}
-              title="Standard fields"
-            />
-            <div className="d-flex align-items-center gap-3 flex-wrap flex-grow-1">
-              {standardFields.map((field) => (
-                <FieldInput
-                  key={field.key}
-                  field={field}
-                  item={item}
-                  onInlineCommit={onInlineCommit}
-                />
-              ))}
-            </div>
-          </div>
-        </td>
-      </tr>
+    <tr className="expandable-details-row">
+      <td colSpan={columnCount} style={{ padding: '0.75rem' }}>
+        <div>
+          {fieldGroups.map((group, index) => {
+            const groupColor = group.color || (group.mode === 'standard' ? 'var(--cui-warning)' : 'var(--cui-danger)');
+            const isExpanded = expandedSections.has(index);
 
-      {/* Detail-only fields row - shown only in Detail mode */}
-      {mode === 'detail' && (
-        <tr className="expandable-details-row">
-          <td colSpan={columnCount} style={{ padding: '0.5rem 0.75rem', backgroundColor: 'var(--cui-table-bg)' }}>
-            <div className="d-flex align-items-center gap-2">
-              {/* Red indicator for Detail fields */}
+            return (
               <div
+                key={index}
                 style={{
-                  width: '4px',
-                  height: '24px',
-                  backgroundColor: '#dc3545',
-                  borderRadius: '2px',
-                  flexShrink: 0,
+                  marginBottom: '0.5rem',
+                  border: '1px solid var(--cui-border-color)',
+                  borderRadius: '0.375rem',
+                  overflow: 'hidden',
                 }}
-                title="Detail fields"
-              />
-              <div className="d-flex align-items-center gap-3 flex-wrap flex-grow-1">
-                {detailOnlyFields.map((field) => (
-                  <FieldInput
-                    key={field.key}
-                    field={field}
-                    item={item}
-                    onInlineCommit={onInlineCommit}
+              >
+                {/* Header */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSection(index);
+                  }}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    backgroundColor: group.mode === 'standard'
+                      ? 'rgba(var(--cui-warning-rgb), 0.1)'
+                      : 'rgba(var(--cui-danger-rgb), 0.1)',
+                    color: 'var(--cui-body-color)',
+                    padding: '0.75rem 1rem',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  {/* Chevron */}
+                  <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
+                    {isExpanded ? '▼' : '▶'}
+                  </span>
+
+                  {/* Color indicator */}
+                  <div
+                    style={{
+                      width: '4px',
+                      height: '20px',
+                      backgroundColor: groupColor,
+                      borderRadius: '2px',
+                      flexShrink: 0,
+                    }}
+                    title={`${group.mode === 'standard' ? 'Standard' : 'Detail'} fields`}
                   />
-                ))}
+
+                  {/* Group label */}
+                  <strong style={{ fontSize: '0.875rem', flex: 1 }}>{group.label}</strong>
+
+                  {/* Field count badge */}
+                  <CBadge
+                    color={group.mode === 'standard' ? 'warning' : 'danger'}
+                  >
+                    {group.fields.length} fields
+                  </CBadge>
+                </button>
+
+                {/* Body - 3-column layout with minimal spacing */}
+                {isExpanded && (
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      backgroundColor: 'var(--cui-body-bg)',
+                      borderTop: '1px solid var(--cui-border-color)',
+                    }}
+                  >
+                    <div className="row g-2" style={{ width: '100%', rowGap: '0.5rem' }}>
+                      {group.fields.map((field) => {
+                        const value = item[field.name];
+
+                        // Check if field should be visible based on dependencies
+                        if (field.dependsOn && field.dependsOn.includes('timing_method')) {
+                          // Curve-specific fields (profile, steepness)
+                          if ((field.name === 'curve_profile' || field.name === 'curve_steepness') && item.timing_method !== 'curve') {
+                            return null;
+                          }
+                          // Milestone-specific fields (dependency_count)
+                          if (field.name === 'dependency_count' && item.timing_method !== 'milestone') {
+                            return null;
+                          }
+                        }
+
+                        // Determine column class: full-width > auto > standard 3-column
+                        const colClass = field.fullWidth
+                          ? 'col-12'
+                          : field.colWidth === 'auto'
+                            ? 'col-auto'
+                            : 'col-md-4';
+
+                        return (
+                          <div key={field.name} className={colClass} style={{ marginBottom: '0.25rem' }}>
+                            {/* Field Label - Minimal */}
+                            <CFormLabel
+                              className="small text-muted d-flex align-items-center gap-1"
+                              style={{
+                                fontSize: '0.75rem',
+                                marginBottom: '0.125rem',
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              <span>{field.label}</span>
+                              {field.readonly && (
+                                <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
+                                  RO
+                                </CBadge>
+                              )}
+                              {field.computed && (
+                                <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
+                                  calc
+                                </CBadge>
+                              )}
+                            </CFormLabel>
+
+                            {/* Field Input */}
+                            <FieldRenderer
+                              field={field}
+                              value={value}
+                              item={item}
+                              onChange={handleFieldChange}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+            );
+          })}
+        </div>
+      </td>
+    </tr>
   );
 }
 
-// Separate component for each field input
-function FieldInput({
-  field,
-  item,
-  onInlineCommit,
-}: {
-  field: FieldConfig;
-  item: BudgetItem;
-  onInlineCommit?: (item: BudgetItem, field: keyof BudgetItem, value: unknown) => Promise<void> | void;
-}) {
-  const [value, setValue] = useState<string | number | boolean>(() => {
-    const itemValue = item[field.key];
-    if (field.type === 'boolean') {
-      return Boolean(itemValue);
-    }
-    return itemValue ?? '';
-  });
-
-  // Update local state when item prop changes
-  useEffect(() => {
-    const itemValue = item[field.key];
-    if (field.type === 'boolean') {
-      setValue(Boolean(itemValue));
-    } else {
-      setValue(itemValue ?? '');
-    }
-  }, [item, field.key, field.type]);
-
-  const handleBlur = async () => {
-    if (!onInlineCommit) return;
-
-    let commitValue: unknown = value;
-
-    if (field.type === 'number') {
-      commitValue = value === '' ? null : Number(value);
-    } else if (field.type === 'text') {
-      commitValue = value === '' ? null : String(value);
-    }
-
-    // Only commit if value changed
-    const itemValue = item[field.key];
-    if (commitValue !== itemValue) {
-      await onInlineCommit(item, field.key, commitValue);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      (e.target as HTMLInputElement).blur();
-    }
-  };
-
-  if (field.type === 'boolean') {
-    return (
-      <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.875rem' }}>
-        <label className="form-label mb-0 text-secondary" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-          {field.label}:
-        </label>
-        <input
-          type="checkbox"
-          className="form-check-input mt-0"
-          checked={Boolean(value)}
-          onChange={(e) => {
-            const newValue = e.target.checked;
-            setValue(newValue);
-            if (onInlineCommit) {
-              onInlineCommit(item, field.key, newValue);
-            }
-          }}
-          style={{ cursor: 'pointer' }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.875rem' }}>
-      <label className="form-label mb-0 text-secondary" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-        {field.label}:
-      </label>
-      <input
-        type={field.type === 'number' ? 'number' : 'text'}
-        className="form-control form-control-sm"
-        value={value}
-        onChange={(e) => setValue(field.type === 'number' ? e.target.value : e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        style={{
-          width: field.type === 'number' ? '80px' : '120px',
-          fontSize: '0.875rem',
-          padding: '0.25rem 0.5rem',
-        }}
-      />
-    </div>
-  );
-}
+export default ExpandableDetailsRow;

@@ -37,6 +37,30 @@ export async function PUT(
     const { factId } = await params;
     const body = await request.json();
 
+    // Try Django API first (supports all 49 fields)
+    const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
+
+    try {
+      const djangoResponse = await fetch(`${DJANGO_API_URL}/api/budget-items/${factId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body), // Pass all fields through
+      });
+
+      if (djangoResponse.ok) {
+        const data = await djangoResponse.json();
+        return NextResponse.json({
+          success: true,
+          data: { item: data }
+        });
+      }
+    } catch (djangoError) {
+      console.warn('Django API unavailable, falling back to SQL:', djangoError);
+    }
+
+    // Fallback to SQL (legacy - supports limited fields)
     const {
       categoryId,
       qty,
