@@ -18,12 +18,12 @@ export default function AnnualInventoryGauge({ projectId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="p-4 bg-white rounded border">
+      <div className="p-4 rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-48 mb-3"></div>
+          <div className="h-6 rounded w-48 mb-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}></div>
           <div className="flex gap-2">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded flex-1"></div>
+              <div key={i} className="h-20 rounded flex-1" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}></div>
             ))}
           </div>
         </div>
@@ -33,7 +33,7 @@ export default function AnnualInventoryGauge({ projectId }: Props) {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
+      <div className="p-4 border rounded" style={{ backgroundColor: 'var(--cui-danger-bg)', borderColor: 'var(--cui-danger)', color: 'var(--cui-danger)' }}>
         <p>Failed to load inventory gauge data</p>
       </div>
     );
@@ -41,15 +41,15 @@ export default function AnnualInventoryGauge({ projectId }: Props) {
 
   if (!data || data.years.length === 0) {
     return (
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded text-gray-600">
+      <div className="p-4 border rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
         <p>No inventory data available</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 bg-white rounded border">
-      <h3 className="text-lg font-semibold mb-3 text-gray-800">Annual Inventory Gauge</h3>
+    <div className="p-4 rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+      <h3 className="text-lg font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Annual Inventory Gauge</h3>
       <div className="grid auto-cols-fr grid-flow-col gap-2">
         {data.years.map((year, index) => (
           <InventoryCell key={year.year} year={year} yearIndex={index} />
@@ -78,21 +78,21 @@ function InventoryCell({ year, yearIndex }: CellProps) {
         borderColor: color.border,
       }}
     >
-      <div className="text-xs font-medium text-gray-700 mb-1">
+      <div className="text-xs font-medium mb-1" style={{ color: 'var(--cui-body-color)' }}>
         Yr {yearIndex + 1}
       </div>
-      <div className="text-sm font-mono text-gray-600">
+      <div className="text-sm font-mono" style={{ color: 'var(--cui-secondary-color)' }}>
         {year.year}
       </div>
       <div className="text-2xl font-bold mt-2" style={{ color: color.text }}>
         {year.year_end_inventory.toLocaleString()}
       </div>
-      <div className="text-xs text-gray-500 mt-1">
+      <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
         lots
       </div>
 
       {/* Tooltip details */}
-      <div className="text-xs text-gray-600 mt-2 space-y-0.5 w-full">
+      <div className="text-xs mt-2 space-y-0.5 w-full" style={{ color: 'var(--cui-secondary-color)' }}>
         <div className="flex justify-between">
           <span>Delivered:</span>
           <span className="font-mono">{year.lots_delivered}</span>

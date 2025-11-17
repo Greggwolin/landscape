@@ -326,7 +326,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
         header: 'Parcel ID',
         size: 120,
         cell: ({ row }) => (
-          <div className="font-semibold text-gray-800">{row.original.parcel_code || `P-${row.original.parcel_id}`}</div>
+          <div className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>{row.original.parcel_code || `P-${row.original.parcel_id}`}</div>
         ),
       },
       {
@@ -351,7 +351,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
       {
         accessorKey: 'lot_product',
         header: 'Product',
-        cell: ({ row }) => <div className="text-gray-800">{row.original.lot_product || row.original.product_code || '-'}</div>,
+        cell: ({ row }) => <div style={{ color: 'var(--cui-body-color)' }}>{row.original.lot_product || row.original.product_code || '-'}</div>,
       },
       {
         accessorKey: 'acres',
@@ -403,15 +403,20 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
                 type="date"
                 value={value}
                 onChange={handleDateChange}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
+                className="border rounded px-2 py-1 text-sm"
+                style={{
+                  borderColor: 'var(--cui-border-color)',
+                  backgroundColor: 'var(--cui-body-bg)',
+                  color: 'var(--cui-body-color)',
+                }}
                 disabled={!hasQuantity || isSaving}
                 title={!hasQuantity ? `Configure ${fieldName} on Planning page first` : ''}
               />
               {isSaving && (
-                <span className="text-xs text-gray-500 italic">Saving...</span>
+                <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Saving...</span>
               )}
               {!hasQuantity && (
-                <span className="text-xs text-gray-500 italic">Configure {fieldName} first</span>
+                <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Configure {fieldName} first</span>
               )}
             </div>
           );
@@ -430,7 +435,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
           const basePrice = parcel.base_price_per_unit ?? parcel.current_value_per_unit;
 
           if (basePrice == null) {
-            return <div className="text-right text-xs text-gray-400 italic">Configure pricing</div>;
+            return <div className="text-right text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Configure pricing</div>;
           }
 
           // Calculate inflated price if sale date exists
@@ -455,7 +460,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
                 minimumFractionDigits: shouldShowDecimals ? 2 : 0,
                 maximumFractionDigits: shouldShowDecimals ? 2 : 0
               })}
-              {parcel.uom_code && <span className="text-xs text-gray-500 ml-1">/{parcel.uom_code}</span>}
+              {parcel.uom_code && <span className="text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>/{parcel.uom_code}</span>}
             </div>
           );
         },
@@ -473,26 +478,26 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
           const saleDate = pendingDates[parcel.parcel_id] ?? parcel.sale_date;
 
           if (!saleDate) {
-            return <div className="text-right italic text-gray-400">Pending</div>;
+            return <div className="text-right italic" style={{ color: 'var(--cui-secondary-color)' }}>Pending</div>;
           }
 
           // If we have saved net proceeds from the backend (from the modal), use that
           if (parcel.net_proceeds != null) {
-            const valueClass = parcel.net_proceeds < 0
-              ? 'text-red-600'
+            const valueColor = parcel.net_proceeds < 0
+              ? 'var(--cui-danger)'
               : parcel.net_proceeds > 1_000_000
-              ? 'text-green-700'
-              : 'text-gray-900';
+              ? 'var(--cui-success)'
+              : 'var(--cui-body-color)';
 
             return (
-              <div className={`text-right font-semibold ${valueClass}`}>
+              <div className="text-right font-semibold" style={{ color: valueColor }}>
                 {formatMoney(parcel.net_proceeds, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
             );
           }
 
           // Otherwise, show placeholder indicating calculation needed
-          return <div className="text-right text-gray-400 italic text-sm">Calculate</div>;
+          return <div className="text-right italic text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Calculate</div>;
         },
       },
       {
@@ -509,9 +514,19 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
               <Tooltip title="View detailed sale calculation">
                 <button
                   type="button"
-                  className={`px-3 py-1 text-sm border rounded flex items-center gap-1 ${
-                    hasCalculation ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-700'
-                  }`}
+                  className="px-3 py-1 text-sm border rounded flex items-center gap-1"
+                  style={
+                    hasCalculation
+                      ? {
+                          borderColor: 'var(--cui-primary)',
+                          color: 'var(--cui-primary)',
+                          backgroundColor: 'var(--cui-primary-bg)',
+                        }
+                      : {
+                          borderColor: 'var(--cui-border-color)',
+                          color: 'var(--cui-body-color)',
+                        }
+                  }
                   onClick={() => {
                     // Clear any previous errors
                     setActionError(null);
@@ -557,11 +572,11 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
 
   if (isLoading) {
     return (
-      <div className="p-4 bg-white rounded border">
+      <div className="p-4 rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
         <div className="animate-pulse space-y-3">
-          <div className="h-8 bg-gray-200 rounded w-full" />
+          <div className="h-8 rounded w-full" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }} />
           {[...Array(5)].map((_, index) => (
-            <div key={index} className="h-12 bg-gray-100 rounded" />
+            <div key={index} className="h-12 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }} />
           ))}
         </div>
       </div>
@@ -570,7 +585,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
+      <div className="p-4 border rounded" style={{ backgroundColor: 'var(--cui-danger-bg)', borderColor: 'var(--cui-danger)', color: 'var(--cui-danger)' }}>
         <p>Failed to load parcels data</p>
       </div>
     );
@@ -578,7 +593,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
 
   if (!parcels || parcels.length === 0) {
     return (
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded text-gray-600">
+      <div className="p-4 border rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
         <p>No parcels found {phaseFilters.length > 0 ? 'for selected phases' : ''}</p>
       </div>
     );
@@ -587,9 +602,9 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
   let lastPhaseCode: string | null = null;
 
   return (
-    <div className="bg-white rounded border overflow-hidden">
+    <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
       {actionError && (
-        <div className="px-4 py-2 bg-red-50 text-red-700 text-sm border-b border-red-100">{actionError}</div>
+        <div className="px-4 py-2 text-sm border-b" style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)', borderColor: 'var(--cui-danger)' }}>{actionError}</div>
       )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -599,9 +614,10 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-2 py-2 font-medium text-gray-700"
+                    className="px-2 py-2 font-medium"
                     style={{
                       width: header.column.columnDef.size ? `${header.column.columnDef.size}px` : undefined,
+                      color: 'var(--cui-body-color)',
                     }}
                   >
                     <div className="flex items-center gap-1 w-full">
@@ -612,7 +628,8 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="text-xs text-blue-600 flex-shrink-0"
+                          className="text-xs flex-shrink-0"
+                          style={{ color: 'var(--cui-primary)' }}
                         >
                           {header.column.getIsSorted() === 'asc'
                             ? '↑'
@@ -641,8 +658,8 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
               return (
                 <React.Fragment key={row.id}>
                   {showHeader && hasMultiplePhases && (
-                    <tr className="bg-gray-100 border-t border-b border-gray-200">
-                      <td colSpan={columns.length} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    <tr className="border-t border-b" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
+                      <td colSpan={columns.length} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--cui-body-color)' }}>
                         {parcel.sale_phase_code
                           ? `Sale Phase ${parcel.sale_phase_code}${phase?.sale_date ? ` (${formatSaleDate(phase.sale_date)})` : ''}`
                           : 'Ungrouped Parcels'}
@@ -651,7 +668,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
                   )}
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-2 py-2 align-top text-gray-800">
+                      <td key={cell.id} className="px-2 py-2 align-top" style={{ color: 'var(--cui-body-color)' }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -662,7 +679,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters }: Props) {
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-3 bg-gray-50 border-t text-sm text-gray-600">
+      <div className="px-4 py-3 border-t text-sm" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}>
         Showing {table.getRowModel().rows.length} parcel(s)
       </div>
 

@@ -92,7 +92,7 @@ function EditablePriceCell({
   return (
     <div className="text-right px-2">
       <div className="relative inline-flex items-center w-full">
-        <span className="absolute left-2 text-gray-500 text-sm pointer-events-none">$</span>
+        <span className="absolute left-2 text-sm pointer-events-none" style={{ color: 'var(--cui-secondary-color)' }}>$</span>
         <input
           type="text"
           inputMode="decimal"
@@ -104,8 +104,11 @@ function EditablePriceCell({
             textAlign: 'right',
             paddingLeft: '1.5rem',
             width: '100%',
+            borderColor: 'var(--cui-border-color)',
+            backgroundColor: 'var(--cui-body-bg)',
+            color: 'var(--cui-body-color)',
           }}
-          className="border border-gray-300 rounded px-2 py-1 text-sm"
+          className="border rounded px-2 py-1 text-sm"
         />
       </div>
     </div>
@@ -301,16 +304,22 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
           );
           const familyName = product?.family_name;
 
-          // Match ParcelSalesTable color scheme
-          const chipClass =
-            familyName === 'Residential' ? 'bg-blue-900 text-blue-300' :
-            familyName === 'Commercial' ? 'bg-purple-900 text-purple-300' :
-            familyName === 'Industrial' ? 'bg-orange-900 text-orange-300' :
-            'bg-indigo-900 text-indigo-300';
+          // Match ParcelSalesTable color scheme with CSS variables
+          const chipColor =
+            familyName === 'Residential' ? 'var(--cui-primary)' :
+            familyName === 'Commercial' ? 'var(--cui-warning)' :
+            familyName === 'Industrial' ? 'var(--cui-info)' :
+            'var(--cui-secondary)';
+
+          const chipBg =
+            familyName === 'Residential' ? 'var(--cui-primary-bg)' :
+            familyName === 'Commercial' ? 'var(--cui-warning-bg)' :
+            familyName === 'Industrial' ? 'var(--cui-info-bg)' :
+            'var(--cui-tertiary-bg)';
 
           return (
             <div className="text-center">
-              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${chipClass}`}>
+              <span className="px-1.5 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: chipBg, color: chipColor }}>
                 {value || 'N/A'}
               </span>
             </div>
@@ -454,7 +463,18 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
             <div className="text-center">
               <button
                 onClick={() => handleDeleteRow(rowIndex)}
-                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                className="p-1 rounded transition-colors"
+                style={{
+                  color: 'var(--cui-secondary-color)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--cui-danger)';
+                  e.currentTarget.style.backgroundColor = 'var(--cui-danger-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--cui-secondary-color)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
                 title="Delete pricing"
                 disabled={isSaving}
               >
@@ -476,11 +496,11 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
 
   if (isLoading || isLoadingProducts) {
     return (
-      <div className="bg-white rounded border p-4">
+      <div className="rounded border p-4" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
         <div className="animate-pulse space-y-3">
-          <div className="h-8 bg-gray-200 rounded w-full"></div>
+          <div className="h-8 rounded w-full" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}></div>
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded"></div>
+            <div key={i} className="h-12 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}></div>
           ))}
         </div>
       </div>
@@ -489,7 +509,7 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
+      <div className="p-4 border rounded" style={{ backgroundColor: 'var(--cui-danger-bg)', borderColor: 'var(--cui-danger)', color: 'var(--cui-danger)' }}>
         <p>Failed to load pricing assumptions</p>
       </div>
     );
@@ -498,8 +518,8 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
   // Empty state - only show if no parcel products exist
   if ((!editingRows || editingRows.length === 0) && (!parcelProducts || parcelProducts.length === 0)) {
     return (
-      <div className="bg-white rounded border p-8 text-center">
-        <div className="text-gray-600 mb-4">
+      <div className="rounded border p-8 text-center" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <div className="mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
           <p className="text-lg font-medium">No parcels configured</p>
           <p className="text-sm mt-2">Add parcels to the project first, then pricing will auto-populate</p>
         </div>
@@ -508,10 +528,10 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
   }
 
   return (
-    <div className="bg-white rounded border overflow-hidden">
+    <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
       {/* Header with action buttons */}
-      <div className="px-4 py-3 bg-gray-50 border-b flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-gray-700">
+      <div className="px-4 py-3 border-b flex justify-between items-center" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>
           Land Use Pricing Assumptions
         </h3>
         <div className="flex gap-2">
@@ -520,7 +540,12 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
               <button
                 onClick={handleCancel}
                 disabled={isSaving}
-                className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-1.5 text-sm border rounded disabled:opacity-50 flex items-center gap-1"
+                style={{
+                  color: 'var(--cui-body-color)',
+                  backgroundColor: 'var(--cui-card-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                }}
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -528,7 +553,11 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-1.5 text-sm rounded disabled:opacity-50 flex items-center gap-1"
+                style={{
+                  color: 'white',
+                  backgroundColor: 'var(--cui-primary)',
+                }}
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : `Save Changes (${editingRows.filter(r => !r.id || hasUnsavedChanges).length})`}
@@ -563,17 +592,30 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
             {table.getRowModel().rows.map((row) => {
               const isEditing = editingRowId === row.index;
               const isNew = !row.original.id;
-              const rowClass = isEditing
-                ? 'bg-blue-50'
+              const rowBg = isEditing
+                ? 'var(--cui-primary-bg)'
                 : isNew
-                ? 'bg-green-50'
-                : 'hover:bg-gray-50';
+                ? 'var(--cui-success-bg)'
+                : 'var(--cui-card-bg)';
 
               return (
                 <tr
                   key={row.id}
-                  className={`border-b transition-colors ${rowClass}`}
-                  style={{ borderColor: 'var(--cui-border-color)' }}
+                  className="border-b transition-colors"
+                  style={{
+                    borderColor: 'var(--cui-border-color)',
+                    backgroundColor: rowBg,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isEditing && !isNew) {
+                      e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isEditing && !isNew) {
+                      e.currentTarget.style.backgroundColor = 'var(--cui-card-bg)';
+                    }
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>
@@ -588,14 +630,23 @@ export default function PricingTable({ projectId, phaseFilters }: Props) {
       </div>
 
       {/* Footer with Add button */}
-      <div className="px-4 py-3 bg-gray-50 border-t flex justify-between items-center">
-        <span className="text-sm text-gray-600">
+      <div className="px-4 py-3 border-t flex justify-between items-center" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
           {editingRows.length} pricing assumption(s)
         </span>
         <button
           onClick={handleAddRow}
           disabled={isSaving}
-          className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded disabled:opacity-50 flex items-center gap-1"
+          className="px-3 py-1.5 text-sm rounded disabled:opacity-50 flex items-center gap-1"
+          style={{
+            color: 'var(--cui-primary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--cui-primary-bg)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           <Plus className="w-4 h-4" />
           Add Pricing
