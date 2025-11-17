@@ -76,50 +76,68 @@ export default function AreaTiles({
         return (
           <div
             key={area.container_id}
-            className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
+            className={`planning-tile ${isSelected ? 'planning-tile-active' : ''}`}
             onClick={() => onAreaSelect(area.container_id)}
           >
-            <div className="planning-tile-header">
+            <div className="planning-tile-header mb-3">
               Village {area.name}
             </div>
 
-            <div className="space-y-1">
-              <div className="planning-tile-stat">
-                {Math.round(area.acres).toLocaleString()} acres
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span style={{ color: 'var(--cui-body-color)' }}>Acres:</span>
+                <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                  {Math.round(area.acres).toLocaleString()}
+                </span>
               </div>
 
               {area.phaseCount !== undefined && area.phaseCount > 0 && (
-                <div className="planning-tile-stat">
-                  {area.phaseCount} {area.phaseCount === 1 ? 'Phase' : 'Phases'}
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Phases:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {area.phaseCount}
+                  </span>
                 </div>
               )}
 
               {area.parcelCount !== undefined && area.parcelCount > 0 && (
-                <div className="planning-tile-stat">
-                  {area.parcelCount} {area.parcelCount === 1 ? 'Parcel' : 'Parcels'}
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Parcels:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {area.parcelCount}
+                  </span>
                 </div>
               )}
 
               {area.units > 0 && (
-                <div className="planning-tile-stat">
-                  {Math.round(area.units).toLocaleString()} units
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Units:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {Math.round(area.units).toLocaleString()}
+                  </span>
                 </div>
               )}
 
               {showCosts && (
                 <>
-                  <div className="planning-tile-stat mt-2">
-                    Area: {formatCurrency(area.directCost)}
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--cui-body-color)' }}>Area Cost:</span>
+                    <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                      {formatCurrency(area.directCost)}
+                    </span>
                   </div>
-                  <div className="planning-tile-stat">
-                    Phase: {formatCurrency(area.childCost)}
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--cui-body-color)' }}>Phase Cost:</span>
+                    <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                      {formatCurrency(area.childCost)}
+                    </span>
                   </div>
                 </>
               )}
             </div>
 
             {isSelected && (
-              <div className="mt-2 pt-2 border-t border-subtle">
+              <div className="mt-3 pt-3 border-t border-subtle">
                 <div className="text-xs font-medium" style={{ color: 'var(--cui-primary)' }}>
                   ✓ Selected
                 </div>

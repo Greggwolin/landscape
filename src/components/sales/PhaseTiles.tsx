@@ -140,38 +140,55 @@ export default function PhaseTiles({
             className={tileClassName}
             onClick={() => onPhaseSelect(phase.phase_id)}
           >
-            <div className="planning-tile-header">
+            <div className="planning-tile-header mb-3">
               Phase {phase.phase_name}
             </div>
 
-            <div className="planning-tile-stat">
-              {Math.round(phase.gross_acres).toLocaleString()} acres
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span style={{ color: 'var(--cui-body-color)' }}>Acres:</span>
+                <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                  {Math.round(phase.gross_acres).toLocaleString()}
+                </span>
+              </div>
+
+              {phase.parcel_count !== undefined && (
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Parcels:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {phase.parcel_count.toLocaleString()}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span style={{ color: 'var(--cui-body-color)' }}>Units:</span>
+                <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                  {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()}
+                </span>
+              </div>
+
+              {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Proceeds:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-success)' }}>
+                    {formatCurrency(phase.net_proceeds)}
+                  </span>
+                </div>
+              )}
+
+              {showCosts && phase.total_cost !== undefined && (
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Cost:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {formatCurrency(phase.total_cost)}
+                  </span>
+                </div>
+              )}
             </div>
-
-            {phase.parcel_count !== undefined && (
-              <div className="planning-tile-stat">
-                {phase.parcel_count.toLocaleString()} {phase.parcel_count === 1 ? 'Parcel' : 'Parcels'}
-              </div>
-            )}
-
-            <div className="planning-tile-stat">
-              {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()} units
-            </div>
-
-            {showCosts && phase.total_cost !== undefined && (
-              <div className="planning-tile-stat">
-                {formatCurrency(phase.total_cost)}
-              </div>
-            )}
-
-            {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
-              <div className="planning-tile-stat-positive">
-                Net: {formatCurrency(phase.net_proceeds)}
-              </div>
-            )}
 
             {isSelected && (
-              <div className="mt-2 pt-2 border-t border-subtle">
+              <div className="mt-3 pt-3 border-t border-subtle">
                 <div className="text-xs font-medium" style={{ color: 'var(--cui-primary)' }}>
                   ✓ Selected
                 </div>
