@@ -140,40 +140,38 @@ export default function PhaseTiles({
             className={tileClassName}
             onClick={() => onPhaseSelect(phase.phase_id)}
           >
-            <div className="planning-tile-header mb-3">
-              {phase.phase_name} #{phase.phase_code}
+            <div className="planning-tile-header">
+              Phase {phase.phase_name}
             </div>
 
-            <div className="space-y-2">
-              <div className="planning-tile-stat">
-                {Math.round(phase.gross_acres).toLocaleString()} acres
-              </div>
-
-              {phase.parcel_count !== undefined && (
-                <div className="planning-tile-stat">
-                  {phase.parcel_count.toLocaleString()} {phase.parcel_count === 1 ? 'parcel' : 'parcels'}
-                </div>
-              )}
-
-              <div className="planning-tile-stat">
-                {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()} units
-              </div>
-
-              {showCosts && phase.total_cost !== undefined && (
-                <div className="planning-tile-stat mt-3">
-                  {formatCurrency(phase.total_cost)}
-                </div>
-              )}
-
-              {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
-                <div className="planning-tile-stat-positive mt-3">
-                  Net: {formatCurrency(phase.net_proceeds)}
-                </div>
-              )}
+            <div className="planning-tile-stat">
+              {Math.round(phase.gross_acres).toLocaleString()} acres
             </div>
+
+            {phase.parcel_count !== undefined && (
+              <div className="planning-tile-stat">
+                {phase.parcel_count.toLocaleString()} {phase.parcel_count === 1 ? 'Parcel' : 'Parcels'}
+              </div>
+            )}
+
+            <div className="planning-tile-stat">
+              {(typeof phase.units_total === 'string' ? parseInt(phase.units_total) : phase.units_total).toLocaleString()} units
+            </div>
+
+            {showCosts && phase.total_cost !== undefined && (
+              <div className="planning-tile-stat">
+                {formatCurrency(phase.total_cost)}
+              </div>
+            )}
+
+            {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
+              <div className="planning-tile-stat-positive">
+                Net: {formatCurrency(phase.net_proceeds)}
+              </div>
+            )}
 
             {isSelected && (
-              <div className="mt-3 pt-3 border-t border-subtle">
+              <div className="mt-2 pt-2 border-t border-subtle">
                 <div className="text-xs font-medium" style={{ color: 'var(--cui-primary)' }}>
                   ✓ Selected
                 </div>
