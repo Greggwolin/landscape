@@ -42,7 +42,7 @@ export default function AreaTiles({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="h-40 bg-gray-200 rounded border-2"></div>
@@ -69,7 +69,7 @@ export default function AreaTiles({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {areas.map((area) => {
         const isSelected = selectedAreaIds.includes(area.container_id)
 
@@ -80,7 +80,7 @@ export default function AreaTiles({
             onClick={() => onAreaSelect(area.container_id)}
           >
             <div className="planning-tile-header">
-              {area.name}
+              {area.name} #{area.code}
             </div>
 
             <div className="space-y-1">

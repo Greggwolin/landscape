@@ -94,7 +94,7 @@ export default function PhaseTiles({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="h-32 bg-gray-200 rounded border-2"></div>
@@ -121,7 +121,7 @@ export default function PhaseTiles({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {filteredPhases.map((phase: Phase & { total_cost?: number; net_proceeds?: number }) => {
         const isSelected = selectedPhaseIds.includes(phase.phase_id);
 
@@ -141,7 +141,7 @@ export default function PhaseTiles({
             onClick={() => onPhaseSelect(phase.phase_id)}
           >
             <div className="planning-tile-header">
-              Phase {phase.phase_name}
+              {phase.phase_name} #{phase.phase_code}
             </div>
 
             <div className="planning-tile-stat">

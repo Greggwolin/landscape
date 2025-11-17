@@ -9,6 +9,7 @@ interface UseContainersOptions {
 interface ContainerStats {
   container_id: number
   name: string
+  code: string
   level: number
   parent_id: number | null
   acres: number
@@ -69,6 +70,7 @@ function extractLevelStats(
       stats.push({
         container_id: node.container_id,
         name: node.display_name,
+        code: node.container_code,
         level: node.container_level,
         parent_id: node.parent_container_id,
         acres,
