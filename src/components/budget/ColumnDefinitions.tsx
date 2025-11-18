@@ -84,21 +84,27 @@ export function getColumnsByMode(
       ),
     },
     {
-      accessorKey: 'category_l1_id',
-      header: 'Category',
-      size: 200,
+      accessorKey: 'lifecycle_stage',
+      header: 'Stage',
+      size: 180,
       minSize: 150,
-      maxSize: 400,
+      maxSize: 250,
       meta: {
         editable: Boolean(handlers.onInlineCommit),
-        inputType: 'category-select' as const,
-        projectId: handlers.projectId,
-        isGrouped: handlers.isGrouped,
+        inputType: 'select' as const,
+        options: [
+          { value: '', label: 'Not Set' },
+          { value: 'Acquisition', label: 'Acquisition' },
+          { value: 'Planning & Engineering', label: 'Planning & Engineering' },
+          { value: 'Development', label: 'Development' },
+          { value: 'Operations', label: 'Operations' },
+          { value: 'Disposition', label: 'Disposition' },
+          { value: 'Financing', label: 'Financing' },
+        ],
         onCommit: async (value: unknown, row: BudgetItem) => {
           if (handlers.onInlineCommit) {
-            // When L1 changes in napkin mode, only update L1
-            // Let the backend handle clearing L2-L4 if needed
-            await handlers.onInlineCommit(row, 'category_l1_id', value);
+            const newStage = value || null;
+            await handlers.onInlineCommit(row, 'lifecycle_stage', newStage);
           }
         },
       },
@@ -143,7 +149,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'qty',
-      header: 'Qty',
+      header: () => <div className="text-center">Qty</div>,
       size: 90,
       meta: {
         ...createMeta('qty', 'number'),
@@ -153,7 +159,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'uom_code',
-      header: 'UOM',
+      header: () => <div className="text-center">UOM</div>,
       size: 80,
       meta: createMeta('uom_code', 'select', uomOptions),
       cell: editableCell,
@@ -180,7 +186,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'start_period',
-      header: 'Start',
+      header: () => <div className="text-center">Start</div>,
       size: 80,
       cell: ({ row }) => (
         <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -190,7 +196,7 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'periods_to_complete',
-      header: 'Duration',
+      header: () => <div className="text-center">Duration</div>,
       size: 100,
       cell: ({ row }) => (
         <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -293,21 +299,30 @@ export function getColumnsByMode(
     );
   };
 
-  // Create standard columns by replacing the category column
-  const napkinWithoutCategory = napkinColumns.filter(col => col.accessorKey !== 'category_l1_id');
-
-  // Extract phase column and other columns separately
+  // Extract phase column and other base columns
   const phaseColumn = napkinColumns.find(col => col.accessorKey === 'container_id');
-  const napkinWithoutCategoryAndPhase = napkinWithoutCategory.filter(col => col.accessorKey !== 'container_id');
+  const stageColumn = napkinColumns.find(col => col.accessorKey === 'lifecycle_stage');
+
+  // Get columns without phase and stage (we'll add those explicitly for each mode)
+  const napkinWithoutPhaseAndStage = napkinColumns.filter(
+    col => col.accessorKey !== 'container_id' && col.accessorKey !== 'lifecycle_stage'
+  );
 
   // Split remaining columns to insert variance after amount
-  const napkinBeforeAmount = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete');
-  const napkinTimingColumns = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete');
+  const napkinBeforeAmount = napkinWithoutPhaseAndStage.filter(
+    col => col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete'
+  );
+  const napkinTimingColumns = napkinWithoutPhaseAndStage.filter(
+    col => col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete'
+  );
 
-  const standard: ColumnDef<BudgetItem>[] = [
+  // Standard & Detail modes: Show BOTH Stage and Category
+  const standardAndDetailColumns: ColumnDef<BudgetItem>[] = [
     // Phase column comes first
     ...(phaseColumn ? [phaseColumn] : []),
-    // Add clickable category column for standard/detail modes
+    // Stage column (inline editable)
+    ...(stageColumn ? [stageColumn] : []),
+    // Category column (clickable to expand row)
     {
       accessorKey: 'category_l1_id',
       header: 'Category',
@@ -317,7 +332,7 @@ export function getColumnsByMode(
       cell: categoryClickCell,
     },
     ...napkinBeforeAmount,
-    // Variance column - positioned after Amount (Standard and Detail modes only)
+    // Variance column - positioned after Amount
     {
       accessorKey: 'variance_amount',
       header: 'Var',
@@ -331,11 +346,10 @@ export function getColumnsByMode(
     ...napkinTimingColumns,
   ];
 
-  // Standard and Detail modes now use expandable rows for additional fields
-  // No need to add extra columns here
+  // Return mode-specific column set
   if (mode === 'standard' || mode === 'detail') {
-    return standard;
+    return standardAndDetailColumns;
   }
 
-  return standard;
+  return standardAndDetailColumns;
 }

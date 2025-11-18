@@ -25,12 +25,12 @@ import BudgetItemModalV2, { type BudgetItemFormValues } from './BudgetItemModalV
 import TimelineTab from './TimelineTab';
 import AssumptionsTab from './AssumptionsTab';
 import AnalysisTab from './AnalysisTab';
-import CostCategoriesTab from './CostCategoriesTab';
 import QuickAddCategoryModal from './QuickAddCategoryModal';
 import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
+import { usePreference } from '@/hooks/useUserPreferences';
 
 interface Props {
   projectId: number;
@@ -49,7 +49,16 @@ function isLandDevelopmentProject(projectTypeCode?: string): boolean {
 
 export default function BudgetGridTab({ projectId }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('grid');
-  const [mode, setMode] = useState<BudgetMode>('napkin');
+
+  // Mode state with database persistence via usePreference hook
+  const [mode, setMode] = usePreference<BudgetMode>({
+    key: 'budget.mode',
+    defaultValue: 'napkin',
+    scopeType: 'project',
+    scopeId: projectId,
+    localStorageMigrationKey: `budget_mode_${projectId}`, // Auto-migrate from old localStorage key
+  });
+
   const [selected, setSelected] = useState<BudgetItem | undefined>();
   const [showGantt, setShowGantt] = useState(false);
   const [projectTypeCode, setProjectTypeCode] = useState<string | undefined>(undefined);
@@ -488,15 +497,6 @@ export default function BudgetGridTab({ projectId }: Props) {
               Analysis
             </CNavLink>
           </CNavItem>
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'categories'}
-              onClick={() => setActiveSubTab('categories')}
-              style={{ cursor: 'pointer' }}
-            >
-              Cost Categories
-            </CNavLink>
-          </CNavItem>
         </CNav>
 
         {/* Tab Content */}
@@ -505,7 +505,7 @@ export default function BudgetGridTab({ projectId }: Props) {
             {/* Incomplete Categories Reminder */}
             <IncompleteCategoriesReminder projectId={projectId} className="mb-3" />
 
-            {/* Filters Accordion */}
+            {/* Filters Accordion - Moved above mode selector */}
             <div className="mb-3">
               <FiltersAccordion
                 projectId={projectId}
@@ -590,7 +590,6 @@ export default function BudgetGridTab({ projectId }: Props) {
         {activeSubTab === 'timeline' && <TimelineTab projectId={projectId} />}
         {activeSubTab === 'assumptions' && <AssumptionsTab projectId={projectId} />}
         {activeSubTab === 'analysis' && <AnalysisTab projectId={projectId} />}
-        {activeSubTab === 'categories' && <CostCategoriesTab projectId={projectId} />}
       </CCardBody>
 
       <BudgetItemModalV2
