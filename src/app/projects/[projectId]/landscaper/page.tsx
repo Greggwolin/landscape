@@ -41,6 +41,7 @@ export default function LandscaperPage() {
       <LandscaperChatModal
         isOpen={isLandscaperOpen}
         onClose={() => setLandscaperOpen(false)}
+        projectId={projectId}
       />
     </>
   );

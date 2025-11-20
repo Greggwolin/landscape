@@ -1,26 +1,35 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Z_INDEX } from './navigation/constants';
+import ChatInterface from '@/components/landscaper/ChatInterface';
+import AdviceAdherencePanel from '@/components/landscaper/AdviceAdherencePanel';
 
 /**
  * LandscaperChatModal Component
  *
- * Full-screen modal overlay for the general Landscaper AI chat interface.
- * Not associated with any specific tab or function.
+ * Full-screen modal overlay for the Landscaper AI chat interface.
+ * Phase 6: Includes chat interface and advice adherence panel.
  *
  * @param isOpen - Whether the modal is visible
  * @param onClose - Callback function to close the modal
+ * @param projectId - ID of the current project
  */
 interface LandscaperChatModalProps {
   isOpen: boolean;
   onClose: () => void;
+  projectId: number;
 }
 
 export default function LandscaperChatModal({
   isOpen,
   onClose,
+  projectId,
 }: LandscaperChatModalProps) {
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [adviceVariances, setAdviceVariances] = useState<any[]>([]);
+  const [varianceThreshold, setVarianceThreshold] = useState(10);
+
   if (!isOpen) return null;
 
   return (
@@ -74,23 +83,44 @@ export default function LandscaperChatModal({
           </button>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden p-6">
+        {/* Content: Two-column layout */}
+        <div className="flex-1 overflow-hidden p-4">
           <div
-            className="h-full rounded-lg border p-4"
-            style={{
-              backgroundColor: 'var(--cui-tertiary-bg)',
-              borderColor: 'var(--cui-border-color)',
-              color: 'var(--cui-body-color)',
-            }}
+            className="d-flex gap-3 h-100"
+            style={{ height: 'calc(85vh - 120px)' }}
           >
-            <p className="text-center text-sm opacity-70">
-              General Landscaper AI chat interface - not associated with a
-              specific tab or function.
-            </p>
-            <p className="text-center text-xs opacity-50 mt-2">
-              (Chat component will be integrated here)
-            </p>
+            {/* LEFT: Chat Interface (66%) */}
+            <div
+              style={{
+                flex: '0 0 66%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <ChatInterface
+                projectId={projectId}
+                messages={chatMessages}
+                onMessagesUpdate={setChatMessages}
+              />
+            </div>
+
+            {/* RIGHT: Advice Adherence Panel (33%) */}
+            <div
+              style={{
+                flex: '0 0 33%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <AdviceAdherencePanel
+                projectId={projectId}
+                variances={adviceVariances}
+                threshold={varianceThreshold}
+                onThresholdChange={setVarianceThreshold}
+              />
+            </div>
           </div>
         </div>
       </div>
