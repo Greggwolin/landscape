@@ -9,10 +9,9 @@ import { useIssueReporter } from '@/components/IssueReporter';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
-import SettingsDropdown from './navigation/SettingsDropdown';
 import LandscaperChatModal from './LandscaperChatModal';
 import CIcon from '@coreui/icons-react';
-import { cilBug } from '@coreui/icons';
+import { cilBug, cilSettings } from '@coreui/icons';
 
 /**
  * TopNavigationBar - Tier 1 Global Navigation
@@ -23,14 +22,18 @@ import { cilBug } from '@coreui/icons';
  * - Landscaper AI button
  * - Sandbox dropdown
  * - User menu
- * - Settings dropdown
+ * - Settings button (opens AdminModal)
  * - Theme toggle
  *
  * Height: 58px
  * Background: var(--nav-bg)
  * Position: Sticky top
  */
-export default function TopNavigationBar() {
+interface TopNavigationBarProps {
+  onSettingsClick?: () => void;
+}
+
+export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
@@ -122,7 +125,21 @@ export default function TopNavigationBar() {
             <SandboxDropdown />
             <UserMenuDropdown />
 
-            <SettingsDropdown />
+            {/* Settings Button */}
+            <button
+              type="button"
+              onClick={onSettingsClick}
+              className="rounded-full border p-2 transition-colors"
+              style={{
+                borderColor: 'var(--nav-border)',
+                color: 'var(--nav-text)',
+                backgroundColor: 'transparent',
+              }}
+              {...navHoverHandlers()}
+              aria-label="Open settings"
+            >
+              <CIcon icon={cilSettings} size="lg" />
+            </button>
 
             {/* Theme Toggle */}
             <button
