@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import { getTabsForPropertyType } from '@/lib/utils/projectTabs';
+import { getTabsForPropertyType, getTabDefaultRoute } from '@/lib/utils/projectTabs';
 import { usePreference } from '@/hooks/useUserPreferences';
 import ModeChip, { type ModeType } from '@/components/ui/ModeChip';
 
@@ -27,8 +27,18 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'project';
+  const pathname = usePathname();
+
+  // Determine active tab from pathname
+  const activeTab = useMemo(() => {
+    if (pathname.includes('/feasibility') || pathname.includes('/valuation')) {
+      return pathname.includes('/valuation') ? 'valuation' : 'feasibility';
+    }
+    if (pathname.includes('/capitalization')) return 'capitalization';
+    if (pathname.includes('/landscaper')) return 'landscaper';
+    if (pathname.includes('/documents')) return 'documents';
+    return 'project'; // Default to project tab
+  }, [pathname]);
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -123,7 +133,9 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
   };
 
   const handleTabChange = (tabId: string) => {
-    router.push(`/projects/${projectId}?tab=${tabId}`);
+    // Phase 1: Navigate to default route for each main tab
+    const defaultRoute = getTabDefaultRoute(projectId, tabId);
+    router.push(defaultRoute);
   };
 
   return (
