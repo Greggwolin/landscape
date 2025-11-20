@@ -1,0 +1,167 @@
+/**
+ * Navigation Styles
+ * Phase 1: Navigation Shell & Infrastructure
+ */
+
+/* Admin Modal Styles */
+.admin-modal .modal-dialog {
+  max-width: 90vw;
+  width: 90vw;
+  margin: 2rem auto;
+}
+
+.admin-modal .modal-content {
+  height: 90vh;
+  background-color: var(--cui-body-bg);
+  border-color: var(--cui-border-color);
+}
+
+.admin-modal .modal-header {
+  background-color: var(--cui-card-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding: 1rem 1.5rem;
+}
+
+.admin-modal .modal-title {
+  color: var(--cui-body-color);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.admin-modal .modal-body {
+  padding: 0;
+  overflow-y: auto;
+  background-color: var(--cui-tertiary-bg);
+}
+
+.admin-modal-content {
+  min-height: 60vh;
+  padding: 1.5rem;
+  background-color: var(--cui-body-bg);
+}
+
+/* Admin Modal Tab Navigation */
+.admin-modal .nav-tabs {
+  background-color: var(--cui-card-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding: 0 1rem;
+  margin: 0;
+}
+
+.admin-modal .nav-tabs .nav-link {
+  color: var(--cui-secondary-color);
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 1rem 1.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.admin-modal .nav-tabs .nav-link:hover {
+  color: var(--cui-body-color);
+  background-color: var(--cui-tertiary-bg);
+  border-bottom-color: transparent;
+}
+
+.admin-modal .nav-tabs .nav-link.active {
+  color: var(--cui-primary);
+  background-color: var(--cui-body-bg);
+  border-bottom-color: var(--cui-primary);
+  font-weight: 600;
+}
+
+/* Top Navigation Bar */
+.top-nav-bar {
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  height: 58px;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Project Context Bar */
+.project-context-bar {
+  background: var(--cui-body-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  height: 56px;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 58px;
+  z-index: 999;
+}
+
+/* Main Content Area */
+.main-content {
+  padding-top: 0;
+  min-height: calc(100vh - 114px); /* Account for both nav bars */
+  background-color: var(--cui-body-bg);
+}
+
+/* Project Tab Buttons */
+.project-tab-button {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background-color: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-tab-button:hover {
+  color: var(--cui-body-color);
+  background-color: rgba(var(--cui-primary-rgb), 0.05);
+}
+
+.project-tab-button.active {
+  color: var(--cui-primary);
+  border-bottom-color: var(--cui-primary);
+  font-weight: 600;
+}
+
+/* Settings Button */
+.settings-button {
+  border-radius: 9999px;
+  border: 1px solid var(--nav-border);
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+  color: var(--nav-text);
+  background-color: transparent;
+}
+
+.settings-button:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .admin-modal .modal-dialog {
+    max-width: 95vw;
+    width: 95vw;
+    margin: 1rem auto;
+  }
+
+  .admin-modal .modal-content {
+    height: 95vh;
+  }
+
+  .project-context-bar {
+    padding: 0 1rem;
+  }
+
+  .project-tab-button {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .admin-modal .nav-tabs .nav-link {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+}

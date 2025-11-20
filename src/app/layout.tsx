@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import './globals.css';
 import '@/styles/coreui-theme.css';
 import '@/styles/budget-color-audit.css';
+import '@/styles/navigation.css';
 import { IssueReporterProvider } from "@/components/IssueReporter";
 import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
 import { ProjectProvider } from "@/app/components/ProjectProvider";
