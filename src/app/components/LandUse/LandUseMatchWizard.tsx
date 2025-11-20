@@ -177,7 +177,7 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
             <div className="text-lg mb-2">Failed to Load Analysis</div>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              className="btn btn-secondary"
             >
               Close
             </button>
@@ -201,7 +201,7 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="btn btn-success"
             >
               Perfect!
             </button>
@@ -222,7 +222,11 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
               Map legacy parcel codes to your structured land use system
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close wizard"
+          >
             <X size={24} />
           </button>
         </div>
@@ -267,20 +271,20 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleMapping(unmatchedCode.code, 'map')}
-                    className={`px-3 py-1 rounded text-sm ${
+                    className={`btn btn-sm ${
                       mappings[unmatchedCode.code]?.action === 'map'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'btn-primary'
+                        : 'btn-secondary'
                     }`}
                   >
                     Map to Existing
                   </button>
                   <button
                     onClick={() => handleMapping(unmatchedCode.code, 'create')}
-                    className={`px-3 py-1 rounded text-sm ${
+                    className={`btn btn-sm ${
                       mappings[unmatchedCode.code]?.action === 'create'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'btn-success'
+                        : 'btn-secondary'
                     }`}
                   >
                     Create New
@@ -341,14 +345,14 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="btn btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={processAllMappings}
             disabled={Object.keys(mappings).length === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-2"
+            className="btn btn-primary d-flex align-items-center gap-2"
           >
             <ArrowRight size={16} />
             Apply Mappings

@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * {
  *   budgetId: number,
  *   projectId: number,
- *   containerId?: number (null for project-level),
+ *   divisionId?: number (null for project-level),
  *   categoryId: number, // Legacy field (for backward compatibility)
  *   categoryL1Id?: number, // New hierarchy fields
  *   categoryL2Id?: number,
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const {
       budgetId,
       // New container-based approach
-      containerId,
+      divisionId,
       // Legacy pe_level approach (still supported)
       peLevel,
       peId,
@@ -100,8 +100,8 @@ export async function POST(request: Request) {
         : null;
 
     let resolvedContainerId =
-      typeof containerId === 'number' && Number.isFinite(containerId)
-        ? containerId
+      typeof divisionId === 'number' && Number.isFinite(divisionId)
+        ? divisionId
         : null;
 
     if (!resolvedContainerId && peLevel && peId && peLevel !== 'project') {
@@ -115,16 +115,16 @@ export async function POST(request: Request) {
         peLevel === 'project'
           ? []
           : await sql`
-              SELECT container_id, project_id
+              SELECT division_id, project_id
               FROM landscape.tbl_container
-              WHERE container_level = ${
+              WHERE tier = ${
                 peLevel === 'area' ? 1 : peLevel === 'phase' ? 2 : 3
               }
                 AND attributes->>${column} = ${peId}
               LIMIT 1
             `;
-      if (containerRow?.container_id != null) {
-        resolvedContainerId = Number(containerRow.container_id);
+      if (containerRow?.division_id != null) {
+        resolvedContainerId = Number(containerRow.division_id);
         if (projectId == null && containerRow.project_id != null) {
           projectId = Number(containerRow.project_id);
         }
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
     if (resolvedContainerId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE container_id = ${resolvedContainerId}
+        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${resolvedContainerId}
       `;
       if (row?.project_id != null) {
         projectId = Number(row.project_id);
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     const result = await sql`
       INSERT INTO landscape.core_fin_fact_budget (
         budget_id,
-        container_id,
+        division_id,
         project_id,
         category_id,
         category_l1_id,
@@ -217,26 +217,17 @@ export async function POST(request: Request) {
     const newItem = result[0];
 
     // Fetch the complete item with category hierarchy and breadcrumb
+    // Phase 4: Removed core_fin_category joins - category_path now comes from view
     const enrichedItem = await sql`
       SELECT
         vbgi.*,
-        parent_cat.detail as parent_category_name,
-        parent_cat.code as parent_category_code,
-        -- Build category breadcrumb from L1 → L2 → L3 → L4
-        CONCAT_WS(' → ',
-          NULLIF(l1.name, ''),
-          NULLIF(l2.name, ''),
-          NULLIF(l3.name, ''),
-          NULLIF(l4.name, '')
-        ) as category_breadcrumb
+        uc.category_name as parent_category_name,
+        NULL::text as parent_category_code,
+        vbgi.category_path as category_breadcrumb
       FROM landscape.vw_budget_grid_items vbgi
-      LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
-        SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
+      LEFT JOIN landscape.core_unit_cost_category uc ON uc.category_id = (
+        SELECT parent_id FROM landscape.core_unit_cost_category WHERE category_id = vbgi.category_id
       )
-      LEFT JOIN landscape.core_budget_category l1 ON l1.category_id = vbgi.category_l1_id
-      LEFT JOIN landscape.core_budget_category l2 ON l2.category_id = vbgi.category_l2_id
-      LEFT JOIN landscape.core_budget_category l3 ON l3.category_id = vbgi.category_l3_id
-      LEFT JOIN landscape.core_budget_category l4 ON l4.category_id = vbgi.category_l4_id
       WHERE vbgi.fact_id = ${newItem.fact_id}
     `;
 

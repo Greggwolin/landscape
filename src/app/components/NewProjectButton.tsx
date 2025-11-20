@@ -10,7 +10,7 @@ const NewProjectButton: React.FC = () => {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+        className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2"
       >
         <svg
           className="w-4 h-4"

@@ -81,26 +81,34 @@ export async function getPreference<T = any>(
   if (defaultValue !== undefined) params.append('default', JSON.stringify(defaultValue));
 
   const url = `${DJANGO_API_URL}/api/user-preferences/by_key/?${params.toString()}`;
-  const response = await fetch(url, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' }
-  });
 
-  if (!response.ok) {
-    if (response.status === 404 && defaultValue !== undefined) {
-      return defaultValue;
+  try {
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      // Return default value for 404 (not found) or 401 (unauthorized - auth not set up yet)
+      if (response.status === 404 || response.status === 401) {
+        // Silently return default - auth errors are expected in development
+        return defaultValue !== undefined ? defaultValue : null as T;
+      }
+      throw new Error(`Failed to fetch preference: ${response.statusText}`);
     }
-    throw new Error(`Failed to fetch preference: ${response.statusText}`);
-  }
 
-  const data = await response.json();
-  return data.preference_value as T;
+    const data = await response.json();
+    return data.preference_value as T;
+  } catch (error) {
+    // Network errors or other fetch failures - silently return default
+    return defaultValue !== undefined ? defaultValue : null as T;
+  }
 }
 
 /**
  * Set a single preference (upsert)
  */
-export async function setPreference(params: SetPreferenceParams): Promise<UserPreference> {
+export async function setPreference(params: SetPreferenceParams): Promise<UserPreference | null> {
   const url = `${DJANGO_API_URL}/api/user-preferences/set_preference/`;
   const response = await fetch(url, {
     method: 'POST',
@@ -110,6 +118,12 @@ export async function setPreference(params: SetPreferenceParams): Promise<UserPr
   });
 
   if (!response.ok) {
+    // Silently fail for unauthorized requests (auth not set up yet)
+    // Preferences will fall back to in-memory/localStorage only
+    if (response.status === 401) {
+      console.warn('User preferences API requires authentication. Using local-only mode.');
+      return null;
+    }
     throw new Error(`Failed to set preference: ${response.statusText}`);
   }
 

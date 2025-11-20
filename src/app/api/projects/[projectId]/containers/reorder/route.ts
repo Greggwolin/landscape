@@ -36,7 +36,7 @@ export async function PATCH(
     // Validate all updates
     for (const update of updates) {
       if (
-        typeof update.container_id !== 'number' ||
+        typeof update.division_id !== 'number' ||
         typeof update.sort_order !== 'number'
       ) {
         return NextResponse.json(
@@ -44,7 +44,7 @@ export async function PATCH(
             success: false,
             error: {
               code: 'VALIDATION_ERROR',
-              message: 'Each update must have container_id (number) and sort_order (number)',
+              message: 'Each update must have division_id (number) and sort_order (number)',
               details: update,
             },
           },
@@ -54,18 +54,18 @@ export async function PATCH(
     }
 
     // Check all containers exist and belong to this project
-    const containerIds = updates.map((u) => u.container_id)
+    const divisionIds = updates.map((u) => u.division_id)
     const existingContainers = await sql<
-      [{ container_id: number; project_id: number; parent_container_id: number | null }]
+      [{ division_id: number; project_id: number; parent_division_id: number | null }]
     >`
-      SELECT container_id, project_id, parent_container_id
+      SELECT division_id, project_id, parent_division_id
       FROM landscape.tbl_container
-      WHERE container_id = ANY(${containerIds})
+      WHERE division_id = ANY(${divisionIds})
     `
 
-    if (existingContainers.length !== containerIds.length) {
-      const foundIds = existingContainers.map((c) => c.container_id)
-      const missingIds = containerIds.filter((id) => !foundIds.includes(id))
+    if (existingContainers.length !== divisionIds.length) {
+      const foundIds = existingContainers.map((c) => c.division_id)
+      const missingIds = divisionIds.filter((id) => !foundIds.includes(id))
 
       return NextResponse.json(
         {
@@ -73,7 +73,7 @@ export async function PATCH(
           error: {
             code: 'CONTAINER_NOT_FOUND',
             message: 'One or more containers do not exist',
-            details: { missing_container_ids: missingIds },
+            details: { missing_division_ids: missingIds },
           },
         },
         { status: 404 }
@@ -90,7 +90,7 @@ export async function PATCH(
             code: 'INVALID_PROJECT',
             message: 'One or more containers do not belong to this project',
             details: {
-              container_id: wrongProject.container_id,
+              division_id: wrongProject.division_id,
               expected_project_id: id,
               actual_project_id: wrongProject.project_id,
             },
@@ -102,7 +102,7 @@ export async function PATCH(
 
     // Verify all containers have same parent (reorder within same level)
     const parents = new Set(
-      existingContainers.map((c) => c.parent_container_id)
+      existingContainers.map((c) => c.parent_division_id)
     )
     if (parents.size > 1) {
       return NextResponse.json(
@@ -126,18 +126,18 @@ export async function PATCH(
         await txn`
           UPDATE landscape.tbl_container
           SET sort_order = ${update.sort_order}, updated_at = CURRENT_TIMESTAMP
-          WHERE container_id = ${update.container_id}
+          WHERE division_id = ${update.division_id}
         `
       }
     })
 
     // Return updated containers
     const updated = await sql<
-      [{ container_id: number; sort_order: number | null }]
+      [{ division_id: number; sort_order: number | null }]
     >`
-      SELECT container_id, sort_order
+      SELECT division_id, sort_order
       FROM landscape.tbl_container
-      WHERE container_id = ANY(${containerIds})
+      WHERE division_id = ANY(${divisionIds})
       ORDER BY sort_order NULLS LAST
     `
 

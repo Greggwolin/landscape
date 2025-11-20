@@ -1,0 +1,424 @@
+// Category Tree Manager Component
+// v1.0 · 2025-11-02
+
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  CButton,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel,
+  CFormInput,
+  CFormSelect,
+  CFormTextarea,
+  CAlert,
+  CSpinner,
+  CButtonGroup,
+} from '@coreui/react';
+import { useBudgetCategories } from '@/hooks/useBudgetCategories';
+import type { BudgetCategory, BudgetCategoryTreeNode } from '@/types/budget-categories';
+
+interface CategoryTreeManagerProps {
+  projectId: number;
+}
+
+export default function CategoryTreeManager({ projectId }: CategoryTreeManagerProps) {
+  const {
+    tree,
+    loading,
+    error,
+    fetchTree,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+  } = useBudgetCategories({
+    projectId,
+    autoFetch: true,
+  });
+
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingCategory, setEditingCategory] = useState<BudgetCategory | null>(null);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    description: '',
+    level: 1,
+    parent_id: null as number | null,
+    sort_order: 0,
+    icon: '',
+    color: '',
+  });
+
+  const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Refresh tree when project changes
+  useEffect(() => {
+    fetchTree();
+  }, [projectId, fetchTree]);
+
+  const handleCreate = (parentCategory?: BudgetCategoryTreeNode) => {
+    setModalMode('create');
+    setEditingCategory(null);
+    setFormData({
+      code: '',
+      name: '',
+      description: '',
+      level: parentCategory ? parentCategory.level + 1 : 1,
+      parent_id: parentCategory ? parentCategory.category_id : null,
+      sort_order: 0,
+      icon: '',
+      color: '',
+    });
+    setShowModal(true);
+  };
+
+  const handleEdit = (category: BudgetCategoryTreeNode) => {
+    setModalMode('edit');
+    setEditingCategory(category);
+    setFormData({
+      code: category.code,
+      name: category.name,
+      description: category.description || '',
+      level: category.level,
+      parent_id: category.parent_id,
+      sort_order: category.sort_order,
+      icon: category.icon || '',
+      color: category.color || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (categoryId: number) => {
+    if (deleteConfirm !== categoryId) {
+      setDeleteConfirm(categoryId);
+      setDeleteError(null); // Clear any previous error
+      setTimeout(() => setDeleteConfirm(null), 3000);
+      return;
+    }
+
+    try {
+      const success = await deleteCategory(categoryId);
+      if (success) {
+        setDeleteConfirm(null);
+        setDeleteError(null);
+        await fetchTree();
+      } else {
+        // Delete failed - error is in the hook's error state
+        setDeleteError(error || 'Failed to delete category');
+        setDeleteConfirm(null);
+      }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete category');
+      setDeleteConfirm(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const data = {
+      ...formData,
+      project_id: projectId,
+      is_template: false,
+    };
+
+    let success = false;
+    if (modalMode === 'create') {
+      success = await createCategory(data) !== null;
+    } else if (editingCategory) {
+      success = await updateCategory(editingCategory.category_id, data) !== null;
+    }
+
+    if (success) {
+      setShowModal(false);
+      await fetchTree();
+    }
+  };
+
+  const toggleExpanded = (categoryId: number) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
+  const renderTreeNode = (node: BudgetCategoryTreeNode, depth: number = 0) => {
+    const isExpanded = expandedNodes.has(node.category_id);
+    const hasChildren = node.children && node.children.length > 0;
+    const isConfirmingDelete = deleteConfirm === node.category_id;
+
+    return (
+      <div key={node.category_id}>
+        <div
+          className="d-flex align-items-center py-2 px-3 border-bottom"
+          style={{
+            marginLeft: `${depth * 24}px`,
+            backgroundColor: depth % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)',
+          }}
+        >
+          {/* Expand/Collapse Button */}
+          <div style={{ width: '24px', marginRight: '8px' }}>
+            {hasChildren && (
+              <CButton
+                color="ghost"
+                size="sm"
+                onClick={() => toggleExpanded(node.category_id)}
+                style={{ padding: '0', width: '24px', height: '24px' }}
+              >
+                {isExpanded ? '▼' : '▶'}
+              </CButton>
+            )}
+          </div>
+
+          {/* Level Badge */}
+          <span
+            className="badge me-2"
+            style={{
+              backgroundColor: getLevelColor(node.level),
+              minWidth: '24px',
+            }}
+          >
+            L{node.level}
+          </span>
+
+          {/* Color Indicator */}
+          {node.color && (
+            <span
+              className="me-2"
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                backgroundColor: node.color,
+                border: '1px solid var(--cui-border-color)',
+              }}
+            />
+          )}
+
+          {/* Icon */}
+          {node.icon && <span className="me-2">{node.icon}</span>}
+
+          {/* Name (primary) and Code (secondary) */}
+          <div className="flex-grow-1">
+            <span className="fw-semibold">{node.name}</span>
+            <span className="text-medium-emphasis ms-2" style={{ fontSize: '0.85em' }}>({node.code})</span>
+          </div>
+
+          {/* Actions */}
+          <CButtonGroup size="sm">
+            <CButton
+              color="primary"
+              variant="ghost"
+              onClick={() => handleCreate(node)}
+              disabled={node.level >= 4}
+              title="Add child category"
+            >
+              + Child
+            </CButton>
+            <CButton
+              color="info"
+              variant="ghost"
+              onClick={() => handleEdit(node)}
+              title="Edit category"
+            >
+              Edit
+            </CButton>
+            <CButton
+              color={isConfirmingDelete ? 'danger' : 'danger'}
+              variant={isConfirmingDelete ? 'outline' : 'ghost'}
+              onClick={() => handleDelete(node.category_id)}
+              title={isConfirmingDelete ? 'Click again to confirm' : 'Delete category'}
+            >
+              {isConfirmingDelete ? 'Confirm?' : 'Delete'}
+            </CButton>
+          </CButtonGroup>
+        </div>
+
+        {/* Children */}
+        {hasChildren && isExpanded && (
+          <div>
+            {node.children.map(child => renderTreeNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-5">
+        <CSpinner color="primary" />
+        <p className="text-medium-emphasis mt-2">Loading categories...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <CAlert color="danger">
+        <strong>Error:</strong> {error}
+      </CAlert>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h5 className="mb-1">Category Hierarchy</h5>
+          <p className="text-medium-emphasis mb-0">
+            Organize budget line items into up to 4 levels of categories
+          </p>
+        </div>
+        <CButton color="primary" onClick={() => handleCreate()}>
+          + Add Root Category
+        </CButton>
+      </div>
+
+      {/* Delete Error Alert */}
+      {deleteError && (
+        <CAlert color="warning" dismissible onClose={() => setDeleteError(null)} className="mb-3">
+          <strong>Cannot delete category:</strong> {deleteError}
+        </CAlert>
+      )}
+
+      {/* Tree View */}
+      {tree.length === 0 ? (
+        <CAlert color="info">
+          No categories defined for this project. Click "Add Root Category" to get started, or apply a template from the Templates tab.
+        </CAlert>
+      ) : (
+        <div className="border rounded">
+          {tree.map(node => renderTreeNode(node))}
+        </div>
+      )}
+
+      {/* Create/Edit Modal */}
+      <CModal visible={showModal} onClose={() => setShowModal(false)} size="lg">
+        <CModalHeader>
+          <CModalTitle>
+            {modalMode === 'create' ? 'Create Category' : 'Edit Category'}
+          </CModalTitle>
+        </CModalHeader>
+
+        <CForm onSubmit={handleSubmit}>
+          <CModalBody>
+            <div className="mb-3">
+              <CFormLabel>Code *</CFormLabel>
+              <CFormInput
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                required
+                placeholder="e.g., ACQUISITION"
+              />
+              <small className="text-medium-emphasis">
+                Unique identifier (uppercase, underscores allowed)
+              </small>
+            </div>
+
+            <div className="mb-3">
+              <CFormLabel>Name *</CFormLabel>
+              <CFormInput
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                placeholder="e.g., Acquisition Costs"
+              />
+            </div>
+
+            <div className="mb-3">
+              <CFormLabel>Description</CFormLabel>
+              <CFormTextarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                placeholder="Optional description"
+              />
+            </div>
+
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <CFormLabel>Level</CFormLabel>
+                <CFormInput
+                  type="number"
+                  value={formData.level}
+                  disabled
+                  readOnly
+                />
+                <small className="text-medium-emphasis">
+                  Level is determined by parent selection
+                </small>
+              </div>
+
+              <div className="col-md-6">
+                <CFormLabel>Sort Order</CFormLabel>
+                <CFormInput
+                  type="number"
+                  value={formData.sort_order}
+                  onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                />
+                <small className="text-medium-emphasis">
+                  Controls display order (lower numbers first)
+                </small>
+              </div>
+            </div>
+
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <CFormLabel>Icon (Emoji)</CFormLabel>
+                <CFormInput
+                  value={formData.icon}
+                  onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                  placeholder="e.g., 🏗️"
+                  maxLength={4}
+                />
+              </div>
+
+              <div className="col-md-6">
+                <CFormLabel>Color</CFormLabel>
+                <CFormInput
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                />
+              </div>
+            </div>
+          </CModalBody>
+
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => setShowModal(false)}>
+              Cancel
+            </CButton>
+            <CButton color="primary" type="submit" disabled={loading}>
+              {loading ? <CSpinner size="sm" /> : modalMode === 'create' ? 'Create' : 'Save'}
+            </CButton>
+          </CModalFooter>
+        </CForm>
+      </CModal>
+    </div>
+  );
+}
+
+function getLevelColor(level: number): string {
+  const colors = {
+    1: '#0d6efd', // primary
+    2: '#6610f2', // purple
+    3: '#d63384', // pink
+    4: '#fd7e14', // orange
+  };
+  return colors[level as keyof typeof colors] || '#6c757d';
+}

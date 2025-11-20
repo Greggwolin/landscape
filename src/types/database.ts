@@ -1580,6 +1580,7 @@ export interface Project {
   taxonomyCustomized: boolean | null;
   /** Default: false */
   jurisdictionIntegrated: boolean | null;
+  planningEfficiency: number | null;
 }
 
 // landscape.tbl_project_config

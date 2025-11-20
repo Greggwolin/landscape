@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
-import { cilFilterSquare } from '@coreui/icons';
+import { cilFilterSquare, cilPencil, cilApple, cilSend, cilCheck } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import FilterDetailView from '@/components/dms/views/FilterDetailView';
@@ -11,6 +11,7 @@ import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import type { DMSDocument } from '@/types/dms';
 import { LandscapeButton } from '@/components/ui/landscape';
+import styles from './page.module.css';
 
 type TabType = 'documents' | 'upload';
 
@@ -244,11 +245,11 @@ export default function DMSPage() {
   if (!currentProject) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+        <div className={`rounded-lg p-6 border ${styles.noProjectCard}`}>
+          <h2 className={`text-lg font-semibold mb-2 ${styles.noProjectTitle}`}>
             No Project Selected
           </h2>
-          <p className="text-yellow-700 dark:text-yellow-300">
+          <p className={`text-sm ${styles.noProjectMessage}`}>
             Please select a project from the navigation to access the Document Management System.
           </p>
         </div>
@@ -259,19 +260,18 @@ export default function DMSPage() {
   return (
     <div className="h-screen flex flex-col">
       {/* Tabs */}
-      <div className="border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}>
+      <div className={`border-b ${styles.tabsBar}`}>
         <div className="px-6">
           <nav className="flex space-x-8" aria-label="Tabs">
             <LandscapeButton
               onClick={() => setActiveTab('documents')}
               color={activeTab === 'documents' ? 'primary' : 'secondary'}
               variant="ghost"
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${styles.tabButton} ${
                 activeTab === 'documents'
-                  ? 'border-blue-500'
-                  : 'border-transparent'
+                  ? styles.tabButtonActive
+                  : styles.tabButtonInactive
               }`}
-              style={{ borderBottomColor: activeTab === 'documents' ? undefined : 'var(--cui-border-color)' }}
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -285,12 +285,11 @@ export default function DMSPage() {
               onClick={() => setActiveTab('upload')}
               color={activeTab === 'upload' ? 'primary' : 'secondary'}
               variant="ghost"
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${styles.tabButton} ${
                 activeTab === 'upload'
-                  ? 'border-blue-500'
-                  : 'border-transparent'
+                  ? styles.tabButtonActive
+                  : styles.tabButtonInactive
               }`}
-              style={{ borderBottomColor: activeTab === 'upload' ? undefined : 'var(--cui-border-color)' }}
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -307,52 +306,52 @@ export default function DMSPage() {
       <div className="flex-1 overflow-hidden">
         {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+          <div className={`h-full flex flex-col ${styles.documentsPane}`}>
             {/* Breadcrumb */}
-            <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+            <div className={`px-6 py-2 border-b ${styles.breadcrumbRow}`}>
               <div className="flex items-center gap-2 text-sm">
                 <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-0 hover:underline">
                   Home
                 </LandscapeButton>
-                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                <span className="text-text-secondary">{'>'}</span>
                 <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-0 hover:underline">
                   Projects
                 </LandscapeButton>
-                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
+                <span className="text-text-secondary">{'>'}</span>
+                <span className="truncate text-text-primary">
                   {currentProject.project_name}
                 </span>
               </div>
             </div>
 
             {/* Toolbar */}
-            <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+            <div className={`px-6 py-3 border-b ${styles.toolbarRow}`}>
               <div className="flex items-center gap-4">
                 <LandscapeButton color="primary" variant="ghost" size="sm" className="!p-1">
                   🔻
                 </LandscapeButton>
-                <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                <span className="text-sm text-text-secondary">
                   {totalItemCount} items | 0 selected
                 </span>
-                <div className="ml-auto flex items-center gap-3 text-sm">
-                  <LandscapeButton color="secondary" variant="ghost" size="sm">
-                    🤖 Ask AI
+                  <div className="ml-auto flex items-center gap-3 text-sm">
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" icon={<CIcon icon={cilApple} className="w-4 h-4" />}>
+                    Ask AI
                   </LandscapeButton>
-                  <LandscapeButton color="secondary" variant="ghost" size="sm">
-                    ✏️ Rename
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" icon={<CIcon icon={cilPencil} className="w-4 h-4" />}>
+                    Rename
                   </LandscapeButton>
                   <LandscapeButton color="secondary" variant="ghost" size="sm" className="flex items-center gap-1">
                     <CIcon icon={cilFilterSquare} className="w-4 h-4" />
                     Move/Copy
                   </LandscapeButton>
-                  <LandscapeButton color="secondary" variant="ghost" size="sm">
-                    📧 Email copy
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" icon={<CIcon icon={cilSend} className="w-4 h-4" />}>
+                    Email copy
                   </LandscapeButton>
-                  <LandscapeButton color="secondary" variant="ghost" size="sm">
-                    ✏️ Edit profile
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" icon={<CIcon icon={cilPencil} className="w-4 h-4" />}>
+                    Edit profile
                   </LandscapeButton>
-                  <LandscapeButton color="secondary" variant="ghost" size="sm">
-                    ✅ Check in
+                  <LandscapeButton color="secondary" variant="ghost" size="sm" icon={<CIcon icon={cilCheck} className="w-4 h-4" />}>
+                    Check in
                   </LandscapeButton>
                   <LandscapeButton color="secondary" variant="ghost" size="sm">
                     ⋯ More
@@ -365,18 +364,18 @@ export default function DMSPage() {
               <div className={`flex-1 overflow-y-auto ${selectedFilterType ? 'lg:w-2/3' : 'w-full'}`}>
                 {isLoadingFilters ? (
                   <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
-                    <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
+                    <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${styles.loadingSpinner}`}></div>
+                    <span className="ml-3 text-text-secondary">Loading filters...</span>
                   </div>
                 ) : allFilters.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-                    <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3" />
-                    <p className="text-sm">No documents found in this project</p>
+                  <div className="flex flex-col items-center justify-center h-64 text-text-secondary">
+                    <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3 text-text-secondary" />
+                    <p className="text-sm text-text-secondary">No documents found in this project</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2">
                     {/* Left Column */}
-                    <div className="border-r border-gray-200 dark:border-gray-700">
+                    <div className="border-r border-line-soft">
                       <AccordionFilters
                         projectId={currentProject.project_id}
                         filters={leftColumnFilters}
@@ -407,11 +406,11 @@ export default function DMSPage() {
               {selectedFilterType && (
                 <>
                   <div
-                    className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+                    className={`fixed inset-0 z-40 lg:hidden ${styles.detailBackdrop}`}
                     onClick={handleCloseDetail}
                     role="presentation"
                   />
-                  <div className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3">
+                  <div className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l border-line-soft bg-surface-card shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3">
                     <FilterDetailView
                       projectId={currentProject.project_id}
                       docType={selectedFilterType}
@@ -429,10 +428,10 @@ export default function DMSPage() {
           <div className="h-full overflow-y-auto p-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h2 className="text-xl font-semibold text-text-primary mb-2">
                   Upload Documents
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-text-secondary">
                   Drag and drop files or click to select
                 </p>
               </div>
@@ -440,7 +439,7 @@ export default function DMSPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left: Upload */}
                 <div className="space-y-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="rounded-lg border border-line-strong bg-surface-card p-6">
                     <Dropzone
                       projectId={currentProject.project_id}
                       workspaceId={defaultWorkspaceId}
@@ -451,8 +450,8 @@ export default function DMSPage() {
                   </div>
 
                   {uploadedFiles.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    <div className="rounded-lg border border-line-strong bg-surface-card p-6">
+                      <h3 className="text-lg font-semibold text-text-primary mb-4">
                         Uploaded Files ({uploadedFiles.length})
                       </h3>
                       <Queue
@@ -465,18 +464,18 @@ export default function DMSPage() {
                 </div>
 
                 {/* Right: Profile Form */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 h-fit sticky top-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                <div className="rounded-lg border border-line-strong bg-surface-card p-6 h-fit sticky top-6">
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">
                     Document Profile
                   </h3>
 
                   {selectedUploadFile ? (
                     <div>
-                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      <div className={`mb-4 p-3 rounded-lg ${styles.selectedFileInfo}`}>
+                        <p className="text-sm font-medium text-text-primary">
                           {selectedUploadFile.name || selectedUploadFile.filename}
                         </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        <p className="text-xs text-text-secondary mt-1">
                           {(selectedUploadFile.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -493,9 +492,9 @@ export default function DMSPage() {
                       />
                     </div>
                   ) : (
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <div className="text-center py-12 text-text-secondary">
                       <svg
-                        className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
+                        className="mx-auto h-12 w-12 text-text-secondary"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

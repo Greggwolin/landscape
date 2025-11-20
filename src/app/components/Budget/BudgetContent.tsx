@@ -13,7 +13,7 @@ type Category = {
   scope: string | null
   detail: string | null
   uoms: { code: string; label: string }[]
-  container_levels?: number[]
+  tiers?: number[]
 }
 type Line = {
   fact_id: number
@@ -49,7 +49,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
   const [activeBudgetId, setActiveBudgetId] = useState<number | null>(null)
   type ScopeSelection =
     | { kind: 'project'; projectId: number }
-    | { kind: 'container'; projectId: number; containerId: number; containerLevel: 1 | 2 | 3 }
+    | { kind: 'container'; projectId: number; divisionId: number; tier: 1 | 2 | 3 }
   const [scopeSelection, setScopeSelection] = useState<ScopeSelection | null>(
     projectId ? { kind: 'project', projectId } : null
   )
@@ -57,7 +57,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
   const [lines, setLines] = useState<Line[]>([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  const selectionLevel = scopeSelection?.kind === 'container' ? scopeSelection.containerLevel : 0
+  const selectionLevel = scopeSelection?.kind === 'container' ? scopeSelection.tier : 0
   const scopeOptions = useMemo(() => {
     const opts: { key: string; label: string; selection: ScopeSelection }[] = []
     if (projectId) {
@@ -68,29 +68,29 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
       })
     }
     const sortedContainers = [...flatContainers].sort((a, b) => {
-      if (a.container_level !== b.container_level) {
-        return a.container_level - b.container_level
+      if (a.tier !== b.tier) {
+        return a.tier - b.tier
       }
       const orderA = a.sort_order ?? 0
       const orderB = b.sort_order ?? 0
       if (orderA !== orderB) return orderA - orderB
-      return a.container_id - b.container_id
+      return a.division_id - b.division_id
     })
     sortedContainers.forEach((container) => {
       const levelLabel =
-        container.container_level === 1
+        container.tier === 1
           ? labels.level1Label
-          : container.container_level === 2
+          : container.tier === 2
             ? labels.level2Label
             : labels.level3Label
       opts.push({
-        key: `container-${container.container_id}`,
+        key: `container-${container.division_id}`,
         label: `${levelLabel}: ${container.display_name}`,
         selection: {
           kind: 'container',
           projectId: container.project_id,
-          containerId: container.container_id,
-          containerLevel: container.container_level as 1 | 2 | 3
+          divisionId: container.division_id,
+          tier: container.tier as 1 | 2 | 3
         }
       })
     })
@@ -100,7 +100,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
   const selectedScopeKey = scopeSelection
     ? scopeSelection.kind === 'project'
       ? 'project'
-      : `container-${scopeSelection.containerId}`
+      : `container-${scopeSelection.divisionId}`
     : ''
 
   useEffect(() => {
@@ -146,7 +146,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
         return
       }
       try {
-        const cats = await fetch(`/api/fin/categories?container_level=${selectionLevel}`).then(r => r.json())
+        const cats = await fetch(`/api/fin/categories?tier=${selectionLevel}`).then(r => r.json())
         setCategories(cats)
       } catch (e) {
         console.error('Failed to load categories', e)
@@ -160,7 +160,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
       if (!activeBudgetId || !scopeSelection) return
       const params = new URLSearchParams({ budget_id: String(activeBudgetId) })
       if (scopeSelection.kind === 'container') {
-        params.set('container_id', String(scopeSelection.containerId))
+        params.set('division_id', String(scopeSelection.divisionId))
       } else {
         params.set('project_id', String(scopeSelection.projectId))
       }
@@ -180,7 +180,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
       const payload = {
         budget_id: activeBudgetId,
         project_id: scopeSelection.projectId,
-        container_id: scopeSelection.kind === 'container' ? scopeSelection.containerId : null,
+        division_id: scopeSelection.kind === 'container' ? scopeSelection.divisionId : null,
         category_id: c.category_id,
         uom_code: uom,
         qty: 1,
@@ -195,7 +195,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
       if (j?.fact_id) {
         const params = new URLSearchParams({ budget_id: String(activeBudgetId) })
         if (scopeSelection.kind === 'container') {
-          params.set('container_id', String(scopeSelection.containerId))
+          params.set('division_id', String(scopeSelection.divisionId))
         } else {
           params.set('project_id', String(scopeSelection.projectId))
         }
@@ -334,7 +334,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
         <div className="flex-1" />
         <div className="text-gray-300">Total:</div>
         <div className="text-white font-medium">{currency(total)}</div>
-        <button onClick={addLine} disabled={(categories ?? []).length === 0 || !scopeSelection} className="ml-3 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">Add Line</button>
+        <button onClick={addLine} disabled={(categories ?? []).length === 0 || !scopeSelection} className="ml-3 btn btn-sm btn-primary">Add Line</button>
       </div>
 
       <div className="bg-gray-800 rounded border border-gray-700 overflow-hidden">
@@ -355,10 +355,10 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
           {(Array.isArray(categories) && categories.length === 0) && (
             <div className="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded p-3 flex items-center gap-3">
               <div>No categories found for this Entity. Seed starter categories or create your own in Admin.</div>
-              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={async () => {
+              <button className="btn btn-sm btn-primary" onClick={async () => {
                 try {
                   await fetch('/api/fin/seed', { method: 'POST' })
-                  const cats = await fetch(`/api/fin/categories?container_level=${selectionLevel}`).then(r => r.json())
+                  const cats = await fetch(`/api/fin/categories?tier=${selectionLevel}`).then(r => r.json())
                   setCategories(Array.isArray(cats) ? cats : [])
                 } catch (e) { console.error('Seed failed', e) }
               }}>Seed</button>
@@ -443,7 +443,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
                   </button>
                 </div>
                 <div className="w-1/12 text-center">
-                  <button className="px-2 py-1 rounded bg-red-700 hover:bg-red-800 text-white" onClick={() => deleteLine(line.fact_id)}>Delete</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => deleteLine(line.fact_id)}>Delete</button>
                 </div>
               </div>
               {openSourceFor === line.fact_id && (
@@ -453,7 +453,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
                     <input className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs" placeholder="Vendor name" value={newVendor.name} onChange={e => setNewVendor({ ...newVendor, name: e.target.value })} />
                     <input className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs w-40" placeholder="Role (bidder/contractor)" value={newVendor.role} onChange={e => setNewVendor({ ...newVendor, role: e.target.value })} />
                     <input className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs flex-1" placeholder="Note (optional)" value={newVendor.note} onChange={e => setNewVendor({ ...newVendor, note: e.target.value })} />
-                    <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => addVendorToLine(line.fact_id)}>Add</button>
+                    <button className="btn btn-sm btn-primary" onClick={() => addVendorToLine(line.fact_id)}>Add</button>
                   </div>
                   <div className="space-y-1">
                     {(lineVendors[line.fact_id] ?? []).map(v => (
@@ -463,7 +463,7 @@ const BudgetContent: React.FC<Props> = ({ projectId = null }) => {
                           {v.role && <span className="text-gray-400">{v.role}</span>}
                           {v.note && <span className="text-gray-400">— {v.note}</span>}
                         </div>
-                        <button className="px-2 py-0.5 rounded bg-red-700 text-white" onClick={() => removeVendorFromLine(line.fact_id, v.party_id)}>Remove</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => removeVendorFromLine(line.fact_id, v.party_id)}>Remove</button>
                       </div>
                     ))}
                   </div>

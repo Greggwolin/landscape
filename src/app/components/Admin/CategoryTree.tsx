@@ -8,7 +8,7 @@ type Category = {
   event: string | null
   uoms: { code: string; label: string }[]
   pe_levels?: string[]
-  container_levels?: number[]
+  tiers?: number[]
 }
 
 type Uom = { uom_code: string; name: string; uom_type: string }
@@ -17,7 +17,7 @@ const CategoryTree: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([])
   const [uoms, setUoms] = useState<Uom[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [form, setForm] = useState<any>({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] })
+  const [form, setForm] = useState<any>({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] })
   const [saving, setSaving] = useState(false)
 
   const reload = async () => {
@@ -37,7 +37,7 @@ const CategoryTree: React.FC = () => {
       if (c) setForm({
         code: c.code, kind: c.kind, class: c.class ?? '', event: c.event ?? '', is_active: true,
         uoms: (c.uoms ?? []).map(u => u.code),
-        container_levels: c.container_levels ?? (c.pe_levels ?? []).map((level) => level === 'project' ? 0 : level === 'area' ? 1 : level === 'phase' ? 2 : 3)
+        tiers: c.tiers ?? (c.pe_levels ?? []).map((level) => level === 'project' ? 0 : level === 'area' ? 1 : level === 'phase' ? 2 : 3)
       })
     }
   }, [selectedId, categories])
@@ -66,7 +66,7 @@ const CategoryTree: React.FC = () => {
     try {
       await fetch(`/api/fin/categories/${selectedId}`, { method: 'DELETE' })
       setSelectedId(null)
-      setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] })
+      setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] })
       await reload()
     } catch (e) { console.error('Delete failed', e) } finally { setSaving(false) }
   }
@@ -84,7 +84,7 @@ const CategoryTree: React.FC = () => {
               </button>
             ))}
             <div className="mt-2">
-              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], container_levels: [] }) }}>New Category</button>
+              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] }) }}>New Category</button>
             </div>
           </div>
           <div className="md:col-span-2 border border-gray-700 rounded p-3 bg-gray-900 space-y-3">
@@ -125,12 +125,12 @@ const CategoryTree: React.FC = () => {
                   <label key={value} className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={form.container_levels.includes(value)}
+                      checked={form.tiers.includes(value)}
                       onChange={e => setForm((f: any) => ({
                         ...f,
-                        container_levels: e.target.checked
-                          ? [...f.container_levels, value]
-                          : f.container_levels.filter((x: number) => x !== value)
+                        tiers: e.target.checked
+                          ? [...f.tiers, value]
+                          : f.tiers.filter((x: number) => x !== value)
                       }))}
                     />
                     <span>{label}</span>

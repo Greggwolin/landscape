@@ -43,7 +43,7 @@ export async function POST() {
       for (const p of s.entities) {
         const level =
           p === 'project' ? 0 : p === 'area' ? 1 : p === 'phase' ? 2 : 3
-        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, container_level) VALUES (${id}, ${level}) ON CONFLICT DO NOTHING`
+        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, tier) VALUES (${id}, ${level}) ON CONFLICT DO NOTHING`
       }
     }
 

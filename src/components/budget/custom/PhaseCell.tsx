@@ -19,7 +19,7 @@ interface PhaseCellProps {
 export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) {
   const item = row.original;
   const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState<number | null>(item.container_id ?? null);
+  const [value, setValue] = useState<number | null>(item.division_id ?? null);
   const selectRef = useRef<HTMLSelectElement>(null);
 
   const pid = projectId || item.project_id || 0;
@@ -42,9 +42,9 @@ export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) 
   // This prevents the state from being overwritten while user is selecting
   useEffect(() => {
     if (!isEditing) {
-      setValue(item.container_id ?? null);
+      setValue(item.division_id ?? null);
     }
-  }, [item.container_id, isEditing]);
+  }, [item.division_id, isEditing]);
 
   // Build options list: Project-Level + Areas + Phases
   const options: { value: number | null; label: string }[] = [
@@ -58,8 +58,8 @@ export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) 
       const isNumeric = /^\d+$/.test(area.name);
       const label = isNumeric ? `${level1Label} ${area.name}` : area.name;
       options.push({
-        value: area.container_id,
-        label: label || `${level1Label} ${area.container_id}`
+        value: area.division_id,
+        label: label || `${level1Label} ${area.division_id}`
       });
     });
   }
@@ -68,11 +68,11 @@ export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) 
   if (phases && phases.length > 0) {
     phases.forEach((phase) => {
       // Build phase name using level2 label (e.g., "Phase")
-      const phaseDisplayName = phase.name || String(phase.container_id);
+      const phaseDisplayName = phase.name || String(phase.division_id);
       const isPhaseNumeric = /^\d+(\.\d+)?$/.test(phaseDisplayName);
       const label = isPhaseNumeric ? `${level2Label} ${phaseDisplayName}` : phaseDisplayName;
 
-      options.push({ value: phase.container_id, label });
+      options.push({ value: phase.division_id, label });
     });
   }
 
@@ -99,23 +99,23 @@ export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) 
 
   const handleBlur = () => {
     setIsEditing(false);
-    setValue(item.container_id ?? null); // Reset to original value
+    setValue(item.division_id ?? null); // Reset to original value
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLSelectElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       setIsEditing(false);
-      setValue(item.container_id ?? null);
+      setValue(item.division_id ?? null);
     }
   };
 
-  // Build display value from current container_id
-  // Use local state 'value' instead of item.container_id to reflect immediate changes
+  // Build display value from current division_id
+  // Use local state 'value' instead of item.division_id to reflect immediate changes
   const getDisplayValue = () => {
-    const containerId = value ?? item.container_id;
+    const divisionId = value ?? item.division_id;
 
-    if (!containerId) return 'Project-Level';
+    if (!divisionId) return 'Project-Level';
 
     // If containers are still loading, show loading state
     if (containersResult?.isLoading) {
@@ -123,24 +123,24 @@ export default function PhaseCell({ row, onCommit, projectId }: PhaseCellProps) 
     }
 
     // Check if it's an area (Level 1)
-    const area = areas.find(a => a.container_id === containerId);
+    const area = areas.find(a => a.division_id === divisionId);
     if (area) {
       const isNumeric = /^\d+$/.test(area.name);
       return isNumeric ? `${level1Label} ${area.name}` : area.name;
     }
 
     // Check if it's a phase (Level 2)
-    const phase = phases.find(p => p.container_id === containerId);
+    const phase = phases.find(p => p.division_id === divisionId);
     if (phase) {
       // Build phase name using level2 label (e.g., "Phase")
-      const phaseDisplayName = phase.name || String(phase.container_id);
+      const phaseDisplayName = phase.name || String(phase.division_id);
       const isPhaseNumeric = /^\d+(\.\d+)?$/.test(phaseDisplayName);
       return isPhaseNumeric ? `${level2Label} ${phaseDisplayName}` : phaseDisplayName;
     }
 
     // Fallback: Container exists but isn't in this project's hierarchy
     // This can happen if data was copied from another project or migrated
-    return `Invalid (ID: ${containerId})`;
+    return `Invalid (ID: ${divisionId})`;
   };
 
   const displayValue = getDisplayValue();

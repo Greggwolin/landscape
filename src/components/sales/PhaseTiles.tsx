@@ -68,8 +68,8 @@ export default function PhaseTiles({
         return sum + (p.net_proceeds || 0);
       }, 0);
 
-      // Find matching container phase for cost data
-      const containerPhase = containerPhases.find(cp => cp.container_id === phase.phase_id);
+      // Find matching container phase for cost data by NAME (not ID)
+      const containerPhase = containerPhases.find(cp => cp.name === phase.phase_name);
 
       return {
         ...phase,
@@ -85,9 +85,9 @@ export default function PhaseTiles({
     if (!phasesWithCounts) return [];
     if (selectedAreaIds.length === 0) return phasesWithCounts;
 
+    // Find matching container phase by NAME (not ID, since phase_id !== division_id)
     return phasesWithCounts.filter((phase: Phase) => {
-      // Find matching container phase to get parent area
-      const containerPhase = containerPhases.find(cp => cp.container_id === phase.phase_id);
+      const containerPhase = containerPhases.find(cp => cp.name === phase.phase_name);
       return containerPhase && selectedAreaIds.includes(containerPhase.parent_id!);
     });
   }, [phasesWithCounts, selectedAreaIds, containerPhases]);
@@ -125,8 +125,8 @@ export default function PhaseTiles({
       {filteredPhases.map((phase: Phase & { total_cost?: number; net_proceeds?: number }) => {
         const isSelected = selectedPhaseIds.includes(phase.phase_id);
 
-        // Check if parent area is selected (for highlighting)
-        const containerPhase = containerPhases.find(cp => cp.container_id === phase.phase_id);
+        // Check if parent area is selected (for highlighting) - match by NAME
+        const containerPhase = containerPhases.find(cp => cp.name === phase.phase_name);
         const isHighlighted = !isSelected && containerPhase && selectedAreaIds.includes(containerPhase.parent_id!);
 
         // Build className dynamically

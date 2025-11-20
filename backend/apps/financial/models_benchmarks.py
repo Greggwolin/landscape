@@ -17,7 +17,7 @@ class CategoryTagLibrary(models.Model):
     """
     tag_id = models.AutoField(primary_key=True)
     tag_name = models.CharField(max_length=50, unique=True)
-    tag_context = models.CharField(max_length=50)  # Which lifecycle_stage(s) this applies to
+    tag_context = models.CharField(max_length=50)  # Which activity/activities this applies to
     is_system_default = models.BooleanField(default=True)
     description = models.TextField(blank=True, null=True)
     display_order = models.IntegerField(default=999)
@@ -39,7 +39,7 @@ class CategoryTagLibrary(models.Model):
 class UnitCostCategory(models.Model):
     """
     Universal category taxonomy for cost/revenue items across all property types.
-    Categories can belong to multiple lifecycle stages via many-to-many relationship.
+    Categories can belong to multiple activities via many-to-many relationship.
     Uses flexible tag-based categorization.
     Maps to landscape.core_unit_cost_category
     """
@@ -68,16 +68,16 @@ class UnitCostCategory(models.Model):
         verbose_name_plural = 'Unit Cost Categories'
 
     def __str__(self):
-        stages = self.get_lifecycle_stages()
-        stages_str = ', '.join(stages) if stages else 'No stages'
-        return f"{self.category_name} ({stages_str})"
+        activities = self.get_activities()
+        activities_str = ', '.join(activities) if activities else 'No activities'
+        return f"{self.category_name} ({activities_str})"
 
-    def get_lifecycle_stages(self):
-        """Get list of lifecycle stages this category belongs to."""
+    def get_activities(self):
+        """Get list of activities this category belongs to."""
         return list(
-            CategoryLifecycleStage.objects.filter(
+            CategoryActivity.objects.filter(
                 category_id=self.category_id
-            ).values_list('lifecycle_stage', flat=True).order_by('lifecycle_stage')
+            ).values_list('activity', flat=True).order_by('activity')
         )
 
     def has_tag(self, tag_name):
@@ -122,15 +122,16 @@ class UnitCostCategory(models.Model):
         return descendants
 
 
-class CategoryLifecycleStage(models.Model):
+class CategoryActivity(models.Model):
     """
-    Many-to-many pivot table linking categories to lifecycle stages.
-    A category can belong to multiple lifecycle stages.
-    Maps to landscape.core_category_lifecycle_stages
+    Many-to-many pivot table linking categories to activities.
+    A category can belong to multiple activities.
+    Maps to landscape.core_category_lifecycle_stages (renamed to activity column)
     """
 
-    LIFECYCLE_CHOICES = [
+    ACTIVITY_CHOICES = [
         ('Acquisition', 'Acquisition'),
+        ('Planning & Engineering', 'Planning & Engineering'),
         ('Development', 'Development'),
         ('Operations', 'Operations'),
         ('Disposition', 'Disposition'),
@@ -138,7 +139,7 @@ class CategoryLifecycleStage(models.Model):
     ]
 
     category_id = models.IntegerField()
-    lifecycle_stage = models.CharField(max_length=50, choices=LIFECYCLE_CHOICES)
+    activity = models.CharField(max_length=50, choices=ACTIVITY_CHOICES, db_column='activity')
     sort_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -146,13 +147,17 @@ class CategoryLifecycleStage(models.Model):
     class Meta:
         managed = False
         db_table = 'core_category_lifecycle_stages'
-        unique_together = [['category_id', 'lifecycle_stage']]
-        ordering = ['lifecycle_stage', 'sort_order']
-        verbose_name = 'Category Lifecycle Stage'
-        verbose_name_plural = 'Category Lifecycle Stages'
+        unique_together = [['category_id', 'activity']]
+        ordering = ['activity', 'sort_order']
+        verbose_name = 'Category Activity'
+        verbose_name_plural = 'Category Activities'
 
     def __str__(self):
-        return f"Category {self.category_id} → {self.lifecycle_stage}"
+        return f"Category {self.category_id} → {self.activity}"
+
+
+# Backward compatibility alias - will be removed in future version
+CategoryLifecycleStage = CategoryActivity
 
 
 class UnitCostItem(models.Model):

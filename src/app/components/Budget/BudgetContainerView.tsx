@@ -10,7 +10,7 @@ interface BudgetItem {
   budget_id: number
   pe_level?: string | null
   pe_id?: string | null
-  container_id: number | null
+  division_id: number | null
   category_id: number
   uom_code: string
   qty: number | null
@@ -19,7 +19,7 @@ interface BudgetItem {
   confidence_level: string | null
   is_committed: boolean
   // Container details
-  container_level: number | null
+  tier: number | null
   container_code: string | null
   container_name: string | null
   project_id: number | null
@@ -43,15 +43,15 @@ interface BudgetSummary {
 
 interface BudgetContainerViewProps {
   projectId: number
-  containerId?: number
-  containerLevel?: number
+  divisionId?: number
+  tier?: number
   includeChildren?: boolean
 }
 
 export default function BudgetContainerView({
   projectId,
-  containerId,
-  containerLevel,
+  divisionId,
+  tier,
   includeChildren = false
 }: BudgetContainerViewProps) {
   const { labels, isLoading: labelsLoading } = useProjectConfig(projectId)
@@ -66,14 +66,14 @@ export default function BudgetContainerView({
 
   // Build query parameters
   const queryParams = new URLSearchParams()
-  if (containerId) {
-    queryParams.append('container_id', containerId.toString())
+  if (divisionId) {
+    queryParams.append('division_id', divisionId.toString())
     if (includeChildren) {
       queryParams.append('include_children', 'true')
     }
-  } else if (containerLevel) {
+  } else if (tier) {
     queryParams.append('project_id', projectId.toString())
-    queryParams.append('container_level', containerLevel.toString())
+    queryParams.append('tier', tier.toString())
   } else {
     queryParams.append('project_id', projectId.toString())
   }
@@ -99,8 +99,8 @@ export default function BudgetContainerView({
     const grouped = new Map<string, BudgetItem[]>()
 
     items.forEach((item) => {
-      const key = item.container_id
-        ? `container-${item.container_id}`
+      const key = item.division_id
+        ? `container-${item.division_id}`
         : 'project'
       if (!grouped.has(key)) {
         grouped.set(key, [])
@@ -122,7 +122,7 @@ export default function BudgetContainerView({
 
       // Sort by level first, then sort_order
       const levelDiff =
-        (itemsA.container_level || 0) - (itemsB.container_level || 0)
+        (itemsA.tier || 0) - (itemsB.tier || 0)
       if (levelDiff !== 0) return levelDiff
 
       return (
@@ -141,13 +141,13 @@ export default function BudgetContainerView({
   }
 
   // Toggle container expansion
-  const toggleContainer = (containerId: number) => {
+  const toggleContainer = (divisionId: number) => {
     setExpandedContainers((prev) => {
       const next = new Set(prev)
-      if (next.has(containerId)) {
-        next.delete(containerId)
+      if (next.has(divisionId)) {
+        next.delete(divisionId)
       } else {
-        next.add(containerId)
+        next.add(divisionId)
       }
       return next
     })
@@ -270,8 +270,8 @@ export default function BudgetContainerView({
                 )
                 const isExpanded =
                   containerKey === 'project' ||
-                  (firstItem.container_id !== null &&
-                    expandedContainers.has(firstItem.container_id))
+                  (firstItem.division_id !== null &&
+                    expandedContainers.has(firstItem.division_id))
 
                 return (
                   <React.Fragment key={containerKey}>
@@ -279,13 +279,13 @@ export default function BudgetContainerView({
                     <tr
                       className="bg-gray-850 hover:bg-gray-800 cursor-pointer"
                       onClick={() =>
-                        firstItem.container_id &&
-                        toggleContainer(firstItem.container_id)
+                        firstItem.division_id &&
+                        toggleContainer(firstItem.division_id)
                       }
                     >
                       <td className="px-4 py-3 font-medium text-white">
                         <div className="flex items-center gap-2">
-                          {firstItem.container_id && (
+                          {firstItem.division_id && (
                             <span className="text-gray-500">
                               {isExpanded ? '▼' : '▶'}
                             </span>
@@ -293,9 +293,9 @@ export default function BudgetContainerView({
                           <span>
                             {firstItem.container_name || 'Project Total'}
                           </span>
-                          {firstItem.container_level !== null && (
+                          {firstItem.tier !== null && (
                             <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded">
-                              {getLevelLabel(firstItem.container_level)}
+                              {getLevelLabel(firstItem.tier)}
                             </span>
                           )}
                         </div>

@@ -12,6 +12,7 @@ interface CategoryTreeProps {
   onSelectCategory: (category: UnitCostCategoryReference) => void;
   onToggleExpanded: (categoryId: number) => void;
   onAddCategory: () => void;
+  onAddSubcategory: (parentCategory: UnitCostCategoryReference) => void;
 }
 
 export default function CategoryTree({
@@ -21,6 +22,7 @@ export default function CategoryTree({
   onSelectCategory,
   onToggleExpanded,
   onAddCategory,
+  onAddSubcategory,
 }: CategoryTreeProps) {
   const totalCategories = countCategories(categories);
 
@@ -60,6 +62,7 @@ export default function CategoryTree({
                 expandedCategories={expandedCategories}
                 onSelectCategory={onSelectCategory}
                 onToggleExpanded={onToggleExpanded}
+                onAddSubcategory={onAddSubcategory}
                 depth={0}
               />
             ))}

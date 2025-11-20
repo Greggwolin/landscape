@@ -17,6 +17,7 @@ import { sql } from '@/lib/db';
  * - parent_id: Filter by parent category
  * - is_template: Filter templates (true) or project categories (false)
  * - include_inactive: Include inactive categories (default: false)
+ * - activity: Filter by activity (Acquisition, Planning & Engineering, Development, Operations, Disposition, Financing)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
     const parent_id = searchParams.get('parent_id');
     const is_template = searchParams.get('is_template');
     const include_inactive = searchParams.get('include_inactive') === 'true';
+    const activity = searchParams.get('activity');
 
     // Build WHERE clause dynamically
     const conditions: string[] = [];
@@ -35,54 +37,57 @@ export async function GET(request: NextRequest) {
     const paramCount = 1;
 
     if (project_id) {
-      // Get project-specific categories OR templates matching project type
-      const projectResult = await sql`
-        SELECT project_type_code FROM landscape.tbl_project WHERE project_id = ${project_id}
-      `;
+      // Use core_unit_cost_category joined with lifecycle stage mapping
+      // This provides user-friendly category names (e.g., "Civil Engineering", "Landscaping")
+      // filtered by the lifecycle stage from core_category_activitys
 
-      if (projectResult.length > 0) {
-        const projectType = projectResult[0].project_type_code;
-
-        // First, check if project has its own categories
-        const projectCategoriesCheck = await sql`
-          SELECT COUNT(*) as count
-          FROM landscape.core_budget_category
-          WHERE project_id = ${project_id}
-            AND is_template = false
-            AND is_active = ${!include_inactive}
+      if (activity) {
+        // Return categories filtered by lifecycle stage
+        const result = await sql`
+          SELECT DISTINCT
+            uc.category_id,
+            uc.parent_id,
+            NULL::text as code,
+            uc.category_name as name,
+            NULL::text as kind,
+            NULL::text as class,
+            NULL::text as event,
+            NULL::text as scope,
+            NULL::text as detail
+          FROM landscape.core_unit_cost_category uc
+          INNER JOIN landscape.core_category_lifecycle_stages cls
+            ON uc.category_id = cls.category_id
+          WHERE uc.is_active = true
+            AND cls.activity = ${activity}
+          ORDER BY uc.category_name
         `;
 
-        const hasProjectCategories = parseInt(projectCategoriesCheck[0].count) > 0;
+        console.log('📊 Returned', result.length, 'unit cost categories for project', project_id,
+                    `(filtered by stage: ${activity})`);
 
-        // Fetch EITHER project-specific categories OR template categories (not both)
+        return NextResponse.json({
+          categories: result,
+          count: result.length,
+        });
+      } else {
+        // No lifecycle stage filter - return all unit cost categories
         const result = await sql`
           SELECT
             category_id,
             parent_id,
-            level,
-            code,
-            name,
-            description,
-            project_id,
-            is_template,
-            template_name,
-            project_type_code,
-            sort_order,
-            icon,
-            color,
-            is_active,
-            created_at,
-            updated_at,
-            created_by
-          FROM landscape.core_budget_category
-          WHERE ${
-            hasProjectCategories
-              ? sql`project_id = ${project_id} AND is_template = false`
-              : sql`is_template = true AND project_type_code = ${projectType}`
-          }
-          AND is_active = ${!include_inactive}
-          ORDER BY level, sort_order, name
+            NULL::text as code,
+            category_name as name,
+            NULL::text as kind,
+            NULL::text as class,
+            NULL::text as event,
+            NULL::text as scope,
+            NULL::text as detail
+          FROM landscape.core_unit_cost_category
+          WHERE is_active = true
+          ORDER BY category_name
         `;
+
+        console.log('📊 Returned', result.length, 'unit cost categories for project', project_id);
 
         return NextResponse.json({
           categories: result,
@@ -92,36 +97,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (template_name && project_type_code) {
-      const result = await sql`
-        SELECT
-          category_id,
-          parent_id,
-          level,
-          code,
-          name,
-          description,
-          project_id,
-          is_template,
-          template_name,
-          project_type_code,
-          sort_order,
-          icon,
-          color,
-          is_active,
-          created_at,
-          updated_at,
-          created_by
-        FROM landscape.core_budget_category
-        WHERE is_template = true
-          AND template_name = ${template_name}
-          AND project_type_code = ${project_type_code}
-          AND is_active = ${!include_inactive}
-        ORDER BY level, sort_order, name
-      `;
-
+      // Phase 4: core_fin_category dropped - this legacy path is no longer supported
+      // Return empty result (template-based filtering moved to core_unit_cost_category)
+      console.warn('⚠️ template_name+project_type_code query path deprecated after Phase 4');
       return NextResponse.json({
-        categories: result,
-        count: result.length,
+        categories: [],
+        count: 0,
       });
     }
 

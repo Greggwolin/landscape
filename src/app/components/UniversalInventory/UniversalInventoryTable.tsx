@@ -29,7 +29,7 @@ interface InventoryItem {
   item_code: string
   hierarchy_values: Record<string, any>
   data_values: Record<string, any>
-  container_id: number | null
+  division_id: number | null
   status: string | null
   [key: string]: any // For dynamic columns
 }
@@ -39,7 +39,7 @@ interface ColumnConfig {
   column_name: string
   column_label: string
   column_type: 'hierarchy' | 'data'
-  container_level: number | null
+  tier: number | null
   data_type: string | null
   is_required: boolean
   is_visible: boolean
@@ -90,7 +90,7 @@ export default function UniversalInventoryTable({
       const flat: any = {
         item_id: item.item_id,
         item_code: item.item_code,
-        container_id: item.container_id,
+        division_id: item.division_id,
         // Land use FK fields (stored at row level, not in JSONB)
         family_id: item.family_id,
         type_id: item.type_id,

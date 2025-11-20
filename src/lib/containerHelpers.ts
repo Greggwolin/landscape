@@ -8,9 +8,9 @@
 import type { ContainerNode } from '@/types'
 
 export interface FlatContainer {
-  container_id: number
-  parent_container_id: number | null
-  container_level: 1 | 2 | 3
+  division_id: number
+  parent_division_id: number | null
+  tier: 1 | 2 | 3
   container_code: string
   display_name: string
   sort_order: number | null
@@ -28,9 +28,9 @@ export function flattenContainers(containers: ContainerNode[]): FlatContainer[] 
   function traverse(nodes: ContainerNode[]) {
     nodes.forEach((node) => {
       result.push({
-        container_id: node.container_id,
-        parent_container_id: node.parent_container_id ?? null,
-        container_level: node.container_level,
+        division_id: node.division_id,
+        parent_division_id: node.parent_division_id ?? null,
+        tier: node.tier,
         container_code: node.container_code,
         display_name: node.display_name,
         sort_order: node.sort_order,
@@ -56,7 +56,7 @@ export function getContainersByLevel(
   containers: FlatContainer[],
   level: 1 | 2 | 3
 ): FlatContainer[] {
-  return containers.filter((c) => c.container_level === level)
+  return containers.filter((c) => c.tier === level)
 }
 
 /**
@@ -66,7 +66,7 @@ export function getChildren(
   containers: FlatContainer[],
   parentId: number
 ): FlatContainer[] {
-  return containers.filter((c) => c.parent_container_id === parentId)
+  return containers.filter((c) => c.parent_division_id === parentId)
 }
 
 /**
@@ -74,12 +74,12 @@ export function getChildren(
  */
 export function getParent(
   containers: FlatContainer[],
-  containerId: number
+  divisionId: number
 ): FlatContainer | null {
-  const container = containers.find((c) => c.container_id === containerId)
-  if (!container || !container.parent_container_id) return null
+  const container = containers.find((c) => c.division_id === divisionId)
+  if (!container || !container.parent_division_id) return null
 
-  return containers.find((c) => c.container_id === container.parent_container_id) || null
+  return containers.find((c) => c.division_id === container.parent_division_id) || null
 }
 
 /**
@@ -88,15 +88,15 @@ export function getParent(
  */
 export function getContainerPath(
   containers: FlatContainer[],
-  containerId: number
+  divisionId: number
 ): FlatContainer[] {
   const path: FlatContainer[] = []
-  let current = containers.find((c) => c.container_id === containerId)
+  let current = containers.find((c) => c.division_id === divisionId)
 
   while (current) {
     path.unshift(current)
-    current = current.parent_container_id
-      ? containers.find((c) => c.container_id === current!.parent_container_id)
+    current = current.parent_division_id
+      ? containers.find((c) => c.division_id === current!.parent_division_id)
       : undefined
   }
 
@@ -139,7 +139,7 @@ export function findLevel2ByPhaseNo(
   const level1 = findLevel1ByAreaNo(containers, areaNo)
   if (!level1) return null
 
-  const level2Containers = getChildren(containers, level1.container_id)
+  const level2Containers = getChildren(containers, level1.division_id)
 
   // Try attributes first
   const byAttribute = level2Containers.find(
@@ -169,8 +169,8 @@ export function hasContainerData(containers: ContainerNode[] | undefined | null)
  */
 export function createContainerPayload(data: {
   project_id: number
-  parent_container_id: number | null
-  container_level: 1 | 2 | 3
+  parent_division_id: number | null
+  tier: 1 | 2 | 3
   container_code: string
   display_name: string
   sort_order?: number
@@ -178,8 +178,8 @@ export function createContainerPayload(data: {
 }) {
   return {
     project_id: data.project_id,
-    parent_container_id: data.parent_container_id,
-    container_level: data.container_level,
+    parent_division_id: data.parent_division_id,
+    tier: data.tier,
     container_code: data.container_code,
     display_name: data.display_name,
     sort_order: data.sort_order ?? 0,
@@ -211,6 +211,6 @@ export function sortContainers(containers: FlatContainer[]): FlatContainer[] {
     const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
     const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
     if (orderA !== orderB) return orderA - orderB
-    return a.container_id - b.container_id
+    return a.division_id - b.division_id
   })
 }

@@ -24,6 +24,7 @@ interface Parcel {
   efficiency: number;
   family_name?: string;
   frontfeet?: number;
+  lot_width?: number;
 }
 
 interface Phase {
@@ -109,6 +110,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const {
     labels,
     areaDisplayByNumber,
+    planningEfficiency
   } = useProjectConfig(projectId ?? undefined)
 
   const { level1Label, level2Label, level3Label, level1LabelPlural, level2LabelPlural, level3LabelPlural } = labels
@@ -763,6 +765,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Product</th>
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Units</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>DUA</th>
+                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>FF/Acre</th>
                 <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
               </tr>
             </thead>
@@ -776,6 +780,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                   formatParcelIdDisplay={formatParcelIdDisplay}
                   projectId={projectId}
                   sharedFamilies={sharedFamilies}
+                  planningEfficiency={planningEfficiency}
                 />
               ))}
             </tbody>
@@ -847,6 +852,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                   } catch (e) { console.error('Save via sidecard failed', e) }
                 }}
                 onClose={() => setDetailOpen(false)}
+                planningEfficiency={planningEfficiency}
               />
             </div>
           )}
@@ -901,8 +907,12 @@ const EditableParcelRow: React.FC<{
   formatParcelIdDisplay: (dbId: string) => string;
   projectId?: number | null;
   sharedFamilies?: { family_id: string; name: string }[];
-}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [] }) => {
+  planningEfficiency?: number | null;
+}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [], planningEfficiency }) => {
   const [editing, setEditing] = useState(false)
+  const [editingFamily, setEditingFamily] = useState(false)
+  const [editingType, setEditingType] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(false)
   const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
   const [types, setTypes] = useState<{ type_id: string; family_id: string; name: string }[]>([])
@@ -1226,20 +1236,29 @@ const EditableParcelRow: React.FC<{
   }
 
   return (
-    <tr className={`border-b transition-colors`} style={{
+    <tr className={`border-b transition-colors ${!editing ? 'cursor-pointer' : ''}`} style={{
       borderColor: 'var(--cui-border-color)',
-      backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)'
+      backgroundColor: editing ? 'rgba(13, 110, 253, 0.08)' : (index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)')
+    }}
+    onClick={() => {
+      if (!editing) {
+        setEditing(true);
+      }
     }}
     onMouseEnter={(e) => {
-      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+      if (!editing) {
+        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+      }
     }}
     onMouseLeave={(e) => {
-      e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)';
+      if (!editing) {
+        e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)';
+      }
     }}>
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{parcel.phase_name}</td>
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatParcelIdDisplay(parcel.parcel_name)}</td>
-      <td className="px-2 py-1.5 text-center">
+      <td className="px-2 py-1.5 text-center" onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           <select
             className="w-32 rounded px-2 py-1 text-xs"
@@ -1270,7 +1289,7 @@ const EditableParcelRow: React.FC<{
           <span style={{ color: 'var(--cui-body-color)' }}>{getFamilyName(parcel)}</span>
         )}
       </td>
-      <td className="px-2 py-1.5 text-center">
+      <td className="px-2 py-1.5 text-center" onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           <select
             className="w-40 rounded px-2 py-1 text-xs"
@@ -1309,7 +1328,7 @@ const EditableParcelRow: React.FC<{
           </span>
         )}
       </td>
-      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }} onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           selectedType && products.length > 0 ? (
             <select
@@ -1339,7 +1358,7 @@ const EditableParcelRow: React.FC<{
           parcel.product || '—'
         )}
       </td>
-      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }} onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           <input className="w-20 rounded px-2 py-1 text-center" inputMode="decimal"
             style={{
@@ -1354,7 +1373,7 @@ const EditableParcelRow: React.FC<{
           new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parcel.acres)
         )}
       </td>
-      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }} onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           (() => {
             const currentFamilyName = selectedFamily
@@ -1382,6 +1401,49 @@ const EditableParcelRow: React.FC<{
           )
         )}
       </td>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
+        {(() => {
+          const numberValue = editing ? draft.units : parcel.units
+          const acresValue = editing ? draft.acres : parcel.acres
+          const familyName = getFamilyName(parcel)
+          if (familyName?.toLowerCase() !== 'residential') {
+            return <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+          }
+          if (acresValue <= 0) {
+            return <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+          }
+          // DUA = units / (acres × planning_efficiency)
+          // This gives density on developable land (after removing ROW, open space, etc.)
+          const efficiency = planningEfficiency ?? 1
+          const dua = numberValue / (acresValue * efficiency)
+          return Number.isFinite(dua)
+            ? dua.toFixed(2)
+            : <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+        })()}
+      </td>
+      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>
+        {(() => {
+          const unitsValue = editing ? draft.units : parcel.units
+          const acresValue = editing ? draft.acres : parcel.acres
+          const lotWidth = parcel.lot_width
+          const familyName = getFamilyName(parcel)
+
+          // Only calculate for residential parcels with valid data
+          if (familyName?.toLowerCase() !== 'residential') {
+            return <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+          }
+          if (!lotWidth || lotWidth <= 0 || acresValue <= 0 || unitsValue <= 0) {
+            return <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+          }
+
+          // Formula: (units × lot_width) / acres
+          const ffPerAcre = (unitsValue * lotWidth) / acresValue
+
+          return Number.isFinite(ffPerAcre)
+            ? Math.round(ffPerAcre).toLocaleString()
+            : <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+        })()}
+      </td>
       <td className="px-2 py-1.5 text-center">
         {editing ? (
           <div className="flex items-center gap-2 justify-center">
@@ -1390,7 +1452,10 @@ const EditableParcelRow: React.FC<{
               style={{ backgroundColor: 'var(--cui-primary)' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onClick={save}
+              onClick={(e) => {
+                e.stopPropagation();
+                save();
+              }}
             >
               Save
             </button>
@@ -1399,7 +1464,10 @@ const EditableParcelRow: React.FC<{
               style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onClick={cancel}
+              onClick={(e) => {
+                e.stopPropagation();
+                cancel();
+              }}
             >
               Cancel
             </button>
@@ -1407,20 +1475,14 @@ const EditableParcelRow: React.FC<{
         ) : (
           <div className="flex items-center gap-2 justify-center">
             <button
-              className="px-1.5 py-0.5 text-xs rounded transition-colors"
-              style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </button>
-            <button
               className="px-1.5 py-0.5 text-xs text-white rounded transition-colors"
               style={{ backgroundColor: 'var(--cui-info)' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onClick={() => onOpenDetail && onOpenDetail()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetail && onOpenDetail();
+              }}
             >
               Detail
             </button>
@@ -1429,7 +1491,10 @@ const EditableParcelRow: React.FC<{
               style={{ backgroundColor: 'var(--cui-danger)' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              onClick={() => onDelete && onDelete(parcel.parcel_id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete && onDelete(parcel.parcel_id);
+              }}
             >
               Delete
             </button>

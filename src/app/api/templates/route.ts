@@ -18,7 +18,7 @@ type TemplateColumn = {
   column_label: string
   column_type: 'hierarchy' | 'data'
   data_type: string | null
-  container_level: number | null
+  tier: number | null
   display_order: number
   is_required: boolean
   data_source_table: string | null
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           column_label,
           column_type,
           data_type,
-          container_level,
+          tier,
           display_order,
           is_required,
           data_source_table,
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
           column_label,
           column_type,
           data_type,
-          container_level,
+          tier,
           display_order,
           is_required,
           data_source_table,

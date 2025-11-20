@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import type {
   UnitCostCategoryReference,
   CategoryTag,
-  LifecycleStage,
+  Activity,
 } from '@/types/benchmarks';
 import { createCategory } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
@@ -13,12 +13,15 @@ import { useToast } from '@/components/ui/toast';
 interface AddCategoryModalProps {
   tags: CategoryTag[];
   categories: UnitCostCategoryReference[];
+  initialStages?: Activity[];
+  initialParentId?: number | null;
   onClose: () => void;
   onCreated: (category: UnitCostCategoryReference) => void;
 }
 
-const LIFECYCLE_STAGES: LifecycleStage[] = [
+const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
+  'Planning & Engineering',
   'Development',
   'Operations',
   'Disposition',
@@ -28,6 +31,8 @@ const LIFECYCLE_STAGES: LifecycleStage[] = [
 export default function AddCategoryModal({
   tags,
   categories,
+  initialStages = [],
+  initialParentId = null,
   onClose,
   onCreated,
 }: AddCategoryModalProps) {
@@ -35,8 +40,8 @@ export default function AddCategoryModal({
 
   const [formData, setFormData] = useState({
     category_name: '',
-    lifecycle_stages: [] as LifecycleStage[],
-    parent_id: null as number | null,
+    activitys: initialStages,
+    parent_id: initialParentId,
     tags: [] as string[],
     sort_order: 0,
   });
@@ -50,8 +55,8 @@ export default function AddCategoryModal({
       errors.category_name = 'Category name is required';
     }
 
-    if (!formData.lifecycle_stages || formData.lifecycle_stages.length === 0) {
-      errors.lifecycle_stages = 'At least one lifecycle stage is required';
+    if (!formData.activitys || formData.activitys.length === 0) {
+      errors.activitys = 'At least one lifecycle stage is required';
     }
 
     setFormErrors(errors);
@@ -67,7 +72,7 @@ export default function AddCategoryModal({
     try {
       const newCategory = await createCategory({
         category_name: formData.category_name,
-        lifecycle_stages: formData.lifecycle_stages,
+        activitys: formData.activitys,
         tags: formData.tags,
         parent: formData.parent_id,
         sort_order: formData.sort_order,
@@ -94,12 +99,12 @@ export default function AddCategoryModal({
   // Get relevant tags for selected lifecycle stages
   const relevantTags = tags.filter((tag) => {
     const contexts = tag.tag_context.split(',').map((c) => c.trim());
-    return formData.lifecycle_stages.some(stage => contexts.includes(stage)) || contexts.includes('All');
+    return formData.activitys.some(stage => contexts.includes(stage)) || contexts.includes('All');
   });
 
   // Get available parent categories (must share at least one lifecycle stage)
   const availableParents = categories.filter(
-    (cat) => cat.lifecycle_stages.some(stage => formData.lifecycle_stages.includes(stage)) && cat.is_active
+    (cat) => cat.activitys.some(stage => formData.activitys.includes(stage)) && cat.is_active
   );
 
   return (
@@ -147,17 +152,17 @@ export default function AddCategoryModal({
                         type="checkbox"
                         className="form-check-input"
                         id={`add-stage-${stage}`}
-                        checked={formData.lifecycle_stages.includes(stage)}
+                        checked={formData.activitys.includes(stage)}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setFormData({
                               ...formData,
-                              lifecycle_stages: [...formData.lifecycle_stages, stage],
+                              activitys: [...formData.activitys, stage],
                             });
                           } else {
                             setFormData({
                               ...formData,
-                              lifecycle_stages: formData.lifecycle_stages.filter((s) => s !== stage),
+                              activitys: formData.activitys.filter((s) => s !== stage),
                               parent_id: null, // Reset parent when stages change
                             });
                           }
@@ -169,8 +174,8 @@ export default function AddCategoryModal({
                     </div>
                   ))}
                 </div>
-                {formErrors.lifecycle_stages && (
-                  <div className="text-danger small mt-1">{formErrors.lifecycle_stages}</div>
+                {formErrors.activitys && (
+                  <div className="text-danger small mt-1">{formErrors.activitys}</div>
                 )}
                 <small className="form-text text-muted">
                   Select all lifecycle stages this category applies to
@@ -209,32 +214,29 @@ export default function AddCategoryModal({
                   {relevantTags.length === 0 ? (
                     <p className="text-muted">No tags available for the selected lifecycle stages</p>
                   ) : (
-                    <div className="tags-grid">
-                      {relevantTags.map((tag) => (
-                        <div
-                          key={tag.tag_id}
-                          className={`tag-option ${
-                            formData.tags.includes(tag.tag_name) ? 'selected' : ''
-                          }`}
-                          onClick={() => toggleTag(tag.tag_name)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.tags.includes(tag.tag_name)}
-                            onChange={() => {}}
-                            className="form-check-input me-2"
-                          />
-                          <div className="tag-option-content">
-                            <div className="tag-option-name">{tag.tag_name}</div>
-                            {tag.description && (
-                              <div className="tag-option-desc">{tag.description}</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="tags-chip-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                      {relevantTags.map((tag) => {
+                        const isSelected = formData.tags.includes(tag.tag_name);
+                        return (
+                          <button
+                            key={tag.tag_id}
+                            type="button"
+                            className={`tag-chip ${isSelected ? 'filled' : 'outline'}`}
+                            onClick={() => toggleTag(tag.tag_name)}
+                            title={tag.description || tag.tag_name}
+                          >
+                            <span className="tag-chip-label">{tag.tag_name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
+                {formData.tags.length > 0 && (
+                  <small className="form-text text-muted">
+                    Selected: {formData.tags.join(', ')}
+                  </small>
+                )}
               </div>
 
               {/* Sort Order */}

@@ -71,13 +71,13 @@ export default function AreaTiles({
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {areas.map((area) => {
-        const isSelected = selectedAreaIds.includes(area.container_id)
+        const isSelected = selectedAreaIds.includes(area.division_id)
 
         return (
           <div
-            key={area.container_id}
+            key={area.division_id}
             className={`planning-tile ${isSelected ? 'planning-tile-active' : ''}`}
-            onClick={() => onAreaSelect(area.container_id)}
+            onClick={() => onAreaSelect(area.division_id)}
           >
             <div className="planning-tile-header mb-3">
               Village {area.name}

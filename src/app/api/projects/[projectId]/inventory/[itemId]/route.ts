@@ -12,7 +12,7 @@ interface InventoryItem {
   property_type: string
   item_code: string
   hierarchy_values: Record<string, any>
-  container_id: number | null
+  division_id: number | null
   data_values: Record<string, any>
   available_date: string | null
   absorption_month: number | null

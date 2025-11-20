@@ -8,6 +8,10 @@
   --surface-bg: #ffffff;
   --surface-card: #f7f7fb;
   --surface-tile: #ffffff;
+  --surface-page-bg: #e6e7eb;
+  --surface-card-header: #f0f1f2;
+  --surface-subheader: #f4f5f8;
+  --surface-operations-tile: #f1f2f6;
 
   /* Text */
   --text-primary: #0f172a;
@@ -48,6 +52,10 @@
   --surface-bg: #0b1220;
   --surface-card: #111827;
   --surface-tile: #0f172a;
+  --surface-page-bg: #0b1220;
+  --surface-card-header: #1f2937;
+  --surface-subheader: #111827;
+  --surface-operations-tile: #111827;
 
   --text-primary: #e5e7eb;
   --text-secondary: #9ca3af;

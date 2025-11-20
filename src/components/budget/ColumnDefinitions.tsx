@@ -2,7 +2,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { CButton } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilPlus, cilTrash } from '@coreui/icons';
+import { cilPlus, cilTrash, cilObjectGroup } from '@coreui/icons';
 import EditableCell from './custom/EditableCell';
 import ColoredDotIndicator from './custom/ColoredDotIndicator';
 import PhaseCell from './custom/PhaseCell';
@@ -31,6 +31,9 @@ type ColumnHandlers = {
   isGrouped?: boolean;
   onRowAdd?: (item: BudgetItem) => void;
   onRowDelete?: (item: BudgetItem) => void;
+  onGroupByPhase?: () => void;
+  onGroupByStage?: () => void;
+  onGroupByCategory?: () => void;
 };
 
 const editableCell = (ctx: any) => <EditableCell {...ctx} />;
@@ -66,8 +69,25 @@ export function getColumnsByMode(
 
   const napkinColumns: ColumnDef<BudgetItem>[] = [
     {
-      accessorKey: 'container_id',
-      header: 'Phase',
+      accessorKey: 'division_id',
+      header: () => (
+        <div className="d-flex align-items-center gap-2">
+          <span>Phase</span>
+          {handlers.onGroupByPhase && (
+            <CIcon
+              icon={cilObjectGroup}
+              size="lg"
+              className="text-muted"
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlers.onGroupByPhase?.();
+              }}
+              title="Group by Phase"
+            />
+          )}
+        </div>
+      ),
       size: 180,
       minSize: 150,
       maxSize: 300,
@@ -77,32 +97,11 @@ export function getColumnsByMode(
           projectId={handlers.projectId}
           onCommit={async (value: number | null) => {
             if (handlers.onInlineCommit) {
-              await handlers.onInlineCommit(ctx.row.original, 'container_id', value);
+              await handlers.onInlineCommit(ctx.row.original, 'division_id', value);
             }
           }}
         />
       ),
-    },
-    {
-      accessorKey: 'category_l1_id',
-      header: 'Category',
-      size: 200,
-      minSize: 150,
-      maxSize: 400,
-      meta: {
-        editable: Boolean(handlers.onInlineCommit),
-        inputType: 'category-select' as const,
-        projectId: handlers.projectId,
-        isGrouped: handlers.isGrouped,
-        onCommit: async (value: unknown, row: BudgetItem) => {
-          if (handlers.onInlineCommit) {
-            // When L1 changes in napkin mode, only update L1
-            // Let the backend handle clearing L2-L4 if needed
-            await handlers.onInlineCommit(row, 'category_l1_id', value);
-          }
-        },
-      },
-      cell: editableCell,
     },
     {
       accessorKey: 'notes',
@@ -143,19 +142,23 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'qty',
-      header: 'Qty',
+      header: () => <div className="text-center">Qty</div>,
       size: 90,
       meta: {
         ...createMeta('qty', 'number'),
         kind: 'numeric' as const,
+        align: 'center' as const,
       },
       cell: editableCell,
     },
     {
       accessorKey: 'uom_code',
-      header: 'UOM',
+      header: () => <div className="text-center">UOM</div>,
       size: 80,
-      meta: createMeta('uom_code', 'select', uomOptions),
+      meta: {
+        ...createMeta('uom_code', 'select', uomOptions),
+        align: 'center' as const,
+      },
       cell: editableCell,
     },
     {
@@ -180,20 +183,26 @@ export function getColumnsByMode(
     },
     {
       accessorKey: 'start_period',
-      header: 'Start',
+      header: () => <div className="text-center">Start</div>,
       size: 80,
+      meta: {
+        align: 'center' as const,
+      },
       cell: ({ row }) => (
-        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
           {row.original.start_period ?? '-'}
         </span>
       ),
     },
     {
       accessorKey: 'periods_to_complete',
-      header: 'Duration',
+      header: () => <div className="text-center">Duration</div>,
       size: 100,
+      meta: {
+        align: 'center' as const,
+      },
       cell: ({ row }) => (
-        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
           {row.original.periods_to_complete ?? '-'}
         </span>
       ),
@@ -245,6 +254,64 @@ export function getColumnsByMode(
     return napkinWithActions;
   }
 
+  // =========================================================================
+  // STANDARD/DETAIL MODE COLUMNS (Stage and Category only visible here)
+  // =========================================================================
+
+  const stageColumn: ColumnDef<BudgetItem> = {
+    accessorKey: 'activity',
+    header: () => (
+      <div className="d-flex align-items-center gap-2">
+        <span>Stage</span>
+        {handlers.onGroupByStage && (
+          <CIcon
+            icon={cilObjectGroup}
+            size="lg"
+            className="text-muted"
+            style={{ cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlers.onGroupByStage?.();
+            }}
+            title="Group by Stage"
+          />
+        )}
+      </div>
+    ),
+    size: 140,
+    minSize: 120,
+    maxSize: 180,
+    meta: createMeta('activity', 'select', [
+      { value: 'Acquisition', label: 'Acquisition' },
+      { value: 'Planning & Engineering', label: 'Planning & Engineering' },
+      { value: 'Development', label: 'Development' },
+      { value: 'Operations', label: 'Operations' },
+      { value: 'Disposition', label: 'Disposition' },
+      { value: 'Financing', label: 'Financing' },
+    ]),
+    cell: editableCell,
+  };
+
+  const categoryEditableColumn: ColumnDef<BudgetItem> = {
+    accessorKey: 'category_l1_id',
+    header: 'Category',
+    size: 200,
+    minSize: 150,
+    maxSize: 400,
+    meta: {
+      editable: Boolean(handlers.onInlineCommit),
+      inputType: 'category-select' as const,
+      projectId: handlers.projectId,
+      isGrouped: handlers.isGrouped,
+      onCommit: async (value: unknown, row: BudgetItem) => {
+        if (handlers.onInlineCommit) {
+          await handlers.onInlineCommit(row, 'category_l1_id', value);
+        }
+      },
+    },
+    cell: editableCell,
+  };
+
   const openModalCell = (ctx: any) => {
     const raw = ctx.getValue();
     const display =
@@ -293,31 +360,65 @@ export function getColumnsByMode(
     );
   };
 
-  // Create standard columns by replacing the category column
-  const napkinWithoutCategory = napkinColumns.filter(col => col.accessorKey !== 'category_l1_id');
+  // Extract phase column from napkin columns
+  const phaseColumn = napkinColumns.find(col => 'accessorKey' in col && col.accessorKey === 'division_id');
 
-  // Extract phase column and other columns separately
-  const phaseColumn = napkinColumns.find(col => col.accessorKey === 'container_id');
-  const napkinWithoutCategoryAndPhase = napkinWithoutCategory.filter(col => col.accessorKey !== 'container_id');
+  // Get napkin columns without phase for reuse in standard mode
+  const napkinWithoutPhase = napkinColumns.filter(col =>
+    'accessorKey' in col && col.accessorKey !== 'division_id'
+  );
 
   // Split remaining columns to insert variance after amount
-  const napkinBeforeAmount = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete');
-  const napkinTimingColumns = napkinWithoutCategoryAndPhase.filter(col => col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete');
+  const napkinBeforeAmount = napkinWithoutPhase.filter(col =>
+    'accessorKey' in col && col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete'
+  );
+  const napkinTimingColumns = napkinWithoutPhase.filter(col =>
+    'accessorKey' in col && (col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete')
+  );
 
-  const standard: ColumnDef<BudgetItem>[] = [
-    // Phase column comes first
-    ...(phaseColumn ? [phaseColumn] : []),
-    // Add clickable category column for standard/detail modes
-    {
-      accessorKey: 'category_l1_id',
-      header: 'Category',
-      size: 200,
-      minSize: 150,
-      maxSize: 400,
-      cell: categoryClickCell,
+  // Category column for Detail mode only (with grouping icon, inline editable)
+  const categoryColumnWithGroup: ColumnDef<BudgetItem> = {
+    accessorKey: 'category_l1_id',
+    header: () => (
+      <div className="d-flex align-items-center gap-2">
+        <span>Category</span>
+        {handlers.onGroupByCategory && (
+          <CIcon
+            icon={cilObjectGroup}
+            size="lg"
+            className="text-muted"
+            style={{ cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlers.onGroupByCategory?.();
+            }}
+            title="Group by Category"
+          />
+        )}
+      </div>
+    ),
+    size: 200,
+    minSize: 150,
+    maxSize: 400,
+    meta: {
+      editable: Boolean(handlers.onInlineCommit),
+      inputType: 'category-select' as const,
+      projectId: handlers.projectId,
+      isGrouped: handlers.isGrouped,
+      onCommit: async (value: unknown, row: BudgetItem) => {
+        if (handlers.onInlineCommit) {
+          await handlers.onInlineCommit(row, 'category_l1_id', value);
+        }
+      },
     },
+    cell: editableCell,
+  };
+
+  // Standard mode: Phase + Stage only
+  const standard: ColumnDef<BudgetItem>[] = [
+    ...(phaseColumn ? [phaseColumn] : []),
+    stageColumn,
     ...napkinBeforeAmount,
-    // Variance column - positioned after Amount (Standard and Detail modes only)
     {
       accessorKey: 'variance_amount',
       header: 'Var',
@@ -331,10 +432,31 @@ export function getColumnsByMode(
     ...napkinTimingColumns,
   ];
 
-  // Standard and Detail modes now use expandable rows for additional fields
-  // No need to add extra columns here
-  if (mode === 'standard' || mode === 'detail') {
-    return standard;
+  // Detail mode: Phase + Stage + Category
+  const detail: ColumnDef<BudgetItem>[] = [
+    ...(phaseColumn ? [phaseColumn] : []),
+    stageColumn,
+    categoryColumnWithGroup,
+    ...napkinBeforeAmount,
+    {
+      accessorKey: 'variance_amount',
+      header: 'Var',
+      size: 100,
+      cell: () => (
+        <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
+          -
+        </span>
+      ),
+    },
+    ...napkinTimingColumns,
+  ];
+
+  if (mode === 'standard') {
+    return [...standard, actionsColumn];
+  }
+
+  if (mode === 'detail') {
+    return [...detail, actionsColumn];
   }
 
   return standard;

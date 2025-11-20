@@ -23,6 +23,7 @@ export interface ProjectConfigResult {
   }
   isLoading: boolean
   error?: Error
+  planningEfficiency: number | null
 }
 
 const toNumber = (value: unknown) => {
@@ -65,19 +66,19 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
     const traverse = (nodes: ContainerNode[]) => {
       nodes.forEach(node => {
         const attrs = (node.attributes ?? {}) as Record<string, unknown>
-        if (node.container_level === 1) {
+        if (node.tier === 1) {
           const areaId = toNumber(attrs.area_id)
           const areaNumber = toNumber(attrs.area_no ?? attrs.areaNo)
           const display = node.display_name || (areaNumber != null ? `${level1Label} ${areaNumber}` : `${level1Label}`)
           if (areaId != null) areaById.set(areaId, display)
           if (areaNumber != null) areaByNumber.set(areaNumber, display)
         }
-        if (node.container_level === 2) {
+        if (node.tier === 2) {
           const phaseId = toNumber(attrs.phase_id)
           const display = node.display_name || `${level2Label}`
           if (phaseId != null) phaseById.set(phaseId, display)
         }
-        if (node.container_level === 3) {
+        if (node.tier === 3) {
           const parcelId = toNumber(attrs.parcel_id)
           const display = node.display_name || `${level3Label}`
           if (parcelId != null) parcelById.set(parcelId, display)
@@ -96,6 +97,8 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
   const isLoading = shouldFetch && (!configResponse || !containersResponse)
   const error = (configError || containerError) as Error | undefined
 
+  const planningEfficiency = configResponse?.planningEfficiency ?? null
+
   return {
     config,
     settings,
@@ -106,7 +109,8 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
     parcelDisplayById: maps.parcelById,
     labels,
     isLoading,
-    error
+    error,
+    planningEfficiency
   }
 }
 

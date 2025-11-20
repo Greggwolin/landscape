@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       is_active,
       uoms,
       pe_levels,
-      container_levels = []
+      tiers = []
     } = body
 
     await sql`
@@ -34,11 +34,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await sql`DELETE FROM landscape.core_fin_category_uom WHERE category_id = ${id}::bigint`
       for (const u of uoms) await sql`INSERT INTO landscape.core_fin_category_uom (category_id, uom_code) VALUES (${id}::bigint, ${u})`
     }
-    if (Array.isArray(pe_levels) || Array.isArray(container_levels)) {
+    if (Array.isArray(pe_levels) || Array.isArray(tiers)) {
       await sql`DELETE FROM landscape.core_fin_container_applicability WHERE category_id = ${id}::bigint`
       const normalized =
-        Array.isArray(container_levels) && container_levels.length > 0
-          ? container_levels
+        Array.isArray(tiers) && tiers.length > 0
+          ? tiers
           : Array.isArray(pe_levels)
             ? pe_levels.map((lvl: string) =>
                 lvl === 'project'
@@ -51,7 +51,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               )
             : []
       for (const level of normalized) {
-        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, container_level) VALUES (${id}::bigint, ${level})`
+        await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, tier) VALUES (${id}::bigint, ${level})`
       }
     }
 

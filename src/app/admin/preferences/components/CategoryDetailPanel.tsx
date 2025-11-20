@@ -5,7 +5,7 @@ import { X, Plus, Trash2, Pencil } from 'lucide-react';
 import type {
   UnitCostCategoryReference,
   CategoryTag,
-  LifecycleStage,
+  Activity,
 } from '@/types/benchmarks';
 import { updateCategory, createTag, deleteTag } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
@@ -20,8 +20,9 @@ interface CategoryDetailPanelProps {
   onTagDeleted: (tagName: string) => void;
 }
 
-const LIFECYCLE_STAGES: LifecycleStage[] = [
+const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
+  'Planning & Engineering',
   'Development',
   'Operations',
   'Disposition',
@@ -96,7 +97,7 @@ export default function CategoryDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     category_name: '',
-    lifecycle_stages: ['Development'] as LifecycleStage[],
+    activitys: ['Development'] as Activity[],
     tags: [] as string[],
     sort_order: 0,
   });
@@ -118,7 +119,7 @@ export default function CategoryDetailPanel({
     if (category) {
       setFormData({
         category_name: category.category_name,
-        lifecycle_stages: category.lifecycle_stages,
+        activitys: category.activitys,
         tags: category.tags,
         sort_order: category.sort_order,
       });
@@ -173,7 +174,7 @@ export default function CategoryDetailPanel({
   const handleCancel = () => {
     setFormData({
       category_name: category.category_name,
-      lifecycle_stages: category.lifecycle_stages,
+      activitys: category.activitys,
       tags: category.tags,
       sort_order: category.sort_order,
     });
@@ -188,8 +189,8 @@ export default function CategoryDetailPanel({
       errors.category_name = 'Category name is required';
     }
 
-    if (!formData.lifecycle_stages || formData.lifecycle_stages.length === 0) {
-      errors.lifecycle_stages = 'At least one lifecycle stage is required';
+    if (!formData.activitys || formData.activitys.length === 0) {
+      errors.activitys = 'At least one lifecycle stage is required';
     }
 
     setFormErrors(errors);
@@ -218,7 +219,7 @@ export default function CategoryDetailPanel({
     try {
       const updated = await updateCategory(category.category_id, {
         category_name: category.category_name,
-        lifecycle_stages: category.lifecycle_stages,
+        activitys: category.activitys,
         tags: nextTags,
         sort_order: category.sort_order,
         parent: category.parent ?? null,
@@ -301,7 +302,7 @@ export default function CategoryDetailPanel({
   const availableTagsForInput = sortedTags.filter((tag) => {
     const matchesInput = tag.tag_name.toLowerCase().includes(tagInputValue.toLowerCase());
     const notAssigned = !assignedTagSet.has(tag.tag_name.toLowerCase());
-    const matchesLifecycle = category.lifecycle_stages.some(stage =>
+    const matchesLifecycle = category.activitys.some(stage =>
       tag.tag_context.split(',').map(c => c.trim()).includes(stage)
     ) || tag.tag_context === 'All';
     return matchesInput && notAssigned && matchesLifecycle && tagInputValue.trim().length > 0;
@@ -326,12 +327,12 @@ export default function CategoryDetailPanel({
     });
   };
 
-  const availableLifecycleStages = LIFECYCLE_STAGES.filter(
-    (stage) => !category.lifecycle_stages.includes(stage)
+  const availableActivitys = LIFECYCLE_STAGES.filter(
+    (stage) => !category.activitys.includes(stage)
   );
 
-  const persistLifecycleStages = async (
-    nextStages: LifecycleStage[],
+  const persistActivitys = async (
+    nextStages: Activity[],
     actionMessage: string
   ) => {
     if (nextStages.length === 0) {
@@ -343,7 +344,7 @@ export default function CategoryDetailPanel({
     try {
       const updated = await updateCategory(category.category_id, {
         category_name: category.category_name,
-        lifecycle_stages: nextStages,
+        activitys: nextStages,
         tags: category.tags,
         sort_order: category.sort_order,
         parent: category.parent ?? null,
@@ -360,22 +361,22 @@ export default function CategoryDetailPanel({
     }
   };
 
-  const handleRemoveLifecycleStage = (stage: LifecycleStage) => {
-    if (category.lifecycle_stages.length <= 1) {
+  const handleRemoveActivity = (stage: Activity) => {
+    if (category.activitys.length <= 1) {
       showToast('At least one lifecycle stage is required', 'error');
       return;
     }
-    const nextStages = category.lifecycle_stages.filter((s) => s !== stage);
-    persistLifecycleStages(nextStages, `Removed ${stage}`);
+    const nextStages = category.activitys.filter((s) => s !== stage);
+    persistActivitys(nextStages, `Removed ${stage}`);
   };
 
-  const handleAddLifecycleStage = (stage: LifecycleStage) => {
-    if (category.lifecycle_stages.includes(stage)) {
+  const handleAddActivity = (stage: Activity) => {
+    if (category.activitys.includes(stage)) {
       setShowLifecyclePicker(false);
       return;
     }
-    const nextStages = [...category.lifecycle_stages, stage];
-    persistLifecycleStages(nextStages, `Added ${stage}`);
+    const nextStages = [...category.activitys, stage];
+    persistActivitys(nextStages, `Added ${stage}`);
   };
 
   const handleTagChipToggle = async (tagName: string) => {
@@ -488,6 +489,8 @@ export default function CategoryDetailPanel({
     }
   };
 
+  const isSubcategory = Boolean(category.parent && category.parent_name);
+
   return (
     <div className="category-detail-panel">
       <div className="detail-header">
@@ -498,7 +501,16 @@ export default function CategoryDetailPanel({
           </p>
         </div>
         <div className="detail-actions">
-          {!isEditing ? (
+          {isSubcategory ? (
+            <button
+              className="btn btn-sm btn-ghost-danger"
+              onClick={handleDelete}
+              aria-label="Delete subcategory"
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : !isEditing ? (
             <>
               <button
                 className="btn btn-sm btn-ghost-secondary"
@@ -540,31 +552,75 @@ export default function CategoryDetailPanel({
 
       <div className="detail-content">
         {/* Category Name */}
-        <div className="form-section form-section-horizontal">
-          <label className="form-label">Category Name</label>
-          {isEditing ? (
-            <div>
+        {isSubcategory ? (
+          <div
+            className="form-section"
+            style={{
+              padding: '0.75rem',
+              background: 'var(--cui-tertiary-bg, #f8f9fa)',
+              border: '1px solid var(--cui-border-color, #d8dbe0)',
+              borderRadius: '6px',
+              marginBottom: '1rem'
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px 16px', alignItems: 'center' }}>
+              <label className="form-label" style={{ marginBottom: 0, fontSize: '0.875rem', fontWeight: 500 }}>
+                Parent Category
+              </label>
               <input
                 type="text"
-                className={`form-control ${formErrors.category_name ? 'is-invalid' : ''}`}
-                value={formData.category_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, category_name: e.target.value })
-                }
+                className="form-control"
+                value={category.parent_name}
+                disabled
+                style={{ backgroundColor: 'var(--cui-secondary-bg, #e9ecef)', cursor: 'not-allowed' }}
               />
-              {formErrors.category_name && (
-                <div className="invalid-feedback">{formErrors.category_name}</div>
-              )}
+
+              <label className="form-label" style={{ marginBottom: 0, fontSize: '0.875rem', fontWeight: 500 }}>
+                Subcategory
+              </label>
+              <div>
+                <input
+                  type="text"
+                  className={`form-control ${formErrors.category_name ? 'is-invalid' : ''}`}
+                  value={formData.category_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category_name: e.target.value })
+                  }
+                  placeholder="Enter subcategory name"
+                />
+                {formErrors.category_name && (
+                  <div className="invalid-feedback">{formErrors.category_name}</div>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="form-value">{category.category_name}</div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="form-section form-section-horizontal">
+            <label className="form-label">Category Name</label>
+            {isEditing ? (
+              <div>
+                <input
+                  type="text"
+                  className={`form-control ${formErrors.category_name ? 'is-invalid' : ''}`}
+                  value={formData.category_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category_name: e.target.value })
+                  }
+                />
+                {formErrors.category_name && (
+                  <div className="invalid-feedback">{formErrors.category_name}</div>
+                )}
+              </div>
+            ) : (
+              <div className="form-value">{category.category_name}</div>
+            )}
+          </div>
+        )}
 
         {/* Lifecycle Stages */}
         <div className="form-section form-section-horizontal">
           <label className="form-label">Lifecycle Stages</label>
-          {isEditing ? (
+          {isEditing && !isSubcategory ? (
             <div>
               <div className="lifecycle-stages-checkboxes">
                 {LIFECYCLE_STAGES.map((stage) => (
@@ -573,17 +629,17 @@ export default function CategoryDetailPanel({
                       type="checkbox"
                       className="form-check-input"
                       id={`stage-${stage}`}
-                      checked={formData.lifecycle_stages.includes(stage)}
+                      checked={formData.activitys.includes(stage)}
                       onChange={(e) => {
                         if (e.target.checked) {
                           setFormData({
                             ...formData,
-                            lifecycle_stages: [...formData.lifecycle_stages, stage],
+                            activitys: [...formData.activitys, stage],
                           });
                         } else {
                           setFormData({
                             ...formData,
-                            lifecycle_stages: formData.lifecycle_stages.filter((s) => s !== stage),
+                            activitys: formData.activitys.filter((s) => s !== stage),
                           });
                         }
                       }}
@@ -594,36 +650,38 @@ export default function CategoryDetailPanel({
                   </div>
                 ))}
               </div>
-              {formErrors.lifecycle_stages && (
-                <div className="text-danger small mt-1">{formErrors.lifecycle_stages}</div>
+              {formErrors.activitys && (
+                <div className="text-danger small mt-1">{formErrors.activitys}</div>
               )}
             </div>
           ) : (
             <div className="form-value">
               <div className="lifecycle-badges-container">
-                {category.lifecycle_stages.map((stage) => (
+                {category.activitys.map((stage) => (
                   <div key={stage} className="lifecycle-badge-large" data-stage={stage}>
                     <span>{stage}</span>
-                    <button
-                      type="button"
-                      className="lifecycle-badge-remove"
-                      onClick={() => handleRemoveLifecycleStage(stage)}
-                      disabled={isLifecycleUpdating || category.lifecycle_stages.length <= 1}
-                      aria-label={`Remove ${stage} stage`}
-                    >
-                      <X size={12} />
-                    </button>
+                    {!isSubcategory && (
+                      <button
+                        type="button"
+                        className="lifecycle-badge-remove"
+                        onClick={() => handleRemoveActivity(stage)}
+                        disabled={isLifecycleUpdating || category.activitys.length <= 1}
+                        aria-label={`Remove ${stage} stage`}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
                 ))}
-                {availableLifecycleStages.length > 0 && (
+                {!isSubcategory && availableActivitys.length > 0 && (
                   <div className="lifecycle-add-wrapper" ref={lifecyclePickerRef}>
                     {showLifecyclePicker ? (
                       <div className="lifecycle-add-menu">
-                        {availableLifecycleStages.map((stage) => (
+                        {availableActivitys.map((stage) => (
                           <button
                             key={stage}
                             type="button"
-                            onClick={() => handleAddLifecycleStage(stage)}
+                            onClick={() => handleAddActivity(stage)}
                             disabled={isLifecycleUpdating}
                           >
                             <Plus size={12} />
@@ -652,6 +710,11 @@ export default function CategoryDetailPanel({
                   </div>
                 )}
               </div>
+              {isSubcategory && (
+                <small className="form-text text-muted" style={{ marginTop: '8px', display: 'block' }}>
+                  Lifecycle stages are inherited from the parent category and cannot be edited.
+                </small>
+              )}
             </div>
           )}
         </div>
@@ -844,7 +907,7 @@ const removeTagFromAssignedCategories = async (
       const nextTags = cat.tags.filter((tag) => tag.toLowerCase() !== normalized);
       await updateCategory(cat.category_id, {
         category_name: cat.category_name,
-        lifecycle_stages: cat.lifecycle_stages,
+        activitys: cat.activitys,
         tags: nextTags,
         sort_order: cat.sort_order,
         parent: cat.parent ?? null,

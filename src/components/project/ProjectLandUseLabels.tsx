@@ -234,14 +234,14 @@ export default function ProjectLandUseLabels({ projectId }: Props) {
           <button
             onClick={handleReset}
             disabled={!hasChanges || isSaving}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-outline-secondary"
           >
             Reset
           </button>
           <button
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="btn btn-primary"
           >
             {isSaving ? 'Saving...' : 'Save Labels'}
           </button>

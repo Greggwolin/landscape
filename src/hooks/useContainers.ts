@@ -7,7 +7,7 @@ interface UseContainersOptions {
 }
 
 interface ContainerStats {
-  container_id: number
+  division_id: number
   name: string
   code: string
   level: number
@@ -36,7 +36,7 @@ interface UseContainersResult {
 function countChildrenAtLevel(node: ContainerNode, targetLevel: number): number {
   let count = 0
 
-  if (node.container_level === targetLevel) {
+  if (node.tier === targetLevel) {
     count = 1
   }
 
@@ -59,7 +59,7 @@ function extractLevelStats(
   const stats: ContainerStats[] = []
 
   function traverse(node: ContainerNode) {
-    if (node.container_level === level) {
+    if (node.tier === level) {
       const attrs = node.attributes || {}
       const acres = Number(attrs.acres || attrs.acres_gross || 0)
       const units = Number(attrs.units || attrs.units_total || 0)
@@ -68,11 +68,11 @@ function extractLevelStats(
       const totalCost = Number(attrs.total_cost || 0)
 
       stats.push({
-        container_id: node.container_id,
+        division_id: node.division_id,
         name: node.display_name,
         code: node.container_code,
-        level: node.container_level,
-        parent_id: node.parent_container_id,
+        level: node.tier,
+        parent_id: node.parent_division_id,
         acres,
         units,
         phaseCount: level === 1 ? countChildrenAtLevel(node, 2) : undefined,

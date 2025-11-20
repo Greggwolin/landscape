@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Use tagged template for Neon SQL
     const budgetId = budgetRows[0].budget_id;
     const categoryId = item.category_id ?? 4; // Default to USE-PRJ-MGMT (legacy financial category required)
-    const containerId = item.container_id ?? null;
+    const divisionId = item.division_id ?? null;
     const categoryL1Id = item.category_l1_id ?? null;
     const categoryL2Id = item.category_l2_id ?? null;
     const categoryL3Id = item.category_l3_id ?? null;
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       INSERT INTO core_fin_fact_budget (
         budget_id,
         project_id,
-        container_id,
+        division_id,
         category_id,
         category_l1_id,
         category_l2_id,
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       ) VALUES (
         ${budgetId},
         ${item.project_id},
-        ${containerId},
+        ${divisionId},
         ${categoryId},
         ${categoryL1Id},
         ${categoryL2Id},

@@ -2,6 +2,7 @@
 // Organizes all budget fields into logical groups for expandable rows
 
 import { FieldGroup, FieldConfig, BudgetMode, BudgetItem } from '@/types/budget';
+import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 
 // ============================================================================
 // FIELD GROUP DEFINITIONS
@@ -236,6 +237,24 @@ export const budgetFieldGroups: FieldGroup[] = [
         ],
         helpText: 'Financial reporting class',
         width: 150,
+      },
+      {
+        name: 'activity',
+        label: 'Lifecycle Stage',
+        type: 'dropdown',
+        mode: 'standard',
+        group: 'classification',
+        editable: true,
+        options: [
+          { value: 'Acquisition', label: 'Acquisition' },
+          { value: 'Planning & Engineering', label: 'Planning & Engineering' },
+          { value: 'Development', label: 'Development' },
+          { value: 'Operations', label: 'Operations' },
+          { value: 'Disposition', label: 'Disposition' },
+          { value: 'Financing', label: 'Financing' },
+        ],
+        helpText: 'Budget lifecycle stage for categorization',
+        width: 180,
       },
       {
         name: 'tax_treatment',
@@ -771,7 +790,33 @@ export function getFieldGroupsByMode(mode: BudgetMode): FieldGroup[] {
 /**
  * Check if field should be visible based on dependencies
  */
-export function shouldShowField(field: FieldConfig, item: BudgetItem): boolean {
+/**
+ * Helper function to check if project is Land Development type
+ */
+function isLandDevelopmentProject(projectTypeCode?: string): boolean {
+  if (!projectTypeCode) return false;
+  return LAND_DEVELOPMENT_SUBTYPES.some(
+    subtype => projectTypeCode.toUpperCase() === subtype.toUpperCase()
+  );
+}
+
+/**
+ * Determines if a field should be shown based on field dependencies and project type
+ * @param field - Field configuration
+ * @param item - Budget item data
+ * @param projectTypeCode - Optional project type code for filtering
+ */
+export function shouldShowField(
+  field: FieldConfig,
+  item: BudgetItem,
+  projectTypeCode?: string
+): boolean {
+  // Hide CPM fields (Advanced Timing group) for Land Development projects
+  if (field.group === 'advanced_timing' && isLandDevelopmentProject(projectTypeCode)) {
+    return false;
+  }
+
+  // Handle field dependencies (e.g., curve fields only show when timing_method='curve')
   if (!field.dependsOn || field.dependsOn.length === 0) return true;
 
   // Example: curve_profile and curve_steepness only show when timing_method = 'curve'

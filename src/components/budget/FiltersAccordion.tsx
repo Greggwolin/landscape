@@ -126,13 +126,13 @@ export default function FiltersAccordion({
               ))}
 
             {!isLoading && validAreas.length > 0 && validAreas.map((area) => {
-              const isSelected = selectedAreaIds.includes(area.container_id)
+              const isSelected = selectedAreaIds.includes(area.division_id)
 
               return (
                 <div
-                  key={area.container_id}
+                  key={area.division_id}
                   className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
-                  onClick={() => onAreaSelect(area.container_id)}
+                  onClick={() => onAreaSelect(area.division_id)}
                 >
                   <div className="planning-tile-header">
                     {labels.level1Label} {area.name}
@@ -195,14 +195,14 @@ export default function FiltersAccordion({
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
               {filteredPhases.map((phase) => {
-                const isSelected = selectedPhaseIds.includes(phase.container_id)
+                const isSelected = selectedPhaseIds.includes(phase.division_id)
                 const isHighlighted = !isSelected && selectedAreaIds.includes(phase.parent_id!)
 
                 return (
                   <div
-                    key={phase.container_id}
+                    key={phase.division_id}
                     className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''} ${isHighlighted ? 'planning-tile-highlighted' : ''}`}
-                    onClick={() => onPhaseSelect(phase.container_id)}
+                    onClick={() => onPhaseSelect(phase.division_id)}
                   >
                     <div className="planning-tile-header">
                       {labels.level2Label} {phase.name}

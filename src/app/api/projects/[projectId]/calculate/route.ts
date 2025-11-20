@@ -6,8 +6,8 @@ type Params = {
 }
 
 type ContainerTotal = {
-  container_id: number
-  container_level: number
+  division_id: number
+  tier: number
   container_code: string
   display_name: string
   total_amount: string | null
@@ -44,16 +44,16 @@ export async function POST(
     const [containerTotals, periodTotals] = await Promise.all([
       sql<ContainerTotal[]>`
         SELECT
-          c.container_id,
-          c.container_level,
+          c.division_id,
+          c.tier,
           c.container_code,
           c.display_name,
           SUM(b.amount)::text AS total_amount
         FROM landscape.core_fin_fact_budget b
-        JOIN landscape.tbl_container c ON c.container_id = b.container_id
+        JOIN landscape.tbl_container c ON c.division_id = b.division_id
         WHERE c.project_id = ${id}
-        GROUP BY c.container_id, c.container_level, c.container_code, c.display_name
-        ORDER BY c.container_level, c.sort_order NULLS LAST, c.container_id
+        GROUP BY c.division_id, c.tier, c.container_code, c.display_name
+        ORDER BY c.tier, c.sort_order NULLS LAST, c.division_id
       `,
       sql<PeriodTotal[]>`
         SELECT
@@ -75,8 +75,8 @@ export async function POST(
       generatedAt: new Date().toISOString(),
       totals: {
         containers: containerTotals.map((row) => ({
-          container_id: row.container_id,
-          container_level: row.container_level,
+          division_id: row.division_id,
+          tier: row.tier,
           container_code: row.container_code,
           display_name: row.display_name,
           total_amount: row.total_amount ? Number(row.total_amount) : 0,

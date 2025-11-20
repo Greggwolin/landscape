@@ -323,6 +323,21 @@ class BudgetItem(models.Model):
         db_column='scope_override',
         help_text='Force budget item into different scope/container'
     )
+    activity = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        db_column='activity',
+        choices=[
+            ('Acquisition', 'Acquisition'),
+            ('Planning & Engineering', 'Planning & Engineering'),
+            ('Development', 'Development'),
+            ('Operations', 'Operations'),
+            ('Disposition', 'Disposition'),
+            ('Financing', 'Financing'),
+        ],
+        help_text='Cost lifecycle activity (Acquisition, Planning & Engineering, Development, Operations, Disposition, Financing)'
+    )
     cost_type = models.CharField(
         max_length=20,
         null=True,

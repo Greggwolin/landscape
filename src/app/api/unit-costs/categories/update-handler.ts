@@ -12,7 +12,7 @@ export type CategoryRow = {
   parent?: number | null;
   parent_name?: string | null;
   category_name: string;
-  lifecycle_stages: string[];
+  activitys: string[];
   tags: string[];
   sort_order: number;
   is_active: boolean;
@@ -21,7 +21,7 @@ export type CategoryRow = {
 
 export type UpdateCategoryPayload = {
   category_name?: string;
-  lifecycle_stages?: string[];
+  activitys?: string[];
   tags?: string[];
   parent?: number | null;
   sort_order?: number | null;
@@ -32,8 +32,10 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
   acquisition: 'Acquisition',
   acquisitions: 'Acquisition',
   due_diligence: 'Acquisition',
+  planning: 'Planning & Engineering',
+  engineering: 'Planning & Engineering',
+  predevelopment: 'Planning & Engineering',
   development: 'Development',
-  predevelopment: 'Development',
   construction: 'Development',
   operations: 'Operations',
   operating: 'Operations',
@@ -46,13 +48,14 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
 
 const VALID_LIFECYCLE_STAGES = new Set([
   'Acquisition',
+  'Planning & Engineering',
   'Development',
   'Operations',
   'Disposition',
   'Financing',
 ]);
 
-function normalizeLifecycleStages(value: unknown): string[] | undefined {
+function normalizeActivitys(value: unknown): string[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) return [];
 
@@ -82,12 +85,12 @@ function normalizeUpdatePayload(raw: any): { data?: UpdateCategoryPayload; error
     data.category_name = name;
   }
 
-  if ('lifecycle_stages' in raw) {
-    const stages = normalizeLifecycleStages(raw.lifecycle_stages);
+  if ('activitys' in raw) {
+    const stages = normalizeActivitys(raw.activitys);
     if (!stages || stages.length === 0) {
       return { error: 'At least one lifecycle stage is required' };
     }
-    data.lifecycle_stages = stages;
+    data.activitys = stages;
   }
 
   if ('tags' in raw) {
@@ -147,9 +150,9 @@ async function fetchCategoryRow(categoryId: number): Promise<CategoryRow | null>
       p.category_name as parent_name,
       c.category_name,
       COALESCE(
-        ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+        ARRAY_AGG(DISTINCT cls.activity) FILTER (WHERE cls.activity IS NOT NULL),
         ARRAY[]::varchar[]
-      ) as lifecycle_stages,
+      ) as activitys,
       COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
       c.sort_order,
       c.is_active,
@@ -212,9 +215,9 @@ async function updateCategoryDirect(
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
 
-    const nextLifecycleStages =
-      payload.lifecycle_stages ?? existing.lifecycle_stages ?? [];
-    if (nextLifecycleStages.length === 0) {
+    const nextActivitys =
+      payload.activitys ?? existing.activitys ?? [];
+    if (nextActivitys.length === 0) {
       return NextResponse.json(
         { error: 'At least one lifecycle stage is required' },
         { status: 400 }
@@ -251,11 +254,11 @@ async function updateCategoryDirect(
       WHERE category_id = ${categoryId}
     `;
 
-    for (const [index, stage] of nextLifecycleStages.entries()) {
+    for (const [index, stage] of nextActivitys.entries()) {
       await sql`
         INSERT INTO landscape.core_category_lifecycle_stages (
           category_id,
-          lifecycle_stage,
+          activity,
           sort_order,
           created_at,
           updated_at
@@ -267,7 +270,7 @@ async function updateCategoryDirect(
           NOW(),
           NOW()
         )
-        ON CONFLICT (category_id, lifecycle_stage) DO UPDATE
+        ON CONFLICT (category_id, activity) DO UPDATE
         SET sort_order = EXCLUDED.sort_order,
             updated_at = NOW()
       `;

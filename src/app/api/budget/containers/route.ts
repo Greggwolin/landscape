@@ -7,7 +7,7 @@ type RawBudgetItem = {
   fact_id: number
   budget_id: number
   project_id: number | null
-  container_id: number | null
+  division_id: number | null
   category_id: number
   uom_code: string
   qty: number | null
@@ -15,10 +15,10 @@ type RawBudgetItem = {
   amount: string | number | null
   confidence_level: string | null
   is_committed: boolean | null
-  container_level: number | null
+  tier: number | null
   container_code: string | null
   container_name: string | null
-  parent_container_id: number | null
+  parent_division_id: number | null
   project_ref: number | null
   container_sort_order: number | null
   category_code: string | null
@@ -32,7 +32,7 @@ const parseId = (input: string | null): number | null => {
   return Number.isFinite(value) ? value : null
 }
 
-const peLevelToContainerLevel = (peLevel: string): number | null => {
+const peLevelToTier = (peLevel: string): number | null => {
   switch (peLevel) {
     case 'project':
       return 0
@@ -49,29 +49,29 @@ const peLevelToContainerLevel = (peLevel: string): number | null => {
 }
 
 async function resolveContainerFromLegacy(peLevel: string, peId: string) {
-  const containerLevel = peLevelToContainerLevel(peLevel)
-  if (containerLevel === null || containerLevel === 0) return null
+  const tier = peLevelToTier(peLevel)
+  if (tier === null || tier === 0) return null
 
   const column =
-    containerLevel === 1
+    tier === 1
       ? 'area_id'
-      : containerLevel === 2
+      : tier === 2
         ? 'phase_id'
         : 'parcel_id'
 
   const [row] = await sql`
-    SELECT container_id, project_id
+    SELECT division_id, project_id
     FROM landscape.tbl_container
-    WHERE container_level = ${containerLevel}
+    WHERE tier = ${tier}
       AND attributes->>${column} = ${peId}
     LIMIT 1
   `
 
   if (!row) return null
   return {
-    containerId: Number(row.container_id),
+    divisionId: Number(row.division_id),
     projectId: row.project_id != null ? Number(row.project_id) : null,
-    containerLevel
+    tier
   }
 }
 
@@ -87,24 +87,24 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const includeChildren = searchParams.get('include_children') === 'true'
-    const containerLevelParam = searchParams.get('container_level')
-    const containerIdParam = searchParams.get('container_id')
+    const tierParam = searchParams.get('tier')
+    const divisionIdParam = searchParams.get('division_id')
     const projectParam = searchParams.get('project_id')
     const peLevel = searchParams.get('pe_level')
     const peId = searchParams.get('pe_id')
 
-    const containerLevel = parseId(containerLevelParam)
-    let containerId = parseId(containerIdParam)
+    const tier = parseId(tierParam)
+    let divisionId = parseId(divisionIdParam)
     let projectId = parseId(projectParam)
 
     // Container-first path (Phase 2)
-    if (!containerId && peLevel && peId) {
+    if (!divisionId && peLevel && peId) {
       if (peLevel === 'project') {
         projectId = projectId ?? parseId(peId)
       } else {
         const resolved = await resolveContainerFromLegacy(peLevel, peId)
         if (resolved) {
-          containerId = resolved.containerId
+          divisionId = resolved.divisionId
           projectId = projectId ?? resolved.projectId
         } else {
           console.warn(
@@ -116,24 +116,24 @@ export async function GET(request: Request) {
       }
     }
 
-    if (!projectId && containerId) {
+    if (!projectId && divisionId) {
       const [row] = await sql`
-        SELECT project_id, container_level
+        SELECT project_id, tier
         FROM landscape.tbl_container
-        WHERE container_id = ${containerId}
+        WHERE division_id = ${divisionId}
       `
       if (row?.project_id != null) {
         projectId = Number(row.project_id)
       }
     }
 
-    if (!containerId && !projectId) {
+    if (!divisionId && !projectId) {
       return NextResponse.json(
         {
           success: false,
           error: 'Missing required parameters',
           details:
-            'Provide container_id or project_id (legacy pe_level/pe_id can be used for fallback resolution)'
+            'Provide division_id or project_id (legacy pe_level/pe_id can be used for fallback resolution)'
         },
         { status: 400 }
       )
@@ -141,24 +141,24 @@ export async function GET(request: Request) {
 
     let items: RawBudgetItem[] = []
 
-    if (containerId && includeChildren) {
+    if (divisionId && includeChildren) {
       items = (await sql`
         WITH RECURSIVE container_tree AS (
-          SELECT container_id, container_level, project_id, parent_container_id, container_code, display_name, sort_order
+          SELECT division_id, tier, project_id, parent_division_id, container_code, display_name, sort_order
           FROM landscape.tbl_container
-          WHERE container_id = ${containerId}
+          WHERE division_id = ${divisionId}
 
           UNION ALL
 
-          SELECT c.container_id, c.container_level, c.project_id, c.parent_container_id, c.container_code, c.display_name, c.sort_order
+          SELECT c.division_id, c.tier, c.project_id, c.parent_division_id, c.container_code, c.display_name, c.sort_order
           FROM landscape.tbl_container c
-          INNER JOIN container_tree ct ON c.parent_container_id = ct.container_id
+          INNER JOIN container_tree ct ON c.parent_division_id = ct.division_id
         )
         SELECT
           b.fact_id,
           b.budget_id,
           b.project_id,
-          b.container_id,
+          b.division_id,
           b.category_id,
           b.uom_code,
           b.qty,
@@ -166,28 +166,28 @@ export async function GET(request: Request) {
           b.amount,
           b.confidence_level,
           b.is_committed,
-          ct.container_level,
+          ct.tier,
           ct.container_code,
           ct.display_name AS container_name,
-          ct.parent_container_id,
+          ct.parent_division_id,
           ct.project_id AS project_ref,
           ct.sort_order AS container_sort_order,
           cat.code AS category_code,
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN container_tree ct ON b.container_id = ct.container_id
+        LEFT JOIN container_tree ct ON b.division_id = ct.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
-        WHERE b.container_id IN (SELECT container_id FROM container_tree)
-        ORDER BY ct.container_level, ct.sort_order, cat.scope, cat.code
+        WHERE b.division_id IN (SELECT division_id FROM container_tree)
+        ORDER BY ct.tier, ct.sort_order, cat.scope, cat.code
       `) as RawBudgetItem[]
-    } else if (containerId) {
+    } else if (divisionId) {
       items = (await sql`
         SELECT
           b.fact_id,
           b.budget_id,
           b.project_id,
-          b.container_id,
+          b.division_id,
           b.category_id,
           b.uom_code,
           b.qty,
@@ -195,28 +195,28 @@ export async function GET(request: Request) {
           b.amount,
           b.confidence_level,
           b.is_committed,
-          c.container_level,
+          c.tier,
           c.container_code,
           c.display_name AS container_name,
-          c.parent_container_id,
+          c.parent_division_id,
           c.project_id AS project_ref,
           c.sort_order AS container_sort_order,
           cat.code AS category_code,
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
-        WHERE b.container_id = ${containerId}
+        WHERE b.division_id = ${divisionId}
         ORDER BY cat.scope, cat.code
       `) as RawBudgetItem[]
-    } else if (projectId != null && containerLevel != null) {
+    } else if (projectId != null && tier != null) {
       items = (await sql`
         SELECT
           b.fact_id,
           b.budget_id,
           b.project_id,
-          b.container_id,
+          b.division_id,
           b.category_id,
           b.uom_code,
           b.qty,
@@ -224,22 +224,22 @@ export async function GET(request: Request) {
           b.amount,
           b.confidence_level,
           b.is_committed,
-          c.container_level,
+          c.tier,
           c.container_code,
           c.display_name AS container_name,
-          c.parent_container_id,
+          c.parent_division_id,
           c.project_id AS project_ref,
           c.sort_order AS container_sort_order,
           cat.code AS category_code,
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
         WHERE b.project_id = ${projectId}
-          ${containerLevel === 0
-            ? sql`AND b.container_id IS NULL`
-            : sql`AND c.container_level = ${containerLevel}`
+          ${tier === 0
+            ? sql`AND b.division_id IS NULL`
+            : sql`AND c.tier = ${tier}`
           }
         ORDER BY c.sort_order, cat.scope, cat.code
       `) as RawBudgetItem[]
@@ -249,7 +249,7 @@ export async function GET(request: Request) {
           b.fact_id,
           b.budget_id,
           b.project_id,
-          b.container_id,
+          b.division_id,
           b.category_id,
           b.uom_code,
           b.qty,
@@ -257,21 +257,21 @@ export async function GET(request: Request) {
           b.amount,
           b.confidence_level,
           b.is_committed,
-          c.container_level,
+          c.tier,
           c.container_code,
           c.display_name AS container_name,
-          c.parent_container_id,
+          c.parent_division_id,
           c.project_id AS project_ref,
           c.sort_order AS container_sort_order,
           cat.code AS category_code,
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
+        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
         WHERE b.project_id = ${projectId}
         ORDER BY
-          COALESCE(c.container_level, 0),
+          COALESCE(c.tier, 0),
           c.sort_order,
           cat.scope,
           cat.code
@@ -286,7 +286,7 @@ export async function GET(request: Request) {
     )
 
     const byLevel = normalized.reduce((groups: Record<string, any>, item) => {
-      const level = item.container_level ?? 0
+      const level = item.tier ?? 0
       if (!groups[level]) {
         groups[level] = {
           level,

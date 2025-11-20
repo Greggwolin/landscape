@@ -456,6 +456,7 @@ class SaleBenchmark(models.Model):
     amount_per_uom = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     uom_code = models.CharField(max_length=10, null=True, blank=True)
+    basis = models.CharField(max_length=50, null=True, blank=True)  # What percentage is applied to
 
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)

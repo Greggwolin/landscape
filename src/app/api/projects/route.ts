@@ -177,7 +177,7 @@ type TemplateColumnConfig = {
   column_label: string
   column_type: 'hierarchy' | 'data'
   data_type: string | null
-  container_level: number | null
+  tier: number | null
   display_order: number
   is_required: boolean
   data_source_table: string | null
@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
         column_label,
         column_type,
         data_type,
-        container_level,
+        tier,
         display_order,
         is_required,
         data_source_table,
@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
           column_label,
           column_type,
           data_type,
-          container_level,
+          tier,
           display_order,
           is_required,
           is_visible,
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
           ${col.column_label},
           ${col.column_type},
           ${col.data_type},
-          ${col.container_level},
+          ${col.tier},
           ${col.display_order},
           ${col.is_required},
           ${isVisible},

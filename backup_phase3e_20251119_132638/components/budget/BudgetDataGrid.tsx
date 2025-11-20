@@ -1,0 +1,412 @@
+// v1.2 · 2025-11-03 · Added reconciliation support
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { CButton } from '@coreui/react';
+import { LandscapeButton } from '@/components/ui/landscape';
+import { getColumnsByMode, type BudgetItem } from './ColumnDefinitions';
+import type { BudgetMode } from '@/types/budget';
+import CategoryEditorRow from './custom/CategoryEditorRow';
+import GroupRow from './custom/GroupRow';
+import ExpandableDetailsRow from './custom/ExpandableDetailsRow';
+import { useBudgetGrouping } from '@/hooks/useBudgetGrouping';
+import { useBudgetVariance, getCategoryVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
+
+interface Props {
+  data: BudgetItem[];
+  mode: BudgetMode;
+  projectId: number;
+  selectedItem?: BudgetItem;
+  onRowSelect?: (item: BudgetItem) => void;
+  onInlineCommit?: (
+    item: BudgetItem,
+    field: keyof BudgetItem,
+    value: unknown
+  ) => Promise<void> | void;
+  onOpenModal?: (item: BudgetItem) => void;
+  projectTypeCode?: string;
+  onRequestRowAdd?: (item: BudgetItem) => void;
+  onRequestRowDelete?: (item: BudgetItem) => void;
+  onRequestGroupAdd?: (context: {
+    level: number;
+    pathIds: number[];
+    pathNames: string[];
+  }) => void;
+}
+
+export default function BudgetDataGrid({
+  data,
+  mode,
+  projectId,
+  selectedItem,
+  onRowSelect,
+  onInlineCommit,
+  onOpenModal,
+  projectTypeCode,
+  onRequestRowAdd,
+  onRequestRowDelete,
+  onRequestGroupAdd,
+}: Props) {
+  const [expandedFactId, setExpandedFactId] = useState<number | null>(null); // For category editor
+  const [expandedDetailsFactId, setExpandedDetailsFactId] = useState<number | null>(null); // For details row
+
+  // Grouping functionality
+  const {
+    isGrouped,
+    toggleGrouping,
+    expandedCategories,
+    toggleCategory,
+    getCategoryKey,
+    buildCategoryTree,
+    flattenTree,
+    expandAll,
+  } = useBudgetGrouping(projectId);
+
+  // Fetch variance data (only when grouped and in Standard/Detail mode)
+  const { data: varianceData } = useBudgetVariance(
+    projectId,
+    0, // min_variance_pct = 0 to get all variances
+    isGrouped && (mode === 'standard' || mode === 'detail') // only fetch when needed
+  );
+
+  // Transform data if grouping is enabled (memoized to prevent infinite loops)
+  const displayData = useMemo(() => {
+    if (!isGrouped) {
+      return data.map(item => ({
+        row_type: 'item' as const,
+        item,
+      }));
+    }
+    const tree = buildCategoryTree(data);
+    return flattenTree(tree);
+  }, [isGrouped, data, buildCategoryTree, flattenTree]);
+
+  // Auto-expand all categories when grouping is first enabled
+  React.useEffect(() => {
+    if (isGrouped && expandedCategories.size === 0 && data.length > 0) {
+      const tree = buildCategoryTree(data);
+      const allKeys: string[] = [];
+
+      // Collect all category keys from the tree
+      const collectKeys = (groups: Map<number, any>) => {
+        groups.forEach(group => {
+          if (group.items.length > 0) {
+            allKeys.push(getCategoryKey(group.level, group.category_id));
+          }
+          if (group.children.size > 0) {
+            collectKeys(group.children);
+          }
+        });
+      };
+
+      collectKeys(tree);
+      if (allKeys.length > 0) {
+        expandAll(allKeys);
+      }
+    }
+  }, [isGrouped, data, expandedCategories.size, buildCategoryTree, getCategoryKey, expandAll]);
+
+  // When grouping is enabled, we need to extract items for the table
+  // For non-grouped, wrap in item format
+  const tableData = useMemo(() => {
+    return displayData
+      .filter(row => row.row_type === 'item')
+      .map(row => row.item!);
+  }, [displayData]);
+
+  const table = useReactTable({
+    data: isGrouped ? tableData : data,
+    columns: getColumnsByMode(mode, {
+      onInlineCommit,
+      onOpenModal,
+      projectId,
+      mode,
+      isGrouped,
+      projectTypeCode,
+      onRowAdd: onRequestRowAdd,
+      onRowDelete: onRequestRowDelete,
+      onCategoryClick: mode === 'napkin' ? undefined : (item: BudgetItem) => {
+        // Show editor row only in standard and detail modes (napkin uses inline editing)
+        setExpandedFactId(expandedFactId === item.fact_id ? null : item.fact_id);
+      },
+      onGroupByPhase: toggleGrouping,
+      onGroupByStage: toggleGrouping,
+      onGroupByCategory: toggleGrouping,
+    }),
+    getCoreRowModel: getCoreRowModel(),
+    columnResizeMode: 'onChange',
+  });
+
+  const handleCategorySave = async (
+    item: BudgetItem,
+    categoryIds: {
+      category_l1_id: number | null;
+      category_l2_id: number | null;
+      category_l3_id: number | null;
+      category_l4_id: number | null;
+    }
+  ) => {
+    if (onInlineCommit) {
+      await onInlineCommit(item, 'category_l1_id', categoryIds.category_l1_id);
+      await onInlineCommit(item, 'category_l2_id', categoryIds.category_l2_id);
+      await onInlineCommit(item, 'category_l3_id', categoryIds.category_l3_id);
+      await onInlineCommit(item, 'category_l4_id', categoryIds.category_l4_id);
+    }
+    setExpandedFactId(null);
+  };
+
+  return (
+    <div className="table-responsive border rounded">
+      <table className="table table-hover align-middle mb-0" style={{ tableLayout: 'fixed' }}>
+        <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                // Check if this is the Phase column
+                const isPhaseColumn = header.column.id === 'container_id';
+
+                return (
+                  <th key={header.id} style={{ width: header.getSize(), maxWidth: header.column.columnDef.maxSize, position: 'relative', paddingLeft: isPhaseColumn ? '16px' : undefined }}>
+                    <div className="d-flex align-items-center gap-2">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </div>
+
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className="position-absolute top-0 end-0 h-100"
+                        style={{
+                          width: '0.25rem',
+                          cursor: 'col-resize',
+                          userSelect: 'none',
+                          touchAction: 'none',
+                          backgroundColor: header.column.getIsResizing() ? 'var(--cui-primary)' : 'transparent',
+                          opacity: header.column.getIsResizing() ? 1 : 0,
+                          transition: 'opacity 0.2s ease',
+                        }}
+                        onMouseEnter={(event) => {
+                          (event.target as HTMLElement).style.opacity = '0.4';
+                          if (!header.column.getIsResizing()) {
+                            (event.target as HTMLElement).style.backgroundColor = 'var(--cui-border-color)';
+                          }
+                        }}
+                        onMouseLeave={(event) => {
+                          if (!header.column.getIsResizing()) {
+                            (event.target as HTMLElement).style.opacity = '0';
+                            (event.target as HTMLElement).style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      />
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {isGrouped ? (
+            // Render grouped rows (mix of parent rows and item rows)
+            displayData.map((groupedRow, index) => {
+              if (groupedRow.row_type === 'parent') {
+                // Render parent category row
+                const categoryKey = getCategoryKey(
+                  groupedRow.category_level!,
+                  groupedRow.category_id!
+                );
+                const isExpanded = expandedCategories.has(categoryKey);
+
+                // Get variance for this category
+                const categoryVariance = getCategoryVariance(
+                  groupedRow.category_id!,
+                  groupedRow.category_level!,
+                  varianceData?.variances
+                );
+                const handleGroupAdd = onRequestGroupAdd
+                  ? () =>
+                      onRequestGroupAdd({
+                        level: groupedRow.category_level!,
+                        pathIds: groupedRow.category_path_ids ?? [],
+                        pathNames: groupedRow.category_path_names ?? [],
+                      })
+                  : undefined;
+
+                return (
+                  <GroupRow
+                    key={`parent-${categoryKey}`}
+                    categoryLevel={groupedRow.category_level!}
+                    categoryId={groupedRow.category_id!}
+                    categoryName={groupedRow.category_name!}
+                    categoryBreadcrumb={groupedRow.category_breadcrumb!}
+                    amountSubtotal={groupedRow.amount_subtotal!}
+                    childCount={groupedRow.child_count!}
+                    descendantDepth={groupedRow.descendant_depth || 0}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleCategory(categoryKey)}
+                    mode={mode}
+                    variance={categoryVariance}
+                    onAddItem={handleGroupAdd}
+                  />
+                );
+              } else {
+                // Render item row
+                const item = groupedRow.item!;
+                const isSelected = selectedItem?.fact_id === item.fact_id;
+                const isExpanded = expandedFactId === item.fact_id;
+
+                // Find the corresponding table row
+                const tableRow = table.getRowModel().rows.find(
+                  r => r.original.fact_id === item.fact_id
+                );
+
+                if (!tableRow) return null;
+
+                const isDetailsExpanded = expandedDetailsFactId === item.fact_id;
+
+                return (
+                  <React.Fragment key={`item-${item.fact_id}`}>
+                    <tr
+                      onClick={() => onRowSelect?.(item)}
+                      className={isSelected ? 'table-active' : undefined}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {tableRow.getVisibleCells().map((cell, cellIndex) => {
+                        const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
+                        const columnMeta = cell.column.columnDef.meta as any;
+                        const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
+
+                        return (
+                          <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                            {hasExpandButton ? (
+                              <div className="d-flex align-items-center gap-2">
+                                <LandscapeButton
+                                  color="secondary"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
+                                  }}
+                                  title="Toggle details"
+                                  className="p-0"
+                                >
+                                  {isDetailsExpanded ? '▼' : '▶'}
+                                </LandscapeButton>
+                                <div className="flex-grow-1">
+                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </div>
+                              </div>
+                            ) : (
+                              flexRender(cell.column.columnDef.cell, cell.getContext())
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${item.fact_id}-expanded`}>
+                        <td colSpan={tableRow.getVisibleCells().length} className="p-0">
+                          <CategoryEditorRow
+                            item={item}
+                            projectId={projectId}
+                            mode={mode}
+                            onSave={(categoryIds) => handleCategorySave(item, categoryIds)}
+                            onCancel={() => setExpandedFactId(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
+                      <ExpandableDetailsRow
+                        item={item}
+                        mode={mode}
+                        columnCount={tableRow.getVisibleCells().length}
+                        projectTypeCode={projectTypeCode}
+                        onInlineCommit={onInlineCommit}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              }
+            })
+          ) : (
+            // Render normal flat rows
+            table.getRowModel().rows.map((row) => {
+              const isSelected = selectedItem?.fact_id === row.original.fact_id;
+              const isExpanded = expandedFactId === row.original.fact_id;
+              const isDetailsExpanded = expandedDetailsFactId === row.original.fact_id;
+
+              return (
+                <React.Fragment key={row.id}>
+                  <tr
+                    onClick={() => onRowSelect?.(row.original)}
+                    className={isSelected ? 'table-active' : undefined}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {row.getVisibleCells().map((cell, cellIndex) => {
+                      const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
+                      const columnMeta = cell.column.columnDef.meta as any;
+                      const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
+
+                      return (
+                        <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                          {hasExpandButton ? (
+                            <div className="d-flex align-items-center gap-2">
+                              <LandscapeButton
+                                color="secondary"
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
+                                }}
+                                title="Toggle details"
+                                className="p-0"
+                              >
+                                {isDetailsExpanded ? '▼' : '▶'}
+                              </LandscapeButton>
+                              <div className="flex-grow-1">
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </div>
+                            </div>
+                          ) : (
+                            flexRender(cell.column.columnDef.cell, cell.getContext())
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${row.id}-expanded`}>
+                      <td colSpan={row.getVisibleCells().length} className="p-0">
+                        <CategoryEditorRow
+                          item={row.original}
+                          projectId={projectId}
+                          mode={mode}
+                          onSave={(categoryIds) => handleCategorySave(row.original, categoryIds)}
+                          onCancel={() => setExpandedFactId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
+                    <ExpandableDetailsRow
+                      item={row.original}
+                      mode={mode}
+                      columnCount={row.getVisibleCells().length}
+                      projectTypeCode={projectTypeCode}
+                      onInlineCommit={onInlineCommit}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+      {data.length === 0 && <div className="text-center py-4 text-secondary">No budget items yet.</div>}
+    </div>
+  );
+}

@@ -6,23 +6,23 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const peLevelParam = (searchParams.get('pe_level') ?? '').toLowerCase()
-    const containerLevelParam = searchParams.get('container_level')
-    const containerLevel = containerLevelParam != null ? Number(containerLevelParam) : null
+    const tierParam = searchParams.get('tier')
+    const tier = tierParam != null ? Number(tierParam) : null
 
     const effectivePeLevel =
-      containerLevel != null
-        ? containerLevel === 0
+      tier != null
+        ? tier === 0
           ? 'project'
-          : containerLevel === 1
+          : tier === 1
             ? 'area'
-            : containerLevel === 2
+            : tier === 2
               ? 'phase'
               : 'parcel'
         : peLevelParam
 
     const levelFilter =
-      containerLevel != null
-        ? containerLevel
+      tier != null
+        ? tier
         : effectivePeLevel
           ? effectivePeLevel === 'project'
             ? 0
@@ -43,15 +43,15 @@ export async function GET(request: Request) {
         FROM landscape.core_fin_category c
         WHERE c.is_active = true
       ), ca AS (
-        SELECT category_id, container_level FROM landscape.core_fin_container_applicability
+        SELECT category_id, tier FROM landscape.core_fin_container_applicability
       )
       SELECT b.*, 
              array_agg(u.uom_code ORDER BY u.uom_code) FILTER (WHERE u.uom_code IS NOT NULL) AS uom_codes,
-             array_agg(DISTINCT ca.container_level) FILTER (WHERE ca.container_level IS NOT NULL) AS container_levels
+             array_agg(DISTINCT ca.tier) FILTER (WHERE ca.tier IS NOT NULL) AS tiers
       FROM base b
       LEFT JOIN landscape.core_fin_category_uom u ON u.category_id = b.category_id
       LEFT JOIN ca ON ca.category_id = b.category_id
-      ${levelFilter != null ? sql`WHERE ca.container_level = ${levelFilter}` : sql``}
+      ${levelFilter != null ? sql`WHERE ca.tier = ${levelFilter}` : sql``}
       GROUP BY b.category_id, b.code, b.kind, b.class, b.event, b.scope, b.detail
       ORDER BY b.kind, b.class NULLS LAST, b.event NULLS LAST, b.scope NULLS LAST, b.detail NULLS LAST
     `
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       scope: string | null
       detail: string | null
       uom_codes: string[] | null
-      container_levels: number[] | null
+      tiers: number[] | null
     }[]).map(r => ({
       category_id: r.category_id,
       code: r.code,
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       scope: r.scope,
       detail: r.detail,
       uoms: (r.uom_codes ?? []).map((c) => ({ code: c, label: uomMap.get(c) ?? c })),
-      pe_levels: (r.container_levels ?? []).map((level) =>
+      pe_levels: (r.tiers ?? []).map((level) =>
         level === 0
           ? 'project'
           : level === 1
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
               ? 'phase'
               : 'parcel'
       ),
-      container_levels: r.container_levels ?? []
+      tiers: r.tiers ?? []
     }))
 
     return NextResponse.json(result)
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       is_active = true,
       uoms = [],
       pe_levels = [],
-      container_levels = []
+      tiers = []
     } = body
     if (!code || !kind) return NextResponse.json({ error: 'code and kind required' }, { status: 400 })
     const inserted = await sql`
@@ -130,8 +130,8 @@ export async function POST(request: Request) {
         for (const u of uoms) await sql`INSERT INTO landscape.core_fin_category_uom (category_id, uom_code) VALUES (${id}, ${u}) ON CONFLICT DO NOTHING`
       }
       const normalizedLevels =
-        Array.isArray(container_levels) && container_levels.length > 0
-          ? container_levels
+        Array.isArray(tiers) && tiers.length > 0
+          ? tiers
           : Array.isArray(pe_levels) && pe_levels.length > 0
             ? pe_levels.map((lvl: string) =>
                 lvl === 'project'
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
             : []
       if (normalizedLevels.length > 0) {
         for (const level of normalizedLevels) {
-          await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, container_level) VALUES (${id}, ${level}) ON CONFLICT DO NOTHING`
+          await sql`INSERT INTO landscape.core_fin_container_applicability (category_id, tier) VALUES (${id}, ${level}) ON CONFLICT DO NOTHING`
         }
       }
     }

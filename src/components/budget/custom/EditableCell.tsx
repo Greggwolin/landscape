@@ -34,6 +34,7 @@ type ColumnMeta = {
   onCommit?: (value: any, row: any, columnId: string) => Promise<void> | void;
   projectTypeCode?: string;
   onAutocompleteSelect?: (template: UnitCostTemplateSummary, row: any) => Promise<void> | void;
+  align?: 'left' | 'center' | 'right';
 };
 
 const isTanStackProps = (props: EditableCellProps): props is TanStackProps =>
@@ -68,13 +69,31 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     if (editing && inputType === 'category-select' && meta.projectId) {
       const fetchCategories = async () => {
         try {
-          const response = await fetch(`/api/budget/categories?project_id=${meta.projectId}`);
+          // Get activity from the current row to filter categories
+          const activity = row?.original?.activity;
+
+          // Build URL with optional activity filter
+          let url = `/api/budget/categories?project_id=${meta.projectId}`;
+          if (activity) {
+            url += `&activity=${encodeURIComponent(activity)}`;
+          }
+
+          const response = await fetch(url);
           if (response.ok) {
             const data = await response.json();
-            const l1Categories = data.categories.filter((c: any) => c.level === 1);
-            setCategoryOptions(l1Categories.map((c: any) => ({
+            console.log('📋 Category API Response:', {
+              url,
+              activity,
+              totalCategories: data.categories?.length,
+              categories: data.categories
+            });
+            // core_fin_category doesn't have a level field
+            // Filter for top-level categories (no parent_id)
+            const topLevelCategories = data.categories.filter((c: any) => !c.parent_id);
+            console.log('📋 Filtered Top-Level Categories:', topLevelCategories);
+            setCategoryOptions(topLevelCategories.map((c: any) => ({
               value: String(c.category_id),
-              label: c.name
+              label: c.name || c.code
             })));
           }
         } catch (err) {
@@ -83,7 +102,7 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       };
       void fetchCategories();
     }
-  }, [editing, inputType, meta.projectId]);
+  }, [editing, inputType, meta.projectId, row?.original?.activity]);
 
   const parseValue = (raw: any) => {
     if (raw === '' || raw === null || raw === undefined) {
@@ -91,6 +110,12 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     }
     if (inputType === 'number' || inputType === 'currency') {
       const parsed = Number(raw);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    if (inputType === 'category-select') {
+      // Category IDs should be numeric
+      const parsed = Number(raw);
+      console.log('📋 Parsing category value:', { raw, parsed, isNaN: Number.isNaN(parsed) });
       return Number.isNaN(parsed) ? null : parsed;
     }
     return raw;
@@ -131,11 +156,24 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     const initial = getValue();
     const parsed = parseValue(value);
 
+    if (inputType === 'category-select') {
+      console.log('📋 Category commit:', {
+        columnId: column.id,
+        initial,
+        value,
+        parsed,
+        rowData: row.original
+      });
+    }
+
     const valuesEqual =
       (parsed === null && (initial === null || initial === undefined || initial === '')) ||
       String(parsed) === String(initial);
 
     if (valuesEqual) {
+      if (inputType === 'category-select') {
+        console.log('📋 Category values equal, skipping save');
+      }
       setEditing(false);
       setError(null);
       setValue(initial);
@@ -143,13 +181,20 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     }
 
     if (!meta.onCommit) {
+      console.error('📋 No onCommit handler!');
       setEditing(false);
       return;
     }
 
     try {
       setSaving(true);
+      if (inputType === 'category-select') {
+        console.log('📋 Calling onCommit with:', { parsed, columnId: column.id });
+      }
       await meta.onCommit(parsed, row.original, column.id);
+      if (inputType === 'category-select') {
+        console.log('📋 Category saved successfully');
+      }
       setError(null);
     } catch (err) {
       console.error('Failed to save cell value', err);
@@ -260,11 +305,26 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     }
   };
 
+  const getAlignmentClass = () => {
+    if (meta.align === 'center') return 'text-center';
+    if (meta.align === 'right') return 'text-end';
+    if (inputType === 'currency' || inputType === 'number') return 'text-end';
+    return '';
+  };
+
+  const getAlignmentStyle = (): React.CSSProperties => {
+    if (meta.align === 'center') return { textAlign: 'center' };
+    if (meta.align === 'right') return { textAlign: 'right' };
+    if (inputType === 'currency' || inputType === 'number') return { textAlign: 'right' };
+    return {};
+  };
+
   return editing ? (
     inputType === 'select' || inputType === 'category-select' ? (
       <select
         autoFocus
-        className="form-select form-select-sm"
+        className={`form-select form-select-sm ${getAlignmentClass()}`}
+        style={getAlignmentStyle()}
         value={value ?? ''}
         onChange={(e) => setValue(e.target.value)}
         onBlur={handleBlur}
@@ -282,7 +342,8 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       <div className="position-relative">
         <input
           autoFocus
-          className="form-control form-control-sm"
+          className={`form-control form-control-sm ${getAlignmentClass()}`}
+          style={getAlignmentStyle()}
           type="text"
           value={value ?? ''}
           onChange={(event) => {
@@ -328,7 +389,8 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
     ) : (
       <input
         autoFocus
-        className="form-control form-control-sm"
+        className={`form-control form-control-sm ${getAlignmentClass()}`}
+        style={getAlignmentStyle()}
         type={inputType === 'number' || inputType === 'currency' ? 'number' : 'text'}
         value={value ?? ''}
         onChange={(e) => setValue(e.target.value)}
@@ -338,7 +400,7 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       />
     )
   ) : (
-    <div className="d-flex flex-column">
+    <>
       {inputType === 'category-select' ? (
         <ColoredDotIndicator
           categoryL1Name={row.original.category_l1_name}
@@ -351,15 +413,23 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       ) : (
         <div
           onClick={() => editable && !saving && setEditing(true)}
-          className={inputType === 'currency' || inputType === 'number' ? 'text-end' : ''}
-          style={{ cursor: editable ? 'pointer' : 'default', minHeight: '1.5rem' }}
+          className={
+            meta.align ?
+              (meta.align === 'center' ? 'text-center' : meta.align === 'right' ? 'text-end' : '') :
+              (inputType === 'currency' || inputType === 'number' ? 'text-end' : '')
+          }
+          style={{
+            cursor: editable ? 'pointer' : 'default',
+            minHeight: '1.5rem',
+            textAlign: meta.align === 'center' ? 'center' : meta.align === 'right' ? 'right' : (inputType === 'currency' || inputType === 'number' ? 'right' : undefined)
+          }}
         >
           {formatDisplay(getValue())}
           {saving && <span className="ms-2 spinner-border spinner-border-sm text-primary" />}
         </div>
       )}
-      {error && <small className="text-danger">{error}</small>}
-    </div>
+      {error && <small className="text-danger d-block">{error}</small>}
+    </>
   );
 }
 

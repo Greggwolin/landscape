@@ -132,7 +132,7 @@ export default function HomeOverview() {
           <p className="text-gray-400 mb-4">No active project selected</p>
           <button
             onClick={refreshProjects}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="btn btn-primary"
           >
             Load Projects
           </button>
@@ -213,7 +213,7 @@ export default function HomeOverview() {
                       // Navigate to planning wizard
                       window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view: 'planning' } }));
                     }}
-                    className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-gray-300 text-sm hover:bg-gray-600 hover:border-gray-500 transition-colors cursor-pointer"
+                    className="btn btn-sm btn-outline-secondary"
                     title="Click to change complexity level"
                   >
                     {currentProject.complexity_level || 'Standard'}
@@ -300,7 +300,7 @@ export default function HomeOverview() {
             {!isEditing ? (
               <button
                 onClick={handleEdit}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="btn btn-primary"
               >
                 Edit
               </button>
@@ -308,14 +308,14 @@ export default function HomeOverview() {
               <>
                 <button
                   onClick={handleCancel}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="btn btn-secondary"
                   disabled={isSaving}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-success"
                   disabled={isSaving}
                 >
                   {isSaving ? 'Saving...' : 'Save'}
@@ -347,10 +347,10 @@ export default function HomeOverview() {
                 // Navigate to DMS page Upload tab
                 window.location.href = '/dms?tab=upload';
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              className="btn btn-primary d-inline-flex align-items-center"
               title="Upload documents to DMS"
             >
-              <i className="ri-add-line mr-2"></i>
+              <i className="ri-add-line me-2"></i>
               Add Document
             </button>
           </div>

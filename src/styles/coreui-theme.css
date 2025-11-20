@@ -31,6 +31,7 @@
   --cui-danger-rgb: 220, 53, 69;
   --cui-info: #0dcaf0;
   --cui-info-rgb: 13, 202, 240;
+  --filter-icon-color: var(--cui-body-color);
 
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
@@ -104,6 +105,7 @@
   --cui-tertiary-bg: var(--surface-card);
   --cui-secondary-color: var(--text-secondary);
   --cui-card-bg: var(--surface-card);
+  --filter-icon-color: #ffffff;
 }
 
 /* Dark mode button overrides - direct rules, not variables */
@@ -326,7 +328,7 @@ body {
 /* Ensure light theme card headers use the correct background */
 .light-theme .card-header,
 .light-theme .card > .card-header {
-  background-color: #f0f1f2 !important;
+  background-color: var(--surface-card-header) !important;
 }
 
 /* Form controls */
@@ -384,8 +386,31 @@ body {
   color: var(--cui-table-color, var(--cui-body-color));
 }
 
+/* Table headers - override all backgrounds including Tailwind classes */
+thead,
+thead tr,
+thead th,
+.table thead,
+.table thead tr,
+.table thead th {
+  background-color: var(--surface-card-header) !important;
+}
+
+/* Table hover - general rule comes first */
 .table-hover tbody tr:hover {
   background-color: var(--cui-table-hover-bg);
+}
+
+/* Group rows - maintain background even on hover (more specific, comes after) */
+.table.table-hover tbody tr.budget-group-row,
+.table-hover tbody tr.budget-group-row {
+  background-color: var(--surface-subheader) !important;
+}
+
+.table.table-hover tbody tr.budget-group-row:hover,
+.table-hover tbody tr.budget-group-row:hover {
+  background-color: var(--surface-subheader) !important;
+  filter: brightness(0.97);
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
@@ -425,7 +450,7 @@ body {
 .light-theme .min-h-screen,
 .light-theme main,
 .light-theme [role="main"] {
-  background-color: #e6e7eb !important;
+  background-color: var(--surface-page-bg) !important;
 }
 
 /* Background colors - convert dark to light */
@@ -591,7 +616,7 @@ body {
 .light-theme [style*="--cui-success-bg"],
 .light-theme [style*="--cui-info-bg"],
 .light-theme [style*="--cui-warning-bg"] {
-  background-color: #f1f2f6 !important;
+  background-color: var(--surface-operations-tile) !important;
 }
 
 /* Specific component fixes */

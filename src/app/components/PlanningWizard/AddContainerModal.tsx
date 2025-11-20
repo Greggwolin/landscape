@@ -51,8 +51,8 @@ export function AddContainerModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          container_level: level,
-          parent_container_id: parentId || null,
+          tier: level,
+          parent_division_id: parentId || null,
           container_code: code.trim() || undefined, // Empty = auto-generate
           display_name: name.trim(),
         }),
@@ -104,7 +104,8 @@ export function AddContainerModal({
           </h2>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -167,14 +168,14 @@ export function AddContainerModal({
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+              className="btn btn-secondary btn-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md"
+              className="btn btn-primary btn-sm"
             >
               {isSubmitting ? 'Adding...' : `Add ${levelLabel}`}
             </button>

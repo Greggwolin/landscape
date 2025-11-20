@@ -197,14 +197,14 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
           <div className="flex gap-2">
             <button
               onClick={performDocumentReview}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="btn btn-primary"
             >
               Retry
             </button>
             {onClose && (
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="btn btn-secondary"
               >
                 Close
               </button>
@@ -236,7 +236,8 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
             {onClose && (
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600"
+                className="btn btn-sm btn-ghost-secondary"
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -295,7 +296,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="btn btn-outline-secondary"
                 >
                   Cancel
                 </button>
@@ -303,7 +304,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
               <button
                 onClick={handleConfirmAll}
                 disabled={isUpdating || (stats.confirmed + stats.edited) === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="btn btn-primary d-flex align-items-center gap-2"
               >
                 {isUpdating && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                 Apply Changes ({stats.confirmed + stats.edited})
@@ -504,19 +505,19 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
           <button
             onClick={() => onAction(suggestion.field_name, 'confirmed')}
-            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+            className="btn btn-sm btn-success"
           >
             Confirm
           </button>
           <button
             onClick={() => setShowEditForm(true)}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+            className="btn btn-sm btn-primary"
           >
             Edit
           </button>
           <button
             onClick={() => onAction(suggestion.field_name, 'passed')}
-            className="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
+            className="btn btn-sm btn-warning"
           >
             Pass
           </button>
@@ -527,7 +528,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
           <button
             onClick={() => onAction(suggestion.field_name, 'pending')}
-            className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+            className="btn btn-sm btn-secondary"
           >
             Reset
           </button>
@@ -597,13 +598,13 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
               <div className="flex gap-2">
                 <button
                   onClick={handleAcceptAiRevision}
-                  className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 font-medium"
+                  className="btn btn-sm btn-success"
                 >
                   ✅ Accept AI Revision
                 </button>
                 <button
                   onClick={handleRejectAiRevision}
-                  className="px-4 py-2 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                  className="btn btn-sm btn-secondary"
                 >
                   ❌ Keep My Value
                 </button>
@@ -615,14 +616,14 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
             <button
               onClick={handleAIReanalysis}
               disabled={isReanalyzing || !editNotes.trim()}
-              className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="btn btn-sm btn-info d-flex align-items-center gap-1"
             >
               {isReanalyzing && <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>}
               🤖 Ask AI to Re-analyze
             </button>
             <button
               onClick={handleEdit}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              className="btn btn-sm btn-primary"
             >
               Save Edit
             </button>
@@ -635,7 +636,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
                 setShowAiRevision(false)
                 setAiRevisedSuggestion(null)
               }}
-              className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
+              className="btn btn-sm btn-secondary"
             >
               Cancel
             </button>

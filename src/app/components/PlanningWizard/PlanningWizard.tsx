@@ -190,10 +190,10 @@ const PlanningWizard: React.FC = () => {
     const level3Containers = getContainersByLevel(flatContainers, 3)
 
     const areas: Area[] = level1Containers.map((level1) => {
-      const level2Children = getChildren(flatContainers, level1.container_id)
+      const level2Children = getChildren(flatContainers, level1.division_id)
 
       const phases: Phase[] = level2Children.map((level2) => {
-        const level3Children = getChildren(flatContainers, level2.container_id)
+        const level3Children = getChildren(flatContainers, level2.division_id)
 
         const parcels: Parcel[] = level3Children.map((level3) => {
           // Extract parcel data from container attributes
@@ -206,7 +206,7 @@ const PlanningWizard: React.FC = () => {
           const ffPerAcre = acres > 0 ? frontage / acres : 0
 
           return {
-            id: `parcel-container-${level3.container_id}`,
+            id: `parcel-container-${level3.division_id}`,
             name: level3.display_name,
             landUse: normalizeLandUse(attrs.usecode as string),
             acres,
@@ -216,7 +216,7 @@ const PlanningWizard: React.FC = () => {
             ff_per_acre: ffPerAcre,
             density_gross: densityGross,
             product: (attrs.product as string) ?? '',
-            dbId: level3.container_id, // Use container_id as dbId
+            dbId: level3.division_id, // Use division_id as dbId
             areaNo: level1.sort_order ?? 0,
             phaseNo: level2.sort_order ?? 0,
             landuseCode: (attrs.usecode as string) ?? undefined,
@@ -230,10 +230,10 @@ const PlanningWizard: React.FC = () => {
         })
 
         return {
-          id: `phase-container-${level2.container_id}`,
+          id: `phase-container-${level2.division_id}`,
           name: level2.display_name,
-          phaseDbId: level2.container_id,
-          areaId: `area-container-${level1.container_id}`,
+          phaseDbId: level2.division_id,
+          areaId: `area-container-${level1.division_id}`,
           areaNo: level1.sort_order ?? 0,
           phaseNo: level2.sort_order ?? 0,
           description: (level2.attributes?.description as string) ?? null,
@@ -242,9 +242,9 @@ const PlanningWizard: React.FC = () => {
       })
 
       return {
-        id: `area-container-${level1.container_id}`,
+        id: `area-container-${level1.division_id}`,
         name: level1.display_name,
-        areaDbId: level1.container_id,
+        areaDbId: level1.division_id,
         areaNo: level1.sort_order ?? 0,
         phases,
       } as Area

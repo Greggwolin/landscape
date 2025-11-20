@@ -44,7 +44,7 @@ export function ColumnChooser({
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+            className="btn btn-sm btn-ghost-secondary"
             aria-label="Close"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,13 +145,13 @@ export function ColumnChooser({
                 }
               });
             }}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            className="btn btn-secondary"
           >
             Show All
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            className="btn btn-primary"
           >
             Done
           </button>

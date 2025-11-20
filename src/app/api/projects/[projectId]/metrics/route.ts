@@ -71,9 +71,9 @@ export async function GET(
     const containerMetrics = await sql`
       SELECT
         COUNT(*) as total_containers,
-        COUNT(*) FILTER (WHERE container_level = 1) as areas,
-        COUNT(*) FILTER (WHERE container_level = 2) as phases,
-        COUNT(*) FILTER (WHERE container_level = 3) as parcels
+        COUNT(*) FILTER (WHERE tier = 1) as areas,
+        COUNT(*) FILTER (WHERE tier = 2) as phases,
+        COUNT(*) FILTER (WHERE tier = 3) as parcels
       FROM landscape.tbl_container
       WHERE project_id = ${projectId}
     `;

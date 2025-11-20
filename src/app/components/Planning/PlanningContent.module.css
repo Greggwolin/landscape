@@ -1,0 +1,113 @@
+.badgeBase {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background-color: var(--badge-bg, var(--cui-tertiary-bg));
+  color: var(--badge-color, var(--cui-body-color));
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.familyResidential {
+  --badge-bg: rgba(var(--cui-primary-rgb), 0.15);
+  --badge-color: var(--cui-primary);
+}
+
+.familyCommercial {
+  --badge-bg: rgba(var(--cui-info-rgb), 0.15);
+  --badge-color: var(--cui-info);
+}
+
+.familyIndustrial {
+  --badge-bg: rgba(var(--cui-warning-rgb), 0.15);
+  --badge-color: var(--cui-warning);
+}
+
+.familyDefault {
+  --badge-bg: var(--cui-tertiary-bg);
+  --badge-color: var(--cui-secondary-color);
+}
+
+.phaseBadgePrimary {
+  --badge-bg: rgba(var(--cui-primary-rgb), 0.12);
+  --badge-color: var(--cui-primary);
+}
+
+.phaseBadgeSuccess {
+  --badge-bg: rgba(var(--cui-success-rgb), 0.12);
+  --badge-color: var(--cui-success);
+}
+
+.phaseBadgeWarning {
+  --badge-bg: rgba(var(--cui-warning-rgb), 0.15);
+  --badge-color: var(--cui-warning);
+}
+
+.phaseBadgeDanger {
+  --badge-bg: rgba(var(--cui-danger-rgb), 0.15);
+  --badge-color: var(--cui-danger);
+}
+
+.phaseBadgeInfo {
+  --badge-bg: rgba(var(--cui-info-rgb), 0.15);
+  --badge-color: var(--cui-info);
+}
+
+.phaseBadgeSecondary {
+  --badge-bg: var(--cui-card-bg);
+  --badge-color: var(--cui-secondary-color);
+}
+
+.notesButton {
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notesButtonFilled {
+  background-color: var(--cui-primary);
+  color: var(--text-inverse);
+  border: none;
+}
+
+.notesButtonFilled:hover {
+  opacity: 0.9;
+}
+
+.notesButtonOutline {
+  background-color: transparent;
+  color: var(--cui-primary);
+  border: 1px solid var(--cui-border-color);
+}
+
+.notesButtonOutline:hover {
+  background-color: rgba(var(--cui-primary-rgb), 0.08);
+}
+
+.reportsButton {
+  background-color: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+  border: none;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+}
+
+.reportsButton:hover {
+  opacity: 0.85;
+}

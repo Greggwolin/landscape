@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         COALESCE(p.units_total, 0) as units,
         COALESCE(CAST(p.plan_efficiency AS FLOAT), 0) as efficiency,
         COALESCE(CAST(p.lots_frontfeet AS FLOAT), 0) as frontfeet,
+        COALESCE(CAST(p.lot_width AS FLOAT), 0) as lot_width,
         COALESCE(p.family_name, '') as family_name,
         COALESCE(p.density_code, '') as density_code,
         COALESCE(p.type_code, '') as type_code,

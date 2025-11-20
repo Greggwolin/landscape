@@ -1099,66 +1099,120 @@ def sale_benchmarks(request: Request, project_id: int) -> Response:
             )
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def global_sale_benchmarks(request: Request) -> Response:
     """
     GET: Fetch all global sale benchmarks
+    POST: Create a new project-level sale benchmark
     """
     from .models import SaleBenchmark
 
-    try:
-        # Get all global benchmarks
-        global_benchmarks = SaleBenchmark.objects.filter(
-            scope_level='global',
-            is_active=True
-        ).order_by('benchmark_type')
+    if request.method == 'GET':
+        try:
+            # Get all global benchmarks
+            global_benchmarks = SaleBenchmark.objects.filter(
+                scope_level='global',
+                is_active=True
+            ).order_by('benchmark_type')
 
-        return Response({
-            'benchmarks': [
-                {
-                    'benchmark_id': b.benchmark_id,
-                    'scope_level': b.scope_level,
-                    'benchmark_type': b.benchmark_type,
-                    'benchmark_name': b.benchmark_name,
-                    'rate_pct': float(b.rate_pct) if b.rate_pct else None,
-                    'amount_per_uom': float(b.amount_per_uom) if b.amount_per_uom else None,
-                    'fixed_amount': float(b.fixed_amount) if b.fixed_amount else None,
-                    'uom_code': b.uom_code,
-                    'description': b.description,
-                    'created_at': b.created_at.isoformat() if b.created_at else None,
-                    'updated_at': b.updated_at.isoformat() if b.updated_at else None
-                }
-                for b in global_benchmarks
-            ]
-        }, status=status.HTTP_200_OK)
+            return Response({
+                'benchmarks': [
+                    {
+                        'benchmark_id': b.benchmark_id,
+                        'scope_level': b.scope_level,
+                        'benchmark_type': b.benchmark_type,
+                        'benchmark_name': b.benchmark_name,
+                        'rate_pct': float(b.rate_pct) if b.rate_pct else None,
+                        'amount_per_uom': float(b.amount_per_uom) if b.amount_per_uom else None,
+                        'fixed_amount': float(b.fixed_amount) if b.fixed_amount else None,
+                        'uom_code': b.uom_code,
+                        'basis': b.basis,
+                        'description': b.description,
+                        'created_at': b.created_at.isoformat() if b.created_at else None,
+                        'updated_at': b.updated_at.isoformat() if b.updated_at else None
+                    }
+                    for b in global_benchmarks
+                ]
+            }, status=status.HTTP_200_OK)
 
-    except Exception as e:
-        import traceback
-        print(f"Error in global_sale_benchmarks GET: {str(e)}")
-        print(traceback.format_exc())
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        except Exception as e:
+            import traceback
+            print(f"Error in global_sale_benchmarks GET: {str(e)}")
+            print(traceback.format_exc())
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    elif request.method == 'POST':
+        try:
+            data = request.data
+
+            benchmark = SaleBenchmark.objects.create(
+                scope_level=data.get('scope_level', 'project'),  # Default to project, allow global
+                project_id=None,  # No project association for benchmarks created from global page
+                benchmark_type=data.get('benchmark_type', 'commission'),
+                benchmark_name=data['benchmark_name'],
+                rate_pct=data.get('rate_pct'),
+                amount_per_uom=data.get('amount_per_uom'),
+                fixed_amount=data.get('fixed_amount'),
+                uom_code=data.get('uom_code'),
+                basis=data.get('basis'),  # Percentage calculation basis
+                description=data.get('description'),
+                created_by=request.user.username if request.user.is_authenticated else None
+            )
+
+            return Response({
+                'benchmark_id': benchmark.benchmark_id,
+                'message': 'Benchmark created successfully'
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            import traceback
+            print(f"Error in global_sale_benchmarks POST: {str(e)}")
+            print(traceback.format_exc())
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
-@api_view(['PUT', 'PATCH'])
+@api_view(['PUT', 'PATCH', 'DELETE'])
 @permission_classes([AllowAny])
 def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
     """
     PUT/PATCH: Update a sale benchmark
+    DELETE: Delete a sale benchmark
     """
     from .models import SaleBenchmark
 
     try:
         benchmark = SaleBenchmark.objects.get(benchmark_id=benchmark_id)
 
-        # Update fields
+        if request.method == 'DELETE':
+            # Check if benchmark is used in any projects
+            # For now, we'll do a soft delete by setting is_active = False
+            # This prevents breaking references to this benchmark
+            benchmark.is_active = False
+            benchmark.updated_by = request.user.username if request.user.is_authenticated else None
+            benchmark.save()
+
+            return Response({
+                'success': True,
+                'message': 'Benchmark deleted successfully'
+            }, status=status.HTTP_200_OK)
+
+        # Handle PUT/PATCH - Update fields
         data = request.data
 
         if 'benchmark_name' in data:
             benchmark.benchmark_name = data['benchmark_name']
+        if 'scope_level' in data:
+            # Validate scope_level is valid choice
+            valid_scopes = ['global', 'project', 'product']
+            if data['scope_level'] in valid_scopes:
+                benchmark.scope_level = data['scope_level']
         if 'rate_pct' in data:
             benchmark.rate_pct = data['rate_pct'] if data['rate_pct'] is not None else None
         if 'amount_per_uom' in data:
@@ -1167,6 +1221,8 @@ def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
             benchmark.fixed_amount = data['fixed_amount'] if data['fixed_amount'] is not None else None
         if 'uom_code' in data:
             benchmark.uom_code = data['uom_code']
+        if 'basis' in data:
+            benchmark.basis = data['basis']
         if 'description' in data:
             benchmark.description = data['description']
 

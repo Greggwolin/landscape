@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 
 from .models_benchmarks import (
     CategoryTagLibrary,
-    CategoryLifecycleStage,
+    CategoryActivity,
     UnitCostCategory,
     UnitCostItem,  # Renamed from UnitCostTemplate in migration 0018
     ItemBenchmarkLink,  # Renamed from TemplateBenchmarkLink in migration 0018
@@ -64,28 +64,28 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def perform_update(self, serializer):
-        """Custom update to handle lifecycle_stages many-to-many relationship."""
+        """Custom update to handle activities many-to-many relationship."""
         from django.db import connection
 
         instance = serializer.save()
 
-        # Handle lifecycle_stages update if provided in request data
-        if 'lifecycle_stages' in self.request.data:
-            new_stages = self.request.data.get('lifecycle_stages', [])
+        # Handle activities update if provided in request data
+        if 'activities' in self.request.data:
+            new_stages = self.request.data.get('activities', [])
 
-            # Clear existing lifecycle stages
-            CategoryLifecycleStage.objects.filter(category_id=instance.category_id).delete()
+            # Clear existing activities
+            CategoryActivity.objects.filter(category_id=instance.category_id).delete()
 
-            # Add new lifecycle stages using raw SQL (table has no id column)
+            # Add new activities using raw SQL (table has no id column)
             if new_stages:
                 with connection.cursor() as cursor:
                     for stage in new_stages:
                         cursor.execute(
                             """
-                            INSERT INTO landscape.core_category_lifecycle_stages
-                            (category_id, lifecycle_stage, sort_order, created_at, updated_at)
+                            INSERT INTO landscape.core_category_activitys
+                            (category_id, activity, sort_order, created_at, updated_at)
                             VALUES (%s, %s, 0, NOW(), NOW())
-                            ON CONFLICT (category_id, lifecycle_stage) DO NOTHING
+                            ON CONFLICT (category_id, activity) DO NOTHING
                             """,
                             [instance.category_id, stage]
                         )
@@ -102,16 +102,16 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Apply filters and annotate item counts."""
         qs = super().get_queryset()
-        lifecycle_stage = self.request.query_params.get('lifecycle_stage')
+        activity = self.request.query_params.get('activity')
         tag = self.request.query_params.get('tag')
         parent_id = self.request.query_params.get('parent')
         project_type_code = self.request.query_params.get('project_type_code')
 
         # Filter by lifecycle stage (using pivot table)
-        if lifecycle_stage:
+        if activity:
             qs = qs.filter(
-                category_id__in=CategoryLifecycleStage.objects.filter(
-                    lifecycle_stage=lifecycle_stage
+                category_id__in=CategoryActivity.objects.filter(
+                    activity=activity
                 ).values_list('category_id', flat=True)
             )
 
@@ -141,16 +141,16 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
         Return categories as nested hierarchy.
 
         Query params:
-            ?lifecycle_stage=Development (optional)
+            ?activity=Development (optional)
         """
-        lifecycle_stage = request.query_params.get('lifecycle_stage')
+        activity = request.query_params.get('activity')
 
         queryset = UnitCostCategory.objects.filter(parent__isnull=True, is_active=True)
-        if lifecycle_stage:
+        if activity:
             # Filter by lifecycle stage using pivot table
             queryset = queryset.filter(
-                category_id__in=CategoryLifecycleStage.objects.filter(
-                    lifecycle_stage=lifecycle_stage
+                category_id__in=CategoryActivity.objects.filter(
+                    activity=activity
                 ).values_list('category_id', flat=True)
             )
 
@@ -165,7 +165,7 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
 
         Query params:
             ?tag=Hard (required)
-            ?lifecycle_stage=Development (optional)
+            ?activity=Development (optional)
         """
         tag = request.query_params.get('tag')
         if not tag:
@@ -174,18 +174,18 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        lifecycle_stage = request.query_params.get('lifecycle_stage')
+        activity = request.query_params.get('activity')
 
         queryset = UnitCostCategory.objects.filter(
             tags__contains=[tag],
             is_active=True
         )
 
-        if lifecycle_stage:
+        if activity:
             # Filter by lifecycle stage using pivot table
             queryset = queryset.filter(
-                category_id__in=CategoryLifecycleStage.objects.filter(
-                    lifecycle_stage=lifecycle_stage
+                category_id__in=CategoryActivity.objects.filter(
+                    activity=activity
                 ).values_list('category_id', flat=True)
             )
 
@@ -286,11 +286,11 @@ class UnitCostItemViewSet(viewsets.ModelViewSet):
             qs = qs.filter(category_id=category_id)
 
         # Filter by lifecycle stage (via category pivot table)
-        lifecycle_stage = self.request.query_params.get('lifecycle_stage')
-        if lifecycle_stage:
+        activity = self.request.query_params.get('activity')
+        if activity:
             qs = qs.filter(
-                category_id__in=CategoryLifecycleStage.objects.filter(
-                    lifecycle_stage=lifecycle_stage
+                category_id__in=CategoryActivity.objects.filter(
+                    activity=activity
                 ).values_list('category_id', flat=True)
             )
 

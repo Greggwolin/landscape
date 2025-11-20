@@ -21,19 +21,31 @@
 }
 
 .accordion-header-standard {
-  composes: accordion-header-base;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  transition: background-color 0.2s ease;
   background-color: rgba(var(--cui-warning-rgb), 0.1);
   color: var(--cui-body-color);
 }
 
 .accordion-header-detail {
-  composes: accordion-header-base;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  transition: background-color 0.2s ease;
   background-color: rgba(var(--cui-danger-rgb), 0.1);
   color: var(--cui-body-color);
 }
 
 .accordion-header-neutral {
-  composes: accordion-header-base;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  transition: background-color 0.2s ease;
   background-color: var(--cui-tertiary-bg);
   color: var(--cui-body-color);
 }
@@ -381,4 +393,121 @@ div.planning-tile-active > .planning-tile-header {
 
 .budget-mode-badge-remove:hover {
   background: rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================================================
+   NAVIGATION TILES (Progressive Breadcrumb System)
+   Used in: ProgressiveNavBar, TopNavigationBar
+   Created: 2025-11-18
+
+   Uses 600-weight color pattern for active state (from Operations filters)
+   Reference: OPEX category badges use bg-{color}-600 with text-white
+   ============================================================================ */
+
+.nav-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Active state - 600-weight blue pattern */
+.nav-tile-active {
+  background-color: rgb(37, 99, 235); /* blue-600 */
+  color: white;
+  cursor: default;
+}
+
+.nav-tile-active:hover {
+  background-color: rgb(37, 99, 235); /* blue-600 - no change on hover */
+}
+
+/* Inactive states - gray backgrounds with hover */
+.nav-tile-inactive {
+  background-color: rgb(243, 244, 246); /* gray-100 */
+  color: rgb(55, 65, 81); /* gray-700 */
+}
+
+.nav-tile-inactive:hover {
+  background-color: rgb(229, 231, 235); /* gray-200 */
+}
+
+/* Dark mode inactive states */
+[data-coreui-theme='dark'] .nav-tile-inactive {
+  background-color: rgb(31, 41, 55); /* gray-800 */
+  color: rgb(209, 213, 219); /* gray-300 */
+}
+
+[data-coreui-theme='dark'] .nav-tile-inactive:hover {
+  background-color: rgb(55, 65, 81); /* gray-700 */
+}
+
+/* Mode chip integration within tiles */
+.nav-tile .mode-chip {
+  margin-left: 0.25rem;
+}
+
+/* ============================================================================
+   PROGRESSIVE TILE NAVIGATION SYSTEM
+   Used in: TileNavigationGrid, ProgressiveTile, ProjectTileNavigation
+   Created: 2025-11-18
+
+   Simple CSS transitions for tile subdivision animations.
+   Uses opacity and scale transforms for smooth progressive disclosure.
+   ============================================================================ */
+
+/* Container for tile navigation */
+.tile-navigation-container {
+  transition: all 0.3s ease;
+}
+
+.project-tile-navigation {
+  transition: all 0.3s ease;
+}
+
+/* Individual progressive tiles */
+.progressive-tile {
+  transition: all 0.2s ease;
+  will-change: transform, opacity;
+}
+
+.progressive-tile:hover {
+  transform: scale(1.02);
+}
+
+.progressive-tile:active {
+  transform: scale(0.98);
+}
+
+/* Tile grid animation on level change */
+.tile-grid-animate {
+  animation: tileGridFadeIn 0.3s ease-out;
+}
+
+@keyframes tileGridFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Status indicator pulse animation (for in-progress tiles) */
+.progressive-tile .status-indicator-in-progress {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }

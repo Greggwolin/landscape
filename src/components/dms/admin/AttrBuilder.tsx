@@ -180,7 +180,7 @@ export default function AttrBuilder({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              className="btn btn-sm btn-ghost-secondary"
             >
               Cancel
             </button>
@@ -188,7 +188,7 @@ export default function AttrBuilder({
           <button
             onClick={handleSave}
             disabled={isLoading || localAttributes.length === 0}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary btn-sm d-inline-flex align-items-center"
           >
             {isLoading ? (
               <>
@@ -307,7 +307,7 @@ export default function AttrBuilder({
                     <button
                       type="button"
                       onClick={addEnumValue}
-                      className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                      className="btn btn-sm btn-secondary"
                     >
                       Add
                     </button>
@@ -359,7 +359,7 @@ export default function AttrBuilder({
             <button
               type="submit"
               disabled={!isValid}
-              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary w-100 d-inline-flex align-items-center justify-content-center"
             >
               <PlusIcon className="w-4 h-4 mr-2" />
               {editingIndex !== null ? 'Update Attribute' : 'Add Attribute'}
@@ -373,7 +373,7 @@ export default function AttrBuilder({
                   reset();
                   setEnumInput('');
                 }}
-                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                className="btn btn-secondary w-100"
               >
                 Cancel Edit
               </button>
@@ -440,32 +440,36 @@ export default function AttrBuilder({
                       <button
                         onClick={() => moveAttribute(index, index - 1)}
                         disabled={index === 0}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                        className="btn btn-sm btn-ghost-secondary"
                         title="Move up"
+                        aria-label="Move up"
                       >
                         ↑
                       </button>
                       <button
                         onClick={() => moveAttribute(index, index + 1)}
                         disabled={index === localAttributes.length - 1}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                        className="btn btn-sm btn-ghost-secondary"
                         title="Move down"
+                        aria-label="Move down"
                       >
                         ↓
                       </button>
-                      
+
                       <button
                         onClick={() => handleEditAttribute(index)}
-                        className="p-1 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="btn btn-sm btn-ghost-primary"
                         title="Edit attribute"
+                        aria-label="Edit attribute"
                       >
                         <PencilSquareIcon className="w-4 h-4" />
                       </button>
-                      
+
                       <button
                         onClick={() => handleDeleteAttribute(index)}
-                        className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        className="btn btn-sm btn-ghost-danger"
                         title="Delete attribute"
+                        aria-label="Delete attribute"
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>

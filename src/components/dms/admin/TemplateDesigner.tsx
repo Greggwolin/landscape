@@ -253,25 +253,25 @@ export default function TemplateDesigner({
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className="inline-flex items-center px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            className="btn btn-sm btn-ghost-secondary d-inline-flex align-items-center"
           >
             <EyeIcon className="w-4 h-4 mr-1" />
             {previewMode ? 'Edit' : 'Preview'}
           </button>
-          
+
           {onCancel && (
             <button
               onClick={onCancel}
-              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              className="btn btn-sm btn-ghost-secondary"
             >
               Cancel
             </button>
           )}
-          
+
           <button
             onClick={handleSubmit(handleSave)}
             disabled={!isValid || isLoading}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary btn-sm d-inline-flex align-items-center"
           >
             {isLoading ? (
               <>
@@ -399,8 +399,9 @@ export default function TemplateDesigner({
                         
                         <button
                           onClick={() => addAttribute(attr.attr_id)}
-                          className="p-1 text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                          className="btn btn-sm btn-ghost-success"
                           title="Add to template"
+                          aria-label="Add to template"
                         >
                           <PlusIcon className="w-4 h-4" />
                         </button>
@@ -467,24 +468,27 @@ export default function TemplateDesigner({
                             <button
                               onClick={() => moveAttribute(index, index - 1)}
                               disabled={index === 0}
-                              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                              className="btn btn-sm btn-ghost-secondary"
                               title="Move up"
+                              aria-label="Move up"
                             >
                               ↑
                             </button>
                             <button
                               onClick={() => moveAttribute(index, index + 1)}
                               disabled={index === selectedAttributes.length - 1}
-                              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                              className="btn btn-sm btn-ghost-secondary"
                               title="Move down"
+                              aria-label="Move down"
                             >
                               ↓
                             </button>
-                            
+
                             <button
                               onClick={() => removeAttribute(config.attr_id)}
-                              className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              className="btn btn-sm btn-ghost-danger"
                               title="Remove from template"
+                              aria-label="Remove from template"
                             >
                               <TrashIcon className="w-4 h-4" />
                             </button>

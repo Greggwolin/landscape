@@ -64,7 +64,7 @@ export async function POST(
 
     // Get existing columns to determine hierarchy vs data
     const existingColumns = await sql<any[]>`
-      SELECT column_name, column_type, container_level
+      SELECT column_name, column_type, tier
       FROM landscape.tbl_project_inventory_columns
       WHERE project_id = ${id}
     `
@@ -137,25 +137,25 @@ export async function POST(
             ${rowData.status || 'Available'},
             ${rowIndex}
           )
-          RETURNING item_id, container_id
+          RETURNING item_id, division_id
         `
 
         imported.push({
           row: rowIndex + 1,
           item_code,
           item_id: result[0].item_id,
-          container_id: result[0].container_id
+          division_id: result[0].division_id
         })
 
         // Count containers created at each level (trigger auto-creates them)
-        if (result[0].container_id) {
-          const containerLevel = await sql<[{ container_level: number }]>`
-            SELECT container_level
+        if (result[0].division_id) {
+          const tier = await sql<[{ tier: number }]>`
+            SELECT tier
             FROM landscape.tbl_container
-            WHERE container_id = ${result[0].container_id}
+            WHERE division_id = ${result[0].division_id}
           `
-          if (containerLevel.length > 0) {
-            const level = containerLevel[0].container_level
+          if (tier.length > 0) {
+            const level = tier[0].tier
             if (level === 2) containersCreated.level_2++
             if (level === 3) containersCreated.level_3++
             if (level === 4) containersCreated.level_4++
@@ -174,19 +174,19 @@ export async function POST(
     // Get unique container counts (since trigger may reuse existing)
     const containerCounts = await sql<any[]>`
       SELECT
-        container_level,
-        COUNT(DISTINCT container_id) as count
+        tier,
+        COUNT(DISTINCT division_id) as count
       FROM landscape.tbl_container
       WHERE project_id = ${id}
         AND is_active = true
-        AND container_level > 1
-      GROUP BY container_level
-      ORDER BY container_level
+        AND tier > 1
+      GROUP BY tier
+      ORDER BY tier
     `
 
     const finalContainerCounts: Record<string, number> = {}
     containerCounts.forEach(row => {
-      finalContainerCounts[`level_${row.container_level}`] = row.count
+      finalContainerCounts[`level_${row.tier}`] = row.count
     })
 
     return NextResponse.json({

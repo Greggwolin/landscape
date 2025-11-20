@@ -108,7 +108,7 @@ export default function BudgetGridTab({ projectId }: Props) {
   const { phases } = useContainers({ projectId, includeCosts: false });
 
   const projectLevelCount = useMemo(
-    () => rawData.filter(item => !item.container_id).length,
+    () => rawData.filter(item => !item.division_id).length,
     [rawData]
   );
 
@@ -116,24 +116,24 @@ export default function BudgetGridTab({ projectId }: Props) {
   const data = useMemo(() => {
     const containerFilterActive = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
 
-    const containerIds = new Set<number>();
-    selectedAreaIds.forEach(id => containerIds.add(id));
-    selectedPhaseIds.forEach(id => containerIds.add(id));
+    const divisionIds = new Set<number>();
+    selectedAreaIds.forEach(id => divisionIds.add(id));
+    selectedPhaseIds.forEach(id => divisionIds.add(id));
 
     if (selectedAreaIds.length > 0 && selectedPhaseIds.length === 0) {
       phases
         .filter(phase => selectedAreaIds.includes(phase.parent_id!))
-        .forEach(phase => containerIds.add(phase.container_id));
+        .forEach(phase => divisionIds.add(phase.division_id));
     }
 
     return rawData.filter(item => {
-      if (!item.container_id) {
+      if (!item.division_id) {
         return includeProjectLevel;
       }
       if (!containerFilterActive) {
         return true;
       }
-      return containerIds.has(item.container_id);
+      return divisionIds.has(item.division_id);
     });
   }, [rawData, selectedAreaIds, selectedPhaseIds, phases, includeProjectLevel]);
 
@@ -175,7 +175,7 @@ export default function BudgetGridTab({ projectId }: Props) {
 
   const handleAddFromRow = (item: BudgetItem) => {
     openCreateModalWithDefaults({
-      container_id: item.container_id ?? null,
+      division_id: item.division_id ?? null,
       category_l1_id: item.category_l1_id ?? null,
       category_l2_id: item.category_l2_id ?? null,
       category_l3_id: item.category_l3_id ?? null,
@@ -185,7 +185,7 @@ export default function BudgetGridTab({ projectId }: Props) {
 
   const handleGroupAdd = (context: { level: number; pathIds: number[]; pathNames: string[] }) => {
     openCreateModalWithDefaults({
-      container_id: activeContainerContext ?? null,
+      division_id: activeContainerContext ?? null,
       category_l1_id: context.pathIds[0] ?? null,
       category_l2_id: context.pathIds[1] ?? null,
       category_l3_id: context.pathIds[2] ?? null,
@@ -282,7 +282,8 @@ export default function BudgetGridTab({ projectId }: Props) {
       'rate',
       'uom_code',
       'notes',
-      'container_id',
+      'division_id',
+      'activity',
       'start_period',
       'periods_to_complete',
       'start_date',
@@ -373,7 +374,7 @@ export default function BudgetGridTab({ projectId }: Props) {
         category_l2_id: values.category_l2_id ?? null,
         category_l3_id: values.category_l3_id ?? null,
         category_l4_id: values.category_l4_id ?? null,
-        container_id: values.container_id ?? null,
+        division_id: values.division_id ?? null,
         qty: values.qty,
         rate: values.rate,
         amount: values.amount,

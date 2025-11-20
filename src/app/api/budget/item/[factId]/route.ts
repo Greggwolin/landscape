@@ -110,6 +110,7 @@ export async function PUT(
     }
 
     // Fetch the complete updated item with category hierarchy
+    // Phase 4: Removed core_fin_category joins - category_path now comes from view
     const enrichedItem = await sql`
       SELECT
         vbgi.*,
@@ -117,12 +118,12 @@ export async function PUT(
         vbv.variance_amount,
         vbv.variance_percent,
         vbv.variance_status,
-        parent_cat.detail as parent_category_name,
-        parent_cat.code as parent_category_code
+        uc.category_name as parent_category_name,
+        NULL::text as parent_category_code
       FROM landscape.vw_budget_grid_items vbgi
       LEFT JOIN landscape.vw_budget_variance vbv ON vbgi.fact_id = vbv.fact_id
-      LEFT JOIN landscape.core_fin_category parent_cat ON parent_cat.category_id = (
-        SELECT parent_id FROM landscape.core_fin_category WHERE category_id = vbgi.category_id
+      LEFT JOIN landscape.core_unit_cost_category uc ON uc.category_id = (
+        SELECT parent_id FROM landscape.core_unit_cost_category WHERE category_id = vbgi.category_id
       )
       WHERE vbgi.fact_id = ${parseInt(factId)}
     `;

@@ -40,9 +40,12 @@ export async function GET(
   }
 
   try {
-    const [configRow, settingsRow] = await Promise.all([
+    const [configRow, settingsRow, projectRow] = await Promise.all([
       sql<ConfigRow[]>`
-        SELECT project_id, asset_type, level1_label, level2_label, level3_label,
+        SELECT project_id, asset_type,
+               tier_1_label as level1_label,
+               tier_2_label as level2_label,
+               tier_3_label as level3_label,
                land_use_level1_label, land_use_level1_label_plural,
                land_use_level2_label, land_use_level2_label_plural,
                land_use_level3_label, land_use_level3_label_plural,
@@ -57,6 +60,12 @@ export async function GET(
         FROM landscape.tbl_project_settings
         WHERE project_id = ${id}
       `,
+      sql`
+        SELECT planning_efficiency
+        FROM landscape.tbl_project
+        WHERE project_id = ${id}::bigint
+        LIMIT 1
+      `
     ])
 
     const config = configRow[0]
@@ -74,7 +83,11 @@ export async function GET(
         }
       : { ...DEFAULT_SETTINGS, project_id: id }
 
-    return NextResponse.json({ config, settings })
+    return NextResponse.json({
+      config,
+      settings,
+      planningEfficiency: projectRow[0]?.planning_efficiency ?? null
+    })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('Failed to load project configuration', error)

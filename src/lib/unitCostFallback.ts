@@ -21,7 +21,7 @@ type FallbackCategory = {
   parent?: number;
   parent_name?: string;
   category_name: string;
-  lifecycle_stages: string[];
+  activitys: string[];
   tags: string[];
   sort_order: number;
   is_active: boolean;
@@ -205,7 +205,7 @@ async function buildFallbackData(): Promise<FallbackData> {
     categoryMap.set(template.category_id, {
       category_id: template.category_id,
       category_name: template.category_name,
-      lifecycle_stages: ['Development'],
+      activitys: ['Development'],
       tags: resolveTags(template.category_name),
       sort_order: categoryMap.size,
       is_active: true,

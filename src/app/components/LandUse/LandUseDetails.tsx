@@ -154,9 +154,10 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close panel"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -200,8 +201,8 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                           <Home className="w-5 h-5" />
                           Residential Standards
                         </h3>
-                        <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
-                          <Plus className="w-4 h-4 inline mr-1" />
+                        <button className="btn btn-primary btn-sm d-inline-flex align-items-center">
+                          <Plus className="w-4 h-4 me-1" />
                           Add Standard
                         </button>
                       </div>
@@ -260,8 +261,11 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                                     </div>
                                   )}
                                 </div>
-                                <button className="p-1 hover:bg-gray-600 rounded">
-                                  <Edit className="w-4 h-4 text-gray-400" />
+                                <button
+                                  className="btn btn-sm btn-ghost-primary"
+                                  aria-label="Edit residential standard"
+                                >
+                                  <Edit className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
@@ -285,8 +289,8 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                           <Building className="w-5 h-5" />
                           Commercial Standards
                         </h3>
-                        <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
-                          <Plus className="w-4 h-4 inline mr-1" />
+                        <button className="btn btn-primary btn-sm d-inline-flex align-items-center">
+                          <Plus className="w-4 h-4 me-1" />
                           Add Standard
                         </button>
                       </div>
@@ -328,8 +332,11 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                             </div>
                             
                             <div className="flex items-center justify-end">
-                              <button className="p-1 hover:bg-gray-600 rounded">
-                                <Edit className="w-4 h-4 text-gray-400" />
+                              <button
+                                className="btn btn-sm btn-ghost-primary"
+                                aria-label="Edit commercial standard"
+                              >
+                                <Edit className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -350,7 +357,7 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                       <Building className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <div className="text-lg mb-2">No Development Standards</div>
                       <div className="text-sm mb-4">Add development standards to define density, setbacks, and building requirements</div>
-                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+                      <button className="btn btn-primary">
                         Add Development Standard
                       </button>
                     </div>
@@ -362,8 +369,8 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">Lot Products</h3>
-                    <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
-                      <Plus className="w-4 h-4 inline mr-1" />
+                    <button className="btn btn-primary btn-sm d-inline-flex align-items-center">
+                      <Plus className="w-4 h-4 me-1" />
                       Add Product
                     </button>
                   </div>
@@ -374,8 +381,11 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                         <div key={product.product_id} className="bg-gray-700 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-medium text-white">{product.code}</h4>
-                            <button className="p-1 hover:bg-gray-600 rounded">
-                              <Edit className="w-4 h-4 text-gray-400" />
+                            <button
+                              className="btn btn-sm btn-ghost-primary"
+                              aria-label="Edit lot product"
+                            >
+                              <Edit className="w-4 h-4" />
                             </button>
                           </div>
                           
@@ -398,7 +408,7 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                       <Home className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <div className="text-lg mb-2">No Lot Products</div>
                       <div className="text-sm mb-4">Add lot products to define standard lot sizes and configurations</div>
-                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+                      <button className="btn btn-primary">
                         Add Lot Product
                       </button>
                     </div>
@@ -410,8 +420,8 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">Land Use Codes</h3>
-                    <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
-                      <Plus className="w-4 h-4 inline mr-1" />
+                    <button className="btn btn-primary btn-sm d-inline-flex align-items-center">
+                      <Plus className="w-4 h-4 me-1" />
                       Add Code
                     </button>
                   </div>
@@ -439,8 +449,11 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                                 )}
                                 <div className="text-sm text-gray-400">({landuse.landuse_type})</div>
                               </div>
-                              <button className="p-1 hover:bg-gray-600 rounded">
-                                <Edit className="w-4 h-4 text-gray-400" />
+                              <button
+                                className="btn btn-sm btn-ghost-primary"
+                                aria-label="Edit land use code"
+                              >
+                                <Edit className="w-4 h-4" />
                               </button>
                             </div>
                             
@@ -464,7 +477,7 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
                       <Map className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <div className="text-lg mb-2">No Land Use Codes</div>
                       <div className="text-sm mb-4">Add land use codes to define specific uses allowed within this subtype</div>
-                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+                      <button className="btn btn-primary">
                         Add Land Use Code
                       </button>
                     </div>

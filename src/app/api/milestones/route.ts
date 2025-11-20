@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       plannedDate,
       baselineDate,
       currentDate,
-      containerId,
+      divisionId,
       notes,
       createdBy
     } = body;
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
           current_date,
           status,
           percent_complete,
-          container_id,
+          division_id,
           notes,
           created_by
         ) VALUES (
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
           ${current || null},
           'not_started',
           0,
-          ${containerId || null},
+          ${divisionId || null},
           ${notes || null},
           ${createdBy ?? null}
         )

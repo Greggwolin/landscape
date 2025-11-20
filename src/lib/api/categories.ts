@@ -6,7 +6,7 @@ import type {
   UnitCostCategoryReference,
   UnitCostCategoryHierarchy,
   CategoryTag,
-  LifecycleStage,
+  Activity,
 } from '@/types/benchmarks';
 
 const API_BASE = '/api/unit-costs';
@@ -16,7 +16,7 @@ const API_BASE = '/api/unit-costs';
 // =============================================================================
 
 export interface FetchCategoriesParams {
-  lifecycle_stage?: LifecycleStage;
+  activity?: Activity;
   tag?: string;
   parent?: number | 'null';
   project_type_code?: string;
@@ -26,7 +26,7 @@ export async function fetchCategories(
   params?: FetchCategoriesParams
 ): Promise<UnitCostCategoryReference[]> {
   const queryParams = new URLSearchParams();
-  if (params?.lifecycle_stage) queryParams.set('lifecycle_stage', params.lifecycle_stage);
+  if (params?.activity) queryParams.set('activity', params.activity);
   if (params?.tag) queryParams.set('tag', params.tag);
   if (params?.parent !== undefined) queryParams.set('parent', String(params.parent));
   if (params?.project_type_code) queryParams.set('project_type_code', params.project_type_code);
@@ -45,7 +45,7 @@ export async function fetchCategories(
 
 export interface CreateCategoryData {
   category_name: string;
-  lifecycle_stages: LifecycleStage[]; // Categories can belong to multiple lifecycle stages
+  activitys: Activity[]; // Categories can belong to multiple lifecycle stages
   tags: string[];
   parent?: number | null;
   sort_order?: number;
@@ -256,14 +256,14 @@ export function buildCategoryHierarchy(
 
   // First pass: Create map of all categories
   uniqueCategories.forEach((cat) => {
-    // Backward compatibility: handle old API returning lifecycle_stage (singular)
-    const lifecycleStages = cat.lifecycle_stages ||
-      ((cat as any).lifecycle_stage ? [(cat as any).lifecycle_stage] : []);
+    // Backward compatibility: handle old API returning activity (singular)
+    const activitys = cat.activitys ||
+      ((cat as any).activity ? [(cat as any).activity] : []);
 
     categoryMap.set(cat.category_id, {
       category_id: cat.category_id,
       category_name: cat.category_name,
-      lifecycle_stages: lifecycleStages,
+      activitys: activitys,
       tags: cat.tags,
       sort_order: cat.sort_order,
       is_active: cat.is_active,

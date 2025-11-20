@@ -7,10 +7,10 @@ type Params = {
 }
 
 type ContainerRow = {
-  container_id: number
+  division_id: number
   project_id: number
-  parent_container_id: number | null
-  container_level: number
+  parent_division_id: number | null
+  tier: number
   container_code: string
   display_name: string
   sort_order: number | null
@@ -22,10 +22,10 @@ type ContainerRow = {
 
 function buildTree(rows: ContainerRow[]): ContainerNode[] {
   const nodes = rows.map<ContainerNode>((row) => ({
-    container_id: row.container_id,
+    division_id: row.division_id,
     project_id: row.project_id,
-    parent_container_id: row.parent_container_id,
-    container_level: row.container_level as ContainerNode['container_level'],
+    parent_division_id: row.parent_division_id,
+    tier: row.tier as ContainerNode['tier'],
     container_code: row.container_code,
     display_name: row.display_name,
     sort_order: row.sort_order ?? null,
@@ -37,16 +37,16 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   }))
 
   const map = new Map<number, ContainerNode>()
-  nodes.forEach((node) => map.set(node.container_id, node))
+  nodes.forEach((node) => map.set(node.division_id, node))
 
   const roots: ContainerNode[] = []
   const childrenByParent = new Map<number, ContainerNode[]>()
 
   for (const node of nodes) {
-    if (node.parent_container_id) {
-      const siblings = childrenByParent.get(node.parent_container_id) ?? []
+    if (node.parent_division_id) {
+      const siblings = childrenByParent.get(node.parent_division_id) ?? []
       siblings.push(node)
-      childrenByParent.set(node.parent_container_id, siblings)
+      childrenByParent.set(node.parent_division_id, siblings)
     } else {
       roots.push(node)
     }
@@ -58,7 +58,7 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
       siblings.sort((a, b) => {
         const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
         const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
-        return orderA - orderB || a.container_id - b.container_id
+        return orderA - orderB || a.division_id - b.division_id
       })
       parent.children.push(...siblings)
     }
@@ -67,7 +67,7 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   roots.sort((a, b) => {
     const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
     const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
-    return orderA - orderB || a.container_id - b.container_id
+    return orderA - orderB || a.division_id - b.division_id
   })
 
   return roots
@@ -87,10 +87,10 @@ export async function GET(
   try {
     const rows = await sql<ContainerRow[]>`
       SELECT
-        container_id,
+        division_id,
         project_id,
-        parent_container_id,
-        container_level,
+        parent_division_id,
+        tier,
         container_code,
         display_name,
         sort_order,
@@ -100,7 +100,7 @@ export async function GET(
         updated_at
       FROM landscape.tbl_container
       WHERE project_id = ${id}
-      ORDER BY container_level, sort_order NULLS LAST, container_id
+      ORDER BY tier, sort_order NULLS LAST, division_id
     `
 
     const tree = buildTree(rows)

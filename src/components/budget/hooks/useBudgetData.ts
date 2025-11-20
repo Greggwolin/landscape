@@ -62,7 +62,7 @@ export function useBudgetData(projectId: number) {
       category_l3_name: raw.category_l3_name ?? raw.categoryL3Name ?? null,
       category_l4_name: raw.category_l4_name ?? raw.categoryL4Name ?? null,
       category_breadcrumb: raw.category_breadcrumb ?? raw.categoryBreadcrumb ?? null,
-      container_id: raw.container_id !== undefined ? Number(raw.container_id) : raw.containerId ?? null,
+      division_id: raw.division_id !== undefined ? Number(raw.division_id) : raw.divisionId ?? null,
       container_name: raw.container_name ?? raw.containerName ?? null,
       container_display: raw.container_display ?? raw.containerDisplay ?? null,
       project_id:
@@ -120,6 +120,7 @@ export function useBudgetData(projectId: number) {
           : raw.cfStartFlag !== undefined && raw.cfStartFlag !== null
             ? Boolean(raw.cfStartFlag)
             : null,
+      activity: raw.activity ?? raw.activity ?? null,
     };
   }, []);
 
@@ -163,7 +164,8 @@ export function useBudgetData(projectId: number) {
         'periods_to_complete',
         'notes',
         'uom_code',
-        'container_id',
+        'division_id',
+        'activity',
         'vendor_name',
         'escalation_rate',
         'escalation_method',

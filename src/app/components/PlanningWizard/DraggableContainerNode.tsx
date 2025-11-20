@@ -49,7 +49,7 @@ export function DraggableContainerNode({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: container.container_id })
+  } = useSortable({ id: container.division_id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -69,7 +69,7 @@ export function DraggableContainerNode({
     const trimmedName = editedName.trim()
     if (trimmedName && trimmedName !== container.display_name) {
       try {
-        await onEdit(container.container_id, { display_name: trimmedName })
+        await onEdit(container.division_id, { display_name: trimmedName })
       } catch (err) {
         // Error already displayed by onEdit, just revert
         setEditedName(container.display_name)
@@ -80,7 +80,7 @@ export function DraggableContainerNode({
 
   const handleSaveAttributes = async () => {
     try {
-      await onEdit(container.container_id, { attributes: editedAttributes })
+      await onEdit(container.division_id, { attributes: editedAttributes })
       setEditingAttributes(false)
     } catch (err) {
       // Error already displayed by onEdit, just revert
@@ -105,7 +105,7 @@ export function DraggableContainerNode({
     setDeleteError(null)
     setIsDeleting(true)
     try {
-      await onDelete(container.container_id)
+      await onDelete(container.division_id)
       setShowDeleteConfirm(false)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to delete container'
@@ -198,7 +198,7 @@ export function DraggableContainerNode({
             {/* Add Child Button (levels 1 & 2 only) */}
             {level < 3 && (
               <button
-                onClick={() => onAddChild(container.container_id, (level + 1) as 2 | 3)}
+                onClick={() => onAddChild(container.division_id, (level + 1) as 2 | 3)}
                 className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
                 title={`Add ${childLabel}`}
               >
@@ -302,7 +302,7 @@ export function DraggableContainerNode({
         <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
           {container.children!.map((child) => (
             <DraggableContainerNode
-              key={child.container_id}
+              key={child.division_id}
               container={child}
               level={(level + 1) as 2 | 3}
               labels={labels}

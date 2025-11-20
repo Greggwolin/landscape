@@ -7,10 +7,10 @@ type Params = {
 }
 
 type ContainerRow = {
-  container_id: number
+  division_id: number
   project_id: number
-  parent_container_id: number | null
-  container_level: number
+  parent_division_id: number | null
+  tier: number
   container_code: string
   display_name: string
   sort_order: number | null
@@ -22,10 +22,10 @@ type ContainerRow = {
 
 function buildTree(rows: ContainerRow[]): ContainerNode[] {
   const nodes = rows.map<ContainerNode>((row) => ({
-    container_id: Number(row.container_id),
+    division_id: Number(row.division_id),
     project_id: Number(row.project_id),
-    parent_container_id: row.parent_container_id ? Number(row.parent_container_id) : null,
-    container_level: Number(row.container_level) as ContainerNode['container_level'],
+    parent_division_id: row.parent_division_id ? Number(row.parent_division_id) : null,
+    tier: Number(row.tier) as ContainerNode['tier'],
     container_code: row.container_code,
     display_name: row.display_name,
     sort_order: row.sort_order ?? null,
@@ -37,16 +37,16 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   }))
 
   const map = new Map<number, ContainerNode>()
-  nodes.forEach((node) => map.set(node.container_id, node))
+  nodes.forEach((node) => map.set(node.division_id, node))
 
   const roots: ContainerNode[] = []
   const childrenByParent = new Map<number, ContainerNode[]>()
 
   for (const node of nodes) {
-    if (node.parent_container_id) {
-      const siblings = childrenByParent.get(node.parent_container_id) ?? []
+    if (node.parent_division_id) {
+      const siblings = childrenByParent.get(node.parent_division_id) ?? []
       siblings.push(node)
-      childrenByParent.set(node.parent_container_id, siblings)
+      childrenByParent.set(node.parent_division_id, siblings)
     } else {
       roots.push(node)
     }
@@ -58,7 +58,7 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
       siblings.sort((a, b) => {
         const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
         const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
-        return orderA - orderB || a.container_id - b.container_id
+        return orderA - orderB || a.division_id - b.division_id
       })
       parent.children.push(...siblings)
     }
@@ -67,7 +67,7 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
   roots.sort((a, b) => {
     const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
     const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
-    return orderA - orderB || a.container_id - b.container_id
+    return orderA - orderB || a.division_id - b.division_id
   })
 
   return roots
@@ -91,11 +91,11 @@ export async function GET(
     // Step 1: Get all containers with their direct inventory data
     const rows = await sql<ContainerRow[]>`
       SELECT
-        c.container_id,
+        c.division_id,
         c.project_id,
-        c.parent_container_id,
-        c.container_level,
-        c.container_code,
+        c.parent_division_id,
+        c.tier,
+        c.division_code as container_code,
         c.display_name,
         c.sort_order,
         c.is_active,
@@ -116,31 +116,31 @@ export async function GET(
           ELSE
             COALESCE(c.attributes, '{}'::jsonb)
         END as attributes
-      FROM landscape.tbl_container c
-      LEFT JOIN landscape.tbl_inventory_item i ON i.container_id = c.container_id AND i.is_active = true
+      FROM landscape.tbl_division c
+      LEFT JOIN landscape.tbl_inventory_item i ON i.container_id = c.division_id AND i.is_active = true
       LEFT JOIN landscape.lu_family f ON i.family_id = f.family_id
       LEFT JOIN landscape.lu_type t ON i.type_id = t.type_id
       WHERE c.project_id = ${id}
         AND c.is_active = true
-      GROUP BY c.container_id, c.project_id, c.parent_container_id, c.container_level,
-               c.container_code, c.display_name, c.sort_order, c.attributes,
+      GROUP BY c.division_id, c.project_id, c.parent_division_id, c.tier,
+               c.division_code, c.display_name, c.sort_order, c.attributes,
                c.is_active, c.created_at, c.updated_at
-      ORDER BY c.container_level, c.sort_order NULLS LAST, c.container_id
+      ORDER BY c.tier, c.sort_order NULLS LAST, c.division_id
     `
 
     // Step 1.5: Get budget costs if requested
     const costMap: Map<number, number> = new Map()
     if (includeCosts) {
-      const costs = await sql<Array<{ container_id: number; total_cost: number }>>`
+      const costs = await sql<Array<{ division_id: number; total_cost: number }>>`
         SELECT
-          container_id,
+          division_id,
           COALESCE(SUM(amount), 0) as total_cost
         FROM landscape.core_fin_fact_budget
         WHERE project_id = ${id}
-          AND container_id IS NOT NULL
-        GROUP BY container_id
+          AND division_id IS NOT NULL
+        GROUP BY division_id
       `
-      costs.forEach(row => costMap.set(row.container_id, Number(row.total_cost)))
+      costs.forEach(row => costMap.set(row.division_id, Number(row.total_cost)))
     }
 
     // Step 2: Build tree structure
@@ -186,7 +186,7 @@ export async function GET(
 
           // Add cost data if requested
           if (includeCosts) {
-            const directCost = costMap.get(node.container_id) || 0
+            const directCost = costMap.get(node.division_id) || 0
             node.attributes.direct_cost = directCost
             node.attributes.child_cost = totalChildCosts
             node.attributes.total_cost = directCost + totalChildCosts
@@ -194,7 +194,7 @@ export async function GET(
         }
       } else if (includeCosts) {
         // Leaf node - just add direct cost
-        const directCost = costMap.get(node.container_id) || 0
+        const directCost = costMap.get(node.division_id) || 0
         node.attributes = {
           ...(node.attributes || {}),
           direct_cost: directCost,
@@ -232,8 +232,8 @@ export async function POST(
   try {
     const body = await request.json()
     const {
-      container_level,
-      parent_container_id,
+      tier,
+      parent_division_id,
       container_code,
       display_name,
       sort_order,
@@ -255,14 +255,14 @@ export async function POST(
       )
     }
 
-    if (![1, 2, 3].includes(container_level)) {
+    if (![1, 2, 3].includes(tier)) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'container_level must be 1, 2, or 3',
-            details: { field: 'container_level', value: container_level },
+            message: 'tier must be 1, 2, or 3',
+            details: { field: 'tier', value: tier },
           },
         },
         { status: 400 }
@@ -270,14 +270,14 @@ export async function POST(
     }
 
     // Level 1 must not have parent
-    if (container_level === 1 && parent_container_id != null) {
+    if (tier === 1 && parent_division_id != null) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Level 1 containers cannot have a parent',
-            details: { container_level, parent_container_id },
+            details: { tier, parent_division_id },
           },
         },
         { status: 400 }
@@ -285,14 +285,14 @@ export async function POST(
     }
 
     // Level 2/3 must have parent
-    if ((container_level === 2 || container_level === 3) && parent_container_id == null) {
+    if ((tier === 2 || tier === 3) && parent_division_id == null) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: `Level ${container_level} containers must have a parent`,
-            details: { container_level },
+            message: `Level ${tier} containers must have a parent`,
+            details: { tier },
           },
         },
         { status: 400 }
@@ -303,7 +303,7 @@ export async function POST(
     let finalCode = container_code
     if (!finalCode || finalCode.trim().length === 0) {
       const codeResult = await sql<[{ generate_container_code: string }]>`
-        SELECT landscape.generate_container_code(${id}, ${container_level}, ${parent_container_id ?? null})
+        SELECT landscape.generate_container_code(${id}, ${tier}, ${parent_division_id ?? null})
       `
       finalCode = codeResult[0].generate_container_code
     }
@@ -334,13 +334,13 @@ export async function POST(
     }
 
     // If parent provided, validate it exists and is correct level
-    if (parent_container_id != null) {
+    if (parent_division_id != null) {
       const parentCheck = await sql<
-        [{ project_id: number; container_level: number; container_id: number }]
+        [{ project_id: number; tier: number; division_id: number }]
       >`
-        SELECT project_id, container_level, container_id
+        SELECT project_id, tier, division_id
         FROM landscape.tbl_container
-        WHERE container_id = ${parent_container_id}
+        WHERE division_id = ${parent_division_id}
       `
 
       if (parentCheck.length === 0) {
@@ -350,7 +350,7 @@ export async function POST(
             error: {
               code: 'PARENT_NOT_FOUND',
               message: 'Parent container does not exist',
-              details: { parent_container_id },
+              details: { parent_division_id },
             },
           },
           { status: 404 }
@@ -366,7 +366,7 @@ export async function POST(
               code: 'INVALID_PARENT_PROJECT',
               message: 'Parent container belongs to different project',
               details: {
-                parent_container_id,
+                parent_division_id,
                 parent_project_id: parent.project_id,
                 child_project_id: id,
               },
@@ -376,7 +376,7 @@ export async function POST(
         )
       }
 
-      if (parent.container_level !== container_level - 1) {
+      if (parent.tier !== tier - 1) {
         return NextResponse.json(
           {
             success: false,
@@ -384,9 +384,9 @@ export async function POST(
               code: 'INVALID_PARENT_LEVEL',
               message: 'Parent container must be exactly 1 level above',
               details: {
-                container_level,
-                parent_level: parent.container_level,
-                parent_container_id,
+                tier,
+                parent_level: parent.tier,
+                parent_division_id,
               },
             },
           },
@@ -399,8 +399,8 @@ export async function POST(
     const inserted = await sql<ContainerRow[]>`
       INSERT INTO landscape.tbl_container (
         project_id,
-        parent_container_id,
-        container_level,
+        parent_division_id,
+        tier,
         container_code,
         display_name,
         sort_order,
@@ -408,8 +408,8 @@ export async function POST(
         is_active
       ) VALUES (
         ${id},
-        ${parent_container_id ?? null},
-        ${container_level},
+        ${parent_division_id ?? null},
+        ${tier},
         ${finalCode},
         ${display_name},
         ${sort_order ?? null},
@@ -425,10 +425,10 @@ export async function POST(
       {
         success: true,
         data: {
-          container_id: created.container_id,
+          division_id: created.division_id,
           project_id: created.project_id,
-          parent_container_id: created.parent_container_id,
-          container_level: created.container_level,
+          parent_division_id: created.parent_division_id,
+          tier: created.tier,
           container_code: created.container_code,
           display_name: created.display_name,
           sort_order: created.sort_order,

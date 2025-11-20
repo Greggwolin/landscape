@@ -70,7 +70,7 @@ class UnitCostCategorySerializer(serializers.ModelSerializer):
     depth = serializers.IntegerField(read_only=True)
     has_children = serializers.SerializerMethodField()
     item_count = serializers.IntegerField(read_only=True)  # Renamed from template_count
-    lifecycle_stages = serializers.SerializerMethodField()  # NEW: array of stages
+    activities = serializers.SerializerMethodField()  # NEW: array of stages
 
     class Meta:
         model = UnitCostCategory
@@ -79,7 +79,7 @@ class UnitCostCategorySerializer(serializers.ModelSerializer):
             'parent',
             'parent_name',
             'category_name',
-            'lifecycle_stages',  # CHANGED: from lifecycle_stage to lifecycle_stages (array)
+            'activities',  # CHANGED: from lifecycle_stage to activities (array)
             'tags',
             'sort_order',
             'is_active',
@@ -89,14 +89,14 @@ class UnitCostCategorySerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['category_id', 'lifecycle_stages', 'depth', 'has_children', 'item_count', 'created_at', 'updated_at']
+        read_only_fields = ['category_id', 'activities', 'depth', 'has_children', 'item_count', 'created_at', 'updated_at']
 
-    def get_lifecycle_stages(self, obj):
+    def get_activities(self, obj):
         """Get all lifecycle stages this category belongs to."""
-        if hasattr(obj, '_lifecycle_stages'):
+        if hasattr(obj, '_activities'):
             # Use prefetched data if available
-            return obj._lifecycle_stages
-        return obj.get_lifecycle_stages()
+            return obj._activities
+        return obj.get_activities()
 
     def get_has_children(self, obj):
         """Check if category has child categories."""
@@ -115,25 +115,25 @@ class UnitCostCategoryHierarchySerializer(serializers.ModelSerializer):
     """Serializer with nested children for tree display."""
 
     children = serializers.SerializerMethodField()
-    lifecycle_stages = serializers.SerializerMethodField()
+    activities = serializers.SerializerMethodField()
 
     class Meta:
         model = UnitCostCategory
         fields = [
             'category_id',
             'category_name',
-            'lifecycle_stages',
+            'activities',
             'tags',
             'sort_order',
             'is_active',
             'children',
         ]
 
-    def get_lifecycle_stages(self, obj):
+    def get_activities(self, obj):
         """Get all lifecycle stages this category belongs to."""
-        if hasattr(obj, '_lifecycle_stages'):
-            return obj._lifecycle_stages
-        return obj.get_lifecycle_stages()
+        if hasattr(obj, '_activities'):
+            return obj._activities
+        return obj.get_activities()
 
     def get_children(self, obj):
         """Get nested children recursively."""

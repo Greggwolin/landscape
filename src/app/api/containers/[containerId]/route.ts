@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
 type Params = {
-  containerId: string
+  divisionId: string
 }
 
 type ContainerRow = {
-  container_id: number
+  division_id: number
   project_id: number
-  parent_container_id: number | null
-  container_level: number
+  parent_division_id: number | null
+  tier: number
   container_code: string
   display_name: string
   sort_order: number | null
@@ -23,8 +23,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const { containerId } = await params
-  const id = Number(containerId)
+  const { divisionId } = await params
+  const id = Number(divisionId)
 
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid container id' }, { status: 400 })
@@ -37,7 +37,7 @@ export async function PATCH(
     // Check container exists
     const existingCheck = await sql<ContainerRow[]>`
       SELECT * FROM landscape.tbl_container
-      WHERE container_id = ${id}
+      WHERE division_id = ${id}
     `
 
     if (existingCheck.length === 0) {
@@ -62,7 +62,7 @@ export async function PATCH(
         FROM landscape.tbl_container
         WHERE project_id = ${existing.project_id}
           AND container_code = ${container_code}
-          AND container_id != ${id}
+          AND division_id != ${id}
       `
 
       if (duplicateCheck[0].count > 0) {
@@ -128,7 +128,7 @@ export async function PATCH(
         attributes = COALESCE(${attributes ? JSON.stringify(attributes) : null}::jsonb, attributes),
         is_active = COALESCE(${is_active ?? null}, is_active),
         updated_at = CURRENT_TIMESTAMP
-      WHERE container_id = ${id}
+      WHERE division_id = ${id}
       RETURNING *
     `
 
@@ -150,10 +150,10 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       data: {
-        container_id: result.container_id,
+        division_id: result.division_id,
         project_id: result.project_id,
-        parent_container_id: result.parent_container_id,
-        container_level: result.container_level,
+        parent_division_id: result.parent_division_id,
+        tier: result.tier,
         container_code: result.container_code,
         display_name: result.display_name,
         sort_order: result.sort_order,
@@ -185,8 +185,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const { containerId } = await params
-  const id = Number(containerId)
+  const { divisionId } = await params
+  const id = Number(divisionId)
 
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid container id' }, { status: 400 })
@@ -241,7 +241,7 @@ export async function DELETE(
             code: errorCode,
             message: `Cannot delete container: ${deleteCheck.reason}`,
             details: {
-              container_id: id,
+              division_id: id,
               child_count: deleteCheck.child_count,
               budget_count: deleteCheck.budget_count,
               actual_count: deleteCheck.actual_count,
@@ -256,7 +256,7 @@ export async function DELETE(
     const deleted = await sql<ContainerRow[]>`
       UPDATE landscape.tbl_container
       SET is_active = false, updated_at = CURRENT_TIMESTAMP
-      WHERE container_id = ${id}
+      WHERE division_id = ${id}
       RETURNING *
     `
 
@@ -277,7 +277,7 @@ export async function DELETE(
       success: true,
       message: 'Container deleted successfully',
       data: {
-        container_id: id,
+        division_id: id,
         deleted_at: new Date().toISOString(),
       },
     })

@@ -81,6 +81,8 @@ export async function PUT(
     }
     if ('category_l1_id' in updates) {
       await sql`UPDATE landscape.core_fin_fact_budget SET category_l1_id = ${updates.category_l1_id} WHERE fact_id = ${factId}`;
+      // Also update legacy category_id for backward compatibility
+      await sql`UPDATE landscape.core_fin_fact_budget SET category_id = ${updates.category_l1_id} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
     if ('category_l2_id' in updates) {
@@ -95,8 +97,12 @@ export async function PUT(
       await sql`UPDATE landscape.core_fin_fact_budget SET category_l4_id = ${updates.category_l4_id} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
-    if ('container_id' in updates) {
-      await sql`UPDATE landscape.core_fin_fact_budget SET container_id = ${updates.container_id} WHERE fact_id = ${factId}`;
+    if ('division_id' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET division_id = ${updates.division_id} WHERE fact_id = ${factId}`;
+      hasUpdates = true;
+    }
+    if ('activity' in updates) {
+      await sql`UPDATE landscape.core_fin_fact_budget SET activity = ${updates.activity} WHERE fact_id = ${factId}`;
       hasUpdates = true;
     }
     if ('start_period' in updates) {
@@ -135,20 +141,16 @@ export async function PUT(
       );
     }
 
-    // Fetch and return the updated record with category names
+    // Phase 4: Fetch updated record from budget grid view (single-source categories)
     const result = await sql`
       SELECT
-        fb.*,
-        c1.name AS category_l1_name,
-        c2.name AS category_l2_name,
-        c3.name AS category_l3_name,
-        c4.name AS category_l4_name
-      FROM landscape.core_fin_fact_budget fb
-      LEFT JOIN landscape.core_budget_category c1 ON fb.category_l1_id = c1.category_id
-      LEFT JOIN landscape.core_budget_category c2 ON fb.category_l2_id = c2.category_id
-      LEFT JOIN landscape.core_budget_category c3 ON fb.category_l3_id = c3.category_id
-      LEFT JOIN landscape.core_budget_category c4 ON fb.category_l4_id = c4.category_id
-      WHERE fb.fact_id = ${factId}
+        vbgi.*,
+        vbgi.category_path as category_name,
+        NULL::text as category_code,
+        vbgi.category_path as category_detail,
+        vbgi.scope
+      FROM landscape.vw_budget_grid_items vbgi
+      WHERE vbgi.fact_id = ${factId}
     `;
 
     if (!result || result.length === 0) {

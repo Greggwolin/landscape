@@ -10,7 +10,7 @@ export interface UnitCostCategory {
   parent: number | null; // Note: API returns 'parent' not 'parent_id'
   parent_name: string | null;
   category_name: string;
-  lifecycle_stages: string[];
+  activitys: string[];
   tags: string[];
   sort_order: number;
   is_active: boolean;
@@ -38,7 +38,7 @@ interface UseUnitCostCategoriesResult {
   loading: boolean;
   error: Error | null;
   getChildren: (parentId: number | null) => CategoryOption[];
-  getCategoriesByStage: (lifecycleStage: string) => CategoryOption[];
+  getCategoriesByStage: (activity: string) => CategoryOption[];
   getCategoryById: (id: number | null | undefined) => UnitCostCategory | null;
 }
 
@@ -120,7 +120,7 @@ export function useUnitCostCategoriesForBudget(projectTypeCode?: string): UseUni
     return LIFECYCLE_STAGES.map((stage) => {
       // Count top-level categories for this lifecycle stage
       const stageCategories = categories.filter(
-        (cat) => cat.lifecycle_stages.includes(stage.code) && !cat.parent // Changed from parent_id to parent
+        (cat) => cat.activitys.includes(stage.code) && !cat.parent // Changed from parent_id to parent
       );
 
       return {
@@ -134,16 +134,16 @@ export function useUnitCostCategoriesForBudget(projectTypeCode?: string): UseUni
   }, [categories]);
 
   const getCategoriesByStage = useCallback(
-    (lifecycleStage: string): CategoryOption[] => {
-      if (!lifecycleStage) return [];
+    (activity: string): CategoryOption[] => {
+      if (!activity) return [];
 
-      console.log('[getCategoriesByStage] Looking for stage:', lifecycleStage);
+      console.log('[getCategoriesByStage] Looking for stage:', activity);
       console.log('[getCategoriesByStage] Total categories:', categories.length);
 
       // Get top-level categories for this lifecycle stage
       const stageCategories = categories
         .filter((cat) => {
-          const hasStage = cat.lifecycle_stages.includes(lifecycleStage);
+          const hasStage = cat.activitys.includes(activity);
           const isTopLevel = !cat.parent;
           console.log(`  - ${cat.category_name}: hasStage=${hasStage}, isTopLevel=${isTopLevel}, parent=${cat.parent}`);
           return hasStage && isTopLevel;
@@ -160,7 +160,7 @@ export function useUnitCostCategoriesForBudget(projectTypeCode?: string): UseUni
           return a.name.localeCompare(b.name);
         });
 
-      console.log('[getCategoriesByStage] Found', stageCategories.length, 'categories for', lifecycleStage);
+      console.log('[getCategoriesByStage] Found', stageCategories.length, 'categories for', activity);
       return stageCategories;
     },
     [categories]

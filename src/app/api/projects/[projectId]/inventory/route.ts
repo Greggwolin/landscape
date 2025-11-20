@@ -11,7 +11,7 @@ interface InventoryItem {
   property_type: string
   item_code: string
   hierarchy_values: Record<string, any>
-  container_id: number | null
+  division_id: number | null
   data_values: Record<string, any>
   available_date: string | null
   absorption_month: number | null
@@ -38,7 +38,7 @@ interface ColumnConfig {
   column_name: string
   column_label: string
   column_type: 'hierarchy' | 'data'
-  container_level: number | null
+  tier: number | null
   data_type: string | null
   enum_options: any
   is_required: boolean

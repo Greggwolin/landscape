@@ -284,7 +284,7 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
 
         Query params:
         - project_id (required): Project to calculate usage for
-        - lifecycle_stage (optional): Filter to specific lifecycle stage
+        - activity (optional): Filter to specific activity
         - include_unused (optional, default=true): Include categories with 0 usage
 
         Response includes:
@@ -292,7 +292,7 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
         - summary: Aggregate statistics (total categories, used, incomplete, total budget)
         """
         project_id = request.query_params.get('project_id')
-        lifecycle_stage = request.query_params.get('lifecycle_stage')
+        activity = request.query_params.get('activity')
         include_unused = request.query_params.get('include_unused', 'true').lower() == 'true'
 
         if not project_id:
@@ -312,10 +312,10 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
         # Build base queryset - active categories only
         categories = BudgetCategory.objects.filter(is_active=True)
 
-        # Filter by lifecycle stage if specified
-        if lifecycle_stage:
+        # Filter by activity if specified
+        if activity:
             categories = categories.filter(
-                lifecycle_stages__lifecycle_stage=lifecycle_stage
+                lifecycle_stages__activity=activity
             )
 
         # Count usage from budget facts using all 4 level FKs
@@ -361,7 +361,7 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
                 'description': category.description,
                 'icon': category.icon,
                 'color': category.color,
-                'lifecycle_stages': [ls.lifecycle_stage for ls in category.lifecycle_stages.all()],
+                'activities': [ls.activity for ls in category.lifecycle_stages.all()],
                 'usage_count': usage['count'],
                 'budget_amount': float(usage['amount']),
                 'is_incomplete': category.is_incomplete,

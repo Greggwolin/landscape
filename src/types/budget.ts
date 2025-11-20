@@ -1,6 +1,8 @@
 // v2.0 · 2025-11-15 · Complete Budget Field Expansion for ARGUS Parity
 // Comprehensive type definitions for Napkin/Standard/Detail modes
 
+import type { LifecycleStage } from './benchmarks';
+
 export type BudgetMode = 'napkin' | 'standard' | 'detail';
 
 // ============================================================================
@@ -32,8 +34,8 @@ export interface BudgetItem {
   // =========================================================================
   fact_id: number;
   project_id: number;
-  container_id: number | null;
-  scope: string | null; // Derived from container
+  division_id: number | null;
+  scope: string | null; // Derived from division
 
   // =========================================================================
   // CATEGORY HIERARCHY (L1-L4)
@@ -57,10 +59,11 @@ export interface BudgetItem {
   category_breadcrumb?: string; // Full path for display
 
   // =========================================================================
-  // NAPKIN MODE FIELDS (9 fields)
+  // NAPKIN MODE FIELDS (10 fields)
   // These are the core fields visible in simplest mode
   // =========================================================================
   notes: string | null; // Description/line item name
+  activity: LifecycleStage | null; // Cost lifecycle activity (Acquisition, Planning & Engineering, Development, Operations, Disposition, Financing)
   qty: number | null;
   uom_code: string | null;
   rate: number | null;

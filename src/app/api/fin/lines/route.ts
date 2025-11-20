@@ -8,7 +8,7 @@ const parseId = (input: string | null | undefined): number | null => {
   return Number.isFinite(value) ? value : null
 }
 
-const peLevelToContainerLevel = (peLevel: string): number | null => {
+const peLevelToTier = (peLevel: string): number | null => {
   switch (peLevel) {
     case 'project':
       return 0
@@ -25,20 +25,20 @@ const peLevelToContainerLevel = (peLevel: string): number | null => {
 }
 
 async function resolveContainerFromLegacy(peLevel: string, peId: string) {
-  const level = peLevelToContainerLevel(peLevel)
+  const level = peLevelToTier(peLevel)
   if (level === null || level === 0) return null
   const column =
     level === 1 ? 'area_id' : level === 2 ? 'phase_id' : 'parcel_id'
   const [row] = await sql`
-    SELECT container_id, project_id
+    SELECT division_id, project_id
     FROM landscape.tbl_container
-    WHERE container_level = ${level}
+    WHERE tier = ${level}
       AND attributes->>${column} = ${peId}
     LIMIT 1
   `
   if (!row) return null
   return {
-    containerId: Number(row.container_id),
+    divisionId: Number(row.division_id),
     projectId: row.project_id != null ? Number(row.project_id) : null
   }
 }
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const budgetId = parseId(searchParams.get('budget_id'))
-    let containerId = parseId(searchParams.get('container_id'))
+    let divisionId = parseId(searchParams.get('division_id'))
     let projectId = parseId(searchParams.get('project_id'))
     const peLevel = searchParams.get('pe_level')
     const peId = searchParams.get('pe_id')
@@ -59,10 +59,10 @@ export async function GET(request: Request) {
       )
     }
 
-    if (!containerId && peLevel && peId && peLevel !== 'project') {
+    if (!divisionId && peLevel && peId && peLevel !== 'project') {
       const resolved = await resolveContainerFromLegacy(peLevel, peId)
       if (resolved) {
-        containerId = resolved.containerId
+        divisionId = resolved.divisionId
         projectId = projectId ?? resolved.projectId
       }
     }
@@ -74,34 +74,34 @@ export async function GET(request: Request) {
       }
     }
 
-    if (containerId != null && projectId == null) {
+    if (divisionId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE container_id = ${containerId}
+        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${divisionId}
       `
       if (row?.project_id != null) {
         projectId = Number(row.project_id)
       }
     }
 
-    if (containerId == null && projectId == null) {
+    if (divisionId == null && projectId == null) {
       return NextResponse.json(
         {
           error: 'Missing hierarchy information',
-          details: 'Provide container_id or project_id (or legacy pe_level + pe_id)'
+          details: 'Provide division_id or project_id (or legacy pe_level + pe_id)'
         },
         { status: 400 }
       )
     }
 
     const filterForView =
-      containerId != null
-        ? sql`AND v.container_id = ${containerId}`
-        : sql`AND v.container_id IS NULL AND v.project_id = ${projectId}`
+      divisionId != null
+        ? sql`AND v.division_id = ${divisionId}`
+        : sql`AND v.division_id IS NULL AND v.project_id = ${projectId}`
 
     const filterForBase =
-      containerId != null
-        ? sql`AND f.container_id = ${containerId}`
-        : sql`AND f.project_id = ${projectId} AND f.container_id IS NULL`
+      divisionId != null
+        ? sql`AND f.division_id = ${divisionId}`
+        : sql`AND f.project_id = ${projectId} AND f.division_id IS NULL`
 
     let rows:
       | {
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       budget_id,
-      container_id,
+      division_id,
       project_id: projectIdInput,
       pe_level,
       pe_id,
@@ -192,21 +192,21 @@ export async function POST(request: Request) {
         ? projectIdInput
         : null
     let resolvedContainerId =
-      typeof container_id === 'number' && Number.isFinite(container_id)
-        ? container_id
+      typeof division_id === 'number' && Number.isFinite(division_id)
+        ? division_id
         : null
 
     if (!resolvedContainerId && pe_level && pe_id && pe_level !== 'project') {
       const resolved = await resolveContainerFromLegacy(pe_level, pe_id)
       if (resolved) {
-        resolvedContainerId = resolved.containerId
+        resolvedContainerId = resolved.divisionId
         projectId = projectId ?? resolved.projectId
       }
     }
 
     if (resolvedContainerId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE container_id = ${resolvedContainerId}
+        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${resolvedContainerId}
       `
       if (row?.project_id != null) {
         projectId = Number(row.project_id)
@@ -229,7 +229,7 @@ export async function POST(request: Request) {
 
     const rows = await sql`
       INSERT INTO landscape.core_fin_fact_budget
-        (budget_id, container_id, project_id, category_id, uom_code, qty, rate, amount, notes)
+        (budget_id, division_id, project_id, category_id, uom_code, qty, rate, amount, notes)
       VALUES
         (${budget_id}::bigint, ${resolvedContainerId}, ${projectId}, ${category_id}::bigint, ${uom_code}, ${qty ?? 1}, ${rate ?? null}, ${amount ?? null}, ${notes ?? null})
       RETURNING fact_id

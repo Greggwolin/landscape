@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Parcel, Phase, Area, LandUseType } from '../PlanningWizard'
+import { LotProduct, normalizeLotProducts, isResidentialLandUse } from './ParcelDetailCard.utils'
 
 const landUseOptions: { value: LandUseType; label: string; densityRange: string }[] = [
   { value: 'LDR', label: 'Low Density Residential', densityRange: '1-3 units/acre' },
@@ -37,11 +38,6 @@ interface LandUseCode {
   has_programming: boolean
 }
 
-interface ProductType {
-  type_code: string
-  product: string
-}
-
 interface ParcelDetailCardProps {
   parcel: Parcel | null
   phase: Phase | null
@@ -62,6 +58,7 @@ interface ParcelDetailCardProps {
   onClose: () => void
   onDelete?: (areaId: string, phaseId: string, parcelId: string) => void
   onAddParcel?: () => void
+  planningEfficiency?: number | null
 }
 
 const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
@@ -100,8 +97,9 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
   const [selectedFamily, setSelectedFamily] = useState<number | null>(null)
   const [selectedSubtype, setSelectedSubtype] = useState<number | null>(null)
-  const [products, setProducts] = useState<ProductType[]>([])
-  const [selectedSubtypeCode, setSelectedSubtypeCode] = useState<string>('')
+  const [types, setTypes] = useState<{ type_id: number; type_code: string; code: string }[]>([])
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null)
+  const [products, setProducts] = useState<LotProduct[]>([])
 
   // Load land use data
   useEffect(() => {
@@ -145,22 +143,16 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
         const family = landUseData.families.find(f => f.name === parcel.familyName)
         console.log('ParcelDetailCard - Found family:', family)
         if (family) {
-          // Convert family_id to number (database returns strings)
           const familyIdNum = typeof family.family_id === 'string' ? parseInt(family.family_id) : family.family_id
           setSelectedFamily(familyIdNum)
 
           // Then try to set subtype using subtypeName (which is type_code)
           if (parcel.subtypeName && landUseData.subtypes.length > 0) {
             console.log('ParcelDetailCard - Looking up subtype:', parcel.subtypeName, 'for family_id:', family.family_id)
-            // Convert family_id to number for comparison (database returns strings)
-            const familyIdNum = typeof family.family_id === 'string' ? parseInt(family.family_id) : family.family_id
-            console.log('ParcelDetailCard - Available subtypes:', landUseData.subtypes.filter(st => {
-              const stFamilyId = typeof st.family_id === 'string' ? parseInt(st.family_id) : st.family_id
-              return stFamilyId === familyIdNum
-            }))
+            const subtypeFamilyId = typeof family.family_id === 'string' ? parseInt(family.family_id) : family.family_id
             const subtype = landUseData.subtypes.find(st => {
               const stFamilyId = typeof st.family_id === 'string' ? parseInt(st.family_id) : st.family_id
-              return st.code === parcel.subtypeName && stFamilyId === familyIdNum
+              return st.code === parcel.subtypeName && stFamilyId === subtypeFamilyId
             })
             console.log('ParcelDetailCard - Found subtype:', subtype)
             if (subtype) {
@@ -180,33 +172,73 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
           setSelectedFamily(code.family_id)
           setSelectedSubtype(code.subtype_id)
         }
+      } else if ((parcel as any).type_code && landUseData.subtypes.length > 0) {
+        const subtype = landUseData.subtypes.find(st => st.code === (parcel as any).type_code)
+        if (subtype) {
+          const familyIdNum = typeof subtype.family_id === 'string' ? parseInt(subtype.family_id) : subtype.family_id
+          const subtypeIdNum = typeof subtype.subtype_id === 'string' ? parseInt(subtype.subtype_id) : subtype.subtype_id
+          setSelectedFamily(familyIdNum)
+          setSelectedSubtype(subtypeIdNum)
+        }
       }
 
       setHasChanges(false)
     }
   }, [parcel, landUseData.families, landUseData.subtypes, landUseData.codes])
 
-  // Fetch products when subtype changes
+  // Resolve the type_id for the selected subtype
   useEffect(() => {
-    if (selectedSubtype && landUseData.subtypes.length > 0) {
-      const subtype = landUseData.subtypes.find(st => {
-        const stId = typeof st.subtype_id === 'string' ? parseInt(st.subtype_id) : st.subtype_id
-        return stId === selectedSubtype
+    if (!selectedSubtype) {
+      setSelectedTypeId(null)
+      return
+    }
+
+    const subtype = landUseData.subtypes.find(st => {
+      const stId = typeof st.subtype_id === 'string' ? parseInt(st.subtype_id) : st.subtype_id
+      return stId === selectedSubtype
+    })
+
+    if (!subtype) {
+      setSelectedTypeId(null)
+      return
+    }
+
+    const targetCode = (subtype.code ?? '').toUpperCase()
+    const matchingType = types.find(type => {
+      const candidateCode = ((type.code ?? type.type_code) ?? '').toUpperCase()
+      return candidateCode === targetCode
+    })
+
+    if (!matchingType) {
+      setSelectedTypeId(null)
+      return
+    }
+
+    const typeId = typeof matchingType.type_id === 'string'
+      ? parseInt(matchingType.type_id)
+      : matchingType.type_id
+    setSelectedTypeId(typeId)
+  }, [selectedSubtype, landUseData.subtypes, types])
+
+  useEffect(() => {
+    if (!selectedTypeId) {
+      setProducts([])
+      return
+    }
+
+    const controller = new AbortController()
+
+    fetch(`/api/landuse/lot-products/${selectedTypeId}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => setProducts(normalizeLotProducts(data)))
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('ParcelDetailCard - Failed to fetch lot products:', err)
+        }
       })
 
-      if (subtype) {
-        setSelectedSubtypeCode(subtype.code)
-        // Fetch products for this subtype
-        fetch(`/api/landuse/products?subtype_code=${subtype.code}`)
-          .then(res => res.json())
-          .then(data => setProducts(data || []))
-          .catch(err => console.error('Failed to fetch products:', err))
-      }
-    } else {
-      setProducts([])
-      setSelectedSubtypeCode('')
-    }
-  }, [selectedSubtype, landUseData.subtypes])
+    return () => controller.abort()
+  }, [selectedTypeId])
 
   // ESC key handling
   useEffect(() => {
@@ -264,7 +296,12 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
 
   // Calculate density
   const calculateDensity = () => {
-    return formData.acres > 0 ? (formData.units / formData.acres).toFixed(2) : '0'
+    // DUA = units / (acres × planning_efficiency)
+    // This gives density on developable land (after removing ROW, open space, etc.)
+    const efficiency = planningEfficiency ?? 1
+    if (formData.acres <= 0) return '0'
+    const density = formData.units / (formData.acres * efficiency)
+    return Number.isFinite(density) ? density.toFixed(2) : '0'
   }
 
   // Get filtered subtypes based on selected family
@@ -355,6 +392,35 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
       })
     }
   }
+
+  // Fetch land use types for the selected family (needed to resolve type_id)
+  useEffect(() => {
+    if (!selectedFamily) {
+      setTypes([])
+      return
+    }
+
+    let isMounted = true
+
+    fetch(`/api/landuse/types/${selectedFamily}`)
+      .then(res => res.json())
+      .then((data) => {
+        if (!isMounted) return
+        if (!Array.isArray(data)) {
+          console.warn('ParcelDetailCard - Expected array for types, got', data)
+          return
+        }
+        setTypes(data as { type_id: number; type_code: string; code: string }[])
+      })
+      .catch(err => {
+        console.error('ParcelDetailCard - Failed to fetch types for family', selectedFamily, err)
+      })
+
+    return () => { isMounted = false }
+  }, [selectedFamily])
+
+  const isResidentialFamily = selectedFamily === 1
+  const showUnitsField = isResidentialFamily || isResidentialLandUse(formData.landUse)
 
   if (!parcel || !phase || !area) return null
 
@@ -462,19 +528,19 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Product Type
                   </label>
-                  <select
-                    value={formData.product}
-                    onChange={(e) => handleFormChange('product', e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  >
-                    <option value="">Select Product</option>
-                    {products.map((prod, idx) => (
-                      <option key={idx} value={prod.product}>
-                        {prod.product}
-                      </option>
-                    ))}
-                    <option value="__custom__">+ Add Custom...</option>
-                  </select>
+              <select
+                value={formData.product}
+                onChange={(e) => handleFormChange('product', e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">Select Product</option>
+                {products.map((prod) => (
+                  <option key={prod.product_id} value={prod.code}>
+                    {prod.name || prod.code}
+                  </option>
+                ))}
+                <option value="__custom__">+ Add Custom...</option>
+              </select>
                   {formData.product === '__custom__' && (
                     <input
                       type="text"
@@ -488,7 +554,7 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
               )}
 
               {/* Row 4: Acres & Units - SAME ROW, NO SPINNERS */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${showUnitsField ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Acres
@@ -503,25 +569,25 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Units
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.units === 0 ? '' : formData.units}
-                    onChange={(e) => handleFormChange('units', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    disabled={['OS'].includes(formData.landUse)}
-                  />
-                  {/* Density display */}
-                  {formData.acres > 0 && formData.units > 0 && !['C', 'OS'].includes(formData.landUse) && (
-                    <p className="text-gray-400 text-xs mt-1">
-                      Density: {calculateDensity()} units/acre
-                    </p>
-                  )}
-                </div>
+                {showUnitsField && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Units
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.units === 0 ? '' : formData.units}
+                      onChange={(e) => handleFormChange('units', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    {formData.acres > 0 && formData.units > 0 && (
+                      <p className="text-gray-400 text-xs mt-1">
+                        Density: {calculateDensity()} units/acre
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Row 5: Frontage - Only show for SFD products (not TH) */}
@@ -567,11 +633,11 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
                   <div>Phase: {phase.name}</div>
                   <div>Land Use: {formData.landUse}</div>
                   <div>Acres: {formData.acres.toFixed(1)}</div>
-                  <div>Units: {formData.units}</div>
+                  {showUnitsField && <div>Units: {formData.units}</div>}
                   {formData.frontage > 0 && <div>Frontage: {formData.frontage} ft</div>}
                   {formData.product && <div>Product: {formData.product}</div>}
                   {/* Status removed */}
-                  {formData.acres && formData.units && !['C', 'OS'].includes(formData.landUse) && (
+                  {showUnitsField && formData.acres && formData.units && (
                     <div>Density: {calculateDensity()} units/acre</div>
                   )}
                 </div>

@@ -40,6 +40,7 @@ interface IssueLogEntry {
   metadata: Record<string, unknown>;
   createdAt: string;
   resolvedAt: string | null;
+  isOpen?: boolean;
 }
 
 const OFFLINE_QUEUE_KEY = 'devIssueOfflineQueue';
@@ -65,6 +66,7 @@ function readOfflineIssues(): IssueLogEntry[] {
       metadata: issue.metadata ?? { source: 'offline-cache' },
       createdAt: issue.createdAt ?? new Date().toISOString(),
       resolvedAt: issue.resolvedAt ?? null,
+      isOpen: issue.isOpen !== false,
     }));
   } catch (error) {
     console.error('Failed to read offline issues', error);
@@ -78,7 +80,7 @@ const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
     issueType: 'bug',
     title: 'Parcel map filters reset on save',
     description:
-      'When saving edits on Planning Overview, the parcel map filter chips reset to default and remove the developer’s selected scope. Preserve the filters after save.',
+      "When saving edits on Planning Overview, the parcel map filter chips reset to default and remove the developer's selected scope. Preserve the filters after save.",
     pagePath: '/planning/overview',
     componentPath: 'PlanningOverviewFilters',
     branch: 'local-sample',
@@ -88,6 +90,7 @@ const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
     metadata: { source: 'local-sample' },
     createdAt: '2025-01-05T14:20:00.000Z',
     resolvedAt: null,
+    isOpen: true,
   },
   {
     issueId: 9002,
@@ -104,6 +107,7 @@ const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
     metadata: { source: 'local-sample' },
     createdAt: '2025-01-05T15:05:00.000Z',
     resolvedAt: null,
+    isOpen: true,
   },
   {
     issueId: 9003,
@@ -120,6 +124,7 @@ const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
     metadata: { source: 'local-sample' },
     createdAt: '2025-01-05T16:12:00.000Z',
     resolvedAt: null,
+    isOpen: true,
   },
   {
     issueId: 9004,
@@ -136,6 +141,24 @@ const LOCAL_SAMPLE_ISSUES: IssueLogEntry[] = [
     metadata: { source: 'local-sample' },
     createdAt: '2025-01-05T17:00:00.000Z',
     resolvedAt: null,
+    isOpen: true,
+  },
+  {
+    issueId: 9010,
+    issueType: 'bug',
+    title: 'Reapply Planning density work',
+    description:
+      'The per-project planning efficiency + DUA column changes were reverted. Keep this as a pending dev-status issue so we know it still needs reapplying.',
+    pagePath: '/planning/overview',
+    componentPath: 'PlanningContent',
+    branch: 'local-sample',
+    commitSha: null,
+    reporterName: 'Local Dev',
+    reporterEmail: 'dev@landscape.dev',
+    metadata: { source: 'pending-dev-status' },
+    createdAt: '2025-01-06T00:00:00.000Z',
+    resolvedAt: '2025-01-06T00:00:00.000Z',
+    isOpen: false,
   },
 ];
 
@@ -486,6 +509,7 @@ const DevStatus: React.FC = () => {
         ? (payload.issues as IssueLogEntry[]).map((issue) => ({
             ...issue,
             metadata: issue.metadata ?? {},
+            isOpen: issue.isOpen !== false,
           }))
         : [];
       if (signal?.aborted) {
@@ -550,6 +574,24 @@ const DevStatus: React.FC = () => {
 
   const handleIssueRefresh = () => {
     fetchIssueLogs(activeIssueFilter ? activeIssueFilter : undefined);
+  };
+
+  const toggleIssueStatus = (issueId: number) => {
+    setIssueLogs(prevLogs => {
+      const updatedLogs = prevLogs.map(issue =>
+        issue.issueId === issueId
+          ? { ...issue, isOpen: issue.isOpen === false ? true : false }
+          : issue
+      );
+
+      // Sort: open issues first, closed issues last
+      return updatedLogs.sort((a, b) => {
+        const aOpen = a.isOpen !== false;
+        const bOpen = b.isOpen !== false;
+        if (aOpen === bOpen) return 0;
+        return aOpen ? -1 : 1;
+      });
+    });
   };
 
   const issuesForSummary = activeIssueFilter ? baselineIssueLogs : issueLogs;
@@ -776,56 +818,58 @@ const DevStatus: React.FC = () => {
                     <table className="w-full text-left">
                       <thead className="bg-gray-900 text-xs uppercase tracking-wide text-gray-400">
                         <tr>
-                          <th className="px-4 py-3">Issue</th>
+                          <th className="px-4 py-3 w-20">Status</th>
                           <th className="px-4 py-3">Details</th>
                           <th className="px-4 py-3">Page</th>
                           <th className="px-4 py-3">Component</th>
-                          <th className="px-4 py-3">Reporter</th>
                           <th className="px-4 py-3">Created</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-800">
-                        {issueLogs.map((issue) => (
-                          <tr key={issue.issueId} className="hover:bg-gray-900/60">
-                            <td className="px-4 py-3 align-top">
-                              <div className="text-white font-semibold">#{issue.issueId}</div>
-                              <span
-                                className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ISSUE_BADGE_CLASSES[issue.issueType]}`}
-                              >
-                                {issue.issueType.charAt(0).toUpperCase() + issue.issueType.slice(1)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <div className="text-white font-medium">
-                                {issue.title?.trim() || issue.description.slice(0, 80)}
-                                {issue.title ? '' : issue.description.length > 80 ? '…' : ''}
-                              </div>
-                              <p className="mt-1 text-xs text-gray-400">
-                                {issue.description.length > 160 ? `${issue.description.slice(0, 160)}…` : issue.description}
-                              </p>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <div className="text-sm text-gray-100">{issue.pagePath ?? '—'}</div>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <div className="text-sm text-gray-100">{issue.componentPath ?? '—'}</div>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <div className="text-sm text-gray-100">
-                                {issue.reporterName || issue.reporterEmail || '—'}
-                              </div>
-                              {issue.reporterName && issue.reporterEmail && (
-                                <div className="text-xs text-gray-400">{issue.reporterEmail}</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 align-top text-sm text-gray-300">
-                              {new Date(issue.createdAt).toLocaleString(undefined, {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}
-                            </td>
-                          </tr>
-                        ))}
+                        {issueLogs.map((issue) => {
+                          const isOpen = issue.isOpen !== false;
+                          return (
+                            <tr key={issue.issueId} className="hover:bg-gray-900/60">
+                              <td className="px-4 py-3 align-top">
+                                <button
+                                  onClick={() => toggleIssueStatus(issue.issueId)}
+                                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                                    isOpen
+                                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                                      : 'bg-green-600 hover:bg-green-700 text-white'
+                                  }`}
+                                >
+                                  {isOpen ? 'Open' : 'Closed'}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="flex items-start gap-2 mb-2">
+                                  <span className="text-xs text-gray-500">#{issue.issueId}</span>
+                                </div>
+                                {issue.title?.trim() && (
+                                  <div className="text-white font-medium mb-1">
+                                    {issue.title}
+                                  </div>
+                                )}
+                                <p className="text-xs text-gray-400">
+                                  {issue.description.length > 160 ? `${issue.description.slice(0, 160)}…` : issue.description}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="text-sm text-gray-100">{issue.pagePath ?? '—'}</div>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="text-sm text-gray-100">{issue.componentPath ?? '—'}</div>
+                              </td>
+                              <td className="px-4 py-3 align-top text-sm text-gray-300">
+                                {new Date(issue.createdAt).toLocaleString(undefined, {
+                                  dateStyle: 'short',
+                                  timeStyle: 'short',
+                                })}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

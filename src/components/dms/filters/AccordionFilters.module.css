@@ -1,0 +1,37 @@
+.filterIconButton {
+  width: 52px;
+  height: 52px;
+  border-radius: 0.75rem;
+  background-color: var(--cui-card-bg);
+  color: var(--filter-icon-color, var(--cui-primary));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.filterIconButtonActive {
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+}
+
+.filterNameButton {
+  min-height: 56px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  font-size: 1.125rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  flex: 1;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.filterNameButtonActive {
+  background-color: rgba(var(--cui-primary-rgb), 0.08);
+  color: var(--cui-primary);
+  font-weight: 600;
+}

@@ -460,7 +460,7 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
   const loadCategoriesData = useCallback(async () => {
     try {
       setError(null);
-      const params = new URLSearchParams({ lifecycle_stage: 'Development' });
+      const params = new URLSearchParams({ activity: 'Development' });
       if (projectTypeFilter) {
         params.set('project_type_code', projectTypeFilter);
       }

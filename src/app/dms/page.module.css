@@ -1,0 +1,59 @@
+.tabsBar {
+  border-color: var(--cui-border-color);
+  background-color: var(--cui-card-bg);
+}
+
+.tabButton {
+  border-bottom-width: 2px;
+}
+
+.tabButtonActive {
+  border-bottom-color: var(--cui-primary);
+  color: var(--cui-body-color);
+}
+
+.tabButtonInactive {
+  border-bottom-color: var(--cui-border-color);
+  color: var(--cui-secondary-color);
+}
+
+.documentsPane {
+  background-color: var(--cui-body-bg);
+}
+
+.breadcrumbRow {
+  border-color: var(--cui-border-color);
+  background-color: var(--cui-tertiary-bg);
+}
+
+.toolbarRow {
+  border-color: var(--cui-border-color);
+  background-color: var(--cui-tertiary-bg);
+}
+
+.loadingSpinner {
+  border-color: var(--cui-border-color);
+  border-bottom-color: var(--cui-primary);
+}
+
+.noProjectCard {
+  border: 1px solid var(--cui-warning);
+  background-color: rgba(var(--cui-warning-rgb), 0.12);
+}
+
+.noProjectTitle {
+  color: var(--cui-body-color);
+}
+
+.noProjectMessage {
+  color: var(--cui-secondary-color);
+}
+
+.detailBackdrop {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.selectedFileInfo {
+  border: 1px solid var(--cui-border-color);
+  background-color: rgba(var(--cui-info-rgb), 0.12);
+}

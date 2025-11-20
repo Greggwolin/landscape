@@ -29,7 +29,7 @@ export interface BudgetItemFormValues {
   category_l2_id?: number | null;
   category_l3_id?: number | null;
   category_l4_id?: number | null;
-  container_id?: number | null;
+  division_id?: number | null;
   qty: number | null;
   rate: number | null;
   amount: number | null;
@@ -65,7 +65,7 @@ interface FormState {
   category_l2_id: number | null;
   category_l3_id: number | null;
   category_l4_id: number | null;
-  container_id: number | null;
+  division_id: number | null;
   qty: number | null;
   rate: number | null;
   start_date: string;
@@ -119,7 +119,7 @@ const buildStateFromItem = (item?: BudgetItem | null): FormState => ({
   category_l2_id: (item as any)?.category_l2_id ?? null,
   category_l3_id: (item as any)?.category_l3_id ?? null,
   category_l4_id: (item as any)?.category_l4_id ?? null,
-  container_id: item?.container_id ?? null,
+  division_id: item?.division_id ?? null,
   qty: item?.qty ?? null,
   rate: item?.rate ?? null,
   start_date: formatDateInput(item?.start_date ?? null),
@@ -207,7 +207,7 @@ const updateDate = (key: keyof FormState, value: string) => {
       category_l2_id: form.category_l2_id,
       category_l3_id: form.category_l3_id,
       category_l4_id: form.category_l4_id,
-      container_id: form.container_id ?? null,
+      division_id: form.division_id ?? null,
       qty: form.qty,
       rate: form.rate,
       amount: calculatedAmount,
@@ -289,12 +289,12 @@ const updateDate = (key: keyof FormState, value: string) => {
 
             {/* Geographic Container */}
             <CCol md={6}>
-              <CFormLabel htmlFor="containerId">Container ID</CFormLabel>
+              <CFormLabel htmlFor="divisionId">Container ID</CFormLabel>
               <CFormInput
-                id="containerId"
+                id="divisionId"
                 type="number"
-                value={form.container_id ?? ''}
-                onChange={(e) => updateNumber('container_id', e.target.value)}
+                value={form.division_id ?? ''}
+                onChange={(e) => updateNumber('division_id', e.target.value)}
               />
               <small className="text-medium-emphasis">
                 Geographic unit (Project/Area/Phase/Parcel)

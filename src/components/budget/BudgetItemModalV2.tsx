@@ -30,7 +30,7 @@ import './BudgetItemModal.css';
 export interface BudgetItemFormValues {
   fact_id?: number;
   project_id?: number;
-  container_id?: number | null;
+  division_id?: number | null;
   category_l1_id?: number | null;
   category_l2_id?: number | null;
   category_l3_id?: number | null;
@@ -68,10 +68,10 @@ interface BudgetItemModalV2Props {
 }
 
 interface Container {
-  container_id: number;
+  division_id: number;
   display_name: string;
-  container_level: number;
-  parent_container_id: number | null;
+  tier: number;
+  parent_division_id: number | null;
 }
 
 interface ProjectConfig {
@@ -110,8 +110,8 @@ export default function BudgetItemModalV2({
   onDelete,
 }: BudgetItemModalV2Props) {
   // Form state
-  const [containerId, setContainerId] = useState<number | null>(null);
-  const [selectedLifecycleStage, setSelectedLifecycleStage] = useState<string>(''); // e.g., 'Acquisition', 'Development'
+  const [divisionId, setContainerId] = useState<number | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<string>(''); // e.g., 'Acquisition', 'Development'
   const [categoryL1Id, setCategoryL1Id] = useState<number | null>(null);
   const [categoryL2Id, setCategoryL2Id] = useState<number | null>(null);
   const [categoryL3Id, setCategoryL3Id] = useState<number | null>(null);
@@ -152,14 +152,14 @@ export default function BudgetItemModalV2({
 
   // Get L1 categories for the selected lifecycle stage
   const level1Options = useMemo(() => {
-    if (!selectedLifecycleStage) {
+    if (!selectedActivity) {
       console.log('[BudgetItemModalV2] No lifecycle stage selected');
       return [];
     }
-    const options = getCategoriesByStage(selectedLifecycleStage);
-    console.log('[BudgetItemModalV2] level1Options for', selectedLifecycleStage, ':', options);
+    const options = getCategoriesByStage(selectedActivity);
+    console.log('[BudgetItemModalV2] level1Options for', selectedActivity, ':', options);
     return options;
-  }, [selectedLifecycleStage, getCategoriesByStage]);
+  }, [selectedActivity, getCategoriesByStage]);
 
   const level2Options = useMemo(() => getChildren(categoryL1Id ?? null), [getChildren, categoryL1Id]);
   const level3Options = useMemo(() => getChildren(categoryL2Id ?? null), [getChildren, categoryL2Id]);
@@ -210,16 +210,16 @@ export default function BudgetItemModalV2({
 
     // Filter to only Level 1 and Level 2, then sort by level first, then by display name
     return [...containers]
-      .filter(c => c.container_level === 1 || c.container_level === 2)
+      .filter(c => c.tier === 1 || c.tier === 2)
       .sort((a, b) => {
-        if (a.container_level !== b.container_level) {
-          return a.container_level - b.container_level;
+        if (a.tier !== b.tier) {
+          return a.tier - b.tier;
         }
         // Natural sort for names like "1.1", "1.2", "2.1"
         return a.display_name.localeCompare(b.display_name, undefined, { numeric: true });
       })
       .map(container => {
-        const levelLabel = getLevelLabel(container.container_level);
+        const levelLabel = getLevelLabel(container.tier);
         const displayName = container.display_name;
 
         // Check if display_name already contains the level label (case-insensitive)
@@ -233,9 +233,9 @@ export default function BudgetItemModalV2({
           : `${levelLabel} ${displayName}`;
 
         return {
-          container_id: container.container_id,
+          division_id: container.division_id,
           display_name: finalName,
-          level: container.container_level,
+          level: container.tier,
         };
       });
   }, [containers, projectConfig]);
@@ -265,10 +265,10 @@ export default function BudgetItemModalV2({
             const result: Container[] = [];
             const traverse = (node: any) => {
               result.push({
-                container_id: node.container_id,
+                division_id: node.division_id,
                 display_name: node.display_name,
-                container_level: node.container_level,
-                parent_container_id: node.parent_container_id || null,
+                tier: node.tier,
+                parent_division_id: node.parent_division_id || null,
               });
               if (node.children && node.children.length > 0) {
                 node.children.forEach(traverse);
@@ -320,8 +320,8 @@ export default function BudgetItemModalV2({
     if (!open) return;
 
     if (mode === 'edit' && initialItem) {
-      setContainerId(initialItem.container_id ?? null);
-      setProjectScopeSelected(initialItem.container_id === null);
+      setContainerId(initialItem.division_id ?? null);
+      setProjectScopeSelected(initialItem.division_id === null);
       setCategoryL1Id(initialItem.category_l1_id || null);
       setCategoryL2Id(initialItem.category_l2_id || null);
       setCategoryL3Id(initialItem.category_l3_id || null);
@@ -353,11 +353,11 @@ export default function BudgetItemModalV2({
     } else if (mode === 'create') {
       const shouldSelectProjectScope =
         initialFormValues !== undefined &&
-        Object.prototype.hasOwnProperty.call(initialFormValues, 'container_id') &&
-        initialFormValues.container_id === null;
+        Object.prototype.hasOwnProperty.call(initialFormValues, 'division_id') &&
+        initialFormValues.division_id === null;
 
       setProjectScopeSelected(Boolean(shouldSelectProjectScope));
-      setContainerId(initialFormValues?.container_id ?? null);
+      setContainerId(initialFormValues?.division_id ?? null);
       setCategoryL1Id(initialFormValues?.category_l1_id ?? null);
       setCategoryL2Id(initialFormValues?.category_l2_id ?? null);
       setCategoryL3Id(initialFormValues?.category_l3_id ?? null);
@@ -405,12 +405,12 @@ export default function BudgetItemModalV2({
   // Handle save button click
   const handleSave = async () => {
     // Validate required fields
-    const scopeSelected = projectScopeSelected || (containerId !== null && containerId !== undefined);
+    const scopeSelected = projectScopeSelected || (divisionId !== null && divisionId !== undefined);
     if (!scopeSelected) {
       setError('Scope is required');
       return;
     }
-    if (!selectedLifecycleStage) {
+    if (!selectedActivity) {
       setError('Stage (lifecycle) is required');
       return;
     }
@@ -462,7 +462,7 @@ export default function BudgetItemModalV2({
       const values: BudgetItemFormValues = {
         fact_id: initialItem?.fact_id,
         project_id: projectId,
-        container_id: projectScopeSelected ? null : containerId ?? null,
+        division_id: projectScopeSelected ? null : divisionId ?? null,
         category_l1_id: categoryL1Id,
         category_l2_id: categoryL2Id,
         category_l3_id: categoryL3Id,
@@ -517,7 +517,7 @@ export default function BudgetItemModalV2({
               <CFormLabel htmlFor="container">{containerLabel} *</CFormLabel>
               <CFormSelect
                 id="container"
-                value={projectScopeSelected ? 'PROJECT' : (containerId ?? '')}
+                value={projectScopeSelected ? 'PROJECT' : (divisionId ?? '')}
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === 'PROJECT') {
@@ -531,12 +531,12 @@ export default function BudgetItemModalV2({
                     setContainerId(parseInt(value, 10));
                   }
                 }}
-                style={{ color: projectScopeSelected || containerId ? 'inherit' : '#6c757d' }}
+                style={{ color: projectScopeSelected || divisionId ? 'inherit' : '#6c757d' }}
               >
                 <option value="" style={{ color: '#6c757d' }}>Select Scope</option>
                 <option value="PROJECT">Project-Wide</option>
                 {containerOptions.map((opt) => (
-                  <option key={opt.container_id} value={opt.container_id}>
+                  <option key={opt.division_id} value={opt.division_id}>
                     {opt.display_name}
                   </option>
                 ))}
@@ -549,11 +549,11 @@ export default function BudgetItemModalV2({
               <CFormLabel htmlFor="stage">Stage *</CFormLabel>
               <CFormSelect
                 id="stage"
-                value={selectedLifecycleStage}
+                value={selectedActivity}
                 onChange={(e) => {
                   const stage = e.target.value;
                   console.log('[Stage onChange] Selected:', stage);
-                  setSelectedLifecycleStage(stage);
+                  setSelectedActivity(stage);
                   setCategoryL1Id(null);
                   setCategoryL2Id(null);
                   setCategoryL3Id(null);
@@ -587,7 +587,7 @@ export default function BudgetItemModalV2({
                   setCategoryL3Id(null);
                   setCategoryL4Id(null);
                 }}
-                disabled={!selectedLifecycleStage || mode === 'edit'}
+                disabled={!selectedActivity || mode === 'edit'}
                 required
               >
                 <option value="">-- Select Category --</option>

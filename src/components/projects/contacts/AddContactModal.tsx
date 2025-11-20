@@ -97,7 +97,8 @@ export default function AddContactModal({
           <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-500"
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -239,14 +240,14 @@ export default function AddContactModal({
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="btn btn-outline-secondary btn-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="btn btn-primary btn-sm"
             >
               {saving ? 'Adding...' : 'Add Contact'}
             </button>

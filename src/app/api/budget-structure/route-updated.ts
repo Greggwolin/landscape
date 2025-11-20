@@ -26,7 +26,7 @@ export async function GET() {
       LEFT JOIN landscape.core_fin_fact_budget fb
         ON fc.category_id = fb.category_id
         AND fb.project_id = 7
-        AND fb.container_id IS NULL
+        AND fb.division_id IS NULL
         AND fb.budget_id = (
           SELECT budget_id
           FROM landscape.core_fin_budget_version
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         INSERT INTO landscape.core_fin_fact_budget (
           budget_id,
           project_id,
-          container_id,
+          division_id,
           category_id,
           uom_code,
           qty,

@@ -125,7 +125,11 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
         {/* Header */}
         <div className="px-6 py-4 border-b border-line-strong flex items-center justify-between">
           <h2 className="text-xl font-bold">Add New {categoryLabel}</h2>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close modal"
+          >
             <X size={24} />
           </button>
         </div>
@@ -357,14 +361,14 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 bg-surface-card hover:bg-surface-card rounded transition-colors"
+            className="btn btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 disabled:bg-surface-card disabled:cursor-not-allowed rounded transition-colors"
+            className="btn btn-primary"
           >
             {saving ? 'Creating...' : 'Create Benchmark'}
           </button>

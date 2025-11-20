@@ -9,8 +9,10 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
   acquisition: 'Acquisition',
   acquisitions: 'Acquisition',
   due_diligence: 'Acquisition',
+  planning: 'Planning & Engineering',
+  engineering: 'Planning & Engineering',
+  predevelopment: 'Planning & Engineering',
   development: 'Development',
-  predevelopment: 'Development',
   construction: 'Development',
   operations: 'Operations',
   operating: 'Operations',
@@ -22,6 +24,7 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
 };
 const VALID_LIFECYCLE_STAGES = new Set([
   'Acquisition',
+  'Planning & Engineering',
   'Development',
   'Operations',
   'Disposition',
@@ -33,7 +36,7 @@ type CategoryRow = {
   parent?: number;
   parent_name?: string;
   category_name: string;
-  lifecycle_stages: string[];
+  activitys: string[];
   tags: string[];
   sort_order: number;
   is_active: boolean;
@@ -69,14 +72,14 @@ async function fetchCategoriesViaDjango(searchParams: URLSearchParams) {
 }
 
 async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<CategoryRow[]> {
-  const lifecycleStage = searchParams.get('lifecycle_stage') ?? searchParams.get('cost_scope') ?? null;
+  const activity = searchParams.get('activity') ?? searchParams.get('cost_scope') ?? null;
   const tag = searchParams.get('tag') ?? null;
   const parentId = searchParams.get('parent') ?? null;
   const projectTypeCode = searchParams.get('project_type_code') ?? null;
 
   let result: CategoryRow[];
 
-  if (lifecycleStage && !tag && !parentId) {
+  if (activity && !tag && !parentId) {
     // Filter by lifecycle stage using junction table
     const templateCountFilter = projectTypeCode
       ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
@@ -89,16 +92,16 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
         p.category_name as parent_name,
         c.category_name,
         COALESCE(
-          ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+          ARRAY_AGG(DISTINCT cls.activity) FILTER (WHERE cls.activity IS NOT NULL),
           ARRAY[]::varchar[]
-        ) as lifecycle_stages,
+        ) as activitys,
         COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
         c.sort_order,
         c.is_active,
         CAST(COUNT(*) FILTER (WHERE t.is_active = true ${templateCountFilter}) AS INTEGER) AS item_count
       FROM landscape.core_unit_cost_category c
       INNER JOIN landscape.core_category_lifecycle_stages cls
-        ON c.category_id = cls.category_id AND cls.lifecycle_stage = ${lifecycleStage}
+        ON c.category_id = cls.category_id AND cls.activity = ${activity}
       LEFT JOIN landscape.core_unit_cost_category p
         ON p.category_id = c.parent_id
       LEFT JOIN landscape.core_unit_cost_item t
@@ -120,9 +123,9 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
         p.category_name as parent_name,
         c.category_name,
         COALESCE(
-          ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+          ARRAY_AGG(DISTINCT cls.activity) FILTER (WHERE cls.activity IS NOT NULL),
           ARRAY[]::varchar[]
-        ) as lifecycle_stages,
+        ) as activitys,
         COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
         c.sort_order,
         c.is_active,
@@ -156,22 +159,22 @@ export async function GET(request: NextRequest) {
     if (!categoryId || !categoryName) return null;
 
     // Handle both old and new schema
-    let lifecycleStages: string[];
-    if (Array.isArray(entry.lifecycle_stages)) {
-      lifecycleStages = entry.lifecycle_stages;
-    } else if (entry.lifecycle_stage) {
-      lifecycleStages = [entry.lifecycle_stage];
+    let activitys: string[];
+    if (Array.isArray(entry.activitys)) {
+      activitys = entry.activitys;
+    } else if (entry.activity) {
+      activitys = [entry.activity];
     } else if (entry.cost_scope) {
-      // Map old cost_scope to lifecycle_stage
+      // Map old cost_scope to activity
       const scopeMap: Record<string, string> = {
         'development': 'Development',
         'acquisition': 'Acquisition',
         'operations': 'Operations',
         'disposition': 'Disposition',
       };
-      lifecycleStages = [scopeMap[entry.cost_scope.toLowerCase()] || 'Development'];
+      activitys = [scopeMap[entry.cost_scope.toLowerCase()] || 'Development'];
     } else {
-      lifecycleStages = ['Development'];
+      activitys = ['Development'];
     }
 
     const tags = Array.isArray(entry.tags) ? entry.tags : [];
@@ -190,7 +193,7 @@ export async function GET(request: NextRequest) {
       parent,
       parent_name: parentName,
       category_name: categoryName,
-      lifecycle_stages: lifecycleStages,
+      activitys: activitys,
       tags,
       sort_order: sortOrder,
       is_active: isActive,
@@ -252,7 +255,7 @@ export async function PUT(request: NextRequest) {
 
 type CreateCategoryPayload = {
   category_name: string;
-  lifecycle_stages: string[];
+  activitys: string[];
   tags: string[];
   parent: number | null;
   sort_order: number | null;
@@ -268,8 +271,8 @@ function normalizeCreatePayload(raw: any): { data?: CreateCategoryPayload; error
     return { error: 'Category name is required' };
   }
 
-  const lifecycleStages = Array.isArray(raw.lifecycle_stages)
-    ? raw.lifecycle_stages
+  const activitys = Array.isArray(raw.activitys)
+    ? raw.activitys
         .map((value) => (typeof value === 'string' ? value.trim() : ''))
         .map((value) => {
           const key = value.toLowerCase();
@@ -280,7 +283,7 @@ function normalizeCreatePayload(raw: any): { data?: CreateCategoryPayload; error
         .filter((stage) => stage && VALID_LIFECYCLE_STAGES.has(stage))
     : [];
 
-  if (lifecycleStages.length === 0) {
+  if (activitys.length === 0) {
     return { error: 'At least one lifecycle stage is required' };
   }
 
@@ -321,7 +324,7 @@ function normalizeCreatePayload(raw: any): { data?: CreateCategoryPayload; error
   return {
     data: {
       category_name: name,
-      lifecycle_stages: lifecycleStages,
+      activitys: activitys,
       tags,
       parent,
       sort_order,
@@ -340,7 +343,7 @@ async function createCategoryViaDjango(payload: CreateCategoryPayload) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category_name: payload.category_name,
-          lifecycle_stages: payload.lifecycle_stages,
+          activitys: payload.activitys,
           tags: payload.tags,
           parent: payload.parent,
           sort_order:
@@ -413,25 +416,41 @@ async function createCategoryDirect(payload: CreateCategoryPayload) {
       );
     }
 
-    for (const [index, stage] of payload.lifecycle_stages.entries()) {
-      await sql`
-        INSERT INTO landscape.core_category_lifecycle_stages (
-          category_id,
-          lifecycle_stage,
-          sort_order,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${inserted.category_id},
-          ${stage},
-          ${index},
-          NOW(),
-          NOW()
-        )
-        ON CONFLICT (category_id, lifecycle_stage) DO UPDATE
-        SET updated_at = NOW()
-      `;
+    // Insert lifecycle stages
+    if (payload.activitys.length === 0) {
+      console.warn(`Category ${inserted.category_id} created with no lifecycle stages - this should not happen`);
+    }
+
+    for (const [index, stage] of payload.activitys.entries()) {
+      try {
+        await sql`
+          INSERT INTO landscape.core_category_lifecycle_stages (
+            category_id,
+            activity,
+            sort_order,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${inserted.category_id},
+            ${stage},
+            ${index},
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (category_id, activity) DO UPDATE
+          SET updated_at = NOW()
+        `;
+        console.log(`✓ Inserted lifecycle stage: ${stage} for category ${inserted.category_id}`);
+      } catch (stageError) {
+        console.error(`Failed to insert lifecycle stage ${stage}:`, stageError);
+        // Rollback: delete the category we just created
+        await sql`DELETE FROM landscape.core_unit_cost_category WHERE category_id = ${inserted.category_id}`;
+        return NextResponse.json(
+          { error: `Failed to assign lifecycle stage: ${stage}` },
+          { status: 500 }
+        );
+      }
     }
 
     const [complete] = await sql<CategoryRow>`
@@ -441,9 +460,9 @@ async function createCategoryDirect(payload: CreateCategoryPayload) {
         p.category_name as parent_name,
         c.category_name,
         COALESCE(
-          ARRAY_AGG(DISTINCT cls.lifecycle_stage) FILTER (WHERE cls.lifecycle_stage IS NOT NULL),
+          ARRAY_AGG(DISTINCT cls.activity) FILTER (WHERE cls.activity IS NOT NULL),
           ARRAY[]::varchar[]
-        ) as lifecycle_stages,
+        ) as activitys,
         COALESCE(c.tags::jsonb, '[]'::jsonb) as tags,
         c.sort_order,
         c.is_active,

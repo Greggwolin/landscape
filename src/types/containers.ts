@@ -1,11 +1,13 @@
-export type ContainerLevel = 1 | 2 | 3
+export type Tier = 0 | 1 | 2 | 3
+// Backward compatibility alias - will be removed in future version
+export type ContainerLevel = Tier
 
-export interface Container {
-  container_id: number
+export interface Division {
+  division_id: number
   project_id: number
-  parent_container_id: number | null
-  container_level: ContainerLevel
-  container_code: string
+  parent_division_id: number | null
+  tier: Tier
+  division_code: string
   display_name: string
   sort_order: number | null
   attributes?: Record<string, unknown> | null
@@ -14,16 +16,23 @@ export interface Container {
   updated_at?: string
 }
 
-export interface ContainerNode extends Container {
-  children: ContainerNode[]
+// Backward compatibility alias - will be removed in future version
+export type Container = Division
+
+export interface DivisionNode extends Division {
+  children: DivisionNode[]
 }
+
+// Backward compatibility alias - will be removed in future version
+export type ContainerNode = DivisionNode
 
 export interface ProjectConfig {
   project_id: number
   asset_type: string
-  level1_label: string
-  level2_label: string
-  level3_label: string
+  tier_0_label?: string
+  tier_1_label: string
+  tier_2_label: string
+  tier_3_label: string
   land_use_level1_label?: string
   land_use_level1_label_plural?: string
   land_use_level2_label?: string
@@ -74,7 +83,7 @@ export interface BudgetTag {
 export interface EnhancedBudgetFact {
   fact_id: number
   budget_id?: number
-  container_id: number | null
+  division_id: number | null
   category_id?: number
   amount: number
   confidence_level?: ConfidenceLevel | null
@@ -90,7 +99,7 @@ export interface EnhancedBudgetFact {
 
 export interface ActualFact {
   fact_id: number
-  container_id: number | null
+  division_id: number | null
   amount: number
   tags?: BudgetTag[]
 }

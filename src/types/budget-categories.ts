@@ -115,7 +115,7 @@ export interface CategoryHierarchyConfig {
 export interface BudgetItemWithCategories {
   fact_id: number;
   project_id: number;
-  container_id: number | null;
+  division_id: number | null;
 
   // Category hierarchy (foreign keys)
   category_l1_id: number | null;

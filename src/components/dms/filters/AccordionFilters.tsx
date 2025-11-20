@@ -13,6 +13,8 @@ export interface FilterAccordion {
   documents?: DMSDocument[];
 }
 
+import styles from './AccordionFilters.module.css';
+
 interface AccordionFiltersProps {
   projectId: number;
   filters: FilterAccordion[];
@@ -31,8 +33,7 @@ export default function AccordionFilters({
 }: AccordionFiltersProps) {
   const headerStyle: React.CSSProperties = {
     backgroundColor: 'var(--cui-card-bg)',
-    color: 'var(--cui-body-color)',
-    borderColor: 'var(--cui-border-color)'
+    color: 'var(--cui-body-color)'
   };
 
   const mutedTextStyle: React.CSSProperties = {
@@ -60,13 +61,11 @@ export default function AccordionFilters({
     <div className="divide-y" style={{ borderColor: 'var(--cui-border-color)' }}>
       {filters.map((filter) => {
         const isActive = activeFilter === filter.doc_type;
-        const headerDynamicStyle: React.CSSProperties = isActive
-          ? {
-              ...headerStyle,
-              backgroundColor: 'var(--cui-primary-bg)',
-              borderColor: 'var(--cui-primary)'
-            }
-          : headerStyle;
+        const headerDynamicStyle: React.CSSProperties = {
+          ...headerStyle,
+          backgroundColor: isActive ? 'var(--cui-primary-bg)' : headerStyle.backgroundColor,
+          borderBottomColor: isActive ? 'var(--cui-primary)' : 'var(--cui-border-color)'
+        };
         const nameStyle: React.CSSProperties = isActive
           ? {
               ...rowStyle,
@@ -79,17 +78,19 @@ export default function AccordionFilters({
           <div key={filter.doc_type} style={{ backgroundColor: 'var(--cui-body-bg)' }}>
             {/* Accordion Header Row */}
             <div
-            className="flex items-center gap-3 px-6 py-3 transition-colors"
-            style={{
-              ...headerDynamicStyle,
-              borderBottom: '1px solid var(--cui-border-color)'
-            }}
-          >
-            {/* Chevron - Click to expand/collapse */}
-            <button
-              onClick={() => onExpand(filter.doc_type)}
-              className="w-4 flex-shrink-0 transition-colors"
-              style={mutedTextStyle}
+              className="flex items-center gap-3 px-6 py-3 transition-colors"
+              style={{
+                ...headerDynamicStyle,
+                borderBottomWidth: '1px',
+                borderBottomStyle: 'solid',
+                borderBottomColor: headerDynamicStyle.borderBottomColor ?? 'var(--cui-border-color)'
+              }}
+            >
+              {/* Chevron - Click to expand/collapse */}
+              <button
+                onClick={() => onExpand(filter.doc_type)}
+                className="w-4 flex-shrink-0 transition-colors"
+                style={mutedTextStyle}
               aria-label={filter.is_expanded ? 'Collapse' : 'Expand'}
             >
               {filter.is_expanded ? '▾' : '▸'}
@@ -98,16 +99,16 @@ export default function AccordionFilters({
             {/* Folder Icon - Click to open filter detail view */}
             <button
               onClick={() => onFilterClick(filter.doc_type)}
-              className="flex-shrink-0 hover:scale-110 transition-transform"
+              className={`${styles.filterIconButton} ${filter.is_expanded ? styles.filterIconButtonActive : ''}`}
               aria-label={`Open ${filter.doc_type} filter`}
             >
-              <CIcon icon={cilFilterSquare} className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} />
+              <CIcon icon={cilFilterSquare} className="w-6 h-6" />
             </button>
 
             {/* Filter Name - Click to open filter detail view */}
             <button
               onClick={() => onFilterClick(filter.doc_type)}
-              className="font-medium flex-1 text-left transition-colors"
+              className={`${styles.filterNameButton} ${isActive ? styles.filterNameButtonActive : ''}`}
               style={nameStyle}
               aria-current={isActive ? 'true' : undefined}
             >
@@ -120,7 +121,7 @@ export default function AccordionFilters({
             </span>
 
             {/* Edit Link */}
-            <button className="text-sm hover:underline" style={{ color: 'var(--cui-primary)' }}>
+            <button className="text-sm hover:underline" style={{ color: 'var(--cui-body-color)' }}>
               Edit
             </button>
           </div>

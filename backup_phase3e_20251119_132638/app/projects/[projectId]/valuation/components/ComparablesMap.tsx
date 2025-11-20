@@ -1,0 +1,332 @@
+/**
+ * ComparablesMap Component
+ *
+ * Displays comparable properties on a map with markers
+ */
+
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import type { SalesComparable } from '@/types/valuation';
+
+interface ComparablesMapProps {
+  comparables: SalesComparable[];
+  subjectProperty?: {
+    latitude: number;
+    longitude: number;
+    name: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    units?: number;
+    sale_price?: number;
+    year_built?: number;
+  };
+  height?: string;
+  className?: string;
+}
+
+export function ComparablesMap({
+  comparables,
+  subjectProperty,
+  height = '500px',
+  className = ''
+}: ComparablesMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const markers = useRef<maplibregl.Marker[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    // Clean up existing map
+    if (map.current) {
+      markers.current.forEach(marker => marker.remove());
+      markers.current = [];
+      map.current.remove();
+      map.current = null;
+    }
+
+    // Filter comparables with valid coordinates
+    const validComps = comparables.filter(comp =>
+      comp.latitude !== null &&
+      comp.longitude !== null &&
+      !isNaN(Number(comp.latitude)) &&
+      !isNaN(Number(comp.longitude))
+    );
+
+    if (validComps.length === 0 && !subjectProperty) {
+      setError('No location data available for comparables');
+      return;
+    }
+
+    try {
+      // Calculate bounds to fit all markers
+      const bounds = new maplibregl.LngLatBounds();
+
+      if (subjectProperty) {
+        bounds.extend([subjectProperty.longitude, subjectProperty.latitude]);
+      }
+
+      validComps.forEach(comp => {
+        bounds.extend([Number(comp.longitude), Number(comp.latitude)]);
+      });
+
+      // Initialize map with satellite/aerial imagery
+      const newMap = new maplibregl.Map({
+        container: mapContainer.current,
+        style: {
+          version: 8,
+          sources: {
+            'raster-tiles': {
+              type: 'raster',
+              tiles: [
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              ],
+              tileSize: 256,
+              attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            },
+            'labels': {
+              type: 'raster',
+              tiles: [
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+              ],
+              tileSize: 256
+            }
+          },
+          layers: [
+            {
+              id: 'satellite',
+              type: 'raster',
+              source: 'raster-tiles',
+              minzoom: 0,
+              maxzoom: 22
+            },
+            {
+              id: 'labels',
+              type: 'raster',
+              source: 'labels',
+              minzoom: 0,
+              maxzoom: 22
+            }
+          ]
+        },
+        center: bounds.getCenter(),
+        zoom: 11
+      });
+
+      map.current = newMap;
+
+      // Add navigation controls
+      newMap.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      newMap.on('load', () => {
+        // Add subject property marker (red star)
+        if (subjectProperty) {
+          const subjectEl = document.createElement('div');
+          subjectEl.innerHTML = `
+            <div style="
+              width: 32px;
+              height: 32px;
+              background-color: #dc3545;
+              border: 3px solid white;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              color: white;
+              font-size: 18px;
+              cursor: pointer;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">★</div>
+          `;
+
+          const subjectMarker = new maplibregl.Marker({
+            element: subjectEl
+          })
+            .setLngLat([subjectProperty.longitude, subjectProperty.latitude])
+            .setPopup(
+              new maplibregl.Popup({ offset: 25 }).setHTML(
+                `<div style="padding: 8px; min-width: 200px; line-height: 1.3;">
+                  <div style="font-weight: 600; color: #dc3545; margin-bottom: 2px;">Subject Property</div>
+                  <div style="font-size: 0.9em; margin-bottom: 2px;">${subjectProperty.name}</div>
+                  ${subjectProperty.address ? `<div style="font-size: 0.85em; color: #495057;">${subjectProperty.address}</div>` : ''}
+                  ${subjectProperty.city || subjectProperty.state ? `<div style="font-size: 0.85em; color: #495057; margin-bottom: 2px;">${subjectProperty.city || ''}${subjectProperty.city && subjectProperty.state ? ', ' : ''}${subjectProperty.state || ''}</div>` : ''}
+                  ${subjectProperty.units ? `<div style="font-size: 0.85em; color: #495057;">Units: ${subjectProperty.units}</div>` : ''}
+                  ${subjectProperty.sale_price ? `<div style="font-size: 0.85em; color: #495057;">Asking Price: $${Number(subjectProperty.sale_price).toLocaleString()}</div>` : ''}
+                  ${subjectProperty.year_built ? `<div style="font-size: 0.85em; color: #495057;">Year Built: ${subjectProperty.year_built}</div>` : ''}
+                </div>`
+              )
+            )
+            .addTo(newMap);
+          markers.current.push(subjectMarker);
+        }
+
+        // Add comparable markers with numbers
+        validComps.forEach((comp, idx) => {
+          const compEl = document.createElement('div');
+          compEl.innerHTML = `
+            <div style="
+              width: 30px;
+              height: 30px;
+              background-color: #0066cc;
+              border: 2px solid white;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              color: white;
+              font-size: 14px;
+              cursor: pointer;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">${idx + 1}</div>
+          `;
+
+          const marker = new maplibregl.Marker({
+            element: compEl
+          })
+            .setLngLat([Number(comp.longitude), Number(comp.latitude)])
+            .setPopup(
+              new maplibregl.Popup({ offset: 25 }).setHTML(
+                `<div style="padding: 8px; min-width: 200px; line-height: 1.3;">
+                  <div style="font-weight: 600; font-size: 1.1em; color: #0066cc; margin-bottom: 2px;">Comp ${idx + 1} - ${comp.property_name || 'Unnamed'}</div>
+                  <div style="font-size: 0.85em; color: #495057;">
+                    ${comp.address || ''}
+                  </div>
+                  <div style="font-size: 0.85em; color: #495057; margin-bottom: 2px;">
+                    ${comp.city || ''}${comp.city && comp.state ? ', ' : ''}${comp.state || ''}
+                  </div>
+                  ${comp.sale_price ? `<div style="font-size: 0.85em; color: #495057;">Sale Price: $${Number(comp.sale_price).toLocaleString()}</div>` : ''}
+                  ${comp.price_per_unit ? `<div style="font-size: 0.85em; color: #495057;">Price/Unit: $${Math.round(Number(comp.price_per_unit)).toLocaleString()}</div>` : ''}
+                  ${comp.units ? `<div style="font-size: 0.85em; color: #495057;">Units: ${comp.units}</div>` : ''}
+                  ${comp.year_built ? `<div style="font-size: 0.85em; color: #495057;">Year Built: ${comp.year_built}</div>` : ''}
+                </div>`
+              )
+            )
+            .addTo(newMap);
+          markers.current.push(marker);
+        });
+
+        // Center on subject property and fit all comps in view
+        if (subjectProperty) {
+          // Set center to subject property first
+          newMap.setCenter([subjectProperty.longitude, subjectProperty.latitude]);
+
+          // Then fit bounds to show all markers
+          if (validComps.length > 0) {
+            newMap.fitBounds(bounds, {
+              padding: { top: 60, bottom: 60, left: 60, right: 60 },
+              maxZoom: 13,
+              center: [subjectProperty.longitude, subjectProperty.latitude]
+            });
+          } else {
+            newMap.setZoom(13);
+          }
+        } else if (validComps.length > 0) {
+          newMap.fitBounds(bounds, {
+            padding: { top: 60, bottom: 60, left: 60, right: 60 },
+            maxZoom: 13
+          });
+        }
+      });
+
+    } catch (err) {
+      console.error('Error initializing map:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load map');
+    }
+
+    // Cleanup
+    return () => {
+      if (map.current) {
+        markers.current.forEach(marker => marker.remove());
+        markers.current = [];
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, [comparables, subjectProperty]);
+
+  if (error) {
+    return (
+      <div
+        className={`rounded flex flex-col items-center justify-center ${className}`}
+        style={{
+          height,
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          border: '1px solid var(--cui-border-color)'
+        }}
+      >
+        <div className="text-center p-6">
+          <div className="text-4xl mb-3">🗺️</div>
+          <div className="text-lg font-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>
+            Map Unavailable
+          </div>
+          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`rounded-lg border overflow-hidden flex flex-col ${className}`}
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        borderColor: 'var(--cui-border-color)',
+        height: height
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-4 py-3 border-b flex-shrink-0"
+        style={{
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          borderColor: 'var(--cui-border-color)'
+        }}
+      >
+        <h3
+          className="text-sm font-semibold"
+          style={{ color: 'var(--cui-body-color)' }}
+        >
+          Comparable Locations
+        </h3>
+        <p
+          className="text-xs mt-1"
+          style={{ color: 'var(--cui-secondary-color)' }}
+        >
+          {comparables.filter(c => c.latitude && c.longitude).length} of {comparables.length} comps with location data
+        </p>
+      </div>
+
+      {/* Map Container */}
+      <div
+        ref={mapContainer}
+        className="flex-1"
+        style={{ minHeight: 0 }}
+      />
+
+      {/* Legend */}
+      <div
+        className="px-4 py-2 border-t flex items-center gap-4 text-xs flex-shrink-0"
+        style={{
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          borderColor: 'var(--cui-border-color)'
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#dc3545', borderRadius: '50%' }} />
+          <span style={{ color: 'var(--cui-secondary-color)' }}>Subject Property</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div style={{ width: '12px', height: '12px', backgroundColor: '#0066cc', borderRadius: '50%' }} />
+          <span style={{ color: 'var(--cui-secondary-color)' }}>Comparables</span>
+        </div>
+      </div>
+    </div>
+  );
+}

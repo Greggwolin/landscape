@@ -5,11 +5,11 @@ import type {
   UnitCostCategoryReference,
   UnitCostCategoryHierarchy,
   CategoryTag,
-  LifecycleStage,
+  Activity,
 } from '@/types/benchmarks';
 import { fetchCategories, fetchTags, buildCategoryHierarchy } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
-import LifecycleStageFilter from './LifecycleStageFilter';
+import ActivityFilter from './ActivityFilter';
 import CategoryTree from './CategoryTree';
 import CategoryDetailPanel from './CategoryDetailPanel';
 import AddCategoryModal from './AddCategoryModal';
@@ -17,20 +17,23 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 import MobileWarning from './MobileWarning';
 import './category-taxonomy.css';
 
-const LIFECYCLE_STAGES: LifecycleStage[] = [
+const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
+  'Planning & Engineering',
   'Development',
   'Operations',
   'Disposition',
   'Financing',
 ];
 
-const LIFECYCLE_STAGE_ALIASES: Record<string, LifecycleStage> = {
+const LIFECYCLE_STAGE_ALIASES: Record<string, Activity> = {
   acquisition: 'Acquisition',
   acquisitions: 'Acquisition',
   due_diligence: 'Acquisition',
+  planning: 'Planning & Engineering',
+  engineering: 'Planning & Engineering',
+  predevelopment: 'Planning & Engineering',
   development: 'Development',
-  predevelopment: 'Development',
   construction: 'Development',
   operations: 'Operations',
   operating: 'Operations',
@@ -41,7 +44,7 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, LifecycleStage> = {
   capital: 'Financing',
 };
 
-const normalizeLifecycleStages = (rawStages?: (string | null)[]): LifecycleStage[] => {
+const normalizeActivitys = (rawStages?: (string | null)[]): Activity[] => {
   if (!rawStages || rawStages.length === 0) {
     return ['Development'];
   }
@@ -55,12 +58,12 @@ const normalizeLifecycleStages = (rawStages?: (string | null)[]): LifecycleStage
       if (LIFECYCLE_STAGE_ALIASES[lower]) {
         return LIFECYCLE_STAGE_ALIASES[lower];
       }
-      if (LIFECYCLE_STAGES.includes(trimmed as LifecycleStage)) {
-        return trimmed as LifecycleStage;
+      if (LIFECYCLE_STAGES.includes(trimmed as Activity)) {
+        return trimmed as Activity;
       }
       return null;
     })
-    .filter((stage): stage is LifecycleStage => stage !== null);
+    .filter((stage): stage is Activity => stage !== null);
 
   if (normalized.length === 0) {
     return ['Development'];
@@ -70,17 +73,17 @@ const normalizeLifecycleStages = (rawStages?: (string | null)[]): LifecycleStage
 };
 
 const normalizeCategory = (category: UnitCostCategoryReference): UnitCostCategoryReference => {
-  const lifecycleStages = normalizeLifecycleStages(
-    category.lifecycle_stages && category.lifecycle_stages.length > 0
-      ? category.lifecycle_stages
-      : (category as any).lifecycle_stage
-        ? [(category as any).lifecycle_stage as string]
+  const activitys = normalizeActivitys(
+    category.activitys && category.activitys.length > 0
+      ? category.activitys
+      : (category as any).activity
+        ? [(category as any).activity as string]
         : []
   );
 
   return {
     ...category,
-    lifecycle_stages: lifecycleStages,
+    activitys: activitys,
     tags: Array.isArray(category.tags) ? category.tags : [],
   };
 };
@@ -144,7 +147,7 @@ export default function UnitCostCategoryManager() {
   // State management
   const [categories, setCategories] = useState<UnitCostCategoryReference[]>([]);
   const [tags, setTags] = useState<CategoryTag[]>([]);
-  const [selectedStages, setSelectedStages] = useState<LifecycleStage[]>([]);
+  const [selectedStages, setSelectedStages] = useState<Activity[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<UnitCostCategoryReference | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -152,6 +155,8 @@ export default function UnitCostCategoryManager() {
 
   // Modal states
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [modalInitialStages, setModalInitialStages] = useState<Activity[]>([]);
+  const [modalInitialParent, setModalInitialParent] = useState<number | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<UnitCostCategoryReference | null>(null);
 
@@ -200,13 +205,33 @@ export default function UnitCostCategoryManager() {
   };
 
   // Filter categories by selected lifecycle stages
+  // Include categories that match the filter OR have a parent that matches
   const filteredCategories = useMemo(() => {
-    return categories.filter((cat) => {
-      const stages = cat.lifecycle_stages && cat.lifecycle_stages.length > 0
-        ? cat.lifecycle_stages
+    if (selectedStages.length === 0) return categories;
+
+    // Create a map for quick parent lookup
+    const categoryMap = new Map(categories.map(cat => [cat.category_id, cat]));
+
+    // First pass: identify categories that match the filter
+    const matchingIds = new Set<number>();
+    categories.forEach((cat) => {
+      const stages = cat.activitys && cat.activitys.length > 0
+        ? cat.activitys
         : ['Development'];
-      return stages.some((stage) => selectedStages.includes(stage));
+      if (stages.some((stage) => selectedStages.includes(stage))) {
+        matchingIds.add(cat.category_id);
+      }
     });
+
+    // Second pass: include children of matching categories
+    const included = new Set<number>(matchingIds);
+    categories.forEach((cat) => {
+      if (cat.parent && matchingIds.has(cat.parent)) {
+        included.add(cat.category_id);
+      }
+    });
+
+    return categories.filter((cat) => included.has(cat.category_id));
   }, [categories, selectedStages]);
 
   // Build hierarchy from filtered categories
@@ -216,7 +241,7 @@ export default function UnitCostCategoryManager() {
 
   // Count categories per lifecycle stage
   const stageCounts = useMemo(() => {
-    const counts: Record<LifecycleStage, number> = {
+    const counts: Record<Activity, number> = {
       Acquisition: 0,
       Development: 0,
       Operations: 0,
@@ -224,8 +249,8 @@ export default function UnitCostCategoryManager() {
       Financing: 0,
     };
     categories.forEach((cat) => {
-      const stages = cat.lifecycle_stages && cat.lifecycle_stages.length > 0
-        ? cat.lifecycle_stages
+      const stages = cat.activitys && cat.activitys.length > 0
+        ? cat.activitys
         : ['Development'];
       stages.forEach((stage) => {
         counts[stage] = (counts[stage] || 0) + 1;
@@ -235,7 +260,7 @@ export default function UnitCostCategoryManager() {
   }, [categories]);
 
   // Toggle lifecycle stage filter
-  const toggleStage = (stage: LifecycleStage) => {
+  const toggleStage = (stage: Activity) => {
     setSelectedStages((prev) => {
       if (prev.includes(stage)) {
         return prev.filter((s) => s !== stage);
@@ -290,7 +315,23 @@ export default function UnitCostCategoryManager() {
     setSelectedCategory(normalized);
     setTags((prev) => ensureTagCoverage(prev, [normalized]));
     setShowAddCategoryModal(false);
+    setModalInitialStages([]);
+    setModalInitialParent(null);
     showToast('Category created successfully', 'success');
+  };
+
+  const handleAddCategory = () => {
+    // Pre-populate with selected lifecycle stages if any
+    setModalInitialStages(selectedStages);
+    setModalInitialParent(null);
+    setShowAddCategoryModal(true);
+  };
+
+  const handleAddSubcategory = (parentCategory: UnitCostCategoryReference) => {
+    // Pre-populate with parent's lifecycle stages and set parent
+    setModalInitialStages(parentCategory.activitys);
+    setModalInitialParent(parentCategory.category_id);
+    setShowAddCategoryModal(true);
   };
 
   const handleTagDeleted = (tagName: string) => {
@@ -435,7 +476,7 @@ export default function UnitCostCategoryManager() {
       <div className="manager-content">
         {/* Column 1: Lifecycle Stage Filter */}
         <div style={{ width: `${leftPanelWidth}%`, flexShrink: 0 }}>
-          <LifecycleStageFilter
+          <ActivityFilter
             stages={LIFECYCLE_STAGES}
             selectedStages={selectedStages}
             stageCounts={stageCounts}
@@ -483,7 +524,8 @@ export default function UnitCostCategoryManager() {
             expandedCategories={expandedCategories}
             onSelectCategory={handleSelectCategory}
             onToggleExpanded={toggleExpanded}
-            onAddCategory={() => setShowAddCategoryModal(true)}
+            onAddCategory={handleAddCategory}
+            onAddSubcategory={handleAddSubcategory}
           />
         </div>
 
@@ -536,7 +578,13 @@ export default function UnitCostCategoryManager() {
         <AddCategoryModal
           tags={tags}
           categories={categories}
-          onClose={() => setShowAddCategoryModal(false)}
+          initialStages={modalInitialStages}
+          initialParentId={modalInitialParent}
+          onClose={() => {
+            setShowAddCategoryModal(false);
+            setModalInitialStages([]);
+            setModalInitialParent(null);
+          }}
           onCreated={handleCategoryCreated}
         />
       )}

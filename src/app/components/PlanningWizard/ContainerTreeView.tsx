@@ -57,12 +57,12 @@ export function ContainerTreeView({
 
   // Helper to find all siblings (containers with same parent)
   const findSiblings = useCallback(
-    (containerId: number): ContainerNode[] => {
+    (divisionId: number): ContainerNode[] => {
       let siblings: ContainerNode[] = []
 
       const findInTree = (nodes: ContainerNode[], parentId: number | null): void => {
         for (const node of nodes) {
-          if (node.container_id === containerId) {
+          if (node.division_id === divisionId) {
             // Found the node, now get its siblings
             if (parentId === null) {
               // Root level siblings
@@ -71,7 +71,7 @@ export function ContainerTreeView({
               // Find parent and get its children
               const findParent = (searchNodes: ContainerNode[]): ContainerNode | null => {
                 for (const searchNode of searchNodes) {
-                  if (searchNode.container_id === parentId) {
+                  if (searchNode.division_id === parentId) {
                     return searchNode
                   }
                   if (searchNode.children) {
@@ -91,7 +91,7 @@ export function ContainerTreeView({
           }
 
           if (node.children) {
-            findInTree(node.children, node.container_id)
+            findInTree(node.children, node.division_id)
           }
         }
       }
@@ -113,8 +113,8 @@ export function ContainerTreeView({
     // Find siblings of dragged container
     const siblings = findSiblings(activeId)
 
-    const oldIndex = siblings.findIndex((c) => c.container_id === activeId)
-    const newIndex = siblings.findIndex((c) => c.container_id === overId)
+    const oldIndex = siblings.findIndex((c) => c.division_id === activeId)
+    const newIndex = siblings.findIndex((c) => c.division_id === overId)
 
     if (oldIndex === -1 || newIndex === -1) return
 
@@ -123,7 +123,7 @@ export function ContainerTreeView({
 
     // Build updates
     const updates = reordered.map((container, index) => ({
-      container_id: container.container_id,
+      division_id: container.division_id,
       sort_order: index,
     }))
 
@@ -150,13 +150,13 @@ export function ContainerTreeView({
   }
 
   const handleUpdateContainer = async (
-    containerId: number,
+    divisionId: number,
     updates: Partial<ContainerNode>
   ) => {
     try {
-      console.log('Updating container:', containerId, 'with updates:', updates)
+      console.log('Updating container:', divisionId, 'with updates:', updates)
 
-      const response = await fetch(`/api/containers/${containerId}`, {
+      const response = await fetch(`/api/containers/${divisionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -182,9 +182,9 @@ export function ContainerTreeView({
     }
   }
 
-  const handleDeleteContainer = async (containerId: number) => {
+  const handleDeleteContainer = async (divisionId: number) => {
     try {
-      const response = await fetch(`/api/containers/${containerId}`, {
+      const response = await fetch(`/api/containers/${divisionId}`, {
         method: 'DELETE',
       })
 
@@ -206,7 +206,7 @@ export function ContainerTreeView({
     await onRefresh()
   }
 
-  const containerIds = containers.map((c) => c.container_id)
+  const divisionIds = containers.map((c) => c.division_id)
 
   // Check if this is a multifamily project (Property/Building structure)
   const isMultifamily = labels.level1Label === 'Property' || labels.level1Label === 'Building'
@@ -244,11 +244,11 @@ export function ContainerTreeView({
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={containerIds} strategy={verticalListSortingStrategy}>
+          <SortableContext items={divisionIds} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {containers.map((container) => (
                 <DraggableContainerNode
-                  key={container.container_id}
+                  key={container.division_id}
                   container={container}
                   level={1}
                   labels={labels}

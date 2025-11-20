@@ -14,6 +14,9 @@ export interface OpExExpense {
   start_period: number;
   payment_frequency?: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   notes?: string;
+  calculation_basis?: 'FIXED_AMOUNT' | 'PER_UNSOLD_PARCEL' | 'PER_UNSOLD_ACRE' | 'PER_PCT_UNSOLD';
+  unit_amount?: number | null;
+  is_auto_calculated?: boolean;
   created_at?: string;
   updated_at?: string;
 }

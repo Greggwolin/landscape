@@ -130,6 +130,9 @@ export default function BudgetDataGrid({
         // Show editor row only in standard and detail modes (napkin uses inline editing)
         setExpandedFactId(expandedFactId === item.fact_id ? null : item.fact_id);
       },
+      onGroupByPhase: toggleGrouping,
+      onGroupByStage: toggleGrouping,
+      onGroupByCategory: toggleGrouping,
     }),
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: 'onChange',
@@ -156,38 +159,17 @@ export default function BudgetDataGrid({
   return (
     <div className="table-responsive border rounded">
       <table className="table table-hover align-middle mb-0" style={{ tableLayout: 'fixed' }}>
-        <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+        <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
-                // Check if this is the Category column
-                const isCategoryColumn = header.column.id === 'category_l1_id';
+                // Check if this is the Phase column
+                const isPhaseColumn = header.column.id === 'division_id';
 
                 return (
-                  <th key={header.id} style={{ width: header.getSize(), maxWidth: header.column.columnDef.maxSize, position: 'relative' }}>
+                  <th key={header.id} style={{ width: header.getSize(), maxWidth: header.column.columnDef.maxSize, position: 'relative', paddingLeft: isPhaseColumn ? '16px' : undefined }}>
                     <div className="d-flex align-items-center gap-2">
                       {flexRender(header.column.columnDef.header, header.getContext())}
-
-                      {/* Add Group button next to Category header */}
-                      {isCategoryColumn && (
-                        <CButton
-                          color="primary"
-                          variant={isGrouped ? undefined : 'outline'}
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleGrouping();
-                          }}
-                          title={isGrouped ? 'Ungroup categories' : 'Group by categories'}
-                          style={{
-                            padding: '2px 8px',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                          }}
-                        >
-                          Group
-                        </CButton>
-                      )}
                     </div>
 
                     {header.column.getCanResize() && (
@@ -290,30 +272,38 @@ export default function BudgetDataGrid({
                       className={isSelected ? 'table-active' : undefined}
                       style={{ cursor: 'pointer' }}
                     >
-                      {tableRow.getVisibleCells().map((cell, cellIndex) => (
-                        <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
-                          <div className="d-flex align-items-center gap-2">
-                            {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
-                              <LandscapeButton
-                                color="secondary"
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
-                                }}
-                                title="Toggle details"
-                                className="p-0"
-                              >
-                                {isDetailsExpanded ? '▼' : '▶'}
-                              </LandscapeButton>
+                      {tableRow.getVisibleCells().map((cell, cellIndex) => {
+                        const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
+                        const columnMeta = cell.column.columnDef.meta as any;
+                        const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
+
+                        return (
+                          <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                            {hasExpandButton ? (
+                              <div className="d-flex align-items-center gap-2">
+                                <LandscapeButton
+                                  color="secondary"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
+                                  }}
+                                  title="Toggle details"
+                                  className="p-0"
+                                >
+                                  {isDetailsExpanded ? '▼' : '▶'}
+                                </LandscapeButton>
+                                <div className="flex-grow-1">
+                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </div>
+                              </div>
+                            ) : (
+                              flexRender(cell.column.columnDef.cell, cell.getContext())
                             )}
-                            <div className="flex-grow-1">
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </div>
-                          </div>
-                        </td>
-                      ))}
+                          </td>
+                        );
+                      })}
                     </tr>
                     {isExpanded && (
                       <tr key={`${item.fact_id}-expanded`}>
@@ -333,6 +323,7 @@ export default function BudgetDataGrid({
                         item={item}
                         mode={mode}
                         columnCount={tableRow.getVisibleCells().length}
+                        projectTypeCode={projectTypeCode}
                         onInlineCommit={onInlineCommit}
                       />
                     )}
@@ -354,30 +345,38 @@ export default function BudgetDataGrid({
                     className={isSelected ? 'table-active' : undefined}
                     style={{ cursor: 'pointer' }}
                   >
-                    {row.getVisibleCells().map((cell, cellIndex) => (
-                      <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize }}>
-                        <div className="d-flex align-items-center gap-2">
-                          {cellIndex === 0 && (mode === 'standard' || mode === 'detail') && (
-                            <LandscapeButton
-                              color="secondary"
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
-                              }}
-                              title="Toggle details"
-                              className="p-0"
-                            >
-                              {isDetailsExpanded ? '▼' : '▶'}
-                            </LandscapeButton>
+                    {row.getVisibleCells().map((cell, cellIndex) => {
+                      const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
+                      const columnMeta = cell.column.columnDef.meta as any;
+                      const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
+
+                      return (
+                        <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                          {hasExpandButton ? (
+                            <div className="d-flex align-items-center gap-2">
+                              <LandscapeButton
+                                color="secondary"
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
+                                }}
+                                title="Toggle details"
+                                className="p-0"
+                              >
+                                {isDetailsExpanded ? '▼' : '▶'}
+                              </LandscapeButton>
+                              <div className="flex-grow-1">
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </div>
+                            </div>
+                          ) : (
+                            flexRender(cell.column.columnDef.cell, cell.getContext())
                           )}
-                          <div className="flex-grow-1">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </div>
-                        </div>
-                      </td>
-                    ))}
+                        </td>
+                      );
+                    })}
                   </tr>
                   {isExpanded && (
                     <tr key={`${row.id}-expanded`}>
@@ -397,6 +396,7 @@ export default function BudgetDataGrid({
                       item={row.original}
                       mode={mode}
                       columnCount={row.getVisibleCells().length}
+                      projectTypeCode={projectTypeCode}
                       onInlineCommit={onInlineCommit}
                     />
                   )}

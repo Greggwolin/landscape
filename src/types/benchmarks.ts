@@ -35,6 +35,8 @@ export interface BenchmarkCategory {
   description?: string;
 }
 
+export type ScopeLevel = 'global' | 'project' | 'product';
+
 export interface Benchmark {
   benchmark_id: number;
   user_id: string;
@@ -55,6 +57,7 @@ export interface Benchmark {
   context_metadata?: Record<string, any>;
   is_active: boolean;
   is_global: boolean;
+  scope_level?: ScopeLevel; // 'global', 'project', or 'product' - added for sale benchmarks
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -134,15 +137,20 @@ export interface LandscaperAbsorptionDetail {
 // =============================================================================
 
 /**
- * Universal lifecycle stages that work across ALL property types
+ * Universal cost lifecycle activities that work across ALL property types
  * (land, multifamily, office, retail, industrial, etc.)
+ * Renamed from LifecycleStage to Activity for clarity
  */
-export type LifecycleStage =
+export type Activity =
   | 'Acquisition'
+  | 'Planning & Engineering'
   | 'Development'
   | 'Operations'
   | 'Disposition'
   | 'Financing';
+
+// Backward compatibility alias - will be removed in future version
+export type LifecycleStage = Activity;
 
 /**
  * Category tag for flexible classification
@@ -151,7 +159,7 @@ export type LifecycleStage =
 export interface CategoryTag {
   tag_id: number;
   tag_name: string;
-  tag_context: string; // Which lifecycle_stage(s) this applies to
+  tag_context: string; // Which activity/activities this applies to
   is_system_default: boolean;
   description?: string;
   display_order: number;
@@ -161,14 +169,14 @@ export interface CategoryTag {
 }
 
 /**
- * Unit cost category with lifecycle stages and flexible tags
+ * Unit cost category with activities and flexible tags
  */
 export interface UnitCostCategoryReference {
   category_id: number;
   parent?: number;
   parent_name?: string;
   category_name: string;
-  lifecycle_stages: LifecycleStage[]; // Categories can belong to multiple lifecycle stages
+  activitys: Activity[]; // Categories can belong to multiple lifecycle stages
   tags: string[]; // Array of tag names (e.g., ["Hard", "Professional Services"])
   sort_order: number;
   is_active: boolean;
@@ -185,7 +193,7 @@ export interface UnitCostCategoryReference {
 export interface UnitCostCategoryHierarchy {
   category_id: number;
   category_name: string;
-  lifecycle_stages: LifecycleStage[]; // Categories can belong to multiple lifecycle stages
+  activitys: Activity[]; // Categories can belong to multiple lifecycle stages
   tags: string[];
   sort_order: number;
   is_active: boolean;
