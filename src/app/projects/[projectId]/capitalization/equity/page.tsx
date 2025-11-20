@@ -6,7 +6,6 @@ import { CButton, CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/reac
 import CIcon from '@coreui/icons-react';
 import { cilPlus } from '@coreui/icons';
 import { useQuery } from '@tanstack/react-query';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubNav';
 import MetricCard from '@/components/capitalization/MetricCard';
 import EquityPartnersTable, { type EquityPartner } from '@/components/capitalization/EquityPartnersTable';
@@ -55,7 +54,6 @@ export default function EquityPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <CapitalizationSubNav projectId={projectId} />
 
       <div

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import ProjectSubNav from '@/components/project/ProjectSubNav';
 import MetricCard from '@/components/project/MetricCard';
 import GranularityIndicators from '@/components/project/GranularityIndicators';
@@ -46,7 +45,6 @@ export default function ProjectSummaryPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <ProjectSubNav projectId={projectId} />
       <div className="container-fluid py-4">
         {/* Key Metrics Row */}

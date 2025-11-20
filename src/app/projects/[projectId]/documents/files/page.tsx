@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import { CAlert } from '@coreui/react';
 
 /**
@@ -16,7 +15,6 @@ export default function DocumentsFilesPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <div className="container py-4">
         <div className="row">
           <div className="col-12">

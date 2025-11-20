@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import ProjectSubNav from '@/components/project/ProjectSubNav';
 import SalesContent from '@/components/sales/SalesContent';
 
@@ -18,7 +17,6 @@ export default function ProjectSalesPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <ProjectSubNav projectId={projectId} />
       <SalesContent projectId={projectId} />
     </>

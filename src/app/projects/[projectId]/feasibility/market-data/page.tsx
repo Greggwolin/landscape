@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import FeasibilitySubNav from '@/components/feasibility/FeasibilitySubNav';
 import MarketDataContent from '@/components/feasibility/MarketDataContent';
 
@@ -25,7 +24,6 @@ export default function MarketDataPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <FeasibilitySubNav projectId={projectId} />
       <MarketDataContent projectId={projectId} />
     </>

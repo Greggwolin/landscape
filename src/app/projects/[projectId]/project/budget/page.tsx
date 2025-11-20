@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import ProjectSubNav from '@/components/project/ProjectSubNav';
 import BudgetGridWithTimeline from '@/components/budget/custom/BudgetGridWithTimeline';
 import { CNav, CNavItem, CNavLink } from '@coreui/react';
@@ -39,7 +38,6 @@ export default function ProjectBudgetPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <ProjectSubNav projectId={projectId} />
       <div className="container-fluid py-4">
         {/* Page Header */}

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import LandscaperChatModal from '@/app/components/LandscaperChatModal';
 import { CButton } from '@coreui/react';
 
@@ -19,7 +18,6 @@ export default function LandscaperPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <div className="container py-4">
         <div className="row">
           <div className="col-12">

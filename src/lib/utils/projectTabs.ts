@@ -38,21 +38,21 @@ export function getTabsForPropertyType(propertyType?: string): Tab[] {
   if (isLandDev) {
     // Land Development: 5 main tabs
     return [
-      { id: 'project', label: 'PROJECT', hasMode: true },
-      { id: 'feasibility', label: 'FEASIBILITY/VALUATION', hasMode: false },
-      { id: 'capitalization', label: 'CAPITALIZATION', hasMode: false },
-      { id: 'landscaper', label: 'LANDSCAPER', hasMode: false },
-      { id: 'documents', label: 'DOCUMENTS', hasMode: false },
+      { id: 'project', label: 'Project', hasMode: true },
+      { id: 'feasibility', label: 'Feasibility', hasMode: false },
+      { id: 'capitalization', label: 'Capitalization', hasMode: false },
+      { id: 'landscaper', label: 'Landscaper AI', hasMode: false },
+      { id: 'documents', label: 'Documents', hasMode: false },
     ];
   }
 
   // Income Properties: Same 5 main tabs (valuation replaces feasibility)
   return [
-    { id: 'project', label: 'PROJECT', hasMode: true },
-    { id: 'valuation', label: 'FEASIBILITY/VALUATION', hasMode: false },
-    { id: 'capitalization', label: 'CAPITALIZATION', hasMode: false },
-    { id: 'landscaper', label: 'LANDSCAPER', hasMode: false },
-    { id: 'documents', label: 'DOCUMENTS', hasMode: false },
+    { id: 'project', label: 'Project', hasMode: true },
+    { id: 'valuation', label: 'Feasibility', hasMode: false },
+    { id: 'capitalization', label: 'Capitalization', hasMode: false },
+    { id: 'landscaper', label: 'Landscaper AI', hasMode: false },
+    { id: 'documents', label: 'Documents', hasMode: false },
   ];
 }
 

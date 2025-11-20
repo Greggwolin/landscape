@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import FeasibilitySubNav from '@/components/feasibility/FeasibilitySubNav';
 import SensitivityAnalysisContent from '@/components/feasibility/SensitivityAnalysisContent';
 
@@ -26,7 +25,6 @@ export default function SensitivityAnalysisPage() {
 
   return (
     <>
-      <ProjectContextBar projectId={projectId} />
       <FeasibilitySubNav projectId={projectId} />
       <SensitivityAnalysisContent projectId={projectId} />
     </>
