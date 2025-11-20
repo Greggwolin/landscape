@@ -9,15 +9,7 @@ type Params = {
  * GET /api/projects/[projectId]/debt/draw-events
  *
  * Fetch all draw events for a project's debt facilities
- *
- * Note: Requires debt_draw_events table (migration not yet created)
- * Table schema suggestion:
- * - id SERIAL PRIMARY KEY
- * - facility_id INT REFERENCES debt_facilities(id)
- * - draw_date DATE
- * - draw_amount NUMERIC(15,2)
- * - description TEXT
- * - created_at TIMESTAMP
+ * Uses existing tbl_debt_draw_schedule table
  */
 export async function GET(
   _request: NextRequest,
@@ -31,27 +23,22 @@ export async function GET(
   }
 
   try {
-    // TODO: Uncomment when debt_draw_events table is created
-    /*
     const drawEvents = await sql`
       SELECT
-        de.id,
-        de.facility_id AS "facilityId",
-        de.draw_date AS "drawDate",
-        de.draw_amount AS "drawAmount",
-        de.description,
+        dds.draw_schedule_id as id,
+        dds.facility_id AS "facilityId",
+        dds.period_start_date AS "drawDate",
+        dds.draw_amount AS "drawAmount",
+        dds.notes as description,
         df.facility_name AS "facilityName"
-      FROM landscape.debt_draw_events de
-      JOIN landscape.debt_facilities df ON de.facility_id = df.id
+      FROM landscape.tbl_debt_draw_schedule dds
+      JOIN landscape.tbl_debt_facility df ON dds.facility_id = df.facility_id
       WHERE df.project_id = ${id}
-      ORDER BY de.draw_date DESC
+        AND dds.draw_amount > 0
+      ORDER BY dds.period_start_date DESC
     `;
 
     return NextResponse.json({ drawEvents });
-    */
-
-    // Temporary: Return empty array until table is created
-    return NextResponse.json({ drawEvents: [] });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to fetch draw events:', error);
@@ -81,37 +68,32 @@ export async function POST(
   try {
     const body = await request.json();
 
-    // TODO: Uncomment when debt_draw_events table is created
-    /*
+    // Note: tbl_debt_draw_schedule requires period_id from tbl_calculation_period
+    // For now, create a simplified draw without period linkage
     const result = await sql`
-      INSERT INTO landscape.debt_draw_events (
+      INSERT INTO landscape.tbl_debt_draw_schedule (
         facility_id,
-        draw_date,
+        period_start_date,
+        period_end_date,
         draw_amount,
-        description
+        notes
       )
       VALUES (
         ${body.facilityId},
+        ${body.drawDate},
         ${body.drawDate},
         ${body.drawAmount},
         ${body.description}
       )
       RETURNING
-        id,
+        draw_schedule_id as id,
         facility_id AS "facilityId",
-        draw_date AS "drawDate",
+        period_start_date AS "drawDate",
         draw_amount AS "drawAmount",
-        description
+        notes as description
     `;
 
     return NextResponse.json({ success: true, drawEvent: result[0] });
-    */
-
-    // Temporary: Return mock success until table is created
-    return NextResponse.json({
-      success: true,
-      message: 'Draw events table not yet created. Migration needed.'
-    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to create draw event:', error);

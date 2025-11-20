@@ -22,29 +22,31 @@ export async function PUT(
     const body = await request.json();
 
     const result = await sql`
-      UPDATE landscape.debt_facilities
+      UPDATE landscape.tbl_debt_facility
       SET
         facility_name = ${body.facilityName},
-        lender = ${body.lender},
+        lender_name = ${body.lender},
         facility_type = ${body.facilityType},
         commitment_amount = ${body.commitmentAmount},
-        outstanding_balance = ${body.outstandingBalance || 0},
+        drawn_to_date = ${body.outstandingBalance || 0},
         interest_rate = ${body.interestRate},
-        maturity_date = ${body.maturityDate},
-        status = ${body.status || 'active'},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${facilityId}
+        maturity_date = ${body.maturityDate}
+      WHERE facility_id = ${facilityId}
         AND project_id = ${projectIdNum}
       RETURNING
-        id,
+        facility_id as id,
         facility_name AS "facilityName",
-        lender,
+        lender_name as lender,
         facility_type AS "facilityType",
         commitment_amount AS "commitmentAmount",
-        outstanding_balance AS "outstandingBalance",
+        drawn_to_date AS "outstandingBalance",
         interest_rate AS "interestRate",
         maturity_date AS "maturityDate",
-        status
+        CASE
+          WHEN maturity_date < CURRENT_DATE THEN 'closed'
+          WHEN commitment_date IS NULL THEN 'pending'
+          ELSE 'active'
+        END as status
     `;
 
     if (result.length === 0) {
@@ -76,10 +78,10 @@ export async function DELETE(
 
   try {
     const result = await sql`
-      DELETE FROM landscape.debt_facilities
-      WHERE id = ${facilityId}
+      DELETE FROM landscape.tbl_debt_facility
+      WHERE facility_id = ${facilityId}
         AND project_id = ${projectIdNum}
-      RETURNING id
+      RETURNING facility_id as id
     `;
 
     if (result.length === 0) {

@@ -5,6 +5,17 @@ type Params = {
   projectId: string;
 };
 
+/**
+ * GET /api/projects/[projectId]/equity/partners
+ *
+ * NOTE: Existing database does not have a dedicated equity_partners table.
+ * The tbl_finance_structure table is for cost allocation, not equity partners.
+ *
+ * This endpoint currently returns empty data. Future enhancement:
+ * - Create dedicated equity_partners table
+ * - OR extend tbl_finance_structure to handle equity partners
+ * - OR use a different existing table if available
+ */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
@@ -17,21 +28,9 @@ export async function GET(
   }
 
   try {
-    const partners = await sql`
-      SELECT
-        id,
-        partner_name AS "partnerName",
-        partner_type AS "partnerType",
-        capital_committed AS "capitalCommitted",
-        capital_deployed AS "capitalDeployed",
-        ownership_percent AS "ownershipPercent",
-        preferred_return AS "preferredReturn",
-        investment_date AS "investmentDate",
-        notes
-      FROM landscape.equity_partners
-      WHERE project_id = ${id}
-      ORDER BY created_at DESC
-    `;
+    // Returning empty array until proper equity partner tracking is established
+    // The duplicate landscape.equity_partners table has been removed
+    const partners: any[] = [];
 
     return NextResponse.json({ partners });
   } catch (error: unknown) {
@@ -44,6 +43,12 @@ export async function GET(
   }
 }
 
+/**
+ * POST /api/projects/[projectId]/equity/partners
+ *
+ * NOTE: Equity partner creation not yet supported.
+ * Requires dedicated equity_partners table or schema extension.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<Params> }
@@ -58,42 +63,10 @@ export async function POST(
   try {
     const body = await request.json();
 
-    const result = await sql`
-      INSERT INTO landscape.equity_partners (
-        project_id,
-        partner_name,
-        partner_type,
-        capital_committed,
-        capital_deployed,
-        ownership_percent,
-        preferred_return,
-        investment_date,
-        notes
-      )
-      VALUES (
-        ${id},
-        ${body.partnerName},
-        ${body.partnerType},
-        ${body.capitalCommitted},
-        ${body.capitalDeployed || 0},
-        ${body.ownershipPercent},
-        ${body.preferredReturn || null},
-        ${body.investmentDate || null},
-        ${body.notes || null}
-      )
-      RETURNING
-        id,
-        partner_name AS "partnerName",
-        partner_type AS "partnerType",
-        capital_committed AS "capitalCommitted",
-        capital_deployed AS "capitalDeployed",
-        ownership_percent AS "ownershipPercent",
-        preferred_return AS "preferredReturn",
-        investment_date AS "investmentDate",
-        notes
-    `;
-
-    return NextResponse.json({ success: true, partner: result[0] });
+    return NextResponse.json({
+      success: false,
+      message: 'Equity partner tracking not yet implemented. Duplicate table removed, proper schema needed.'
+    }, { status: 501 }); // 501 Not Implemented
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to create partner:', error);

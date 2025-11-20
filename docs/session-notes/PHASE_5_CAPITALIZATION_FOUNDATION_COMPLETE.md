@@ -402,4 +402,66 @@ Phase 5 Foundation is complete when:
 
 **Ready for**: Follow-up task to complete API endpoints, then Phase 6
 
+---
+
+## Phase 5 Correction (2025-11-21)
+
+**Branch**: `feature/phase5-cleanup-duplicate-tables`
+
+Phase 5 initially created duplicate debt/equity tables (migrations 029-032) when comprehensive ARGUS-compliant tables already existed.
+
+### Cleanup Performed
+
+**Duplicate Tables Removed** (Migration 036):
+- `landscape.debt_facilities` → Use `landscape.tbl_debt_facility` instead
+- `landscape.equity_partners` → Removed (proper schema needed)
+- `landscape.waterfall_tiers` → Removed (proper schema needed)
+- `landscape.waterfall_splits` → Removed (proper schema needed)
+
+**Table Kept**:
+- `landscape.developer_fees` ✓ (no existing duplicate)
+
+### API Endpoints Updated
+
+**Debt Endpoints** - Now use `tbl_debt_facility`:
+- ✅ GET/POST/PUT/DELETE `/api/projects/[projectId]/debt/facilities`
+- ✅ GET/POST `/api/projects/[projectId]/debt/draw-events` (uses `tbl_debt_draw_schedule`)
+
+**Equity Endpoints** - Return empty (schema needed):
+- ⚠️ GET/POST `/api/projects/[projectId]/equity/partners` (501 Not Implemented)
+- ⚠️ GET/POST `/api/projects/[projectId]/equity/waterfall` (501 Not Implemented)
+
+**Developer Fees** - Working:
+- ✅ GET/POST/PUT/DELETE `/api/projects/[projectId]/developer/fees`
+
+### Field Mappings
+
+**Phase 5 UI → Existing tbl_debt_facility**:
+| Phase 5 Field | Maps To |
+|---------------|---------|
+| `id` | `facility_id` |
+| `facilityName` | `facility_name` |
+| `lender` | `lender_name` |
+| `facilityType` | `facility_type` |
+| `commitmentAmount` | `commitment_amount` |
+| `outstandingBalance` | `drawn_to_date` |
+| `interestRate` | `interest_rate` |
+| `maturityDate` | `maturity_date` |
+| `status` | Derived from dates |
+
+### Current Status
+
+✅ **Debt Tab**: Fully functional with existing `tbl_debt_facility`
+❌ **Equity Tab**: Not functional (proper schema needed)
+✅ **Developer Operations Tab**: Fully functional with `developer_fees`
+
+### Next Steps
+
+1. Design proper equity partner schema
+2. Design proper waterfall structure schema
+3. Integrate with existing `tbl_finance_structure` if applicable
+4. Re-enable equity/waterfall functionality
+
+---
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

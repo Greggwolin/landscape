@@ -19,18 +19,22 @@ export async function GET(
   try {
     const facilities = await sql`
       SELECT
-        id,
+        facility_id as id,
         facility_name AS "facilityName",
-        lender,
+        lender_name as lender,
         facility_type AS "facilityType",
         commitment_amount AS "commitmentAmount",
-        outstanding_balance AS "outstandingBalance",
+        drawn_to_date AS "outstandingBalance",
         interest_rate AS "interestRate",
         maturity_date AS "maturityDate",
-        status
-      FROM landscape.debt_facilities
+        CASE
+          WHEN maturity_date < CURRENT_DATE THEN 'closed'
+          WHEN commitment_date IS NULL THEN 'pending'
+          ELSE 'active'
+        END as status
+      FROM landscape.tbl_debt_facility
       WHERE project_id = ${id}
-      ORDER BY created_at DESC
+      ORDER BY commitment_date DESC NULLS LAST, facility_id DESC
     `;
 
     return NextResponse.json({ facilities });
@@ -59,29 +63,44 @@ export async function POST(
     const body = await request.json();
 
     const result = await sql`
-      INSERT INTO landscape.debt_facilities (
+      INSERT INTO landscape.tbl_debt_facility (
         project_id,
         facility_name,
-        lender,
+        lender_name,
         facility_type,
         commitment_amount,
-        outstanding_balance,
+        drawn_to_date,
         interest_rate,
         maturity_date,
-        status
+        commitment_date,
+        interest_calculation,
+        payment_frequency,
+        interest_payment_method
       )
       VALUES (
         ${id},
         ${body.facilityName},
         ${body.lender},
-        ${body.facilityType},
+        ${body.facilityType || 'CONSTRUCTION'},
         ${body.commitmentAmount},
         ${body.outstandingBalance || 0},
         ${body.interestRate},
         ${body.maturityDate},
-        ${body.status || 'active'}
+        CURRENT_DATE,
+        'SIMPLE',
+        'MONTHLY',
+        'accrued_simple'
       )
-      RETURNING *
+      RETURNING
+        facility_id as id,
+        facility_name AS "facilityName",
+        lender_name as lender,
+        facility_type AS "facilityType",
+        commitment_amount AS "commitmentAmount",
+        drawn_to_date AS "outstandingBalance",
+        interest_rate AS "interestRate",
+        maturity_date AS "maturityDate",
+        'active' as status
     `;
 
     return NextResponse.json({ success: true, facility: result[0] });
