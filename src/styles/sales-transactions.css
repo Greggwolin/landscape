@@ -1,0 +1,63 @@
+/**
+ * Sales Transaction Details Styles
+ * Phase 3: Sale Transaction Details accordion
+ */
+
+.transaction-grid {
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cui-secondary-bg) var(--cui-border-color);
+}
+
+.transaction-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.transaction-grid::-webkit-scrollbar-track {
+  background: var(--cui-border-color);
+  border-radius: 4px;
+}
+
+.transaction-grid::-webkit-scrollbar-thumb {
+  background: var(--cui-secondary-bg);
+  border-radius: 4px;
+}
+
+.transaction-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.transaction-column {
+  flex-shrink: 0;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.transaction-column:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.filter-sidebar button {
+  transition: all 0.2s ease;
+}
+
+.filter-sidebar button:not(.btn-primary):hover {
+  transform: translateX(4px);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .transaction-column:hover {
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Ensure sale-transaction-details accordion integrates smoothly */
+.sale-transaction-details {
+  transition: all 0.3s ease;
+}
+
+.sale-transaction-details:hover {
+  border-color: var(--cui-primary);
+}

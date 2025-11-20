@@ -13,9 +13,10 @@ import AreaTiles from '@/components/shared/AreaTiles';
 import PhaseTiles from './PhaseTiles';
 import ParcelSalesTable from './ParcelSalesTable';
 import PricingTable from './PricingTable';
+import SaleTransactionDetails from './SaleTransactionDetails';
 import ModeSelector from '@/components/budget/ModeSelector';
 import { useContainers } from '@/hooks/useContainers';
-import { usePhaseStats } from '@/hooks/useSalesAbsorption';
+import { usePhaseStats, useParcelsWithSales } from '@/hooks/useSalesAbsorption';
 import type { BudgetMode } from '@/components/budget/ModeSelector';
 
 // Sales mode uses the same type as Budget mode for consistency
@@ -31,6 +32,7 @@ export default function SalesContent({ projectId }: Props) {
   const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
   const { phases: containerPhases } = useContainers({ projectId, includeCosts: false });
   const { data: phases } = usePhaseStats(projectId);
+  const { data: parcelSalesData } = useParcelsWithSales(projectId, selectedPhaseIds);
 
   const handleAreaSelect = (areaId: number | null) => {
     if (areaId === null) {
@@ -202,6 +204,14 @@ export default function SalesContent({ projectId }: Props) {
           />
         </div>
       </CollapsibleSection>
+
+      {/* Sale Transaction Details - Phase 3 Addition */}
+      {parcelSalesData?.parcels && (
+        <SaleTransactionDetails
+          projectId={projectId}
+          parcels={parcelSalesData.parcels}
+        />
+      )}
     </div>
   );
 }

@@ -24,8 +24,8 @@ interface SubTab {
  * - Summary: Overview dashboard with key metrics
  * - Planning: Parcel management and phasing
  * - Budget: Lifecycle stage budget management
+ * - Sales: Sales & absorption (Phase 3)
  * - Operations: (Future) Operations tracking
- * - Sales: (Future) Sales & absorption
  */
 export default function ProjectSubNav({ projectId }: ProjectSubNavProps) {
   const router = useRouter();
@@ -35,9 +35,9 @@ export default function ProjectSubNav({ projectId }: ProjectSubNavProps) {
     { id: 'summary', label: 'Summary', path: `/projects/${projectId}/project/summary` },
     { id: 'planning', label: 'Planning', path: `/projects/${projectId}/project/planning` },
     { id: 'budget', label: 'Budget', path: `/projects/${projectId}/project/budget` },
-    // Future Phase 3 tabs
+    { id: 'sales', label: 'Sales & Absorption', path: `/projects/${projectId}/project/sales` },
+    // Future Phase 4+ tabs
     // { id: 'operations', label: 'Operations', path: `/projects/${projectId}/project/operations` },
-    // { id: 'sales', label: 'Sales & Absorption', path: `/projects/${projectId}/project/sales` },
   ];
 
   // Determine active sub-tab from pathname
