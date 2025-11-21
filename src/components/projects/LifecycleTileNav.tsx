@@ -20,6 +20,14 @@ interface LifecycleTileNavProps {
 
 const TILES: TileConfig[] = [
   {
+    id: 'home',
+    label: 'Project Home',
+    colorClass: 'bg-light',
+    textClass: 'text-dark',
+    borderClass: 'border-secondary',
+    route: '' // Empty route = base project route
+  },
+  {
     id: 'acquisition',
     label: 'Acquisition',
     colorClass: 'bg-info',
@@ -29,7 +37,7 @@ const TILES: TileConfig[] = [
   },
   {
     id: 'planning',
-    label: 'Planning &\nEngineering',
+    label: 'Planning',
     colorClass: 'bg-success',
     textClass: 'text-white',
     borderClass: 'border-success',
@@ -45,7 +53,7 @@ const TILES: TileConfig[] = [
   },
   {
     id: 'sales',
-    label: 'Sales &\nMarketing',
+    label: 'Sales',
     colorClass: 'bg-primary',
     textClass: 'text-white',
     borderClass: 'border-primary',
@@ -53,7 +61,7 @@ const TILES: TileConfig[] = [
   },
   {
     id: 'capitalization',
-    label: 'Capitalization\nDebt/Equity',
+    label: 'Capital',
     colorClass: 'bg-danger',
     textClass: 'text-white',
     borderClass: 'border-danger',
@@ -62,7 +70,7 @@ const TILES: TileConfig[] = [
   },
   {
     id: 'results',
-    label: 'Project\nResults',
+    label: 'Results',
     colorClass: 'bg-secondary',
     textClass: 'text-white',
     borderClass: 'border-secondary',
@@ -90,16 +98,26 @@ export function LifecycleTileNav({ projectId, tierLevel }: LifecycleTileNavProps
 
   // Check if a tile is active based on current path
   const isActive = (tileRoute: string) => {
+    if (tileRoute === '') {
+      // Home tile is active when on the exact project route (not a subroute)
+      const projectBasePath = `/projects/${projectId}`;
+      return pathname === projectBasePath || pathname === `${projectBasePath}/`;
+    }
     return pathname.includes(`/projects/${projectId}${tileRoute}`);
   };
 
   // Navigate to tile route
   const handleTileClick = (route: string) => {
-    router.push(`/projects/${projectId}${route}`);
+    if (route === '') {
+      // Navigate to project home
+      router.push(`/projects/${projectId}`);
+    } else {
+      router.push(`/projects/${projectId}${route}`);
+    }
   };
 
   return (
-    <div className="lifecycle-tile-nav d-flex gap-3 overflow-x-auto mb-4 pb-2">
+    <div className="d-flex gap-2 overflow-x-auto align-items-center">
       {visibleTiles.map(tile => {
         const active = isActive(tile.route);
 
@@ -107,23 +125,24 @@ export function LifecycleTileNav({ projectId, tierLevel }: LifecycleTileNavProps
           <div
             key={tile.id}
             className={`
-              tile rounded-3 p-3 text-center
+              tile rounded-2 px-3 py-2 text-center
               ${tile.colorClass}
               ${tile.textClass}
-              ${active ? `border border-3 ${tile.borderClass}` : ''}
+              ${active ? `border border-2 ${tile.borderClass}` : ''}
             `}
             onClick={() => handleTileClick(tile.route)}
             style={{
-              minWidth: '140px',
-              whiteSpace: 'pre-line',
+              minWidth: '100px',
+              fontSize: '0.875rem',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: active ? '0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25)' : 'none'
+              whiteSpace: 'nowrap',
+              boxShadow: active ? '0 0 0 0.1rem rgba(var(--bs-primary-rgb), 0.25)' : 'none'
             }}
             onMouseEnter={(e) => {
               if (!active) {
                 e.currentTarget.style.opacity = '0.85';
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }
             }}
             onMouseLeave={(e) => {

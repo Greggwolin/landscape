@@ -1,18 +1,16 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import { getTabsForPropertyType, getTabDefaultRoute } from '@/lib/utils/projectTabs';
-import { usePreference } from '@/hooks/useUserPreferences';
-import ModeChip, { type ModeType } from '@/components/ui/ModeChip';
+import { LifecycleTileNav } from '@/components/projects/LifecycleTileNav';
 
 /**
  * ProjectContextBar - Tier 2 Project Navigation
  *
  * Renders project-specific navigation bar with:
  * - Project selector dropdown (left)
- * - Project tabs (right)
+ * - Lifecycle stage tiles (right)
  *
  * Only renders when a project is loaded.
  * Height: 56px
@@ -27,101 +25,10 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
-  const pathname = usePathname();
-
-  // Determine active tab from pathname
-  const activeTab = useMemo(() => {
-    if (pathname.includes('/feasibility') || pathname.includes('/valuation')) {
-      return pathname.includes('/valuation') ? 'valuation' : 'feasibility';
-    }
-    if (pathname.includes('/capitalization')) return 'capitalization';
-    if (pathname.includes('/landscaper')) return 'landscaper';
-    if (pathname.includes('/documents')) return 'documents';
-    return 'project'; // Default to project tab
-  }, [pathname]);
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
   }, [projects, projectId, activeProject]);
-
-  const tabs = useMemo(() => {
-    return getTabsForPropertyType(project?.project_type_code);
-  }, [project]);
-
-  // Mode preferences for each tab (database-backed)
-  // Project mode serves as the project-level default
-  const [projectMode] = usePreference<ModeType>({
-    key: 'project.mode',
-    defaultValue: 'napkin',
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  const [planningMode] = usePreference<ModeType>({
-    key: 'planning.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  const [salesMode] = usePreference<ModeType>({
-    key: 'sales.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  const [propertyMode] = usePreference<ModeType>({
-    key: 'property.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  const [operationsMode] = usePreference<ModeType>({
-    key: 'operations.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  const [valuationMode] = usePreference<ModeType>({
-    key: 'valuation.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-  });
-
-  // Budget mode with database persistence (migrated from localStorage)
-  const [budgetMode] = usePreference<ModeType>({
-    key: 'budget.mode',
-    defaultValue: projectMode,
-    scopeType: 'project',
-    scopeId: projectId,
-    localStorageMigrationKey: `budget_mode_${projectId}`, // Auto-migrate from old localStorage key
-  });
-
-  // Helper to get mode for a specific tab
-  const getModeForTab = (tabId: string): ModeType => {
-    switch (tabId) {
-      case 'project':
-        return projectMode;
-      case 'planning':
-        return planningMode;
-      case 'budget':
-        return budgetMode;
-      case 'sales':
-        return salesMode;
-      case 'property':
-        return propertyMode;
-      case 'operations':
-        return operationsMode;
-      case 'valuation':
-        return valuationMode;
-      default:
-        return 'napkin';
-    }
-  };
 
   if (!project) {
     return null;
@@ -132,26 +39,25 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
     router.push(`/projects/${newProjectId}`);
   };
 
-  const handleTabChange = (tabId: string) => {
-    // Phase 1: Navigate to default route for each main tab
-    const defaultRoute = getTabDefaultRoute(projectId, tabId);
-    router.push(defaultRoute);
-  };
+  // TODO: Read tierLevel from user settings/subscription
+  // For now, default to 'analyst' tier
+  const tierLevel: 'analyst' | 'pro' = 'analyst';
 
   return (
     <div
-      className="sticky flex items-center gap-8 px-6 h-14 border-b"
+      className="sticky d-flex align-items-center gap-4 px-4 border-bottom"
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         borderColor: 'var(--cui-border-color)',
         top: '58px',
         zIndex: 40,
+        height: '56px'
       }}
     >
       {/* Project Selector - Left */}
-      <div className="flex items-center gap-2">
+      <div className="d-flex align-items-center gap-2">
         <span
-          className="text-xs font-medium"
+          className="text-xs fw-medium"
           style={{ color: 'var(--cui-secondary-color)' }}
         >
           Active Project:
@@ -159,7 +65,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         <select
           value={project.project_id}
           onChange={(e) => handleProjectChange(Number(e.target.value))}
-          className="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+          className="px-3 py-2 text-sm fw-medium rounded"
           style={{
             backgroundColor: 'var(--cui-tertiary-bg)',
             borderColor: 'var(--cui-border-color)',
@@ -177,42 +83,12 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         </select>
       </div>
 
-      {/* Project Tabs - Right */}
-      <div className="flex flex-1">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          const tabMode = getModeForTab(tab.id);
-
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className="px-3 py-4 text-sm font-medium transition-colors relative flex items-center"
-              style={{
-                color: isActive
-                  ? 'var(--cui-primary)'
-                  : 'var(--cui-secondary-color)',
-                borderBottom: isActive
-                  ? '2px solid var(--cui-primary)'
-                  : '2px solid transparent',
-                backgroundColor: 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor =
-                    'rgba(74, 158, 255, 0.05)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <span>{tab.label}</span>
-              {tab.hasMode && <ModeChip mode={tabMode} />}
-            </button>
-          );
-        })}
+      {/* Lifecycle Tiles - Right */}
+      <div className="flex-grow-1">
+        <LifecycleTileNav
+          projectId={projectId.toString()}
+          tierLevel={tierLevel}
+        />
       </div>
     </div>
   );
