@@ -68,13 +68,21 @@ export function useReportTemplatesForTab(tabName: string) {
   return useQuery<ReportTemplate[]>({
     queryKey: ['reportTemplates', 'tab', tabName],
     queryFn: async () => {
-      const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/for-tab/${encodeURIComponent(tabName)}/`);
+      const url = `${DJANGO_API_URL}/api/reports/templates/for-tab/${encodeURIComponent(tabName)}/`;
+      console.log('🔍 [useReportTemplatesForTab] Fetching:', url);
+
+      const response = await fetch(url);
+      console.log('🔍 [useReportTemplatesForTab] Response status:', response.status);
 
       if (!response.ok) {
+        console.error('❌ [useReportTemplatesForTab] Failed with status:', response.status);
         throw new Error(`Failed to fetch templates for tab: ${tabName}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('✅ [useReportTemplatesForTab] Fetched data:', data);
+      console.log('✅ [useReportTemplatesForTab] Number of templates:', data?.length);
+      return data;
     },
     enabled: !!tabName,
   });

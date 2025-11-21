@@ -25,6 +25,7 @@ interface SubTab {
  * - Planning: Parcel management and phasing
  * - Budget: Lifecycle stage budget management
  * - Sales: Sales & absorption (Phase 3)
+ * - DMS: Document Management System
  * - Operations: (Future) Operations tracking
  */
 export default function ProjectSubNav({ projectId }: ProjectSubNavProps) {
@@ -36,6 +37,7 @@ export default function ProjectSubNav({ projectId }: ProjectSubNavProps) {
     { id: 'planning', label: 'Planning', path: `/projects/${projectId}/project/planning` },
     { id: 'budget', label: 'Budget', path: `/projects/${projectId}/project/budget` },
     { id: 'sales', label: 'Sales & Absorption', path: `/projects/${projectId}/project/sales` },
+    { id: 'dms', label: 'DMS', path: `/projects/${projectId}/project/dms` },
     // Future Phase 4+ tabs
     // { id: 'operations', label: 'Operations', path: `/projects/${projectId}/project/operations` },
   ];

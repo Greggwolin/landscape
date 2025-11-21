@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CModal,
   CModalHeader,
@@ -20,10 +20,12 @@ import {
   type ReportTemplate,
   type CreateReportTemplateData,
 } from '@/hooks/useReports';
+import { useUnsavedChanges, useKeyboardShortcuts } from '@/hooks/useUnsavedChanges';
 
 interface ReportTemplateEditorModalProps {
   template: ReportTemplate | null;
   onClose: () => void;
+  defaultTab?: string;
 }
 
 // Available tabs for assignment
@@ -62,20 +64,33 @@ const AVAILABLE_SECTIONS = [
 export default function ReportTemplateEditorModal({
   template,
   onClose,
+  defaultTab,
 }: ReportTemplateEditorModalProps) {
   const isEditing = !!template;
   const createTemplate = useCreateReportTemplate();
   const updateTemplate = useUpdateReportTemplate();
 
-  const [formData, setFormData] = useState<CreateReportTemplateData>({
+  const initialData = useMemo<CreateReportTemplateData>(() => ({
     template_name: template?.template_name || '',
     description: template?.description || '',
     output_format: template?.output_format || 'pdf',
-    assigned_tabs: template?.assigned_tabs || [],
+    assigned_tabs: template?.assigned_tabs || (defaultTab ? [defaultTab] : []),
     sections: template?.sections || [],
-  });
+  }), [template, defaultTab]);
 
+  const [formData, setFormData] = useState<CreateReportTemplateData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Detect if form has unsaved changes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  }, [formData, initialData]);
+
+  // Use unsaved changes hook for close confirmation
+  const handleCloseWithConfirmation = useUnsavedChanges(hasChanges, onClose);
+
+  // Add keyboard shortcuts (ESC to close, Cmd/Ctrl+Enter to submit)
+  useKeyboardShortcuts(handleCloseWithConfirmation);
 
   const handleInputChange = (field: keyof CreateReportTemplateData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -158,8 +173,8 @@ export default function ReportTemplateEditorModal({
   const isSaving = createTemplate.isPending || updateTemplate.isPending;
 
   return (
-    <CModal visible={true} onClose={onClose} size="lg" backdrop="static">
-      <CModalHeader>
+    <CModal visible={true} onClose={handleCloseWithConfirmation} size="lg" backdrop="static">
+      <CModalHeader closeButton>
         <CModalTitle>
           {isEditing ? 'Edit Report Template' : 'Create Report Template'}
         </CModalTitle>
@@ -279,7 +294,7 @@ export default function ReportTemplateEditorModal({
         </CModalBody>
 
         <CModalFooter>
-          <LandscapeButton variant="secondary" onClick={onClose} disabled={isSaving}>
+          <LandscapeButton variant="secondary" onClick={handleCloseWithConfirmation} disabled={isSaving}>
             Cancel
           </LandscapeButton>
           <LandscapeButton variant="primary" type="submit" disabled={isSaving}>

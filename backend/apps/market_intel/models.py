@@ -124,3 +124,76 @@ class MarketData(models.Model):
     class Meta:
         managed = False
         abstract = True
+
+
+class MarketCompetitiveProject(models.Model):
+    """
+    Model for competitive land development projects.
+    Used in Planning & Engineering → Market Analysis page.
+    Maps to landscape.market_competitive_projects
+    """
+
+    id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='competitive_projects'
+    )
+    comp_name = models.CharField(max_length=200)
+    comp_address = models.TextField(null=True, blank=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=8, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=11, decimal_places=8, null=True, blank=True)
+    total_units = models.IntegerField(null=True, blank=True)
+    price_min = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    price_max = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    absorption_rate_monthly = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Units per month")
+    status = models.CharField(max_length=50, default='selling', help_text="selling, sold_out, planned")
+    data_source = models.CharField(max_length=50, default='manual', help_text="manual, landscaper_ai, mls, public_records")
+    source_url = models.TextField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'market_competitive_projects'
+        ordering = ['project', '-created_at']
+
+    def __str__(self):
+        return f"{self.comp_name} ({self.status})"
+
+
+class MarketMacroData(models.Model):
+    """
+    Model for market macro-economic data.
+    Used in Planning & Engineering → Market Analysis page.
+    Maps to landscape.market_macro_data
+    """
+
+    id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='market_macro_data'
+    )
+    population_growth_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Percentage")
+    employment_trend = models.CharField(max_length=50, null=True, blank=True, help_text="growing, stable, declining")
+    household_formation_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Percentage")
+    building_permits_annual = models.IntegerField(null=True, blank=True)
+    median_income = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    data_year = models.IntegerField(null=True, blank=True)
+    data_source = models.CharField(max_length=50, default='manual', help_text="manual, landscaper_ai, census, bls")
+    source_url = models.TextField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'market_macro_data'
+        ordering = ['project', '-data_year']
+
+    def __str__(self):
+        return f"Macro Data for {self.project.project_name} ({self.data_year})"

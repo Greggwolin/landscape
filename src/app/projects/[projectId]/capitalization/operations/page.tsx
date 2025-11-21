@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubNav';
 import MetricCard from '@/components/capitalization/MetricCard';
 import DeveloperFeesTable, { type DeveloperFee } from '@/components/capitalization/DeveloperFeesTable';
+import { ExportButton } from '@/components/admin';
 
 export default function DeveloperOperationsPage() {
   const params = useParams();
@@ -45,6 +46,11 @@ export default function DeveloperOperationsPage() {
         className="p-4 space-y-4 min-h-screen"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Capitalization</h5>
+          <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
+        </div>
+
         <h2 className="mb-4">Developer Operations</h2>
 
         <CRow className="g-3 mb-4">

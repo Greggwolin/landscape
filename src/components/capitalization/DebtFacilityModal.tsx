@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CModal,
   CModalHeader,
@@ -16,6 +16,7 @@ import {
   CCol,
 } from '@coreui/react';
 import type { DebtFacility } from './DebtFacilitiesTable';
+import { useUnsavedChanges, useKeyboardShortcuts } from '@/hooks/useUnsavedChanges';
 
 interface DebtFacilityModalProps {
   visible: boolean;
@@ -36,16 +37,20 @@ export default function DebtFacilityModal({
   onClose,
   onSave,
 }: DebtFacilityModalProps) {
-  const [formData, setFormData] = useState<Partial<DebtFacility>>({
-    facilityName: '',
-    lender: '',
-    facilityType: 'construction',
-    commitmentAmount: 0,
-    outstandingBalance: 0,
-    interestRate: 0,
-    maturityDate: '',
-    status: 'active',
-  });
+  // Track initial data for change detection
+  const initialData = useMemo<Partial<DebtFacility>>(() =>
+    facility || {
+      facilityName: '',
+      lender: '',
+      facilityType: 'construction',
+      commitmentAmount: 0,
+      outstandingBalance: 0,
+      interestRate: 0,
+      maturityDate: '',
+      status: 'active',
+    }, [facility]);
+
+  const [formData, setFormData] = useState<Partial<DebtFacility>>(initialData);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -68,6 +73,17 @@ export default function DebtFacilityModal({
       setErrors({});
     }
   }, [visible, facility]);
+
+  // Detect if form has unsaved changes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  }, [formData, initialData]);
+
+  // Use unsaved changes hook for close confirmation
+  const handleCloseWithConfirmation = useUnsavedChanges(hasChanges, onClose);
+
+  // Add keyboard shortcuts (ESC to close)
+  useKeyboardShortcuts(handleCloseWithConfirmation);
 
   const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -130,12 +146,12 @@ export default function DebtFacilityModal({
   return (
     <CModal
       visible={visible}
-      onClose={onClose}
+      onClose={handleCloseWithConfirmation}
       alignment="center"
       size="lg"
       backdrop="static"
     >
-      <CModalHeader>
+      <CModalHeader closeButton>
         <CModalTitle>
           {facility ? 'Edit Debt Facility' : 'Add Debt Facility'}
         </CModalTitle>
@@ -247,7 +263,7 @@ export default function DebtFacilityModal({
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="secondary" onClick={onClose} disabled={saving}>
+          <CButton color="secondary" onClick={handleCloseWithConfirmation} disabled={saving}>
             Cancel
           </CButton>
           <CButton color="primary" type="submit" disabled={saving}>

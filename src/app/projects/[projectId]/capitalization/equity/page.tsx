@@ -10,6 +10,7 @@ import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubN
 import MetricCard from '@/components/capitalization/MetricCard';
 import EquityPartnersTable, { type EquityPartner } from '@/components/capitalization/EquityPartnersTable';
 import WaterfallStructureTable, { type WaterfallTier } from '@/components/capitalization/WaterfallStructureTable';
+import { ExportButton } from '@/components/admin';
 
 export default function EquityPage() {
   const params = useParams();
@@ -60,6 +61,11 @@ export default function EquityPage() {
         className="p-4 space-y-4 min-h-screen"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Capitalization</h5>
+          <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
+        </div>
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2>Equity Structure</h2>
           <CButton

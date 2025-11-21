@@ -12,6 +12,7 @@ import DebtFacilitiesTable, { type DebtFacility } from '@/components/capitalizat
 import DebtFacilityModal from '@/components/capitalization/DebtFacilityModal';
 import DrawScheduleTable, { type DrawEvent } from '@/components/capitalization/DrawScheduleTable';
 import { useToast } from '@/components/ui/toast';
+import { ExportButton } from '@/components/admin';
 
 export default function DebtPage() {
   const params = useParams();
@@ -157,6 +158,11 @@ export default function DebtPage() {
         className="p-4 space-y-4 min-h-screen"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Capitalization</h5>
+          <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
+        </div>
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2>Debt Facilities</h2>
           <CButton

@@ -20,6 +20,7 @@ import {
 import CategoryCascadingDropdown from './CategoryCascadingDropdown';
 import type { BudgetItem } from './ColumnDefinitions';
 import type { BudgetMode } from './ModeSelector';
+import { useUnsavedChanges, useKeyboardShortcuts } from '@/hooks/useUnsavedChanges';
 
 export interface BudgetItemFormValues {
   fact_id?: number;
@@ -146,7 +147,10 @@ export default function BudgetItemModal({
   onSave,
   onDelete,
 }: BudgetItemModalProps) {
-  const [form, setForm] = useState<FormState>(buildStateFromItem(initialItem));
+  // Track initial data for change detection
+  const initialData = useMemo(() => buildStateFromItem(initialItem), [initialItem]);
+
+  const [form, setForm] = useState<FormState>(initialData);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +161,17 @@ export default function BudgetItemModal({
       setError(null);
     }
   }, [initialItem, open]);
+
+  // Detect if form has unsaved changes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(form) !== JSON.stringify(initialData);
+  }, [form, initialData]);
+
+  // Use unsaved changes hook for close confirmation
+  const handleCloseWithConfirmation = useUnsavedChanges(hasChanges, onClose);
+
+  // Add keyboard shortcuts (ESC to close)
+  useKeyboardShortcuts(handleCloseWithConfirmation);
 
   const calculatedAmount = useMemo(() => {
     const qty = form.qty ?? 0;
@@ -252,8 +267,8 @@ const updateDate = (key: keyof FormState, value: string) => {
   };
 
   return (
-    <CModal visible={open} onClose={onClose} alignment="center" size="lg" scrollable>
-      <CModalHeader>
+    <CModal visible={open} onClose={handleCloseWithConfirmation} alignment="center" size="lg" scrollable>
+      <CModalHeader closeButton>
         <CModalTitle>
           {mode === 'create' ? 'Add Budget Item' : `Edit Budget Item #${form.fact_id ?? ''}`}
         </CModalTitle>
@@ -498,7 +513,7 @@ const updateDate = (key: keyof FormState, value: string) => {
             <span />
           )}
           <div className="d-flex gap-2">
-            <CButton color="secondary" variant="outline" onClick={onClose} disabled={submitting}>
+            <CButton color="secondary" variant="outline" onClick={handleCloseWithConfirmation} disabled={submitting}>
               Cancel
             </CButton>
             <CButton color="primary" type="submit" disabled={submitting}>

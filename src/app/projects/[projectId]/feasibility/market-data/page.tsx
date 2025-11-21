@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import FeasibilitySubNav from '@/components/feasibility/FeasibilitySubNav';
 import MarketDataContent from '@/components/feasibility/MarketDataContent';
+import { ExportButton } from '@/components/admin';
 
 /**
  * Market Data Page
@@ -25,7 +26,14 @@ export default function MarketDataPage() {
   return (
     <>
       <FeasibilitySubNav projectId={projectId} />
-      <MarketDataContent projectId={projectId} />
+      <div className="container-fluid py-4">
+        {/* Page Header */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Feasibility</h5>
+          <ExportButton tabName="Feasibility" projectId={projectId.toString()} />
+        </div>
+        <MarketDataContent projectId={projectId} />
+      </div>
     </>
   );
 }

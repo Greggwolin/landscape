@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import FeasibilitySubNav from '@/components/feasibility/FeasibilitySubNav';
 import SensitivityAnalysisContent from '@/components/feasibility/SensitivityAnalysisContent';
+import { ExportButton } from '@/components/admin';
 
 /**
  * Sensitivity Analysis Page
@@ -26,7 +27,14 @@ export default function SensitivityAnalysisPage() {
   return (
     <>
       <FeasibilitySubNav projectId={projectId} />
-      <SensitivityAnalysisContent projectId={projectId} />
+      <div className="container-fluid py-4">
+        {/* Page Header */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Feasibility</h5>
+          <ExportButton tabName="Feasibility" projectId={projectId.toString()} />
+        </div>
+        <SensitivityAnalysisContent projectId={projectId} />
+      </div>
     </>
   );
 }
