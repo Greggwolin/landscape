@@ -37,9 +37,9 @@ class SalesComparable(models.Model):
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     price_per_sf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     year_built = models.IntegerField(null=True, blank=True)
-    units = models.IntegerField(null=True, blank=True)
-    building_sf = models.IntegerField(null=True, blank=True)
-    cap_rate = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    units = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Changed to support acres with decimals
+    building_sf = models.CharField(max_length=255, null=True, blank=True)  # Changed to CharField to support entitlements text for land sales
+    cap_rate = models.CharField(max_length=255, null=True, blank=True)  # Changed to CharField to support utilities text for land sales
     grm = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     distance_from_subject = models.CharField(max_length=50, null=True, blank=True)
     latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)

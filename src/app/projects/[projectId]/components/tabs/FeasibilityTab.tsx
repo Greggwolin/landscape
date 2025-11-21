@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, memo } from 'react';
+import { ExportButton } from '@/components/admin';
 
 type Tab = 'sales-comparison' | 'residual' | 'cash-flow';
 
@@ -94,6 +95,12 @@ function FeasibilityTab({ project }: FeasibilityTabProps) {
 
   return (
     <div>
+      {/* Header with Export Button */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="mb-0">Feasibility Analysis</h2>
+        <ExportButton tabName="Feasibility" projectId={projectId.toString()} />
+      </div>
+
       {/* Sub-Tab Bar for Feasibility Approaches */}
       <div
         className="border-b mb-6"

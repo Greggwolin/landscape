@@ -100,8 +100,8 @@ export interface SalesComparable {
   price_per_sf: number | null;
   year_built: number | null;
   units: number | null;
-  building_sf: number | null;
-  cap_rate: number | null;
+  building_sf: number | string | null; // String for land (entitlements), number for MF (square feet)
+  cap_rate: number | string | null; // String for land (utilities), number for MF (cap rate %)
   grm: number | null;
   distance_from_subject: string | null;
   latitude: number | null;
@@ -267,24 +267,26 @@ export interface ValuationSummary {
 
 export interface SalesComparableForm {
   project_id: number;
-  comp_number?: number;
-  property_name?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  sale_date?: string;
-  sale_price?: number;
-  price_per_unit?: number;
-  price_per_sf?: number;
-  year_built?: number;
-  units?: number;
-  building_sf?: number;
-  cap_rate?: number;
-  grm?: number;
-  distance_from_subject?: string;
-  unit_mix?: UnitMix;
-  notes?: string;
+  comp_number?: number | null;
+  property_name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  sale_date?: string | null;
+  sale_price?: number | null;
+  price_per_unit?: number | null;
+  price_per_sf?: number | null;
+  year_built?: number | null;
+  units?: number | null;
+  building_sf?: number | string | null; // String for land (entitlements), number for MF (square feet)
+  cap_rate?: number | string | null; // String for land (utilities), number for MF (cap rate %)
+  grm?: number | null;
+  distance_from_subject?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  unit_mix?: UnitMix | null;
+  notes?: string | null;
 }
 
 export interface SalesCompAdjustmentForm {

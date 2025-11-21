@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import BudgetGridWithTimeline from '@/components/budget/custom/BudgetGridWithTimeline';
 import '@/components/budget/custom/BudgetGrid.css';
 import { LandscapeButton } from '@/components/ui/landscape';
+import { ExportButton } from '@/components/admin';
 
 export default function BudgetPage() {
   const params = useParams();
@@ -50,9 +51,7 @@ export default function BudgetPage() {
           <LandscapeButton color="secondary" variant="outline">
             Import from Excel
           </LandscapeButton>
-          <LandscapeButton color="secondary" variant="outline">
-            Export to PDF
-          </LandscapeButton>
+          <ExportButton tabName="Budget" projectId={projectId} />
           <LandscapeButton color="primary">
             Save Budget
           </LandscapeButton>

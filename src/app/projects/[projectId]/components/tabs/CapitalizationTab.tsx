@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { CCard, CCardHeader, CCardBody } from '@coreui/react';
+import { ExportButton } from '@/components/admin';
 
 interface Project {
   project_id: number;
@@ -15,7 +16,10 @@ interface CapitalizationTabProps {
 export default function CapitalizationTab({ project }: CapitalizationTabProps) {
   return (
     <CCard>
-      <CCardHeader>Capitalization</CCardHeader>
+      <CCardHeader className="d-flex justify-content-between align-items-center">
+        <span>Capitalization</span>
+        <ExportButton tabName="Capitalization" projectId={project.project_id.toString()} />
+      </CCardHeader>
       <CCardBody>
         <div className="text-center py-8">
           <h5>Capitalization Tab - Coming Soon</h5>

@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
 import ComparablesTable, { type ComparableColumn, type ComparableRow } from './ComparablesTable';
 import ComparableModal from './ComparableModal';
+import { SalesComparisonApproach } from '@/app/projects/[projectId]/valuation/components/SalesComparisonApproach';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/toast';
+import { getValuationSummary } from '@/lib/api/valuation';
 
 interface MarketDataContentProps {
   projectId: number;
@@ -70,16 +72,31 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
     type: null,
   });
 
-  // Fetch land sales comparables
-  const { data: landSales = [] } = useQuery({
-    queryKey: ['market-data', 'land-sales', projectId],
+  // Fetch valuation summary (includes sales comparables from Django backend)
+  // For land projects, this uses the same tbl_sales_comparables table as MF projects
+  // The mode='land' prop will show land-appropriate field labels
+  const { data: valuationData, isLoading: valuationLoading } = useQuery({
+    queryKey: ['valuation-summary', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/market-data/land-sales`);
-      if (!response.ok) throw new Error('Failed to fetch land sales');
-      const data = await response.json();
-      return data.comparables || [];
+      try {
+        const data = await getValuationSummary(projectId);
+        return data;
+      } catch (error) {
+        console.error('Error fetching valuation summary:', error);
+        // Return empty data structure if API call fails
+        return {
+          project_id: projectId,
+          sales_comparables: [],
+          sales_comparison_summary: { total_comps: 0, indicated_value_per_unit: null, weighted_average_per_unit: null, total_indicated_value: null },
+          cost_approach: null,
+          income_approach: null,
+          reconciliation: null
+        };
+      }
     },
   });
+
+  const landSales = valuationData?.sales_comparables || [];
 
   // Fetch housing price comparables
   const { data: housingPrices = [] } = useQuery({
@@ -217,14 +234,12 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
         defaultExpanded={true}
       >
         <div className="p-4">
-          <ComparablesTable
-            title="Land Sale Comparables"
-            columns={LAND_SALES_COLUMNS}
-            data={landSales}
-            onAdd={() => handleOpenModal('land_sales')}
-            onEdit={(row) => handleOpenModal('land_sales', row)}
-            onDelete={(id) => handleDelete('land_sales', id)}
-            emptyMessage="No land sale comparables yet. Click 'Add Comparable' to track nearby sales."
+          <SalesComparisonApproach
+            projectId={projectId}
+            comparables={landSales}
+            reconciliation={valuationData?.reconciliation || null}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey: ['valuation-summary', projectId] })}
+            mode="land"
           />
         </div>
       </CollapsibleSection>

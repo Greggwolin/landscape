@@ -54,12 +54,13 @@ export default function BenchmarksPanel() {
     setError(null);
 
     try {
-      const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes] = await Promise.all([
+      const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes, growthRatesRes] = await Promise.all([
         fetch('/api/benchmarks'),
         fetch('/api/sale-benchmarks/global'),
         fetch('/api/benchmarks/ai-suggestions'),
         fetch('/api/benchmarks/absorption-velocity'),
         fetch('/api/unit-costs/templates'),
+        fetch('/api/benchmarks/growth-rates'),
       ]);
 
       if (!benchmarkRes.ok) {
@@ -71,9 +72,21 @@ export default function BenchmarksPanel() {
       const suggestionsData = suggestionsRes.ok ? await suggestionsRes.json() : { suggestions: [] };
       const absorptionData = absorptionRes.ok ? await absorptionRes.json() : { absorption_velocities: [] };
       const unitCostTemplatesData = unitCostTemplatesRes.ok ? await unitCostTemplatesRes.json() : { templates: [] };
+      const growthRatesData = growthRatesRes.ok ? await growthRatesRes.json() : { sets: [] };
 
-      setBenchmarks(benchmarkData.benchmarks || {});
-      setGrowthRateSets(benchmarkData.growth_rate_sets || []);
+      // Group benchmarks by category
+      const benchmarksList = Array.isArray(benchmarkData.benchmarks) ? benchmarkData.benchmarks : [];
+      const grouped: Record<string, Benchmark[]> = {};
+      benchmarksList.forEach((benchmark: Benchmark) => {
+        const category = benchmark.category || 'other';
+        if (!grouped[category]) {
+          grouped[category] = [];
+        }
+        grouped[category].push(benchmark);
+      });
+
+      setBenchmarks(grouped);
+      setGrowthRateSets(growthRatesData.sets || []);
       setAiSuggestions(suggestionsData.suggestions || []);
       setAbsorptionCount(absorptionData.absorption_velocities?.length || 0);
       setTotalCostLineItems(unitCostTemplatesData.templates?.length || 0);
@@ -110,19 +123,52 @@ export default function BenchmarksPanel() {
           backgroundColor: 'var(--cui-body-bg)'
         }}
       >
-        <BenchmarkAccordion
-          categories={CATEGORIES}
-          benchmarks={benchmarks}
-          growthRateSets={growthRateSets}
-          absorptionCount={absorptionCount}
-          totalCostLineItems={totalCostLineItems}
-          onCategorySelect={handleCategorySelect}
-          onAddBenchmark={handleAddBenchmark}
-          selectedCategory={selectedCategory}
-        />
+        {CATEGORIES.map((category) => {
+          // Get benchmarks for this category
+          const categoryBenchmarks = benchmarks[category.key] || [];
+
+          // Update count based on special categories
+          let displayCount = categoryBenchmarks.length;
+          if (category.key === 'growth_rate') {
+            displayCount = growthRateSets.length;
+          } else if (category.key === 'absorption') {
+            displayCount = absorptionCount;
+          }
+
+          const categoryWithCount = { ...category, count: displayCount };
+
+          // Growth Rate category uses custom panel in left accordion
+          if (category.key === 'growth_rate') {
+            return (
+              <GrowthRateCategoryPanel
+                key={category.key}
+                category={categoryWithCount}
+                sets={growthRateSets}
+                isExpanded={selectedCategory?.key === category.key}
+                loading={loading}
+                onToggle={() => handleCategorySelect(category)}
+                onRefresh={loadData}
+              />
+            );
+          }
+
+          // All other categories use BenchmarkAccordion
+          return (
+            <BenchmarkAccordion
+              key={category.key}
+              category={categoryWithCount}
+              benchmarks={categoryBenchmarks}
+              isExpanded={selectedCategory?.key === category.key}
+              onToggle={() => handleCategorySelect(category)}
+              onBenchmarkClick={(benchmark) => console.log('Benchmark clicked:', benchmark)}
+              onAddNew={() => handleAddBenchmark(category)}
+              onRefresh={loadData}
+            />
+          );
+        })}
       </div>
 
-      {/* Right Panel - Details */}
+      {/* Right Panel - Placeholder for future Landscaper integration */}
       <div
         style={{
           width: `${100 - leftPanelWidth}%`,
@@ -131,28 +177,11 @@ export default function BenchmarksPanel() {
           padding: '1rem'
         }}
       >
-        {selectedCategory ? (
-          selectedCategory.key === 'growth_rate' ? (
-            <GrowthRateCategoryPanel
-              growthRateSets={growthRateSets}
-              onRefresh={loadData}
-            />
-          ) : selectedCategory.key === 'absorption' ? (
-            <AbsorptionVelocityPanel onRefresh={loadData} />
-          ) : (
-            <div className="text-center py-5">
-              <p className="text-muted">
-                {selectedCategory.label} panel coming soon.
-              </p>
-            </div>
-          )
-        ) : (
-          <div className="text-center py-5">
-            <p className="text-muted">
-              Select a category from the left to view and manage benchmarks.
-            </p>
-          </div>
-        )}
+        <div className="text-center py-5">
+          <p className="text-muted">
+            Landscaper panel will be integrated here in a future update.
+          </p>
+        </div>
       </div>
 
       {/* Add Benchmark Modal */}

@@ -2,7 +2,8 @@
 
 import React from 'react';
 import PlanningContent from '@/app/components/Planning/PlanningContent';
-import { CCard, CCardBody } from '@coreui/react';
+import { CCard, CCardBody, CCardHeader } from '@coreui/react';
+import { ExportButton } from '@/components/admin';
 
 interface Project {
   project_id: number;
@@ -73,5 +74,15 @@ export default function PlanningTab({ project }: PlanningTabProps) {
     );
   }
 
-  return <PlanningContent projectId={project.project_id} />;
+  return (
+    <CCard>
+      <CCardHeader className="d-flex justify-content-between align-items-center">
+        <span>Planning</span>
+        <ExportButton tabName="Planning" projectId={project.project_id.toString()} />
+      </CCardHeader>
+      <CCardBody>
+        <PlanningContent projectId={project.project_id} />
+      </CCardBody>
+    </CCard>
+  );
 }

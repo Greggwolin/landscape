@@ -4,6 +4,7 @@ ViewSets for Reports API endpoints.
 Provides:
 - Financial calculation endpoints
 - PDF report generation endpoints
+- Report template CRUD operations
 """
 
 from rest_framework import viewsets, status
@@ -14,6 +15,8 @@ from django.http import HttpResponse
 from decimal import Decimal
 
 from .calculators import MultifamilyCalculator, MetricsCalculator
+from .models import ReportTemplate
+from .serializers import ReportTemplateSerializer
 
 
 class ReportViewSet(viewsets.ViewSet):
@@ -280,6 +283,106 @@ class ReportViewSet(viewsets.ViewSet):
             response['Content-Disposition'] = f'inline; filename="rent_roll_{project_id}.pdf"'
             return response
 
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ReportTemplateViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Report Template CRUD operations.
+
+    Endpoints:
+    - GET /api/reports/templates/ - List all templates
+    - POST /api/reports/templates/ - Create new template
+    - GET /api/reports/templates/:id/ - Retrieve template
+    - PUT/PATCH /api/reports/templates/:id/ - Update template
+    - DELETE /api/reports/templates/:id/ - Delete template
+    - PATCH /api/reports/templates/:id/toggle_active/ - Toggle active status
+    - GET /api/reports/templates/for-tab/:tab_name/ - Get templates for a specific tab
+    """
+    queryset = ReportTemplate.objects.all()
+    serializer_class = ReportTemplateSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter templates by active status if requested."""
+        queryset = super().get_queryset()
+
+        # Filter by active status if requested
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        return queryset.order_by('-updated_at')
+
+    @action(detail=True, methods=['patch'])
+    def toggle_active(self, request, pk=None):
+        """Toggle the is_active status of a template."""
+        template = self.get_object()
+        template.is_active = not template.is_active
+        template.save()
+        serializer = self.get_serializer(template)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='for-tab/(?P<tab_name>[^/.]+)')
+    def for_tab(self, request, tab_name=None):
+        """
+        Get active templates assigned to a specific tab.
+
+        Usage: GET /api/reports/templates/for-tab/Budget/
+        """
+        templates = ReportTemplate.objects.filter(
+            is_active=True,
+            assigned_tabs__contains=[tab_name]
+        )
+        serializer = self.get_serializer(templates, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path=r'generate/(?P<template_id>[0-9]+)/(?P<project_id>[0-9]+)')
+    def generate_report(self, request, template_id=None, project_id=None):
+        """
+        Generate a report from a template.
+        
+        POST /api/reports/generate/:template_id/:project_id/
+        
+        Returns: PDF file
+        """
+        try:
+            from .generators.base import TemplateReportGenerator
+            
+            # Get the template
+            template = ReportTemplate.objects.get(id=template_id, is_active=True)
+            
+            # Prepare template config
+            template_config = {
+                'template_name': template.template_name,
+                'description': template.description,
+                'sections': template.sections,
+                'output_format': template.output_format,
+            }
+            
+            # Generate PDF
+            generator = TemplateReportGenerator(
+                project_id=int(project_id),
+                template_id=int(template_id),
+                template_config=template_config
+            )
+            
+            pdf = generator.generate_pdf()
+            
+            # Return PDF response
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{template.template_name}_{project_id}.pdf"'
+            return response
+            
+        except ReportTemplate.DoesNotExist:
+            return Response(
+                {'error': 'Template not found or inactive'},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             return Response(
                 {'error': str(e)},

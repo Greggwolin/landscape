@@ -9,7 +9,7 @@ import type { BenchmarkCategory, Benchmark } from '@/types/benchmarks';
 
 interface Props {
   category: BenchmarkCategory;
-  benchmarks: Benchmark[];
+  benchmarks: Benchmark[] | Record<string, Benchmark[]>; // Accept both array and object
   isExpanded: boolean;
   hideHeader?: boolean;
   onToggle: () => void;
@@ -83,12 +83,23 @@ export default function BenchmarkAccordion({
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
 
+  // Ensure benchmarks is an array (handle cases where it might be passed as an object)
+  const benchmarksArray = React.useMemo(() => {
+    if (!benchmarks) return [];
+    if (Array.isArray(benchmarks)) return benchmarks;
+    // If it's an object (Record<string, Benchmark[]>), flatten all values
+    if (typeof benchmarks === 'object') {
+      return Object.values(benchmarks).flat();
+    }
+    return [];
+  }, [benchmarks]);
+
   // Calculate stale count (>730 days = 24 months)
-  const staleCount = benchmarks.filter(b => (b.age_days || 0) > 730).length;
+  const staleCount = benchmarksArray.filter(b => (b.age_days || 0) > 730).length;
 
   // Sort benchmarks: global defaults first, then project-specific, then product-specific
   const sortedBenchmarks = React.useMemo(() => {
-    return [...benchmarks].sort((a, b) => {
+    return [...benchmarksArray].sort((a, b) => {
       // Use scope_level if available, fall back to source_type check
       const aScope = a.scope_level || (a.source_type === 'global_default' ? 'global' : 'project');
       const bScope = b.scope_level || (b.source_type === 'global_default' ? 'global' : 'project');
@@ -102,7 +113,7 @@ export default function BenchmarkAccordion({
       // Within same scope level, sort alphabetically by name
       return (a.benchmark_name || '').localeCompare(b.benchmark_name || '');
     });
-  }, [benchmarks]);
+  }, [benchmarksArray]);
 
   const handleAddNew = async () => {
     // Clear previous messages
@@ -249,7 +260,7 @@ export default function BenchmarkAccordion({
             ) : (
               <ChevronRight size={20} className="" style={{ color: 'var(--cui-secondary-color)' }} />
             )}
-            <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{category.label}</span>
+            <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{category?.label || 'Unknown Category'}</span>
           </div>
           <div className="flex items-center gap-2">
             {staleCount > 0 && (
@@ -257,7 +268,7 @@ export default function BenchmarkAccordion({
                 {staleCount} stale
               </span>
             )}
-            <span className="text-sm " style={{ color: 'var(--cui-secondary-color)' }}>{category.count}</span>
+            <span className="text-sm " style={{ color: 'var(--cui-secondary-color)' }}>{category?.count || benchmarksArray.length}</span>
           </div>
         </button>
       )}
@@ -658,7 +669,7 @@ function BenchmarkListItem({
         const value = parseFloat(formData.value);
 
         // Determine which field to set based on value_type
-        let saleBenchmarkPayload: any = {
+        const saleBenchmarkPayload: any = {
           benchmark_name: formData.benchmark_name,
           description: formData.description,
           scope_level: formData.scope_level, // Include scope_level in update

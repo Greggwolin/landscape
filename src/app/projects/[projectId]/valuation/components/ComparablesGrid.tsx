@@ -18,8 +18,10 @@ interface ComparablesGridProps {
   comparables: SalesComparable[];
   projectId: number;
   onEdit?: (comp: SalesComparable) => void;
+  onDelete?: (compId: number) => Promise<void>;
   onRefresh?: () => void;
   onAddComp?: () => void;
+  mode?: 'multifamily' | 'land'; // Field label mode: multifamily (default) or land sales
 }
 
 interface OpenAnalysisPanel {
@@ -29,10 +31,26 @@ interface OpenAnalysisPanel {
   comparable: SalesComparable;
 }
 
-export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onAddComp }: ComparablesGridProps) {
+export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRefresh, onAddComp, mode = 'multifamily' }: ComparablesGridProps) {
   const [openAdjustmentPanel, setOpenAdjustmentPanel] = useState<OpenAnalysisPanel | null>(null);
   const [editingCompId, setEditingCompId] = useState<number | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState<{ compId: number; comp: SalesComparable } | null>(null);
+
+  // Field label mapping based on mode
+  const getFieldLabel = (field: string): string => {
+    if (mode === 'land') {
+      const landMapping: Record<string, string> = {
+        'Price/Unit': 'Price/Acre',
+        'Price/SF': 'Price/Front Foot',
+        'Units': 'Acres',
+        'Building SF': 'Zoning',
+        'Cap Rate': 'Entitlements',
+        'Year Built': 'Utilities',
+      };
+      return landMapping[field] || field;
+    }
+    return field;
+  };
 
   const formatCurrency = (value: number | null | undefined) => {
     if (!value) return '-';
@@ -146,16 +164,14 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
     if (!deleteModalOpen) return;
 
     try {
-      // TODO: Call API to soft-delete the comparable and store metadata about why it wasn't suitable
-      // await deleteComparable(deleteModalOpen.compId, { reason: aiAnalysis });
-
-      // For now, just close modal and refresh
-      alert(`Delete functionality for ${deleteModalOpen.comp.property_name} - Coming in Phase 2`);
+      if (onDelete) {
+        await onDelete(deleteModalOpen.compId);
+      }
       setDeleteModalOpen(null);
       onRefresh?.();
     } catch (error) {
       console.error('Error deleting comparable:', error);
-      alert('Error deleting comparable');
+      alert(`Error deleting comparable: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -558,7 +574,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Price/Unit */}
+              {/* Price/Unit (or Price/Acre for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -567,7 +583,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Price/Unit
+                  {getFieldLabel('Price/Unit')}
                 </td>
                 {comparables.map(comp => (
                   <td
@@ -584,7 +600,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Price/SF */}
+              {/* Price/SF (or Price/Front Foot for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -593,7 +609,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Price/SF
+                  {getFieldLabel('Price/SF')}
                 </td>
                 {comparables.map(comp => (
                   <td
@@ -610,7 +626,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Units */}
+              {/* Units (or Acres for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -619,7 +635,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Units
+                  {getFieldLabel('Units')}
                 </td>
                 {comparables.map(comp => (
                   <td
@@ -636,7 +652,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Building SF */}
+              {/* Building SF (or Zoning for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -645,7 +661,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Building SF
+                  {getFieldLabel('Building SF')}
                 </td>
                 {comparables.map(comp => (
                   <td
@@ -662,7 +678,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Cap Rate */}
+              {/* Cap Rate (or Entitlements for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -671,7 +687,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Cap Rate
+                  {getFieldLabel('Cap Rate')}
                 </td>
                 {comparables.map(comp => (
                   <td
@@ -688,7 +704,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                 ))}
               </tr>
 
-              {/* Year Built */}
+              {/* Year Built (or Utilities for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
                   className="py-2 px-4 font-medium sticky left-0 z-10"
@@ -697,7 +713,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onRefresh, onA
                     backgroundColor: 'var(--cui-card-bg)'
                   }}
                 >
-                  Year Built
+                  {getFieldLabel('Year Built')}
                 </td>
                 {comparables.map(comp => (
                   <td
