@@ -22,40 +22,40 @@ const TILES: TileConfig[] = [
   {
     id: 'acquisition',
     label: 'Acquisition',
-    colorClass: 'bg-info-subtle',
-    textClass: 'text-info-emphasis',
+    colorClass: 'bg-info',
+    textClass: 'text-white',
     borderClass: 'border-info',
     route: '/acquisition'
   },
   {
     id: 'planning',
     label: 'Planning &\nEngineering',
-    colorClass: 'bg-success-subtle',
-    textClass: 'text-success-emphasis',
+    colorClass: 'bg-success',
+    textClass: 'text-white',
     borderClass: 'border-success',
     route: '/planning/market'
   },
   {
     id: 'development',
     label: 'Development',
-    colorClass: 'bg-warning-subtle',
-    textClass: 'text-warning-emphasis',
+    colorClass: 'bg-warning',
+    textClass: 'text-dark',
     borderClass: 'border-warning',
     route: '/development/phasing'
   },
   {
     id: 'sales',
     label: 'Sales &\nMarketing',
-    colorClass: 'bg-primary-subtle',
-    textClass: 'text-primary-emphasis',
+    colorClass: 'bg-primary',
+    textClass: 'text-white',
     borderClass: 'border-primary',
     route: '/sales-marketing'
   },
   {
     id: 'capitalization',
     label: 'Capitalization\nDebt/Equity',
-    colorClass: 'bg-danger-subtle',
-    textClass: 'text-danger-emphasis',
+    colorClass: 'bg-danger',
+    textClass: 'text-white',
     borderClass: 'border-danger',
     route: '/capitalization',
     proOnly: true
@@ -63,16 +63,16 @@ const TILES: TileConfig[] = [
   {
     id: 'results',
     label: 'Project\nResults',
-    colorClass: 'bg-secondary-subtle',
-    textClass: 'text-secondary-emphasis',
+    colorClass: 'bg-secondary',
+    textClass: 'text-white',
     borderClass: 'border-secondary',
     route: '/results'
   },
   {
     id: 'documents',
     label: 'Documents',
-    colorClass: 'bg-dark-subtle',
-    textClass: 'text-dark-emphasis',
+    colorClass: 'bg-dark',
+    textClass: 'text-white',
     borderClass: 'border-dark',
     route: '/documents'
   },
