@@ -51,7 +51,12 @@ export function useReportTemplates(isActive?: boolean) {
         throw new Error('Failed to fetch report templates');
       }
 
-      return response.json();
+      const data = await response.json();
+
+      // Handle paginated response from Django REST Framework
+      // DRF returns {count, next, previous, results} when pagination is enabled
+      const templates = data.results || data;
+      return templates;
     },
   });
 }
