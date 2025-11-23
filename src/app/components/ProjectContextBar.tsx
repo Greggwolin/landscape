@@ -39,55 +39,68 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
     router.push(`/projects/${newProjectId}`);
   };
 
-  // TODO: Read tierLevel from user settings/subscription
-  // For now, default to 'analyst' tier
-  const tierLevel: 'analyst' | 'pro' = 'analyst';
-
   return (
     <div
-      className="sticky d-flex align-items-center gap-4 px-4 border-bottom"
+      className="sticky"
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         borderColor: 'var(--cui-border-color)',
+        border: '1px solid var(--cui-border-color)',
+        borderRadius: '12px',
         top: '58px',
         zIndex: 40,
-        height: '56px'
+        marginLeft: '1rem',
+        marginRight: '1rem',
+        marginBottom: '0.5rem',
+        overflow: 'hidden'
       }}
     >
-      {/* Project Selector - Left */}
-      <div className="d-flex align-items-center gap-2">
-        <span
-          className="text-xs fw-medium"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          Active Project:
-        </span>
-        <select
-          value={project.project_id}
-          onChange={(e) => handleProjectChange(Number(e.target.value))}
-          className="px-3 py-2 text-sm fw-medium rounded"
-          style={{
-            backgroundColor: 'var(--cui-tertiary-bg)',
-            borderColor: 'var(--cui-border-color)',
-            color: 'var(--cui-body-color)',
-            border: '1px solid var(--cui-border-color)',
-            cursor: 'pointer',
-            minWidth: '320px',
-          }}
-        >
-          {projects.map((proj) => (
-            <option key={proj.project_id} value={proj.project_id}>
-              {proj.project_name} - {proj.project_type_code || 'Unknown'}
-            </option>
-          ))}
-        </select>
+      {/* Header with Active Project Label */}
+      <div
+        style={{
+          backgroundColor: 'var(--surface-card-header)',
+          padding: '12px 16px'
+        }}
+      >
+        <div className="d-flex align-items-center gap-3">
+          <span
+            className="fw-semibold"
+            style={{
+              color: 'var(--cui-body-color)',
+              fontSize: '1.1rem',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Active Project:
+          </span>
+          <select
+            value={project.project_id}
+            onChange={(e) => handleProjectChange(Number(e.target.value))}
+            className="px-3 py-2 fw-medium rounded"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)',
+              border: '1px solid var(--cui-border-color)',
+              cursor: 'pointer',
+              minWidth: '380px',
+              fontSize: '1.05rem',
+            }}
+          >
+            {projects.map((proj) => (
+              <option key={proj.project_id} value={proj.project_id}>
+                {proj.project_name} - {proj.project_type_code || 'Unknown'}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Lifecycle Tiles - Right */}
-      <div className="flex-grow-1">
+      {/* Lifecycle Tiles */}
+      <div style={{ padding: '12px 16px' }}>
         <LifecycleTileNav
           projectId={projectId.toString()}
-          tierLevel={tierLevel}
+          propertyType={project.project_type_code}
         />
       </div>
     </div>

@@ -32,9 +32,18 @@ export default function PlanningLayout({
   ];
 
   return (
-    <div className="container-fluid px-4">
+    <div style={{ marginLeft: '1rem', marginRight: '1rem' }}>
       {/* Subtab Navigation */}
-      <ul className="nav nav-tabs mb-4">
+      <ul
+        className="nav nav-tabs sticky"
+        style={{
+          top: '163px',
+          zIndex: 30,
+          backgroundColor: 'var(--cui-body-bg)',
+          borderBottom: '1px solid var(--cui-border-color)',
+          marginBottom: 0
+        }}
+      >
         {tabs.map(tab => {
           const isActive = pathname.includes(tab.path);
           return (

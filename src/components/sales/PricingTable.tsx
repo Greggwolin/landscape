@@ -12,6 +12,7 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table';
+import { CBadge } from '@coreui/react';
 import {
   usePricingAssumptions,
   useSavePricingAssumptions,
@@ -102,7 +103,7 @@ function EditablePriceCell({
             width: '100%',
             borderColor: 'var(--cui-border-color)',
             backgroundColor: 'var(--cui-body-bg)',
-            color: '#000',
+            color: 'var(--cui-body-color)',
           }}
           className="border rounded px-2 py-1 text-sm"
         />
@@ -128,22 +129,34 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
   const [isSaving, setIsSaving] = useState(false);
   const [customGrowthRate, setCustomGrowthRate] = useState<string>('');
   const [globalGrowthRate, setGlobalGrowthRate] = useState<number>(0.035); // Default 3.5%
+  const [isCustomGrowthRate, setIsCustomGrowthRate] = useState(false);
 
   // Use API UOM options or fallback
   const uomChoices = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS_FALLBACK;
 
-  // Build growth rate options from benchmarks only
+  // Build growth rate options from benchmarks
   const growthRateOptions = useMemo(() => {
     const options: Array<{ value: number; label: string }> = [];
 
-    // Add flat-rate benchmarks from API
+    // Add benchmarks from API
     if (growthRateBenchmarks && Array.isArray(growthRateBenchmarks)) {
       growthRateBenchmarks.forEach((benchmark: any) => {
+        let rate: number | null = null;
+        let label = benchmark.set_name;
+
         if (benchmark.rate_type === 'flat' && benchmark.current_rate !== null) {
-          const rate = Number(benchmark.current_rate);
+          // Use flat rate directly
+          rate = Number(benchmark.current_rate);
+        } else if (benchmark.rate_type === 'stepped' && benchmark.steps && benchmark.steps.length > 0) {
+          // For stepped benchmarks, use the first step's rate
+          rate = Number(benchmark.steps[0].rate);
+          label = `${benchmark.set_name} (Step 1)`;
+        }
+
+        if (rate !== null && !isNaN(rate)) {
           options.push({
             value: rate,
-            label: `${(rate * 100).toFixed(1)}% - ${benchmark.set_name}`,
+            label: `${(rate * 100).toFixed(1)}% - ${label}`,
           });
         }
       });
@@ -332,24 +345,18 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
           );
           const familyName = product?.family_name;
 
-          // Match ParcelSalesTable color scheme with CSS variables
-          const chipColor =
-            familyName === 'Residential' ? 'var(--cui-primary)' :
-            familyName === 'Commercial' ? 'var(--cui-warning)' :
-            familyName === 'Industrial' ? 'var(--cui-info)' :
-            'var(--cui-secondary)';
-
-          const chipBg =
-            familyName === 'Residential' ? 'var(--cui-primary-bg)' :
-            familyName === 'Commercial' ? 'var(--cui-warning-bg)' :
-            familyName === 'Industrial' ? 'var(--cui-info-bg)' :
-            'var(--cui-tertiary-bg)';
+          // Match ParcelSalesTable color scheme using CoreUI badge colors
+          const badgeColor =
+            familyName === 'Residential' ? 'primary' :
+            familyName === 'Commercial' ? 'warning' :
+            familyName === 'Industrial' ? 'info' :
+            'secondary';
 
           return (
             <div className="text-center">
-              <span className="px-1.5 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: chipBg, color: chipColor }}>
+              <CBadge color={badgeColor} className="font-semibold text-xs">
                 {value || 'N/A'}
-              </span>
+              </CBadge>
             </div>
           );
         },
@@ -385,7 +392,11 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                   value={value || 'FF'}
                   onChange={(e) => handleCellChange(rowIndex, 'unit_of_measure', e.target.value)}
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
-                  style={{ color: '#000' }}
+                  style={{
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                  }}
                 >
                   {uomChoices.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -484,7 +495,11 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                     }
                   }}
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
-                  style={{ color: '#000' }}
+                  style={{
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                  }}
                 >
                   {growthRateOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -508,7 +523,11 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                       }}
                       placeholder="%"
                       className="w-1/2 px-2 py-1 text-sm text-center border rounded focus:ring-2 focus:ring-blue-500"
-                      style={{ color: '#000' }}
+                      style={{
+                        backgroundColor: 'var(--cui-body-bg)',
+                        color: 'var(--cui-body-color)',
+                        borderColor: 'var(--cui-border-color)',
+                      }}
                     />
                   </div>
                 )}
@@ -585,44 +604,26 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
               <label className="text-sm font-medium whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>
                 Annual Growth:
               </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={(globalGrowthRate * 100).toFixed(1)}
+              <select
+                value={isCustomGrowthRate ? 'custom' : globalGrowthRate}
                 onChange={(e) => {
-                  const percentage = parseFloat(e.target.value);
-                  if (!isNaN(percentage)) {
-                    const newRate = percentage / 100;
+                  if (e.target.value === 'custom') {
+                    setIsCustomGrowthRate(true);
+                    setCustomGrowthRate((globalGrowthRate * 100).toFixed(1));
+                  } else {
+                    setIsCustomGrowthRate(false);
+                    const newRate = parseFloat(e.target.value);
                     setGlobalGrowthRate(newRate);
                     // Apply to all rows
                     setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
                     setHasUnsavedChanges(true);
                   }
                 }}
-                className="px-2 py-1 text-sm border rounded w-20"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-body-bg)',
-                  color: '#000',
-                }}
-              />
-              <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>%</span>
-              <select
-                value={globalGrowthRate}
-                onChange={(e) => {
-                  const newRate = parseFloat(e.target.value);
-                  setGlobalGrowthRate(newRate);
-                  // Apply to all rows
-                  setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
-                  setHasUnsavedChanges(true);
-                }}
                 className="px-2 py-1 text-sm border rounded"
                 style={{
                   borderColor: 'var(--cui-border-color)',
                   backgroundColor: 'var(--cui-body-bg)',
-                  color: '#000',
+                  color: 'var(--cui-body-color)',
                 }}
               >
                 {growthRateOptions.map(opt => (
@@ -630,7 +631,40 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                     {opt.label}
                   </option>
                 ))}
+                <option value="custom">Custom...</option>
               </select>
+              {isCustomGrowthRate && (
+                <>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={customGrowthRate}
+                    onChange={(e) => {
+                      const percentage = e.target.value;
+                      setCustomGrowthRate(percentage);
+                      const numRate = parseFloat(percentage);
+                      if (!isNaN(numRate)) {
+                        const newRate = numRate / 100;
+                        setGlobalGrowthRate(newRate);
+                        // Apply to all rows
+                        setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
+                        setHasUnsavedChanges(true);
+                      }
+                    }}
+                    className="px-2 py-1 text-sm border rounded w-20"
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      backgroundColor: 'var(--cui-body-bg)',
+                      color: 'var(--cui-body-color)',
+                    }}
+                    placeholder="0.0"
+                    autoFocus
+                  />
+                  <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>%</span>
+                </>
+              )}
             </div>
           )}
         </div>

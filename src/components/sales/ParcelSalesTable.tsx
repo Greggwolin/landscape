@@ -16,8 +16,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { format, parseISO } from 'date-fns';
-import { Select, MenuItem, Tooltip, CircularProgress } from '@mui/material';
-import { CBadge } from '@coreui/react';
+import { CBadge, CTooltip } from '@coreui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useAssignParcelToPhase,
@@ -513,7 +512,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
 
           return (
             <div className="flex justify-center">
-              <Tooltip title="View detailed sale calculation">
+              <CTooltip content="View detailed sale calculation" placement="top">
                 <button
                   type="button"
                   className="px-3 py-1 text-sm border rounded flex items-center gap-1"
@@ -552,7 +551,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                   </svg>
                   Detail
                 </button>
-              </Tooltip>
+              </CTooltip>
             </div>
           );
         },

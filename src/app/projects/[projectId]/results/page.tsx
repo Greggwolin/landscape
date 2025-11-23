@@ -27,7 +27,15 @@ export default function ProjectResultsPage() {
       </div>
 
       {/* Section Tabs */}
-      <ul className="nav nav-tabs mb-4">
+      <ul
+        className="nav nav-tabs mb-4 sticky border-bottom"
+        style={{
+          top: '163px',
+          zIndex: 30,
+          backgroundColor: 'var(--cui-body-bg)',
+          borderColor: 'var(--cui-border-color)'
+        }}
+      >
         <li className="nav-item">
           <button
             className={`nav-link ${activeSection === 'sales-comp' ? 'active' : ''}`}
@@ -67,7 +75,12 @@ export default function ProjectResultsPage() {
             </p>
           </div>
           <div className="card-body">
-            <SalesComparisonApproach projectId={projectId} />
+            <SalesComparisonApproach
+              projectId={projectId}
+              comparables={[]}
+              reconciliation={null}
+              mode="land"
+            />
           </div>
         </div>
       )}

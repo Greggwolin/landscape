@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CModal, CModalBody, CModalHeader, CNav, CNavItem, CNavLink } from '@coreui/react';
 import PreferencesPanel from './PreferencesPanel';
 import BenchmarksPanel from './BenchmarksPanel';
@@ -29,6 +29,24 @@ type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'r
 
 export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
+
+  // ESC key handler
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscKey, true);
+      return () => {
+        document.removeEventListener('keydown', handleEscKey, true);
+      };
+    }
+  }, [isOpen, onClose]);
 
   return (
     <CModal

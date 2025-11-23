@@ -226,7 +226,15 @@ export async function migrateLocalStorage(
   if (!value) return;
 
   try {
-    const parsedValue = JSON.parse(value);
+    // Try to parse as JSON first, but fall back to plain string if it fails
+    let parsedValue: any;
+    try {
+      parsedValue = JSON.parse(value);
+    } catch {
+      // If JSON parsing fails, use the raw string value
+      parsedValue = value;
+    }
+
     await setPreference({
       preference_key: preferenceKey,
       preference_value: parsedValue,

@@ -17,6 +17,7 @@ import SaleTransactionDetails from './SaleTransactionDetails';
 import ModeSelector from '@/components/budget/ModeSelector';
 import { useContainers } from '@/hooks/useContainers';
 import { usePhaseStats, useParcelsWithSales } from '@/hooks/useSalesAbsorption';
+import { usePreference } from '@/hooks/useUserPreferences';
 import type { BudgetMode } from '@/components/budget/ModeSelector';
 
 // Sales mode uses the same type as Budget mode for consistency
@@ -27,7 +28,14 @@ interface Props {
 }
 
 export default function SalesContent({ projectId }: Props) {
-  const [mode, setMode] = useState<SalesMode>('napkin');
+  // Mode state with database persistence via usePreference hook
+  const [mode, setMode] = usePreference<SalesMode>({
+    key: 'sales.mode',
+    defaultValue: 'napkin',
+    scopeType: 'project',
+    scopeId: projectId,
+    migrateFrom: `sales_mode_${projectId}`, // Auto-migrate from old localStorage key
+  });
   const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
   const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
   const { phases: containerPhases } = useContainers({ projectId, includeCosts: false });

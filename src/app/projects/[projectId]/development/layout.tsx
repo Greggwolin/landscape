@@ -29,7 +29,15 @@ export default function DevelopmentLayout({
   return (
     <div className="container-fluid px-4">
       {/* Subtab Navigation */}
-      <ul className="nav nav-tabs mb-4">
+      <ul
+        className="nav nav-tabs mb-4 sticky border-bottom"
+        style={{
+          top: '163px',
+          zIndex: 30,
+          backgroundColor: 'var(--cui-body-bg)',
+          borderColor: 'var(--cui-border-color)'
+        }}
+      >
         {tabs.map(tab => {
           const isActive = pathname.includes(tab.path);
           return (
