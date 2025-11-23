@@ -6,28 +6,135 @@ import type { ProjectSummary } from '@/app/components/ProjectProvider';
 
 interface DashboardMapProps {
   projects: ProjectSummary[];
+  selectedProjectId?: number | null;
+  onProjectSelect?: (projectId: number) => void;
 }
 
-const PROPERTY_TYPE_COLORS: Record<string, string> = {
-  'MPC': '#0d6efd',           // primary blue
-  'MULTIFAMILY': '#198754',   // success green
-  'COMMERCIAL': '#0dcaf0',    // info cyan
-  'OFFICE': '#ffc107',        // warning yellow
-  'RETAIL': '#dc3545',        // danger red
-  'INDUSTRIAL': '#6c757d',    // secondary grey
-  'HOTEL': '#212529',         // dark
-  'MIXED_USE': '#0d6efd',     // primary blue
-  'SUBDIVISION': '#0dcaf0'    // info cyan
+const getNumber = (value?: number | string | null) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 };
 
-export default function DashboardMap({ projects }: DashboardMapProps) {
+const isValidLatLon = (lat: number | null, lon: number | null) =>
+  lat !== null &&
+  lon !== null &&
+  Math.abs(lat) <= 90 &&
+  Math.abs(lon) <= 180;
+
+const filterOutliers = (coords: Array<{ lat: number; lon: number }>) => {
+  if (coords.length <= 3) return coords;
+
+  const toRadians = (deg: number) => (deg * Math.PI) / 180;
+  const approxDistanceKm = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => {
+    const R = 6371;
+    const dLat = toRadians(b.lat - a.lat);
+    const dLon = toRadians(b.lon - a.lon);
+    const lat1 = toRadians(a.lat);
+    const lat2 = toRadians(b.lat);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
+    const c = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+    return 2 * R * Math.atan2(Math.sqrt(c), Math.sqrt(1 - c));
+  };
+
+  const centroid = coords.reduce(
+    (acc, c) => ({ lat: acc.lat + c.lat / coords.length, lon: acc.lon + c.lon / coords.length }),
+    { lat: 0, lon: 0 }
+  );
+
+  const distances = coords.map((c) => ({
+    ...c,
+    dist: approxDistanceKm(c, centroid)
+  }));
+
+  const sorted = [...distances].sort((a, b) => a.dist - b.dist);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0 ? (sorted[mid - 1].dist + sorted[mid].dist) / 2 : sorted[mid].dist;
+
+  const threshold = Math.max(median * 4, 1200); // allow regional spread (SoCal + AZ) but drop cross-country outliers
+  const filtered = distances.filter((d) => d.dist <= threshold);
+
+  const keep = filtered.length >= 2 ? filtered : distances;
+  return keep.map(({ lat, lon }) => ({ lat, lon }));
+};
+
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  LAND: 'Land Development',
+  MF: 'Multifamily',
+  OFF: 'Office',
+  RET: 'Retail',
+  IND: 'Industrial',
+  HTL: 'Hotel',
+  MXU: 'Mixed-Use',
+  MPC: 'Master Planned Community',
+  MULTIFAMILY: 'Multifamily',
+  COMMERCIAL: 'Commercial',
+  OFFICE: 'Office',
+  RETAIL: 'Retail',
+  INDUSTRIAL: 'Industrial',
+  HOTEL: 'Hotel',
+  MIXED_USE: 'Mixed Use',
+  SUBDIVISION: 'Subdivision'
+};
+
+const PROPERTY_TYPE_COLORS: Record<string, string> = {
+  LAND: 'var(--cui-primary)',
+  MF: 'var(--cui-success)',
+  OFF: 'var(--cui-warning)',
+  RET: 'var(--cui-danger)',
+  IND: 'var(--cui-secondary-color)',
+  HTL: 'var(--cui-dark)',
+  MXU: 'var(--cui-info)',
+  MPC: 'var(--cui-primary)',
+  MULTIFAMILY: 'var(--cui-success)',
+  COMMERCIAL: 'var(--cui-info)',
+  OFFICE: 'var(--cui-warning)',
+  RETAIL: 'var(--cui-danger)',
+  INDUSTRIAL: 'var(--cui-secondary-color)',
+  HOTEL: 'var(--cui-dark)',
+  MIXED_USE: 'var(--cui-primary)',
+  SUBDIVISION: 'var(--cui-info)'
+};
+
+const getTypeLabel = (project: ProjectSummary) => {
+  const code =
+    project.project_type_code?.toUpperCase() ||
+    project.project_type?.toUpperCase() ||
+    project.property_subtype?.toUpperCase() ||
+    null;
+  if (code && PROPERTY_TYPE_LABELS[code]) return PROPERTY_TYPE_LABELS[code];
+  return project.project_type || project.project_type_code || 'Type N/A';
+};
+
+const getTypeColor = (project: ProjectSummary) => {
+  const code =
+    project.project_type_code?.toUpperCase() ||
+    project.project_type?.toUpperCase() ||
+    project.property_subtype?.toUpperCase() ||
+    null;
+  if (code && PROPERTY_TYPE_COLORS[code]) return PROPERTY_TYPE_COLORS[code];
+  return '#000000';
+};
+
+export default function DashboardMap({ projects, selectedProjectId, onProjectSelect }: DashboardMapProps) {
   const mapRef = useRef<MapObliqueRef>(null);
 
   // Calculate center point and bounds from all projects with coordinates
   const { center, markers, bounds } = useMemo(() => {
-    const projectsWithCoords = projects.filter(
-      p => p.location_lat != null && p.location_lon != null
-    );
+    const projectsWithCoords = projects
+      .map((project) => {
+        const lat = getNumber(project.latitude ?? project.location_lat);
+        const lon = getNumber(project.longitude ?? project.location_lon);
+        return isValidLatLon(lat, lon)
+          ? { ...project, lat, lon }
+          : null;
+      })
+      .filter(Boolean) as Array<ProjectSummary & { lat: number; lon: number }>;
 
     if (projectsWithCoords.length === 0) {
       // Default to LA area if no projects have coordinates
@@ -42,50 +149,87 @@ export default function DashboardMap({ projects }: DashboardMapProps) {
     let minLat = Infinity, maxLat = -Infinity;
     let minLon = Infinity, maxLon = -Infinity;
 
-    projectsWithCoords.forEach(p => {
-      if (p.location_lat! < minLat) minLat = p.location_lat!;
-      if (p.location_lat! > maxLat) maxLat = p.location_lat!;
-      if (p.location_lon! < minLon) minLon = p.location_lon!;
-      if (p.location_lon! > maxLon) maxLon = p.location_lon!;
+    projectsWithCoords.forEach((p) => {
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon;
+      if (p.lon > maxLon) maxLon = p.lon;
     });
 
+    // Identify main cluster to avoid outlier zoom blowouts
+    const filtered = filterOutliers(projectsWithCoords.map(({ lat, lon }) => ({ lat, lon })));
+    const fitCoords = filtered.length >= 2 ? filtered : projectsWithCoords;
+
+    let fitMinLat = Infinity, fitMaxLat = -Infinity;
+    let fitMinLon = Infinity, fitMaxLon = -Infinity;
+    fitCoords.forEach((c) => {
+      if (c.lat < fitMinLat) fitMinLat = c.lat;
+      if (c.lat > fitMaxLat) fitMaxLat = c.lat;
+      if (c.lon < fitMinLon) fitMinLon = c.lon;
+      if (c.lon > fitMaxLon) fitMaxLon = c.lon;
+    });
+
+    // Expand bounds by 10% for padding
+    const latPadding = Math.max((fitMaxLat - fitMinLat) * 0.1, 0.01);
+    const lonPadding = Math.max((fitMaxLon - fitMinLon) * 0.1, 0.01);
+    const paddedBounds: [[number, number], [number, number]] = [
+      [fitMinLon - lonPadding, fitMinLat - latPadding],
+      [fitMaxLon + lonPadding, fitMaxLat + latPadding]
+    ];
+
     // Calculate average center
-    const avgLat = projectsWithCoords.reduce((sum, p) => sum + (p.location_lat || 0), 0) / projectsWithCoords.length;
-    const avgLon = projectsWithCoords.reduce((sum, p) => sum + (p.location_lon || 0), 0) / projectsWithCoords.length;
+    const avgLat = fitCoords.reduce((sum, c) => sum + c.lat, 0) / fitCoords.length;
+    const avgLon = fitCoords.reduce((sum, c) => sum + c.lon, 0) / fitCoords.length;
 
     // Create markers for each project
-    const projectMarkers = projectsWithCoords.map((project, index) => ({
-      id: `project-${project.project_id}`,
-      coordinates: [project.location_lon!, project.location_lat!] as [number, number],
-      color: PROPERTY_TYPE_COLORS[project.project_type_code || ''] || '#6c757d',
-      label: `${index + 1}`,
-      tooltip: project.project_name
+    const projectMarkers = projectsWithCoords.map((project) => ({
+      id: `${project.project_id}`,
+      coordinates: [project.lon, project.lat] as [number, number],
+      color: getTypeColor(project),
+      variant: 'dot' as const,
+      isActive: project.project_id === selectedProjectId,
+      popup: `
+        <div style="font-size: 13px; line-height: 1.3;">
+          <div style="font-weight: 600;">${project.project_name}</div>
+          <div style="color: var(--cui-secondary-color);">${getTypeLabel(project)}</div>
+        </div>
+      `
     }));
 
     return {
       center: [avgLon, avgLat] as [number, number],
       markers: projectMarkers,
-      bounds: [[minLon, minLat], [maxLon, maxLat]] as [[number, number], [number, number]]
+      bounds: paddedBounds
     };
-  }, [projects]);
+  }, [projects, selectedProjectId]);
 
-  // Fit map to bounds when it loads
-  React.useEffect(() => {
-    if (mapRef.current && bounds && markers.length > 1) {
-      // Give the map a moment to initialize, then fit bounds
-      setTimeout(() => {
-        mapRef.current?.fitBounds(bounds, { padding: 50, pitch: 0, bearing: 0 });
-      }, 500);
-    }
-  }, [bounds, markers.length]);
+  // Fit map to bounds when it loads or filters change
+  useEffect(() => {
+    if (!mapRef.current || markers.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (markers.length === 1) {
+        mapRef.current?.flyToSubject(markers[0].coordinates, 11);
+      } else if (bounds) {
+        mapRef.current?.fitBounds(bounds, { padding: 60, pitch: 0, bearing: 0 });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [bounds, markers]);
 
   return (
     <div className="h-full w-full relative">
       {markers.length === 0 ? (
-        <div className="flex items-center justify-center h-full" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-            No project locations available
-          </p>
+        <div
+          className="flex items-center justify-center h-full rounded-lg border text-center"
+          style={{
+            backgroundColor: 'var(--cui-tertiary-bg)',
+            borderColor: 'var(--cui-border-color)',
+            color: 'var(--cui-secondary-color)'
+          }}
+        >
+          <p className="text-sm">Add project coordinates to display on map</p>
         </div>
       ) : (
         <MapOblique
@@ -95,6 +239,13 @@ export default function DashboardMap({ projects }: DashboardMapProps) {
           pitch={0}
           bearing={0}
           markers={markers}
+          showExtrusions={false}
+          onFeatureClick={(id) => {
+            const projectId = Number(id);
+            if (!Number.isNaN(projectId)) {
+              onProjectSelect?.(projectId);
+            }
+          }}
           styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
         />
       )}

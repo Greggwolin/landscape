@@ -6,18 +6,26 @@ type RawProjectRow = {
   project_id: number
   project_name: string
   acres_gross: number | null
+  acreage: number | null
   location_lat: number | null
   location_lon: number | null
+  latitude: number | null
+  longitude: number | null
   start_date: string | null
   jurisdiction_city: string | null
   jurisdiction_county: string | null
   jurisdiction_state: string | null
+  location_description: string | null
+  location: string | null
   project_type_code?: string | null
   project_type: string | null
   is_active?: boolean | null
   analysis_type?: string | null
   property_subtype?: string | null
   property_class?: string | null
+  total_residential_units?: number | null
+  total_commercial_sqft?: number | null
+  updated_at?: string | null
 }
 
 type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
@@ -37,15 +45,26 @@ const CARNEY_FALLBACK_PROJECT: RawProjectRow = {
   project_id: CARNEY_PROJECT_ID,
   project_name: 'Carney Power Center',
   acres_gross: 200,
+  acreage: 200,
   location_lat: null,
   location_lon: null,
+  latitude: null,
+  longitude: null,
   start_date: '2025-01-01',
   jurisdiction_city: 'Phoenix',
   jurisdiction_county: 'Maricopa County',
   jurisdiction_state: 'AZ',
+  location_description: 'Phoenix, AZ',
+  location: 'Phoenix, AZ',
   project_type_code: 'COMMERCIAL',
   project_type: 'Retail Power Center',
   is_active: true,
+  analysis_type: null,
+  property_subtype: null,
+  property_class: null,
+  total_residential_units: null,
+  total_commercial_sqft: null,
+  updated_at: new Date().toISOString()
 }
 
 function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: string | null): string | null {
@@ -64,22 +83,31 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         project_id,
         project_name,
         acres_gross,
+        acres_gross AS acreage,
         location_lat,
         location_lon,
+        location_lat AS latitude,
+        location_lon AS longitude,
         start_date,
         jurisdiction_city,
         jurisdiction_county,
         jurisdiction_state,
+        location_description,
+        location_description AS location,
         project_type_code,
         project_type,
         is_active,
         analysis_type,
         property_subtype,
-        property_class
+        property_class,
+        -- Phase 5 fields (nullable in legacy DB)
+        NULL::numeric AS total_residential_units,
+        NULL::numeric AS total_commercial_sqft,
+        updated_at
       FROM landscape.tbl_project
       WHERE 1 = 1
         ${includeInactive ? sql`` : sql`AND COALESCE(is_active, true)`}
-      ORDER BY project_name
+      ORDER BY updated_at DESC NULLS LAST, project_name
     `
   } catch (error: unknown) {
     const pgError = error as PostgresError
@@ -90,15 +118,23 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         project_id, 
         project_name, 
         acres_gross, 
+        acres_gross AS acreage,
         location_lat,
         location_lon,
+        location_lat AS latitude,
+        location_lon AS longitude,
         start_date,
         jurisdiction_city,
         jurisdiction_county,
         jurisdiction_state,
-        project_type
+        project_type,
+        location_description,
+        location_description AS location,
+        NULL::numeric AS total_residential_units,
+        NULL::numeric AS total_commercial_sqft,
+        updated_at
       FROM landscape.tbl_project
-      ORDER BY project_name
+      ORDER BY updated_at DESC NULLS LAST, project_name
     `
 
     return fallbackRows.map((row) => ({

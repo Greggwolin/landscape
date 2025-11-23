@@ -25,6 +25,11 @@ export interface MarkerData {
   color?: string;
   label?: string;
   popup?: string; // HTML content for popup
+  tooltip?: string; // alias for popup
+  variant?: 'pin' | 'dot';
+  isActive?: boolean;
+  onHover?: () => void;
+  onLeave?: () => void;
 }
 
 export interface MapObliqueProps {
@@ -323,8 +328,20 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
           el.className = 'map-marker';
           el.style.cursor = 'pointer';
 
-          // Special styling for subject property
-          if (m.id === 'subject') {
+          const variant = m.variant ?? 'pin';
+
+          if (variant === 'dot') {
+            const size = m.isActive ? 18 : 14;
+            el.style.width = `${size}px`;
+            el.style.height = `${size}px`;
+            el.style.borderRadius = '9999px';
+            el.style.backgroundColor = m.color || '#000';
+            el.style.border = '2px solid #fff';
+            el.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.3)';
+            if (m.isActive) {
+              el.style.boxShadow = '0 0 0 2px rgba(0, 0, 0, 0.35)';
+            }
+          } else if (m.id === 'subject') {
             el.style.width = '32px';
             el.style.height = '32px';
             el.innerHTML = `
@@ -351,14 +368,29 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             .setLngLat(m.coordinates)
             .addTo(map);
 
-          // Add popup if provided
-          if (m.popup) {
+          const popupHtml = m.popup ?? m.tooltip;
+
+          if (popupHtml) {
             const popup = new maplibregl.Popup({
-              offset: 25,
-              closeButton: true,
+              offset: variant === 'dot' ? 12 : 25,
+              closeButton: false,
               closeOnClick: false
-            }).setHTML(m.popup);
+            }).setHTML(popupHtml);
             marker.setPopup(popup);
+
+            el.addEventListener('mouseenter', () => {
+              popup.addTo(map);
+              m.onHover?.();
+            });
+            el.addEventListener('mouseleave', () => {
+              popup.remove();
+              m.onLeave?.();
+            });
+          }
+
+          if (!popupHtml) {
+            el.addEventListener('mouseenter', () => m.onHover?.());
+            el.addEventListener('mouseleave', () => m.onLeave?.());
           }
 
           markersRef.current.push(marker);
