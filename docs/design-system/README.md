@@ -32,6 +32,8 @@ import { CCard, CCardBody, CFormInput, CFormSelect } from '@coreui/react';
 
 ## Color Palette
 
+Reference: extended CoreUI-aligned swatches live in `docs/design-system/coreui-brand-color-variants.html` (open in a browser to view the 50–800 steps).
+
 ### Semantic Colors
 
 ```typescript

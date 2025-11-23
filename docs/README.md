@@ -1,12 +1,33 @@
 # Landscape Pro-Forma Documentation
 
-**Version:** 3.4 + Migration 013
-**Last Updated:** 2025-11-02
-**Status:** Production Ready + PDF Reports + Progressive Assumptions + Standardized Project Types
+**Version:** 3.5 + Navigation Phase 7
+**Last Updated:** 2025-11-23
+**Status:** Production Ready + PDF Reports + Progressive Assumptions + Dual Property Type Navigation
 
 Welcome to the comprehensive documentation for the Landscape Pro-Forma financial modeling application.
 
 ## 🔥 Recent Updates (November 2025)
+
+**Navigation Phase 7 - Budget & Navigation Fixes** (Nov 23, 2025)
+- ✅ Fixed planning efficiency auto-save with type conversion and debouncing
+- ✅ Fixed lifecycle tile navigation state retention across subtabs
+- ✅ Categorized all budget items into Planning & Engineering vs Development phases
+- ✅ Added budget scope labels for filtered views
+- ✅ Improved admin modal UX (ESC key, visible close button)
+- ✅ Added sticky subtab navigation for Planning and Development pages
+- 📄 [SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md](session-notes/SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md)
+
+**Acquisition Interface Fixes** (Nov 23, 2025)
+- ✅ Fixed goes-hard date persistence with database schema update
+- ✅ Resolved field mapping mismatch between frontend/backend
+- ✅ Simplified amount display (removed colored badges)
+- 📄 [SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md](session-notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
+
+**Multifamily Tile Navigation** (Nov 21, 2025)
+- ✅ Dual navigation system supporting Land Development and Multifamily workflows
+- ✅ Property type-aware tile configuration (8 lifecycle vs 7 functional tiles)
+- ✅ Consistent CoreUI brand colors with theme-aware active states
+- 📄 [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](session-notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md)
 
 **Migration 013 - Project Type Code Standardization** (Nov 2, 2025)
 - ✅ Standardized 7 project type codes (LAND, MF, OFF, RET, IND, HTL, MXU)
@@ -14,9 +35,6 @@ Welcome to the comprehensive documentation for the Landscape Pro-Forma financial
 - ✅ Updated 21 frontend files + Django backend
 - ✅ Fixed tab routing for LAND projects
 - 📄 [MIGRATION_013_EXECUTION_REPORT.md](../MIGRATION_013_EXECUTION_REPORT.md)
-- 📄 [MIGRATION_013_BACKEND_UPDATES.md](../MIGRATION_013_BACKEND_UPDATES.md)
-- 📄 [MIGRATION_013_TAB_ROUTING_FIX.md](../MIGRATION_013_TAB_ROUTING_FIX.md)
-- 📄 [CHANGELOG.md](../CHANGELOG.md)
 
 ---
 

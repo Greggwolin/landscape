@@ -1,12 +1,78 @@
 # Landscape Implementation Status
 
-**Version:** 5.5
-**Last Updated:** 2025-11-20
+**Version:** 5.9
+**Last Updated:** 2025-11-23
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (October 28 - November 20, 2025)
+## 🆕 Recent Updates (October 28 - November 23, 2025)
+
+### Sales & Marketing Page Migration (Nov 23, 2025) ⭐ NEW
+- ✅ **Page Migration Complete** - Migrated Sales & Absorption from `/projects/[id]/project/sales` to `/projects/[id]/sales-marketing`
+- ✅ **Dark Mode Input Fixes** - Fixed 6 input fields with hardcoded black text to use `var(--cui-body-color)`
+- ✅ **Land Use Chip Colors** - Replaced custom CSS variable chips with CoreUI CBadge components for proper theming
+- ✅ **Annual Growth Rate Simplified** - Single dropdown with benchmark rates + custom option (removed dual input/dropdown)
+- ✅ **Stepped Benchmarks Support** - Now shows both flat and stepped growth rate benchmarks (using first step for stepped)
+- ✅ **Database Migration** - Created `landscape.sale_names` table via migration `026_sale_names.sql`
+- ✅ **MUI to CoreUI Migration** - Replaced MUI Tooltip with CoreUI CTooltip in ParcelSalesTable
+- ⚠️ **Remaining MUI Usage** - 3 modal components still use MUI (see Next Priorities)
+- 📁 Files: `src/app/projects/[projectId]/sales-marketing/page.tsx`, `src/components/sales/PricingTable.tsx`, `src/components/sales/ParcelSalesTable.tsx`
+- 📊 Database: `landscape.sale_names` table created (id, project_id, sale_date, sale_name, timestamps)
+- 📖 Documentation: [SESSION_NOTES_2025_11_23_SALES_MARKETING_MIGRATION.md](../session-notes/SESSION_NOTES_2025_11_23_SALES_MARKETING_MIGRATION.md)
+- 🎯 Status: Complete - Sales & Marketing page fully operational with all features working
+
+### Budget Navigation & Categorization Fixes (Nov 23, 2025) ⭐ NEW
+- ✅ **Planning Efficiency Save Fix** - Fixed type conversion issue preventing planning efficiency values from saving on Land Use page
+- ✅ **Navigation Tile Active State** - Fixed lifecycle tiles losing outline when viewing subtabs (e.g., Planning tile now stays active on `/planning/budget`)
+- ✅ **Budget Item Categorization** - Categorized all 17 budget items into Planning & Engineering (10 items, $79.3M) or Development (7 items, $34.9M)
+- ✅ **Budget Scope Labels** - Added "Budget: Planning and Engineering" / "Budget: Development" headers above budget grid tabs
+- ✅ **Admin Modal ESC Key** - Added keyboard shortcut to close admin modal with Escape key
+- ✅ **Admin Modal Close Button** - Fixed close button visibility with proper SVG icons for both light and dark themes
+- ✅ **Type Handling Improvements** - Changed efficiency loading from strict type check to Number() conversion to handle Postgres numeric type
+- ✅ **Visual Feedback** - Added auto-save with 800ms debounce, success toast notifications, and error alerts for planning efficiency
+- 📁 Files: `src/components/projects/LifecycleTileNav.tsx`, `src/app/components/Planning/PlanningOverviewControls.tsx`, `src/components/admin/AdminModal.tsx`, `src/components/budget/BudgetGridTab.tsx`, `src/styles/navigation.css`
+- 📊 Database: Updated `landscape.core_fin_fact_budget.activity` field for 14 records (categorized by development phase)
+- 📖 Documentation: [SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md](../session-notes/SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md)
+- 🐛 Bugs Fixed: 4 major issues (efficiency save, nav tile state, modal interactions, budget visibility)
+- 🎯 Status: Complete - All budget items categorized, navigation state working correctly, efficiency auto-save functional
+
+### Acquisition Interface Fixes (Nov 23, 2025) ⭐ NEW
+- ✅ **Goes-Hard Date Persistence** - Fixed critical bug where goes-hard date values would disappear after editing
+- ✅ **Database Schema Update** - Added `goes_hard_date` and `is_conditional` columns to `landscape.tbl_acquisition` via Django migration
+- ✅ **Field Mapping Correction** - Fixed frontend/backend mismatch (was using `deposit_goes_hard_date`, now uses `goes_hard_date`)
+- ✅ **Django Model & Serializer** - Updated `AcquisitionEvent` model and serializer to include new fields
+- ✅ **Amount Display Simplification** - Removed colored "Debit" and "Credit" badge pills from amount column
+- ✅ **Refundable Field Removal** - Removed deprecated `isDepositRefundable` field from modal form
+- ✅ **Goes-Hard Date Visibility** - Made goes-hard date field available for all event types (not just deposits)
+- 📁 Files: `backend/apps/acquisition/models.py`, `backend/apps/acquisition/serializers.py`, `backend/apps/acquisition/migrations/0001_add_goes_hard_and_conditional_fields.py`, `src/components/acquisition/AcquisitionLedgerGrid.tsx`, `src/types/acquisition.ts`
+- 📖 Documentation: [SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md](../session-notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
+- 🐛 Root Cause: Database table missing columns that frontend was trying to save; field name mismatch between frontend and backend
+- 🎯 Status: Complete - Goes-hard date now persists correctly, amount display simplified
+
+### Multifamily Tile Navigation (Nov 21, 2025) ⭐ NEW
+- ✅ **Dual Navigation System** - Implemented property type-aware tile navigation supporting both land development and multifamily workflows
+- ✅ **Land Development Tiles** - 8 lifecycle stage tiles with route-based navigation (`/acquisition`, `/planning/market`, etc.)
+- ✅ **Multifamily Tiles** - 7 functional area tiles with query parameter navigation (`?tab=property`, `?tab=operations`, etc.)
+- ✅ **Property Type Detection** - Automatic detection based on project_type_code (LAND/MPC vs MF/OFF/RET/IND/HTL/MXU)
+- ✅ **Consistent Color Sequence** - Both tile sets follow same CoreUI brand color progression (Primary→Info→Danger→Warning→Success→Secondary→Dark)
+- ✅ **Theme-Aware Borders** - Active tile border adapts to theme (white in dark mode, dark in light mode)
+- ✅ **Fixed Tile Sizing** - All tiles 140px wide × 81px tall with `flexShrink: 0` for consistent layout
+- ✅ **Pro Tier Integration** - Capitalization tile visible only in Pro tier for both property types
+- 📁 Files: `src/components/projects/LifecycleTileNav.tsx`, `src/app/components/ProjectContextBar.tsx`
+- 📖 Documentation: [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](../session-notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md), [MULTIFAMILY_TILE_NAV_IMPLEMENTATION.md](../../MULTIFAMILY_TILE_NAV_IMPLEMENTATION.md), [MULTIFAMILY_INTEGRATION_ANALYSIS.md](../../MULTIFAMILY_INTEGRATION_ANALYSIS.md)
+- 🎯 Status: Implementation Complete - Runtime testing pending for multifamily tab page integration
+
+### Planning Tab Enhancements (Nov 21, 2025) ⭐ NEW
+- ✅ **Planning Efficiency Auto-Save** - Removed "Apply Changes" button, now auto-saves with 800ms debounce
+- ✅ **DUA Formula Correction** - Fixed backwards formula: now `units / (acres × efficiency)` for correct net density calculation
+- ✅ **FF/Acre Column** - Added Front Feet per Acre calculated column (`units × lot_width / acres`)
+- ✅ **Click-to-Edit Rows** - Removed Edit button, parcel rows enter edit mode on click
+- ✅ **Database Column Fix** - Resolved `tier_*_label` vs `level*_label` mismatch preventing planning efficiency saves
+- 📁 Files: `src/app/components/Planning/PlanningContent.tsx`, `src/app/components/Planning/PlanningOverviewControls.tsx`, `src/app/components/PlanningWizard/cards/ParcelDetailCard.tsx`, API routes for granularity settings and project config
+- 📖 Documentation: [SESSION_NOTES_2025_11_21_PLANNING_TAB_ENHANCEMENTS.md](../session-notes/SESSION_NOTES_2025_11_21_PLANNING_TAB_ENHANCEMENTS.md), [PLANNING_EFFICIENCY_REFERENCE.md](../02-features/land-use/PLANNING_EFFICIENCY_REFERENCE.md)
+- 🐛 Bugs Fixed: 2 critical (planning efficiency save, DUA formula)
+- 🎯 Status: Complete - All features tested and working
 
 ### CoreUI Button Standardization (Nov 20, 2025) ⭐ NEW
 - ✅ **Phase 1 Complete** - Migrated 105 buttons across 29 files from Tailwind to CoreUI theme classes (~85% of project)
@@ -1416,6 +1482,11 @@ core_fin_container_applicability:
 3. Planning Page Phase 3 - Auto-create Area/Phase logic
 4. Budget Variance Testing - End-to-end workflow validation
 5. Performance Testing - Validation with 1000+ budget items
+6. **MUI to CoreUI Migration** - Remove Material-UI dependencies from sales modals
+   - ⚠️ 3 modal components still using MUI: `CreateSalePhaseModal.tsx`, `SaleCalculationModal.tsx`, `SaveBenchmarkModal.tsx`
+   - ParcelSalesTable migrated to CoreUI (CTooltip, CBadge) ✅
+   - Need to replace MUI Dialog, TextField, IconButton with CoreUI equivalents
+   - Files: `src/components/sales/{CreateSalePhaseModal,SaleCalculationModal,SaveBenchmarkModal}.tsx`
 
 ---
 

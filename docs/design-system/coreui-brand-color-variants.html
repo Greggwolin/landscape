@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Brand Color Variants Preview</title>
+  <style>
+    :root {
+      --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #0f1115;
+      --panel: #181b22;
+      --border: #262a33;
+      --text-main: #f5f7fb;
+      --text-subtle: #a5a9b5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-family);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0.03em;
+    }
+
+    p.subtitle {
+      margin: 0 0 24px;
+      color: var(--text-subtle);
+      font-size: 13px;
+    }
+
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .palette {
+      background: var(--panel);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .palette-header {
+      padding: 10px 14px 9px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .palette-base-bar {
+      height: 8px;
+      width: 100%;
+    }
+
+    .palette-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .palette-base {
+      font-size: 12px;
+      color: var(--text-subtle);
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+    }
+
+    .swatch {
+      position: relative;
+      min-height: 58px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #f9fbff;
+      font-size: 11px;
+    }
+
+    .swatch-label {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.9;
+    }
+
+    .swatch-hex {
+      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      opacity: 0.92;
+    }
+
+    .swatch-dark-text {
+      color: #0f1115;
+    }
+
+    .column-group {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 1px solid var(--border);
+    }
+
+    .column-group > div {
+      padding: 10px 8px;
+      border-right: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--text-subtle);
+    }
+
+    .column-group > div:last-child {
+      border-right: none;
+    }
+
+    .legend {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--text-subtle);
+    }
+
+    .legend span.key {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      margin-right: 6px;
+      background: #14171f;
+    }
+  </style>
+</head>
+<body>
+  <h1>Brand Color Variants</h1>
+  <p class="subtitle">
+    Preview of the extended CoreUI-aligned palette for Landscape. Each card shows the 50–1000 steps with hex values.
+  </p>
+
+  <div class="palette-grid">
+    <!-- PRIMARY -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#3d99f5;"></div>
+      <header class="palette-header" style="background:#3d99f5;">$1Primary</div>
+        <div class="palette-base">Base: #3d99f5</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#16406a;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#16406a</div>
+        </div>
+        <div class="swatch" style="background:#102c4a;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#102c4a</div>
+        </div>
+        <div class="swatch" style="background:#eaf4ff;" >
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#eaf4ff</div>
+        </div>
+        <div class="swatch" style="background:#d4e9ff;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#d4e9ff</div>
+        </div>
+        <div class="swatch" style="background:#a9d3ff;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#a9d3ff</div>
+        </div>
+        <div class="swatch" style="background:#7dbbff;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#7dbbff</div>
+        </div>
+        <div class="swatch" style="background:#51a6fa;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#51a6fa</div>
+        </div>
+        <div class="swatch" style="background:#3d99f5;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#3d99f5</div>
+        </div>
+        <div class="swatch" style="background:#2e7cd1;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#2e7cd1</div>
+        </div>
+        <div class="swatch" style="background:#2261aa;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#2261aa</div>
+        </div>
+        <div class="swatch" style="background:#18457c;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#18457c</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECONDARY -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#6b7785;"></div>
+      <header class="palette-header" style="background:#6b7785;">$1Secondary</div>
+        <div class="palette-base">Base: #6b7785</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#1c2228;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#1c2228</div>
+        </div>
+        <div class="swatch" style="background:#13181d;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#13181d</div>
+        </div>
+        <div class="swatch" style="background:#f2f4f6;">
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#f2f4f6</div>
+        </div>
+        <div class="swatch" style="background:#e3e6ea;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#e3e6ea</div>
+        </div>
+        <div class="swatch" style="background:#c6cbd2;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#c6cbd2</div>
+        </div>
+        <div class="swatch" style="background:#a9b0bc;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#a9b0bc</div>
+        </div>
+        <div class="swatch" style="background:#868f9b;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#868f9b</div>
+        </div>
+        <div class="swatch" style="background:#6b7785;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#6b7785</div>
+        </div>
+        <div class="swatch" style="background:#55606d;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#55606d</div>
+        </div>
+        <div class="swatch" style="background:#3f4753;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#3f4753</div>
+        </div>
+        <div class="swatch" style="background:#272d35;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#272d35</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUCCESS -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#57c68a;"></div>
+      <header class="palette-header" style="background:#57c68a;">$1Success</div>
+        <div class="palette-base">Base: #57c68a</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#184631;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#184631</div>
+        </div>
+        <div class="swatch" style="background:#103222;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#103222</div>
+        </div>
+        <div class="swatch" style="background:#e8fbf2;">
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#e8fbf2</div>
+        </div>
+        <div class="swatch" style="background:#d0f6e4;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#d0f6e4</div>
+        </div>
+        <div class="swatch" style="background:#a7eccd;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#a7eccd</div>
+        </div>
+        <div class="swatch" style="background:#7de0b4;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#7de0b4</div>
+        </div>
+        <div class="swatch" style="background:#55d49f;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#55d49f</div>
+        </div>
+        <div class="swatch" style="background:#57c68a;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#57c68a</div>
+        </div>
+        <div class="swatch" style="background:#3da56f;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#3da56f</div>
+        </div>
+        <div class="swatch" style="background:#2f7f55;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#2f7f55</div>
+        </div>
+        <div class="swatch" style="background:#1f583c;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#1f583c</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DANGER -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#e64072;"></div>
+      <header class="palette-header" style="background:#e64072;">$1Danger</div>
+        <div class="palette-base">Base: #e64072</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#561029;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#561029</div>
+        </div>
+        <div class="swatch" style="background:#3a0a1c;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#3a0a1c</div>
+        </div>
+        <div class="swatch" style="background:#ffe7ef;">
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#ffe7ef</div>
+        </div>
+        <div class="swatch" style="background:#ffcfdf;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#ffcfdf</div>
+        </div>
+        <div class="swatch" style="background:#ff9fbf;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#ff9fbf</div>
+        </div>
+        <div class="swatch" style="background:#ff6f9f;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#ff6f9f</div>
+        </div>
+        <div class="swatch" style="background:#ef4e82;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#ef4e82</div>
+        </div>
+        <div class="swatch" style="background:#e64072;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#e64072</div>
+        </div>
+        <div class="swatch" style="background:#c42f5d;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#c42f5d</div>
+        </div>
+        <div class="swatch" style="background:#9a2348;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#9a2348</div>
+        </div>
+        <div class="swatch" style="background:#6e1833;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#6e1833</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WARNING -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#f2c40d;"></div>
+      <header class="palette-header" style="background:#f2c40d;">$1Warning</div>
+        <div class="palette-base">Base: #f2c40d</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#4c3a02;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#4c3a02</div>
+        </div>
+        <div class="swatch" style="background:#352801;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#352801</div>
+        </div>
+        <div class="swatch" style="background:#fffbe8;">
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#fffbe8</div>
+        </div>
+        <div class="swatch" style="background:#fff4c2;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#fff4c2</div>
+        </div>
+        <div class="swatch" style="background:#ffe98a;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#ffe98a</div>
+        </div>
+        <div class="swatch" style="background:#ffdc52;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#ffdc52</div>
+        </div>
+        <div class="swatch" style="background:#f7cf29;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#f7cf29</div>
+        </div>
+        <div class="swatch" style="background:#f2c40d;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#f2c40d</div>
+        </div>
+        <div class="swatch" style="background:#c59f07;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#c59f07</div>
+        </div>
+        <div class="swatch" style="background:#987904;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#987904</div>
+        </div>
+        <div class="swatch" style="background:#6a5402;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#6a5402</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INFO -->
+    <section class="palette">
+      <div class="palette-base-bar" style="background:#7a80ec;"></div>
+      <header class="palette-header" style="background:#7a80ec;">$1Info</div>
+        <div class="palette-base">Base: #7a80ec</div>
+      </header>
+      <div class="swatches">
+        <div class="swatch" style="background:#1b1f46;">
+          <div class="swatch-label">900</div>
+          <div class="swatch-hex">#1b1f46</div>
+        </div>
+        <div class="swatch" style="background:#12152f;">
+          <div class="swatch-label">1000</div>
+          <div class="swatch-hex">#12152f</div>
+        </div>
+        <div class="swatch" style="background:#eef0ff;">
+          <div class="swatch-label swatch-dark-text">50</div>
+          <div class="swatch-hex swatch-dark-text">#eef0ff</div>
+        </div>
+        <div class="swatch" style="background:#dadaff;">
+          <div class="swatch-label swatch-dark-text">100</div>
+          <div class="swatch-hex swatch-dark-text">#dadaff</div>
+        </div>
+        <div class="swatch" style="background:#b2b4fb;">
+          <div class="swatch-label swatch-dark-text">200</div>
+          <div class="swatch-hex swatch-dark-text">#b2b4fb</div>
+        </div>
+        <div class="swatch" style="background:#8c8ff4;">
+          <div class="swatch-label swatch-dark-text">300</div>
+          <div class="swatch-hex swatch-dark-text">#8c8ff4</div>
+        </div>
+        <div class="swatch" style="background:#676ceb;">
+          <div class="swatch-label">400</div>
+          <div class="swatch-hex">#676ceb</div>
+        </div>
+        <div class="swatch" style="background:#7a80ec;">
+          <div class="swatch-label">500 (Base)</div>
+          <div class="swatch-hex">#7a80ec</div>
+        </div>
+        <div class="swatch" style="background:#5155c7;">
+          <div class="swatch-label">600</div>
+          <div class="swatch-hex">#5155c7</div>
+        </div>
+        <div class="swatch" style="background:#3d409a;">
+          <div class="swatch-label">700</div>
+          <div class="swatch-hex">#3d409a</div>
+        </div>
+        <div class="swatch" style="background:#282c6e;">
+          <div class="swatch-label">800</div>
+          <div class="swatch-hex">#282c6e</div>
+        </div>
+      </div>
+    </section>
+    </div>
+</body>
+</html>

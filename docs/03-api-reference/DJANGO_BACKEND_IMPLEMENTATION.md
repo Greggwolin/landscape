@@ -406,6 +406,85 @@ mypy apps/
 - Added label mapping to match frontend (HomeOverview.tsx)
 - Now displays: MPC → "Master Planned Community", etc.
 
+## Acquisition App - COMPLETE ✅ (Nov 23, 2025)
+
+### Models Implemented
+
+#### 1. AcquisitionEvent Model
+Maps to `landscape.tbl_acquisition` table for ledger entries.
+
+**Fields:**
+- `acquisition_id` (AutoField, primary key)
+- `project` (ForeignKey to Project)
+- `contact_id` (IntegerField, nullable)
+- `event_date` (DateField, nullable)
+- `event_type` (CharField, nullable) - Deposit, Credit, Fee, Open Escrow, Closing, etc.
+- `description` (TextField, nullable)
+- `amount` (DecimalField, nullable)
+- `is_applied_to_purchase` (BooleanField, default=True)
+- `goes_hard_date` (DateField, nullable) - **Added Nov 23, 2025**
+- `is_conditional` (BooleanField, nullable) - **Added Nov 23, 2025**
+- `units_conveyed` (DecimalField, nullable)
+- `measure_id` (IntegerField, nullable)
+- `notes` (TextField, nullable)
+- `created_at` (DateTimeField, auto_now_add)
+- `updated_at` (DateTimeField, auto_now)
+
+**Configuration:**
+```python
+class Meta:
+    managed = False
+    db_table = 'tbl_acquisition'
+    ordering = ['event_date', 'acquisition_id']
+```
+
+#### 2. PropertyAcquisition Model
+Maps to `landscape.tbl_property_acquisition` table for acquisition assumptions.
+
+**Fields:**
+- High-level acquisition parameters
+- Hold period and exit strategy assumptions
+- Transaction costs (closing, due diligence, sale costs)
+- Pricing metrics (price per unit, price per SF)
+- Soft costs (legal, financing, third-party reports)
+- Tax basis allocation (land %, improvement %)
+- 1031 exchange flag
+
+### API Endpoints
+
+#### Acquisition Ledger Events
+- `GET /api/projects/{project_id}/acquisition/ledger/` - List all events for project
+- `POST /api/projects/{project_id}/acquisition/ledger/` - Create new event
+- `GET /api/projects/{project_id}/acquisition/ledger/{id}/` - Retrieve event
+- `PATCH /api/projects/{project_id}/acquisition/ledger/{id}/` - Update event
+- `DELETE /api/projects/{project_id}/acquisition/ledger/{id}/` - Delete event
+
+#### Acquisition Assumptions
+- `GET /api/projects/{project_id}/assumptions/acquisition/` - Get/create assumptions (returns defaults if none exist)
+- `POST /api/projects/{project_id}/assumptions/acquisition/` - Create or update assumptions
+- `PATCH /api/projects/{project_id}/assumptions/acquisition/` - Partially update assumptions
+
+### Features
+- ✅ Full CRUD operations for acquisition ledger
+- ✅ Inline editing with auto-save
+- ✅ Support for all ALTA-style event types
+- ✅ Goes-hard date tracking for contingencies
+- ✅ Conditional event marking
+- ✅ Integration with frontend acquisition page (`/projects/[projectId]/acquisition`)
+- ✅ DRF pagination support
+- ✅ Proper null handling for optional financial fields
+
+### Migration History
+- `0001_add_goes_hard_and_conditional_fields.py` - Added `goes_hard_date` and `is_conditional` columns (Nov 23, 2025)
+
+### Files
+- `backend/apps/acquisition/models.py`
+- `backend/apps/acquisition/serializers.py`
+- `backend/apps/acquisition/views.py`
+- `backend/apps/acquisition/urls.py`
+- `backend/apps/acquisition/apps.py`
+- `backend/apps/acquisition/migrations/`
+
 ## Next Steps
 
 ### Phase 2: Container Hierarchy
