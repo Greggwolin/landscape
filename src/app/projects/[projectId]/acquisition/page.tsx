@@ -1,115 +1,133 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import AcquisitionHeaderCard from '@/components/acquisition/AcquisitionHeaderCard';
+import AcquisitionLedgerGrid from '@/components/acquisition/AcquisitionLedgerGrid';
+import AcquisitionReconciliation from '@/components/acquisition/AcquisitionReconciliation';
+import { usePreference } from '@/hooks/useUserPreferences';
+import type { AcquisitionEvent, AcquisitionHeader } from '@/types/acquisition';
+import type { BudgetMode } from '@/components/budget/ModeSelector';
 
-/**
- * Acquisition Page
- *
- * TODO: Migrate content from one of these sources:
- * Option 1: /projects/[projectId]/components/tabs/ProjectTab.tsx (legacy tab component)
- * Option 2: /projects/[projectId]/project/summary/page.tsx (newer summary page)
- *
- * Should include:
- * - Project profile information (name, location, type, size)
- * - Project map showing location
- * - Acquisition costs and land pricing
- * - Key contacts
- * - Project notes/description
- */
+const normalizeNumber = (value: any) => (value === null || value === undefined ? null : Number(value));
+
 export default function AcquisitionPage() {
   const params = useParams();
   const projectId = parseInt(params.projectId as string);
 
+  // Mode state with database persistence via usePreference hook
+  const [mode, setMode] = usePreference<BudgetMode>({
+    key: 'acquisition.mode',
+    defaultValue: 'napkin',
+    scopeType: 'project',
+    scopeId: projectId,
+    migrateFrom: `acquisition_mode_${projectId}`, // Auto-migrate from old localStorage key
+  });
+  const [headerData, setHeaderData] = useState<AcquisitionHeader | null>(null);
+  const [headerLoading, setHeaderLoading] = useState<boolean>(true);
+  const [headerSaving, setHeaderSaving] = useState<boolean>(false);
+  const [events, setEvents] = useState<AcquisitionEvent[]>([]);
+  const [headerError, setHeaderError] = useState<string | null>(null);
+
+  const fetchHeader = async () => {
+    setHeaderLoading(true);
+    setHeaderError(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/projects/${projectId}/assumptions/acquisition/`);
+      if (!res.ok) throw new Error(`Failed to fetch header (${res.status})`);
+      const json = await res.json();
+      setHeaderData({
+        ...json,
+        purchase_price: normalizeNumber(json.purchase_price),
+        due_diligence_days: normalizeNumber(json.due_diligence_days),
+        earnest_money: normalizeNumber(json.earnest_money),
+      });
+    } catch (err) {
+      console.error(err);
+      setHeaderError('Unable to load acquisition assumptions');
+    } finally {
+      setHeaderLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHeader();
+  }, [projectId]);
+
+  const handleHeaderChange = (patch: Partial<AcquisitionHeader>) => {
+    setHeaderData((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const handleHeaderSave = async () => {
+    if (!headerData) return;
+    setHeaderSaving(true);
+    setHeaderError(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/projects/${projectId}/assumptions/acquisition/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(headerData),
+      });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      const json = await res.json();
+      setHeaderData({
+        ...json,
+        purchase_price: normalizeNumber(json.purchase_price),
+        due_diligence_days: normalizeNumber(json.due_diligence_days),
+        earnest_money: normalizeNumber(json.earnest_money),
+      });
+    } catch (err) {
+      console.error(err);
+      setHeaderError('Failed to save acquisition assumptions');
+    } finally {
+      setHeaderSaving(false);
+    }
+  };
+
+  const purchasePrice = useMemo(() => Number(headerData?.purchase_price ?? 0), [headerData?.purchase_price]);
+  const netAffecting = useMemo(
+    () =>
+      events
+        .filter((evt) => evt.isAppliedToPurchase)
+        .reduce((sum, evt) => sum + (evt.amount ?? 0), 0),
+    [events]
+  );
+
   return (
-    <div className="container-fluid px-4">
-      <div className="alert alert-info">
-        <h5><i className="bi bi-info-circle me-2"></i>Acquisition Page</h5>
-        <p className="mb-2">
-          This page will display the project profile and acquisition information.
-        </p>
-        <p className="mb-2"><strong>Content to migrate:</strong></p>
-        <ul className="mb-2">
-          <li>Project details (name, address, type, size, etc.)</li>
-          <li>Project map with property location</li>
-          <li>Acquisition cost breakdown</li>
-          <li>Land pricing (per acre, per unit)</li>
-          <li>Key contacts (owner, broker, team)</li>
-          <li>Project description and notes</li>
-        </ul>
-        <p className="mb-0">
-          <strong>Recommended source:</strong> Reuse components from{' '}
-          <code>/projects/[projectId]/project/summary/page.tsx</code>
-        </p>
+    <div className="container-fluid px-4 py-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+      <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+          <h2 className="mb-0">Acquisition</h2>
+          <p className="text-muted mb-0">Header assumptions + unified acquisition ledger (ALTA-inspired)</p>
+        </div>
+        <div className="text-muted small">Project ID: {projectId}</div>
       </div>
 
-      {/* Temporary: Basic project info display */}
-      <div className="row g-4">
-        <div className="col-md-8">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-building me-2"></i>
-                Project Profile
-              </h5>
-            </div>
-            <div className="card-body">
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-file-earmark-text" style={{ fontSize: '3rem' }}></i>
-                <p className="mt-3">Project profile component will be displayed here</p>
-                <p className="small">Project ID: {projectId}</p>
-              </div>
-            </div>
-          </div>
+      {headerError && <div className="alert alert-danger py-2">{headerError}</div>}
 
-          <div className="card mt-4">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-cash-coin me-2"></i>
-                Acquisition Costs
-              </h5>
-            </div>
-            <div className="card-body">
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-receipt" style={{ fontSize: '3rem' }}></i>
-                <p className="mt-3">Acquisition cost breakdown will be displayed here</p>
-              </div>
-            </div>
-          </div>
+      <div className="row g-4 mb-4">
+        <div className="col-lg-8">
+          <AcquisitionHeaderCard
+            data={headerData}
+            loading={headerLoading}
+            saving={headerSaving}
+            onChange={handleHeaderChange}
+            onSave={handleHeaderSave}
+          />
         </div>
-
-        <div className="col-md-4">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-geo-alt me-2"></i>
-                Project Location
-              </h5>
-            </div>
-            <div className="card-body">
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-map" style={{ fontSize: '3rem' }}></i>
-                <p className="mt-3">Project map will be displayed here</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="card mt-4">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-people me-2"></i>
-                Key Contacts
-              </h5>
-            </div>
-            <div className="card-body">
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-person-lines-fill" style={{ fontSize: '3rem' }}></i>
-                <p className="mt-3">Project contacts will be displayed here</p>
-              </div>
-            </div>
-          </div>
+        <div className="col-lg-4">
+          <AcquisitionReconciliation purchasePrice={purchasePrice} netAffecting={netAffecting} />
         </div>
       </div>
+
+      <AcquisitionLedgerGrid
+        projectId={projectId}
+        mode={mode}
+        onModeChange={setMode}
+        onEventsChange={setEvents}
+      />
     </div>
   );
 }

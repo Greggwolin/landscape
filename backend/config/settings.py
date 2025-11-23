@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     "apps.market_intel",
     "apps.reports",  # Report generation and PDF export
     "apps.landscaper",  # Phase 6: Landscaper AI chat interface
+    "apps.users",  # Phase 7: User settings and tier management
+    "apps.acquisition",  # Acquisition tracking and ledger
 ]
 
 MIDDLEWARE = [
