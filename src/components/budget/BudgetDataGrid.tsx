@@ -323,6 +323,7 @@ export default function BudgetDataGrid({
                         item={item}
                         mode={mode}
                         columnCount={tableRow.getVisibleCells().length}
+                        projectId={projectId}
                         projectTypeCode={projectTypeCode}
                         onInlineCommit={onInlineCommit}
                       />
@@ -396,6 +397,7 @@ export default function BudgetDataGrid({
                       item={row.original}
                       mode={mode}
                       columnCount={row.getVisibleCells().length}
+                      projectId={projectId}
                       projectTypeCode={projectTypeCode}
                       onInlineCommit={onInlineCommit}
                     />

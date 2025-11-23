@@ -85,11 +85,12 @@ export interface BudgetItem {
   curve_id?: number | null; // FK to core_fin_curve
 
   // =========================================================================
-  // STANDARD MODE: Cost Controls (6 fields)
+  // STANDARD MODE: Cost Controls (7 fields)
   // =========================================================================
   contingency_pct: number | null; // Cost buffer %
   confidence_level: ConfidenceLevel | null; // Estimation confidence
   vendor_name: string | null; // Vendor or supplier
+  vendor_contact_id: number | null; // FK to contacts table
   contract_number: string | null; // Contract reference
   purchase_order: string | null; // PO number
   is_committed: boolean | null; // Cannot delete if true

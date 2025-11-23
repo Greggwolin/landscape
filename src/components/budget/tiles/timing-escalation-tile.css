@@ -1,0 +1,27 @@
+/**
+ * Timing & Escalation Tile Custom Styles
+ *
+ * Adjustments for CoreUI floating labels to prevent value/label overlap
+ * and improve label readability
+ */
+
+.timing-escalation-tile .form-floating > label {
+  /* Lighter label color for better contrast */
+  color: var(--cui-body-color) !important;
+  opacity: 0.6;
+}
+
+.timing-escalation-tile .form-floating > .form-control:focus ~ label,
+.timing-escalation-tile .form-floating > .form-control:not(:placeholder-shown) ~ label,
+.timing-escalation-tile .form-floating > .form-select ~ label {
+  /* Adjust label position when floated to prevent overlap */
+  transform: scale(0.85) translateY(-0.75rem) translateX(0.15rem);
+  opacity: 0.8;
+}
+
+.timing-escalation-tile .form-floating > .form-control,
+.timing-escalation-tile .form-floating > .form-select {
+  /* Ensure adequate padding for floated label */
+  padding-top: 1.625rem;
+  padding-bottom: 0.625rem;
+}

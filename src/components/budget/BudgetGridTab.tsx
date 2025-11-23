@@ -31,9 +31,11 @@ import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
+import { usePreference } from '@/hooks/useUserPreferences';
 
 interface Props {
   projectId: number;
+  scopeFilter?: string; // Optional scope filter (e.g., "Planning & Engineering", "Development")
 }
 
 type SubTab = 'grid' | 'timeline' | 'assumptions' | 'analysis' | 'categories';
@@ -47,9 +49,18 @@ function isLandDevelopmentProject(projectTypeCode?: string): boolean {
   );
 }
 
-export default function BudgetGridTab({ projectId }: Props) {
+export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('grid');
-  const [mode, setMode] = useState<BudgetMode>('napkin');
+
+  // Mode state with database persistence via usePreference hook
+  const [mode, setMode] = usePreference<BudgetMode>({
+    key: 'budget.mode',
+    defaultValue: 'napkin',
+    scopeType: 'project',
+    scopeId: projectId,
+    migrateFrom: `budget_mode_${projectId}`, // Auto-migrate from old localStorage key
+  });
+
   const [selected, setSelected] = useState<BudgetItem | undefined>();
   const [showGantt, setShowGantt] = useState(false);
   const [projectTypeCode, setProjectTypeCode] = useState<string | undefined>(undefined);
@@ -112,7 +123,7 @@ export default function BudgetGridTab({ projectId }: Props) {
     [rawData]
   );
 
-  // Filter budget data by selected containers
+  // Filter budget data by selected containers and scope
   const data = useMemo(() => {
     const containerFilterActive = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
 
@@ -127,6 +138,12 @@ export default function BudgetGridTab({ projectId }: Props) {
     }
 
     return rawData.filter(item => {
+      // Apply scope filter if provided (check both scope and activity fields)
+      if (scopeFilter && item.activity !== scopeFilter && item.scope !== scopeFilter) {
+        return false;
+      }
+
+      // Apply container filters
       if (!item.division_id) {
         return includeProjectLevel;
       }
@@ -135,7 +152,7 @@ export default function BudgetGridTab({ projectId }: Props) {
       }
       return divisionIds.has(item.division_id);
     });
-  }, [rawData, selectedAreaIds, selectedPhaseIds, phases, includeProjectLevel]);
+  }, [rawData, selectedAreaIds, selectedPhaseIds, phases, includeProjectLevel, scopeFilter]);
 
   const [modalState, setModalState] = useState<{
     open: boolean;
@@ -375,6 +392,8 @@ export default function BudgetGridTab({ projectId }: Props) {
         category_l3_id: values.category_l3_id ?? null,
         category_l4_id: values.category_l4_id ?? null,
         division_id: values.division_id ?? null,
+        scope: scopeFilter ?? values.scope ?? null, // Use scopeFilter if provided
+        activity: scopeFilter ?? values.activity ?? null, // Also set activity field
         qty: values.qty,
         rate: values.rate,
         amount: values.amount,
@@ -451,6 +470,15 @@ export default function BudgetGridTab({ projectId }: Props) {
   return (
     <CCard>
       <CCardBody>
+        {/* Scope Label - shown when filtering by scope */}
+        {scopeFilter && (
+          <div className="mb-3 pb-2 border-bottom" style={{ borderColor: 'var(--cui-border-color)' }}>
+            <h4 className="mb-0" style={{ color: 'var(--cui-body-color)', fontSize: '1.25rem', fontWeight: 600 }}>
+              Budget: {scopeFilter}
+            </h4>
+          </div>
+        )}
+
         {/* Sub-tab Navigation */}
         <CNav variant="tabs" className="mb-4">
           <CNavItem>
