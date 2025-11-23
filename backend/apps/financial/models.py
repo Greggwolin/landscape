@@ -208,6 +208,12 @@ class BudgetItem(models.Model):
         db_column='vendor_name',
         help_text='Vendor or source for this line item'
     )
+    vendor_contact_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='vendor_contact_id',
+        help_text='Foreign key to contacts table'
+    )
 
     # STANDARD MODE: Timing & Escalation
     escalation_rate = models.DecimalField(

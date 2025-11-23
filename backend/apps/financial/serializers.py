@@ -99,6 +99,7 @@ class BudgetItemSerializer(serializers.ModelSerializer):
             'budgeted_amount',
             'variance_amount',
             'vendor_name',
+            'vendor_contact_id',
 
             # STANDARD MODE: Timing & Escalation
             'escalation_rate',
