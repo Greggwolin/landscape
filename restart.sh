@@ -13,8 +13,12 @@ echo "✅ Servers stopped"
 echo ""
 echo "🚀 Starting Django backend..."
 
+# Get the script's directory and navigate to project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Start Django in background
-cd /Users/5150east/landscape/backend
+cd backend
 source venv/bin/activate
 python manage.py runserver 8000 > /dev/null 2>&1 &
 
@@ -22,8 +26,8 @@ echo "✅ Django running on http://localhost:8000"
 echo ""
 echo "🚀 Starting Next.js frontend..."
 
-# Start Next.js in background
-cd /Users/5150east/landscape
+# Start Next.js in background (back to project root)
+cd "$SCRIPT_DIR"
 npm run dev > /dev/null 2>&1 &
 
 echo "✅ Next.js running on http://localhost:3000"
