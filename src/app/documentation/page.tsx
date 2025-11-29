@@ -24,11 +24,11 @@ const DocumentationIndex: React.FC = () => {
     // Status Reports
     {
       title: 'Implementation Status',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS.md',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-24.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Migration 013 (Project Type Code Standardization)',
+      description: 'Current implementation status and progress tracking - Updated with Project Costs Excel Export (Nov 29)',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-11-02'
+      lastModified: '2025-11-29'
     },
     {
       title: 'CHANGELOG',

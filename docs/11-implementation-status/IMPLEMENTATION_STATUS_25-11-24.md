@@ -1,14 +1,26 @@
 # Landscape Implementation Status
 
-**Version:** 6.2
-**Last Updated:** 2025-11-26
+**Version:** 6.3
+**Last Updated:** 2025-11-29
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (October 28 - November 26, 2025)
+## 🆕 Recent Updates (October 28 - November 29, 2025)
 
-### Area/Phase Tile Improvements (Nov 26, 2025) ⭐ NEW
+### Project Costs Report Excel Export (Nov 29, 2025) ⭐ NEW
+- ✅ **Export Button Added** - "Export to Excel" button in Project Costs Report header
+- ✅ **Excel Generation** - Uses SheetJS (xlsx) library to create .xlsx file matching on-screen layout
+- ✅ **Filter-Aware Export** - Respects current area/phase filter state, exports only filtered phases
+- ✅ **Proper Number Formatting** - Parentheses for negatives, $ prefix for currency, % for percentages, dash for zeros
+- ✅ **All Sections Included** - Physical Metrics, Revenue, Combined Revenue, Deductions, Schedule, Budget, Cost Totals, Profit Metrics
+- ✅ **Dynamic Filename** - Format: `{ProjectName}_ProjectCosts_{YYYY-MM-DD}.xlsx`
+- 📁 Files Created: `src/lib/exports/projectCostsExcel.ts`
+- 📁 Files Modified: `src/components/analysis/validation/ValidationReport.tsx`
+- 📖 Documentation: [SESSION_NOTES_2025_11_29_PROJECT_COSTS_EXCEL_EXPORT.md](../session-notes/SESSION_NOTES_2025_11_29_PROJECT_COSTS_EXCEL_EXPORT.md)
+- 🎯 Status: Complete - Export generates properly formatted Excel file
+
+### Area/Phase Tile Improvements (Nov 26, 2025)
 - ✅ **Level 1 Label Added** - Sales AreaTiles now show proper label (e.g., "Village 1" instead of just "1")
 - ✅ **Net Proceeds on Area Tiles** - Added net proceeds aggregation from child phases to Level 1 tiles
 - ✅ **Acreage Fix** - Fixed container aggregation overwriting valid phase acreage data with zeros
