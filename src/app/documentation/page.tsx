@@ -24,11 +24,19 @@ const DocumentationIndex: React.FC = () => {
     // Status Reports
     {
       title: 'Implementation Status',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-24.md',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-30.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Project Costs Excel Export (Nov 29)',
+      description: 'Current implementation status and progress tracking - Updated with Redfin Housing Comps Integration (Nov 30)',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-11-29'
+      lastModified: '2025-11-30'
+    },
+    {
+      title: 'Redfin Comps Integration',
+      path: '/docs/session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
+      category: 'Component',
+      description: 'Housing price comparables using Redfin API - Map visualization with price-tier markers, layer controls, and statistics',
+      icon: <Map className="w-5 h-5" />,
+      lastModified: '2025-11-30'
     },
     {
       title: 'CHANGELOG',
