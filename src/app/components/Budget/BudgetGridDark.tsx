@@ -495,9 +495,9 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
             <tr className="border-b border-gray-600">
               <th className="px-6 py-4 text-left font-semibold text-gray-300 text-xs" style={{ width: '160px' }}>Scope</th>
               <th className="px-6 py-4 text-left font-semibold text-gray-300 text-xs" style={{ width: '176px' }}>Category</th>
-              <th className="px-6 py-4 text-left font-semibold text-gray-300 text-xs" style={{ width: '240px' }}>Description</th>
-              <th className="px-4 py-4 text-center font-semibold text-gray-300 text-xs" style={{ width: '64px' }}>UOM</th>
-              <th className="px-4 py-4 text-right font-semibold text-gray-300 text-xs" style={{ width: '96px' }}>Quantity</th>
+              <th className="px-3 py-4 text-left font-semibold text-gray-300 text-xs" style={{ width: '108px' }}>Description</th>
+              <th className="px-3 py-4 text-center font-semibold text-gray-300 text-xs" style={{ width: '64px' }}>UOM</th>
+              <th className="px-3 py-4 text-center font-semibold text-gray-300 text-xs" style={{ width: '96px' }}>Units</th>
               <th className="px-4 py-4 text-right font-semibold text-gray-300 text-xs" style={{ width: '112px' }}>Rate</th>
               <th className="px-4 py-4 text-right font-semibold text-gray-300 text-xs relative" style={{ width: '112px' }}>
                 Amount
@@ -543,7 +543,7 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
                   <td className="px-6 py-3 text-gray-300 text-xs" title={item.category_path}>
                     {item.category_path}
                   </td>
-                  <td className="px-4 py-2 text-xs">
+                  <td className="px-3 py-2 text-xs" style={{ width: '108px' }}>
                     <input
                       type="text"
                       value={edits.description ?? item.description ?? ''}

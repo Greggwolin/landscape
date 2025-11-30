@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +13,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { CBadge } from '@coreui/react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   usePricingAssumptions,
   useSavePricingAssumptions,
@@ -21,6 +22,7 @@ import {
   useGrowthRateBenchmarks,
 } from '@/hooks/useSalesAbsorption';
 import { useMeasureOptions } from '@/hooks/useMeasures';
+import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 import type { PricingAssumption } from '@/types/sales-absorption';
 import { formatMoney } from '@/utils/formatters/number';
 import { Trash2, Plus, Save, X } from 'lucide-react';
@@ -31,18 +33,31 @@ interface Props {
   mode?: 'napkin' | 'standard' | 'detail';
 }
 
-// Default growth rate options (fallback if no benchmarks)
-const DEFAULT_GROWTH_RATES = [
-  { value: 0.035, label: '3.5%' },
-];
+// Use-type pill colors aligned with Parcel Detail & Parcel Sales tables
+const USE_TYPE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
+  // Blues
+  SFD: { bg: '#1e3a8a', text: '#93c5fd' },   // blue-900 / blue-300
+  VLDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  LDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  MLDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  MDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  RET: { bg: '#1e3a8a', text: '#93c5fd' },
+  // Purples
+  MX: { bg: '#581c87', text: '#d8b4fe' },    // purple-900 / purple-300
+  MU: { bg: '#581c87', text: '#d8b4fe' },
+  SFA: { bg: '#581c87', text: '#d8b4fe' },
+  // Oranges
+  MF: { bg: '#7c2d12', text: '#fdba74' },    // orange-900 / orange-300
+  HDR: { bg: '#7c2d12', text: '#fdba74' },
+  BTR: { bg: '#7c2d12', text: '#fdba74' },
+  // Greens
+  PARK: { bg: '#14532d', text: '#86efac' },  // green-900 / green-300
+};
 
-// Hardcoded UOM options (fallback if API fails)
-const UOM_OPTIONS_FALLBACK = [
-  { value: 'FF', label: 'FF - Front Foot' },
-  { value: 'SF', label: 'SF - Square Foot' },
-  { value: 'AC', label: 'AC - Acre' },
-  { value: 'EA', label: 'EA - Each' },
-];
+const getUseTypePillColors = (typeCode?: string | null) => {
+  const key = (typeCode ?? '').toUpperCase();
+  return USE_TYPE_PILL_COLORS[key] || { bg: '#312e81', text: '#a5b4fc' }; // indigo fallback
+};
 
 // Extracted component for editable price cell to avoid hooks-in-render-prop violation
 function EditablePriceCell({
@@ -113,13 +128,15 @@ function EditablePriceCell({
 }
 
 export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' }: Props) {
-  const { data: assumptions, isLoading, error } = usePricingAssumptions(projectId);
+  const queryClient = useQueryClient();
+  const { data: assumptions, isLoading, error, refetch: refetchPricingAssumptions } = usePricingAssumptions(projectId);
   const { data: parcelProducts, isLoading: isLoadingProducts } = useParcelProductTypes(
     projectId,
     phaseFilters && phaseFilters.length > 0 ? phaseFilters : null
   );
-  const { options: uomOptions, isLoading: isLoadingMeasures } = useMeasureOptions(true);
+  const { options: uomOptions, isLoading: isLoadingMeasures } = useMeasureOptions(true, 'land_pricing');
   const { data: growthRateBenchmarks } = useGrowthRateBenchmarks();
+  const { data: inflationSettings } = useProjectInflationSettings(projectId);
   const saveMutation = useSavePricingAssumptions();
   const deleteMutation = useDeletePricingAssumption();
 
@@ -128,52 +145,162 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [customGrowthRate, setCustomGrowthRate] = useState<string>('');
-  const [globalGrowthRate, setGlobalGrowthRate] = useState<number>(0.035); // Default 3.5%
+  const [globalGrowthRate, setGlobalGrowthRate] = useState<number | null>(null); // No default - use admin configured options
   const [isCustomGrowthRate, setIsCustomGrowthRate] = useState(false);
+  const lastInflationRate = useRef<number | null>(null);
 
-  // Use API UOM options or fallback
-  const uomChoices = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS_FALLBACK;
+  // Track which rows have been modified (dirty tracking)
+  const [dirtyRowIndices, setDirtyRowIndices] = useState<Set<number>>(new Set());
+
+  // Use API UOM options only - no fallback
+  const uomChoices = uomOptions;
 
   // Build growth rate options from benchmarks
   const growthRateOptions = useMemo(() => {
-    const options: Array<{ value: number; label: string }> = [];
+    const options: Array<{ id: string; value: number; label: string; setId?: string; isMultiStep?: boolean }> = [];
 
     // Add benchmarks from API
     if (growthRateBenchmarks && Array.isArray(growthRateBenchmarks)) {
-      growthRateBenchmarks.forEach((benchmark: any) => {
+      growthRateBenchmarks.forEach((benchmark: any, index: number) => {
         let rate: number | null = null;
         let label = benchmark.set_name;
+        let isMultiStep = false;
 
         if (benchmark.rate_type === 'flat' && benchmark.current_rate !== null) {
           // Use flat rate directly
           rate = Number(benchmark.current_rate);
         } else if (benchmark.rate_type === 'stepped' && benchmark.steps && benchmark.steps.length > 0) {
-          // For stepped benchmarks, use the first step's rate
-          rate = Number(benchmark.steps[0].rate);
-          label = `${benchmark.set_name} (Step 1)`;
+          // For stepped benchmarks, show it's a multi-step series
+          // Calculate weighted average of all steps for display
+          const totalPeriods = benchmark.steps.reduce((sum: number, step: any) => sum + (step.periods || 0), 0);
+          const weightedSum = benchmark.steps.reduce((sum: number, step: any) => {
+            return sum + (Number(step.rate) * (step.periods || 0));
+          }, 0);
+          rate = totalPeriods > 0 ? weightedSum / totalPeriods : Number(benchmark.steps[0].rate);
+
+          // Show it's a multi-step series with step count
+          label = `${benchmark.set_name} (${benchmark.steps.length} steps)`;
+          isMultiStep = true;
         }
 
         if (rate !== null && !isNaN(rate)) {
           options.push({
+            // Use set_id in the ID to ensure uniqueness
+            id: `benchmark-${benchmark.set_id || index}`,
             value: rate,
             label: `${(rate * 100).toFixed(1)}% - ${label}`,
+            setId: benchmark.set_id,
+            isMultiStep,
           });
         }
       });
     }
 
-    // If no benchmarks, use default
+    // If no benchmarks configured, return empty array - don't use fallback
+    // This will show "No options configured" in the dropdown
     if (options.length === 0) {
-      return DEFAULT_GROWTH_RATES;
+      return [];
     }
 
     // Sort by value
     return options.sort((a, b) => a.value - b.value);
   }, [growthRateBenchmarks]);
 
+  const formatOptionLabel = (opt: { value: number; label: string }) => {
+    return `${(opt.value * 100).toFixed(1)}%`;
+  };
+
+  const applyBenchmarkRate = useCallback(async (newRate: number) => {
+    console.log(`[PricingTable] Applying price inflation selection: ${newRate * 100}%`);
+    setGlobalGrowthRate(newRate);
+    setIsCustomGrowthRate(false);
+    setIsSaving(true);
+    try {
+      console.log(`[PricingTable] Applying benchmark growth_rate ${newRate} to all pricing assumptions`);
+
+      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/bulk-update-field/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'growth_rate', value: newRate }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update growth rate');
+      }
+
+      const result = await response.json();
+      console.log(`[PricingTable] Updated ${result.count} rows via benchmark selection`);
+
+      setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
+      setDirtyRowIndices(new Set());
+
+      await refetchPricingAssumptions();
+
+      const typesCodes = [...new Set(editingRows.map(row => row.lu_type_code))];
+      const typeCodesParam = typesCodes.join(',');
+
+      const recalcResponse = await fetch(
+        `/api/projects/${projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (recalcResponse.ok) {
+        const recalcResult = await recalcResponse.json();
+        console.log(`[PricingTable] Recalculated ${recalcResult.updated_count} parcels after benchmark rate change`);
+
+        await queryClient.invalidateQueries({
+          queryKey: ['parcels-with-sales', projectId],
+        });
+      } else {
+        console.error('[PricingTable] Recalculation failed:', await recalcResponse.text());
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save growth rate');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [projectId, queryClient, refetchPricingAssumptions, editingRows]);
+
+  // Initialize global growth from selected price inflation set if not set yet
+  useEffect(() => {
+    if (globalGrowthRate !== null) return;
+    const selectedRate = inflationSettings?.price_inflation?.current_rate;
+    if (selectedRate !== null && selectedRate !== undefined) {
+      setGlobalGrowthRate(selectedRate);
+      // Toggle custom flag if selection not in options
+      const matchesOption = growthRateOptions.some(opt => Math.abs(opt.value - selectedRate) < 0.0001);
+      setIsCustomGrowthRate(!matchesOption);
+      if (!matchesOption) {
+        setCustomGrowthRate((selectedRate * 100).toFixed(1));
+      }
+    }
+  }, [inflationSettings?.price_inflation?.current_rate, globalGrowthRate, growthRateOptions]);
+
+  // React when price inflation selection (nav) changes
+  useEffect(() => {
+    const rate = inflationSettings?.price_inflation?.current_rate;
+    if (rate === null || rate === undefined) {
+      console.log('[PricingTable] Nav price inflation not set; skipping');
+      return;
+    }
+    if (lastInflationRate.current !== null && Math.abs(lastInflationRate.current - rate) < 1e-6) {
+      return;
+    }
+    lastInflationRate.current = rate;
+    console.log(`[PricingTable] Detected nav price inflation change to ${rate * 100}% (will apply to pricing assumptions)`);
+    void applyBenchmarkRate(rate);
+  }, [inflationSettings?.price_inflation?.current_rate, applyBenchmarkRate]);
+
   // Initialize editing rows: merge parcel products with existing pricing assumptions
   useEffect(() => {
     if (!parcelProducts) return;
+
+    // Don't reset editing rows if user has unsaved changes
+    if (hasUnsavedChanges) return;
 
     if (parcelProducts.length > 0) {
       // Create rows for each actual parcel product combination
@@ -190,25 +317,41 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
           return {
             ...existing,
             product_code: existing.product_code || '',
-            growth_rate: existing.growth_rate || 0.035,
+            // Keep existing growth_rate as-is, don't apply fallback
+            growth_rate: existing.growth_rate ?? null,
           };
         } else {
-          // Create new row with defaults
-          const defaultGrowthRate =
-            product.family_name === 'Residential' ? 0.035 : 0.040;
-
+          // Create new row without hardcoded defaults
+          // User must select from admin-configured options
           return {
             project_id: projectId,
             lu_type_code: product.type_code,
             product_code: product.product_code || '',
             price_per_unit: 0,
-            unit_of_measure: 'FF',
-            growth_rate: defaultGrowthRate,
+            unit_of_measure: null, // No default - must be selected
+            growth_rate: null,      // No default - must be selected
           };
         }
       });
 
       setEditingRows(rows);
+
+      // Initialize global growth rate from the first row that has one
+      const firstGrowthRate = rows.find(r => r.growth_rate != null)?.growth_rate;
+      if (firstGrowthRate != null && globalGrowthRate === null) {
+        setGlobalGrowthRate(firstGrowthRate);
+
+        // Check if this rate matches any benchmark option (with tolerance)
+        const matchesOption = growthRateOptions.some(opt =>
+          Math.abs(opt.value - firstGrowthRate) < 0.0001
+        );
+        if (!matchesOption && firstGrowthRate !== 0) {
+          // Set as custom rate if it doesn't match any option
+          setIsCustomGrowthRate(true);
+          setCustomGrowthRate((firstGrowthRate * 100).toFixed(1));
+        }
+      }
+
       // Don't auto-mark as unsaved on initial load
       setHasUnsavedChanges(false);
     } else {
@@ -216,17 +359,58 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
       setEditingRows([]);
       setHasUnsavedChanges(false);
     }
-  }, [assumptions, parcelProducts, projectId]);
+  }, [assumptions, parcelProducts, projectId, hasUnsavedChanges, globalGrowthRate, growthRateOptions]);
 
-  const handleCellChange = (rowIndex: number, field: keyof PricingAssumption, value: any) => {
+  const handleCellChange = React.useCallback((rowIndex: number, field: keyof PricingAssumption, value: any) => {
     setEditingRows(prev => {
       const updated = [...prev];
       updated[rowIndex] = { ...updated[rowIndex], [field]: value };
       return updated;
     });
+    // Mark this row as dirty
+    setDirtyRowIndices(prev => new Set(prev).add(rowIndex));
     // Defer setting unsaved changes to avoid immediate re-render during typing
     setTimeout(() => setHasUnsavedChanges(true), 0);
-  };
+  }, []);
+
+  // Auto-save handler for fields that should save immediately (like UOM dropdown)
+  const handleCellChangeAndSave = React.useCallback(async (rowIndex: number, field: keyof PricingAssumption, value: any) => {
+    // Update local state first
+    const updatedRows = [...editingRows];
+    updatedRows[rowIndex] = { ...updatedRows[rowIndex], [field]: value };
+    setEditingRows(updatedRows);
+
+    // Validate the row before saving
+    const row = updatedRows[rowIndex];
+    if (!row.lu_type_code || !row.unit_of_measure) {
+      // Don't auto-save if required fields are missing
+      setDirtyRowIndices(prev => new Set(prev).add(rowIndex));
+      setHasUnsavedChanges(true);
+      return;
+    }
+
+    // Auto-save ONLY this changed row
+    setIsSaving(true);
+    try {
+      await saveMutation.mutateAsync({
+        projectId,
+        assumptions: [updatedRows[rowIndex]], // Only save the changed row
+      });
+      // Clear this row from dirty set
+      setDirtyRowIndices(prev => {
+        const next = new Set(prev);
+        next.delete(rowIndex);
+        return next;
+      });
+      setHasUnsavedChanges(false);
+      setEditingRowId(null);
+    } catch (err) {
+      console.error('Failed to auto-save:', err);
+      setHasUnsavedChanges(true);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editingRows, saveMutation, projectId]);
 
   const handleAddRow = () => {
     const newRow: PricingAssumption = {
@@ -234,8 +418,8 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
       lu_type_code: '',
       product_code: '',
       price_per_unit: 0,
-      unit_of_measure: 'FF',
-      growth_rate: 0.035, // Default 3.5%
+      unit_of_measure: null, // No default - must be selected from admin options
+      growth_rate: null,      // No default - must be selected from admin options
     };
     setEditingRows(prev => [...prev, newRow]);
     setHasUnsavedChanges(true);
@@ -264,8 +448,19 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
   };
 
   const handleSave = async () => {
-    // Validate all rows
-    const invalidRows = editingRows.filter(
+    // Get only the dirty (changed) rows
+    const dirtyRows = Array.from(dirtyRowIndices)
+      .map(index => editingRows[index])
+      .filter(row => row); // Filter out undefined
+
+    if (dirtyRows.length === 0) {
+      // Nothing to save
+      setHasUnsavedChanges(false);
+      return;
+    }
+
+    // Validate dirty rows
+    const invalidRows = dirtyRows.filter(
       row => !row.lu_type_code || row.price_per_unit <= 0 || !row.unit_of_measure
     );
 
@@ -278,8 +473,10 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
     try {
       await saveMutation.mutateAsync({
         projectId,
-        assumptions: editingRows,
+        assumptions: dirtyRows, // Only save dirty rows
       });
+      // Clear dirty tracking
+      setDirtyRowIndices(new Set());
       setHasUnsavedChanges(false);
       setEditingRowId(null);
       // Success toast would go here
@@ -338,25 +535,21 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
           const rowIndex = row.index;
           const isEditing = editingRowId === rowIndex;
 
-          // Get family_name from parcelProducts for color coding
-          const product = parcelProducts?.find(
-            p => p.type_code === value &&
-                 (p.product_code || '') === (row.original.product_code || '')
-          );
-          const familyName = product?.family_name;
-
-          // Match ParcelSalesTable color scheme using CoreUI badge colors
-          const badgeColor =
-            familyName === 'Residential' ? 'primary' :
-            familyName === 'Commercial' ? 'warning' :
-            familyName === 'Industrial' ? 'info' :
-            'secondary';
+          // Match ParcelSalesTable pill colors
+          const { bg, text } = getUseTypePillColors(value);
 
           return (
             <div className="text-center">
-              <CBadge color={badgeColor} className="font-semibold text-xs">
+              <span
+                className="px-2 py-1 rounded text-xs fw-semibold"
+                style={{
+                  backgroundColor: bg,
+                  color: text,
+                  letterSpacing: '0.01em',
+                }}
+              >
                 {value || 'N/A'}
-              </CBadge>
+              </span>
             </div>
           );
         },
@@ -365,7 +558,7 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
       baseColumns.push({
         accessorKey: 'product_code',
         header: 'Product',
-        size: 200,
+        size: 140,
         cell: ({ row }) => {
           const value = row.original.product_code;
           return (
@@ -389,8 +582,11 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
             return (
               <div className="text-center">
                 <select
-                  value={value || 'FF'}
-                  onChange={(e) => handleCellChange(rowIndex, 'unit_of_measure', e.target.value)}
+                  value={value || ''}
+                  onChange={(e) => handleCellChangeAndSave(rowIndex, 'unit_of_measure', e.target.value)}
+                  onBlur={() => setEditingRowId(null)}
+                  autoFocus
+                  disabled={uomChoices.length === 0}
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
                   style={{
                     backgroundColor: 'var(--cui-body-bg)',
@@ -398,11 +594,15 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                     borderColor: 'var(--cui-border-color)',
                   }}
                 >
-                  {uomChoices.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
+                  {uomChoices.length === 0 ? (
+                    <option value="">No UOM options configured</option>
+                  ) : (
+                    uomChoices.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             );
@@ -427,7 +627,31 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
           return (
             <EditablePriceCell
               value={value}
-              onSave={(newValue) => handleCellChange(rowIndex, 'price_per_unit', newValue || 0)}
+              onSave={async (newValue) => {
+                // Update the row value
+                const updatedRows = [...editingRows];
+                updatedRows[rowIndex] = { ...updatedRows[rowIndex], price_per_unit: newValue || 0 };
+                setEditingRows(updatedRows);
+
+                // Auto-save ONLY this row
+                setIsSaving(true);
+                try {
+                  await saveMutation.mutateAsync({
+                    projectId,
+                    assumptions: [updatedRows[rowIndex]], // Only save this row
+                  });
+                  // Clear this row from dirty set
+                  setDirtyRowIndices(prev => {
+                    const next = new Set(prev);
+                    next.delete(rowIndex);
+                    return next;
+                  });
+                } catch (err) {
+                  alert('Failed to save price');
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
             />
           );
         },
@@ -485,15 +709,16 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
             return (
               <div className="text-center flex flex-col gap-1">
                 <select
-                  value={isCustomRate ? 'custom' : String(value || 0.035)}
+                  value={isCustomRate ? 'custom' : String(value || '')}
                   onChange={(e) => {
                     if (e.target.value === 'custom') {
-                      setCustomGrowthRate(String((value || 0.035) * 100));
+                      setCustomGrowthRate(String((value || 0) * 100));
                     } else {
-                      handleCellChange(rowIndex, 'growth_rate', parseFloat(e.target.value));
+                      handleCellChangeAndSave(rowIndex, 'growth_rate', parseFloat(e.target.value));
                       setCustomGrowthRate('');
                     }
                   }}
+                  disabled={growthRateOptions.length === 0}
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500"
                   style={{
                     backgroundColor: 'var(--cui-body-bg)',
@@ -501,12 +726,18 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                     borderColor: 'var(--cui-border-color)',
                   }}
                 >
-                  {growthRateOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                  <option value="custom">Custom...</option>
+                  {growthRateOptions.length === 0 ? (
+                    <option value="">No benchmarks configured</option>
+                  ) : (
+                    <>
+                      {growthRateOptions.map(opt => (
+                        <option key={opt.id} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                      <option value="custom">Custom...</option>
+                    </>
+                  )}
                 </select>
                 {(isCustomRate || customGrowthRate !== '') && (
                   <div className="flex justify-center">
@@ -519,6 +750,13 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                           const numValue = Number(rawValue) / 100;
                           handleCellChange(rowIndex, 'growth_rate', numValue);
                           setCustomGrowthRate(rawValue);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const rawValue = e.target.value.replace(/%/g, '');
+                        if (rawValue !== '' && !isNaN(Number(rawValue))) {
+                          const numValue = Number(rawValue) / 100;
+                          handleCellChangeAndSave(rowIndex, 'growth_rate', numValue);
                         }
                       }}
                       placeholder="%"
@@ -547,7 +785,7 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
 
     return baseColumns;
   },
-    [parcelProducts, editingRowId, uomChoices, isSaving, growthRateOptions, customGrowthRate, mode]
+    [parcelProducts, editingRowId, uomChoices, isSaving, growthRateOptions, customGrowthRate, mode, handleCellChangeAndSave, handleCellChange]
   );
 
   const table = useReactTable({
@@ -591,82 +829,12 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
 
   return (
     <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-      {/* Header with action buttons and growth rate selector */}
+      {/* Header */}
       <div className="px-4 py-3 border-b flex justify-between items-center" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 w-full">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>
             Land Use Pricing Assumptions
           </h3>
-
-          {/* Growth Rate Selector (Napkin & Standard modes only) */}
-          {mode !== 'detail' && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>
-                Annual Growth:
-              </label>
-              <select
-                value={isCustomGrowthRate ? 'custom' : globalGrowthRate}
-                onChange={(e) => {
-                  if (e.target.value === 'custom') {
-                    setIsCustomGrowthRate(true);
-                    setCustomGrowthRate((globalGrowthRate * 100).toFixed(1));
-                  } else {
-                    setIsCustomGrowthRate(false);
-                    const newRate = parseFloat(e.target.value);
-                    setGlobalGrowthRate(newRate);
-                    // Apply to all rows
-                    setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
-                    setHasUnsavedChanges(true);
-                  }
-                }}
-                className="px-2 py-1 text-sm border rounded"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-body-bg)',
-                  color: 'var(--cui-body-color)',
-                }}
-              >
-                {growthRateOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-                <option value="custom">Custom...</option>
-              </select>
-              {isCustomGrowthRate && (
-                <>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={customGrowthRate}
-                    onChange={(e) => {
-                      const percentage = e.target.value;
-                      setCustomGrowthRate(percentage);
-                      const numRate = parseFloat(percentage);
-                      if (!isNaN(numRate)) {
-                        const newRate = numRate / 100;
-                        setGlobalGrowthRate(newRate);
-                        // Apply to all rows
-                        setEditingRows(prev => prev.map(row => ({ ...row, growth_rate: newRate })));
-                        setHasUnsavedChanges(true);
-                      }
-                    }}
-                    className="px-2 py-1 text-sm border rounded w-20"
-                    style={{
-                      borderColor: 'var(--cui-border-color)',
-                      backgroundColor: 'var(--cui-body-bg)',
-                      color: 'var(--cui-body-color)',
-                    }}
-                    placeholder="0.0"
-                    autoFocus
-                  />
-                  <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>%</span>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="flex gap-2">
@@ -695,7 +863,7 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
                 }}
               >
                 <Save className="w-4 h-4" />
-                {isSaving ? 'Saving...' : `Save Changes (${editingRows.filter(r => !r.id || hasUnsavedChanges).length})`}
+                {isSaving ? 'Saving...' : `Save Changes (${dirtyRowIndices.size})`}
               </button>
             </>
           )}

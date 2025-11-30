@@ -25,34 +25,11 @@ function formatValueInput(value: string, valueType: string = 'flat_fee'): string
   // Remove non-numeric characters except decimal point
   const cleaned = value.replace(/[^\d.]/g, '');
 
-  // For flat fees and most cases: no decimals
-  if (valueType === 'flat_fee') {
-    return cleaned.split('.')[0];
+  // Allow up to 2 decimals for all types (flat fees can have cents)
+  const parts = cleaned.split('.');
+  if (parts.length > 1) {
+    return parts[0] + '.' + parts[1].substring(0, 2);
   }
-
-  // For percentages: allow up to 2 decimals
-  if (valueType === 'percentage') {
-    const parts = cleaned.split('.');
-    if (parts.length > 1) {
-      return parts[0] + '.' + parts[1].substring(0, 2);
-    }
-    return cleaned;
-  }
-
-  // For per_unit: allow decimals only if value < 10, otherwise no decimals
-  if (valueType === 'per_unit') {
-    const numValue = parseFloat(cleaned);
-    if (numValue < 10) {
-      const parts = cleaned.split('.');
-      if (parts.length > 1) {
-        return parts[0] + '.' + parts[1].substring(0, 2);
-      }
-      return cleaned;
-    } else {
-      return cleaned.split('.')[0];
-    }
-  }
-
   return cleaned;
 }
 
@@ -377,11 +354,13 @@ export default function BenchmarkAccordion({
                           <>
                             <option value="gross_sale_price">Gross Sale Price</option>
                             <option value="net_sale_price">Net Sale Price</option>
+                            <option value="lease_value">Lease Value</option>
                           </>
                         ) : (
                           <>
                             <option value="gross_sale_price">Gross Sale Price</option>
                             <option value="net_sale_price">Net Sale Price</option>
+                            <option value="lease_value">Lease Value</option>
                             <option value="purchase_price">Purchase Price</option>
                             <option value="loan_amount">Loan Amount</option>
                           </>
@@ -620,18 +599,47 @@ function BenchmarkListItem({
   const [isEditing, setIsEditing] = React.useState(false);
 
   // Helper function to get initial form data from benchmark
-  const getInitialFormData = React.useCallback(() => ({
-    benchmark_name: benchmark.benchmark_name || '',
-    value: benchmark.value?.toString() || '0',
-    cost_type: (benchmark as any).cost_type || '',
-    value_type: (benchmark as any).value_type || 'flat_fee',
-    basis: (benchmark as any).basis || '', // For "% of what" field
-    uom_code: benchmark.uom_code || '$/SF',
-    description: benchmark.description || '',
-    cost_phase: (benchmark as any).cost_phase || '',
-    work_type: (benchmark as any).work_type || '',
-    scope_level: benchmark.scope_level || (benchmark.source_type === 'global_default' ? 'global' : 'project'),
-  }), [benchmark]);
+  const getInitialFormData = React.useCallback(() => {
+    const bm = benchmark as any;
+
+    // Determine value and value_type from sale benchmark fields
+    let value = '0';
+    let value_type = 'flat_fee';
+    let basis = '';
+
+    if (bm.rate_pct != null) {
+      // Percentage type - convert 0.03 to 3
+      value = (parseFloat(bm.rate_pct) * 100).toString();
+      value_type = 'percentage';
+      basis = bm.basis || '';
+    } else if (bm.fixed_amount != null) {
+      // Flat fee type
+      value = bm.fixed_amount.toString();
+      value_type = 'flat_fee';
+    } else if (bm.amount_per_uom != null) {
+      // Per unit type
+      value = bm.amount_per_uom.toString();
+      value_type = 'per_unit';
+    } else if (bm.value != null) {
+      // Legacy benchmark with value field
+      value = bm.value.toString();
+      value_type = bm.value_type || 'flat_fee';
+      basis = bm.basis || '';
+    }
+
+    return {
+      benchmark_name: benchmark.benchmark_name || '',
+      value,
+      cost_type: bm.cost_type || '',
+      value_type,
+      basis,
+      uom_code: benchmark.uom_code || '$/SF',
+      description: benchmark.description || '',
+      cost_phase: bm.cost_phase || '',
+      work_type: bm.work_type || '',
+      scope_level: benchmark.scope_level || (benchmark.source_type === 'global_default' ? 'global' : 'project'),
+    };
+  }, [benchmark]);
 
   const [formData, setFormData] = React.useState(getInitialFormData);
   const [saving, setSaving] = React.useState(false);
@@ -655,9 +663,19 @@ function BenchmarkListItem({
 
   const handleSave = async () => {
     setSaving(true);
+    console.log('[BenchmarkAccordion] handleSave called with formData:', formData);
+    console.log('[BenchmarkAccordion] benchmark.category:', benchmark.category);
+    console.log('[BenchmarkAccordion] benchmark.source_type:', benchmark.source_type);
+    console.log('[BenchmarkAccordion] benchmark.scope_level:', benchmark.scope_level);
     try {
-      // Determine endpoint based on benchmark source
-      const isSaleBenchmark = benchmark.source_type === 'global_default' || benchmark.scope_level;
+      // Determine endpoint based on benchmark category
+      // Commission and transaction_cost benchmarks use tbl_sale_benchmarks
+      const isSaleBenchmark = benchmark.category === 'commission' ||
+                             benchmark.category === 'transaction_cost' ||
+                             benchmark.source_type === 'global_default' ||
+                             benchmark.scope_level;
+
+      console.log('[BenchmarkAccordion] isSaleBenchmark:', isSaleBenchmark);
 
       let endpoint: string;
       let payload: any;
@@ -674,6 +692,7 @@ function BenchmarkListItem({
           description: formData.description,
           scope_level: formData.scope_level, // Include scope_level in update
         };
+        console.log('[BenchmarkAccordion] Saving with scope_level:', formData.scope_level);
 
         if (formData.value_type === 'flat_fee') {
           saleBenchmarkPayload.fixed_amount = value;
@@ -710,16 +729,32 @@ function BenchmarkListItem({
         };
       }
 
+      console.log('[BenchmarkAccordion] PATCH to endpoint:', endpoint);
+      console.log('[BenchmarkAccordion] PATCH payload:', JSON.stringify(payload, null, 2));
+
       const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
+      console.log('[BenchmarkAccordion] Response status:', response.status, response.statusText);
+
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('[BenchmarkAccordion] Response data:', responseData);
         setIsEditing(false);
-        // Refresh parent
-        onRefresh?.();
+        // Only refresh parent for benchmarks that affect this panel
+        // improvement_offset benchmarks don't need a full reload - the database trigger
+        // will clear the cache and React Query will refetch when needed
+        const isImprovementOffset = benchmark.category === 'improvement_offset' ||
+                                   (isSaleBenchmark && benchmark.benchmark_type === 'improvement_offset');
+        if (!isImprovementOffset) {
+          console.log('[BenchmarkAccordion] Calling onRefresh to reload data');
+          onRefresh?.();
+        } else {
+          console.log('[BenchmarkAccordion] Skipping onRefresh for improvement_offset - will auto-update via cache invalidation');
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('Failed to save:', errorData);
@@ -781,124 +816,128 @@ function BenchmarkListItem({
             {benchmark.category === 'transaction_cost' || benchmark.category === 'commission' ? (
               // Transaction Cost Edit Form
               <div className="space-y-2">
-                {/* Row 1: Name, Value, Type */}
+                {/* Row 1: Name, Amount, Type, Factor - ALL ON ONE LINE */}
                 <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="text-xs  mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Name</label>
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Name</label>
                     <input
                       type="text"
                       value={formData.benchmark_name || ''}
                       onChange={(e) => setFormData({ ...formData, benchmark_name: e.target.value })}
-                      className="w-full px-2 py-1 border  rounded text-sm" style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                      className="w-full px-2 py-1 border rounded text-sm"
+                      style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                       placeholder="-"
                     />
                   </div>
-              <div>
-                <label className="text-xs  mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Amount</label>
-                <input
-                  type="text"
-                  value={formData.value ? parseFloat(formData.value).toLocaleString('en-US', {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
-                  }) : ''}
-                  onChange={(e) => {
-                    const formatted = formatValueInput(e.target.value, formData.value_type);
-                    setFormData({ ...formData, value: formatted });
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-24 px-2 py-1 border  rounded text-sm text-right" style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
-                  placeholder="-"
-                />
-              </div>
-              <div>
-                <label className="text-xs  mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Type</label>
-                <select
-                  value={formData.value_type}
-                  onChange={(e) => setFormData({ ...formData, value_type: e.target.value as any })}
-                  className="w-24 px-2 py-1 border  rounded text-sm" style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
-                >
-                  <option value="flat_fee">$$</option>
-                  <option value="percentage">% of</option>
-                  <option value="per_unit">$/Unit</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Row 2: "% of what" field - Only show when percentage is selected */}
-            {formData.value_type === 'percentage' && (
-              <div className="space-y-1">
-                <label className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                  {benchmark.category === 'commission' ? 'Percentage of' : 'Select Factor to Apply Percentage'}
-                </label>
-                <select
-                  value={formData.basis || ''}
-                  onChange={(e) => setFormData({ ...formData, basis: e.target.value })}
-                  className="w-full px-2 py-1 border rounded text-sm"
-                  style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
-                >
-                  <option value="">Select...</option>
-                  {benchmark.category === 'commission' ? (
-                    <>
-                      <option value="gross_sale_price">Gross Sale Price</option>
-                      <option value="net_sale_price">Net Sale Price</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="gross_sale_price">Gross Sale Price</option>
-                      <option value="net_sale_price">Net Sale Price</option>
-                      <option value="purchase_price">Purchase Price</option>
-                      <option value="loan_amount">Loan Amount</option>
-                    </>
+                  <div className="w-24">
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Amount</label>
+                    <input
+                      type="text"
+                      value={formData.value || ''}
+                      onChange={(e) => {
+                        const formatted = formatValueInput(e.target.value, formData.value_type);
+                        setFormData({ ...formData, value: formatted });
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="w-full px-2 py-1 border rounded text-sm text-right"
+                      style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                      placeholder="-"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <label className="text-xs mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Type</label>
+                    <select
+                      value={formData.value_type}
+                      onChange={(e) => setFormData({ ...formData, value_type: e.target.value as any })}
+                      className="w-full px-2 py-1 border rounded text-sm"
+                      style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                    >
+                      <option value="flat_fee">$$</option>
+                      <option value="percentage">% of</option>
+                      <option value="per_unit">$/Unit</option>
+                    </select>
+                  </div>
+                  {/* Factor field - show inline when percentage is selected */}
+                  {formData.value_type === 'percentage' && (
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Factor</label>
+                      <select
+                        value={formData.basis || ''}
+                        onChange={(e) => setFormData({ ...formData, basis: e.target.value })}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                        style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                      >
+                        <option value="">Select...</option>
+                        {benchmark.category === 'commission' ? (
+                          <>
+                            <option value="gross_sale_price">Gross Sale Price</option>
+                            <option value="net_sale_price">Net Sale Price</option>
+                            <option value="lease_value">Lease Value</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="gross_sale_price">Gross Sale Price</option>
+                            <option value="net_sale_price">Net Sale Price</option>
+                            <option value="lease_value">Lease Value</option>
+                            <option value="purchase_price">Purchase Price</option>
+                            <option value="loan_amount">Loan Amount</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
                   )}
-                </select>
-              </div>
-            )}
+                </div>
 
-            {/* Row 3: Description */}
-            <div>
-              <label className="text-xs  mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Description</label>
-              <textarea
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-2 py-1 border  rounded text-sm" style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
-                placeholder="-"
-                rows={2}
-              />
-            </div>
+                {/* Row 2: Description */}
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--cui-secondary-color)' }}>Description</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-2 py-1 border rounded text-sm"
+                    style={{ backgroundColor: 'var(--cui-body-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                    placeholder="-"
+                    rows={2}
+                  />
+                </div>
 
-            {/* Row 4: Scope Level Switch */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2">
-                {formData.scope_level === 'global' ? (
-                  <Globe size={16} style={{ color: 'var(--cui-secondary-color)' }} />
-                ) : (
-                  <User size={16} style={{ color: 'var(--cui-secondary-color)' }} />
-                )}
-                <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                  {formData.scope_level === 'global' ? 'Global Default' : 'Custom'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({
-                  ...formData,
-                  scope_level: formData.scope_level === 'global' ? 'project' : 'global'
-                })}
-                className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{
-                  backgroundColor: formData.scope_level === 'global'
-                    ? 'var(--cui-primary, #0d6efd)'
-                    : 'var(--cui-secondary-bg, #6c757d)'
-                }}
-              >
-                <span
-                  className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  style={{
-                    transform: formData.scope_level === 'global' ? 'translateX(1.5rem)' : 'translateX(0.25rem)'
-                  }}
-                />
-              </button>
-            </div>
+                {/* Row 3: Scope Level Switch - label and switch together */}
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="flex items-center gap-2">
+                    {formData.scope_level === 'global' ? (
+                      <Globe size={16} style={{ color: 'var(--cui-secondary-color)' }} />
+                    ) : (
+                      <User size={16} style={{ color: 'var(--cui-secondary-color)' }} />
+                    )}
+                    <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {formData.scope_level === 'global' ? 'Global Default' : 'Custom'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newScope = formData.scope_level === 'global' ? 'project' : 'global';
+                      console.log('[BenchmarkAccordion] Toggling scope_level from', formData.scope_level, 'to', newScope);
+                      setFormData({
+                        ...formData,
+                        scope_level: newScope
+                      });
+                    }}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{
+                      backgroundColor: formData.scope_level === 'global'
+                        ? 'var(--cui-primary, #0d6efd)'
+                        : 'var(--cui-secondary-bg, #6c757d)'
+                    }}
+                  >
+                    <span
+                      className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                      style={{
+                        transform: formData.scope_level === 'global' ? 'translateX(1.5rem)' : 'translateX(0.25rem)'
+                      }}
+                    />
+                  </button>
+                </div>
 
             {/* Actions */}
             {showDeleteConfirm ? (
@@ -1089,11 +1128,30 @@ function BenchmarkListItem({
 
   // View mode - Display with border
   const formatAmount = () => {
-    if (!benchmark.value) return '-';
+    const bm = benchmark as any;
 
-    if (benchmark.category === 'transaction_cost') {
-      const value = parseFloat(benchmark.value.toString());
-      const valueType = (benchmark as any).value_type;
+    // Extract value from sale benchmark fields or legacy value field
+    let value: number | null = null;
+    let valueType = 'flat_fee';
+
+    if (bm.rate_pct != null) {
+      // Percentage type - convert 0.03 to 3 for display
+      value = parseFloat(bm.rate_pct) * 100;
+      valueType = 'percentage';
+    } else if (bm.fixed_amount != null) {
+      value = parseFloat(bm.fixed_amount);
+      valueType = 'flat_fee';
+    } else if (bm.amount_per_uom != null) {
+      value = parseFloat(bm.amount_per_uom);
+      valueType = 'per_unit';
+    } else if (bm.value != null) {
+      value = parseFloat(bm.value.toString());
+      valueType = bm.value_type || 'flat_fee';
+    }
+
+    if (value == null) return '-';
+
+    if (benchmark.category === 'transaction_cost' || benchmark.category === 'commission') {
 
       if (valueType === 'percentage') {
         const formatted = value % 1 === 0 ? value.toFixed(0) : value.toFixed(2).replace(/\.?0+$/, '');
@@ -1123,14 +1181,28 @@ function BenchmarkListItem({
 
   const formatType = () => {
     if (benchmark.category === 'transaction_cost' || benchmark.category === 'commission') {
-      const valueType = (benchmark as any).value_type;
-      const basis = (benchmark as any).basis;
+      const bm = benchmark as any;
+
+      // Determine value_type from which field is populated
+      let valueType = 'flat_fee';
+      if (bm.rate_pct != null) {
+        valueType = 'percentage';
+      } else if (bm.fixed_amount != null) {
+        valueType = 'flat_fee';
+      } else if (bm.amount_per_uom != null) {
+        valueType = 'per_unit';
+      } else if (bm.value_type) {
+        // Legacy benchmark with explicit value_type
+        valueType = bm.value_type;
+      }
+
+      const basis = bm.basis;
 
       if (valueType === 'flat_fee') {
         return '$$';
       } else if (valueType === 'percentage') {
         if (basis) {
-          // Format basis for display: "net_proceeds" -> "Net Proceeds"
+          // Format basis for display: "net_sale_price" -> "Net Sale Price"
           const formattedBasis = basis
             .split('_')
             .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))

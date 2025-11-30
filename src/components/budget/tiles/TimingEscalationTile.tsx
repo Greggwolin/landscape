@@ -37,6 +37,7 @@ import {
 import { validateTimingFields } from '../utils/timingValidation';
 import { format } from 'date-fns';
 import './timing-escalation-tile.css';
+import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 
 interface TimingEscalationTileProps {
   item: BudgetItem;
@@ -58,6 +59,7 @@ export default function TimingEscalationTile({
   const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedProfile, setDraggedProfile] = useState<'front_loaded' | 'standard' | 'back_loaded' | null>(null);
+  const { data: inflationSettings } = useProjectInflationSettings(projectId);
 
   // Fetch growth rate benchmarks for escalation dropdown
   useEffect(() => {
@@ -77,6 +79,18 @@ export default function TimingEscalationTile({
       onFieldChange('escalation_method', 'to_start');
     }
   }, [item.escalation_rate, item.escalation_method]);
+
+  // If no escalation rate is set, default to project cost inflation selection
+  useEffect(() => {
+    if (item.escalation_rate === null || item.escalation_rate === undefined) {
+      const rate = inflationSettings?.cost_inflation?.current_rate;
+      if (rate !== null && rate !== undefined) {
+        const pct = parseFloat((rate * 100).toFixed(2));
+        onFieldChange('escalation_rate', pct);
+        onFieldChange('escalation_method', item.escalation_method || 'to_start');
+      }
+    }
+  }, [inflationSettings?.cost_inflation?.current_rate, item.escalation_rate, item.escalation_method, onFieldChange]);
 
   // Set default curve profile to "standard" when S-Curve is selected
   useEffect(() => {

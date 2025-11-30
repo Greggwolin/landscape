@@ -3,6 +3,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .batch_recalc import batch_recalculate_assumptions
 from .views import (
     BenchmarkAbsorptionVelocityViewSet,
     BenchmarkMarketTimingViewSet,
@@ -23,6 +24,7 @@ from .views import (
     parcel_sale_assumptions,
     parcel_sale_benchmarks,
     parcels_with_sales,
+    recalculate_sfd_parcels,
     sale_benchmarks,
     save_parcel_overrides,
     update_parcel_sale_date,
@@ -148,6 +150,11 @@ urlpatterns = [
         name='sale-benchmarks',
     ),
     path(
+        'projects/<int:project_id>/recalculate-sfd/',
+        recalculate_sfd_parcels,
+        name='recalculate-sfd-parcels',
+    ),
+    path(
         'projects/<int:project_id>/parcels/<int:parcel_id>/sale-benchmarks/',
         parcel_sale_benchmarks,
         name='parcel-sale-benchmarks',
@@ -161,5 +168,10 @@ urlpatterns = [
         'projects/<int:project_id>/parcels/<int:parcel_id>/sale-assumptions/',
         parcel_sale_assumptions,
         name='parcel-sale-assumptions',
+    ),
+    path(
+        'projects/<int:project_id>/batch-recalculate-assumptions/',
+        batch_recalculate_assumptions,
+        name='batch-recalculate-assumptions',
     ),
 ]

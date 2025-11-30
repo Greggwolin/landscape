@@ -6,11 +6,14 @@ import { useRouter } from 'next/navigation'
 import type { UOMOption } from '../../lib/uom-utils'
 
 type LandUseItem = {
+  id?: number
   lu_type_code: string
   type_name?: string
+  product_code?: string
   price_per_unit: number
   unit_of_measure: string
   inflation_type: string
+  growth_rate?: number
 }
 
 type Props = {
@@ -37,46 +40,39 @@ const LandUsePricing: React.FC<Props> = ({
   const [pricingData, setPricingData] = useState<LandUseItem[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize data by loading both active types and existing pricing
+  // Initialize data by loading pricing records only
   useEffect(() => {
     const initializeData = async () => {
       if (!projectId) return
 
       setLoading(true)
       try {
-        // Load active land use types
+        // Load active land use types for lookup
         const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`)
         if (!typesResponse.ok) throw new Error('Failed to load land use types')
         const types = await typesResponse.json()
         setActiveLandUseTypes(types)
+
+        // Create type map for name lookup
+        const typeMap = types.reduce((acc: any, type: any) => {
+          acc[type.code] = type.name
+          return acc
+        }, {})
 
         // Load existing pricing data
         const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`)
         if (!pricingResponse.ok) throw new Error('Failed to load pricing data')
         const existingPricing = await pricingResponse.json()
 
-        // Create pricing data map for quick lookup
-        const existingPricingMap = existingPricing.reduce((acc: any, item: any) => {
-          acc[item.lu_type_code] = item
-          return acc
-        }, {})
+        // Show only pricing records that exist, enriched with type names and defaults
+        const enrichedPricing = existingPricing.map((item: any) => ({
+          ...item,
+          type_name: typeMap[item.lu_type_code] || item.lu_type_code,
+          inflation_type: item.inflation_type || 'Global', // Default to Global if NULL
+          price_per_unit: parseFloat(item.price_per_unit) || 0
+        }))
 
-        // Merge active types with existing pricing data
-        const mergedPricingData = types.map((type: any) => {
-          const existing = existingPricingMap[type.code]
-          return existing ? {
-            ...existing,
-            type_name: type.name // Ensure we have the type name
-          } : {
-            lu_type_code: type.code,
-            type_name: type.name,
-            price_per_unit: 0,
-            unit_of_measure: 'LS',
-            inflation_type: 'Global'
-          }
-        })
-
-        setPricingData(mergedPricingData)
+        setPricingData(enrichedPricing)
         setLoading(false)
       } catch (err) {
         console.error('Failed to load data:', err)
@@ -88,10 +84,10 @@ const LandUsePricing: React.FC<Props> = ({
     initializeData()
   }, [projectId])
 
-  // Update pricing data
-  const updatePricingData = (typeCode: string, field: string, value: any) => {
+  // Update pricing data by both type code and product code
+  const updatePricingData = (typeCode: string, productCode: string | undefined, field: string, value: any) => {
     setPricingData(prev => prev.map(item =>
-      item.lu_type_code === typeCode
+      item.lu_type_code === typeCode && item.product_code === productCode
         ? { ...item, [field]: value }
         : item
     ))
@@ -181,7 +177,8 @@ const LandUsePricing: React.FC<Props> = ({
         </div>
         <div className="flex items-center text-xs space-x-2 text-slate-300">
           <div className="w-1/6">LU Code</div>
-          <div className="w-2/6">Description</div>
+          <div className="w-1/6">Product</div>
+          <div className="w-1/6">Description</div>
           <div className="w-1/6 text-center">$/Unit</div>
           <div className="w-1/6 text-center">UOM</div>
           <div className="w-1/6 text-center">Inflate</div>
@@ -195,14 +192,19 @@ const LandUsePricing: React.FC<Props> = ({
       )}
 
       <div className="p-2 space-y-1">
-        {pricingData.map(item => (
-          <div key={item.lu_type_code} className="flex items-center text-xs space-x-2">
+        {pricingData.map((item, idx) => (
+          <div key={item.id || `${item.lu_type_code}-${item.product_code || idx}`} className="flex items-center text-xs space-x-2">
             <div className="w-1/6">
               <div className="w-full bg-blue-900 border border-slate-600 rounded px-2 py-1 text-white text-xs font-medium">
                 {item.lu_type_code}
               </div>
             </div>
-            <div className="w-2/6">
+            <div className="w-1/6">
+              <div className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs">
+                {item.product_code || '-'}
+              </div>
+            </div>
+            <div className="w-1/6">
               <div className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs">
                 {item.type_name || activeLandUseTypes.find(t => t.code === item.lu_type_code)?.name || ''}
               </div>
@@ -213,14 +215,14 @@ const LandUsePricing: React.FC<Props> = ({
                 inputMode="decimal"
                 className="w-full bg-gray-700 border border-slate-600 rounded px-2 py-1 text-white text-xs text-center"
                 value={formatNumber(item.price_per_unit)}
-                onChange={(e) => updatePricingData(item.lu_type_code, 'price_per_unit', parseNumber(e.target.value))}
+                onChange={(e) => updatePricingData(item.lu_type_code, item.product_code, 'price_per_unit', parseNumber(e.target.value))}
               />
             </div>
             <div className="w-1/6">
               <select
                 className="w-full bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs"
                 value={item.unit_of_measure}
-                onChange={(e) => updatePricingData(item.lu_type_code, 'unit_of_measure', e.target.value)}
+                onChange={(e) => updatePricingData(item.lu_type_code, item.product_code, 'unit_of_measure', e.target.value)}
               >
                 {uomOptions.map(option => (
                   <option key={option.code} value={option.code}>{option.label}</option>
@@ -233,9 +235,9 @@ const LandUsePricing: React.FC<Props> = ({
                 value={item.inflation_type}
                 onChange={(e) => {
                   if (e.target.value === 'D') {
-                    onOpenGrowthDetail(`lu_${item.lu_type_code}`)
+                    onOpenGrowthDetail(`lu_${item.lu_type_code}_${item.product_code || ''}`)
                   } else {
-                    updatePricingData(item.lu_type_code, 'inflation_type', e.target.value)
+                    updatePricingData(item.lu_type_code, item.product_code, 'inflation_type', e.target.value)
                   }
                 }}
               >

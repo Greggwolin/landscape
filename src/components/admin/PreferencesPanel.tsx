@@ -15,6 +15,16 @@ const UnitCostCategoryManager = dynamic(
   { ssr: false }
 );
 
+const UnitOfMeasureManager = dynamic(
+  () => import('@/app/admin/preferences/components/UnitOfMeasureManager'),
+  { ssr: false }
+);
+
+const SystemPicklistsAccordion = dynamic(
+  () => import('@/components/admin/SystemPicklistsAccordion').then((mod) => mod.SystemPicklistsAccordion),
+  { ssr: false }
+);
+
 interface PreferenceCategory {
   key: string;
   label: string;
@@ -34,11 +44,23 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     label: 'Land Use Taxonomy Manager',
     description: 'Configure land use types, families, and product categories',
     icon: 'Map'
+  },
+  {
+    key: 'uom_manager',
+    label: 'Units of Measure Manager',
+    description: 'Configure measurement units used throughout the application',
+    icon: 'Ruler'
+  },
+  {
+    key: 'system_picklists',
+    label: 'System Picklists',
+    description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
+    icon: 'List'
   }
 ];
 
 export default function PreferencesPanel() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('unit_cost_categories');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const toggleCategory = (key: string) => {
     setExpandedCategory(expandedCategory === key ? null : key);
@@ -79,9 +101,11 @@ export default function PreferencesPanel() {
                 >
                   <div className="d-flex align-items-center gap-3 flex-grow-1">
                     <div className="d-flex flex-column align-items-start">
-                      <span className="fw-semibold">{category.label}</span>
-                      <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {category.description}
+                      <span className="fw-semibold">
+                        {category.label}
+                        <span className="text-sm ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                          — {category.description}
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -96,6 +120,8 @@ export default function PreferencesPanel() {
                   <div className="p-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                     {category.key === 'unit_cost_categories' && <UnitCostCategoryManager />}
                     {category.key === 'land_use_taxonomy' && <TaxonomyPage />}
+                    {category.key === 'uom_manager' && <UnitOfMeasureManager />}
+                    {category.key === 'system_picklists' && <SystemPicklistsAccordion />}
                   </div>
                 )}
               </div>

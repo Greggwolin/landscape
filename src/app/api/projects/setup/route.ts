@@ -84,6 +84,8 @@ export async function POST(request: Request) {
         default_currency,
         default_period_type,
         global_inflation_rate,
+        cost_inflation_set_id,
+        price_inflation_set_id,
         analysis_start_date,
         analysis_end_date,
         discount_rate
@@ -93,6 +95,8 @@ export async function POST(request: Request) {
         'USD',
         'monthly',
         0.03,
+        NULL,
+        NULL,
         ${body.startDate ?? null},
         NULL,
         0.10

@@ -128,6 +128,54 @@ export async function GET(
       ORDER BY c.tier, c.sort_order NULLS LAST, c.division_id
     `
 
+    // Step 1.2: Get parcel aggregations for phases (tier=2)
+    // Maps division_id -> {units, acres, parcel_count}
+    const parcelMap: Map<number, { units: number; acres: number; parcel_count: number }> = new Map()
+    const parcelAggregations = await sql<Array<{
+      division_id: number;
+      units: number;
+      acres: number;
+      parcel_count: number;
+    }>>`
+      SELECT
+        d.division_id,
+        COALESCE(SUM(p.units_total), 0)::int as units,
+        COALESCE(SUM(p.acres_gross), 0)::int as acres,
+        COUNT(p.parcel_id)::int as parcel_count
+      FROM landscape.tbl_division d
+      JOIN landscape.tbl_phase ph
+        ON ph.phase_name = d.display_name
+        AND ph.project_id = d.project_id
+      LEFT JOIN landscape.tbl_parcel p ON p.phase_id = ph.phase_id
+      WHERE d.project_id = ${id}
+        AND d.tier = 2
+      GROUP BY d.division_id
+    `
+    parcelAggregations.forEach(row => {
+      parcelMap.set(row.division_id, {
+        units: Number(row.units),
+        acres: Number(row.acres),
+        parcel_count: Number(row.parcel_count)
+      })
+    })
+
+    // Merge parcel data into rows
+    for (const row of rows) {
+      const parcelData = parcelMap.get(row.division_id)
+      if (parcelData && (parcelData.units > 0 || parcelData.acres > 0)) {
+        const existingAttrs = (row.attributes as Record<string, unknown>) || {}
+        row.attributes = {
+          ...existingAttrs,
+          units_total: parcelData.units,
+          units: parcelData.units,
+          acres_gross: parcelData.acres,
+          acres: parcelData.acres,
+          parcel_count: parcelData.parcel_count,
+          status: 'active'
+        }
+      }
+    }
+
     // Step 1.5: Get budget costs if requested
     const costMap: Map<number, number> = new Map()
     if (includeCosts) {
@@ -152,11 +200,10 @@ export async function GET(
         // First, recursively process all children
         node.children.forEach(child => aggregateChildData(child))
 
-        // Then aggregate their data
+        // Then aggregate their data from children
         let totalUnits = 0
         let totalAcres = 0
         let totalChildCosts = 0
-        let hasData = false
 
         node.children.forEach(child => {
           if (child.attributes) {
@@ -164,7 +211,6 @@ export async function GET(
             const childAcres = Number(child.attributes.acres_gross || child.attributes.acres || 0)
             totalUnits += childUnits
             totalAcres += childAcres
-            if (childUnits > 0 || childAcres > 0) hasData = true
 
             // Aggregate child costs
             if (includeCosts && child.attributes.total_cost !== undefined) {
@@ -173,27 +219,34 @@ export async function GET(
           }
         })
 
-        // Update parent's attributes with aggregated data
-        if (hasData || includeCosts) {
-          node.attributes = {
-            ...(node.attributes || {}),
-            units_total: totalUnits,
-            units: totalUnits,
-            acres_gross: totalAcres,
-            acres: totalAcres,
-            status: 'active'
-          }
+        // Get existing attributes (may have been set from parcel aggregation query)
+        const existingAttrs = (node.attributes || {}) as Record<string, unknown>
+        const existingUnits = Number(existingAttrs.units_total || existingAttrs.units || 0)
+        const existingAcres = Number(existingAttrs.acres_gross || existingAttrs.acres || 0)
 
-          // Add cost data if requested
-          if (includeCosts) {
-            const directCost = costMap.get(node.division_id) || 0
-            node.attributes.direct_cost = directCost
-            node.attributes.child_cost = totalChildCosts
-            node.attributes.total_cost = directCost + totalChildCosts
-          }
+        // Use child aggregation if it has data, otherwise keep existing values
+        const finalUnits = totalUnits > 0 ? totalUnits : existingUnits
+        const finalAcres = totalAcres > 0 ? totalAcres : existingAcres
+
+        // Update parent's attributes - preserve existing data, add aggregated data
+        node.attributes = {
+          ...existingAttrs,
+          units_total: finalUnits,
+          units: finalUnits,
+          acres_gross: finalAcres,
+          acres: finalAcres,
+          status: 'active'
+        }
+
+        // Add cost data if requested
+        if (includeCosts) {
+          const directCost = costMap.get(node.division_id) || 0
+          node.attributes.direct_cost = directCost
+          node.attributes.child_cost = totalChildCosts
+          node.attributes.total_cost = directCost + totalChildCosts
         }
       } else if (includeCosts) {
-        // Leaf node - just add direct cost
+        // Leaf node - just add direct cost, preserve existing attributes
         const directCost = costMap.get(node.division_id) || 0
         node.attributes = {
           ...(node.attributes || {}),

@@ -200,35 +200,45 @@ class SaleCalculationService:
         parcel_data: dict,
         pricing_data: dict,
         sale_date: str,
-        overrides: Optional[Dict] = None
+        overrides: Optional[Dict] = None,
+        cost_inflation_rate: Optional[float] = None
     ) -> Dict:
         """
         Calculate complete sale proceeds with all deductions
 
         Args:
-            parcel_data: Dict with parcel fields (lot_width, units_total, acres_gross, type_code, product_code, project_id)
+            parcel_data: Dict with parcel fields (lot_width, units_total, acres_gross, type_code, product_code, project_id, sale_period)
             pricing_data: Dict with pricing fields (price_per_unit, unit_of_measure, growth_rate, pricing_effective_date)
             sale_date: Date of sale (YYYY-MM-DD string)
             overrides: Dict of user overrides (optional)
+            cost_inflation_rate: Annual cost inflation rate for improvement offset escalation (e.g., 0.03 for 3%)
 
         Returns:
             Dict with complete calculation breakdown
         """
         from decimal import Decimal
         from datetime import datetime
-        from .utils import calculate_inflated_price
+        from .utils import calculate_inflated_price, calculate_inflated_price_from_periods
 
-        # Parse dates
-        sale_date_obj = datetime.strptime(sale_date, '%Y-%m-%d').date()
-        base_date = datetime.strptime(pricing_data['pricing_effective_date'], '%Y-%m-%d').date()
+        # Check if we have sale_period (more accurate for monthly compounding)
+        if 'sale_period' in parcel_data and parcel_data['sale_period']:
+            # Use period-based calculation (matches Excel FV function exactly)
+            inflated_price = calculate_inflated_price_from_periods(
+                base_price=Decimal(str(pricing_data['price_per_unit'])),
+                growth_rate=Decimal(str(pricing_data['growth_rate'])),
+                periods=int(parcel_data['sale_period'])
+            )
+        else:
+            # Fallback to date-based calculation with monthly compounding
+            sale_date_obj = datetime.strptime(sale_date, '%Y-%m-%d').date()
+            base_date = datetime.strptime(pricing_data['pricing_effective_date'], '%Y-%m-%d').date()
 
-        # Calculate inflated price
-        inflated_price = calculate_inflated_price(
-            base_price=Decimal(str(pricing_data['price_per_unit'])),
-            growth_rate=Decimal(str(pricing_data['growth_rate'])),
-            base_date=base_date,
-            closing_date=sale_date_obj
-        )
+            inflated_price = calculate_inflated_price(
+                base_price=Decimal(str(pricing_data['price_per_unit'])),
+                growth_rate=Decimal(str(pricing_data['growth_rate'])),
+                base_date=base_date,
+                closing_date=sale_date_obj
+            )
 
         # Get UOM calculation
         parcel_calc_data = {
@@ -290,16 +300,36 @@ class SaleCalculationService:
             custom_costs = []
 
         # Calculate improvement offset total
-        uom = pricing_data['unit_of_measure']
-        if uom == 'FF':
-            improvement_offset_total = improvement_offset_per_uom * Decimal(str(parcel_data.get('lot_width', 0))) * Decimal(str(parcel_data.get('units_total', 0)))
-        elif uom in ['EA', 'UN']:
-            improvement_offset_total = improvement_offset_per_uom * Decimal(str(parcel_data.get('units_total', 0)))
-        elif uom == 'SF':
-            improvement_offset_total = improvement_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0))) * Decimal('43560')
-        elif uom == 'AC':
-            improvement_offset_total = improvement_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0)))
-        else:  # $$$
+        raw_uom = pricing_data['unit_of_measure']
+        # Normalize UOM: strip $/prefix if present (e.g., '$/FF' -> 'FF')
+        uom = raw_uom.replace('$/', '') if raw_uom else 'EA'
+        benchmark_uom = benchmarks.get('improvement_offset', {}).get('uom', uom)
+
+        # Apply cost inflation to improvement offset if rate is provided
+        sale_period = parcel_data.get('sale_period')
+        if cost_inflation_rate and sale_period and improvement_offset_per_uom:
+            inflated_offset_per_uom = calculate_inflated_price_from_periods(
+                base_price=improvement_offset_per_uom,
+                growth_rate=Decimal(str(cost_inflation_rate)),
+                periods=int(sale_period)
+            )
+        else:
+            inflated_offset_per_uom = improvement_offset_per_uom
+
+        # Only apply improvement offset if the benchmark UOM matches the pricing UOM (after normalization)
+        if inflated_offset_per_uom and benchmark_uom == uom:
+            if uom == 'FF':
+                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('lot_width', 0))) * Decimal(str(parcel_data.get('units_total', 0)))
+            elif uom in ['EA', 'UN']:
+                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('units_total', 0)))
+            elif uom == 'SF':
+                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0))) * Decimal('43560')
+            elif uom == 'AC':
+                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0)))
+            else:  # $$$
+                improvement_offset_total = Decimal('0')
+        else:
+            # UOM mismatch or no offset - don't apply improvement offset
             improvement_offset_total = Decimal('0')
 
         # Gross sale proceeds (after improvement offset)

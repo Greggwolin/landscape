@@ -88,6 +88,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const selectProject = useCallback((projectId: number | null) => {
     setActiveProjectId(projectId)
+
+    // Record access timestamp in localStorage
+    if (projectId !== null && typeof window !== 'undefined') {
+      const key = `project_${projectId}_last_accessed`;
+      localStorage.setItem(key, Date.now().toString());
+    }
   }, [])
 
   const refreshProjects = useCallback(() => {

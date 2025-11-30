@@ -237,64 +237,103 @@ export default function FamilyDetails({ family, selectedType, onSelectType, onRe
 
       {/* Edit/Add Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '24px',
-            borderRadius: '8px',
-            width: '90%',
-            maxWidth: '500px'
-          }}>
-            <h3 style={{ marginTop: 0 }}>{editingType ? 'Edit Type' : 'Add New Type'}</h3>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              color: 'var(--cui-body-color)',
+              padding: '24px',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '540px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              border: `1px solid var(--cui-border-color)`
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '12px', color: 'var(--cui-body-color)' }}>
+              {editingType ? 'Edit Type' : 'Add New Type'}
+            </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Code</label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: 'var(--cui-secondary-color)' }}>Code</label>
                   <input
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: `1px solid var(--cui-border-color)`,
+                      backgroundColor: 'var(--cui-body-bg)',
+                      color: 'var(--cui-body-color)'
+                    }}
                     placeholder="e.g., SFD"
                   />
                 </div>
-                <div style={{ width: '100px' }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Color</label>
+                <div style={{ width: '110px' }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: 'var(--cui-secondary-color)' }}>Color</label>
                   <input
                     type="color"
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    style={{ width: '100%', height: '40px', padding: '2px', borderRadius: '4px', border: '1px solid #ccc', cursor: 'pointer' }}
+                    style={{
+                      width: '100%',
+                      height: '42px',
+                      padding: '2px',
+                      borderRadius: '6px',
+                      border: `1px solid var(--cui-border-color)`,
+                      backgroundColor: 'var(--cui-body-bg)',
+                      cursor: 'pointer'
+                    }}
                   />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Name</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: 'var(--cui-secondary-color)' }}>Name</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: `1px solid var(--cui-border-color)`,
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)'
+                  }}
                   placeholder="e.g., Single Family Detached"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>Notes (optional)</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: 'var(--cui-secondary-color)' }}>Notes (optional)</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '80px' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: `1px solid var(--cui-border-color)`,
+                    backgroundColor: 'var(--cui-body-bg)',
+                    color: 'var(--cui-body-color)',
+                    minHeight: '90px'
+                  }}
                   placeholder="Optional description"
                 />
               </div>
@@ -302,13 +341,27 @@ export default function FamilyDetails({ family, selectedType, onSelectType, onRe
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', cursor: 'pointer' }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: `1px solid var(--cui-border-color)`,
+                  backgroundColor: 'transparent',
+                  color: 'var(--cui-body-color)',
+                  cursor: 'pointer'
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer' }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'var(--cui-primary)',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
               >
                 Save
               </button>

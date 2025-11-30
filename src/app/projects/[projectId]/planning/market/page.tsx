@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMarketCompetitors, useMarketMacroData, useCreateCompetitor, useUpdateCompetitor, useDeleteCompetitor, useSaveMarketMacroData, MarketCompetitiveProject, MarketMacroData } from '@/hooks/useMarketData';
+import MarketMapView from '@/app/components/market/MarketMapView';
+import SfCompsTile from '@/components/analysis/SfCompsTile';
 
 export default function MarketAnalysisPage() {
   const params = useParams();
@@ -141,13 +143,38 @@ export default function MarketAnalysisPage() {
   };
 
   return (
-    <div className="row">
-      {/* Left Panel - Data Entry */}
-      <div className="col-md-4">
+    <div className="d-flex flex-column gap-3">
+      {/* Top Row - Map (left 50%) and Housing Comps (right 50%) */}
+      <div className="row g-3">
+        {/* Left Panel - Map */}
+        <div className="col-lg-6 col-md-6">
+          <div className="card h-100">
+            <div className="card-header">
+              <h5 className="mb-0">Competitive Project Map</h5>
+            </div>
+            <div className="card-body p-0">
+              <MarketMapView
+                projectId={projectId}
+                competitors={competitors}
+                height="500px"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Panel - Housing Price Comparables */}
+        <div className="col-lg-6 col-md-6">
+          <SfCompsTile projectId={projectId} />
+        </div>
+      </div>
+
+      {/* Bottom Row - Competitive Projects and Macro Data */}
+      <div className="row g-3">
         {/* Competitive Projects Section */}
-        <div className="card mb-3">
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Competitive Projects</h5>
+        <div className="col-lg-6 col-md-6">
+          <div className="card h-100">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Competitive Projects</h5>
             <div className="d-flex gap-2">
               <button
                 className="btn btn-sm btn-primary"
@@ -367,34 +394,36 @@ export default function MarketAnalysisPage() {
               ))}
             </div>
           </div>
+          </div>
         </div>
 
         {/* Market Macro Data Section */}
-        <div className="card">
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Market Macro Data</h5>
-            <button className="btn btn-sm btn-secondary" disabled>
-              <i className="bi bi-robot me-1"></i>
-              Import from Landscaper
-            </button>
-          </div>
-
-          <div className="card-body">
-            <div className="mb-2">
-              <label className="form-label small">Data Year</label>
-              <input
-                type="number"
-                className="form-control form-control-sm"
-                value={macroForm.data_year || new Date().getFullYear()}
-                onChange={(e) => setMacroForm({ ...macroForm, data_year: parseInt(e.target.value) })}
-              />
+        <div className="col-lg-6 col-md-6">
+          <div className="card h-100">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Market Macro Data</h5>
+              <button className="btn btn-sm btn-secondary" disabled>
+                <i className="bi bi-robot me-1"></i>
+                Import from Landscaper
+              </button>
             </div>
 
-            <div className="mb-2">
-              <label className="form-label small">Population Growth Rate (%)</label>
-              <input
-                type="number"
-                step="0.1"
+            <div className="card-body">
+              <div className="mb-2">
+                <label className="form-label small">Data Year</label>
+                <input
+                  type="number"
+                  className="form-control form-control-sm"
+                  value={macroForm.data_year || new Date().getFullYear()}
+                  onChange={(e) => setMacroForm({ ...macroForm, data_year: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div className="mb-2">
+                <label className="form-label small">Population Growth Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
                 className="form-control form-control-sm"
                 value={macroForm.population_growth_rate || ''}
                 onChange={(e) => setMacroForm({ ...macroForm, population_growth_rate: parseFloat(e.target.value) })}
@@ -452,28 +481,13 @@ export default function MarketAnalysisPage() {
             >
               Save Macro Data
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Panel - Map */}
-      <div className="col-md-8">
-        <div className="card" style={{ height: '600px' }}>
-          <div className="card-header">
-            <h5 className="mb-0">Competitive Project Map</h5>
-          </div>
-          <div className="card-body d-flex align-items-center justify-content-center bg-light">
-            <div className="text-center text-muted">
-              <i className="bi bi-map" style={{ fontSize: '3rem' }}></i>
-              <p className="mt-3">Map integration coming soon</p>
-              <p className="small">Will display subject property and competitive projects</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Bottom Panel - Landscaper Analysis (Collapsible) */}
-      <div className="col-12 mt-3">
+      <div>
         <div className="card">
           <div
             className="card-header d-flex justify-content-between align-items-center"

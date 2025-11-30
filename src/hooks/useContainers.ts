@@ -58,11 +58,31 @@ function extractLevelStats(
 ): ContainerStats[] {
   const stats: ContainerStats[] = []
 
+  const getFirstNumber = (obj: Record<string, unknown>, keys: string[]): number => {
+    for (const key of keys) {
+      const raw = obj[key]
+      const num = typeof raw === 'string' ? Number(raw) : typeof raw === 'number' ? raw : null
+      if (num !== null && !Number.isNaN(num)) return num
+    }
+    return 0
+  }
+
   function traverse(node: ContainerNode) {
     if (node.tier === level) {
       const attrs = node.attributes || {}
-      const acres = Number(attrs.acres || attrs.acres_gross || 0)
-      const units = Number(attrs.units || attrs.units_total || 0)
+      const acres = getFirstNumber(attrs, [
+        'acres',
+        'acres_gross',
+        'acres_net',
+        'acres_total',
+        'gross_acres'
+      ])
+      const units = getFirstNumber(attrs, [
+        'units',
+        'units_total',
+        'units_net',
+        'units_planned'
+      ])
       const directCost = Number(attrs.direct_cost || 0)
       const childCost = Number(attrs.child_cost || 0)
       const totalCost = Number(attrs.total_cost || 0)

@@ -38,6 +38,7 @@ import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import { calculateGrossValue, calculateInflatedValue } from '@/utils/sales/calculations';
 import {
   calculateInflatedPrice,
+  calculateInflatedPriceFromPeriods,
   calculateNetProceeds,
   formatDateForAPI,
   parseISODate,
@@ -50,14 +51,30 @@ interface Props {
   mode?: 'napkin' | 'standard' | 'detail';
 }
 
-// Use semantic chip colors that work in light and dark modes
-const USE_TYPE_CHIP_COLORS: Record<string, string> = {
-  VLDR: 'success',   // Very Low Density Residential - green
-  LDR: 'success',    // Low Density Residential - green
-  MDR: 'warning',    // Medium Density Residential - yellow
-  HDR: 'danger',     // High Density Residential - red
-  COM: 'info',       // Commercial - blue
-  IND: 'secondary',  // Industrial - gray
+// Use-type pill colors aligned with Parcel Detail table
+const USE_TYPE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
+  // Blues
+  SFD: { bg: '#1e3a8a', text: '#93c5fd' },   // blue-900 / blue-300
+  VLDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  LDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  MLDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  MDR: { bg: '#1e3a8a', text: '#93c5fd' },
+  RET: { bg: '#1e3a8a', text: '#93c5fd' },
+  // Purples
+  MX: { bg: '#581c87', text: '#d8b4fe' },    // purple-900 / purple-300
+  MU: { bg: '#581c87', text: '#d8b4fe' },
+  SFA: { bg: '#581c87', text: '#d8b4fe' },
+  // Oranges
+  MF: { bg: '#7c2d12', text: '#fdba74' },    // orange-900 / orange-300
+  HDR: { bg: '#7c2d12', text: '#fdba74' },
+  BTR: { bg: '#7c2d12', text: '#fdba74' },
+  // Greens
+  PARK: { bg: '#14532d', text: '#86efac' },  // green-900 / green-300
+};
+
+const getUseTypePillColors = (typeCode?: string | null) => {
+  const key = (typeCode ?? '').toUpperCase();
+  return USE_TYPE_PILL_COLORS[key] || { bg: '#312e81', text: '#a5b4fc' }; // indigo fallback
 };
 
 const CREATE_NEW_PHASE_VALUE = '__create__';
@@ -119,6 +136,10 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
   const [savingParcelId, setSavingParcelId] = useState<number | null>(null);
   const [calculationModalParcel, setCalculationModalParcel] = useState<ParcelWithSale | null>(null);
   const [isSavingCalculation, setIsSavingCalculation] = useState<boolean>(false);
+  const [improvementOffset, setImprovementOffset] = useState<string>('');
+  const [improvementOffsetDisplay, setImprovementOffsetDisplay] = useState<string>('');
+  const [isSavingOffset, setIsSavingOffset] = useState<boolean>(false);
+  const [improvementOffsetBenchmarkId, setImprovementOffsetBenchmarkId] = useState<number | null>(null);
 
   const dataset: ParcelSalesDataset | undefined = data;
   const salePhases = dataset?.sale_phases ?? [];
@@ -188,6 +209,138 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       setActionError(message);
     } finally {
       setDateUpdatingParcelId(null);
+    }
+  };
+
+  // Helper to format number with commas
+  const formatNumberWithCommas = (value: number | string): string => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '';
+    return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  };
+
+  // Helper to remove commas from formatted string
+  const removeCommas = (value: string): string => {
+    return value.replace(/,/g, '');
+  };
+
+  // Fetch improvement offset on mount
+  React.useEffect(() => {
+    const fetchImprovementOffset = async () => {
+      try {
+        const url = `/api/projects/${projectId}/benchmarks?type=improvement_offset&scope=project`;
+        console.log('Fetching improvement offset from:', url);
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched improvement offset data:', data);
+          const benchmarks = data.benchmarks || data; // Handle both nested and direct array
+          if (benchmarks && benchmarks.length > 0) {
+            if (benchmarks[0].amount_per_uom != null) {
+              const value = benchmarks[0].amount_per_uom.toString();
+              setImprovementOffset(value);
+              setImprovementOffsetDisplay(formatNumberWithCommas(value));
+            }
+            setImprovementOffsetBenchmarkId(benchmarks[0].benchmark_id);
+            console.log('Set benchmark ID:', benchmarks[0].benchmark_id, 'value:', benchmarks[0].amount_per_uom);
+          } else {
+            console.log('No existing improvement offset found');
+          }
+        } else {
+          console.error('Failed to fetch improvement offset, status:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to fetch improvement offset:', error);
+      }
+    };
+    fetchImprovementOffset();
+  }, [projectId]);
+
+  // Save improvement offset
+  const handleSaveImprovementOffset = async () => {
+    const value = parseFloat(improvementOffset);
+    if (isNaN(value) && improvementOffset !== '') return;
+
+    setIsSavingOffset(true);
+    try {
+      // If we have an existing benchmark, update it
+      if (improvementOffsetBenchmarkId) {
+        console.log('Updating existing benchmark:', improvementOffsetBenchmarkId, 'with value:', value);
+        const response = await fetch(`/api/projects/${projectId}/benchmarks/${improvementOffsetBenchmarkId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount_per_uom: improvementOffset === '' ? null : value,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Failed to update improvement offset:', errorData);
+          throw new Error(errorData.error || 'Failed to update improvement offset');
+        }
+
+        const data = await response.json();
+        console.log('Update response:', data);
+      } else {
+        // Create new benchmark
+        console.log('Creating new benchmark with value:', value);
+        const response = await fetch(`/api/projects/${projectId}/benchmarks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'SFD Improvement Offset',
+            scope_level: 'project',
+            project_id: parseInt(projectId),
+            benchmark_type: 'improvement_offset',
+            amount_per_uom: improvementOffset === '' ? null : value,
+            uom_code: 'FF',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Failed to create improvement offset:', errorData);
+          throw new Error(errorData.error || 'Failed to create improvement offset');
+        }
+
+        // Store the new benchmark ID
+        const data = await response.json();
+        console.log('Create response:', data);
+        if (data.benchmark_id) {
+          setImprovementOffsetBenchmarkId(data.benchmark_id);
+        }
+      }
+
+      // Trigger recalculation of all SFD parcels
+      console.log('Triggering SFD parcel recalculation...');
+      const recalcResponse = await fetch(`/api/projects/${projectId}/recalculate-sfd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (recalcResponse.ok) {
+        const recalcData = await recalcResponse.json();
+        console.log('Recalculation result:', recalcData);
+
+        // Invalidate parcel sales data to refresh with new calculations
+        queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+
+        // Show success message with count
+        setActionError(`✓ Improvement offset saved. ${recalcData.updated_count || 0} SFD parcels recalculated.`);
+        setTimeout(() => setActionError(null), 5000);
+      } else {
+        console.error('Recalculation failed:', await recalcResponse.text());
+        // Still invalidate to refresh
+        queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+        setActionError('✓ Improvement offset saved. Refresh the page to see updated values.');
+        setTimeout(() => setActionError(null), 5000);
+      }
+    } catch (error) {
+      console.error('Failed to save improvement offset:', error);
+      setActionError('Failed to save improvement offset');
+    } finally {
+      setIsSavingOffset(false);
     }
   };
 
@@ -295,6 +448,25 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       // Create single closing sale with quantity
       await createParcelSale.mutateAsync(payload);
 
+      // Trigger automatic recalculation for this parcel's use type
+      try {
+        const recalcResponse = await fetch(
+          `/api/projects/${projectId}/recalculate-sfd?type_code=${parcel.type_code}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+
+        if (recalcResponse.ok) {
+          // Invalidate queries to refresh the table with new net proceeds
+          queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+        }
+      } catch (recalcError) {
+        console.warn('Recalculation failed (sale saved successfully):', recalcError);
+        // Don't block the save flow - proceed even if recalculation fails
+      }
+
       // Clear pending date after successful save
       setPendingDates((prev) => {
         const next = { ...prev };
@@ -339,12 +511,19 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         ),
         cell: ({ row }) => {
           const code = row.original.type_code;
-          const chipColor = USE_TYPE_CHIP_COLORS[code] || 'secondary';
+          const { bg, text } = getUseTypePillColors(code);
           return (
             <div className="flex justify-center">
-              <CBadge color={chipColor} className="font-semibold text-xs">
+              <span
+                className="px-2 py-1 rounded text-xs fw-semibold"
+                style={{
+                  backgroundColor: bg,
+                  color: text,
+                  letterSpacing: '0.01em',
+                }}
+              >
                 {code || 'N/A'}
-              </CBadge>
+              </span>
             </div>
           );
         },
@@ -369,6 +548,32 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         cell: ({ row }) => (
           <div className="text-center">{formatNumber(row.original.units)}</div>
         ),
+      },
+      {
+        accessorKey: 'sale_period',
+        header: () => <div className="text-center">Sale Period</div>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const parcel = row.original;
+          return (
+            <div className="text-center">
+              <input
+                type="number"
+                value={parcel.sale_period ?? ''}
+                className="border rounded px-2 py-1 text-sm text-center"
+                style={{
+                  borderColor: 'var(--cui-border-color)',
+                  backgroundColor: 'var(--cui-body-bg)',
+                  color: 'var(--cui-body-color)',
+                  width: '80px',
+                }}
+                placeholder="-"
+                title="Absolute month index (e.g., month 26 = 2 years, 2 months)"
+                readOnly
+              />
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'sale_date',
@@ -403,15 +608,17 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
               <input
                 type="date"
                 value={value}
-                onChange={handleDateChange}
+                readOnly
                 className="border rounded px-2 py-1 text-sm"
                 style={{
                   borderColor: 'var(--cui-border-color)',
                   backgroundColor: 'var(--cui-body-bg)',
                   color: 'var(--cui-body-color)',
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
                 }}
                 disabled={!hasQuantity || isSaving}
-                title={!hasQuantity ? `Configure ${fieldName} on Planning page first` : ''}
+                title="Sale date is automatically calculated from Sale Period"
               />
               {isSaving && (
                 <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Saving...</span>
@@ -439,21 +646,25 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
             return <div className="text-right text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Configure pricing</div>;
           }
 
-          // Calculate inflated price if sale date exists
-          const saleDate = pendingDates[parcel.parcel_id] ?? parcel.sale_date;
+          // Calculate inflated price using sale_period (not dates) for accuracy
           let pricePerUnit = basePrice;
+          let isInflated = false;
 
-          if (saleDate && parcel.pricing_effective_date && parcel.growth_rate) {
-            pricePerUnit = calculateInflatedPrice(
+          if (parcel.sale_period && parcel.growth_rate) {
+            // Use period-based calculation (matches Excel FV function exactly)
+            pricePerUnit = calculateInflatedPriceFromPeriods(
               basePrice,
               parcel.growth_rate,
-              parseISODate(parcel.pricing_effective_date),
-              parseISODate(saleDate)
+              parcel.sale_period
             );
+            isInflated = parcel.growth_rate > 0;
           }
 
-          // Format: no decimals for FF (Front Foot), decimals for SF (Square Foot)
-          const shouldShowDecimals = parcel.uom_code === 'SF';
+          // Format: Show cents for values < $100, otherwise show whole dollars with commas
+          const shouldShowDecimals = pricePerUnit < 100;
+
+          // Normalize UOM display (strip $/prefix if present)
+          const displayUom = parcel.uom_code ? parcel.uom_code.replace('$/', '') : '';
 
           return (
             <div className="text-right">
@@ -461,7 +672,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                 minimumFractionDigits: shouldShowDecimals ? 2 : 0,
                 maximumFractionDigits: shouldShowDecimals ? 2 : 0
               })}
-              {parcel.uom_code && <span className="text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>/{parcel.uom_code}</span>}
+              {displayUom && <span className="text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>/{displayUom}</span>}
             </div>
           );
         },
@@ -477,6 +688,12 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         cell: ({ row }) => {
           const parcel = row.original;
           const saleDate = pendingDates[parcel.parcel_id] ?? parcel.sale_date;
+          const currentPrice = parcel.base_price_per_unit ?? parcel.current_value_per_unit;
+
+          // If no pricing configured, show "-" with value of 0
+          if (!currentPrice || currentPrice === 0) {
+            return <div className="text-right" style={{ color: 'var(--cui-secondary-color)' }}>-</div>;
+          }
 
           if (!saleDate) {
             return <div className="text-right italic" style={{ color: 'var(--cui-secondary-color)' }}>Pending</div>;
@@ -635,6 +852,51 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       {actionError && (
         <div className="px-4 py-2 text-sm border-b" style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)', borderColor: 'var(--cui-danger)' }}>{actionError}</div>
       )}
+      {/* Header bar with improvement offset input */}
+      <div className="px-4 py-2 border-b flex justify-end items-center gap-2" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <label className="text-sm font-medium whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>
+          Impr. Offset (SFD):
+        </label>
+        <div className="flex items-center gap-1">
+          <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>$</span>
+          <input
+            type="text"
+            value={improvementOffsetDisplay}
+            onChange={(e) => {
+              const rawValue = removeCommas(e.target.value);
+              // Only allow numbers and decimal point
+              if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
+                setImprovementOffset(rawValue);
+                setImprovementOffsetDisplay(e.target.value);
+              }
+            }}
+            onBlur={(e) => {
+              // Format on blur
+              const rawValue = removeCommas(e.target.value);
+              if (rawValue !== '') {
+                setImprovementOffsetDisplay(formatNumberWithCommas(rawValue));
+              }
+              handleSaveImprovementOffset();
+            }}
+            onFocus={(e) => {
+              // Remove formatting on focus for easier editing
+              setImprovementOffsetDisplay(improvementOffset);
+            }}
+            disabled={isSavingOffset}
+            className="px-2 py-1 text-sm border rounded w-24 text-right"
+            style={{
+              borderColor: 'var(--cui-border-color)',
+              backgroundColor: 'var(--cui-body-bg)',
+              color: 'var(--cui-body-color)',
+            }}
+            placeholder="0.00"
+          />
+          <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>/FF</span>
+        </div>
+        {isSavingOffset && (
+          <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Saving...</span>
+        )}
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>

@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { CButton } from '@coreui/react';
 import { LandscapeButton } from '@/components/ui/landscape';
-import { getColumnsByMode, type BudgetItem } from './ColumnDefinitions';
+import { getColumnsByMode, type BudgetItem, type BudgetColumnDef } from './ColumnDefinitions';
 import type { BudgetMode } from '@/types/budget';
 import CategoryEditorRow from './custom/CategoryEditorRow';
 import GroupRow from './custom/GroupRow';
@@ -33,6 +33,8 @@ interface Props {
     pathIds: number[];
     pathNames: string[];
   }) => void;
+  hasFrontFeet?: boolean;
+  costInflationRate?: number; // Project-level cost inflation rate (decimal, e.g., 0.03 for 3%)
 }
 
 export default function BudgetDataGrid({
@@ -47,6 +49,8 @@ export default function BudgetDataGrid({
   onRequestRowAdd,
   onRequestRowDelete,
   onRequestGroupAdd,
+  hasFrontFeet,
+  costInflationRate,
 }: Props) {
   const [expandedFactId, setExpandedFactId] = useState<number | null>(null); // For category editor
   const [expandedDetailsFactId, setExpandedDetailsFactId] = useState<number | null>(null); // For details row
@@ -133,6 +137,8 @@ export default function BudgetDataGrid({
       onGroupByPhase: toggleGrouping,
       onGroupByStage: toggleGrouping,
       onGroupByCategory: toggleGrouping,
+      hasFrontFeet,
+      costInflationRate,
     }),
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: 'onChange',
@@ -165,10 +171,19 @@ export default function BudgetDataGrid({
               {headerGroup.headers.map((header) => {
                 // Check if this is the Phase column
                 const isPhaseColumn = header.column.id === 'division_id';
+                const columnDef = header.column.columnDef as BudgetColumnDef<BudgetItem>;
+
+                const align = header.column.columnDef.meta?.align;
+                const textAlign = align === 'right' ? 'right' : align === 'center' ? 'center' : 'left';
+                const justify = align === 'right' ? 'end' : align === 'center' ? 'center' : 'start';
 
                 return (
-                  <th key={header.id} style={{ width: header.getSize(), maxWidth: header.column.columnDef.maxSize, position: 'relative', paddingLeft: isPhaseColumn ? '16px' : undefined }}>
-                    <div className="d-flex align-items-center gap-2">
+                  <th
+                    key={header.id}
+                    className={columnDef.headerClassName}
+                    style={{ width: header.getSize(), maxWidth: header.column.columnDef.maxSize, position: 'relative', paddingLeft: isPhaseColumn ? '16px' : undefined }}
+                  >
+                    <div className={`d-flex align-items-center gap-2 justify-content-${justify}`} style={{ textAlign }}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </div>
 
@@ -275,10 +290,11 @@ export default function BudgetDataGrid({
                       {tableRow.getVisibleCells().map((cell, cellIndex) => {
                         const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
                         const columnMeta = cell.column.columnDef.meta as any;
+                        const columnDef = cell.column.columnDef as BudgetColumnDef<BudgetItem>;
                         const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
 
                         return (
-                          <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                          <td key={cell.id} className={columnDef.cellClassName} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
                             {hasExpandButton ? (
                               <div className="d-flex align-items-center gap-2">
                                 <LandscapeButton
@@ -349,10 +365,11 @@ export default function BudgetDataGrid({
                     {row.getVisibleCells().map((cell, cellIndex) => {
                       const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
                       const columnMeta = cell.column.columnDef.meta as any;
+                      const columnDef = cell.column.columnDef as BudgetColumnDef<BudgetItem>;
                       const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
 
                       return (
-                        <td key={cell.id} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                        <td key={cell.id} className={columnDef.cellClassName} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
                           {hasExpandButton ? (
                             <div className="d-flex align-items-center gap-2">
                               <LandscapeButton

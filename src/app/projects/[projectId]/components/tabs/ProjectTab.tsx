@@ -102,8 +102,19 @@ export default function ProjectTab({
   showProjectSelectorInLocationHeader = false
 }: ProjectTabProps) {
   const { projects, selectProject, activeProjectId } = useProjectContext();
+  const normalizeMarketValue = (proj: Project) => {
+    if (!proj.market) return proj.market;
+    const marketLower = proj.market.trim().toLowerCase();
+    const stateCandidates = [proj.state, proj.jurisdiction_state].filter(Boolean).map(v => String(v).trim().toLowerCase());
+    return stateCandidates.includes(marketLower) ? null : proj.market;
+  };
+
+  const normalizeProject = (proj: Project) => ({
+    ...proj,
+    market: normalizeMarketValue(proj)
+  });
   // Fetch full project details (initial project from provider only has basic fields)
-  const [project, setProject] = useState<Project>(initialProject);
+  const [project, setProject] = useState<Project>(normalizeProject(initialProject));
   const [loadingProject, setLoadingProject] = useState(true);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
@@ -114,14 +125,14 @@ export default function ProjectTab({
         const response = await fetch(`/api/projects/${initialProject.project_id}/details`);
         if (response.ok) {
           const data = await response.json();
-          setProject(data);
+          setProject(normalizeProject(data));
         } else {
           // Fallback to initial project if API fails
-          setProject(initialProject);
+          setProject(normalizeProject(initialProject));
         }
       } catch (error) {
         console.error('Error fetching project details:', error);
-        setProject(initialProject);
+        setProject(normalizeProject(initialProject));
       } finally {
         setLoadingProject(false);
       }
@@ -181,6 +192,9 @@ export default function ProjectTab({
 
   const [marketStats, setMarketStats] = useState<MarketStatsForProject | null>(null);
   const [loadingMarketData, setLoadingMarketData] = useState(true);
+  const macroCity = project.jurisdiction_city || project.city || null;
+  const macroState = project.jurisdiction_state || project.state || null;
+  const macroLocationLabel = macroCity && macroState ? `${macroCity}, ${macroState}` : null;
   const [editingLocation, setEditingLocation] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
@@ -464,8 +478,8 @@ export default function ProjectTab({
       try {
         setLoadingMarketData(true);
         const stats = await fetchMarketStatsForProject(
-          project.jurisdiction_city,
-          project.jurisdiction_state
+          macroCity,
+          macroState
         );
         setMarketStats(stats);
       } catch (error) {
@@ -476,7 +490,7 @@ export default function ProjectTab({
     };
 
     loadMarketData();
-  }, [project.jurisdiction_city, project.jurisdiction_state]);
+  }, [macroCity, macroState, project.project_id]);
 
   if (loadingProject) {
     return (
@@ -508,7 +522,7 @@ export default function ProjectTab({
 
       if (response.ok) {
         const updated = await response.json();
-        setProject(updated);
+        setProject(normalizeProject(updated));
         void maybeUpdateProfileCoordinates(updated, pendingChanges);
         setEditingLocation(false);
         setEditedProject({});
@@ -530,7 +544,7 @@ export default function ProjectTab({
 
       if (response.ok) {
         const updated = await response.json();
-        setProject(updated);
+        setProject(normalizeProject(updated));
         void maybeUpdateProfileCoordinates(updated, pendingChanges);
         setEditingProfile(false);
         setEditedProject({});
@@ -1506,13 +1520,13 @@ export default function ProjectTab({
       <div className="mb-2">
         <h5 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>
           Macro Conditions
-          {project.jurisdiction_city && project.jurisdiction_state && (
+          {macroLocationLabel && (
             <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
-              (Based on {project.jurisdiction_city}, {project.jurisdiction_state})
+              (Based on {macroLocationLabel})
             </span>
           )}
         </h5>
-        {!project.jurisdiction_city || !project.jurisdiction_state && (
+        {(!macroCity || !macroState) && (
           <div className="mb-3 text-center">
             <p className="text-xs" style={{ color: 'var(--cui-warning)' }}>
               Project location not set. Showing national data.

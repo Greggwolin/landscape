@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * GET /api/projects/[projectId]/pricing-assumptions
+ * POST /api/projects/[projectId]/pricing-assumptions
+ *
+ * Manages land use pricing assumptions for sales projections
+ */
 
-// Hardcoded for now - env vars not loading correctly with Turbopack
-const DJANGO_API_URL = 'http://127.0.0.1:8000';
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
@@ -9,42 +14,36 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const url = `${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`;
 
-    console.log('[pricing-assumptions] Attempting to fetch:', url);
-    console.log('[pricing-assumptions] DJANGO_API_URL:', DJANGO_API_URL);
-
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-      // @ts-ignore - keepalive for Node.js fetch
-      keepalive: true,
-    });
-
-    console.log('[pricing-assumptions] Response status:', response.status);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+    if (!projectId) {
       return NextResponse.json(
-        { error: 'Failed to fetch pricing assumptions', details: errorData },
-        { status: response.status }
+        { error: 'projectId is required' },
+        { status: 400 }
       );
     }
 
-    const data = await response.json();
-    // Django returns paginated response, extract results array
-    const results = data.results || data;
-    console.log('[GET pricing-assumptions] Django response keys:', Object.keys(data));
-    console.log('[GET pricing-assumptions] Results count:', Array.isArray(results) ? results.length : 'not an array');
-    console.log('[GET pricing-assumptions] First result sample:', results[0]);
-    return NextResponse.json(results);
+    // Fetch pricing assumptions from land_use_pricing table
+    const result = await sql`
+      SELECT
+        lup.id,
+        lup.project_id,
+        lup.lu_type_code,
+        lup.product_code,
+        lup.price_per_unit,
+        lup.unit_of_measure,
+        lup.growth_rate,
+        lup.created_at,
+        lup.updated_at
+      FROM landscape.land_use_pricing lup
+      WHERE lup.project_id = ${projectId}
+      ORDER BY lup.lu_type_code, lup.product_code
+    `;
+
+    return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Pricing assumptions proxy error:', error);
+    console.error('Error fetching pricing assumptions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch pricing assumptions', details: message },
+      { error: 'Failed to fetch pricing assumptions', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -56,35 +55,54 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
-    const body = await request.json();
+    const { assumptions } = await request.json();
 
-    console.log('[POST pricing-assumptions] Received body:', JSON.stringify(body, null, 2));
-    console.log('[POST pricing-assumptions] URL:', `${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`);
-
-    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[POST pricing-assumptions] Django error:', response.status, errorData);
+    if (!projectId || !assumptions || !Array.isArray(assumptions)) {
       return NextResponse.json(
-        { error: 'Failed to create pricing assumption', details: errorData },
-        { status: response.status }
+        { error: 'projectId and assumptions array are required' },
+        { status: 400 }
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Delete all existing pricing for this project
+    await sql`DELETE FROM landscape.land_use_pricing WHERE project_id = ${projectId}`;
+
+    // Insert new pricing assumptions
+    const results = [];
+    for (const assumption of assumptions) {
+      const luCode = assumption.lu_type_code;
+      const prodCode = assumption.product_code || null;
+      const pricePerUnit = assumption.price_per_unit || 0;
+      const uom = assumption.unit_of_measure || 'FF';
+      // Use nullish coalescing to allow 0 as a valid value (0% growth)
+      const growthRate = assumption.growth_rate ?? 0.035;
+
+      const result = await sql`
+        INSERT INTO landscape.land_use_pricing (
+          project_id,
+          lu_type_code,
+          product_code,
+          price_per_unit,
+          unit_of_measure,
+          growth_rate
+        ) VALUES (
+          ${projectId},
+          ${luCode},
+          ${prodCode},
+          ${pricePerUnit},
+          ${uom},
+          ${growthRate}
+        )
+        RETURNING *
+      `;
+      results.push(result[0]);
+    }
+
+    return NextResponse.json(results);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Create pricing assumption proxy error:', error);
+    console.error('Error saving pricing assumptions:', error);
     return NextResponse.json(
-      { error: 'Failed to create pricing assumption', details: message },
+      { error: 'Failed to save pricing assumptions', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

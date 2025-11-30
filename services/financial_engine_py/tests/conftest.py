@@ -121,7 +121,7 @@ def monthly_opex() -> OperatingExpenses:
         insurance=500,  # $6k/year
         cam_expenses=2_000,  # $24k/year
         utilities=800,  # $9.6k/year
-        management_fee_pct=3.0,
+        management_fee_pct=0.03,  # 3% as decimal
         repairs_maintenance=600,  # $7.2k/year
         other_expenses=400,  # $4.8k/year
     )
@@ -172,14 +172,14 @@ def known_irr_case():
     """
     Known IRR test case with validated answer.
 
-    This is the Excel XIRR example from numpy-financial docs.
-    Expected IRR: 7.93%
+    $10M investment, $500k/year for 5 years, $11M exit.
+    Expected IRR: 6.7477%
     """
     return {
         "initial_investment": 10_000_000,
         "cash_flows": [500_000, 500_000, 500_000, 500_000, 500_000],
         "reversion_value": 11_000_000,
-        "expected_irr": 0.0793,  # 7.93%
+        "expected_irr": 0.067477,  # 6.7477%
         "tolerance": 0.0001,  # Within 0.01%
     }
 
@@ -190,15 +190,15 @@ def known_npv_case():
     Known NPV test case.
 
     $10M investment, $500k annual cash flow, $11M exit after 5 years.
-    At 10% discount rate, NPV should be ~$1.24M.
+    At 10% discount rate, NPV is -$1.27M (negative NPV).
     """
     return {
         "discount_rate": 0.10,
         "initial_investment": 10_000_000,
         "cash_flows": [500_000, 500_000, 500_000, 500_000, 500_000],
         "reversion_value": 11_000_000,
-        "expected_npv": 1_234_567,  # Approximate
-        "tolerance": 50_000,  # Within $50k
+        "expected_npv": -1_274_472,  # Negative NPV
+        "tolerance": 100,  # Within $100
     }
 
 

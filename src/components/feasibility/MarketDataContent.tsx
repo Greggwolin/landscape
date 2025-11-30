@@ -8,6 +8,7 @@ import { SalesComparisonApproach } from '@/app/projects/[projectId]/valuation/co
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/toast';
 import { getValuationSummary } from '@/lib/api/valuation';
+import SfCompsTile from '@/components/analysis/SfCompsTile';
 
 interface MarketDataContentProps {
   projectId: number;
@@ -227,6 +228,8 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
       className="p-4 space-y-4 min-h-screen"
       style={{ backgroundColor: 'var(--cui-body-bg)' }}
     >
+      <SfCompsTile projectId={projectId} />
+
       {/* Comparable Land Sales */}
       <CollapsibleSection
         title="Comparable Land Sales"

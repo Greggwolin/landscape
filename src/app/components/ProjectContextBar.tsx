@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LifecycleTileNav } from '@/components/projects/LifecycleTileNav';
+import { InflationRateDisplay } from '@/components/projects/InflationRateDisplay';
 
 /**
  * ProjectContextBar - Tier 2 Project Navigation
@@ -96,12 +97,17 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         </div>
       </div>
 
-      {/* Lifecycle Tiles */}
+      {/* Lifecycle Tiles + Inflation selectors */}
       <div style={{ padding: '12px 16px' }}>
-        <LifecycleTileNav
-          projectId={projectId.toString()}
-          propertyType={project.project_type_code}
-        />
+        <div className="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+          <div className="flex-grow-1">
+            <LifecycleTileNav
+              projectId={projectId.toString()}
+              propertyType={project.project_type_code}
+            />
+          </div>
+          <InflationRateDisplay projectId={projectId} />
+        </div>
       </div>
     </div>
   );

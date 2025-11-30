@@ -290,15 +290,34 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState<PropertyFilterKey>('ALL');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
 
-  const sortedProjects = useMemo(
-    () =>
-      [...projects].sort((a, b) => {
-        const aDate = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const bDate = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        return bDate - aDate;
-      }),
-    [projects]
-  );
+  const sortedProjects = useMemo(() => {
+    // Get last accessed timestamps from localStorage
+    const getLastAccessed = (projectId: number): number => {
+      if (typeof window === 'undefined') return 0;
+      const key = `project_${projectId}_last_accessed`;
+      const timestamp = localStorage.getItem(key);
+      return timestamp ? parseInt(timestamp, 10) : 0;
+    };
+
+    return [...projects].sort((a, b) => {
+      const aAccessed = getLastAccessed(a.project_id);
+      const bAccessed = getLastAccessed(b.project_id);
+
+      // If both have been accessed, sort by most recent access
+      if (aAccessed && bAccessed) {
+        return bAccessed - aAccessed;
+      }
+
+      // If only one has been accessed, it goes first
+      if (aAccessed) return -1;
+      if (bAccessed) return 1;
+
+      // If neither has been accessed, fall back to updated_at
+      const aDate = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bDate = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [projects]);
 
   const filteredProjects = useMemo(
     () => sortedProjects.filter((project) => matchesFilter(project, activeFilter)),
@@ -314,6 +333,10 @@ export default function DashboardPage() {
   const handleProjectClick = (projectId: number) => {
     const project = projects.find((p) => p.project_id === projectId);
     if (project) {
+      // Record access timestamp in localStorage
+      const key = `project_${projectId}_last_accessed`;
+      localStorage.setItem(key, Date.now().toString());
+
       selectProject(projectId);
       router.push(`/projects/${projectId}`);
     }

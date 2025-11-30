@@ -32,6 +32,7 @@ import { useContainers } from '@/hooks/useContainers';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
 import { usePreference } from '@/hooks/useUserPreferences';
+import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 
 interface Props {
   projectId: number;
@@ -109,6 +110,7 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
     data: rawData,
     loading,
     error,
+    hasFrontFeet,
     updateItem,
     createItem,
     deleteItem,
@@ -117,6 +119,10 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
 
   // Get container hierarchy for filtering
   const { phases } = useContainers({ projectId, includeCosts: false });
+
+  // Get project-level cost inflation rate for escalation calculations
+  const { data: inflationData } = useProjectInflationSettings(projectId);
+  const costInflationRate = inflationData?.cost_inflation?.current_rate ?? undefined;
 
   const projectLevelCount = useMemo(
     () => rawData.filter(item => !item.division_id).length,
@@ -327,7 +333,8 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
 
     let value = rawValue;
 
-    if (field === 'qty' || field === 'rate') {
+    // Parse numeric fields
+    if (field === 'qty' || field === 'rate' || field === 'start_period' || field === 'periods_to_complete') {
       value =
         rawValue === null || rawValue === undefined || rawValue === ''
           ? null
@@ -600,6 +607,8 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
                   onRequestRowAdd={handleAddFromRow}
                   onRequestRowDelete={handleRequestDelete}
                   onRequestGroupAdd={handleGroupAdd}
+                  hasFrontFeet={hasFrontFeet}
+                  costInflationRate={costInflationRate}
                 />
               </div>
               {hasDateData && showGantt && (

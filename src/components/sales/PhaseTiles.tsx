@@ -92,9 +92,11 @@ export default function PhaseTiles({
     });
   }, [phasesWithCounts, selectedAreaIds, containerPhases]);
 
+  const gridClass = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2';
+
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className={gridClass}>
         {[...Array(4)].map((_, i) => (
           <div key={i} className="animate-pulse">
             <div className="h-32 bg-gray-200 rounded border-2"></div>
@@ -121,7 +123,7 @@ export default function PhaseTiles({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className={gridClass}>
       {filteredPhases.map((phase: Phase & { total_cost?: number; net_proceeds?: number }) => {
         const isSelected = selectedPhaseIds.includes(phase.phase_id);
 
@@ -169,19 +171,10 @@ export default function PhaseTiles({
               </div>
 
               {phase.net_proceeds !== undefined && phase.net_proceeds > 0 && (
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--cui-body-color)' }}>Proceeds:</span>
+                <div className="flex justify-between mt-1">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Net $$:</span>
                   <span className="font-semibold" style={{ color: 'var(--cui-success)' }}>
                     {formatCurrency(phase.net_proceeds)}
-                  </span>
-                </div>
-              )}
-
-              {showCosts && phase.total_cost !== undefined && (
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--cui-body-color)' }}>Cost:</span>
-                  <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                    {formatCurrency(phase.total_cost)}
                   </span>
                 </div>
               )}

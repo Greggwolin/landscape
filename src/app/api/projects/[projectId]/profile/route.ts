@@ -25,6 +25,9 @@ export interface ProjectProfile {
   county?: string;
   state?: string;
   zip_code?: string;
+  start_date?: string | null;
+  analysis_start_date?: string | null;
+  analysis_end_date?: string | null;
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
@@ -58,6 +61,9 @@ export async function GET(
         COALESCE(p.county, p.jurisdiction_county) as county,
         p.state,
         p.zip_code,
+        p.start_date,
+        p.analysis_start_date,
+        p.analysis_end_date,
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
@@ -122,6 +128,9 @@ export async function PATCH(
       'county': 'county',
       'state': 'state',
       'zip_code': 'zip_code',
+      'start_date': 'start_date',
+      'analysis_start_date': 'analysis_start_date',
+      'analysis_end_date': 'analysis_end_date',
       'msa_id': 'msa_id',
       'apn': 'apn_primary',
       'ownership_type': 'ownership_type'
@@ -269,6 +278,9 @@ export async function PATCH(
         COALESCE(p.county, p.jurisdiction_county) as county,
         p.state,
         p.zip_code,
+        p.start_date,
+        p.analysis_start_date,
+        p.analysis_end_date,
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,

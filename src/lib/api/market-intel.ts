@@ -113,7 +113,9 @@ export async function fetchMarketStatsForProject(
     }
 
     // Get geo IDs for this location
-    let geoIds: string[] = ['01000US']; // Always include US as fallback
+    // Always include broad fallbacks for national data
+    const fallbackGeoIds = ['01000US', 'US', '00000US', 'NATION'];
+    let geoIds: string[] = [...fallbackGeoIds];
 
     if (city && state) {
       const geoUrl = `/api/market/geos?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
@@ -126,7 +128,11 @@ export async function fetchMarketStatsForProject(
         const geoData = await geoResponse.json();
         console.log('[Market Intel API] Geo data received:', geoData);
         if (geoData.base && geoData.base.geo_id) {
-          geoIds = [geoData.base.geo_id, ...geoData.targets.map((t: { geo_id: string }) => t.geo_id)];
+          geoIds = [
+            geoData.base.geo_id,
+            ...geoData.targets.map((t: { geo_id: string }) => t.geo_id),
+            ...fallbackGeoIds
+          ];
         }
       } else {
         const errorText = await geoResponse.text();
@@ -135,7 +141,7 @@ export async function fetchMarketStatsForProject(
     }
 
     // Fetch macro series data (inflation, interest rates, etc.)
-    const seriesUrl = `/api/market/series?codes=CPIAUCSL,GS10,DPRIME,SOFR&geo_ids=${geoIds.join(',')}`;
+    const seriesUrl = `/api/market/series?codes=CPIAUCSL,GS10,DPRIME,SOFR&geo_ids=${Array.from(new Set(geoIds)).join(',')}`;
     console.log('[Market Intel API] Fetching series from:', seriesUrl);
 
     const seriesResponse = await fetch(seriesUrl);
@@ -152,19 +158,50 @@ export async function fetchMarketStatsForProject(
 
     // Find each series (prioritize most specific geography)
     const findSeries = (codes: string[]): MarketSeries | undefined => {
-      for (const code of codes) {
-        const matches = seriesData.series.filter((s) => s.series_code === code);
-        if (matches.length > 0) {
-          // Prefer series with most data points
-          return matches.sort((a, b) => b.data.length - a.data.length)[0];
-        }
+      const normalizedCodes = codes.map((c) => c.toUpperCase());
+      const allSeries = seriesData.series.map((s) => ({
+        ...s,
+        _code: s.series_code.toUpperCase(),
+        _name: s.series_name.toUpperCase(),
+      }));
+
+      // Exact matches first
+      const exact = allSeries.filter((s) => normalizedCodes.includes(s._code));
+      if (exact.length > 0) {
+        return exact.sort((a, b) => b.data.length - a.data.length)[0];
       }
+
+      // Fallback: substring match (covers variants like DGS10, DPRIMEAN, PRIME)
+      const partial = allSeries.filter((s) =>
+        normalizedCodes.some((code) => s._code.includes(code) || code.includes(s._code))
+      );
+      if (partial.length > 0) {
+        return partial.sort((a, b) => b.data.length - a.data.length)[0];
+      }
+
+      // Name-based fallback for common variants (e.g., "10-Year Treasury", "Prime Rate")
+      const nameMatches = allSeries.filter((s) => {
+        const name = s._name;
+        return normalizedCodes.some((code) => {
+          if (code.includes('GS10') || code.includes('TREAS')) {
+            return name.includes('TREASURY') && name.includes('10');
+          }
+          if (code.includes('PRIME')) {
+            return name.includes('PRIME');
+          }
+          return false;
+        });
+      });
+      if (nameMatches.length > 0) {
+        return nameMatches.sort((a, b) => b.data.length - a.data.length)[0];
+      }
+
       return undefined;
     };
 
     const cpiSeries = findSeries(['CPIAUCSL', 'CPIAUCNS']);
-    const treasury10ySeries = findSeries(['GS10', 'DGS10']);
-    const primeRateSeries = findSeries(['DPRIME']);
+    const treasury10ySeries = findSeries(['GS10', 'DGS10', 'GS10IR']);
+    const primeRateSeries = findSeries(['DPRIME', 'DPRIMEAN', 'PRIME']);
     const sofrSeries = findSeries(['SOFR', 'SOFR90DAY']);
 
     return {

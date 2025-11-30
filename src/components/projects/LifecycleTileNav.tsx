@@ -71,12 +71,12 @@ const LAND_DEV_TILES: TileConfig[] = [
     proOnly: true
   },
   {
-    id: 'results',
-    label: 'Results',
+    id: 'analysis',
+    label: 'Analysis',
     colorClass: '', // Use Secondary base: #6b7785
     textClass: 'text-white',
     borderClass: 'border-secondary',
-    route: '/results'
+    route: '/analysis'
   },
   {
     id: 'documents',

@@ -129,6 +129,14 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               value={profile.county}
             />
             <ProfileField
+              label="State"
+              value={profile.state}
+            />
+            <ProfileField
+              label="Zip Code"
+              value={profile.zip_code}
+            />
+            <ProfileField
               label="Market"
               value={formatMSADisplay(profile.msa_name, profile.state_abbreviation)}
             />

@@ -3,6 +3,7 @@
 import React from 'react'
 import { useParams } from 'next/navigation'
 import ProjectLandUseLabels from '@/components/project/ProjectLandUseLabels'
+import ProjectDates from '@/components/project/ProjectDates'
 import { CContainer } from '@coreui/react'
 
 export default function ProjectSettingsPage() {
@@ -19,6 +20,7 @@ export default function ProjectSettingsPage() {
       </div>
 
       <div className="space-y-6">
+        <ProjectDates projectId={projectId} />
         <ProjectLandUseLabels projectId={projectId} />
       </div>
     </CContainer>

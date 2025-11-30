@@ -76,13 +76,47 @@ export default function BenchmarksPanel() {
 
       // Group benchmarks by category
       const benchmarksList = Array.isArray(benchmarkData.benchmarks) ? benchmarkData.benchmarks : [];
+      const saleBenchmarksList = Array.isArray(saleBenchmarksData.benchmarks) ? saleBenchmarksData.benchmarks : [];
+
       const grouped: Record<string, Benchmark[]> = {};
+
+      // Add regular benchmarks (excluding commission and transaction_cost as they come from sale-benchmarks)
       benchmarksList.forEach((benchmark: Benchmark) => {
         const category = benchmark.category || 'other';
+        // Skip commission and transaction_cost from old benchmarks table
+        if (category === 'commission' || category === 'transaction_cost') {
+          return;
+        }
         if (!grouped[category]) {
           grouped[category] = [];
         }
         grouped[category].push(benchmark);
+      });
+
+      // Add sale benchmarks to appropriate categories
+      // Map benchmark_type to category key
+      saleBenchmarksList.forEach((benchmark: any) => {
+        let category: string | null = null;
+
+        // Map benchmark types to categories
+        if (benchmark.benchmark_type === 'commission') {
+          category = 'commission';
+        } else if (['closing', 'legal', 'title_insurance'].includes(benchmark.benchmark_type)) {
+          category = 'transaction_cost';
+        }
+        // Skip improvement_offset and other types - they're not shown in this panel
+
+        if (category) {
+          if (!grouped[category]) {
+            grouped[category] = [];
+          }
+          // Add category field and mark as coming from sale benchmarks
+          grouped[category].push({
+            ...benchmark,
+            category,
+            source_type: 'global_default'
+          });
+        }
       });
 
       setBenchmarks(grouped);

@@ -180,6 +180,14 @@ export interface BudgetItem {
   growth_rate_set_id?: number | null; // FK to growth rate sets
 
   // =========================================================================
+  // PHASE MEASUREMENTS (read-only, from parcel aggregation)
+  // Used for UOM auto-population and display in Planning Budget
+  // =========================================================================
+  phase_units?: number | null; // Sum of parcel units for this phase
+  phase_acres?: number | null; // Sum of parcel acres for this phase
+  phase_front_feet?: number | null; // Sum(units * lot_width) for this phase
+
+  // =========================================================================
   // UI STATE (client-side only)
   // =========================================================================
   is_expanded?: boolean; // Row expansion state

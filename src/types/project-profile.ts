@@ -28,6 +28,9 @@ export interface ProjectProfile {
   apn?: string;
   ownership_type?: OwnershipType;
   property_class?: PropertyClass;
+  start_date?: string;
+  analysis_start_date?: string;
+  analysis_end_date?: string;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -60,6 +63,9 @@ export interface ProjectProfileFormData {
   msa_id?: number;
   apn?: string;
   ownership_type?: OwnershipType;
+  start_date?: string;
+  analysis_start_date?: string;
+  analysis_end_date?: string;
 }
 
 // ============================================================================

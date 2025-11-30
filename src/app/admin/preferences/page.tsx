@@ -23,6 +23,16 @@ const UnitCostCategoryManager = dynamic(
   { ssr: false }
 );
 
+const UnitOfMeasureManager = dynamic(
+  () => import('./components/UnitOfMeasureManager'),
+  { ssr: false }
+);
+
+const SystemPicklistsAccordion = dynamic(
+  () => import('@/components/admin/SystemPicklistsAccordion').then((mod) => mod.SystemPicklistsAccordion),
+  { ssr: false }
+);
+
 // Preference categories
 interface PreferenceCategory {
   key: string;
@@ -49,11 +59,23 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     label: 'Land Use Taxonomy Manager',
     description: 'Configure land use types, families, and product categories',
     icon: 'Map'
+  },
+  {
+    key: 'uom_manager',
+    label: 'Units of Measure Manager',
+    description: 'Configure measurement units used throughout the application',
+    icon: 'Ruler'
+  },
+  {
+    key: 'system_picklists',
+    label: 'System Picklists',
+    description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
+    icon: 'List'
   }
 ];
 
 export default function SystemPreferencesPage() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('unit_cost_categories');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const { data: tierLevel, isLoading: isTierLoading } = useUserTier();
   const updateTierMutation = useUpdateUserTier();
 
@@ -186,6 +208,14 @@ export default function SystemPreferencesPage() {
                     ) : category.key === 'unit_cost_categories' ? (
                       <div style={{ minHeight: '600px' }}>
                         <UnitCostCategoryManager />
+                      </div>
+                    ) : category.key === 'uom_manager' ? (
+                      <div className="px-6 py-4">
+                        <UnitOfMeasureManager />
+                      </div>
+                    ) : category.key === 'system_picklists' ? (
+                      <div className="px-6 py-4">
+                        <SystemPicklistsAccordion />
                       </div>
                     ) : null}
                   </div>

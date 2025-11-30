@@ -43,6 +43,7 @@ export interface MapObliqueProps {
   markers?: MarkerData[]; // Simple markers instead of extrusions
   onFeatureClick?: (featureId?: string) => void;
   showExtrusions?: boolean; // Toggle between 3D buildings and flat markers (default true)
+  onMapClick?: (lngLat: [number, number]) => void;
 }
 
 export interface MapObliqueRef {
@@ -83,7 +84,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
       lines = [],
       markers = [],
       onFeatureClick,
-      showExtrusions = true
+      showExtrusions = true,
+      onMapClick
     },
     ref
   ) {
@@ -196,6 +198,14 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
       map.on('load', () => {
         setMapLoaded(true);
       });
+
+      if (onMapClick) {
+        map.on('click', (event) => {
+          const { lng, lat } = event.lngLat;
+          onMapClick([lng, lat]);
+        });
+        map.getCanvas().style.cursor = 'crosshair';
+      }
 
       mapRef.current = map;
 
