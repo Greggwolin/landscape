@@ -26,7 +26,7 @@ const DocumentationIndex: React.FC = () => {
       title: 'Implementation Status',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-30.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Redfin Housing Comps Integration (Nov 30)',
+      description: 'Current implementation status and progress tracking - Updated with Redfin Comps & User Management (Nov 30)',
       icon: <FileText className="w-5 h-5" />,
       lastModified: '2025-11-30'
     },
@@ -36,6 +36,14 @@ const DocumentationIndex: React.FC = () => {
       category: 'Component',
       description: 'Housing price comparables using Redfin API - Map visualization with price-tier markers, layer controls, and statistics',
       icon: <Map className="w-5 h-5" />,
+      lastModified: '2025-11-30'
+    },
+    {
+      title: 'User Management System',
+      path: '/docs/session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
+      category: 'Component',
+      description: 'Full CRUD user management in System Administration - Add/Edit/Delete users, password reset, active/inactive toggle',
+      icon: <Code className="w-5 h-5" />,
       lastModified: '2025-11-30'
     },
     {

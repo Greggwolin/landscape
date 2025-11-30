@@ -4,6 +4,7 @@ export { default as BenchmarksPanel } from './BenchmarksPanel';
 export { default as CostLibraryPanel } from './CostLibraryPanel';
 export { default as DMSAdminPanel } from './DMSAdminPanel';
 export { default as ReportConfiguratorPanel } from './ReportConfiguratorPanel';
+export { default as UserManagementPanel } from './UserManagementPanel';
 export { default as ReportTemplateCard } from './ReportTemplateCard';
 export { default as ReportTemplateEditorModal } from './ReportTemplateEditorModal';
 export { default as ExportButton } from './ExportButton';

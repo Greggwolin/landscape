@@ -24,6 +24,24 @@
 - 📖 Documentation: [SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md](../session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md)
 - 🎯 Status: Complete - Housing comps display on map and table with interactive controls
 
+### User Management System (Nov 30, 2025) ⭐ NEW
+- ✅ **User Management Panel** - Full CRUD UI in System Administration modal (`src/components/admin/UserManagementPanel.tsx`)
+- ✅ **User List Table** - Displays users with status, organization, last login, admin badge
+- ✅ **Add User Modal** - Create users with username, email, password, name, company, phone, active/admin toggles
+- ✅ **Edit User Modal** - Update existing user profile details
+- ✅ **Reset Password Modal** - Admin can set password without knowing current (no email required)
+- ✅ **Delete User Modal** - Confirmation dialog with user preview, self-deletion prevention
+- ✅ **Status Toggle** - Inline active/inactive toggle with loading states and self-action prevention
+- ✅ **Backend API** - Enhanced `UserManagementViewSet` with full CRUD, `set_password`, `activate`, `deactivate` endpoints
+- ✅ **Admin Serializers** - `AdminUserCreateSerializer`, `AdminUserUpdateSerializer`, `AdminSetPasswordSerializer`
+- ✅ **Frontend API Client** - Type-safe `src/lib/api/admin-users.ts` with all user management functions
+- ✅ **Login System Update** - Changed from email-based to username-based authentication
+- ✅ **Database Schema** - Added missing columns to auth_user table, created user_profile table
+- 📁 Files Created: `src/components/admin/UserManagementPanel.tsx`, `src/lib/api/admin-users.ts`
+- 📁 Files Modified: `src/components/admin/AdminModal.tsx`, `src/contexts/AuthContext.tsx`, `src/app/login/page.tsx`, `backend/apps/projects/serializers_auth.py`, `backend/apps/projects/views_auth.py`
+- 📖 Documentation: [SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md](../session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md)
+- 🎯 Status: Complete - Full user CRUD in System Administration > Users tab
+
 ### Project Costs Report Excel Export (Nov 29, 2025)
 - ✅ **Export Button Added** - "Export to Excel" button in Project Costs Report header
 - ✅ **Excel Generation** - Uses SheetJS (xlsx) library to create .xlsx file matching on-screen layout

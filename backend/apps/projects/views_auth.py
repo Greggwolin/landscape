@@ -22,8 +22,12 @@ from .serializers_auth import (
     PasswordResetConfirmSerializer,
     APIKeySerializer,
     APIKeyCreateSerializer,
+    AdminUserCreateSerializer,
+    AdminUserUpdateSerializer,
+    AdminSetPasswordSerializer,
 )
 from .permissions import IsOwnerOrReadOnly
+from rest_framework.permissions import IsAdminUser
 
 
 class UserRegistrationView(generics.CreateAPIView):
@@ -118,16 +122,66 @@ class UserLogoutView(generics.GenericAPIView):
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """
     User profile endpoint.
-    
+
     GET /api/auth/profile/
     PUT /api/auth/profile/
     """
-    
+
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
-    
+
     def get_object(self):
         return self.request.user
+
+
+class PasswordChangeView(generics.GenericAPIView):
+    """
+    Change password for authenticated user.
+
+    POST /api/auth/password-change/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        new_password_confirm = request.data.get('new_password_confirm')
+
+        if not all([current_password, new_password, new_password_confirm]):
+            return Response(
+                {'error': 'All password fields are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if new_password != new_password_confirm:
+            return Response(
+                {'error': 'New passwords do not match'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        if not user.check_password(current_password):
+            return Response(
+                {'error': 'Current password is incorrect'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate new password strength
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response(
+                {'error': e.messages[0] if e.messages else 'Password does not meet requirements'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({'message': 'Password changed successfully'})
 
 
 class PasswordResetRequestView(generics.GenericAPIView):
@@ -265,23 +319,93 @@ class APIKeyViewSet(viewsets.ModelViewSet):
 class UserManagementViewSet(viewsets.ModelViewSet):
     """
     User management for admins.
-    
+
     GET /api/auth/users/
     POST /api/auth/users/
     PUT /api/auth/users/:id/
+    DELETE /api/auth/users/:id/
+    POST /api/auth/users/:id/set_password/
+    POST /api/auth/users/:id/activate/
+    POST /api/auth/users/:id/deactivate/
     """
-    
+
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    
+
     def get_queryset(self):
         # Only admins can see all users
         if self.request.user.is_staff:
-            return User.objects.all()
+            return User.objects.all().order_by('-created_at')
         # Regular users only see themselves
         return User.objects.filter(id=self.request.user.id)
-    
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AdminUserCreateSerializer
+        if self.action in ['update', 'partial_update']:
+            return AdminUserUpdateSerializer
+        if self.action == 'set_password':
+            return AdminSetPasswordSerializer
+        return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        """Create a new user (admin only)."""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """Update a user (admin only)."""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a user (admin only)."""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        user = self.get_object()
+
+        # Prevent self-deletion
+        if user.id == request.user.id:
+            return Response(
+                {'error': 'You cannot delete your own account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.delete()
+        return Response({'message': 'User deleted successfully'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def set_password(self, request, pk=None):
+        """Admin set password for a user (no current password needed)."""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        user = self.get_object()
+        serializer = AdminSetPasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user.set_password(serializer.validated_data['password'])
+            user.save()
+            return Response({'message': 'Password updated successfully'})
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=['post'])
     def deactivate(self, request, pk=None):
         """Deactivate a user (admin only)."""
@@ -290,13 +414,13 @@ class UserManagementViewSet(viewsets.ModelViewSet):
                 {'error': 'Admin access required'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         user = self.get_object()
         user.is_active = False
         user.save()
-        
+
         return Response({'message': 'User deactivated'})
-    
+
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
         """Activate a user (admin only)."""
@@ -305,9 +429,9 @@ class UserManagementViewSet(viewsets.ModelViewSet):
                 {'error': 'Admin access required'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         user = self.get_object()
         user.is_active = True
         user.save()
-        
+
         return Response({'message': 'User activated'})

@@ -40,42 +40,35 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class UserLoginSerializer(serializers.Serializer):
     """Serializer for user login."""
-    
-    email = serializers.EmailField()
+
+    username = serializers.CharField()
     password = serializers.CharField(write_only=True)
-    
+
     def validate(self, attrs):
-        email = attrs.get('email')
+        username = attrs.get('username')
         password = attrs.get('password')
-        
-        # Get user by email
-        try:
-            user = User.objects.get(email=email)
-            username = user.username
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Invalid credentials")
-        
-        # Authenticate
+
+        # Authenticate directly with username
         user = authenticate(username=username, password=password)
         if not user:
             raise serializers.ValidationError("Invalid credentials")
-        
+
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled")
-        
+
         attrs['user'] = user
         return attrs
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model."""
-    
+
     profile = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'company', 'phone', 'role', 'is_verified', 'is_active', 'created_at', 'profile']
-        read_only_fields = ['id', 'created_at', 'is_verified']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'company', 'phone', 'role', 'is_verified', 'is_active', 'is_staff', 'created_at', 'last_login', 'profile']
+        read_only_fields = ['id', 'created_at', 'is_verified', 'last_login']
     
     def get_profile(self, obj):
         try:
@@ -107,16 +100,72 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
 
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    """Serializer for admin user creation."""
+
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'username', 'email', 'password', 'password_confirm',
+            'first_name', 'last_name', 'company', 'phone',
+            'is_active', 'is_staff', 'role'
+        ]
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Passwords must match"})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        password = validated_data.pop('password')
+        user = User.objects.create_user(
+            password=password,
+            **validated_data
+        )
+        # Create profile
+        UserProfile.objects.create(user=user)
+        return user
+
+
+class AdminUserUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for admin user updates (no password)."""
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name',
+            'company', 'phone', 'is_active', 'is_staff', 'role',
+            'created_at', 'last_login'
+        ]
+        read_only_fields = ['id', 'created_at', 'last_login']
+
+
+class AdminSetPasswordSerializer(serializers.Serializer):
+    """Serializer for admin password reset."""
+
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Passwords must match"})
+        return attrs
+
+
 class APIKeySerializer(serializers.ModelSerializer):
     """Serializer for API keys."""
-    
+
     key_preview = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = APIKey
         fields = ['id', 'name', 'key_preview', 'is_active', 'created_at', 'last_used_at', 'expires_at']
         read_only_fields = ['id', 'key_preview', 'created_at', 'last_used_at']
-    
+
     def get_key_preview(self, obj):
         """Show only first 8 characters of key."""
         return f"{obj.key[:8]}..." if obj.key else None

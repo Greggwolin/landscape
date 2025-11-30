@@ -7,17 +7,19 @@ import BenchmarksPanel from './BenchmarksPanel';
 import CostLibraryPanel from './CostLibraryPanel';
 import DMSAdminPanel from './DMSAdminPanel';
 import ReportConfiguratorPanel from './ReportConfiguratorPanel';
+import UserManagementPanel from './UserManagementPanel';
 
 /**
  * AdminModal Component
  *
  * Full-screen modal overlay for system administration.
- * Contains 5 internal tabs:
+ * Contains 6 internal tabs:
  * - Preferences (Unit Cost Categories, Land Use Taxonomy)
  * - Benchmarks (Global Benchmarks Library)
  * - Cost Library (Cost Library Management)
  * - DMS Admin (Document Templates)
  * - Report Configurator (Coming in Phase 2)
+ * - Users (User Management - CRUD operations)
  */
 
 interface AdminModalProps {
@@ -25,7 +27,7 @@ interface AdminModalProps {
   onClose: () => void;
 }
 
-type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator';
+type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users';
 
 export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
@@ -56,6 +58,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       alignment="center"
       backdrop="static"
       scrollable
+      portal={false}
       className="admin-modal"
     >
       <CModalHeader closeButton>
@@ -125,6 +128,18 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
               Report Configurator
             </CNavLink>
           </CNavItem>
+          <CNavItem>
+            <CNavLink
+              href="#"
+              active={activeTab === 'users'}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('users');
+              }}
+            >
+              Users
+            </CNavLink>
+          </CNavItem>
         </CNav>
 
         {/* Tab Content Panels */}
@@ -134,6 +149,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           {activeTab === 'cost-library' && <CostLibraryPanel />}
           {activeTab === 'dms-admin' && <DMSAdminPanel />}
           {activeTab === 'report-configurator' && <ReportConfiguratorPanel />}
+          {activeTab === 'users' && <UserManagementPanel />}
         </div>
       </CModalBody>
     </CModal>

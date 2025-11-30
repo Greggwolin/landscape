@@ -1,14 +1,16 @@
-# Redfin Housing Comparables Integration
+# Redfin Housing Comparables Integration + User Management
 
 **Date**: November 30, 2025
-**Duration**: ~2 hours
-**Focus**: Replace defunct Zillow API with Redfin's public Stingray API for housing price comparables
+**Duration**: ~4 hours
+**Focus**: Replace defunct Zillow API with Redfin's public Stingray API for housing price comparables; Add User Management to System Administration
 
 ---
 
 ## Summary
 
-Integrated Redfin's public CSV endpoint as the data source for single-family housing comparables on the Market Analysis page. Added map visualization with price-tier color coding, interactive controls, and matching card-based UI styling.
+**Part 1:** Integrated Redfin's public CSV endpoint as the data source for single-family housing comparables on the Market Analysis page. Added map visualization with price-tier color coding, interactive controls, and matching card-based UI styling.
+
+**Part 2:** Added full User Management CRUD functionality to the System Administration modal. Includes user list, add/edit/delete users, admin password reset, and active/inactive status toggling.
 
 ## Major Accomplishments
 
@@ -49,18 +51,78 @@ Integrated Redfin's public CSV endpoint as the data source for single-family hou
 - Market page now shows 50/50 split: Map (left) and Housing Comps (right)
 - Competitive Projects and Macro Data in bottom row
 
+---
+
+## Part 2: User Management System
+
+### 7. User Management Panel ✅
+- Created `src/components/admin/UserManagementPanel.tsx` - Full CRUD UI
+- User list table with status, organization, last login, admin badge
+- Add User modal with all profile fields (username, email, name, company, phone, password)
+- Edit User modal with pre-populated form data
+- Reset Password modal (admin can set without knowing current password)
+- Delete User confirmation modal with user preview
+- Toggle active/inactive status inline with loading states
+- Self-action prevention (can't delete/deactivate yourself)
+- Toast notifications for all operations
+
+### 8. Backend API Updates ✅
+- Enhanced `UserManagementViewSet` in `views_auth.py` with full CRUD
+- Added `AdminUserCreateSerializer` for user creation with password validation
+- Added `AdminUserUpdateSerializer` for profile updates
+- Added `AdminSetPasswordSerializer` for admin password reset
+- Added `/api/auth/users/:id/set_password/` endpoint
+- Added `/api/auth/users/:id/activate/` and `/deactivate/` endpoints
+- Admin permission checks on all management operations
+
+### 9. Frontend API Client ✅
+- Created `src/lib/api/admin-users.ts` with type-safe API functions
+- Interfaces: `AdminUser`, `CreateUserData`, `UpdateUserData`, `SetPasswordData`
+- Functions: `fetchUsers`, `createUser`, `updateUser`, `deleteUser`, `setUserPassword`, `activateUser`, `deactivateUser`
+
+### 10. AdminModal Integration ✅
+- Added "Users" tab to System Administration modal
+- Imported `UserManagementPanel` component
+- Updated admin exports in `src/components/admin/index.ts`
+- Set `portal={false}` on CModal to preserve React context for auth
+
+### 11. Login System Updates ✅
+- Changed login from email-based to username-based authentication
+- Updated `UserLoginSerializer` to accept `username` field
+- Updated `LoginData` interface in AuthContext
+- Updated login page form UI
+
+### 12. Database Schema Fixes ✅
+- Added missing columns to `auth_user` table: phone, company, role, is_verified, created_at, updated_at, last_login_ip
+- Created `user_profile` table for extended user data
+- Created admin user for testing
+
 ## Files Modified
 
 ### New Files Created:
+**Part 1 - Redfin:**
 - `src/lib/redfinClient.ts` - Redfin API client (403 lines)
 - `src/app/api/projects/[projectId]/sf-comps/route.ts` - API route (297 lines)
 - `src/hooks/analysis/useSfComps.ts` - React Query hook (93 lines)
 - `src/components/analysis/SfCompsTile.tsx` - Tile component (293 lines)
 
+**Part 2 - User Management:**
+- `src/components/admin/UserManagementPanel.tsx` - Full user management UI (~850 lines)
+- `src/lib/api/admin-users.ts` - Type-safe API client for user management
+
 ### Files Modified:
+**Part 1 - Redfin:**
 - `src/app/components/Market/MarketMapView.tsx` - Added comps visualization
 - `src/app/projects/[projectId]/planning/market/page.tsx` - Layout changes
 - `archive/docs/.env.local.template` - Added Redfin config documentation
+
+**Part 2 - User Management:**
+- `src/components/admin/AdminModal.tsx` - Added Users tab, portal={false}
+- `src/components/admin/index.ts` - Added UserManagementPanel export
+- `src/contexts/AuthContext.tsx` - Changed LoginData to use username
+- `src/app/login/page.tsx` - Changed form to use username instead of email
+- `backend/apps/projects/serializers_auth.py` - Added admin serializers, username login
+- `backend/apps/projects/views_auth.py` - Enhanced UserManagementViewSet with CRUD
 
 ## Technical Details
 
@@ -101,9 +163,16 @@ Integrated Redfin's public CSV endpoint as the data source for single-family hou
 
 ## Next Steps
 
+**Redfin Comps:**
 - Consider adding builder data from alternative source (ATTOM, CoreLogic)
 - Add comp selection/favoriting functionality
 - Export comps to Excel
+
+**User Management:**
+- Add role-based access control (RBAC)
+- Add user activity logging/audit trail
+- Add bulk user import from CSV
+- Add email verification workflow
 
 ## Git Activity
 
@@ -116,6 +185,7 @@ Integrated Redfin's public CSV endpoint as the data source for single-family hou
 
 ## Testing Completed
 
+**Redfin Comps:**
 - [x] Comps load for project with valid lat/lng
 - [x] Map markers appear with correct price-tier colors
 - [x] Popup shows full property details
@@ -123,3 +193,14 @@ Integrated Redfin's public CSV endpoint as the data source for single-family hou
 - [x] Layer toggles hide/show markers correctly
 - [x] Table displays correctly without horizontal scroll
 - [x] External links open Redfin in new tab
+
+**User Management:**
+- [x] Login with username works
+- [x] Users tab loads user list
+- [x] Add User modal creates new user
+- [x] Edit User modal updates user details
+- [x] Reset Password modal sets new password
+- [x] Delete User modal with confirmation
+- [x] Active/Inactive toggle works
+- [x] Toast notifications display
+- [x] Self-action prevention (can't delete yourself)
