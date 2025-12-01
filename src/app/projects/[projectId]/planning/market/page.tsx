@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useMarketCompetitors, useMarketMacroData, useCreateCompetitor, useUpdateCompetitor, useDeleteCompetitor, useSaveMarketMacroData, MarketCompetitiveProject, MarketMacroData } from '@/hooks/useMarketData';
+import { useMarketCompetitors, useCreateCompetitor, useUpdateCompetitor, useDeleteCompetitor, MarketCompetitiveProject } from '@/hooks/useMarketData';
 import MarketMapView from '@/app/components/market/MarketMapView';
 import SfCompsTile from '@/components/analysis/SfCompsTile';
 
@@ -13,20 +13,14 @@ export default function MarketAnalysisPage() {
   // State
   const [showCompForm, setShowCompForm] = useState(false);
   const [editingComp, setEditingComp] = useState<MarketCompetitiveProject | null>(null);
-  const [showLandscaperAnalysis, setShowLandscaperAnalysis] = useState(false);
 
   // Queries
   const { data: competitors = [], isLoading: loadingComps } = useMarketCompetitors(projectId);
-  const { data: macroData = [], isLoading: loadingMacro } = useMarketMacroData(projectId);
 
   // Mutations
   const createCompetitor = useCreateCompetitor();
   const updateCompetitor = useUpdateCompetitor();
   const deleteCompetitor = useDeleteCompetitor();
-  const saveMacroData = useSaveMarketMacroData();
-
-  // Get the most recent macro data entry
-  const currentMacroData = macroData.length > 0 ? macroData[0] : null;
 
   // Form state for new/edit competitor
   const [compForm, setCompForm] = useState<Partial<MarketCompetitiveProject>>({
@@ -42,20 +36,6 @@ export default function MarketAnalysisPage() {
     data_source: 'manual',
     notes: ''
   });
-
-  // Form state for macro data
-  const [macroForm, setMacroForm] = useState<Partial<MarketMacroData>>(
-    currentMacroData || {
-      population_growth_rate: undefined,
-      employment_trend: 'stable',
-      household_formation_rate: undefined,
-      building_permits_annual: undefined,
-      median_income: undefined,
-      data_year: new Date().getFullYear(),
-      data_source: 'manual',
-      notes: ''
-    }
-  );
 
   // Handle competitor form submission
   const handleSaveCompetitor = async () => {
@@ -106,21 +86,6 @@ export default function MarketAnalysisPage() {
     }
   };
 
-  // Handle macro data save
-  const handleSaveMacroData = async () => {
-    try {
-      await saveMacroData.mutateAsync({
-        projectId,
-        id: currentMacroData?.id,
-        data: { ...macroForm, project: projectId } as MarketMacroData
-      });
-      alert('Macro data saved successfully');
-    } catch (error) {
-      console.error('Failed to save macro data:', error);
-      alert('Failed to save macro data');
-    }
-  };
-
   // Start editing a competitor
   const handleEditCompetitor = (comp: MarketCompetitiveProject) => {
     setEditingComp(comp);
@@ -145,10 +110,10 @@ export default function MarketAnalysisPage() {
   return (
     <div className="d-flex flex-column gap-3">
       {/* Top Row - Map (left 50%) and Housing Comps (right 50%) */}
-      <div className="row g-3">
+      <div className="row g-3 align-items-stretch" style={{ marginTop: '1rem' }}>
         {/* Left Panel - Map */}
-        <div className="col-lg-6 col-md-6">
-          <div className="card h-100">
+        <div className="col-lg-6 col-md-6 d-flex">
+          <div className="card h-100 w-100" style={{ minHeight: '620px' }}>
             <div className="card-header">
               <h5 className="mb-0">Competitive Project Map</h5>
             </div>
@@ -156,14 +121,14 @@ export default function MarketAnalysisPage() {
               <MarketMapView
                 projectId={projectId}
                 competitors={competitors}
-                height="500px"
+                height="600px"
               />
             </div>
           </div>
         </div>
 
         {/* Right Panel - Housing Price Comparables */}
-        <div className="col-lg-6 col-md-6">
+        <div className="col-lg-6 col-md-6 d-flex">
           <SfCompsTile projectId={projectId} />
         </div>
       </div>
@@ -397,129 +362,36 @@ export default function MarketAnalysisPage() {
           </div>
         </div>
 
-        {/* Market Macro Data Section */}
+        {/* Landscaper Insights Section */}
         <div className="col-lg-6 col-md-6">
           <div className="card h-100">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Market Macro Data</h5>
-              <button className="btn btn-sm btn-secondary" disabled>
-                <i className="bi bi-robot me-1"></i>
-                Import from Landscaper
-              </button>
+            <div className="card-header d-flex align-items-center gap-2">
+              <i className="bi bi-robot fs-5 text-primary"></i>
+              <h5 className="mb-0">Landscaper AI</h5>
             </div>
-
             <div className="card-body">
-              <div className="mb-2">
-                <label className="form-label small">Data Year</label>
-                <input
-                  type="number"
-                  className="form-control form-control-sm"
-                  value={macroForm.data_year || new Date().getFullYear()}
-                  onChange={(e) => setMacroForm({ ...macroForm, data_year: parseInt(e.target.value) })}
-                />
+              <div className="mb-3">
+                <p className="mb-1 text-muted small">Upload market docs and let Landscaper summarize risks, comps, and positioning.</p>
+                <div className="border-2 border-dashed rounded p-4 text-center" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+                  <i className="bi bi-cloud-upload fs-4 text-muted d-block mb-2"></i>
+                  <p className="mb-1">Drag and drop files here</p>
+                  <p className="text-muted small mb-3">PDF, Excel, Word, images</p>
+                  <button className="btn btn-sm btn-primary">Select Files</button>
+                </div>
               </div>
-
-              <div className="mb-2">
-                <label className="form-label small">Population Growth Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                className="form-control form-control-sm"
-                value={macroForm.population_growth_rate || ''}
-                onChange={(e) => setMacroForm({ ...macroForm, population_growth_rate: parseFloat(e.target.value) })}
-              />
-            </div>
-
-            <div className="mb-2">
-              <label className="form-label small">Employment Trend</label>
-              <select
-                className="form-select form-select-sm"
-                value={macroForm.employment_trend || 'stable'}
-                onChange={(e) => setMacroForm({ ...macroForm, employment_trend: e.target.value as any })}
-              >
-                <option value="growing">Growing</option>
-                <option value="stable">Stable</option>
-                <option value="declining">Declining</option>
-              </select>
-            </div>
-
-            <div className="mb-2">
-              <label className="form-label small">Household Formation Rate (%)</label>
-              <input
-                type="number"
-                step="0.1"
-                className="form-control form-control-sm"
-                value={macroForm.household_formation_rate || ''}
-                onChange={(e) => setMacroForm({ ...macroForm, household_formation_rate: parseFloat(e.target.value) })}
-              />
-            </div>
-
-            <div className="mb-2">
-              <label className="form-label small">Building Permits (Annual)</label>
-              <input
-                type="number"
-                className="form-control form-control-sm"
-                value={macroForm.building_permits_annual || ''}
-                onChange={(e) => setMacroForm({ ...macroForm, building_permits_annual: parseInt(e.target.value) })}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label small">Median Income</label>
-              <input
-                type="number"
-                className="form-control form-control-sm"
-                value={macroForm.median_income || ''}
-                onChange={(e) => setMacroForm({ ...macroForm, median_income: parseFloat(e.target.value) })}
-              />
-            </div>
-
-            <button
-              className="btn btn-sm btn-success w-100"
-              onClick={handleSaveMacroData}
-              disabled={saveMacroData.isPending}
-            >
-              Save Macro Data
-            </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Panel - Landscaper Analysis (Collapsible) */}
-      <div>
-        <div className="card">
-          <div
-            className="card-header d-flex justify-content-between align-items-center"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setShowLandscaperAnalysis(!showLandscaperAnalysis)}
-          >
-            <h5 className="mb-0">
-              <i className="bi bi-robot me-2"></i>
-              Landscaper Market Analysis
-            </h5>
-            <i className={`bi bi-chevron-${showLandscaperAnalysis ? 'up' : 'down'}`}></i>
-          </div>
-
-          {showLandscaperAnalysis && (
-            <div className="card-body">
-              <div className="alert alert-info">
-                <strong>Placeholder:</strong> AI-generated market analysis will appear here.
-                <ul className="mt-2 mb-0">
-                  <li>Market summary based on competitive data</li>
-                  <li>Recommended product mix</li>
-                  <li>Estimated absorption rates by product type</li>
-                  <li>Competitive positioning analysis</li>
-                  <li>Risk flags and opportunity indicators</li>
+              <div className="mb-3">
+                <h6 className="fw-semibold mb-2">What you’ll get</h6>
+                <ul className="small mb-0">
+                  <li>Market summary and risk flags</li>
+                  <li>Recommended product mix and absorption</li>
+                  <li>Comparable set callouts with pricing bands</li>
                 </ul>
               </div>
-
-              <button className="btn btn-primary" disabled>
-                <i className="bi bi-arrow-repeat me-2"></i>
-                Refresh Analysis
+              <button className="btn btn-outline-primary w-100" disabled>
+                Run Landscaper Analysis
               </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

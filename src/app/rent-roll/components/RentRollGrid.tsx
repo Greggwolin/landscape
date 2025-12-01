@@ -12,6 +12,7 @@ import {
   leasesAPI,
   unitsAPI,
 } from '@/lib/api/multifamily'
+import { FloorplanUpdateDialog } from './FloorplanUpdateDialog'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -139,6 +140,15 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   const [notification, setNotification] = useState<{
     message: string
     type: 'success' | 'error'
+  } | null>(null)
+  const [floorplanDialogOpen, setFloorplanDialogOpen] = useState(false)
+  const [floorplanCheck, setFloorplanCheck] = useState<any>(null)
+  const [pendingUpdate, setPendingUpdate] = useState<{
+    leaseId: number
+    field: string
+    newValue: any
+    oldValue: any
+    event: CellValueChangedEvent<Lease>
   } | null>(null)
 
   // Show notification helper
@@ -661,9 +671,33 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
       // Determine which API to call based on field
       const isUnitField = ['unit_number', 'building_name', 'bedrooms', 'bathrooms', 'square_feet', 'other_features'].includes(field)
+      const isFloorplanAffectingField = ['bedrooms', 'bathrooms', 'square_feet'].includes(field)
 
-      if (isUnitField) {
-        // Update unit
+      if (isUnitField && isFloorplanAffectingField) {
+        // Check if this differs from the floorplan
+        const checkResponse = await leasesAPI.checkFloorplanDiff(leaseId, {
+          [field]: newValue,
+          unit_type: updatedLease.unit_type
+        })
+
+        if (checkResponse.differs_from_floorplan) {
+          // Store the pending update and show dialog
+          setPendingUpdate({
+            leaseId,
+            field,
+            newValue,
+            oldValue,
+            event
+          })
+          setFloorplanCheck(checkResponse)
+          setFloorplanDialogOpen(true)
+          return
+        } else {
+          // No difference, just update the unit
+          await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
+        }
+      } else if (isUnitField) {
+        // Update unit (non-floorplan fields)
         await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
       } else {
         // Update lease
@@ -731,6 +765,51 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   const handleRefresh = useCallback(async () => {
     await mutate()
   }, [mutate])
+
+  // Handle floorplan dialog confirmation
+  const handleFloorplanConfirm = useCallback(async (
+    action: 'create' | 'update' | 'none',
+    newUnitTypeCode?: string
+  ) => {
+    if (!pendingUpdate) return
+
+    try {
+      const { leaseId, field, newValue } = pendingUpdate
+
+      // Call the update-with-floorplan endpoint
+      await leasesAPI.updateWithFloorplan(leaseId, {
+        unit_fields: { [field]: newValue },
+        floorplan_action: action,
+        new_unit_type_code: newUnitTypeCode
+      })
+
+      // Clear pending state
+      setPendingUpdate(null)
+      setFloorplanCheck(null)
+      setFloorplanDialogOpen(false)
+
+      // Refresh data
+      await mutate()
+      showNotification('✅ Saved successfully', 'success')
+    } catch (error) {
+      console.error('Failed to save with floorplan:', error)
+      // Revert the cell value
+      if (pendingUpdate.event) {
+        pendingUpdate.event.node.setDataValue(pendingUpdate.field, pendingUpdate.oldValue)
+      }
+      showNotification(`❌ Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    }
+  }, [pendingUpdate, mutate, showNotification])
+
+  // Handle floorplan dialog cancellation
+  const handleFloorplanCancel = useCallback(() => {
+    if (pendingUpdate && pendingUpdate.event) {
+      // Revert the cell value
+      pendingUpdate.event.node.setDataValue(pendingUpdate.field, pendingUpdate.oldValue)
+    }
+    setPendingUpdate(null)
+    setFloorplanCheck(null)
+  }, [pendingUpdate])
 
   // Loading state
   if (!response && !error) {
@@ -903,6 +982,16 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
           />
         </div>
       </div>
+
+      {/* Floorplan Update Dialog */}
+      <FloorplanUpdateDialog
+        open={floorplanDialogOpen}
+        onOpenChange={setFloorplanDialogOpen}
+        floorplanCheck={floorplanCheck}
+        proposedChanges={pendingUpdate ? { [pendingUpdate.field]: pendingUpdate.newValue } : {}}
+        onConfirm={handleFloorplanConfirm}
+        onCancel={handleFloorplanCancel}
+      />
     </div>
   )
 }

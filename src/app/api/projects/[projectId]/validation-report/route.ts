@@ -34,6 +34,7 @@ interface PhasePricingRow {
   phase_id: number | null;
   avg_price_per_ff: number;
   gross_revenue: number;
+  improvement_offset_total: number;
   total_commissions: number;
   closing_cost_per_lot: number;
   total_closing_costs: number;
@@ -49,6 +50,8 @@ interface OtherLandRow {
   acres_gross: number;
   price_per_unit: number;
   gross_parcel_price: number;
+  improvement_offset_total: number;
+  commission_amount: number;
   net_sale_proceeds: number;
 }
 
@@ -148,6 +151,7 @@ export async function GET(
 
     // 3. Fetch phase pricing/revenue data for SFD lots only
     // Note: closing costs now come from global benchmarks, not parcel-level data
+    // improvement_offset_total is the "subdivision cost" - credit given to buyer for improvements they complete
     const phasePricing = await sql<PhasePricingRow>`
       SELECT
         p.phase_id,
@@ -157,6 +161,7 @@ export async function GET(
           ELSE 0
         END::numeric as avg_price_per_ff,
         COALESCE(SUM(psa.gross_parcel_price), 0)::numeric as gross_revenue,
+        COALESCE(SUM(psa.improvement_offset_total), 0)::numeric as improvement_offset_total,
         COALESCE(SUM(psa.commission_amount), 0)::numeric as total_commissions,
         0::numeric as closing_cost_per_lot,
         0::numeric as total_closing_costs,
@@ -232,6 +237,8 @@ export async function GET(
         COALESCE(p.acres_gross, 0)::numeric as acres_gross,
         COALESCE(psa.inflated_price_per_unit, psa.base_price_per_unit, 0)::numeric as price_per_unit,
         COALESCE(psa.gross_parcel_price, 0)::numeric as gross_parcel_price,
+        COALESCE(psa.improvement_offset_total, 0)::numeric as improvement_offset_total,
+        COALESCE(psa.commission_amount, 0)::numeric as commission_amount,
         COALESCE(psa.net_sale_proceeds, 0)::numeric as net_sale_proceeds
       FROM landscape.tbl_parcel p
       LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
@@ -373,11 +380,17 @@ export async function GET(
       const netProceeds = Number(parcel.net_sale_proceeds) || 0;
       const acres = Number(parcel.acres_gross) || 0;
       const pricePerUnit = Number(parcel.price_per_unit) || 0;
+      const improvementOffset = Number(parcel.improvement_offset_total) || 0;
+      const commission = Number(parcel.commission_amount) || 0;
 
       phase.otherLandAcres += acres;
       phase.otherLandUnits += units;
       phase.otherLandGrossRevenue += grossPrice;
       phase.otherLandNetRevenue += netProceeds;
+      // Add Other Land improvement offset to subdivision cost
+      phase.subdivisionCost += improvementOffset;
+      // Add Other Land commission to phase commissions
+      phase.commissions += commission;
 
       phase.otherLandParcels.push({
         parcelCode: parcel.parcel_code,
@@ -428,7 +441,11 @@ export async function GET(
         phase.pricePerFrontFoot = Number(pricing.avg_price_per_ff) || 0;
         phase.grossRevenue = Number(pricing.gross_revenue) || 0;
         phase.grossRevenuePerLot = phase.lots > 0 ? phase.grossRevenue / phase.lots : 0;
-        phase.commissions = Number(pricing.total_commissions) || 0;
+        // Add SFD commissions to any already accumulated from Other Land parcels
+        phase.commissions += Number(pricing.total_commissions) || 0;
+
+        // Add SFD improvement offset to any already accumulated from Other Land parcels
+        phase.subdivisionCost += Number(pricing.improvement_offset_total) || 0;
 
         // Calculate closing costs with inflation applied per-parcel based on sale period
         const salePeriods = phaseSalePeriods.get(pricing.phase_id) || [];
@@ -481,9 +498,7 @@ export async function GET(
     };
 
     // Add budget data with cost inflation applied based on timing
-    // Track project-level costs (NULL phase_id) for proportional allocation
-    const projectLevelBudgets: { activity: string; amount: number }[] = [];
-
+    // Only phase-specific budgets are used - project-level budgets (NULL phase_id) are not allocated
     for (const budget of phaseBudgets) {
       const baseAmount = Number(budget.total_amount) || 0;
       if (baseAmount === 0) continue;
@@ -498,23 +513,9 @@ export async function GET(
       if (phase) {
         // Phase-specific budget - add directly
         addBudgetToPhase(phase, amount, activity);
-      } else {
-        // Project-level budget (NULL phase_id) - track for proportional allocation
-        projectLevelBudgets.push({ activity, amount });
       }
-    }
-
-    // Allocate project-level budget items proportionally by gross acres
-    if (projectLevelBudgets.length > 0 && projectTotalAcres > 0) {
-      for (const phase of phaseMap.values()) {
-        const phaseGrossAcres = phaseAcresMap.get(phase.phaseId) || 0;
-        const acresShare = phaseGrossAcres / projectTotalAcres;
-
-        for (const budget of projectLevelBudgets) {
-          const allocatedAmount = budget.amount * acresShare;
-          addBudgetToPhase(phase, allocatedAmount, budget.activity);
-        }
-      }
+      // Project-level budgets (NULL phase_id) are intentionally not allocated to phases
+      // Planning & Development costs are parcel-specific, not allocated across parcels
     }
 
     // Allocate acquisition cost proportionally by gross acres
@@ -533,12 +534,8 @@ export async function GET(
       // Calculate combined revenue totals
       phase.totalGrossRevenue = phase.grossRevenue + phase.otherLandGrossRevenue;
 
-      // Subdivision cost is the sum of development costs (planning, engineering, development, operations)
-      // This represents the costs to subdivide/develop the land
-      phase.subdivisionCost =
-        phase.planningEngineering +
-        phase.development +
-        phase.operations;
+      // subdivisionCost is already set from improvement_offset_total in the pricing loop
+      // It represents the credit given to buyer for improvements they'll complete post-closing
 
       // Gross sale proceeds = gross revenue minus subdivision costs (before commissions/closing)
       phase.grossSaleProceeds = phase.totalGrossRevenue - phase.subdivisionCost;

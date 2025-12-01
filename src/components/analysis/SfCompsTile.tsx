@@ -136,8 +136,8 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
     const stats = data.stats;
 
     return (
-      <div className="row gy-2">
-        <div className="col-md-3 col-sm-6">
+                  <div className="row gy-2">
+                    <div className="col-md-3 col-sm-6">
           <div className="text-muted small">Median Price</div>
           <div className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
             {formatCurrencyCompact(stats.medianPrice)}
@@ -228,7 +228,7 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
                   <thead>
                     <tr style={{ color: 'var(--cui-secondary-color)' }}>
                       <th className="text-center" style={{ width: 55 }}>Sold</th>
-                      <th>Address</th>
+                      <th style={{ width: 200 }}>Address</th>
                       <th className="text-center" style={{ width: 50 }}>Year</th>
                       <th className="text-center" style={{ width: 35 }}>Bd</th>
                       <th className="text-center" style={{ width: 35 }}>Ba</th>
@@ -244,7 +244,11 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
                       <tr key={comp.mlsId}>
                         <td className="text-center text-muted">{formatDate(comp.saleDate)}</td>
                         <td>
-                          <div className="text-truncate" title={`${comp.address || ''}, ${[comp.city, comp.state].filter(Boolean).join(', ')}`}>
+                          <div
+                            className="text-truncate"
+                            title={`${comp.address || ''}, ${[comp.city, comp.state].filter(Boolean).join(', ')}`}
+                            style={{ maxWidth: 210, whiteSpace: 'nowrap' }}
+                          >
                             <span className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>{comp.address || '—'}</span>
                             <span className="text-muted">, {[comp.city, comp.state].filter(Boolean).join(', ')}</span>
                           </div>

@@ -35,11 +35,26 @@ const INDENT = {
   TOTAL: 36,           // Totals (additional 2 spaces = 12px more)
 };
 
+// Unit column widths
+const UNIT_COL_WIDTH = 85;
+
+/**
+ * Format a per-unit value ($/Unit, $/FrFt, $/Acre, $/SF)
+ * Returns '-' if divisor is 0 to avoid divide-by-zero
+ */
+function formatUnitValue(value: number, divisor: number): string {
+  if (divisor === 0 || value === 0) return '-';
+  const unitValue = value / divisor;
+  return formatValidationCurrency(unitValue);
+}
+
+// Acres to square feet conversion
+const SQFT_PER_ACRE = 43560;
+
 // Section IDs for accordion state
 type SectionId =
   | 'physical'
   | 'revenue'
-  | 'combined-revenue'
   | 'schedule'
   | 'budget'
   | 'cost-totals'
@@ -74,7 +89,9 @@ interface DataRowProps {
   highlight?: boolean;
   indent?: IndentLevel;
   textColor?: string;
-  topBorder?: boolean; // Add thick top border to separate use types
+  bottomBorder?: boolean; // Add underline after this row
+  expandedPhases?: Record<string, boolean>;
+  showUnitCols?: boolean; // Whether to show unit columns when expanded
 }
 
 function DataRow({
@@ -87,7 +104,9 @@ function DataRow({
   highlight = false,
   indent = 'none',
   textColor,
-  topBorder = false,
+  bottomBorder = false,
+  expandedPhases = {},
+  showUnitCols = false,
 }: DataRowProps) {
   const formatValue = (value: number): string => {
     switch (format) {
@@ -104,19 +123,66 @@ function DataRow({
 
   const rowStyle: React.CSSProperties = {
     ...(highlight ? { backgroundColor: 'var(--cui-tertiary-bg)', fontWeight: 600 } : {}),
-    ...(topBorder ? { borderTop: '2px solid var(--cui-border-color)' } : {}),
   };
 
+  // Text decoration for underlined values
+  const textDecoration = bottomBorder ? 'underline' : undefined;
+
   // Determine padding based on indent level
-  // Totals get the deepest indent, line items get standard indent
+  // Use explicit indent if provided, otherwise default to section header level
   const getPaddingLeft = (): number => {
-    if (highlight) return INDENT.TOTAL;  // Totals always get deepest indent
     if (indent === 'line_item') return INDENT.LINE_ITEM;
     if (indent === 'total') return INDENT.TOTAL;
-    return INDENT.SECTION_HEADER;  // Default: same as section header
+    return INDENT.SECTION_HEADER;  // Default: same as section header (including highlighted rows)
   };
 
   const labelStyle: React.CSSProperties = { paddingLeft: `${getPaddingLeft()}px` };
+
+  // Unit column style - smaller font than parent columns
+  const unitCellStyle: React.CSSProperties = {
+    textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums',
+    fontSize: '0.7rem',
+    color: 'var(--cui-secondary-color)',
+    backgroundColor: 'var(--cui-tertiary-bg)',
+    padding: '2px 6px',
+  };
+
+  // Render unit columns for a phase if that phase is expanded
+  // If showUnitCols is false or format is percent, render empty cells to maintain table structure
+  const renderUnitCols = (phase: PhaseData, phaseKey: string) => {
+    if (!expandedPhases[phaseKey]) return null;
+
+    const unitCellWithDecoration: React.CSSProperties = {
+      ...unitCellStyle,
+      textDecoration,
+    };
+
+    // If this row doesn't show unit values or is a percent format, render empty cells
+    if (!showUnitCols || format === 'percent') {
+      return (
+        <>
+          <td style={unitCellWithDecoration}>-</td>
+          <td style={unitCellWithDecoration}>-</td>
+          <td style={unitCellWithDecoration}>-</td>
+          <td style={unitCellWithDecoration}>-</td>
+        </>
+      );
+    }
+
+    const value = getValue(phase);
+    const totalUnits = phase.lots + phase.otherLandUnits;
+    const totalAcres = phase.acres + phase.otherLandAcres;
+    const totalSF = totalAcres * SQFT_PER_ACRE;
+    return (
+      <>
+        <td style={unitCellWithDecoration}>{formatUnitValue(value, totalUnits)}</td>
+        <td style={unitCellWithDecoration}>{formatUnitValue(value, phase.frontFeet)}</td>
+        <td style={unitCellWithDecoration}>{formatUnitValue(value, totalSF)}</td>
+        <td style={unitCellWithDecoration}>{formatUnitValue(value, totalAcres)}</td>
+      </>
+    );
+  };
 
   return (
     <tr style={rowStyle}>
@@ -131,16 +197,19 @@ function DataRow({
         {label}
       </td>
       {phases.map((phase, idx) => (
-        <td
-          key={idx}
-          style={{
-            textAlign: 'right',
-            fontVariantNumeric: 'tabular-nums',
-            color: getValue(phase) < 0 ? 'var(--cui-danger)' : textColor,
-          }}
-        >
-          {formatValue(getValue(phase))}
-        </td>
+        <React.Fragment key={idx}>
+          <td
+            style={{
+              textAlign: 'right',
+              fontVariantNumeric: 'tabular-nums',
+              color: getValue(phase) < 0 ? 'var(--cui-danger)' : textColor,
+              textDecoration,
+            }}
+          >
+            {formatValue(getValue(phase))}
+          </td>
+          {renderUnitCols(phase, phase.phaseName)}
+        </React.Fragment>
       ))}
       <td
         style={{
@@ -150,10 +219,12 @@ function DataRow({
           backgroundColor: 'var(--cui-light-bg-subtle)',
           borderLeft: '2px solid var(--cui-border-color)',
           color: getValue(totals) < 0 ? 'var(--cui-danger)' : textColor,
+          textDecoration,
         }}
       >
         {formatValue(getValue(totals))}
       </td>
+      {renderUnitCols(totals, 'total')}
     </tr>
   );
 }
@@ -164,13 +235,14 @@ interface SectionHeaderProps {
   colSpan: number;
   isExpanded: boolean;
   onToggle: () => void;
+  extraColSpan?: number; // Additional columns for expanded unit columns
 }
 
-function SectionHeader({ title, colSpan, isExpanded, onToggle }: SectionHeaderProps) {
+function SectionHeader({ title, colSpan, isExpanded, onToggle, extraColSpan = 0 }: SectionHeaderProps) {
   return (
     <tr>
       <td
-        colSpan={colSpan}
+        colSpan={colSpan + extraColSpan}
         onClick={onToggle}
         style={{
           backgroundColor: 'var(--cui-dark-bg-subtle)',
@@ -202,9 +274,8 @@ const DEFAULT_DATA_WIDTH = 110;
 // All sections expanded by default
 const ALL_SECTIONS: SectionId[] = [
   'physical',
-  'revenue',
-  'combined-revenue',
   'schedule',
+  'revenue',
   'budget',
   'cost-totals',
   'profit',
@@ -235,6 +306,9 @@ export default function ValidationReport({ projectId }: Props) {
   // State for accordion sections - all expanded by default
   const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(new Set(ALL_SECTIONS));
 
+  // State for expanded unit cost columns - keyed by phase name or 'total'
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({});
+
   const toggleSection = useCallback((sectionId: SectionId) => {
     setExpandedSections(prev => {
       const next = new Set(prev);
@@ -248,6 +322,14 @@ export default function ValidationReport({ projectId }: Props) {
   }, []);
 
   const isSectionExpanded = (sectionId: SectionId) => expandedSections.has(sectionId);
+
+  // Toggle unit cost columns for a phase
+  const togglePhaseExpanded = useCallback((phaseKey: string) => {
+    setExpandedPhases(prev => ({
+      ...prev,
+      [phaseKey]: !prev[phaseKey],
+    }));
+  }, []);
 
   // Initialize column widths when data loads
   const initColumnWidths = useCallback((phaseCount: number) => {
@@ -448,10 +530,10 @@ export default function ValidationReport({ projectId }: Props) {
   }, [phases, allPhases, totals]);
 
   // Export to Excel handler - must be after phases and filteredTotals are defined
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     if (!data?.data || !filteredTotals) return;
 
-    exportProjectCostsToExcel({
+    await exportProjectCostsToExcel({
       projectName: data.data.projectName,
       generatedAt: data.data.generatedAt,
       phases,
@@ -459,6 +541,16 @@ export default function ValidationReport({ projectId }: Props) {
       level2Label: labels.level2Label,
     });
   }, [data?.data, phases, filteredTotals, labels.level2Label]);
+
+  // Calculate extra columns for expanded unit columns (4 per expanded phase/total: $/Unit, $/FrFt, $/SF, $/Acre)
+  const expandedUnitColCount = useMemo(() => {
+    let count = 0;
+    phases.forEach(p => {
+      if (expandedPhases[p.phaseName]) count += 4;
+    });
+    if (expandedPhases['total']) count += 4;
+    return count;
+  }, [phases, expandedPhases]);
 
   // Loading state
   if (isLoading) {
@@ -513,6 +605,7 @@ export default function ValidationReport({ projectId }: Props) {
     fontSize: '0.8125rem',
     marginBottom: 0,
     tableLayout: 'fixed',
+    width: 'auto',  // Allow table to shrink when fewer columns are visible
   };
 
   const headerStyle: React.CSSProperties = {
@@ -670,43 +763,148 @@ export default function ValidationReport({ projectId }: Props) {
         <CCardBody className="p-0" style={{ maxHeight: '80vh', overflowX: 'auto', overflowY: 'auto' }}>
           <CTable small bordered hover style={tableStyle}>
             <colgroup>
-              {headerColumns.map((_, idx) => (
-                <col
-                  key={idx}
-                  style={{
-                    width: columnWidths[idx] ? `${columnWidths[idx]}px` : (idx === 0 ? `${DEFAULT_LABEL_WIDTH}px` : `${DEFAULT_DATA_WIDTH}px`),
-                  }}
-                />
+              {/* Label column */}
+              <col style={{ width: columnWidths[0] ? `${columnWidths[0]}px` : `${DEFAULT_LABEL_WIDTH}px` }} />
+              {/* Phase columns with optional unit cols */}
+              {phases.map((phase, idx) => (
+                <React.Fragment key={phase.phaseName}>
+                  <col style={{ width: columnWidths[idx + 1] ? `${columnWidths[idx + 1]}px` : `${DEFAULT_DATA_WIDTH}px` }} />
+                  {expandedPhases[phase.phaseName] && (
+                    <>
+                      <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                      <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                      <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                      <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                    </>
+                  )}
+                </React.Fragment>
               ))}
+              {/* Total column with optional unit cols */}
+              <col style={{ width: columnWidths[phases.length + 1] ? `${columnWidths[phases.length + 1]}px` : `${DEFAULT_DATA_WIDTH}px` }} />
+              {expandedPhases['total'] && (
+                <>
+                  <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                  <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                  <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                  <col style={{ width: `${UNIT_COL_WIDTH}px` }} />
+                </>
+              )}
             </colgroup>
             <thead>
               <tr>
-                {headerColumns.map((col, idx) => (
-                  <th
-                    key={idx}
-                    style={{
-                      ...headerStyle,
-                      textAlign: idx === 0 ? 'left' : 'center',
-                      paddingLeft: idx === 0 ? `${INDENT.SECTION_HEADER}px` : undefined,
-                      borderRight: idx === 0 ? '2px solid var(--cui-border-color)' : undefined,
-                      borderLeft: idx === headerColumns.length - 1 ? '2px solid var(--cui-border-color)' : undefined,
-                      position: 'relative',
-                    }}
-                  >
-                    {col}
-                    {/* Resize handle */}
-                    <div
-                      style={resizeHandleStyle}
-                      onMouseDown={(e) => handleResizeStart(e, idx)}
-                      onMouseEnter={(e) => {
-                        (e.target as HTMLElement).style.backgroundColor = 'var(--cui-primary)';
+                {/* Label column header */}
+                <th
+                  style={{
+                    ...headerStyle,
+                    textAlign: 'left',
+                    paddingLeft: `${INDENT.SECTION_HEADER}px`,
+                    borderRight: '2px solid var(--cui-border-color)',
+                    position: 'relative',
+                  }}
+                >
+                  {`${labels.level2Label} ID`}
+                  <div
+                    style={resizeHandleStyle}
+                    onMouseDown={(e) => handleResizeStart(e, 0)}
+                    onMouseEnter={(e) => { (e.target as HTMLElement).style.backgroundColor = 'var(--cui-primary)'; }}
+                    onMouseLeave={(e) => { (e.target as HTMLElement).style.backgroundColor = 'transparent'; }}
+                  />
+                </th>
+                {/* Phase column headers with toggle and optional unit headers */}
+                {phases.map((phase, idx) => {
+                  const phaseKey = phase.phaseName;
+                  const isExpanded = expandedPhases[phaseKey] || false;
+                  return (
+                    <React.Fragment key={phaseKey}>
+                      <th
+                        style={{
+                          ...headerStyle,
+                          textAlign: 'center',
+                          position: 'relative',
+                          minWidth: `${DEFAULT_DATA_WIDTH}px`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePhaseExpanded(phaseKey); }}
+                            style={{
+                              background: 'none',
+                              border: '1px solid var(--cui-border-color)',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              padding: '0 4px',
+                              fontSize: '0.75rem',
+                              lineHeight: 1.2,
+                              color: 'var(--cui-body-color)',
+                            }}
+                            title={isExpanded ? 'Hide unit columns' : 'Show $/Unit, $/FrFt, $/Acre'}
+                          >
+                            {isExpanded ? '−' : '+'}
+                          </button>
+                          <span>{`${labels.level2Label} ${phaseKey}`}</span>
+                        </div>
+                        <div
+                          style={resizeHandleStyle}
+                          onMouseDown={(e) => handleResizeStart(e, idx + 1)}
+                          onMouseEnter={(e) => { (e.target as HTMLElement).style.backgroundColor = 'var(--cui-primary)'; }}
+                          onMouseLeave={(e) => { (e.target as HTMLElement).style.backgroundColor = 'transparent'; }}
+                        />
+                      </th>
+                      {isExpanded && (
+                        <>
+                          <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/Unit</th>
+                          <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/FrFt</th>
+                          <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/SF</th>
+                          <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/Acre</th>
+                        </>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {/* Total column header with toggle and optional unit headers */}
+                <th
+                  style={{
+                    ...headerStyle,
+                    textAlign: 'center',
+                    borderLeft: '2px solid var(--cui-border-color)',
+                    position: 'relative',
+                    minWidth: `${DEFAULT_DATA_WIDTH}px`,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); togglePhaseExpanded('total'); }}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--cui-border-color)',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        padding: '0 4px',
+                        fontSize: '0.75rem',
+                        lineHeight: 1.2,
+                        color: 'var(--cui-body-color)',
                       }}
-                      onMouseLeave={(e) => {
-                        (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                      }}
-                    />
-                  </th>
-                ))}
+                      title={expandedPhases['total'] ? 'Hide unit columns' : 'Show $/Unit, $/FrFt, $/Acre'}
+                    >
+                      {expandedPhases['total'] ? '−' : '+'}
+                    </button>
+                    <span>TOTAL</span>
+                  </div>
+                  <div
+                    style={resizeHandleStyle}
+                    onMouseDown={(e) => handleResizeStart(e, phases.length + 1)}
+                    onMouseEnter={(e) => { (e.target as HTMLElement).style.backgroundColor = 'var(--cui-primary)'; }}
+                    onMouseLeave={(e) => { (e.target as HTMLElement).style.backgroundColor = 'transparent'; }}
+                  />
+                </th>
+                {expandedPhases['total'] && (
+                  <>
+                    <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/Unit</th>
+                    <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/FrFt</th>
+                    <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/SF</th>
+                    <th style={{ ...headerStyle, fontSize: '0.65rem', padding: '4px 2px', backgroundColor: 'var(--cui-tertiary-bg)' }}>$/Acre</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -714,15 +912,16 @@ export default function ValidationReport({ projectId }: Props) {
               <SectionHeader
                 title="Physical Metrics"
                 colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
                 isExpanded={isSectionExpanded('physical')}
                 onToggle={() => toggleSection('physical')}
               />
               {isSectionExpanded('physical') && (
                 <>
                   {/* SFD Lots */}
-                  <DataRow label="SFD Acres" phases={phases} totals={filteredTotals} getValue={(p) => p.acres} format="number" indent="line_item" />
-                  <DataRow label="SFD Lots" phases={phases} totals={filteredTotals} getValue={(p) => p.lots} format="number" indent="line_item" />
-                  <DataRow label="SFD Front Feet" phases={phases} totals={filteredTotals} getValue={(p) => p.frontFeet} format="number" indent="line_item" />
+                  <DataRow label="SFD Acres" phases={phases} totals={filteredTotals} getValue={(p) => p.acres} format="number" indent="line_item" expandedPhases={expandedPhases} />
+                  <DataRow label="SFD Lots" phases={phases} totals={filteredTotals} getValue={(p) => p.lots} format="number" indent="line_item" expandedPhases={expandedPhases} />
+                  <DataRow label="SFD Front Feet" phases={phases} totals={filteredTotals} getValue={(p) => p.frontFeet} format="number" indent="line_item" expandedPhases={expandedPhases} />
 
                   {/* Other Land (grouped by land use type) */}
                   {typeCodes.map((typeCode, idx) => {
@@ -738,7 +937,7 @@ export default function ValidationReport({ projectId }: Props) {
                           getValue={(p) => p.otherLandByType?.find(t => t.typeCode === typeCode)?.acres || 0}
                           format="number"
                           indent="line_item"
-                          topBorder={isFirst}
+                          expandedPhases={expandedPhases}
                         />
                         {hasUnits && (
                           <DataRow
@@ -748,6 +947,7 @@ export default function ValidationReport({ projectId }: Props) {
                             getValue={(p) => p.otherLandByType?.find(t => t.typeCode === typeCode)?.units || 0}
                             format="number"
                             indent="line_item"
+                            expandedPhases={expandedPhases}
                           />
                         )}
                       </React.Fragment>
@@ -756,107 +956,73 @@ export default function ValidationReport({ projectId }: Props) {
                 </>
               )}
 
-              {/* SECTION: Revenue */}
-              <SectionHeader
-                title="Revenue"
-                colSpan={colCount}
-                isExpanded={isSectionExpanded('revenue')}
-                onToggle={() => toggleSection('revenue')}
-              />
-              {isSectionExpanded('revenue') && (
-                <>
-                  {/* SFD Revenue */}
-                  <DataRow
-                    label="SFD $/FF"
-                    phases={phases}
-                    totals={filteredTotals}
-                    getValue={(p) => p.pricePerFrontFoot}
-                    indent="line_item"
-                    textColor="var(--validation-unit-price-color, #000)"
-                  />
-                  <DataRow
-                    label="SFD $/Lot"
-                    phases={phases}
-                    totals={filteredTotals}
-                    getValue={(p) => p.grossRevenuePerLot}
-                    indent="line_item"
-                    textColor="var(--validation-unit-price-color, #000)"
-                  />
-                  <DataRow label="SFD Gross Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.grossRevenue} indent="total" highlight />
-
-                  {/* Other Land Revenue (grouped by land use type, only types with revenue) */}
-                  {typeCodesWithRevenue.map((typeCode, idx) => (
-                    <React.Fragment key={typeCode}>
-                      <DataRow
-                        label={`${typeCode} $/Unit`}
-                        phases={phases}
-                        totals={filteredTotals}
-                        getValue={(p) => p.otherLandByType?.find(t => t.typeCode === typeCode)?.pricePerUnit || 0}
-                        indent="line_item"
-                        textColor="var(--validation-unit-price-color, #000)"
-                        topBorder={idx === 0}
-                      />
-                      <DataRow
-                        label={`${typeCode} Gross Revenue`}
-                        phases={phases}
-                        totals={filteredTotals}
-                        getValue={(p) => p.otherLandByType?.find(t => t.typeCode === typeCode)?.grossRevenue || 0}
-                        indent="total"
-                        highlight
-                      />
-                    </React.Fragment>
-                  ))}
-                </>
-              )}
-
-              {/* SECTION: Combined Revenue */}
-              <SectionHeader
-                title="Combined Revenue"
-                colSpan={colCount}
-                isExpanded={isSectionExpanded('combined-revenue')}
-                onToggle={() => toggleSection('combined-revenue')}
-              />
-              {isSectionExpanded('combined-revenue') && (
-                <>
-                  <DataRow label="Total Gross Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.totalGrossRevenue} highlight />
-                  <DataRow label="Subdivision Cost" phases={phases} totals={filteredTotals} getValue={(p) => -p.subdivisionCost} indent="line_item" />
-                  <DataRow label="Gross Sale Proceeds" phases={phases} totals={filteredTotals} getValue={(p) => p.grossSaleProceeds} highlight />
-                  <DataRow label="Commissions" phases={phases} totals={filteredTotals} getValue={(p) => -p.commissions} indent="line_item" />
-                  <DataRow label="Closing Costs Total" phases={phases} totals={filteredTotals} getValue={(p) => -p.closingCostsTotal} indent="line_item" />
-                  <DataRow label="Net Revenue (SFD)" phases={phases} totals={filteredTotals} getValue={(p) => p.netRevenue} highlight />
-                  <DataRow label="Net Revenue per Lot" phases={phases} totals={filteredTotals} getValue={(p) => p.netRevenuePerLot} />
-                </>
-              )}
-
               {/* SECTION: Schedule */}
               <SectionHeader
                 title="Schedule"
                 colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
                 isExpanded={isSectionExpanded('schedule')}
                 onToggle={() => toggleSection('schedule')}
               />
               {isSectionExpanded('schedule') && (
                 <>
-                  <DataRow label="Months to First Sale" phases={phases} totals={filteredTotals} getValue={(p) => p.monthsToFirstSale} format="number" />
-                  <DataRow label="Total Months to Sell" phases={phases} totals={filteredTotals} getValue={(p) => p.totalMonthsToSell} format="number" />
+                  <DataRow label="Months to First Sale" phases={phases} totals={filteredTotals} getValue={(p) => p.monthsToFirstSale} format="number" expandedPhases={expandedPhases} />
+                  <DataRow label="Total Months to Sell" phases={phases} totals={filteredTotals} getValue={(p) => p.totalMonthsToSell} format="number" expandedPhases={expandedPhases} />
                 </>
               )}
+
+              {/* SECTION: Revenue */}
+              <SectionHeader
+                title="Revenue"
+                colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
+                isExpanded={isSectionExpanded('revenue')}
+                onToggle={() => toggleSection('revenue')}
+              />
+              {isSectionExpanded('revenue') && (
+                <>
+                  {/* SFD Revenue - unit columns show $/Unit, $/FrFt, $/Acre when expanded */}
+                  <DataRow label="SFD Gross Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.grossRevenue} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+
+                  {/* Other Land Revenue (grouped by land use type, only types with revenue) */}
+                  {typeCodesWithRevenue.map((typeCode, idx) => (
+                    <DataRow
+                      key={typeCode}
+                      label={`${typeCode} Gross Revenue`}
+                      phases={phases}
+                      totals={filteredTotals}
+                      getValue={(p) => p.otherLandByType?.find(t => t.typeCode === typeCode)?.grossRevenue || 0}
+                      indent="line_item"
+                      expandedPhases={expandedPhases}
+                      showUnitCols
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* Combined Revenue rows (no section header) */}
+              <DataRow label="Less: Subdivision Cost" phases={phases} totals={filteredTotals} getValue={(p) => -p.subdivisionCost} indent="total" bottomBorder expandedPhases={expandedPhases} showUnitCols />
+              <DataRow label="Gross Sale Proceeds" phases={phases} totals={filteredTotals} getValue={(p) => p.grossSaleProceeds} highlight expandedPhases={expandedPhases} showUnitCols />
+              <DataRow label="Commissions" phases={phases} totals={filteredTotals} getValue={(p) => -p.commissions} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+              <DataRow label="Closing Costs Total" phases={phases} totals={filteredTotals} getValue={(p) => -p.closingCostsTotal} indent="line_item" bottomBorder expandedPhases={expandedPhases} showUnitCols />
+              <DataRow label="Net Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.totalNetRevenue} highlight expandedPhases={expandedPhases} showUnitCols />
 
               {/* SECTION: Budget by Category */}
               <SectionHeader
                 title="Budget by Category"
                 colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
                 isExpanded={isSectionExpanded('budget')}
                 onToggle={() => toggleSection('budget')}
               />
               {isSectionExpanded('budget') && (
                 <>
-                  <DataRow label="Acquisition" phases={phases} totals={filteredTotals} getValue={(p) => p.acquisition} indent="line_item" />
-                  <DataRow label="Planning & Engineering" phases={phases} totals={filteredTotals} getValue={(p) => p.planningEngineering} indent="line_item" />
-                  <DataRow label="Development" phases={phases} totals={filteredTotals} getValue={(p) => p.development} indent="line_item" />
-                  <DataRow label="Operations" phases={phases} totals={filteredTotals} getValue={(p) => p.operations} indent="line_item" />
-                  <DataRow label="Contingency" phases={phases} totals={filteredTotals} getValue={(p) => p.contingency} indent="line_item" />
-                  <DataRow label="Financing" phases={phases} totals={filteredTotals} getValue={(p) => p.financing} indent="line_item" />
+                  <DataRow label="Acquisition" phases={phases} totals={filteredTotals} getValue={(p) => p.acquisition} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Planning & Engineering" phases={phases} totals={filteredTotals} getValue={(p) => p.planningEngineering} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Development" phases={phases} totals={filteredTotals} getValue={(p) => p.development} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Operations" phases={phases} totals={filteredTotals} getValue={(p) => p.operations} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Contingency" phases={phases} totals={filteredTotals} getValue={(p) => p.contingency} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Financing" phases={phases} totals={filteredTotals} getValue={(p) => p.financing} indent="line_item" expandedPhases={expandedPhases} showUnitCols />
                 </>
               )}
 
@@ -864,13 +1030,13 @@ export default function ValidationReport({ projectId }: Props) {
               <SectionHeader
                 title="Cost Totals"
                 colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
                 isExpanded={isSectionExpanded('cost-totals')}
                 onToggle={() => toggleSection('cost-totals')}
               />
               {isSectionExpanded('cost-totals') && (
                 <>
-                  <DataRow label="Total Costs" phases={phases} totals={filteredTotals} getValue={(p) => p.totalCosts} highlight />
-                  <DataRow label="Cost per Unit" phases={phases} totals={filteredTotals} getValue={(p) => p.costPerLot} />
+                  <DataRow label="Total Costs" phases={phases} totals={filteredTotals} getValue={(p) => p.totalCosts} highlight expandedPhases={expandedPhases} showUnitCols />
                 </>
               )}
 
@@ -878,13 +1044,14 @@ export default function ValidationReport({ projectId }: Props) {
               <SectionHeader
                 title="Profit Metrics"
                 colSpan={colCount}
+                extraColSpan={expandedUnitColCount}
                 isExpanded={isSectionExpanded('profit')}
                 onToggle={() => toggleSection('profit')}
               />
               {isSectionExpanded('profit') && (
                 <>
-                  <DataRow label="Gross Profit" phases={phases} totals={filteredTotals} getValue={(p) => p.grossProfit} highlight />
-                  <DataRow label="Profit Margin" phases={phases} totals={filteredTotals} getValue={(p) => p.profitMargin} format="percent" />
+                  <DataRow label="Gross Profit" phases={phases} totals={filteredTotals} getValue={(p) => p.grossProfit} highlight expandedPhases={expandedPhases} showUnitCols />
+                  <DataRow label="Profit Margin" phases={phases} totals={filteredTotals} getValue={(p) => p.profitMargin} format="percent" expandedPhases={expandedPhases} showUnitCols />
                 </>
               )}
             </tbody>

@@ -282,7 +282,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
             <CCol md={6}>
               <CFormSelect
                 id="property_subtype"
-                floatingLabel="Property Subtype"
+                  floatingLabel="Project Type"
                 value={formData.property_subtype || ''}
                 onChange={(e) => handleInputChange('property_subtype', e.target.value || undefined)}
                 className="text-start"

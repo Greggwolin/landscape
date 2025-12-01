@@ -26,6 +26,8 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
+  const horizontalMargin = '1rem';
+  const stickyTop = 'calc(58px + 1rem)'; // top nav height + desired gap
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -48,10 +50,11 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         borderColor: 'var(--cui-border-color)',
         border: '1px solid var(--cui-border-color)',
         borderRadius: '12px',
-        top: '58px',
+        top: stickyTop,
         zIndex: 40,
-        marginLeft: '1rem',
-        marginRight: '1rem',
+        marginTop: horizontalMargin,
+        marginLeft: horizontalMargin,
+        marginRight: horizontalMargin,
         marginBottom: '0.5rem',
         overflow: 'hidden'
       }}

@@ -198,6 +198,7 @@ export default function ProjectTab({
   const [editingLocation, setEditingLocation] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
+  const [profileMapExpanded, setProfileMapExpanded] = useState(true);
   const [financialSummaryExpanded, setFinancialSummaryExpanded] = useState(false);
   const [marketRatesExpanded, setMarketRatesExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(true);
@@ -571,14 +572,16 @@ export default function ProjectTab({
   };
 
   const renderMapCard = () => (
-    <CCard style={{ height: '100%' }}>
+    <CCard style={{ height: '100%', minHeight: '520px' }}>
       <CCardHeader>Map - 3D Oblique View</CCardHeader>
-      <CCardBody style={{ padding: '12px', height: 'calc(100% - 49px)' }}>
-        <ProjectTabMap
-          projectId={String(project.project_id)}
-          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-          tabId="project"
-        />
+      <CCardBody style={{ padding: '12px', minHeight: '500px' }}>
+        <div style={{ height: '100%' }}>
+          <ProjectTabMap
+            projectId={String(project.project_id)}
+            styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+            tabId="project"
+          />
+        </div>
       </CCardBody>
     </CCard>
   );
@@ -934,11 +937,11 @@ export default function ProjectTab({
               <CFormInput
                 type="text"
                 id="property_subtype"
-                placeholder="Property Subtype"
+                placeholder="Project Type"
                 value={getEditValue('property_subtype') as string || ''}
                 onChange={(e) => setEditedProject({ ...editedProject, property_subtype: e.target.value })}
               />
-              <label htmlFor="property_subtype">Property Subtype</label>
+              <label htmlFor="property_subtype">Project Type</label>
             </CFormFloating>
 
             <CFormFloating className="mb-3">
@@ -1077,26 +1080,32 @@ export default function ProjectTab({
     </CCard>
   );
 
-  const renderOverviewColumns = () => {
-    return (
-      <>
-        <CCol md={5} lg={4}>
-          <ProjectProfileTile projectId={project.project_id} />
-        </CCol>
-        <CCol md={7} lg={8}>
-          {renderMapCard()}
-        </CCol>
-      </>
-    );
-  };
-
   return (
     <>
-    <div className="space-y-4">
-      {/* Section 1: Location, Profile & Map (Two Column Layout) */}
-      <CRow>
-        {renderOverviewColumns()}
-      </CRow>
+      <div className="d-flex flex-column gap-3">
+      {/* Section 1: Project Profile + Map */}
+      <CCard>
+      <CCardHeader
+        className="d-flex justify-content-between align-items-center"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setProfileMapExpanded(!profileMapExpanded)}
+      >
+        <span>Project Profile &amp; Map</span>
+        <CIcon icon={profileMapExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
+      </CCardHeader>
+      {profileMapExpanded && (
+        <CCardBody>
+          <CRow className="g-3">
+            <CCol md={5} lg={4}>
+              <ProjectProfileTile projectId={project.project_id} />
+            </CCol>
+            <CCol md={7} lg={8}>
+              {renderMapCard()}
+            </CCol>
+          </CRow>
+        </CCardBody>
+      )}
+    </CCard>
 
       {/* Section 2: Financial Summary */}
       {hasFinancialData && (
@@ -1326,129 +1335,133 @@ export default function ProjectTab({
         </CCard>
       )}
 
-      {/* Section 3: Market Rates - Accordion */}
-      <CCard className="mb-3">
-        <CCardHeader
-          className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
-          onClick={() => setMarketRatesExpanded(!marketRatesExpanded)}
-        >
-          <span>Market Rates</span>
-          <CIcon icon={marketRatesExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-        </CCardHeader>
-        {marketRatesExpanded && (
-          <CCardBody>
-            {/* Inflation / Growth Rates */}
-            <div className="mb-3">
-              <h6 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>Inflation / Growth Rates</h6>
+      {/* Section 3: Market Rates + Contacts */}
+      <CRow className="g-3">
+        <CCol style={{ flexBasis: '40%', maxWidth: '40%' }}>
+          <CCard className="h-100">
+            <CCardHeader
+              className="d-flex justify-content-between align-items-center"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setMarketRatesExpanded(!marketRatesExpanded)}
+            >
+              <span>Global Assumptions</span>
+              <CIcon icon={marketRatesExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
+            </CCardHeader>
+            {marketRatesExpanded && (
+              <CCardBody>
+                {/* Inflation / Growth Rates */}
+                <div className="mb-3">
+                  <h6 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>Inflation / Growth Rates</h6>
 
-              {/* General Inflation Row */}
-              <div className="mb-2 d-flex align-items-center">
-                <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>Inflation: General</div>
-                <div style={{ width: '120px', marginRight: '10px' }}>
-                  <CFormInput
-                    id="general_inflation"
-                    type="number"
-                    step="0.1"
-                    placeholder="2.5"
-                    defaultValue="2.5"
-                    size="sm"
-                  />
-                </div>
-                <div style={{ marginRight: '10px' }}>%</div>
-                <CButton
-                  color="secondary"
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenNewInflationSchedule();
-                  }}
-                >
-                  Custom
-                </CButton>
-              </div>
-
-              {/* Saved Inflation Schedules - Each on its own row */}
-              {savedInflationSchedules.map((schedule) => (
-                <div key={schedule.id} className="mb-2 d-flex align-items-center">
-                  <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>
-                    Inflation: {schedule.name}
+                  {/* General Inflation Row */}
+                  <div className="mb-2 d-flex align-items-center">
+                    <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>Inflation: General</div>
+                    <div style={{ width: '120px', marginRight: '10px' }}>
+                      <CFormInput
+                        id="general_inflation"
+                        type="number"
+                        step="0.1"
+                        placeholder="2.5"
+                        defaultValue="2.5"
+                        size="sm"
+                      />
+                    </div>
+                    <div style={{ marginRight: '10px' }}>%</div>
+                    <CButton
+                      color="secondary"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenNewInflationSchedule();
+                      }}
+                    >
+                      Custom
+                    </CButton>
                   </div>
-                  <div
-                    style={{
-                      width: '120px',
-                      marginRight: '10px',
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: 'var(--cui-tertiary-bg)',
-                      border: '1px solid var(--cui-border-color)',
-                      borderRadius: '0.25rem',
-                      fontSize: '0.875rem',
-                      textAlign: 'center'
-                    }}
-                  >
-                    Custom
-                  </div>
-                  <div style={{ marginRight: '10px' }}>&nbsp;</div>
-                  <CButton
-                    color="primary"
-                    variant="ghost"
-                    size="sm"
-                    className="p-1 me-1"
-                    style={{ minWidth: 'auto', fontSize: '0.75rem' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLoadInflationSchedule(schedule);
-                    }}
-                  >
-                    Edit
-                  </CButton>
-                  <CButton
-                    color="danger"
-                    variant="ghost"
-                    size="sm"
-                    className="p-1"
-                    style={{ minWidth: 'auto', fontSize: '0.75rem' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Delete schedule "${schedule.name}"?`)) {
-                        handleDeleteInflationSchedule(schedule.id);
-                      }
-                    }}
-                  >
-                    Delete
-                  </CButton>
-                </div>
-              ))}
-            </div>
-          </CCardBody>
-        )}
-      </CCard>
 
-      {/* Section 4: Contacts */}
-      <CCard className="mb-3">
-        <CCardHeader
-          className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
-          onClick={() => setContactsExpanded(!contactsExpanded)}
-        >
-          <span>Contacts</span>
-          <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-        </CCardHeader>
-        {contactsExpanded && (
-          <CCardBody>
-            {project.listing_brokerage && (
-              <div className="mb-3">
-                <strong>Listing Brokerage:</strong>
-                <div>{project.listing_brokerage}</div>
-              </div>
+                  {/* Saved Inflation Schedules - Each on its own row */}
+                  {savedInflationSchedules.map((schedule) => (
+                    <div key={schedule.id} className="mb-2 d-flex align-items-center">
+                      <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>
+                        Inflation: {schedule.name}
+                      </div>
+                      <div
+                        style={{
+                          width: '120px',
+                          marginRight: '10px',
+                          padding: '0.25rem 0.5rem',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          border: '1px solid var(--cui-border-color)',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.875rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        Custom
+                      </div>
+                      <div style={{ marginRight: '10px' }}>&nbsp;</div>
+                      <CButton
+                        color="primary"
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 me-1"
+                        style={{ minWidth: 'auto', fontSize: '0.75rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLoadInflationSchedule(schedule);
+                        }}
+                      >
+                        Edit
+                      </CButton>
+                      <CButton
+                        color="danger"
+                        variant="ghost"
+                        size="sm"
+                        className="p-1"
+                        style={{ minWidth: 'auto', fontSize: '0.75rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete schedule "${schedule.name}"?`)) {
+                            handleDeleteInflationSchedule(schedule.id);
+                          }
+                        }}
+                      >
+                        Delete
+                      </CButton>
+                    </div>
+                  ))}
+                </div>
+              </CCardBody>
             )}
+          </CCard>
+        </CCol>
+        <CCol style={{ flexBasis: '60%', maxWidth: '60%' }}>
+          <CCard className="h-100">
+            <CCardHeader
+              className="d-flex justify-content-between align-items-center"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setContactsExpanded(!contactsExpanded)}
+            >
+              <span>Contacts</span>
+              <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
+            </CCardHeader>
+            {contactsExpanded && (
+              <CCardBody>
+                {project.listing_brokerage && (
+                  <div className="mb-3">
+                    <strong>Listing Brokerage:</strong>
+                    <div>{project.listing_brokerage}</div>
+                  </div>
+                )}
 
-            {/* Contacts Section */}
-            <ContactsSection projectId={project.project_id} />
-          </CCardBody>
-        )}
-      </CCard>
+                {/* Contacts Section */}
+                <ContactsSection projectId={project.project_id} />
+              </CCardBody>
+            )}
+          </CCard>
+        </CCol>
+      </CRow>
 
       {/* Section 5: Landscaper AI Assistant with Document Upload */}
       <CCard>
@@ -1755,11 +1768,11 @@ export default function ProjectTab({
           </CModalFooter>
         </div>
       </CModal>
-    </div>
-    <NewProjectModal
-      isOpen={isNewProjectModalOpen}
-      onClose={() => setIsNewProjectModalOpen(false)}
-    />
+      </div>
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+      />
     </>
   );
 }

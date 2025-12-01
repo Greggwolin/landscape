@@ -5,27 +5,20 @@ import { useRouter } from 'next/navigation'
 import { useForm, type FieldErrors, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useProjectContext } from './ProjectProvider'
-import AssetTypeSection from './new-project/AssetTypeSection'
-import ConfigureSection from './new-project/ConfigureSection'
 import LocationSection from './new-project/LocationSection'
 import PropertyDataSection from './new-project/PropertyDataSection'
-import PathSelection from './new-project/PathSelection'
-import type { NewProjectFormData, ProjectCreationPath, UploadedDocument } from './new-project/types'
+import LandscaperPanel from './new-project/LandscaperPanel'
+import type { NewProjectFormData } from './new-project/types'
 import { emptyFormDefaults, newProjectSchema } from './new-project/validation'
 import { usePersistentForm, clearPersistedForm } from './new-project/usePersistentForm'
 import { generateProjectName } from './new-project/utils'
 import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
+import { useTheme } from '@/app/components/CoreUIThemeProvider'
 
 type NewProjectModalProps = {
   isOpen: boolean
   onClose: () => void
-}
-
-const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.csv', '.png', '.jpg', '.jpeg']
-
-const isValidExtension = (filename: string) => {
-  const lower = filename.toLowerCase()
-  return ACCEPTED_EXTENSIONS.some(ext => lower.endsWith(ext))
 }
 
 const getNumeric = (value: string) => {
@@ -34,18 +27,15 @@ const getNumeric = (value: string) => {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData' | 'path'
+type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData'
 
 const FIELD_SECTION_MAP: Record<string, SectionKey> = {
-  // Asset type section
   analysis_type: 'asset',
-  development_type: 'asset', // deprecated
-  project_type_code: 'asset', // deprecated
-  // Configure section
+  development_type: 'asset',
+  project_type_code: 'asset',
   property_subtype: 'configure',
   property_class: 'configure',
   project_name: 'configure',
-  // Location section
   location_mode: 'location',
   single_line_address: 'location',
   street_address: 'location',
@@ -55,7 +45,6 @@ const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   cross_streets: 'location',
   latitude: 'location',
   longitude: 'location',
-  // Property data section
   total_units: 'propertyData',
   building_sf: 'propertyData',
   site_area: 'propertyData',
@@ -63,10 +52,33 @@ const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   total_lots_units: 'propertyData',
   density: 'propertyData',
   scale_input_method: 'propertyData',
-  analysis_start_date: 'propertyData',
-  // Path section
-  path_choice: 'path'
+  analysis_start_date: 'propertyData'
 }
+
+const LAND_SUBTYPE_OPTIONS = [
+  { value: 'MPC', label: 'Master Planned Community' },
+  { value: 'INFILL', label: 'Infill Subdivision' },
+  { value: 'LAND_BANK', label: 'Land Banking' },
+  { value: 'LOT_DEVELOPMENT', label: 'Lot Development' },
+  { value: 'ENTITLED_LAND', label: 'Entitled Land Sale' }
+]
+
+const INCOME_SUBTYPE_OPTIONS = [
+  { value: 'MULTIFAMILY', label: 'Multifamily' },
+  { value: 'OFFICE', label: 'Office' },
+  { value: 'RETAIL', label: 'Retail' },
+  { value: 'INDUSTRIAL', label: 'Industrial' },
+  { value: 'MIXED_USE', label: 'Mixed Use' },
+  { value: 'HOTEL', label: 'Hotel' },
+  { value: 'SELF_STORAGE', label: 'Self Storage' }
+]
+
+const PROPERTY_CLASS_OPTIONS = [
+  { value: 'CLASS_A', label: 'Class A' },
+  { value: 'CLASS_B', label: 'Class B' },
+  { value: 'CLASS_C', label: 'Class C' },
+  { value: 'CLASS_D', label: 'Class D' }
+]
 
 const collectErrorFieldNames = (errors: FieldErrors<NewProjectFormData>): string[] => {
   const fields: string[] = []
@@ -91,6 +103,8 @@ const getSectionForField = (fieldName: string): SectionKey | undefined => {
 const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   const router = useRouter()
   const { refreshProjects, selectProject } = useProjectContext()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   const form = useForm<NewProjectFormData>({
     resolver: zodResolver(newProjectSchema),
@@ -105,46 +119,70 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
     reset,
     setValue,
     setFocus,
+    register,
     formState: { isDirty, errors }
   } = form
 
   const formData = watch()
+  const analysisType = watch('analysis_type')
+  const subtypeOptions = useMemo(() => {
+    if (analysisType === 'Land Development') return LAND_SUBTYPE_OPTIONS
+    if (analysisType === 'Income Property') return INCOME_SUBTYPE_OPTIONS
+    return []
+  }, [analysisType])
 
-  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([])
-  const [extractionPending, setExtractionPending] = useState(false)
+  const showPropertyClass = analysisType === 'Income Property'
+  const [subtypeFocused, setSubtypeFocused] = useState(false)
+  const [classFocused, setClassFocused] = useState(false)
+  const hasSubtypeValue = Boolean(formData.property_subtype)
+  const hasClassValue = Boolean(formData.property_class)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
-  const [infoMessage, setInfoMessage] = useState<string | null>(null)
-  const [pendingPath, setPendingPath] = useState<ProjectCreationPath | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
   const [invalidSections, setInvalidSections] = useState<SectionKey[]>([])
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const assetSectionRef = useRef<HTMLDivElement>(null)
-  const configureSectionRef = useRef<HTMLDivElement>(null)
   const locationSectionRef = useRef<HTMLDivElement>(null)
   const propertyDataSectionRef = useRef<HTMLDivElement>(null)
-  const pathSectionRef = useRef<HTMLDivElement>(null)
 
   const sectionRefs: Record<SectionKey, React.RefObject<HTMLDivElement>> = {
     asset: assetSectionRef,
-    configure: configureSectionRef,
+    configure: assetSectionRef,
     location: locationSectionRef,
-    propertyData: propertyDataSectionRef,
-    path: pathSectionRef
+    propertyData: propertyDataSectionRef
   }
 
   useEffect(() => {
     if (!isOpen) {
-      setUploadedDocuments([])
-      setExtractionPending(false)
       setGlobalError(null)
-      setInfoMessage(null)
-      setUploadError(null)
-      setPendingPath(null)
       setInvalidSections([])
     }
   }, [isOpen])
+
+  const previousAnalysisType = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (previousAnalysisType.current === analysisType) return
+
+    setValue('development_type', analysisType || '', { shouldDirty: false })
+
+    const hasChanged = previousAnalysisType.current !== null
+
+    setValue('property_subtype', '', {
+      shouldDirty: hasChanged,
+      shouldValidate: hasChanged
+    })
+    setValue('project_type_code', '', { shouldDirty: hasChanged })
+
+    if (analysisType !== 'Income Property' || hasChanged) {
+      setValue('property_class', '', {
+        shouldDirty: hasChanged,
+        shouldValidate: hasChanged
+      })
+    }
+
+    previousAnalysisType.current = analysisType
+  }, [analysisType, setValue])
 
   const invalidSectionSet = useMemo(() => new Set(invalidSections), [invalidSections])
 
@@ -175,7 +213,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   const closeModal = () => {
     if (isSubmitting) return
 
-    const hasData = isDirty || uploadedDocuments.length > 0
+    const hasData = isDirty
     if (hasData) {
       const confirmed = window.confirm('Discard new project setup? Your progress will be saved locally.')
       if (!confirmed) return
@@ -187,9 +225,6 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   const resetFormState = () => {
     clearPersistedForm()
     reset(emptyFormDefaults)
-    setUploadedDocuments([])
-    setExtractionPending(false)
-    setPendingPath(null)
   }
 
   const handleCreationSuccess = async (projectId: number) => {
@@ -200,30 +235,23 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
     router.push(`/projects/${projectId}`)
   }
 
-  const submitProject = async (path: ProjectCreationPath) => {
-    setPendingPath(path)
-    setValue('path_choice', path, { shouldDirty: true })
+  const submitProject = async () => {
     await form.handleSubmit(onSubmit, handleInvalidSubmit)()
   }
 
   const onSubmit = async (data: NewProjectFormData) => {
-    const path = pendingPath ?? 'immediate'
     setIsSubmitting(true)
     setGlobalError(null)
-    setInfoMessage(null)
 
     try {
       const projectName = generateProjectName(data)
       const payload = {
         project_name: projectName,
-        // New taxonomy fields
         analysis_type: data.analysis_type,
         property_subtype: data.property_subtype || undefined,
         property_class: data.property_class || undefined,
-        // Deprecated fields (for backwards compatibility during transition)
-        development_type: data.analysis_type, // sync deprecated field
-        project_type_code: data.property_subtype || '', // sync deprecated field
-        // Location fields
+        development_type: data.analysis_type,
+        project_type_code: data.property_subtype || '',
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,
         city: data.city || undefined,
@@ -231,7 +259,6 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
         zip_code: data.zip || undefined,
         latitude: getNumeric(data.latitude),
         longitude: getNumeric(data.longitude),
-        // Property data fields
         site_area: getNumeric(data.site_area),
         site_area_unit: data.site_area_unit,
         total_units: getNumeric(data.total_units),
@@ -253,18 +280,12 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
       }
 
       const { project } = await response.json() as { project: { project_id: number } }
-
-      if (path === 'ai_extraction') {
-        setInfoMessage('AI extraction job kicked off. You will be redirected once the project is ready.')
-      }
-
       await handleCreationSuccess(project.project_id)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error creating project'
       setGlobalError(message)
     } finally {
       setIsSubmitting(false)
-      setPendingPath(null)
     }
   }
 
@@ -274,9 +295,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }
 
   const handleInvalidSubmit = (formErrors: FieldErrors<NewProjectFormData>) => {
-    setPendingPath(null)
     setIsSubmitting(false)
-    setInfoMessage(null)
     const fieldNames = collectErrorFieldNames(formErrors)
     if (fieldNames.length === 0) return
     const primaryField = fieldNames[0]
@@ -297,58 +316,10 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
     setGlobalError('Please complete the highlighted fields.')
   }
 
-  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
-
-    const accepted: UploadedDocument[] = []
-    const errors: string[] = []
-
-    Array.from(files).forEach(file => {
-      if (!isValidExtension(file.name)) {
-        errors.push(`${file.name} has an unsupported file type.`)
-        return
-      }
-      if (file.size > 50 * 1024 * 1024) {
-        errors.push(`${file.name} exceeds the 50MB limit.`)
-        return
-      }
-      accepted.push({
-        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${file.name}-${Date.now()}`,
-        filename: file.name,
-        size: file.size,
-        status: 'pending',
-        uploadedAt: new Date().toISOString()
-      })
-    })
-
-    if (accepted.length > 0) {
-      setUploadedDocuments(prev => [...prev, ...accepted])
-      setExtractionPending(true)
-    }
-
-    if (errors.length > 0) {
-      setUploadError(errors.join(' '))
-    } else {
-      setUploadError(null)
-    }
-
-    event.target.value = ''
-  }
-
-  const openFilePicker = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleSkipUpload = () => {
-    setInfoMessage('You can upload documents at any time from the Project Home page.')
-  }
-
-  const docsSummary = useMemo(() => {
-    if (uploadedDocuments.length === 0) return null
-    const totalSizeMb = uploadedDocuments.reduce((acc, doc) => acc + doc.size, 0) / (1024 * 1024)
-    return `${uploadedDocuments.length} ${uploadedDocuments.length === 1 ? 'document' : 'documents'} • ${totalSizeMb.toFixed(1)} MB`
-  }, [uploadedDocuments])
+  // Calculate implied density for display
+  const siteArea = formData.site_area ? Number(formData.site_area) : 0
+  const totalUnits = formData.total_lots_units ? Number(formData.total_lots_units) : 0
+  const impliedDensity = siteArea > 0 && totalUnits > 0 ? (totalUnits / siteArea).toFixed(2) : null
 
   if (!isOpen) {
     return null
@@ -356,139 +327,269 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={closeModal} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
 
       <div
         role="dialog"
         aria-modal="true"
-        className="relative flex max-h-[90vh] w-[92vw] max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl shadow-blue-950/40"
+        className={`relative flex max-h-[90vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-2xl border shadow-2xl ${
+          isDark ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+        }`}
       >
-        <header className="border-b border-slate-800 bg-slate-950/90 px-6 py-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">New Project Intake</p>
-              <h2 className="text-xl font-semibold text-slate-50">Create New Project</h2>
-              <p className="text-sm text-slate-400">
-                Provide the minimum details to spin up a project workspace.
-              </p>
-            </div>
-            <Button type="button" variant="ghost" onClick={closeModal} disabled={isSubmitting}>
-              Close
-            </Button>
+        {/* Header */}
+        <header
+          className={`flex items-center justify-between border-b px-6 py-4 ${
+            isDark ? 'border-slate-800 bg-slate-900/70 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-900'
+          }`}
+        >
+          <div>
+            <h2 className="text-xl font-semibold">Create Project</h2>
           </div>
-          {docsSummary && (
-            <div className="mt-3 rounded-lg border border-blue-900/40 bg-blue-950/20 px-3 py-2 text-xs text-blue-200">
-              📎 {docsSummary}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={closeModal}
+            disabled={isSubmitting}
+            className={`rounded-lg p-2 transition ${
+              isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+            }`}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div ref={assetSectionRef}>
-              <AssetTypeSection form={form} hasError={invalidSectionSet.has('asset')} />
-            </div>
-            <div ref={configureSectionRef}>
-              <ConfigureSection
-                form={form}
-                uploadedDocuments={uploadedDocuments}
-                extractionPending={extractionPending}
-                hasError={invalidSectionSet.has('configure')}
-              />
+        {/* Two-column layout */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left column - Form (60%) */}
+          <div
+            className={`flex-1 overflow-y-auto border-r p-6 ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}
+            style={{ flexBasis: '60%' }}
+          >
+            <div className="space-y-6 max-w-2xl">
+              {/* Analysis Type Toggle */}
+              <div ref={assetSectionRef}>
+                <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Analysis Type
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setValue('analysis_type', 'Land Development', { shouldDirty: true, shouldValidate: true })}
+                    className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
+                      analysisType === 'Land Development'
+                        ? 'bg-blue-600 text-white'
+                        : isDark
+                          ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Land Development
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue('analysis_type', 'Income Property', { shouldDirty: true, shouldValidate: true })}
+                    className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
+                      analysisType === 'Income Property'
+                        ? 'bg-blue-600 text-white'
+                        : isDark
+                          ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Income Property
+                  </button>
+                </div>
+                {errors.analysis_type && (
+                  <p className="mt-2 text-xs text-rose-500">{errors.analysis_type.message as string}</p>
+                )}
+              </div>
+
+              {/* Property Subtype & Class (Income Property only) */}
+              {analysisType === 'Income Property' && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <div className="relative">
+                      <select
+                        value={formData.property_subtype}
+                        onFocus={() => setSubtypeFocused(true)}
+                        onBlur={() => setSubtypeFocused(false)}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setValue('property_subtype', value, { shouldDirty: true, shouldValidate: true })
+                          setValue('project_type_code', value, { shouldDirty: true })
+                        }}
+                        className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
+                        }`}
+                      >
+                        <option value="">Select property type (optional)</option>
+                        {subtypeOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <label
+                        className={`pointer-events-none absolute left-3 transition-all duration-200 ${
+                          subtypeFocused || hasSubtypeValue
+                            ? 'top-1 text-[10px] text-blue-600'
+                            : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
+                        }`}
+                      >
+                        Property Type
+                      </label>
+                      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {errors.property_subtype && (
+                        <p className="mt-1 text-xs text-rose-500">{errors.property_subtype.message as string}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {showPropertyClass && (
+                    <div>
+                      <div className="relative">
+                        <select
+                          value={formData.property_class}
+                          onFocus={() => setClassFocused(true)}
+                          onBlur={() => setClassFocused(false)}
+                          onChange={(event) => {
+                            const value = event.target.value
+                            setValue('property_class', value, { shouldDirty: true, shouldValidate: true })
+                          }}
+                          className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                            isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
+                          }`}
+                        >
+                          <option value="">Select property class (optional)</option>
+                          {PROPERTY_CLASS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <label
+                          className={`pointer-events-none absolute left-3 transition-all duration-200 ${
+                            classFocused || hasClassValue
+                              ? 'top-1 text-[10px] text-blue-600'
+                              : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
+                          }`}
+                        >
+                          Property Class
+                        </label>
+                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                        {errors.property_class && (
+                          <p className="mt-1 text-xs text-rose-500">{errors.property_class.message as string}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Project Name - Floating Label */}
+              <div className="relative">
+                <input
+                  {...register('project_name')}
+                  id="project-name"
+                  placeholder=" "
+                  className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
+                  }`}
+                />
+                <label
+                  htmlFor="project-name"
+                  className={`absolute left-3 transition-all duration-200 pointer-events-none ${
+                    watch('project_name')
+                      ? 'top-1 text-[10px] text-blue-600'
+                      : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'} peer-focus:top-1 peer-focus:text-[10px] peer-focus:text-blue-600`
+                  }`}
+                >
+                  Project Name (optional)
+                </label>
+              </div>
+
+              {/* Location Section */}
+              <div ref={locationSectionRef} className="pt-2">
+                <div className="flex items-baseline gap-2 mb-3">
+                  <h3 className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Location</h3>
+                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Click on the map to place a pin, or drag to adjust</span>
+                </div>
+                <LocationSection
+                  form={form}
+                  analysisType={analysisType}
+                  isDark={isDark}
+                  hasError={invalidSectionSet.has('location')}
+                />
+              </div>
+
+              {/* Property Data Section */}
+              <div ref={propertyDataSectionRef} className="pt-2">
+                <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Property Data</h3>
+                <PropertyDataSection
+                  form={form}
+                  isDark={isDark}
+                  hasError={invalidSectionSet.has('propertyData')}
+                />
+              </div>
+
+              {/* Implied Density Display */}
+              {analysisType === 'Land Development' && impliedDensity && (
+                <div className={`rounded-lg px-4 py-3 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Implied Density</span>
+                    <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{impliedDensity} DU/AC</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {globalError && (
+                <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                  {globalError}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div ref={locationSectionRef}>
-              <LocationSection
-                form={form}
-                onUploadDocuments={openFilePicker}
-                onSkipUpload={handleSkipUpload}
-                hasError={invalidSectionSet.has('location')}
-              />
-            </div>
-            <div ref={propertyDataSectionRef}>
-              <PropertyDataSection
-                form={form}
-                onAddDocuments={openFilePicker}
-                onContinueWithout={() => setInfoMessage('Documents can be added later from the documents tab.')}
-                hasError={invalidSectionSet.has('propertyData')}
-              />
-            </div>
-          </div>
-
-          <div ref={pathSectionRef}>
-            <PathSelection
+          {/* Right column - Landscaper (40%) */}
+          <div className="overflow-hidden p-4" style={{ flexBasis: '40%' }}>
+            <LandscaperPanel
+              analysisType={analysisType}
               formData={formData}
-              uploadedDocuments={uploadedDocuments}
-              extractionPending={extractionPending}
-              onCreateNow={() => submitProject('immediate')}
-              onExtendedSetup={() => setInfoMessage('Extended setup wizard is coming soon. Create the project now and continue from the tabs.')}
-              onAIExtraction={() => {
-                if (uploadedDocuments.length === 0) {
-                  setGlobalError('Upload documents before requesting AI extraction.')
-                  return
-                }
-                submitProject('ai_extraction').catch(() => undefined)
-              }}
-              onUploadNow={openFilePicker}
-              onManualEntry={() => setInfoMessage('Manual entry selected. You can enrich the project after creation.')}
-              hasError={invalidSectionSet.has('path')}
             />
           </div>
-
-          {uploadError && (
-            <div className="rounded-lg border border-amber-600/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              {uploadError}
-            </div>
-          )}
-
-          {infoMessage && (
-            <div className="rounded-lg border border-blue-600/50 bg-blue-900/20 px-4 py-3 text-sm text-blue-100">
-              {infoMessage}
-            </div>
-          )}
-
-          {globalError && (
-            <div className="rounded-lg border border-rose-600/50 bg-rose-900/20 px-4 py-3 text-sm text-rose-200">
-              {globalError}
-            </div>
-          )}
         </div>
 
-        <footer className="border-t border-slate-800 bg-slate-950/90 px-6 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-slate-500">
-              Progress autosaves locally. Closing will pause the setup.
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={closeModal}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => submitProject('immediate')}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Creating…' : 'Create Project'}
-              </Button>
-            </div>
+        {/* Footer */}
+        <footer className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+          <p className="text-xs text-slate-400">
+            Progress autosaves locally.
+          </p>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeModal}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={submitProject}
+              disabled={isSubmitting || !analysisType}
+            >
+              {isSubmitting ? 'Creating...' : 'Create Project'}
+            </Button>
           </div>
         </footer>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED_EXTENSIONS.join(',')}
-          multiple
-          className="hidden"
-          onChange={handleFileSelection}
-        />
       </div>
     </div>
   )

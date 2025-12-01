@@ -127,8 +127,7 @@ export function InflationRateDisplay({ projectId }: Props) {
     setName: string | undefined,
   ) => {
     const displayRate = formatRate(currentRate ?? null);
-    const collapsedWidth = 78; // px
-    const selectWidth = collapsedWidth;
+    const selectWidth = 130; // widened for readability
 
     return (
       <div

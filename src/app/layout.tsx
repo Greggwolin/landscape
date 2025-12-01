@@ -10,6 +10,7 @@ import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
 import { ProjectProvider } from "@/app/components/ProjectProvider";
 import { QueryProvider } from "@/app/components/QueryProvider";
 import { ToastProvider } from "@/components/ui/toast";
+import { AuthProvider } from "@/contexts/AuthContext";
 import NavigationLayout from "@/app/components/NavigationLayout";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
@@ -28,17 +29,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <QueryProvider>
-          <CoreUIThemeProvider>
-            <ToastProvider>
-              <ProjectProvider>
-                <IssueReporterProvider>
-                  <NavigationLayout>
-                    {children}
-                  </NavigationLayout>
-                </IssueReporterProvider>
-              </ProjectProvider>
-            </ToastProvider>
-          </CoreUIThemeProvider>
+          <AuthProvider>
+            <CoreUIThemeProvider>
+              <ToastProvider>
+                <ProjectProvider>
+                  <IssueReporterProvider>
+                    <NavigationLayout>
+                      {children}
+                    </NavigationLayout>
+                  </IssueReporterProvider>
+                </ProjectProvider>
+              </ToastProvider>
+            </CoreUIThemeProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

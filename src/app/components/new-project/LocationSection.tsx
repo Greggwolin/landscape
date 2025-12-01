@@ -1,56 +1,217 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, forwardRef, useState, type InputHTMLAttributes } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { US_STATES } from './constants'
-import type { LocationMode, NewProjectFormData } from './types'
-import AIDocumentPrompt from './AIDocumentPrompt'
-import { Lightbulb } from 'lucide-react'
-import { parseSingleLineAddress, type ParsedAddress } from './utils'
+import type { NewProjectFormData } from './types'
+import MapPinSelector, { type GeocodeResult } from './MapPinSelector'
+import { cn } from '@/lib/utils'
 
-const LOCATION_TABS: Array<{ id: LocationMode; label: string; description: string }> = [
-  { id: 'address', label: 'Full Address', description: 'Recommended' },
-  { id: 'cross_streets', label: 'Cross Streets', description: 'When no street number' },
-  { id: 'coordinates', label: 'Coordinates', description: 'Lat / Long' }
-]
+type LocationMode = 'cross_streets' | 'coordinates' | 'map_pin' | 'address'
+
+interface LocationTab {
+  id: LocationMode
+  label: string
+}
 
 type LocationSectionProps = {
   form: UseFormReturn<NewProjectFormData>
-  onUploadDocuments: () => void
-  onSkipUpload: () => void
+  analysisType: 'Land Development' | 'Income Property' | ''
+  isDark?: boolean
   hasError?: boolean
 }
 
-const LocationSection = ({ form, onUploadDocuments, onSkipUpload, hasError = false }: LocationSectionProps) => {
+// Floating Label Input Component (Light mode)
+interface FloatingInputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label: string
+  error?: string
+  isDark?: boolean
+}
+
+const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
+  ({ label, error, isDark = false, className, id, value, ...props }, ref) => {
+    const [isFocused, setIsFocused] = useState(false)
+    const hasValue = value !== undefined && value !== ''
+
+    const inputId = id || `floating-loc-${label.toLowerCase().replace(/\s+/g, '-')}`
+
+    return (
+      <div className="relative">
+        <input
+          ref={ref}
+          id={inputId}
+          value={value}
+          {...props}
+          onFocus={(e) => {
+            setIsFocused(true)
+            props.onFocus?.(e)
+          }}
+          onBlur={(e) => {
+            setIsFocused(false)
+            props.onBlur?.(e)
+          }}
+          placeholder=" "
+          className={cn(
+            'peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition',
+            'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+            error ? 'border-rose-400' : (isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'),
+            className
+          )}
+        />
+        <label
+          htmlFor={inputId}
+          className={cn(
+            'absolute left-3 transition-all duration-200 pointer-events-none',
+            (isFocused || hasValue)
+              ? 'top-1 text-[10px] text-blue-600'
+              : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
+          )}
+        >
+          {label}
+        </label>
+        {error && (
+          <p className="mt-1 text-xs text-rose-500">{error}</p>
+        )}
+      </div>
+    )
+  }
+)
+FloatingInput.displayName = 'FloatingInput'
+
+// Floating Label Select Component (Light mode)
+interface FloatingSelectProps {
+  label: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onBlur?: (e: React.FocusEvent<HTMLSelectElement>) => void
+  name?: string
+  options: { value: string; label: string }[]
+  error?: string
+  className?: string
+  isDark?: boolean
+}
+
+const FloatingSelect = forwardRef<HTMLSelectElement, FloatingSelectProps>(
+  ({ label, value, onChange, onBlur, name, options, error, className, isDark = false }, ref) => {
+    const hasValue = value !== ''
+
+    return (
+      <div className="relative">
+        <select
+          ref={ref}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          className={cn(
+            'peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none',
+            'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+            error ? 'border-rose-400' : (isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'),
+            className
+          )}
+        >
+          <option value="">Select...</option>
+          {options.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <label
+          className={cn(
+            'absolute left-3 transition-all duration-200 pointer-events-none',
+            hasValue ? 'top-1 text-[10px] text-blue-600' : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
+          )}
+        >
+          {label}
+        </label>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+        {error && (
+          <p className="mt-1 text-xs text-rose-500">{error}</p>
+        )}
+      </div>
+    )
+  }
+)
+FloatingSelect.displayName = 'FloatingSelect'
+
+const LocationSection = ({ form, analysisType, isDark = false, hasError = false }: LocationSectionProps) => {
   const {
     register,
     setValue,
-    getValues,
     watch,
     formState: { errors }
   } = form
 
-  const [suggestedAddress, setSuggestedAddress] = useState<ParsedAddress | null>(null)
-  const [showSuggestion, setShowSuggestion] = useState(false)
+  const locationMode = watch('location_mode') as LocationMode
+  const latitude = watch('latitude')
+  const longitude = watch('longitude')
 
-  const locationMode = watch('location_mode')
+  // Location tabs differ based on analysis type
+  const locationTabs: LocationTab[] = analysisType === 'Income Property'
+    ? [
+        { id: 'address', label: 'Full Address' },
+        { id: 'cross_streets', label: 'Cross Streets' },
+        { id: 'coordinates', label: 'Coordinates' },
+        { id: 'map_pin', label: 'Map Pin' }
+      ]
+    : [
+        { id: 'cross_streets', label: 'Cross Streets' },
+        { id: 'coordinates', label: 'Coordinates' },
+        { id: 'map_pin', label: 'Map Pin' }
+      ]
+
+  // Set default location mode based on analysis type
+  useEffect(() => {
+    if (analysisType === 'Income Property' && !['address', 'cross_streets', 'coordinates', 'map_pin'].includes(locationMode)) {
+      setValue('location_mode', 'address', { shouldDirty: false })
+    } else if (analysisType === 'Land Development' && locationMode === 'address') {
+      setValue('location_mode', 'cross_streets', { shouldDirty: false })
+    }
+  }, [analysisType, locationMode, setValue])
 
   const setLocationMode = (mode: LocationMode) => {
     setValue('location_mode', mode, { shouldDirty: true })
   }
 
+  const handleMapLocationSelect = (coords: { lat: number; lng: number }) => {
+    setValue('latitude', coords.lat.toFixed(6), { shouldDirty: true })
+    setValue('longitude', coords.lng.toFixed(6), { shouldDirty: true })
+  }
+
+  const handleGeocode = (result: GeocodeResult) => {
+    if (result.city) {
+      setValue('city', result.city, { shouldDirty: true })
+    }
+    if (result.state) {
+      const stateMatch = US_STATES.find(
+        s => s.label.toLowerCase() === result.state?.toLowerCase() ||
+             s.value.toLowerCase() === result.state?.toLowerCase()
+      )
+      if (stateMatch) {
+        setValue('state', stateMatch.value, { shouldDirty: true })
+      }
+    }
+    if (result.zip) {
+      setValue('zip', result.zip, { shouldDirty: true })
+    }
+    if (result.crossStreets && locationMode === 'cross_streets') {
+      setValue('cross_streets', result.crossStreets, { shouldDirty: true })
+    }
+  }
+
   const renderLocationErrors = () => {
     if (errors.street_address) {
-      return <p className="text-xs text-rose-400">{errors.street_address.message as string}</p>
+      return <p className="text-xs text-rose-500">{errors.street_address.message as string}</p>
     }
     if (errors.cross_streets) {
-      return <p className="text-xs text-rose-400">{errors.cross_streets.message as string}</p>
+      return <p className="text-xs text-rose-500">{errors.cross_streets.message as string}</p>
     }
     if (errors.latitude || errors.longitude) {
       return (
-        <p className="text-xs text-rose-400">
+        <p className="text-xs text-rose-500">
           {(errors.latitude?.message as string) || (errors.longitude?.message as string)}
         </p>
       )
@@ -58,206 +219,144 @@ const LocationSection = ({ form, onUploadDocuments, onSkipUpload, hasError = fal
     return null
   }
 
-  const attemptParseAddress = () => {
-    const raw = getValues('single_line_address')
-    if (!raw) return
-    const parsed = parseSingleLineAddress(raw)
-    if (!parsed) return
-    setSuggestedAddress(parsed)
-    setShowSuggestion(true)
-  }
-
-  const acceptSuggestion = () => {
-    if (!suggestedAddress) return
-    setValue('street_address', suggestedAddress.street, { shouldDirty: true })
-    setValue('city', suggestedAddress.city, { shouldDirty: true })
-    setValue('state', suggestedAddress.state, { shouldDirty: true })
-    setValue('zip', suggestedAddress.zip ?? '', { shouldDirty: true })
-    setValue('location_mode', 'address', { shouldDirty: true })
-    setShowSuggestion(false)
-  }
-
-  const rejectSuggestion = () => {
-    setShowSuggestion(false)
-    setSuggestedAddress(null)
-  }
+  const parsedLat = latitude ? parseFloat(latitude) : undefined
+  const parsedLng = longitude ? parseFloat(longitude) : undefined
 
   return (
-    <section
-      className={`space-y-5 rounded-xl border bg-slate-900/40 p-5 shadow-sm shadow-slate-950/30 transition-colors ${
-        hasError ? 'border-rose-600/70 ring-1 ring-rose-500/40' : 'border-slate-800'
-      }`}
-    >
-      <header>
-        <h3 className="text-lg font-semibold text-slate-100">Location</h3>
-        <p className="text-sm text-slate-400">Enter a quick address or choose another method.</p>
-      </header>
+    <div className="space-y-4">
+      {/* Location mode tabs - no label */}
+      <div className="flex flex-wrap gap-2">
+        {locationTabs.map(tab => {
+          const isActive = locationMode === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setLocationMode(tab.id)}
+              className={`rounded-md px-3 py-1.5 text-sm transition ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : isDark
+                    ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-slate-100">
-          Quick address
-        </label>
-        <Input
-          {...register('single_line_address')}
-          placeholder="e.g., 14105 Chadron Ave, Hawthorne, CA 90250"
-          className="mt-2 border-slate-700 bg-slate-900/40 text-slate-100"
-          onBlur={attemptParseAddress}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Landscaper will auto-fill address fields when possible.
-        </p>
-
-        {showSuggestion && suggestedAddress && (
-          <div className="mt-3 rounded-lg border border-blue-700 bg-blue-900/20 p-3 text-sm text-slate-100">
-            <p className="font-semibold text-blue-200">Confirm parsed address</p>
-            <p className="mt-1 text-slate-200">
-              {suggestedAddress.street}, {suggestedAddress.city}, {suggestedAddress.state}
-              {suggestedAddress.zip ? ` ${suggestedAddress.zip}` : ''}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <Button type="button" size="sm" onClick={acceptSuggestion}>
-                Use this address
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={rejectSuggestion}>
-                Edit manually
-              </Button>
+      <div className="space-y-3">
+        {locationMode === 'address' && (
+          <>
+            <FloatingInput
+              label="Street Address"
+              {...register('street_address')}
+              value={watch('street_address')}
+              isDark={isDark}
+            />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FloatingInput
+                label="City"
+                {...register('city')}
+                value={watch('city')}
+                isDark={isDark}
+              />
+              <FloatingSelect
+                label="State"
+                value={watch('state')}
+                onChange={(e) => setValue('state', e.target.value)}
+                options={US_STATES}
+                isDark={isDark}
+              />
+              <FloatingInput
+                label="ZIP"
+                inputMode="numeric"
+                maxLength={10}
+                {...register('zip')}
+                value={watch('zip')}
+                isDark={isDark}
+              />
             </div>
+          </>
+        )}
+
+        {locationMode === 'cross_streets' && (
+          <>
+            <FloatingInput
+              label="Cross Streets"
+              {...register('cross_streets')}
+              value={watch('cross_streets')}
+              isDark={isDark}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FloatingInput
+                label="City"
+                {...register('city')}
+                value={watch('city')}
+                isDark={isDark}
+              />
+              <FloatingSelect
+                label="State"
+                value={watch('state')}
+                onChange={(e) => setValue('state', e.target.value)}
+                options={US_STATES}
+                isDark={isDark}
+              />
+            </div>
+          </>
+        )}
+
+        {locationMode === 'coordinates' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FloatingInput
+              label="Latitude"
+              type="number"
+              step="0.000001"
+              {...register('latitude')}
+              value={watch('latitude')}
+              isDark={isDark}
+            />
+            <FloatingInput
+              label="Longitude"
+              type="number"
+              step="0.000001"
+              {...register('longitude')}
+              value={watch('longitude')}
+              isDark={isDark}
+            />
           </div>
         )}
+
+        {locationMode === 'map_pin' && parsedLat && parsedLng && (
+          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Current: {parsedLat.toFixed(4)}, {parsedLng.toFixed(4)}
+          </p>
+        )}
+
+        {renderLocationErrors()}
       </div>
 
-      <div>
-        <div className="flex flex-wrap gap-2">
-          {LOCATION_TABS.map(tab => {
-            const isActive = locationMode === tab.id
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setLocationMode(tab.id)}
-                className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
-                  isActive
-                    ? 'border-blue-500 bg-blue-900/40 text-blue-100'
-                    : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-blue-400 hover:bg-slate-700'
-                }`}
-              >
-                <div className="font-semibold">{tab.label}</div>
-                <div className="text-xs text-slate-300">{tab.description}</div>
-              </button>
-            )
-          })}
+      {/* Map - always visible */}
+      <MapPinSelector
+        latitude={parsedLat}
+        longitude={parsedLng}
+        onLocationSelect={handleMapLocationSelect}
+        onGeocode={handleGeocode}
+        isDark={isDark}
+        className="h-96"
+      />
+
+      {/* Auto-detected location display */}
+      {(watch('city') || watch('state')) && locationMode === 'map_pin' && (
+        <div className={`rounded-md px-3 py-2 text-xs ${
+          isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+        }`}>
+          Auto-detected: {[watch('city'), watch('state'), watch('zip')].filter(Boolean).join(', ')}
         </div>
-
-        <div className="mt-4 space-y-3">
-          {locationMode === 'address' && (
-            <>
-              <Input
-                {...register('street_address')}
-                placeholder="Street Address"
-                className="border-slate-700 bg-slate-900/40 text-slate-100"
-              />
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                <Input
-                  {...register('city')}
-                  placeholder="City"
-                  className="border-slate-700 bg-slate-900/40 text-slate-100"
-                />
-                <select
-                  {...register('state')}
-                  className="rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">State</option>
-                  {US_STATES.map(state => (
-                    <option key={state.value} value={state.value}>
-                      {state.label}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  {...register('zip')}
-                  placeholder="ZIP Code"
-                  inputMode="numeric"
-                  maxLength={10}
-                  className="border-slate-700 bg-slate-900/40 text-slate-100"
-                />
-              </div>
-            </>
-          )}
-
-          {locationMode === 'cross_streets' && (
-            <>
-              <Input
-                {...register('cross_streets')}
-                placeholder="Main St & Oak Ave"
-                className="border-slate-700 bg-slate-900/40 text-slate-100"
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  {...register('city')}
-                  placeholder="City"
-                  className="border-slate-700 bg-slate-900/40 text-slate-100"
-                />
-                <select
-                  {...register('state')}
-                  className="rounded-md border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">State</option>
-                  {US_STATES.map(state => (
-                    <option key={state.value} value={state.value}>
-                      {state.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {locationMode === 'coordinates' && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                {...register('latitude')}
-                type="number"
-                step="0.000001"
-                placeholder="33.914400"
-                className="border-slate-700 bg-slate-900/40 text-slate-100"
-              />
-              <Input
-                {...register('longitude')}
-                type="number"
-                step="0.000001"
-                placeholder="-118.352600"
-                className="border-slate-700 bg-slate-900/40 text-slate-100"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="mt-2">{renderLocationErrors()}</div>
-      </div>
-
-      <AIDocumentPrompt step={1}>
-        <div className="flex items-start gap-3">
-          <Lightbulb className="mt-0.5 h-5 w-5 text-blue-300" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-blue-200">Landscaper says:</p>
-            <p className="mt-1 text-sm text-slate-200">
-              "I can extract location details, property specs, and financial data from your documents."
-            </p>
-            <p className="mt-2 text-sm text-slate-300">
-              Have an Offering Memo, Appraisal, or Site Plan?
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={onUploadDocuments}>
-                📎 Upload Documents
-              </Button>
-              <Button type="button" variant="ghost" onClick={onSkipUpload}>
-                Skip for now
-              </Button>
-            </div>
-          </div>
-        </div>
-      </AIDocumentPrompt>
-    </section>
+      )}
+    </div>
   )
 }
 

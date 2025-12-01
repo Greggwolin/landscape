@@ -7,6 +7,7 @@ from .views_auth import (
     UserLoginView,
     UserLogoutView,
     UserProfileView,
+    PasswordChangeView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
     APIKeyViewSet,
@@ -23,11 +24,12 @@ urlpatterns = [
     path('login/', UserLoginView.as_view(), name='login'),
     path('logout/', UserLogoutView.as_view(), name='logout'),
     path('profile/', UserProfileView.as_view(), name='profile'),
-    
-    # Password reset
+
+    # Password management
+    path('password-change/', PasswordChangeView.as_view(), name='password-change'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password-reset'),
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-    
+
     # API keys and user management
     path('', include(router.urls)),
 ]

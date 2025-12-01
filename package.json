@@ -96,6 +96,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "dotenv": "^17.2.2",
+    "exceljs": "^4.4.0",
     "form-data": "^4.0.4",
     "handsontable": "^16.0.0",
     "lodash": "^4.17.21",

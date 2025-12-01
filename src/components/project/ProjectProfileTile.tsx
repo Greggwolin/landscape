@@ -105,7 +105,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               value={profile.analysis_type}
             />
             <ProfileField
-              label="Property Subtype"
+              label="Project Type"
               value={profile.property_subtype}
             />
             <ProfileField
