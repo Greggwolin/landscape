@@ -819,10 +819,10 @@ export default function ValidationReport({ projectId }: Props) {
               {isSectionExpanded('combined-revenue') && (
                 <>
                   <DataRow label="Total Gross Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.totalGrossRevenue} highlight />
-                  <DataRow label="Subdivision Cost" phases={phases} totals={filteredTotals} getValue={(p) => p.subdivisionCost} indent="line_item" />
+                  <DataRow label="Subdivision Cost" phases={phases} totals={filteredTotals} getValue={(p) => -p.subdivisionCost} indent="line_item" />
                   <DataRow label="Gross Sale Proceeds" phases={phases} totals={filteredTotals} getValue={(p) => p.grossSaleProceeds} highlight />
-                  <DataRow label="Commissions" phases={phases} totals={filteredTotals} getValue={(p) => p.commissions} indent="line_item" />
-                  <DataRow label="Closing Costs Total" phases={phases} totals={filteredTotals} getValue={(p) => p.closingCostsTotal} indent="line_item" />
+                  <DataRow label="Commissions" phases={phases} totals={filteredTotals} getValue={(p) => -p.commissions} indent="line_item" />
+                  <DataRow label="Closing Costs Total" phases={phases} totals={filteredTotals} getValue={(p) => -p.closingCostsTotal} indent="line_item" />
                   <DataRow label="Net Revenue (SFD)" phases={phases} totals={filteredTotals} getValue={(p) => p.netRevenue} highlight />
                   <DataRow label="Net Revenue per Lot" phases={phases} totals={filteredTotals} getValue={(p) => p.netRevenuePerLot} />
                 </>
