@@ -459,32 +459,60 @@ export async function GET(
       }
     }
 
+    // Helper to add budget amount to the appropriate category
+    const addBudgetToPhase = (phase: PhaseData, amount: number, activity: string) => {
+      const activityLower = activity.toLowerCase();
+      if (activityLower.includes('acquisition')) {
+        phase.acquisition += amount;
+      } else if (activityLower.includes('planning') || activityLower.includes('engineering')) {
+        phase.planningEngineering += amount;
+      } else if (activityLower.includes('development')) {
+        phase.development += amount;
+      } else if (activityLower.includes('operations') || activityLower.includes('operating')) {
+        phase.operations += amount;
+      } else if (activityLower.includes('contingency')) {
+        phase.contingency += amount;
+      } else if (activityLower.includes('financing')) {
+        phase.financing += amount;
+      } else {
+        // Other costs go to operations
+        phase.operations += amount;
+      }
+    };
+
     // Add budget data with cost inflation applied based on timing
+    // Track project-level costs (NULL phase_id) for proportional allocation
+    const projectLevelBudgets: { activity: string; amount: number }[] = [];
+
     for (const budget of phaseBudgets) {
+      const baseAmount = Number(budget.total_amount) || 0;
+      if (baseAmount === 0) continue;
+
+      // Use mid_period for weighted average timing, fallback to start_period
+      const period = budget.mid_period || budget.start_period || 0;
+      // Apply cost inflation to the amount based on when it will occur
+      const amount = calculateInflatedCost(baseAmount, period);
+      const activity = budget.activity || '';
+
       const phase = phaseMap.get(budget.phase_id);
       if (phase) {
-        const baseAmount = Number(budget.total_amount) || 0;
-        // Use mid_period for weighted average timing, fallback to start_period
-        const period = budget.mid_period || budget.start_period || 0;
-        // Apply cost inflation to the amount based on when it will occur
-        const amount = calculateInflatedCost(baseAmount, period);
-        const activity = (budget.activity || '').toLowerCase();
+        // Phase-specific budget - add directly
+        addBudgetToPhase(phase, amount, activity);
+      } else {
+        // Project-level budget (NULL phase_id) - track for proportional allocation
+        projectLevelBudgets.push({ activity, amount });
+      }
+    }
 
-        if (activity.includes('acquisition')) {
-          phase.acquisition += amount;
-        } else if (activity.includes('planning') || activity.includes('engineering')) {
-          phase.planningEngineering += amount;
-        } else if (activity.includes('development')) {
-          phase.development += amount;
-        } else if (activity.includes('operations') || activity.includes('operating')) {
-          phase.operations += amount;
-        } else if (activity.includes('contingency')) {
-          phase.contingency += amount;
-        } else if (activity.includes('financing')) {
-          phase.financing += amount;
-        } else {
-          // Other costs go to operations
-          phase.operations += amount;
+    // Allocate project-level budget items proportionally by gross acres
+    if (projectLevelBudgets.length > 0 && projectTotalAcres > 0) {
+      for (const phase of phaseMap.values()) {
+        const phaseGrossAcres = phaseAcresMap.get(phase.phaseId) || 0;
+        const acresShare = phaseGrossAcres / projectTotalAcres;
+
+        for (const budget of projectLevelBudgets) {
+          const allocatedAmount = budget.amount * acresShare;
+          addBudgetToPhase(phase, allocatedAmount, budget.activity);
         }
       }
     }
