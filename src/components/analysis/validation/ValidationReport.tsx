@@ -40,7 +40,6 @@ type SectionId =
   | 'physical'
   | 'revenue'
   | 'combined-revenue'
-  | 'deductions'
   | 'schedule'
   | 'budget'
   | 'cost-totals'
@@ -205,7 +204,6 @@ const ALL_SECTIONS: SectionId[] = [
   'physical',
   'revenue',
   'combined-revenue',
-  'deductions',
   'schedule',
   'budget',
   'cost-totals',
@@ -406,6 +404,8 @@ export default function ValidationReport({ projectId }: Props) {
       otherLandNetRevenue: 0,
       otherLandByType: [],
       totalGrossRevenue: 0,
+      subdivisionCost: 0,
+      grossSaleProceeds: 0,
       totalNetRevenue: 0,
     };
 
@@ -431,6 +431,8 @@ export default function ValidationReport({ projectId }: Props) {
       newTotals.otherLandGrossRevenue += p.otherLandGrossRevenue;
       newTotals.otherLandNetRevenue += p.otherLandNetRevenue;
       newTotals.totalGrossRevenue += p.totalGrossRevenue;
+      newTotals.subdivisionCost += p.subdivisionCost;
+      newTotals.grossSaleProceeds += p.grossSaleProceeds;
       newTotals.totalNetRevenue += p.totalNetRevenue;
     });
 
@@ -817,19 +819,8 @@ export default function ValidationReport({ projectId }: Props) {
               {isSectionExpanded('combined-revenue') && (
                 <>
                   <DataRow label="Total Gross Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.totalGrossRevenue} highlight />
-                  <DataRow label="Total Net Revenue" phases={phases} totals={filteredTotals} getValue={(p) => p.totalNetRevenue} highlight />
-                </>
-              )}
-
-              {/* SECTION: Deductions */}
-              <SectionHeader
-                title="Deductions"
-                colSpan={colCount}
-                isExpanded={isSectionExpanded('deductions')}
-                onToggle={() => toggleSection('deductions')}
-              />
-              {isSectionExpanded('deductions') && (
-                <>
+                  <DataRow label="Subdivision Cost" phases={phases} totals={filteredTotals} getValue={(p) => p.subdivisionCost} indent="line_item" />
+                  <DataRow label="Gross Sale Proceeds" phases={phases} totals={filteredTotals} getValue={(p) => p.grossSaleProceeds} highlight />
                   <DataRow label="Commissions" phases={phases} totals={filteredTotals} getValue={(p) => p.commissions} indent="line_item" />
                   <DataRow label="Closing Costs Total" phases={phases} totals={filteredTotals} getValue={(p) => p.closingCostsTotal} indent="line_item" />
                   <DataRow label="Net Revenue (SFD)" phases={phases} totals={filteredTotals} getValue={(p) => p.netRevenue} highlight />

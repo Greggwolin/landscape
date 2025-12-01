@@ -61,6 +61,8 @@ export interface PhaseData {
 
   // Combined Revenue
   totalGrossRevenue: number;
+  subdivisionCost: number;  // Development costs deducted from gross revenue
+  grossSaleProceeds: number;  // Gross revenue minus subdivision costs (before commissions/closing)
   totalNetRevenue: number;
 
   // Deductions (SFD only for per-lot metrics)

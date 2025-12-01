@@ -325,6 +325,8 @@ export async function GET(
       otherLandGrossRevenue: 0,
       otherLandNetRevenue: 0,
       totalGrossRevenue: 0,
+      subdivisionCost: 0,
+      grossSaleProceeds: 0,
       totalNetRevenue: 0,
       commissions: 0,
       closingCostsPerLot: 0,
@@ -502,6 +504,17 @@ export async function GET(
     for (const phase of phaseMap.values()) {
       // Calculate combined revenue totals
       phase.totalGrossRevenue = phase.grossRevenue + phase.otherLandGrossRevenue;
+
+      // Subdivision cost is the sum of development costs (planning, engineering, development, operations)
+      // This represents the costs to subdivide/develop the land
+      phase.subdivisionCost =
+        phase.planningEngineering +
+        phase.development +
+        phase.operations;
+
+      // Gross sale proceeds = gross revenue minus subdivision costs (before commissions/closing)
+      phase.grossSaleProceeds = phase.totalGrossRevenue - phase.subdivisionCost;
+
       phase.totalNetRevenue = phase.netRevenue + phase.otherLandNetRevenue;
 
       phase.totalCosts =
@@ -570,6 +583,8 @@ export async function GET(
       otherLandGrossRevenue: phases.reduce((sum, p) => sum + p.otherLandGrossRevenue, 0),
       otherLandNetRevenue: phases.reduce((sum, p) => sum + p.otherLandNetRevenue, 0),
       totalGrossRevenue: phases.reduce((sum, p) => sum + p.totalGrossRevenue, 0),
+      subdivisionCost: phases.reduce((sum, p) => sum + p.subdivisionCost, 0),
+      grossSaleProceeds: phases.reduce((sum, p) => sum + p.grossSaleProceeds, 0),
       totalNetRevenue: phases.reduce((sum, p) => sum + p.totalNetRevenue, 0),
       commissions: phases.reduce((sum, p) => sum + p.commissions, 0),
       closingCostsPerLot: 0,

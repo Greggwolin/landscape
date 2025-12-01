@@ -149,13 +149,8 @@ function getCombinedRevenueRows(): RowData[] {
   return [
     { label: 'COMBINED REVENUE', getValue: () => 0, format: 'currency', isHeader: true },
     { label: '** Total Gross Revenue', getValue: (p) => p.totalGrossRevenue, format: 'currency' },
-    { label: '** Total Net Revenue', getValue: (p) => p.totalNetRevenue, format: 'currency' },
-  ];
-}
-
-function getDeductionsRows(): RowData[] {
-  return [
-    { label: 'DEDUCTIONS', getValue: () => 0, format: 'currency', isHeader: true },
+    { label: 'Subdivision Cost', getValue: (p) => p.subdivisionCost, format: 'currency', indent: 1 },
+    { label: '** Gross Sale Proceeds', getValue: (p) => p.grossSaleProceeds, format: 'currency' },
     { label: 'Commissions', getValue: (p) => p.commissions, format: 'currency', indent: 1 },
     { label: 'Closing Costs Total', getValue: (p) => p.closingCostsTotal, format: 'currency', indent: 1 },
     { label: '** Net Revenue (SFD)', getValue: (p) => p.netRevenue, format: 'currency' },
@@ -227,7 +222,6 @@ export function exportProjectCostsToExcel({
     ...getPhysicalMetricsRows(typeCodes, totals),
     ...getRevenueRows(typeCodesWithRevenue),
     ...getCombinedRevenueRows(),
-    ...getDeductionsRows(),
     ...getScheduleRows(),
     ...getBudgetRows(),
     ...getCostTotalsRows(),

@@ -1,12 +1,31 @@
 # Landscape Implementation Status
 
-**Version:** 6.4
-**Last Updated:** 2025-11-30
+**Version:** 6.5
+**Last Updated:** 2025-12-01
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (October 28 - November 30, 2025)
+## 🆕 Recent Updates (October 28 - December 1, 2025)
+
+### Project Costs Report Restructure (Dec 1, 2025) ⭐ NEW
+- ✅ **Subdivision Cost Row Added** - New line item showing Planning & Engineering + Development + Operations costs
+- ✅ **Gross Sale Proceeds Row** - Renamed from "Total Net Revenue" to show gross revenue minus subdivision costs
+- ✅ **Deductions Section Removed** - Eliminated separate "Deductions" accordion header
+- ✅ **Combined Revenue Reorganized** - All deduction items now appear within Combined Revenue section:
+  - Total Gross Revenue (highlighted)
+  - Subdivision Cost (indented)
+  - Gross Sale Proceeds (highlighted)
+  - Commissions (indented)
+  - Closing Costs Total (indented)
+  - Net Revenue (SFD) (highlighted)
+  - Net Revenue per Lot
+- ✅ **Type Definition Updated** - Added `subdivisionCost` and `grossSaleProceeds` to PhaseData interface
+- ✅ **API Calculation** - Backend now calculates subdivision cost and gross sale proceeds for each phase
+- ✅ **Excel Export Updated** - Export file matches new UI structure
+- 📁 Files Modified: `src/types/validation-report.ts`, `src/app/api/projects/[projectId]/validation-report/route.ts`, `src/components/analysis/validation/ValidationReport.tsx`, `src/lib/exports/projectCostsExcel.ts`
+- 📖 Documentation: [SESSION_NOTES_2025_12_01_PROJECT_COSTS_REPORT_RESTRUCTURE.md](../session-notes/SESSION_NOTES_2025_12_01_PROJECT_COSTS_REPORT_RESTRUCTURE.md)
+- 🎯 Status: Complete - Report now shows proper subdivision cost deduction flow
 
 ### Redfin Housing Comparables Integration (Nov 30, 2025) ⭐ NEW
 - ✅ **Redfin API Client** - Created full client for Redfin's public Stingray CSV endpoint (replaced defunct Zillow API)
