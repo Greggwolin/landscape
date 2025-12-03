@@ -122,30 +122,33 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
       showToast(editingProduct ? 'Product updated successfully' : 'Product created successfully', 'success');
       setShowModal(false);
       loadProducts(type.type_id);
-    } catch (error: any) {
-      showToast(error.message, 'error');
+  } catch (error: any) {
+    showToast(error.message, 'error');
+  }
+};
+
+const handleDelete = async (product: Product) => {
+  if (!confirm(`Remove "${product.code}" from ${type.name}? This will keep the product available for other categories.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/taxonomy/products/${product.product_id}?type_id=${type.type_id}`,
+      { method: 'DELETE' }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete product');
     }
-  };
 
-  const handleDelete = async (product: Product) => {
-    if (!confirm(`Are you sure you want to delete "${product.code}"?`)) return;
-
-    try {
-      const response = await fetch(`/api/taxonomy/products/${product.product_id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete product');
-      }
-
-      showToast('Product deleted successfully', 'success');
-      loadProducts(type.type_id);
-    } catch (error: any) {
-      showToast(error.message, 'error');
-    }
-  };
+    showToast('Product removed from this category', 'success');
+    loadProducts(type.type_id);
+  } catch (error: any) {
+    showToast(error.message, 'error');
+  }
+};
 
   const computeDensity = (product: { lot_area_sf: number }, efficiency: number | null) => {
     if (!efficiency || !product.lot_area_sf || product.lot_area_sf <= 0) return null;

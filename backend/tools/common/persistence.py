@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -35,6 +35,9 @@ from backend.tools.common.models import (
     UnifiedPlanBenchmark,
     UnifiedResaleClosing,
 )
+
+if TYPE_CHECKING:
+    from backend.tools.hbaca_ingest.schemas import MarketActivityRecord
 
 
 logger = logging.getLogger(__name__)
@@ -519,6 +522,100 @@ def persist_redfin_closings(
     except Exception:
         conn.rollback()
         logger.exception("persist_redfin_closings: transaction rolled back")
+        raise
+    finally:
+        conn.close()
+
+
+def upsert_market_activity(
+    conn: psycopg2.extensions.connection,
+    records: "List[MarketActivityRecord]",
+) -> Dict[str, int]:
+    """Upsert market activity records to landscape.market_activity.
+
+    Uses ON CONFLICT to update existing records or insert new ones.
+    Conflict key: (msa_code, source, metric_type, geography_type, geography_name, period_end_date)
+
+    Args:
+        conn: psycopg2 connection (caller manages transaction).
+        records: List of MarketActivityRecord instances.
+
+    Returns:
+        Dict with 'inserted' and 'updated' counts.
+    """
+    if not records:
+        return {"inserted": 0, "updated": 0}
+
+    now = datetime.utcnow()
+
+    values = []
+    for r in records:
+        values.append((
+            r.msa_code,
+            r.source,
+            r.metric_type,
+            r.geography_type,
+            r.geography_name,
+            r.period_type,
+            r.period_end_date,
+            r.value,
+            r.notes,
+            now,  # updated_at
+        ))
+
+    sql = """
+        INSERT INTO landscape.market_activity (
+            msa_code, source, metric_type, geography_type, geography_name,
+            period_type, period_end_date, value, notes, updated_at
+        ) VALUES %s
+        ON CONFLICT (msa_code, source, metric_type, geography_type, geography_name, period_end_date)
+        DO UPDATE SET
+            value = EXCLUDED.value,
+            notes = EXCLUDED.notes,
+            updated_at = EXCLUDED.updated_at
+        RETURNING (xmax = 0) AS inserted
+    """
+
+    with conn.cursor() as cur:
+        results = execute_values(cur, sql, values, fetch=True)
+
+    inserted = sum(1 for r in results if r[0])
+    updated = len(results) - inserted
+
+    logger.info(
+        "upsert_market_activity: %d inserted, %d updated",
+        inserted,
+        updated,
+    )
+
+    return {"inserted": inserted, "updated": updated}
+
+
+def persist_market_activity(
+    records: "List[MarketActivityRecord]",
+    database_url: Optional[str] = None,
+) -> Dict[str, int]:
+    """Convenience function to persist market activity records.
+
+    Args:
+        records: List of MarketActivityRecord instances.
+        database_url: Optional override for DATABASE_URL env var.
+
+    Returns:
+        Dict with 'inserted' and 'updated' counts.
+    """
+    if database_url:
+        os.environ["DATABASE_URL"] = database_url
+
+    conn = get_connection()
+    try:
+        stats = upsert_market_activity(conn, records)
+        conn.commit()
+        logger.info("persist_market_activity: transaction committed")
+        return stats
+    except Exception:
+        conn.rollback()
+        logger.exception("persist_market_activity: transaction rolled back")
         raise
     finally:
         conn.close()

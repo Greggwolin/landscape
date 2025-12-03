@@ -96,6 +96,21 @@ backend/*_extraction.json
 backend/*_reconciliation_report.md
 backend/*_rent_roll_extracted.json
 
-# Python cache
+# Python cache and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 backend/**/__pycache__/
 backend/**/migrations/__pycache__/
+services/**/__pycache__/
+
+# Virtual environments
+.venv/
+venv/
+services/**/.venv/
+
+# Archive and backup directories (historical code)
+archive/
+backup_*/
