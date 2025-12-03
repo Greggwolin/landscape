@@ -24,11 +24,27 @@ const DocumentationIndex: React.FC = () => {
     // Status Reports
     {
       title: 'Implementation Status',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-30.md',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-02.md',
       category: 'Status',
-      description: 'Current implementation status and progress tracking - Updated with Redfin Comps & User Management (Nov 30)',
+      description: 'Current implementation status - Updated with Redfin Python Ingestion Tool (Dec 2)',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-11-30'
+      lastModified: '2025-12-02'
+    },
+    {
+      title: 'Redfin Python Ingestion Tool',
+      path: '/docs/session-notes/2025-12-02-redfin-ingestion-tool.md',
+      category: 'Technical',
+      description: 'Python-based Redfin ingestion for unified data pipeline - Fetches sold comps, normalizes to UnifiedResaleClosing, persists to Neon',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-12-02'
+    },
+    {
+      title: 'Builder/Redfin Ingestion Architecture',
+      path: '/docs/architecture/ingestion_builder_redfin_v1.md',
+      category: 'Architecture',
+      description: 'Unified ingestion architecture for builder (Lennar, NHS) and resale (Redfin) data - Adapters, persistence, CLI tools',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-12-02'
     },
     {
       title: 'Redfin Comps Integration',
