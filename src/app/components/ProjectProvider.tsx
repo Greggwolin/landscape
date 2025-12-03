@@ -8,18 +8,26 @@ interface ProjectSummary {
   project_id: number
   project_name: string
   acres_gross: number | null
+  acreage?: number | null
   location_lat?: number | null
   location_lon?: number | null
+  latitude?: number | null
+  longitude?: number | null
   start_date?: string | null
   jurisdiction_city?: string | null
   jurisdiction_county?: string | null
   jurisdiction_state?: string | null
+  location_description?: string | null
+  location?: string | null
   project_type_code?: string | null
   project_type?: string | null
   is_active?: boolean
   analysis_type?: string | null
   property_subtype?: string | null
   property_class?: string | null
+  total_residential_units?: number | null
+  total_commercial_sqft?: number | null
+  updated_at?: string | null
 }
 
 interface ProjectContextValue {
@@ -80,6 +88,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const selectProject = useCallback((projectId: number | null) => {
     setActiveProjectId(projectId)
+
+    // Record access timestamp in localStorage
+    if (projectId !== null && typeof window !== 'undefined') {
+      const key = `project_${projectId}_last_accessed`;
+      localStorage.setItem(key, Date.now().toString());
+    }
   }, [])
 
   const refreshProjects = useCallback(() => {

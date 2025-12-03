@@ -4,12 +4,14 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Avg, Min, Max, Count
-from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis
+from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData
 from .serializers import (
     AIIngestionHistorySerializer,
     MarketReportSerializer,
     RentComparableSerializer,
-    MarketRateAnalysisSerializer
+    MarketRateAnalysisSerializer,
+    MarketCompetitiveProjectSerializer,
+    MarketMacroDataSerializer
 )
 
 
@@ -229,3 +231,62 @@ class MarketReportViewSet(viewsets.ViewSet):
             'reports': [],
             'message': 'Market reports endpoint - implement with external data sources'
         })
+
+
+class MarketCompetitiveProjectViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Land Development Competitive Projects.
+
+    Endpoints:
+    - GET /api/projects/:project_id/market/competitors/ - List competitors for project
+    - POST /api/projects/:project_id/market/competitors/ - Create new competitor
+    - GET /api/projects/:project_id/market/competitors/:id/ - Get competitor detail
+    - PUT/PATCH /api/projects/:project_id/market/competitors/:id/ - Update competitor
+    - DELETE /api/projects/:project_id/market/competitors/:id/ - Delete competitor
+    """
+
+    serializer_class = MarketCompetitiveProjectSerializer
+
+    def get_queryset(self):
+        """Filter competitive projects by project."""
+        project_id = self.kwargs.get('project_pk')
+        queryset = MarketCompetitiveProject.objects.filter(project_id=project_id)
+
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        # Filter by data source if provided
+        data_source = self.request.query_params.get('data_source')
+        if data_source:
+            queryset = queryset.filter(data_source=data_source)
+
+        return queryset.order_by('-created_at')
+
+
+class MarketMacroDataViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Market Macro-Economic Data.
+
+    Endpoints:
+    - GET /api/projects/:project_id/market/macro/ - List macro data for project
+    - POST /api/projects/:project_id/market/macro/ - Create new macro data
+    - GET /api/projects/:project_id/market/macro/:id/ - Get macro data detail
+    - PUT/PATCH /api/projects/:project_id/market/macro/:id/ - Update macro data
+    - DELETE /api/projects/:project_id/market/macro/:id/ - Delete macro data
+    """
+
+    serializer_class = MarketMacroDataSerializer
+
+    def get_queryset(self):
+        """Filter macro data by project."""
+        project_id = self.kwargs.get('project_pk')
+        queryset = MarketMacroData.objects.filter(project_id=project_id)
+
+        # Filter by data year if provided
+        data_year = self.request.query_params.get('data_year')
+        if data_year:
+            queryset = queryset.filter(data_year=data_year)
+
+        return queryset.order_by('-data_year', '-created_at')

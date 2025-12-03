@@ -57,6 +57,8 @@ export interface ProjectSettings {
   default_currency: string
   default_period_type: string
   global_inflation_rate: number | null
+  cost_inflation_set_id?: number | null
+  price_inflation_set_id?: number | null
   analysis_start_date: string | null
   analysis_end_date: string | null
   discount_rate: number | null

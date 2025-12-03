@@ -264,29 +264,18 @@ class ProjectPricingAssumptionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at", "inflated_value"]
 
     def get_inflated_value(self, obj):
-        """Calculate inflated value based on growth rate and time elapsed."""
-        if not obj.price_per_unit or not obj.growth_rate or not obj.created_at:
-            return obj.price_per_unit
+        """
+        Return base price (inflation is applied during sale calculation based on sale_period).
 
-        from datetime import datetime
-        from decimal import Decimal
-
-        # Calculate years elapsed from creation date to now
-        now = datetime.now(obj.created_at.tzinfo) if obj.created_at.tzinfo else datetime.now()
-        days_elapsed = (now - obj.created_at).days
-        years_elapsed = Decimal(days_elapsed) / Decimal(365.25)
-
-        # Calculate inflated value: price * (1 + rate) ^ years
-        multiplier = (Decimal(1) + obj.growth_rate) ** years_elapsed
-        inflated = obj.price_per_unit * multiplier
-
-        # Round to 2 decimal places
-        return float(round(inflated, 2))
+        The actual inflated price is calculated using the sale_period and monthly compounding
+        when calculating sale proceeds. This field is just for reference.
+        """
+        return float(obj.price_per_unit) if obj.price_per_unit else 0.0
 
     def validate_price_per_unit(self, value):
-        """Ensure price is positive."""
-        if value is not None and value <= 0:
-            raise serializers.ValidationError("Price per unit must be greater than zero.")
+        """Ensure price is non-negative (allow zero for non-saleable uses like parks)."""
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Price per unit cannot be negative.")
         return value
 
     def validate_growth_rate(self, value):

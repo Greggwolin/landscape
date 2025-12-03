@@ -6,6 +6,14 @@
 
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { geocodeLocation } from '@/lib/geocoding';
+
+function normalizeCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -20,8 +28,17 @@ export async function GET(
   try {
     // Fetch project coordinates from database
     const projectResult = await pool.query(
-      `SELECT project_name, location_lon as lng, location_lat as lat,
-              COALESCE(stories, 3) as stories
+      `SELECT project_name,
+              location_lon AS lng,
+              location_lat AS lat,
+              COALESCE(stories, 3) as stories,
+              street_address,
+              city,
+              state,
+              zip_code,
+              jurisdiction_city,
+              jurisdiction_state,
+              jurisdiction_county
        FROM landscape.tbl_project
        WHERE project_id = $1`,
       [projectId]
@@ -33,13 +50,70 @@ export async function GET(
 
     const project = projectResult.rows[0];
 
+    let lng: number | null = normalizeCoordinate(project.lng);
+    let lat: number | null = normalizeCoordinate(project.lat);
+
+    // Fallback geocoding if coordinates are missing
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      const fallbackCity = project.city || project.jurisdiction_city;
+      const fallbackState = project.state || project.jurisdiction_state;
+      const fallbackZip = project.zip_code;
+      const fallbackCounty = project.jurisdiction_county;
+      const addressParts = [
+        project.street_address,
+        fallbackCity,
+        fallbackState,
+        fallbackZip,
+        fallbackCounty
+      ].filter(Boolean);
+
+      const primaryQuery = addressParts.length >= 2 ? addressParts.join(', ') : null;
+      const secondaryQuery = fallbackCity && fallbackState ? `${fallbackCity}, ${fallbackState}` : null;
+
+      const tryGeocode = async (query: string | null) => {
+        if (!query) return null;
+        try {
+          return await geocodeLocation(query);
+        } catch (geoError) {
+          console.error('Geocoding failed for project map:', geoError);
+          return null;
+        }
+      };
+
+      const geocode =
+        (await tryGeocode(primaryQuery)) ||
+        (await tryGeocode(secondaryQuery));
+
+      if (geocode) {
+        lat = geocode.latitude;
+        lng = geocode.longitude;
+        // Persist coordinates for future map fetches
+        await pool.query(
+          `UPDATE landscape.tbl_project
+           SET location_lat = $1, location_lon = $2
+           WHERE project_id = $3`,
+          [lat, lng, projectId]
+        );
+      }
+    }
+
+    // If we still don't have coordinates, return a friendly error
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      return NextResponse.json(
+        { error: 'Project coordinates unavailable' },
+        { status: 404 }
+      );
+    }
+
     // Generate approximate building footprint (small rectangle around center point)
     // In production, this would come from PostGIS parcel boundaries
     const offsetLng = 0.0003; // ~30 meters
     const offsetLat = 0.0002; // ~20 meters
 
+    const center = [Number(lng), Number(lat)] as [number, number];
+
     const payload = {
-      center: [Number(project.lng), Number(project.lat)] as [number, number],
+      center,
       footprint: {
         type: 'FeatureCollection',
         features: [
@@ -56,11 +130,11 @@ export async function GET(
               type: 'Polygon',
               coordinates: [
                 [
-                  [project.lng - offsetLng, project.lat - offsetLat],
-                  [project.lng - offsetLng, project.lat + offsetLat],
-                  [project.lng + offsetLng, project.lat + offsetLat],
-                  [project.lng + offsetLng, project.lat - offsetLat],
-                  [project.lng - offsetLng, project.lat - offsetLat]
+                  [center[0] - offsetLng, center[1] - offsetLat],
+                  [center[0] - offsetLng, center[1] + offsetLat],
+                  [center[0] + offsetLng, center[1] + offsetLat],
+                  [center[0] + offsetLng, center[1] - offsetLat],
+                  [center[0] - offsetLng, center[1] - offsetLat]
                 ]
               ]
             }

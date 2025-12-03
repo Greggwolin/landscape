@@ -43,4 +43,7 @@ urlpatterns = [
     path("api/dms/", include('apps.documents.urls')),
     path("api/market-intel/", include('apps.market_intel.urls')),
     path("", include('apps.reports.urls')),  # Reports (includes /api/ prefix)
+    path("api/", include('apps.landscaper.urls')),  # Phase 6: Landscaper AI
+    path("api/users/", include('apps.users.urls')),  # Phase 7: User settings
+    path("api/", include('apps.acquisition.urls')),  # Acquisition tracking
 ]

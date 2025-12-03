@@ -191,6 +191,167 @@ class MultifamilyLeaseViewSet(viewsets.ModelViewSet):
             'months': months
         })
 
+    @action(detail=True, methods=['post'], url_path='check-floorplan-diff')
+    def check_floorplan_diff(self, request, pk=None):
+        """
+        Check if a unit's data differs from its floorplan.
+        Used before updating unit fields to determine if floorplan should be updated.
+
+        Request body should contain the proposed changes:
+        {
+            "unit_type": "2BR",
+            "bedrooms": 2,
+            "bathrooms": 1.5,
+            "square_feet": 950
+        }
+
+        Returns:
+        {
+            "differs_from_floorplan": true/false,
+            "floorplan": {...} or null,
+            "differences": {...}
+        }
+        """
+        lease = self.get_object()
+        unit = lease.unit
+        project_id = unit.project_id
+
+        # Get proposed values from request
+        proposed_unit_type = request.data.get('unit_type', unit.unit_type)
+        proposed_bedrooms = request.data.get('bedrooms')
+        proposed_bathrooms = request.data.get('bathrooms')
+        proposed_square_feet = request.data.get('square_feet')
+
+        # Convert to Decimal for comparison
+        if proposed_bedrooms is not None:
+            proposed_bedrooms = Decimal(str(proposed_bedrooms))
+        if proposed_bathrooms is not None:
+            proposed_bathrooms = Decimal(str(proposed_bathrooms))
+
+        # Try to find matching floorplan
+        try:
+            floorplan = MultifamilyUnitType.objects.get(
+                project_id=project_id,
+                unit_type_code=proposed_unit_type
+            )
+
+            # Check for differences
+            differences = {}
+            differs = False
+
+            if proposed_bedrooms is not None and proposed_bedrooms != floorplan.bedrooms:
+                differences['bedrooms'] = {
+                    'floorplan': float(floorplan.bedrooms),
+                    'proposed': float(proposed_bedrooms)
+                }
+                differs = True
+
+            if proposed_bathrooms is not None and proposed_bathrooms != floorplan.bathrooms:
+                differences['bathrooms'] = {
+                    'floorplan': float(floorplan.bathrooms),
+                    'proposed': float(proposed_bathrooms)
+                }
+                differs = True
+
+            if proposed_square_feet is not None and proposed_square_feet != floorplan.avg_square_feet:
+                differences['square_feet'] = {
+                    'floorplan': floorplan.avg_square_feet,
+                    'proposed': proposed_square_feet
+                }
+                differs = True
+
+            return Response({
+                'differs_from_floorplan': differs,
+                'floorplan': {
+                    'unit_type_id': floorplan.unit_type_id,
+                    'unit_type_code': floorplan.unit_type_code,
+                    'bedrooms': float(floorplan.bedrooms),
+                    'bathrooms': float(floorplan.bathrooms),
+                    'avg_square_feet': floorplan.avg_square_feet,
+                    'total_units': floorplan.total_units
+                },
+                'differences': differences,
+                'unit_type': proposed_unit_type
+            })
+
+        except MultifamilyUnitType.DoesNotExist:
+            # No floorplan exists for this unit type
+            return Response({
+                'differs_from_floorplan': True,
+                'floorplan': None,
+                'differences': {'message': f'No floorplan exists for unit type: {proposed_unit_type}'},
+                'unit_type': proposed_unit_type
+            })
+
+    @action(detail=True, methods=['post'], url_path='update-with-floorplan')
+    def update_with_floorplan(self, request, pk=None):
+        """
+        Update unit fields and handle floorplan creation/update.
+
+        Request body:
+        {
+            "unit_fields": {
+                "unit_type": "2BR",
+                "bedrooms": 2,
+                "bathrooms": 1.5,
+                "square_feet": 950
+            },
+            "floorplan_action": "create" | "update" | "none",
+            "new_unit_type_code": "2BR-Custom" (only if action is "create")
+        }
+        """
+        lease = self.get_object()
+        unit = lease.unit
+        project_id = unit.project_id
+
+        unit_fields = request.data.get('unit_fields', {})
+        floorplan_action = request.data.get('floorplan_action', 'none')
+        new_unit_type_code = request.data.get('new_unit_type_code')
+
+        # Update the unit fields
+        for field, value in unit_fields.items():
+            if hasattr(unit, field):
+                setattr(unit, field, value)
+        unit.save()
+
+        # Handle floorplan action
+        if floorplan_action == 'create' and new_unit_type_code:
+            # Create new floorplan
+            MultifamilyUnitType.objects.create(
+                project_id=project_id,
+                unit_type_code=new_unit_type_code,
+                bedrooms=unit_fields.get('bedrooms', unit.bedrooms),
+                bathrooms=unit_fields.get('bathrooms', unit.bathrooms),
+                avg_square_feet=unit_fields.get('square_feet', unit.square_feet),
+                current_market_rent=unit.market_rent or Decimal('0.00'),
+                total_units=1,
+                notes=f'Created from rent roll for unit {unit.unit_number}'
+            )
+            # Update unit to use new type
+            unit.unit_type = new_unit_type_code
+            unit.save()
+
+        elif floorplan_action == 'update':
+            # Update existing floorplan
+            try:
+                floorplan = MultifamilyUnitType.objects.get(
+                    project_id=project_id,
+                    unit_type_code=unit_fields.get('unit_type', unit.unit_type)
+                )
+                floorplan.bedrooms = unit_fields.get('bedrooms', unit.bedrooms)
+                floorplan.bathrooms = unit_fields.get('bathrooms', unit.bathrooms)
+                floorplan.avg_square_feet = unit_fields.get('square_feet', unit.square_feet)
+                floorplan.save()
+            except MultifamilyUnitType.DoesNotExist:
+                return Response(
+                    {'error': 'Floorplan not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Return updated lease data
+        serializer = self.get_serializer(lease)
+        return Response(serializer.data)
+
 
 class MultifamilyTurnViewSet(viewsets.ModelViewSet):
     """

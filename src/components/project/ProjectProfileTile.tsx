@@ -105,7 +105,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               value={profile.analysis_type}
             />
             <ProfileField
-              label="Property Subtype"
+              label="Project Type"
               value={profile.property_subtype}
             />
             <ProfileField
@@ -127,6 +127,14 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             <ProfileField
               label="County"
               value={profile.county}
+            />
+            <ProfileField
+              label="State"
+              value={profile.state}
+            />
+            <ProfileField
+              label="Zip Code"
+              value={profile.zip_code}
             />
             <ProfileField
               label="Market"

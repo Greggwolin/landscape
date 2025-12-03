@@ -27,7 +27,6 @@ import type {
 const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
   { key: 'transaction_cost', label: 'Transaction Costs', icon: 'Receipt', count: 0 },
-  { key: 'commission', label: 'Commissions', icon: 'Percent', count: 0 },
   { key: 'absorption', label: 'Absorption Velocity', icon: 'Timeline', count: 0 },
   { key: 'contingency', label: 'Contingency Standards', icon: 'Shield', count: 0 },
   { key: 'market_timing', label: 'Market Timing', icon: 'Schedule', count: 0 },
@@ -136,7 +135,7 @@ export default function GlobalBenchmarksPage() {
       });
 
       // Convert sale benchmarks to Benchmark format
-      // Route by benchmark_type: 'commission' → commission category, others → transaction_cost
+      // All sale benchmarks (including commissions) go to transaction_cost category
       const convertedSaleBenchmarks: Benchmark[] = saleBenchmarks.map((sb: any) => {
         // Determine value and value_type based on what fields are set
         let value: number | undefined;
@@ -153,8 +152,8 @@ export default function GlobalBenchmarksPage() {
           value_type = 'per_unit';
         }
 
-        // Route to category based on benchmark_type
-        const category = sb.benchmark_type === 'commission' ? 'commission' : 'transaction_cost';
+        // All benchmarks go to transaction_cost category (including commissions)
+        const category = 'transaction_cost';
 
         return {
           benchmark_id: sb.benchmark_id, // Use actual ID, not offset
@@ -319,72 +318,6 @@ export default function GlobalBenchmarksPage() {
                       onRefresh={loadData}
                       onSelectSet={handleGrowthRateSelect}
                     />
-                  );
-                }
-
-                if (category.key === 'commission') {
-                  const isExpanded = selectedCategory?.key === category.key;
-                  const commissionBenchmarks = benchmarks[category.key] || [];
-
-                  return (
-                    <div key={category.key} className="border-b border-line-soft">
-                      <button
-                        onClick={() =>
-                          setSelectedCategory(isExpanded ? null : category)
-                        }
-                        className="flex w-full items-center justify-between px-4 py-3 text-left text-text-primary transition-colors hover:bg-surface-card/80"
-                        style={{ backgroundColor: 'var(--surface-card-header)' }}
-                      >
-                        <div className="flex items-center gap-3">
-                          {isExpanded ? (
-                            <ChevronDown size={20} className="text-text-secondary" />
-                          ) : (
-                            <ChevronRight size={20} className="text-text-secondary" />
-                          )}
-                          <span className="font-medium">{category.label}</span>
-                        </div>
-                        <span className="text-sm text-text-secondary">
-                          {category.count}
-                        </span>
-                      </button>
-                      {isExpanded && (
-                        <div className="bg-surface-bg">
-                          {/* Property Sales Section */}
-                          <div>
-                            <h3 className="text-sm font-semibold mb-2 px-4 pt-4" style={{ color: 'var(--cui-secondary-color)' }}>
-                              Property Sales
-                            </h3>
-                            <BenchmarkAccordion
-                              category={category}
-                              benchmarks={commissionBenchmarks}
-                              isExpanded={true}
-                              hideHeader={true}
-                              onToggle={() => {}}
-                              onBenchmarkClick={(benchmark) => handleBenchmarkSelect(category, benchmark)}
-                              onAddNew={() => {
-                                setAddingToCategory(category);
-                                setShowAddModal(true);
-                              }}
-                              onRefresh={loadData}
-                            />
-                          </div>
-
-                          {/* Leasing Section */}
-                          <div className="pt-4 pb-4">
-                            <h3 className="text-sm font-semibold mb-2 px-4" style={{ color: 'var(--cui-secondary-color)' }}>
-                              Leasing
-                            </h3>
-                            <div className="mx-4 px-3 py-2 rounded border text-sm" style={{
-                              borderColor: 'var(--cui-border-color)',
-                              color: 'var(--cui-secondary-color)',
-                              backgroundColor: 'var(--cui-body-bg)'
-                            }}>
-                              No leasing commissions configured
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
                   );
                 }
 

@@ -7,6 +7,7 @@ export function useBudgetData(projectId: number) {
   const [data, setData] = useState<BudgetItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasFrontFeet, setHasFrontFeet] = useState(false);
 
   const normalizeItem = useCallback((raw: any): BudgetItem => {
     const startDateStr = raw.start_date ?? raw.startDate ?? null;
@@ -121,6 +122,19 @@ export function useBudgetData(projectId: number) {
             ? Boolean(raw.cfStartFlag)
             : null,
       activity: raw.activity ?? raw.activity ?? null,
+      // Phase measurements for UOM auto-population
+      phase_units:
+        raw.phase_units !== undefined && raw.phase_units !== null
+          ? Number(raw.phase_units)
+          : null,
+      phase_acres:
+        raw.phase_acres !== undefined && raw.phase_acres !== null
+          ? Number(raw.phase_acres)
+          : null,
+      phase_front_feet:
+        raw.phase_front_feet !== undefined && raw.phase_front_feet !== null
+          ? Number(raw.phase_front_feet)
+          : null,
     };
   }, []);
 
@@ -138,6 +152,8 @@ export function useBudgetData(projectId: number) {
       const result = await response.json();
       const items = Array.isArray(result) ? result : (result.items || []);
       setData(items.map(normalizeItem));
+      // Track if project has front feet data for conditional column visibility
+      setHasFrontFeet(result.hasFrontFeet ?? false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch budget data');
       console.error('Error fetching budget data:', err);
@@ -256,6 +272,7 @@ export function useBudgetData(projectId: number) {
     data,
     loading,
     error,
+    hasFrontFeet,
     refetch: fetchData,
     updateItem,
     createItem,

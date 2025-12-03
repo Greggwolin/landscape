@@ -85,11 +85,12 @@ export interface BudgetItem {
   curve_id?: number | null; // FK to core_fin_curve
 
   // =========================================================================
-  // STANDARD MODE: Cost Controls (6 fields)
+  // STANDARD MODE: Cost Controls (7 fields)
   // =========================================================================
   contingency_pct: number | null; // Cost buffer %
   confidence_level: ConfidenceLevel | null; // Estimation confidence
   vendor_name: string | null; // Vendor or supplier
+  vendor_contact_id: number | null; // FK to contacts table
   contract_number: string | null; // Contract reference
   purchase_order: string | null; // PO number
   is_committed: boolean | null; // Cannot delete if true
@@ -177,6 +178,14 @@ export interface BudgetItem {
   container_display?: string;
   vendor_contact?: number | null; // FK to contacts table
   growth_rate_set_id?: number | null; // FK to growth rate sets
+
+  // =========================================================================
+  // PHASE MEASUREMENTS (read-only, from parcel aggregation)
+  // Used for UOM auto-population and display in Planning Budget
+  // =========================================================================
+  phase_units?: number | null; // Sum of parcel units for this phase
+  phase_acres?: number | null; // Sum of parcel acres for this phase
+  phase_front_feet?: number | null; // Sum(units * lot_width) for this phase
 
   // =========================================================================
   // UI STATE (client-side only)

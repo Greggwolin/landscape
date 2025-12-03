@@ -1,0 +1,119 @@
+/**
+ * VarianceItem Component
+ *
+ * Displays a single variance between AI suggestion and actual value.
+ * Shows the assumption key, suggested vs actual values, and variance percentage.
+ */
+
+import React from 'react';
+import { CCard, CCardBody } from '@coreui/react';
+
+interface VarianceItemProps {
+  assumptionKey: string;
+  lifecycleStage: string;
+  suggestedValue: number;
+  actualValue: number;
+  variancePercent: number;
+  confidenceLevel: string;
+  adviceDate: string;
+  notes?: string | null;
+}
+
+export default function VarianceItem({
+  assumptionKey,
+  lifecycleStage,
+  suggestedValue,
+  actualValue,
+  variancePercent,
+  confidenceLevel,
+  adviceDate,
+  notes,
+}: VarianceItemProps) {
+  // Format assumption key to readable label
+  const formatLabel = (key: string) => {
+    return key
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Determine variance direction
+  const isHigher = actualValue > suggestedValue;
+
+  // Format date
+  const formattedDate = new Date(adviceDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+
+  // Format currency or number based on assumption key
+  const formatValue = (value: number) => {
+    if (assumptionKey.includes('price') || assumptionKey.includes('cost')) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).format(value);
+    } else if (assumptionKey.includes('percent')) {
+      return `${value}%`;
+    } else {
+      return value.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      });
+    }
+  };
+
+  return (
+    <CCard className="mb-2 border">
+      <CCardBody className="p-3">
+        {/* Header: Assumption name and stage */}
+        <div className="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <div className="fw-semibold">{formatLabel(assumptionKey)}</div>
+            <div className="text-muted small">{lifecycleStage}</div>
+          </div>
+          <div className="text-end">
+            <div
+              className={`badge ${
+                variancePercent > 20
+                  ? 'bg-danger'
+                  : variancePercent > 10
+                  ? 'bg-warning'
+                  : 'bg-info'
+              }`}
+            >
+              {isHigher ? '+' : '-'}{variancePercent.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+
+        {/* Values comparison */}
+        <div className="small">
+          <div className="d-flex justify-content-between mb-1">
+            <span className="text-muted">AI Suggested:</span>
+            <span className="fw-semibold">{formatValue(suggestedValue)}</span>
+          </div>
+          <div className="d-flex justify-content-between mb-1">
+            <span className="text-muted">Your Value:</span>
+            <span className="fw-semibold">{formatValue(actualValue)}</span>
+          </div>
+        </div>
+
+        {/* Metadata */}
+        <div className="d-flex justify-content-between align-items-center mt-2 pt-2 border-top text-muted small">
+          <span>
+            Confidence: <span className="fw-semibold">{confidenceLevel}</span>
+          </span>
+          <span>{formattedDate}</span>
+        </div>
+
+        {/* Notes if available */}
+        {notes && (
+          <div className="mt-2 pt-2 border-top text-muted small">{notes}</div>
+        )}
+      </CCardBody>
+    </CCard>
+  );
+}

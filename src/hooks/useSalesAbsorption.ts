@@ -74,8 +74,7 @@ export function useParcelsWithSales(
       return response.json();
     },
     enabled: !!projectId,
-    staleTime: 30 * 1000, // 30 seconds (reduced from 2 minutes)
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 }
 
@@ -254,8 +253,8 @@ export function usePricingAssumptions(projectId: number | null) {
       return data;
     },
     enabled: !!projectId,
-    staleTime: 30 * 1000, // 30 seconds (reduced from 2 minutes)
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: 2 * 60 * 1000, // 2 minutes - data changes infrequently
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   });
 }
 
@@ -273,47 +272,68 @@ export function useSavePricingAssumptions() {
       projectId: number;
       assumptions: PricingAssumption[];
     }) => {
-      // Save each assumption individually
-      const promises = assumptions.map(async (assumption) => {
-        console.log('[useSavePricingAssumptions] Full assumption object:', assumption);
-        console.log('[useSavePricingAssumptions] Keys:', Object.keys(assumption));
-        console.log('[useSavePricingAssumptions] ID value:', assumption.id, 'Type:', typeof assumption.id);
+      console.log(`[useSavePricingAssumptions] Bulk saving ${assumptions.length} pricing assumption(s)`);
 
-        const url = assumption.id
-          ? `/api/projects/${projectId}/pricing-assumptions/${assumption.id}/`
-          : `/api/projects/${projectId}/pricing-assumptions/`;
-
-        const method = assumption.id ? 'PUT' : 'POST';
-
-        console.log(`[useSavePricingAssumptions] Will use ${method} to ${url}`);
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(assumption),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to save pricing assumption`);
-        }
-
-        return response.json();
+      // Use bulk endpoint for ALL saves - handles 1 or 20 rows in ONE SQL query
+      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/bulk/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ assumptions }),
       });
 
-      return Promise.all(promises);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save pricing assumptions');
+      }
+
+      return response.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       // Invalidate pricing assumptions to refetch
-      queryClient.invalidateQueries({
+      await queryClient.invalidateQueries({
         queryKey: ['pricing-assumptions', variables.projectId],
       });
-      // Also invalidate parcels-with-sales to show updated values
-      queryClient.invalidateQueries({
+
+      // CRITICAL: Trigger recalculation when pricing assumptions change
+      // Growth rate changes affect inflated prices and net proceeds
+      // MUST wait for recalculation to complete before invalidating parcels cache
+      try {
+        console.log('[useSavePricingAssumptions] Starting recalculation for all parcel types...');
+
+        // Get unique type codes from the saved assumptions
+        const typesCodes = [...new Set(variables.assumptions.map(a => a.lu_type_code))];
+        console.log('[useSavePricingAssumptions] Recalculating types:', typesCodes);
+
+        // Make ONE call with all type codes (comma-separated)
+        const typeCodesParam = typesCodes.join(',');
+        const response = await fetch(
+          `/api/projects/${variables.projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[useSavePricingAssumptions] Recalculation failed:', errorText);
+          throw new Error(`Recalculation failed: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log(`[useSavePricingAssumptions] Recalculated ${result.updated_count} parcels for types: ${result.type_codes}`);
+      } catch (error) {
+        console.error('[useSavePricingAssumptions] Failed to trigger recalculation:', error);
+        throw error; // Re-throw to prevent cache invalidation on failure
+      }
+
+      // Only invalidate parcels cache AFTER recalculation completes successfully
+      await queryClient.invalidateQueries({
         queryKey: ['parcels-with-sales', variables.projectId],
       });
+      console.log('[useSavePricingAssumptions] Cache invalidated, new data will be fetched');
     },
   });
 }
@@ -377,8 +397,8 @@ export function useParcelProductTypes(
       return response.json();
     },
     enabled: !!projectId,
-    staleTime: 30 * 1000, // 30 seconds (reduced from 5 minutes)
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: 5 * 60 * 1000, // 5 minutes - product types don't change often
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   });
 }
 

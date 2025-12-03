@@ -9,9 +9,15 @@ import PhaseCell from './custom/PhaseCell';
 import type { BudgetMode, BudgetItem } from '@/types/budget';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
+import { UOMSelect } from '@/components/common/UOMSelect';
 
 // Re-export BudgetItem for backward compatibility
 export type { BudgetItem };
+
+export type BudgetColumnDef<TData> = ColumnDef<TData> & {
+  headerClassName?: string;
+  cellClassName?: string;
+};
 
 // Use standard formatters from UI_STANDARDS_v1.0.md
 const moneyFmt = (value?: number | null) => formatMoney(value);
@@ -34,23 +40,16 @@ type ColumnHandlers = {
   onGroupByPhase?: () => void;
   onGroupByStage?: () => void;
   onGroupByCategory?: () => void;
+  hasFrontFeet?: boolean; // Whether to show Frt Ft column
+  costInflationRate?: number; // Project-level cost inflation rate (decimal, e.g., 0.03 for 3%)
 };
 
 const editableCell = (ctx: any) => <EditableCell {...ctx} />;
 
-const uomOptions = [
-  { value: 'EA', label: 'Each' },
-  { value: 'AC', label: 'Acre' },
-  { value: 'SF', label: 'Square Feet' },
-  { value: 'LF', label: 'Linear Feet' },
-  { value: 'CY', label: 'Cubic Yards' },
-  { value: 'LOT', label: 'Lot' },
-];
-
 export function getColumnsByMode(
   mode: BudgetMode,
   handlers: ColumnHandlers = {}
-): ColumnDef<BudgetItem>[] {
+): BudgetColumnDef<BudgetItem>[] {
   const createMeta = (
     field: keyof BudgetItem,
     inputType: 'text' | 'number' | 'currency' | 'select',
@@ -67,7 +66,7 @@ export function getColumnsByMode(
     },
   });
 
-  const napkinColumns: ColumnDef<BudgetItem>[] = [
+  const napkinColumns: BudgetColumnDef<BudgetItem>[] = [
     {
       accessorKey: 'division_id',
       header: () => (
@@ -88,9 +87,9 @@ export function getColumnsByMode(
           )}
         </div>
       ),
-      size: 180,
-      minSize: 150,
-      maxSize: 300,
+      size: 140,
+      minSize: 100,
+      maxSize: 200,
       cell: (ctx) => (
         <PhaseCell
           row={ctx.row}
@@ -106,8 +105,8 @@ export function getColumnsByMode(
     {
       accessorKey: 'notes',
       header: 'Description',
-      size: 400,
-      minSize: 50,
+      size: 160,
+      minSize: 100,
       meta: {
         ...createMeta('notes', 'text'),
         inputType: 'template-autocomplete' as const,
@@ -140,41 +139,141 @@ export function getColumnsByMode(
       },
       cell: editableCell,
     },
+    // Phase measurement columns (read-only, from parcel aggregation)
+    // Bold when UOM matches the measurement type
     {
-      accessorKey: 'qty',
-      header: () => <div className="text-center">Qty</div>,
-      size: 90,
-      meta: {
-        ...createMeta('qty', 'number'),
-        kind: 'numeric' as const,
-        align: 'center' as const,
+      accessorKey: 'phase_units',
+      header: () => <div className="text-end">Units</div>,
+      headerClassName: 'text-end',
+      size: 60,
+      minSize: 55,
+      meta: { align: 'right' as const },
+      cell: ({ row, getValue }) => {
+        const value = getValue() as number | null;
+        const uom = row.original.uom_code;
+        const isBold = uom === '$/Unit' || uom === 'Unit';
+        return (
+          <span
+            className={`text-end d-block ${isBold ? 'fw-semibold' : 'text-muted'}`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {value != null && value > 0 ? numberFmt(value) : '—'}
+          </span>
+        );
       },
-      cell: editableCell,
     },
+    {
+      accessorKey: 'phase_acres',
+      header: () => <div className="text-end">Acres</div>,
+      headerClassName: 'text-end',
+      size: 60,
+      minSize: 55,
+      meta: { align: 'right' as const },
+      cell: ({ row, getValue }) => {
+        const value = getValue() as number | null;
+        const uom = row.original.uom_code;
+        const isBold = uom === 'AC' || uom === '$/AC';
+        return (
+          <span
+            className={`text-end d-block ${isBold ? 'fw-semibold' : 'text-muted'}`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {value != null && value > 0 ? numberFmt(value) : '—'}
+          </span>
+        );
+      },
+    },
+    // Frt Ft column - conditionally included based on hasFrontFeet
+    ...(handlers.hasFrontFeet !== false ? [{
+      accessorKey: 'phase_front_feet',
+      header: () => <div className="text-end">Frt Ft</div>,
+      headerClassName: 'text-end',
+      size: 75,
+      minSize: 65,
+      meta: { align: 'right' as const },
+      cell: ({ row, getValue }: { row: any; getValue: () => unknown }) => {
+        const value = getValue() as number | null;
+        const uom = row.original.uom_code;
+        const isBold = uom === 'FF' || uom === '$/FF';
+        return (
+          <span
+            className={`text-end d-block ${isBold ? 'fw-semibold' : 'text-muted'}`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {value != null && value > 0 ? numberFmt(value) : '—'}
+          </span>
+        );
+      },
+    } as BudgetColumnDef<BudgetItem>] : []),
     {
       accessorKey: 'uom_code',
       header: () => <div className="text-center">UOM</div>,
-      size: 80,
-      meta: {
-        ...createMeta('uom_code', 'select', uomOptions),
-        align: 'center' as const,
-      },
-      cell: editableCell,
+      size: 95,
+      minSize: 90,
+      meta: { align: 'center' as const },
+      cell: ({ row }) => (
+        <div
+          className="d-flex justify-content-center"
+          style={{ minWidth: 90 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <UOMSelect
+            context="budget_cost"
+            value={row.original.uom_code || ''}
+            disabled={!handlers.onInlineCommit}
+            onChange={async (code) => {
+              if (!handlers.onInlineCommit) return;
+
+              // Update UOM first
+              await handlers.onInlineCommit(row.original, 'uom_code', code);
+
+              // Auto-populate qty if currently empty/zero
+              const currentQty = row.original.qty;
+              if (!currentQty || currentQty === 0) {
+                let autoQty: number | null = null;
+
+                switch (code) {
+                  case 'AC':
+                    autoQty = row.original.phase_acres ?? null;
+                    break;
+                  case 'FF':
+                    autoQty = row.original.phase_front_feet ?? null;
+                    break;
+                  case 'LS':
+                  case '$$$':
+                    autoQty = 1;
+                    break;
+                }
+
+                if (autoQty !== null) {
+                  await handlers.onInlineCommit(row.original, 'qty', Math.round(autoQty));
+                }
+              }
+            }}
+            className="w-100"
+          />
+        </div>
+      ),
     },
     {
       accessorKey: 'rate',
       header: () => <div className="text-end">Rate</div>,
-      size: 120,
+      headerClassName: 'text-end',
+      size: 80,
       meta: {
         ...createMeta('rate', 'currency'),
         kind: 'numeric' as const,
+        align: 'right' as const,
       },
       cell: editableCell,
     },
     {
       accessorKey: 'amount',
       header: () => <div className="text-end">Amount</div>,
+      headerClassName: 'text-end',
       size: 130,
+      cellClassName: 'text-end',
+      meta: { align: 'right' as const },
       cell: ({ getValue }) => (
         <span className="text-success fw-semibold text-end d-block tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {moneyFmt(getValue() as number | null)}
@@ -182,34 +281,82 @@ export function getColumnsByMode(
       ),
     },
     {
+      id: 'escalated_amount',
+      header: () => <div className="text-end">Escalated</div>,
+      headerClassName: 'text-end',
+      size: 130,
+      cellClassName: 'text-end',
+      meta: { align: 'right' as const },
+      cell: ({ row }) => {
+        const item = row.original;
+        const baseAmount = item.amount;
+        const startPeriod = item.start_period;
+
+        // Use project-level cost inflation rate if available, fall back to per-item rate
+        // costInflationRate is decimal (e.g., 0.03), item.escalation_rate is percentage (e.g., 3.0)
+        const escalationRate = handlers.costInflationRate !== undefined
+          ? handlers.costInflationRate * 100 // Convert decimal to percentage for consistency
+          : item.escalation_rate;
+
+        // If no amount, show dash
+        if (!baseAmount) {
+          return <span className="text-muted text-end d-block">—</span>;
+        }
+
+        // If no escalation rate or no start period, show base amount (rounded)
+        if (!escalationRate || !startPeriod) {
+          return (
+            <span className="text-end d-block tnum" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--cui-body-color)' }}>
+              {moneyFmt(Math.round(baseAmount))}
+            </span>
+          );
+        }
+
+        // Calculate escalation: years from project start (period 1 = month 0)
+        const yearsFromStart = Math.max(0, (startPeriod - 1) / 12);
+        const rate = escalationRate / 100; // Convert percentage to decimal
+        const escalatedAmount = Math.round(baseAmount * Math.pow(1 + rate, yearsFromStart));
+
+        // Show escalated amount in primary color if different from base
+        const isDifferent = Math.abs(escalatedAmount - baseAmount) > 0.01;
+        return (
+          <span
+            className="fw-semibold text-end d-block tnum"
+            style={{
+              fontVariantNumeric: 'tabular-nums',
+              color: isDifferent ? 'var(--cui-primary)' : 'var(--cui-body-color)'
+            }}
+          >
+            {moneyFmt(escalatedAmount)}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: 'start_period',
       header: () => <div className="text-center">Start</div>,
       size: 80,
       meta: {
+        ...createMeta('start_period', 'number'),
+        kind: 'numeric' as const,
         align: 'center' as const,
       },
-      cell: ({ row }) => (
-        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
-          {row.original.start_period ?? '-'}
-        </span>
-      ),
+      cell: editableCell,
     },
     {
       accessorKey: 'periods_to_complete',
       header: () => <div className="text-center">Duration</div>,
       size: 100,
       meta: {
+        ...createMeta('periods_to_complete', 'number'),
+        kind: 'numeric' as const,
         align: 'center' as const,
       },
-      cell: ({ row }) => (
-        <span className="text-center d-block tnum" style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
-          {row.original.periods_to_complete ?? '-'}
-        </span>
-      ),
+      cell: editableCell,
     },
   ];
 
-  const actionsColumn: ColumnDef<BudgetItem> = {
+  const actionsColumn: BudgetColumnDef<BudgetItem> = {
     id: 'actions',
     header: '',
     size: 80,
@@ -258,7 +405,7 @@ export function getColumnsByMode(
   // STANDARD/DETAIL MODE COLUMNS (Stage and Category only visible here)
   // =========================================================================
 
-  const stageColumn: ColumnDef<BudgetItem> = {
+  const stageColumn: BudgetColumnDef<BudgetItem> = {
     accessorKey: 'activity',
     header: () => (
       <div className="d-flex align-items-center gap-2">
@@ -292,7 +439,7 @@ export function getColumnsByMode(
     cell: editableCell,
   };
 
-  const categoryEditableColumn: ColumnDef<BudgetItem> = {
+  const categoryEditableColumn: BudgetColumnDef<BudgetItem> = {
     accessorKey: 'category_l1_id',
     header: 'Category',
     size: 200,
@@ -364,20 +511,33 @@ export function getColumnsByMode(
   const phaseColumn = napkinColumns.find(col => 'accessorKey' in col && col.accessorKey === 'division_id');
 
   // Get napkin columns without phase for reuse in standard mode
-  const napkinWithoutPhase = napkinColumns.filter(col =>
-    'accessorKey' in col && col.accessorKey !== 'division_id'
-  );
+  // Include both data columns (accessorKey) and computed columns (id)
+  const napkinWithoutPhase = napkinColumns.filter(col => {
+    if ('accessorKey' in col) {
+      return col.accessorKey !== 'division_id';
+    }
+    // Include computed columns like escalated_amount
+    return 'id' in col && col.id === 'escalated_amount';
+  });
 
   // Split remaining columns to insert variance after amount
-  const napkinBeforeAmount = napkinWithoutPhase.filter(col =>
-    'accessorKey' in col && col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete'
-  );
+  // Include columns with accessorKey (data fields) and id (computed columns like escalated_amount)
+  const napkinBeforeAmount = napkinWithoutPhase.filter(col => {
+    if ('accessorKey' in col) {
+      return col.accessorKey !== 'start_period' && col.accessorKey !== 'periods_to_complete';
+    }
+    // Include computed columns like escalated_amount
+    if ('id' in col && col.id === 'escalated_amount') {
+      return true;
+    }
+    return false;
+  });
   const napkinTimingColumns = napkinWithoutPhase.filter(col =>
     'accessorKey' in col && (col.accessorKey === 'start_period' || col.accessorKey === 'periods_to_complete')
   );
 
   // Category column for Detail mode only (with grouping icon, inline editable)
-  const categoryColumnWithGroup: ColumnDef<BudgetItem> = {
+  const categoryColumnWithGroup: BudgetColumnDef<BudgetItem> = {
     accessorKey: 'category_l1_id',
     header: () => (
       <div className="d-flex align-items-center gap-2">
@@ -415,7 +575,7 @@ export function getColumnsByMode(
   };
 
   // Standard mode: Phase + Stage only
-  const standard: ColumnDef<BudgetItem>[] = [
+  const standard: BudgetColumnDef<BudgetItem>[] = [
     ...(phaseColumn ? [phaseColumn] : []),
     stageColumn,
     ...napkinBeforeAmount,
@@ -433,7 +593,7 @@ export function getColumnsByMode(
   ];
 
   // Detail mode: Phase + Stage + Category
-  const detail: ColumnDef<BudgetItem>[] = [
+  const detail: BudgetColumnDef<BudgetItem>[] = [
     ...(phaseColumn ? [phaseColumn] : []),
     stageColumn,
     categoryColumnWithGroup,

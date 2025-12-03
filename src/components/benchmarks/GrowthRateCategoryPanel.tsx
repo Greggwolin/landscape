@@ -26,6 +26,7 @@ interface Props {
   sets: GrowthRateSet[];
   isExpanded: boolean;
   loading?: boolean;
+  hideHeader?: boolean;
   onToggle: () => void;
   onRefresh: () => void;
   onSelectSet?: (set: GrowthRateSet) => void;
@@ -52,6 +53,7 @@ export default function GrowthRateCategoryPanel({
   sets,
   isExpanded,
   loading = false,
+  hideHeader = false,
   onToggle,
   onRefresh,
   onSelectSet,
@@ -61,23 +63,25 @@ export default function GrowthRateCategoryPanel({
 
   return (
     <div className="border-b border-line-strong">
-      <button
-        onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-card transition-colors"
-        style={{ backgroundColor: 'var(--surface-card-header)' }}
-      >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown size={20} className="text-text-secondary" />
-          ) : (
-            <ChevronRight size={20} className="text-text-secondary" />
-          )}
-          <span className="font-medium">{category.label}</span>
-        </div>
-        <span className="text-sm text-text-secondary">{sets.length}</span>
-      </button>
+      {!hideHeader && (
+        <button
+          onClick={onToggle}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-card transition-colors"
+          style={{ backgroundColor: 'var(--surface-card-header)' }}
+        >
+          <div className="flex items-center gap-3">
+            {isExpanded ? (
+              <ChevronDown size={20} className="text-text-secondary" />
+            ) : (
+              <ChevronRight size={20} className="text-text-secondary" />
+            )}
+            <span className="font-medium">{category?.label || 'Unknown Category'}</span>
+          </div>
+          <span className="text-sm text-text-secondary">{sets.length}</span>
+        </button>
+      )}
 
-      {isExpanded && (
+      {(isExpanded || hideHeader) && (
         <div className="bg-surface-card px-4 py-4 space-y-4">
           {loading ? (
             <div className="py-6 text-center text-sm text-text-secondary">

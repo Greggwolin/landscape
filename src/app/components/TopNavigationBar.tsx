@@ -9,10 +9,9 @@ import { useIssueReporter } from '@/components/IssueReporter';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
-import SettingsDropdown from './navigation/SettingsDropdown';
 import LandscaperChatModal from './LandscaperChatModal';
 import CIcon from '@coreui/icons-react';
-import { cilBug } from '@coreui/icons';
+import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
 
 /**
  * TopNavigationBar - Tier 1 Global Navigation
@@ -23,20 +22,30 @@ import { cilBug } from '@coreui/icons';
  * - Landscaper AI button
  * - Sandbox dropdown
  * - User menu
- * - Settings dropdown
+ * - Settings button (opens AdminModal)
  * - Theme toggle
  *
  * Height: 58px
  * Background: var(--nav-bg)
  * Position: Sticky top
  */
-export default function TopNavigationBar() {
+interface TopNavigationBarProps {
+  onSettingsClick?: () => void;
+}
+
+export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
   const [isLandscaperOpen, setLandscaperOpen] = useState(false);
   const [showBugHint, setShowBugHint] = useState(false);
+  const [mode, setMode] = useState<'analyst' | 'developer'>('analyst');
   const logoSrc = '/logo-invert.png';
+
+  const toggleMode = () => {
+    setMode(prev => prev === 'analyst' ? 'developer' : 'analyst');
+    // TODO: Persist mode preference to localStorage or user settings
+  };
 
   const navHoverHandlers = (isActive = false) => ({
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
@@ -84,6 +93,7 @@ export default function TopNavigationBar() {
               priority
               className="object-contain"
               sizes="176px"
+              style={{ width: 'auto', height: 'auto' }}
             />
           </Link>
 
@@ -122,22 +132,51 @@ export default function TopNavigationBar() {
             <SandboxDropdown />
             <UserMenuDropdown />
 
-            <SettingsDropdown />
+            {/* Mode Toggle (Analyst/Developer) */}
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="rounded-full px-3 py-2 text-sm font-medium transition-colors"
+              style={{
+                color: 'var(--nav-text)',
+                backgroundColor: 'transparent',
+              }}
+              {...navHoverHandlers()}
+              aria-label="Toggle Analyst/Developer mode"
+              title={`Switch to ${mode === 'analyst' ? 'Developer' : 'Analyst'} mode`}
+            >
+              {mode === 'analyst' ? 'Analyst' : 'Developer'}
+            </button>
+
+            {/* Settings Button */}
+            <button
+              type="button"
+              onClick={onSettingsClick}
+              className="rounded-full p-2 transition-colors"
+              style={{
+                color: 'var(--nav-text)',
+                backgroundColor: 'transparent',
+              }}
+              {...navHoverHandlers()}
+              aria-label="Open settings"
+            >
+              <CIcon icon={cilSettings} size="lg" />
+            </button>
 
             {/* Theme Toggle */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-full border px-3 py-2 text-sm font-medium transition-colors"
+              className="rounded-full px-3 py-2 text-sm font-medium transition-colors d-flex align-items-center gap-2"
               style={{
-                borderColor: 'var(--nav-border)',
                 color: 'var(--nav-text)',
                 backgroundColor: 'transparent',
               }}
               {...navHoverHandlers()}
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
             >
-              {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+              <CIcon icon={theme === 'light' ? cilMoon : cilSun} size="sm" />
+              {theme === 'light' ? 'Dark' : 'Light'}
             </button>
 
             {/* Bug/Issues Icon Button */}

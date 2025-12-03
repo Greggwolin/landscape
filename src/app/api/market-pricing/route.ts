@@ -19,15 +19,18 @@ export async function GET(request: Request) {
     try {
       const pricingData = await sql`
         SELECT
+          lup.id,
           lup.lu_type_code,
+          lup.product_code,
           lup.price_per_unit,
           lup.unit_of_measure,
           lup.inflation_type,
+          lup.growth_rate,
           lst.name as type_name
         FROM landscape.land_use_pricing lup
         LEFT JOIN landscape.lu_subtype lst ON lst.code = lup.lu_type_code
         WHERE lup.project_id = ${projectId}
-        ORDER BY lup.lu_type_code
+        ORDER BY lup.lu_type_code, lup.product_code
       `;
 
       return NextResponse.json(pricingData || []);
@@ -70,15 +73,19 @@ export async function POST(request: Request) {
           INSERT INTO landscape.land_use_pricing (
             project_id,
             lu_type_code,
+            product_code,
             price_per_unit,
             unit_of_measure,
-            inflation_type
+            inflation_type,
+            growth_rate
           ) VALUES (
             ${project_id},
             ${item.lu_type_code},
+            ${item.product_code || null},
             ${item.price_per_unit},
             ${item.unit_of_measure || 'LS'},
-            ${item.inflation_type || 'Global'}
+            ${item.inflation_type || 'Global'},
+            ${item.growth_rate || null}
           )
         `;
       }

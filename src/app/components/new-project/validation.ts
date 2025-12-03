@@ -3,7 +3,7 @@ import type { NewProjectFormData } from './types'
 
 const analysisTypeEnum = z.enum(['Land Development', 'Income Property'])
 const developmentTypeEnum = analysisTypeEnum // backwards compatibility
-const locationModeEnum = z.enum(['address', 'cross_streets', 'coordinates'])
+const locationModeEnum = z.enum(['address', 'cross_streets', 'coordinates', 'map_pin'])
 const siteAreaUnitEnum = z.enum(['AC', 'SF', 'SM'])
 const scaleMethodEnum = z.enum(['units', 'density', 'later'])
 
@@ -68,15 +68,20 @@ export const newProjectSchema = z.object({
       data.latitude &&
       data.longitude
 
-    if (!hasAddress && !hasCross && !hasCoordinates) {
+    const hasMapPin =
+      data.location_mode === 'map_pin' &&
+      data.latitude &&
+      data.longitude
+
+    if (!hasAddress && !hasCross && !hasCoordinates && !hasMapPin) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide an address, cross streets, or coordinates',
+        message: 'Provide an address, cross streets, or drop a pin on the map',
         path: ['street_address']
       })
     }
 
-    if (data.location_mode === 'coordinates') {
+    if (data.location_mode === 'coordinates' || data.location_mode === 'map_pin') {
       const lat = Number(data.latitude)
       const lon = Number(data.longitude)
       if (Number.isNaN(lat) || lat < -90 || lat > 90) {

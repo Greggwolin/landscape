@@ -479,29 +479,50 @@ def parcels_with_sales(request: Request, project_id: int):
             COALESCE(p.units_total, 0) as units,
             -- Get sale date from saved assumptions first, fallback to closing event
             COALESCE(psa.sale_date, ce.closing_date) as sale_date,
-            -- Calculate inflated value per unit from pricing assumptions
+            p.sale_period,
+            -- Calculate inflated value per unit using monthly compounding from sale_period
             CASE
-              WHEN pricing.price_per_unit IS NOT NULL AND pricing.growth_rate IS NOT NULL
+              WHEN pricing.price_per_unit IS NOT NULL AND pricing.growth_rate IS NOT NULL AND p.sale_period IS NOT NULL
               THEN ROUND(
                 pricing.price_per_unit * POWER(
-                  1 + pricing.growth_rate,
-                  EXTRACT(YEAR FROM AGE(CURRENT_DATE, pricing.created_at))
+                  1 + (pricing.growth_rate / 12),
+                  p.sale_period
                 )::numeric,
                 2
               )
-              ELSE NULL
+              ELSE pricing.price_per_unit
             END as current_value_per_unit,
-            -- Calculate gross value: inflated_price_per_unit * units
+            -- Calculate gross value using UOM-aware calculation
             CASE
-              WHEN pricing.price_per_unit IS NOT NULL AND pricing.growth_rate IS NOT NULL
-              THEN ROUND(
-                pricing.price_per_unit * POWER(
-                  1 + pricing.growth_rate,
-                  EXTRACT(YEAR FROM AGE(CURRENT_DATE, pricing.created_at))
-                ) * COALESCE(p.units_total, 0),
-                2
-              )
-              ELSE NULL
+              WHEN pricing.price_per_unit IS NOT NULL AND pricing.growth_rate IS NOT NULL AND p.sale_period IS NOT NULL
+              THEN
+                -- Apply UOM formula: FF = price * lot_width * units, EA = price * units, AC = price * acres
+                CASE pricing.unit_of_measure
+                  WHEN 'FF' THEN ROUND((
+                    pricing.price_per_unit * POWER(1 + (pricing.growth_rate / 12), p.sale_period)
+                    * COALESCE(p.lot_width, 0) * COALESCE(p.units_total, 0))::numeric, 2
+                  )
+                  WHEN '$/FF' THEN ROUND((
+                    pricing.price_per_unit * POWER(1 + (pricing.growth_rate / 12), p.sale_period)
+                    * COALESCE(p.lot_width, 0) * COALESCE(p.units_total, 0))::numeric, 2
+                  )
+                  WHEN 'AC' THEN ROUND((
+                    pricing.price_per_unit * POWER(1 + (pricing.growth_rate / 12), p.sale_period)
+                    * COALESCE(p.acres_gross, 0))::numeric, 2
+                  )
+                  ELSE ROUND((
+                    pricing.price_per_unit * POWER(1 + (pricing.growth_rate / 12), p.sale_period)
+                    * COALESCE(p.units_total, 0))::numeric, 2
+                  )
+                END
+              ELSE
+                -- No inflation: apply UOM formula to base price
+                CASE pricing.unit_of_measure
+                  WHEN 'FF' THEN pricing.price_per_unit * COALESCE(p.lot_width, 0) * COALESCE(p.units_total, 0)
+                  WHEN '$/FF' THEN pricing.price_per_unit * COALESCE(p.lot_width, 0) * COALESCE(p.units_total, 0)
+                  WHEN 'AC' THEN pricing.price_per_unit * COALESCE(p.acres_gross, 0)
+                  ELSE pricing.price_per_unit * COALESCE(p.units_total, 0)
+                END
             END as gross_value,
             pricing.unit_of_measure as uom_code,
             -- Add fields needed by frontend for inflation calculations
@@ -1005,6 +1026,458 @@ def get_all_uoms(request: Request) -> Response:
         )
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
+    """
+    Recalculate net sale proceeds for parcels in the project.
+
+    Query Parameters:
+        type_code (optional): Recalculate only specific use type (e.g., 'SFD', 'MF', 'BTR')
+                             If not provided, defaults to 'SFD' for backward compatibility
+
+    Called automatically when improvement offset is updated (SFD only).
+    Can be called manually to recalculate other use types.
+    """
+    from .services import SaleCalculationService
+    from .models import ParcelSaleAssumption
+    from django.db import connection, models, reset_queries
+    import time
+
+    # Enable query tracking
+    reset_queries()
+    start_time = time.time()
+
+    try:
+        # Get project start date and cost inflation rate
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COALESCE(p.start_date, p.analysis_start_date),
+                       CASE
+                         WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
+                         ELSE MAX(CASE WHEN st.step_number = 1 THEN st.rate END)
+                       END AS cost_inflation_rate
+                FROM landscape.tbl_project p
+                LEFT JOIN landscape.tbl_project_settings ps ON ps.project_id = p.project_id
+                LEFT JOIN landscape.core_fin_growth_rate_sets s ON s.set_id = ps.cost_inflation_set_id
+                LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = s.set_id
+                WHERE p.project_id = %s
+                GROUP BY p.project_id, p.start_date, p.analysis_start_date
+            """, [project_id])
+            project_row = cursor.fetchone()
+            project_start_date = project_row[0] if project_row else None
+            cost_inflation_rate = float(project_row[1]) if project_row and project_row[1] else 0
+
+        if not project_start_date:
+            return Response(
+                {"error": "Project start date or analysis start date not found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get type_code filter from query params
+        # If neither parameter provided, recalculate ALL parcels
+        type_codes_param = request.query_params.get('type_codes')  # Comma-separated list
+        type_code_param = request.query_params.get('type_code')     # Single type code
+
+        if type_codes_param:
+            # Multiple type codes: 'SFD,MF,BTR'
+            type_code_filters = [tc.strip() for tc in type_codes_param.split(',')]
+        elif type_code_param:
+            # Single type code: 'SFD'
+            type_code_filters = [type_code_param]
+        else:
+            # No filter: recalculate ALL parcels with pricing
+            type_code_filters = None
+
+        # Get parcels for recalculation
+        with connection.cursor() as cursor:
+            if type_code_filters:
+                # Filter by specific type codes
+                placeholders = ','.join(['%s'] * len(type_code_filters))
+                cursor.execute(f"""
+                    SELECT p.parcel_id, p.type_code, p.product_code,
+                           p.lot_width, p.units_total, p.acres_gross,
+                           p.sale_period, psa.sale_date,
+                           pricing.price_per_unit, pricing.unit_of_measure, pricing.growth_rate
+                    FROM landscape.tbl_parcel p
+                    LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON psa.parcel_id = p.parcel_id
+                    LEFT JOIN landscape.land_use_pricing pricing
+                        ON pricing.project_id = p.project_id
+                        AND pricing.lu_type_code = p.type_code
+                        AND (pricing.product_code = p.product_code OR pricing.product_code IS NULL)
+                    WHERE p.project_id = %s
+                      AND p.type_code IN ({placeholders})
+                      AND (p.units_total > 0 OR p.acres_gross > 0)
+                      AND p.sale_period IS NOT NULL
+                """, [project_id] + type_code_filters)
+            else:
+                # No filter: get ALL parcels with pricing
+                cursor.execute("""
+                    SELECT p.parcel_id, p.type_code, p.product_code,
+                           p.lot_width, p.units_total, p.acres_gross,
+                           p.sale_period, psa.sale_date,
+                           pricing.price_per_unit, pricing.unit_of_measure, pricing.growth_rate
+                    FROM landscape.tbl_parcel p
+                    LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON psa.parcel_id = p.parcel_id
+                    LEFT JOIN landscape.land_use_pricing pricing
+                        ON pricing.project_id = p.project_id
+                        AND pricing.lu_type_code = p.type_code
+                        AND (pricing.product_code = p.product_code OR pricing.product_code IS NULL)
+                    WHERE p.project_id = %s
+                      AND (p.units_total > 0 OR p.acres_gross > 0)
+                      AND p.sale_period IS NOT NULL
+                      AND pricing.price_per_unit IS NOT NULL
+                """, [project_id])
+
+            parcels = cursor.fetchall()
+
+        updated_count = 0
+        from datetime import timedelta
+        updates_to_save = []
+
+        # PRE-FETCH 1: Load ALL UOM formulas once (avoid N database queries)
+        from .models import UOMCalculationFormula
+        uom_formulas_cache = {}
+        all_uom_formulas = UOMCalculationFormula.objects.all()
+        for formula in all_uom_formulas:
+            uom_formulas_cache[formula.uom_code] = formula
+
+        # PRE-FETCH 2: Load ALL benchmarks for this project in one optimized query
+        from .models import SaleBenchmark
+        all_benchmarks_raw = SaleBenchmark.objects.filter(
+            is_active=True
+        ).filter(
+            # Get global benchmarks + this project's benchmarks
+            models.Q(scope_level='global') | models.Q(project_id=project_id)
+        ).select_related()  # Optimize query
+
+        # Build benchmark lookup structure: {(type_code, product_code, benchmark_type): benchmark}
+        benchmarks_lookup = {}
+        for bm in all_benchmarks_raw:
+            # Create keys for all possible lookups
+            # Key format: (scope_level, type_code or None, product_code or None, benchmark_type)
+            key = (bm.scope_level, bm.lu_type_code, bm.product_code, bm.benchmark_type)
+            benchmarks_lookup[key] = bm
+
+        # Helper function to get benchmark with hierarchy (product > project > global)
+        def get_benchmark_from_cache(benchmark_type: str, lu_type: str, product: str):
+            """Look up benchmark using in-memory cache with hierarchy."""
+            # Try product-level first
+            key = ('product', lu_type, product, benchmark_type)
+            if key in benchmarks_lookup:
+                return benchmarks_lookup[key]
+
+            # Try project-level (type_code match, no product_code)
+            for key, bm in benchmarks_lookup.items():
+                if (key[0] == 'project' and
+                    key[3] == benchmark_type and
+                    bm.project_id == project_id):
+                    return bm
+
+            # Try global (no type, no product)
+            for key, bm in benchmarks_lookup.items():
+                if key[0] == 'global' and key[3] == benchmark_type:
+                    return bm
+
+            return None
+
+        # Cache benchmarks by product_code to avoid repeated lookups (performance optimization)
+        benchmarks_cache = {}
+
+        for parcel in parcels:
+            parcel_id, type_code, product_code, lot_width, units, acres, sale_period, sale_date, price_per_unit, uom, growth_rate = parcel
+
+            if not sale_period or not price_per_unit:
+                continue
+
+            # Always calculate sale_date from sale_period to ensure it lands on 1st of month
+            from dateutil.relativedelta import relativedelta
+            # sale_period represents months elapsed (e.g., sale_period 26 = 26 months from start)
+            sale_date = project_start_date + relativedelta(months=sale_period)
+
+            if not price_per_unit:
+                continue
+
+            # Build parcel data
+            parcel_data = {
+                'parcel_id': parcel_id,
+                'project_id': project_id,
+                'type_code': type_code,
+                'product_code': product_code,
+                'lot_width': lot_width,
+                'units_total': units,
+                'acres_gross': acres,
+                'sale_period': sale_period,  # Pass sale_period for accurate monthly compounding
+            }
+
+            # Normalize UOM code (strip $/prefix if present, then map to registry codes)
+            normalized_uom = uom.replace('$/', '') if uom else 'EA'
+            # Map common variations to UOM registry codes
+            uom_mapping = {
+                'Unit': 'EA',
+                'Acre': 'AC',
+                'unit': 'EA',
+                'acre': 'AC',
+            }
+            normalized_uom = uom_mapping.get(normalized_uom, normalized_uom)
+
+            pricing_data = {
+                'price_per_unit': price_per_unit,
+                'unit_of_measure': normalized_uom,
+                'growth_rate': growth_rate or 0,
+                'pricing_effective_date': str(project_start_date),  # Use project start date as pricing effective date
+            }
+
+            # Get benchmarks from cache (built from pre-fetched data)
+            cache_key = f"{type_code}_{product_code or ''}"
+            if cache_key not in benchmarks_cache:
+                # Build benchmarks dict using pre-fetched data (NO database queries)
+                benchmarks = {}
+
+                # Transaction cost types
+                for cost_type in ['legal', 'commission', 'closing', 'title_insurance']:
+                    bm = get_benchmark_from_cache(cost_type, type_code, product_code or '')
+                    if bm:
+                        benchmarks[cost_type] = {
+                            'rate': float(bm.rate_pct) if bm.rate_pct else 0,
+                            'fixed_amount': float(bm.fixed_amount) if bm.fixed_amount else None,
+                            'source': bm.scope_level,
+                            'description': bm.description
+                        }
+
+                # Improvement offset
+                imp_bm = get_benchmark_from_cache('improvement_offset', type_code, product_code or '')
+                if imp_bm:
+                    benchmarks['improvement_offset'] = {
+                        'amount_per_uom': float(imp_bm.amount_per_uom) if imp_bm.amount_per_uom else 0,
+                        'uom': imp_bm.uom_code,
+                        'source': imp_bm.scope_level,
+                        'description': imp_bm.description
+                    }
+
+                benchmarks_cache[cache_key] = benchmarks
+            benchmarks = benchmarks_cache[cache_key]
+
+            # Calculate inline using cached benchmarks for performance
+            from .utils import calculate_inflated_price_from_periods
+            from decimal import Decimal
+
+            # Calculate inflated price
+            inflated_price = calculate_inflated_price_from_periods(
+                base_price=Decimal(str(price_per_unit)),
+                growth_rate=Decimal(str(growth_rate or 0)),
+                periods=int(sale_period)
+            )
+
+            # Calculate gross parcel price using pre-fetched UOM formula (NO database query)
+            parcel_calc_data = {
+                'lot_width': float(lot_width or 0),
+                'units': int(units or 0),
+                'acres': float(acres or 0)
+            }
+
+            # Get UOM formula from pre-fetched cache
+            formula = uom_formulas_cache.get(normalized_uom)
+            if not formula:
+                # Fallback to default calculation if formula not found
+                gross_parcel_price = Decimal(str(float(inflated_price) * int(units or 0)))
+            else:
+                # Use formula's calculate method (pure Python, no DB access)
+                gross_value = formula.calculate(parcel_calc_data, float(inflated_price))
+                gross_parcel_price = Decimal(str(gross_value))
+
+            # Get improvement offset from benchmarks
+            base_improvement_offset_per_uom = Decimal(str(benchmarks.get('improvement_offset', {}).get('amount_per_uom', 0)))
+
+            # Apply cost inflation to improvement offset (mirrors price inflation on lot prices)
+            if cost_inflation_rate and sale_period and base_improvement_offset_per_uom:
+                inflated_improvement_offset_per_uom = calculate_inflated_price_from_periods(
+                    base_price=base_improvement_offset_per_uom,
+                    growth_rate=Decimal(str(cost_inflation_rate)),
+                    periods=int(sale_period)
+                )
+            else:
+                inflated_improvement_offset_per_uom = base_improvement_offset_per_uom
+
+            # Calculate improvement offset total using inflated offset
+            if normalized_uom == 'FF':
+                improvement_offset_total = inflated_improvement_offset_per_uom * Decimal(str(lot_width or 0)) * Decimal(str(units or 0))
+            elif normalized_uom == 'AC':
+                improvement_offset_total = inflated_improvement_offset_per_uom * Decimal(str(acres or 0))
+            else:  # EA
+                improvement_offset_total = inflated_improvement_offset_per_uom * Decimal(str(units or 0))
+
+            # Calculate gross sale proceeds (after improvement offset)
+            gross_sale_proceeds = gross_parcel_price - improvement_offset_total
+
+            # Get transaction cost benchmarks
+            commission_fixed = benchmarks.get('commission', {}).get('fixed_amount')
+            commission_pct = Decimal(str(benchmarks.get('commission', {}).get('rate', 0))) if not commission_fixed else Decimal('0')
+
+            closing_fixed = benchmarks.get('closing', {}).get('fixed_amount')
+            closing_pct = Decimal(str(benchmarks.get('closing', {}).get('rate', 0))) if not closing_fixed else Decimal('0')
+
+            legal_fixed = benchmarks.get('legal', {}).get('fixed_amount')
+            legal_pct = Decimal(str(benchmarks.get('legal', {}).get('rate', 0))) if not legal_fixed else Decimal('0')
+
+            title_fixed = benchmarks.get('title_insurance', {}).get('fixed_amount')
+            title_pct = Decimal(str(benchmarks.get('title_insurance', {}).get('rate', 0))) if not title_fixed else Decimal('0')
+
+            # Calculate transaction costs (applied to gross_sale_proceeds)
+            # Note: rate is already a decimal (e.g., 0.03 = 3%), no need to divide by 100
+            commission_amount = Decimal(str(commission_fixed)) if commission_fixed else (gross_sale_proceeds * commission_pct)
+            closing_amount = Decimal(str(closing_fixed)) if closing_fixed else (gross_sale_proceeds * closing_pct)
+            legal_amount = Decimal(str(legal_fixed)) if legal_fixed else (gross_sale_proceeds * legal_pct)
+            title_amount = Decimal(str(title_fixed)) if title_fixed else (gross_sale_proceeds * title_pct)
+
+            total_transaction_costs = commission_amount + closing_amount + legal_amount + title_amount
+            net_sale_proceeds = gross_sale_proceeds - total_transaction_costs
+
+            result = {
+                'inflated_price_per_unit': float(inflated_price),
+                'gross_parcel_price': float(gross_parcel_price),
+                'improvement_offset_total': float(improvement_offset_total),
+                'gross_sale_proceeds': float(gross_sale_proceeds),
+                'commission_amount': float(commission_amount),
+                'net_sale_proceeds': float(net_sale_proceeds),
+                'total_transaction_costs': float(total_transaction_costs)
+            }
+
+            # Collect updates for bulk operation
+            updates_to_save.append({
+                'parcel_id': parcel_id,
+                'inflated_price_per_unit': result.get('inflated_price_per_unit', 0),
+                'gross_parcel_price': result.get('gross_parcel_price', 0),
+                'improvement_offset_total': result.get('improvement_offset_total', 0),
+                'gross_sale_proceeds': result.get('gross_sale_proceeds', 0),
+                'commission_amount': result.get('commission_amount', 0),
+                'net_sale_proceeds': result.get('net_sale_proceeds', 0),
+                'total_transaction_costs': result.get('total_transaction_costs', 0),
+                'sale_date': sale_date,
+            })
+
+            updated_count += 1
+
+        # Bulk update all parcels using raw SQL for maximum performance
+        if updates_to_save:
+            from django.db import transaction
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    # TRUE BULK INSERT: Use unnest() to insert all rows in a single query (no round-trips)
+                    # This is 20x faster than executemany() which sends 24 individual INSERT statements
+
+                    # Extract arrays for each column
+                    parcel_ids = [u['parcel_id'] for u in updates_to_save]
+                    inflated_prices = [u['inflated_price_per_unit'] for u in updates_to_save]
+                    gross_prices = [u['gross_parcel_price'] for u in updates_to_save]
+                    improvement_offsets = [u['improvement_offset_total'] for u in updates_to_save]
+                    gross_sale_proceeds_list = [u['gross_sale_proceeds'] for u in updates_to_save]
+                    commission_amounts = [u['commission_amount'] for u in updates_to_save]
+                    net_proceeds = [u['net_sale_proceeds'] for u in updates_to_save]
+                    transaction_costs = [u['total_transaction_costs'] for u in updates_to_save]
+                    sale_dates = [u['sale_date'] for u in updates_to_save]
+
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_parcel_sale_assumptions
+                            (parcel_id, inflated_price_per_unit, gross_parcel_price, improvement_offset_total,
+                             gross_sale_proceeds, commission_amount, net_sale_proceeds, total_transaction_costs,
+                             sale_date, created_at, updated_at)
+                        SELECT
+                            parcel_id,
+                            inflated_price_per_unit,
+                            gross_parcel_price,
+                            improvement_offset_total,
+                            gross_sale_proceeds,
+                            commission_amount,
+                            net_sale_proceeds,
+                            total_transaction_costs,
+                            sale_date,
+                            NOW(),
+                            NOW()
+                        FROM unnest(
+                            %s::bigint[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::date[]
+                        ) AS t(parcel_id, inflated_price_per_unit, gross_parcel_price, improvement_offset_total,
+                               gross_sale_proceeds, commission_amount, net_sale_proceeds, total_transaction_costs, sale_date)
+                        ON CONFLICT (parcel_id)
+                        DO UPDATE SET
+                            inflated_price_per_unit = EXCLUDED.inflated_price_per_unit,
+                            gross_parcel_price = EXCLUDED.gross_parcel_price,
+                            improvement_offset_total = EXCLUDED.improvement_offset_total,
+                            gross_sale_proceeds = EXCLUDED.gross_sale_proceeds,
+                            commission_amount = EXCLUDED.commission_amount,
+                            net_sale_proceeds = EXCLUDED.net_sale_proceeds,
+                            total_transaction_costs = EXCLUDED.total_transaction_costs,
+                            sale_date = EXCLUDED.sale_date,
+                            updated_at = NOW()
+                    """, (parcel_ids, inflated_prices, gross_prices, improvement_offsets, gross_sale_proceeds_list,
+                          commission_amounts, net_proceeds, transaction_costs, sale_dates))
+
+        # Log query statistics
+        total_time = time.time() - start_time
+        num_queries = len(connection.queries)
+        print(f"\n{'='*80}")
+        print(f"RECALCULATE PERFORMANCE STATS")
+        print(f"{'='*80}")
+        print(f"Total Time: {total_time:.3f}s")
+        print(f"Total Queries: {num_queries}")
+        print(f"Parcels Updated: {updated_count}")
+        print(f"Time per Parcel: {total_time/updated_count*1000:.1f}ms" if updated_count > 0 else "N/A")
+        print(f"{'='*80}")
+        print(f"QUERY BREAKDOWN:")
+        print(f"{'='*80}")
+        for i, query in enumerate(connection.queries, 1):
+            sql_preview = query['sql'][:150].replace('\n', ' ')
+            print(f"{i}. [{query['time']}s] {sql_preview}...")
+        print(f"{'='*80}\n")
+
+        # Build query summary for API response
+        query_summary = []
+        for i, query in enumerate(connection.queries, 1):
+            sql_preview = query['sql'][:200].replace('\n', ' ').strip()
+            query_summary.append({
+                'num': i,
+                'time': query['time'],
+                'sql_preview': sql_preview
+            })
+
+        # Build response message
+        if type_code_filters:
+            type_codes_str = ','.join(type_code_filters)
+            message = f'Recalculated {updated_count} parcels ({type_codes_str})'
+        else:
+            message = f'Recalculated {updated_count} parcels (all types)'
+
+        return Response({
+            'success': True,
+            'updated_count': updated_count,
+            'type_codes': type_code_filters or 'all',
+            'message': message,
+            'debug': {
+                'total_time': f'{total_time:.3f}s',
+                'num_queries': num_queries,
+                'time_per_parcel': f'{total_time/updated_count*1000:.1f}ms' if updated_count > 0 else 'N/A',
+                'queries': query_summary[:10]  # First 10 queries only
+            }
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        import traceback
+        print(f"Error in recalculate_sfd_parcels: {str(e)}")
+        print(traceback.format_exc())
+        return Response(
+            {"error": str(e), "traceback": traceback.format_exc()},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def sale_benchmarks(request: Request, project_id: int) -> Response:
@@ -1016,30 +1489,39 @@ def sale_benchmarks(request: Request, project_id: int) -> Response:
 
     if request.method == 'GET':
         try:
+            # Get optional filter parameters
+            benchmark_type_filter = request.query_params.get('benchmark_type')
+            scope_level_filter = request.query_params.get('scope_level')
+
             # Get all applicable benchmarks for this project
             benchmarks = []
 
+            # Build base filters
+            base_filters = {'is_active': True}
+            if benchmark_type_filter:
+                base_filters['benchmark_type'] = benchmark_type_filter
+
             # Global benchmarks
-            global_benchmarks = SaleBenchmark.objects.filter(
-                scope_level='global',
-                is_active=True
-            )
+            global_filters = {**base_filters, 'scope_level': 'global'}
+            global_benchmarks = SaleBenchmark.objects.filter(**global_filters)
 
             # Project benchmarks
-            project_benchmarks = SaleBenchmark.objects.filter(
-                scope_level='project',
-                project_id=project_id,
-                is_active=True
-            )
+            project_filters = {**base_filters, 'scope_level': 'project', 'project_id': project_id}
+            project_benchmarks = SaleBenchmark.objects.filter(**project_filters)
 
             # Product benchmarks
-            product_benchmarks = SaleBenchmark.objects.filter(
-                scope_level='product',
-                project_id=project_id,
-                is_active=True
-            )
+            product_filters = {**base_filters, 'scope_level': 'product', 'project_id': project_id}
+            product_benchmarks = SaleBenchmark.objects.filter(**product_filters)
 
-            all_benchmarks = list(global_benchmarks) + list(project_benchmarks) + list(product_benchmarks)
+            # Apply scope_level filter if specified
+            if scope_level_filter == 'global':
+                all_benchmarks = list(global_benchmarks)
+            elif scope_level_filter == 'project':
+                all_benchmarks = list(project_benchmarks)
+            elif scope_level_filter == 'product':
+                all_benchmarks = list(product_benchmarks)
+            else:
+                all_benchmarks = list(global_benchmarks) + list(project_benchmarks) + list(product_benchmarks)
 
             return Response({
                 'benchmarks': [
@@ -1110,11 +1592,11 @@ def global_sale_benchmarks(request: Request) -> Response:
 
     if request.method == 'GET':
         try:
-            # Get all global benchmarks
+            # Get all sale benchmarks (both global and project-level)
+            # This allows the UI to display and toggle between global/custom
             global_benchmarks = SaleBenchmark.objects.filter(
-                scope_level='global',
                 is_active=True
-            ).order_by('benchmark_type')
+            ).order_by('scope_level', 'benchmark_type')
 
             return Response({
                 'benchmarks': [
@@ -1206,13 +1688,22 @@ def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
         # Handle PUT/PATCH - Update fields
         data = request.data
 
+        print(f"\n[update_sale_benchmark] Received PATCH for benchmark_id={benchmark_id}")
+        print(f"[update_sale_benchmark] Current scope_level: {benchmark.scope_level}")
+        print(f"[update_sale_benchmark] Request data: {data}")
+
         if 'benchmark_name' in data:
             benchmark.benchmark_name = data['benchmark_name']
         if 'scope_level' in data:
             # Validate scope_level is valid choice
             valid_scopes = ['global', 'project', 'product']
+            print(f"[update_sale_benchmark] Requested scope_level: {data['scope_level']}")
             if data['scope_level'] in valid_scopes:
+                old_scope = benchmark.scope_level
                 benchmark.scope_level = data['scope_level']
+                print(f"[update_sale_benchmark] Updated scope_level from '{old_scope}' to '{benchmark.scope_level}'")
+            else:
+                print(f"[update_sale_benchmark] Invalid scope_level: {data['scope_level']}")
         if 'rate_pct' in data:
             benchmark.rate_pct = data['rate_pct'] if data['rate_pct'] is not None else None
         if 'amount_per_uom' in data:
@@ -1229,9 +1720,12 @@ def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
         benchmark.updated_by = request.user.username if request.user.is_authenticated else None
         benchmark.save()
 
+        print(f"[update_sale_benchmark] Saved successfully. Final scope_level: {benchmark.scope_level}")
+
         return Response({
             'benchmark_id': benchmark.benchmark_id,
-            'message': 'Benchmark updated successfully'
+            'message': 'Benchmark updated successfully',
+            'scope_level': benchmark.scope_level  # Return the scope_level in response
         }, status=status.HTTP_200_OK)
 
     except SaleBenchmark.DoesNotExist:
@@ -1346,7 +1840,8 @@ def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) ->
                     p.product_code,
                     p.lot_width,
                     p.units_total,
-                    p.acres_gross
+                    p.acres_gross,
+                    p.sale_period
                 FROM landscape.tbl_parcel p
                 WHERE p.parcel_id = %s
                   AND p.project_id = %s
@@ -1367,8 +1862,26 @@ def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) ->
             'product_code': parcel_row[3] or '',
             'lot_width': float(parcel_row[4]) if parcel_row[4] else 0,
             'units_total': int(parcel_row[5]) if parcel_row[5] else 0,
-            'acres_gross': float(parcel_row[6]) if parcel_row[6] else 0
+            'acres_gross': float(parcel_row[6]) if parcel_row[6] else 0,
+            'sale_period': int(parcel_row[7]) if parcel_row[7] else None
         }
+
+        # Fetch cost inflation rate from project settings
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    CASE
+                        WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
+                        ELSE MAX(CASE WHEN st.step_number = 1 THEN st.rate END)
+                    END AS cost_inflation_rate
+                FROM landscape.tbl_project_settings ps
+                LEFT JOIN landscape.core_fin_growth_rate_sets s ON s.set_id = ps.cost_inflation_set_id
+                LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = s.set_id
+                WHERE ps.project_id = %s
+                GROUP BY ps.project_id
+            """, [project_id])
+            inflation_row = cursor.fetchone()
+            cost_inflation_rate = float(inflation_row[0]) if inflation_row and inflation_row[0] else None
 
         # Fetch pricing data
         with connection.cursor() as cursor:
@@ -1394,9 +1907,22 @@ def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) ->
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Normalize UOM code (strip $/prefix if present, then map to registry codes)
+        raw_uom = pricing_row[1]
+        normalized_uom = raw_uom.replace('$/', '') if raw_uom else 'EA'
+
+        # Map legacy UOM codes to standard registry codes
+        uom_mapping = {
+            'SF': 'SF',  # Square Foot
+            'FF': 'FF',  # Front Foot
+            'AC': 'AC',  # Acre
+            'EA': 'EA',  # Each (unit)
+        }
+        normalized_uom = uom_mapping.get(normalized_uom, normalized_uom)
+
         pricing_data = {
             'price_per_unit': float(pricing_row[0]),
-            'unit_of_measure': pricing_row[1],
+            'unit_of_measure': normalized_uom,
             'growth_rate': float(pricing_row[2]),
             'pricing_effective_date': pricing_row[3].isoformat() if hasattr(pricing_row[3], 'isoformat') else str(pricing_row[3])
         }
@@ -1409,12 +1935,14 @@ def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) ->
         log_debug(f"  pricing_data: {pricing_data}")
         log_debug(f"  sale_date: {sale_date}")
         log_debug(f"  overrides: {overrides}")
+        log_debug(f"  cost_inflation_rate: {cost_inflation_rate}")
 
         calculation = SaleCalculationService.calculate_sale_proceeds(
             parcel_data=parcel_data,
             pricing_data=pricing_data,
             sale_date=sale_date,
-            overrides=overrides
+            overrides=overrides,
+            cost_inflation_rate=cost_inflation_rate
         )
 
         log_debug(f"✓ Calculation completed successfully")
@@ -1566,6 +2094,23 @@ def parcel_sale_assumptions(request: Request, project_id: int, parcel_id: int) -
                 'acres_gross': float(parcel_row[6]) if parcel_row[6] else 0
             }
 
+            # Fetch cost inflation rate from project settings
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        CASE
+                            WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
+                            ELSE MAX(CASE WHEN st.step_number = 1 THEN st.rate END)
+                        END AS cost_inflation_rate
+                    FROM landscape.tbl_project_settings ps
+                    LEFT JOIN landscape.core_fin_growth_rate_sets s ON s.set_id = ps.cost_inflation_set_id
+                    LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = s.set_id
+                    WHERE ps.project_id = %s
+                    GROUP BY ps.project_id
+                """, [project_id])
+                inflation_row = cursor.fetchone()
+                cost_inflation_rate = float(inflation_row[0]) if inflation_row and inflation_row[0] else None
+
             # Fetch pricing
             with connection.cursor() as cursor:
                 pricing_sql = """
@@ -1604,7 +2149,8 @@ def parcel_sale_assumptions(request: Request, project_id: int, parcel_id: int) -
                 parcel_data=parcel_data,
                 pricing_data=pricing_data,
                 sale_date=sale_date,
-                overrides=overrides
+                overrides=overrides,
+                cost_inflation_rate=cost_inflation_rate
             )
 
             # Save to database using raw SQL (since model is unmanaged)
@@ -1703,3 +2249,4 @@ def parcel_sale_assumptions(request: Request, project_id: int, parcel_id: int) -
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+

@@ -5,8 +5,10 @@
 
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useContainers } from '@/hooks/useContainers'
+import { useProjectConfig } from '@/hooks/useProjectConfig'
+import { useParcelsWithSales } from '@/hooks/useSalesAbsorption'
 
 interface Props {
   projectId: number
@@ -35,17 +37,53 @@ export default function AreaTiles({
   onAreaSelect,
   showCosts = false
 }: Props) {
-  const { areas, isLoading, error } = useContainers({
+  const { areas, phases, isLoading, error } = useContainers({
     projectId,
     includeCosts: showCosts
   })
+  const { labels } = useProjectConfig(projectId)
+  const { data: parcelDataset } = useParcelsWithSales(projectId, null)
+
+  // Calculate net proceeds per area by aggregating from parcels through phases
+  const areaNetProceeds = useMemo(() => {
+    const proceedsMap = new Map<number, number>()
+    if (!parcelDataset?.parcels || !phases.length || !areas.length) return proceedsMap
+
+    const parcels = parcelDataset.parcels
+
+    // Build a map of phase_name -> parent area division_id
+    const phaseToAreaMap = new Map<string, number>()
+    phases.forEach(phase => {
+      if (phase.parent_id) {
+        phaseToAreaMap.set(phase.name, phase.parent_id)
+      }
+    })
+
+    // Initialize area proceeds
+    areas.forEach(area => proceedsMap.set(area.division_id, 0))
+
+    // Sum up net proceeds per area from parcels
+    parcels.forEach(parcel => {
+      if (parcel.phase_name) {
+        const areaId = phaseToAreaMap.get(parcel.phase_name)
+        if (areaId) {
+          const current = proceedsMap.get(areaId) || 0
+          proceedsMap.set(areaId, current + (parcel.net_proceeds || 0))
+        }
+      }
+    })
+
+    return proceedsMap
+  }, [areas, phases, parcelDataset])
+
+  const gridClass = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2';
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {[...Array(3)].map((_, i) => (
+      <div className={gridClass}>
+        {[...Array(4)].map((_, i) => (
           <div key={i} className="animate-pulse">
-            <div className="h-40 bg-gray-200 rounded border-2"></div>
+            <div className="h-36 bg-gray-200 rounded border-2"></div>
           </div>
         ))}
       </div>
@@ -69,18 +107,27 @@ export default function AreaTiles({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className={gridClass}>
       {areas.map((area) => {
         const isSelected = selectedAreaIds.includes(area.division_id)
+
+        const rawName = area.name || area.code || `Area ${area.division_id}`;
+        // Remove standalone word "Area" while keeping other context (e.g., "Village Area 1" -> "Village 1")
+        const cleaned = rawName
+          .replace(/\bArea\b/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        const displayName = cleaned.length > 0 ? cleaned : rawName;
+        const netProceeds = areaNetProceeds.get(area.division_id) || 0;
 
         return (
           <div
             key={area.division_id}
-            className={`planning-tile ${isSelected ? 'planning-tile-active' : ''}`}
+            className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
             onClick={() => onAreaSelect(area.division_id)}
           >
             <div className="planning-tile-header mb-3">
-              Village {area.name}
+              {labels.level1Label} {displayName}
             </div>
 
             <div className="space-y-1.5 text-sm">
@@ -118,22 +165,24 @@ export default function AreaTiles({
                 </div>
               )}
 
-              {showCosts && (
-                <>
-                  <div className="flex justify-between">
-                    <span style={{ color: 'var(--cui-body-color)' }}>Area Cost:</span>
-                    <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                      {formatCurrency(area.directCost)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span style={{ color: 'var(--cui-body-color)' }}>Phase Cost:</span>
-                    <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                      {formatCurrency(area.childCost)}
-                    </span>
-                  </div>
-                </>
+              {showCosts && area.totalCost > 0 && (
+                <div className="flex justify-between mt-1">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Budget:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-success)' }}>
+                    {formatCurrency(area.totalCost)}
+                  </span>
+                </div>
               )}
+
+              {netProceeds > 0 && (
+                <div className="flex justify-between mt-1">
+                  <span style={{ color: 'var(--cui-body-color)' }}>Net $$:</span>
+                  <span className="font-semibold" style={{ color: 'var(--cui-success)' }}>
+                    {formatCurrency(netProceeds)}
+                  </span>
+                </div>
+              )}
+
             </div>
 
             {isSelected && (

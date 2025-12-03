@@ -40,6 +40,9 @@
   --cui-header-hover-bg: var(--nav-hover-bg);
   --cui-header-active-bg: var(--nav-active-bg);
   --cui-header-brand-color: var(--nav-brand);
+
+  /* Validation Report */
+  --validation-unit-price-color: #000;
 }
 
 /* v1.0 · Dark header contrast fix — keep near other CoreUI var bridges */
@@ -106,6 +109,7 @@
   --cui-secondary-color: var(--text-secondary);
   --cui-card-bg: var(--surface-card);
   --filter-icon-color: #ffffff;
+  --validation-unit-price-color: #07FF8A;
 }
 
 /* Dark mode button overrides - direct rules, not variables */
@@ -350,8 +354,7 @@ body {
   position: relative;
 }
 
-.form-floating > .form-control,
-.form-floating > .form-select {
+.form-floating > .form-control {
   height: calc(3.5rem + 2px);
   line-height: 1.25;
   padding: 1rem 0.75rem;
@@ -372,7 +375,9 @@ body {
 
 .form-floating > .form-control:focus ~ label,
 .form-floating > .form-control:not(:placeholder-shown) ~ label,
-.form-floating > .form-select ~ label {
+.form-floating > .form-select:focus ~ label,
+.form-floating > .form-select.has-value ~ label,
+.form-floating > .form-select:not([value=""]) ~ label {
   opacity: 0.65;
   transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
 }

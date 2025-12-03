@@ -53,13 +53,19 @@ export default function FiltersAccordion({
   const { areas, phases, isLoading } = useContainers({ projectId, includeCosts: true })
   const { labels } = useProjectConfig(projectId)
 
-  // Filter out containers with no acres (these are duplicates or empty containers)
+  // Prefer containers with data, but fall back to showing everything so users can still select areas/phases
   const validAreas = React.useMemo(() => {
-    return areas.filter(area => area.acres > 0 || area.units > 0)
+    const filtered = areas.filter(area =>
+      area.acres > 0 || area.units > 0 || area.phaseCount > 0 || area.parcelCount > 0 || area.totalCost > 0
+    )
+    return filtered.length > 0 ? filtered : areas
   }, [areas])
 
   const validPhases = React.useMemo(() => {
-    return phases.filter(phase => phase.acres > 0 || phase.units > 0)
+    const filtered = phases.filter(phase =>
+      phase.acres > 0 || phase.units > 0 || phase.parcelCount > 0 || phase.totalCost > 0
+    )
+    return filtered.length > 0 ? filtered : phases
   }, [phases])
 
   const hasFilters = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0
@@ -127,6 +133,11 @@ export default function FiltersAccordion({
 
             {!isLoading && validAreas.length > 0 && validAreas.map((area) => {
               const isSelected = selectedAreaIds.includes(area.division_id)
+              // Clean the name: remove redundant "Area" since we're already prefixing with the label
+              const cleanName = area.name
+                .replace(/\bArea\b/gi, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim()
 
               return (
                 <div
@@ -135,7 +146,7 @@ export default function FiltersAccordion({
                   onClick={() => onAreaSelect(area.division_id)}
                 >
                   <div className="planning-tile-header">
-                    {labels.level1Label} {area.name}
+                    {labels.level1Label} {cleanName}
                   </div>
 
                   <div className="planning-tile-stat">

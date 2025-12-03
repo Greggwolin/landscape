@@ -1137,6 +1137,11 @@ export interface Acquisition {
   amount: number | null;
   /** Default: true */
   isAppliedToPurchase: boolean | null;
+  /** Default: false */
+  isDepositRefundable: boolean | null;
+  depositGoesHardDate: string | null;
+  /** Default: false */
+  isConditional: boolean | null;
   unitsConveyed: number | null;
   measureId: number | null;
   notes: string | null;
@@ -1155,6 +1160,9 @@ export type AcquisitionInsert = {
   description?: string | null;
   amount?: number | null;
   isAppliedToPurchase?: boolean | null;
+  isDepositRefundable?: boolean | null;
+  depositGoesHardDate?: string | null;
+  isConditional?: boolean | null;
   unitsConveyed?: number | null;
   measureId?: number | null;
   notes?: string | null;
@@ -1621,6 +1629,8 @@ export interface ProjectSettings {
   defaultPeriodType: string | null;
   /** Default: 0.03 */
   globalInflationRate: number | null;
+  costInflationSetId?: number | null;
+  priceInflationSetId?: number | null;
   analysisStartDate: string | null;
   analysisEndDate: string | null;
   /** Default: 0.10 */
@@ -1637,6 +1647,8 @@ export type ProjectSettingsInsert = {
   defaultCurrency?: string | null;
   defaultPeriodType?: string | null;
   globalInflationRate?: number | null;
+  costInflationSetId?: number | null;
+  priceInflationSetId?: number | null;
   analysisStartDate?: string | null;
   analysisEndDate?: string | null;
   discountRate?: number | null;

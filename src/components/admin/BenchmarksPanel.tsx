@@ -1,0 +1,230 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import BenchmarkAccordion from '@/components/benchmarks/BenchmarkAccordion';
+import BenchmarksFlyout, { BenchmarksFlyoutSelection } from '@/components/benchmarks/BenchmarksFlyout';
+import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
+import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
+import AbsorptionVelocityPanel from '@/components/benchmarks/absorption/AbsorptionVelocityPanel';
+import { LandscapeButton } from '@/components/ui/landscape';
+import type {
+  Benchmark,
+  AISuggestion,
+  BenchmarkCategory,
+  GrowthRateSet,
+  AbsorptionVelocity
+} from '@/types/benchmarks';
+
+// Category definitions
+const CATEGORIES: BenchmarkCategory[] = [
+  { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
+  { key: 'transaction_cost', label: 'Transaction Costs', icon: 'Receipt', count: 0 },
+  { key: 'commission', label: 'Commissions', icon: 'Percent', count: 0 },
+  { key: 'absorption', label: 'Absorption Velocity', icon: 'Timeline', count: 0 },
+  { key: 'contingency', label: 'Contingency Standards', icon: 'Shield', count: 0 },
+  { key: 'market_timing', label: 'Market Timing', icon: 'Schedule', count: 0 },
+  { key: 'land_use_pricing', label: 'Land Use Pricing', icon: 'Landscape', count: 0 },
+  { key: 'op_cost', label: 'Op Costs', icon: 'Business', count: 0 },
+  { key: 'capital_stack', label: 'Capital Stack', icon: 'Layers', count: 0 },
+  { key: 'debt_standard', label: 'Debt Standards', icon: 'CreditCard', count: 0 },
+];
+
+export default function BenchmarksPanel() {
+  const [selectedCategory, setSelectedCategory] = useState<BenchmarkCategory | null>(null);
+  const [benchmarks, setBenchmarks] = useState<Record<string, Benchmark[]>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addingToCategory, setAddingToCategory] = useState<BenchmarkCategory | null>(null);
+  const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
+  const [absorptionCount, setAbsorptionCount] = useState(0);
+  const [totalCostLineItems, setTotalCostLineItems] = useState(0);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(60);
+  const [isDragging, setIsDragging] = useState(false);
+  const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes, growthRatesRes] = await Promise.all([
+        fetch('/api/benchmarks'),
+        fetch('/api/sale-benchmarks/global'),
+        fetch('/api/benchmarks/ai-suggestions'),
+        fetch('/api/benchmarks/absorption-velocity'),
+        fetch('/api/unit-costs/templates'),
+        fetch('/api/benchmarks/growth-rates'),
+      ]);
+
+      if (!benchmarkRes.ok) {
+        throw new Error('Failed to fetch benchmark registry');
+      }
+
+      const benchmarkData = await benchmarkRes.json();
+      const saleBenchmarksData = saleBenchmarksRes.ok ? await saleBenchmarksRes.json() : { benchmarks: [] };
+      const suggestionsData = suggestionsRes.ok ? await suggestionsRes.json() : { suggestions: [] };
+      const absorptionData = absorptionRes.ok ? await absorptionRes.json() : { absorption_velocities: [] };
+      const unitCostTemplatesData = unitCostTemplatesRes.ok ? await unitCostTemplatesRes.json() : { templates: [] };
+      const growthRatesData = growthRatesRes.ok ? await growthRatesRes.json() : { sets: [] };
+
+      // Group benchmarks by category
+      const benchmarksList = Array.isArray(benchmarkData.benchmarks) ? benchmarkData.benchmarks : [];
+      const saleBenchmarksList = Array.isArray(saleBenchmarksData.benchmarks) ? saleBenchmarksData.benchmarks : [];
+
+      const grouped: Record<string, Benchmark[]> = {};
+
+      // Add regular benchmarks (excluding commission and transaction_cost as they come from sale-benchmarks)
+      benchmarksList.forEach((benchmark: Benchmark) => {
+        const category = benchmark.category || 'other';
+        // Skip commission and transaction_cost from old benchmarks table
+        if (category === 'commission' || category === 'transaction_cost') {
+          return;
+        }
+        if (!grouped[category]) {
+          grouped[category] = [];
+        }
+        grouped[category].push(benchmark);
+      });
+
+      // Add sale benchmarks to appropriate categories
+      // Map benchmark_type to category key
+      saleBenchmarksList.forEach((benchmark: any) => {
+        let category: string | null = null;
+
+        // Map benchmark types to categories
+        if (benchmark.benchmark_type === 'commission') {
+          category = 'commission';
+        } else if (['closing', 'legal', 'title_insurance'].includes(benchmark.benchmark_type)) {
+          category = 'transaction_cost';
+        }
+        // Skip improvement_offset and other types - they're not shown in this panel
+
+        if (category) {
+          if (!grouped[category]) {
+            grouped[category] = [];
+          }
+          // Add category field and mark as coming from sale benchmarks
+          grouped[category].push({
+            ...benchmark,
+            category,
+            source_type: 'global_default'
+          });
+        }
+      });
+
+      setBenchmarks(grouped);
+      setGrowthRateSets(growthRatesData.sets || []);
+      setAiSuggestions(suggestionsData.suggestions || []);
+      setAbsorptionCount(absorptionData.absorption_velocities?.length || 0);
+      setTotalCostLineItems(unitCostTemplatesData.templates?.length || 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load benchmarks');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleCategorySelect = (category: BenchmarkCategory) => {
+    setSelectedCategory(category);
+  };
+
+  const handleAddBenchmark = (category: BenchmarkCategory) => {
+    setAddingToCategory(category);
+    setShowAddModal(true);
+  };
+
+  const handleModalClose = () => {
+    setShowAddModal(false);
+    setAddingToCategory(null);
+    loadData();
+  };
+
+  return (
+    <div className="d-flex" style={{ height: '70vh', overflow: 'hidden' }}>
+      {/* Left Panel - Benchmark Categories */}
+      <div
+        style={{
+          width: `${leftPanelWidth}%`,
+          overflowY: 'auto',
+          borderRight: '1px solid var(--cui-border-color)',
+          backgroundColor: 'var(--cui-body-bg)'
+        }}
+      >
+        {CATEGORIES.map((category) => {
+          // Get benchmarks for this category
+          const categoryBenchmarks = benchmarks[category.key] || [];
+
+          // Update count based on special categories
+          let displayCount = categoryBenchmarks.length;
+          if (category.key === 'growth_rate') {
+            displayCount = growthRateSets.length;
+          } else if (category.key === 'absorption') {
+            displayCount = absorptionCount;
+          }
+
+          const categoryWithCount = { ...category, count: displayCount };
+
+          // Growth Rate category uses custom panel in left accordion
+          if (category.key === 'growth_rate') {
+            return (
+              <GrowthRateCategoryPanel
+                key={category.key}
+                category={categoryWithCount}
+                sets={growthRateSets}
+                isExpanded={selectedCategory?.key === category.key}
+                loading={loading}
+                onToggle={() => handleCategorySelect(category)}
+                onRefresh={loadData}
+              />
+            );
+          }
+
+          // All other categories use BenchmarkAccordion
+          return (
+            <BenchmarkAccordion
+              key={category.key}
+              category={categoryWithCount}
+              benchmarks={categoryBenchmarks}
+              isExpanded={selectedCategory?.key === category.key}
+              onToggle={() => handleCategorySelect(category)}
+              onBenchmarkClick={(benchmark) => console.log('Benchmark clicked:', benchmark)}
+              onAddNew={() => handleAddBenchmark(category)}
+              onRefresh={loadData}
+            />
+          );
+        })}
+      </div>
+
+      {/* Right Panel - Placeholder for future Landscaper integration */}
+      <div
+        style={{
+          width: `${100 - leftPanelWidth}%`,
+          overflowY: 'auto',
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          padding: '1rem'
+        }}
+      >
+        <div className="text-center py-5">
+          <p className="text-muted">
+            Landscaper panel will be integrated here in a future update.
+          </p>
+        </div>
+      </div>
+
+      {/* Add Benchmark Modal */}
+      {showAddModal && addingToCategory && (
+        <AddBenchmarkModal
+          category={addingToCategory}
+          onClose={handleModalClose}
+        />
+      )}
+    </div>
+  );
+}

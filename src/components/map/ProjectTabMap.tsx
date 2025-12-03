@@ -9,6 +9,7 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
+import useSWRMutation from 'swr/mutation';
 
 export interface ProjectTabMapProps {
   projectId: string;
@@ -17,8 +18,11 @@ export interface ProjectTabMapProps {
 }
 
 export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }: ProjectTabMapProps) {
-  const { data, error, isLoading } = useProjectMapData(projectId);
+  const { data, error, isLoading, mutate } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
+  const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   // Create storage key with tabId to keep tab views independent
   const storageKey = `map-saved-view-${projectId}-${tabId}`;
@@ -48,17 +52,58 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
 
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
-  const markers = useMemo(
-    () => (data?.center ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }] : []),
+  const markers = useMemo(() => {
+    const base = data?.center
+      ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }]
+      : [];
+
+    if (pendingLocation) {
+      base.push({ id: 'pending', coordinates: pendingLocation, color: '#f97316', label: 'New Location' });
+    }
+
+    return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data?.center ? JSON.stringify(data.center) : null]
-  );
+  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation]);
 
   const lines = useMemo(
     () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data?.context ? JSON.stringify(data.context) : null]
   );
+
+  const { trigger: saveLocation, isMutating: saving } = useSWRMutation(
+    `/api/projects/${projectId}`,
+    async (_url: string, { arg }: { arg: { lat: number; lng: number } }) => {
+      setSaveError(null);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location_lat: arg.lat,
+          location_lon: arg.lng
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Failed to save location');
+      }
+      return response.json();
+    }
+  );
+
+  const handleMapClick = async ([lng, lat]: [number, number]) => {
+    setPendingLocation([lng, lat]);
+    setSaveSuccess(null);
+    try {
+      await saveLocation({ lat, lng });
+      setSaveSuccess('Location saved');
+      await mutate();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save location';
+      setSaveError(message);
+    }
+  };
 
   // Save to localStorage whenever savedView changes
   useEffect(() => {
@@ -130,6 +175,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
           showExtrusions={false}
           markers={markers}
           lines={lines}
+          onMapClick={handleMapClick}
         />
       </div>
 
@@ -166,7 +212,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
             </svg>
             <span className="font-medium">Map View Controls</span>
             <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-              3D Oblique View
+              3D Oblique View · Click map to set location
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -190,6 +236,24 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
               borderTop: '1px solid var(--cui-border-color)'
             }}
           >
+            <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
+              <div className="fw-semibold mb-1">Set location</div>
+              <div className="text-muted" style={{ fontSize: 12 }}>
+                Click anywhere on the map to set project coordinates. Saves immediately.
+              </div>
+              <div className="d-flex align-items-center gap-2 mt-2">
+                <span className="badge bg-light text-dark">
+                  {saving ? 'Saving...' : pendingLocation ? 'Pending update' : 'Ready'}
+                </span>
+                {saveSuccess && (
+                  <span className="text-success small">{saveSuccess}</span>
+                )}
+                {saveError && (
+                  <span className="text-danger small">{saveError}</span>
+                )}
+              </div>
+            </div>
+
             {/* Reset View Button */}
             <button
               onClick={() => {

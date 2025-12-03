@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const codes = codesParam
       ? codesParam.split(',').map((code) => code.trim()).filter(Boolean)
       : null;
+    const normalizedCodes = codes ? codes.map((c) => c.toUpperCase()) : null;
 
     const result = await sql<{
       series_code: string;
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     for (const row of result) {
       if (categories && !categories.includes(row.category)) continue;
       if (seasonal && row.seasonal && row.seasonal !== seasonal) continue;
-      if (codes && !codes.includes(row.series_code)) continue;
+      if (normalizedCodes && !normalizedCodes.includes(row.series_code.toUpperCase())) continue;
       const key = `${row.series_code}__${row.geo_id}`;
       if (!grouped.has(key)) {
         grouped.set(key, {

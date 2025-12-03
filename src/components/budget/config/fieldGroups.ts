@@ -18,7 +18,7 @@ export const budgetFieldGroups: FieldGroup[] = [
     id: 'timing',
     label: 'Timing & Escalation',
     mode: 'standard',
-    collapsed: false,
+    collapsed: true, // Collapsed by default - user expands to see timing tile
     color: '#ffc107', // Yellow indicator
     fields: [
       // Single row with auto-width columns (slightly wider than v2.4 for better spacing)
@@ -171,6 +171,16 @@ export const budgetFieldGroups: FieldGroup[] = [
         helpText: 'Vendor or supplier',
         width: 180,
       },
+      {
+        name: 'vendor_contact_id',
+        label: 'Vendor Contact ID',
+        type: 'number',
+        mode: 'standard',
+        group: 'cost_controls',
+        editable: true,
+        helpText: 'Link to contact database',
+        width: 100,
+      },
       // Row 2: Commitment Tracking
       {
         name: 'contract_number',
@@ -201,6 +211,18 @@ export const budgetFieldGroups: FieldGroup[] = [
         editable: true,
         helpText: 'Has contractual commitment',
         width: 80,
+      },
+      // Row 3: Notes (full-width)
+      {
+        name: 'notes',
+        label: 'Notes',
+        type: 'textarea',
+        mode: 'standard',
+        group: 'cost_controls',
+        editable: true,
+        helpText: 'Cost assumptions, sources, or considerations',
+        width: 300,
+        fullWidth: true,
       },
     ],
   },

@@ -89,13 +89,13 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
     unit_number = serializers.CharField(source='unit.unit_number', read_only=True)
     building_name = serializers.CharField(source='unit.building_name', read_only=True, allow_null=True)
     project_id = serializers.IntegerField(source='unit.project.project_id', read_only=True)
-    # Include unit fields for RentRollGrid compatibility
-    unit_type = serializers.CharField(source='unit.unit_type', read_only=True)
-    square_feet = serializers.IntegerField(source='unit.square_feet', read_only=True)
-    bedrooms = serializers.DecimalField(source='unit.bedrooms', read_only=True, max_digits=3, decimal_places=1, allow_null=True)
-    bathrooms = serializers.DecimalField(source='unit.bathrooms', read_only=True, max_digits=3, decimal_places=2, allow_null=True)
-    market_rent = serializers.DecimalField(source='unit.market_rent', read_only=True, max_digits=10, decimal_places=2, allow_null=True)
-    other_features = serializers.CharField(source='unit.other_features', read_only=True, allow_null=True)
+    # Include unit fields for RentRollGrid compatibility - writable for inline editing
+    unit_type = serializers.CharField(required=False)
+    square_feet = serializers.IntegerField(required=False)
+    bedrooms = serializers.DecimalField(required=False, max_digits=3, decimal_places=1, allow_null=True)
+    bathrooms = serializers.DecimalField(required=False, max_digits=3, decimal_places=2, allow_null=True)
+    market_rent = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, allow_null=True)
+    other_features = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = MultifamilyLease
@@ -131,6 +131,39 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['lease_id', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        """Add unit fields to the representation."""
+        data = super().to_representation(instance)
+        # Populate unit fields from the related unit
+        if instance.unit:
+            data['unit_type'] = instance.unit.unit_type
+            data['square_feet'] = instance.unit.square_feet
+            data['bedrooms'] = instance.unit.bedrooms
+            data['bathrooms'] = instance.unit.bathrooms
+            data['market_rent'] = instance.unit.market_rent
+            data['other_features'] = instance.unit.other_features
+        return data
+
+    def update(self, instance, validated_data):
+        """Handle updates to both lease and unit fields."""
+        # Extract unit fields from validated data
+        unit_fields = {}
+        unit_field_names = ['unit_type', 'square_feet', 'bedrooms', 'bathrooms', 'market_rent', 'other_features']
+
+        for field in unit_field_names:
+            if field in validated_data:
+                unit_fields[field] = validated_data.pop(field)
+
+        # Update the unit if any unit fields were provided
+        if unit_fields:
+            unit = instance.unit
+            for field, value in unit_fields.items():
+                setattr(unit, field, value)
+            unit.save()
+
+        # Update the lease with remaining fields
+        return super().update(instance, validated_data)
 
 
 class MultifamilyTurnSerializer(serializers.ModelSerializer):

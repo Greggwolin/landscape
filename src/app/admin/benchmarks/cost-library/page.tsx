@@ -14,7 +14,6 @@
 import React, { useState } from 'react';
 import { Database } from 'lucide-react';
 import UnitCostsPanel, { DEFAULT_PROJECT_TYPE } from '@/components/benchmarks/unit-costs/UnitCostsPanel';
-import AdminNavBar from '@/app/components/AdminNavBar';
 
 const PROJECT_TYPE_OPTIONS = ['LAND'];
 
@@ -23,7 +22,6 @@ export default function CostLibraryPage() {
 
   return (
     <div className="min-h-screen bg-surface-card text-text-primary">
-      <AdminNavBar />
       <div className="p-4 space-y-4">
         <div className="rounded-lg border border-line-soft bg-surface-card shadow-sm">
           {/* Header */}

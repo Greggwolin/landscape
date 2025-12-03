@@ -261,6 +261,15 @@ export default function SaleCalculationModal({
     }).format(value);
   };
 
+  const formatCurrencyNoDecimals = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   const formatPercent = (value: number | null | undefined) => {
     if (value == null || isNaN(value)) {
       return '0.0%';
@@ -301,13 +310,13 @@ export default function SaleCalculationModal({
             pb: 1,
             pt: 2,
             px: 2,
-            backgroundColor: 'var(--surface-card)',
+            backgroundColor: 'var(--surface-card-header)',
             borderBottom: '1px solid var(--cui-border-color)'
           }}
         >
           <div>
-            <div className="text-base font-semibold">
-              SALE CALCULATION - {parcel.parcel_code || `P-${parcel.parcel_id}`} ({parcel.product_code})
+            <div className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+              Sale Calculation - {parcel.parcel_code || `P-${parcel.parcel_id}`} ({parcel.product_code})
             </div>
           </div>
           <IconButton onClick={onClose} size="small">
@@ -344,7 +353,10 @@ export default function SaleCalculationModal({
               required
               InputLabelProps={{ shrink: true }}
               size="small"
-              sx={{ width: '180px' }}
+              sx={{
+                width: '180px',
+                '& input': { color: 'var(--cui-body-color)' }
+              }}
             />
           </div>
 
@@ -352,213 +364,161 @@ export default function SaleCalculationModal({
 
           {calculation && (
             <>
-              {/* Gross Parcel Price - BLUE BOX */}
-              <div className="mb-3 p-3" style={infoPanelStyle}>
-                <div className="flex justify-between items-center">
-                  <div className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>Gross Parcel Price</div>
+              {/* Single P&L Box */}
+              <div className="mb-3 p-4" style={basePanelStyle}>
+                {/* Gross Parcel Price */}
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>Gross Sale Price [Finished]</div>
                   <div className="flex items-baseline gap-2">
-                    <div className="text-xs" style={{ color: 'var(--cui-info)' }}>
-                      {formatCurrencyDetailed(calculation.inflated_price_per_unit)} / {calculation.price_uom}
+                    <div className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>
+                      {formatCurrencyNoDecimals(calculation.inflated_price_per_unit)} / {calculation.price_uom}
                     </div>
-                    <div className="text-xl font-bold" style={{ color: 'var(--cui-info)' }}>
+                    <div className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>
                       {formatCurrency(calculation.gross_parcel_price)}
                     </div>
                   </div>
                 </div>
-                <div className="text-xs italic mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                  populate from sale table, editable here. Changes are reflected in price and improvement offset calcs (inflation)
-                </div>
-              </div>
 
-              {/* Improvement Offset */}
-              <div className="mb-2 p-3" style={neutralPanelStyle}>
-                <div className="flex justify-between items-center">
-                  <div className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>Less: Improvement Offset</div>
-                  <div className="flex items-baseline gap-2">
-                    <div className="flex items-center gap-1">
-                      <TextField
-                        type="number"
-                        value={improvementOffsetPerUom}
-                        onChange={(e) => {
-                          const newValue = Number(e.target.value);
-                          setImprovementOffsetPerUom(newValue);
-                          setImprovementOffsetOverride(true);
-                        }}
-                        onBlur={handleRecalculate}
-                        size="small"
-                        sx={{ width: '100px' }}
-                        slotProps={{
-                          input: {
-                            startAdornment: <span className="text-xs text-gray-500 mr-1">$</span>,
-                          },
-                          htmlInput: { step: 0.01, min: 0 }
-                        }}
-                      />
-                      <span className="text-xs" style={{ color: 'var(--cui-body-color)' }}>/ {calculation.price_uom}</span>
-                    </div>
-                    <div className="text-xl font-semibold" style={{ color: 'var(--cui-danger)' }}>
-                      ({formatCurrency(calculation.improvement_offset_total)})
-                    </div>
+                {/* Improvement Offset */}
+                <div className="flex justify-between items-center mb-2 pl-4">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>Less: Improvement Offset</div>
+                    <TextField
+                      type="number"
+                      value={improvementOffsetPerUom}
+                      onChange={(e) => {
+                        const newValue = Number(e.target.value);
+                        setImprovementOffsetPerUom(newValue);
+                        setImprovementOffsetOverride(true);
+                      }}
+                      onBlur={handleRecalculate}
+                      size="small"
+                      sx={{ width: '90px', '& input': { fontSize: '0.75rem', padding: '2px 6px', color: 'var(--cui-body-color)' } }}
+                      slotProps={{
+                        htmlInput: { step: 0.01, min: 0 }
+                      }}
+                      InputProps={{
+                        startAdornment: <span className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>$</span>,
+                        endAdornment: <span className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>/ {calculation.price_uom}</span>,
+                      }}
+                    />
+                  </div>
+                  <div className="text-base font-semibold" style={{ color: 'var(--cui-danger)' }}>
+                    -{formatCurrency(calculation.improvement_offset_total)}
                   </div>
                 </div>
-                <div className="text-xs italic mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                  populate from benchmarks with available override
-                </div>
-              </div>
 
-              {/* Gross Sale Proceeds - GREEN BOX */}
-              <div className="mb-3 p-3" style={successPanelStyle}>
-                <div className="flex justify-between items-center">
-                  <div className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>Gross Sale Proceeds</div>
-                  <div className="text-xl font-bold" style={{ color: 'var(--cui-success)' }}>
+                {/* Gross Sale Proceeds - Subtotal */}
+                <div className="flex justify-between items-center mb-3 pb-3" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                  <div className="font-bold text-base" style={{ color: 'var(--cui-body-color)' }}>Gross Sale Proceeds</div>
+                  <div className="text-lg font-bold" style={{ color: 'var(--cui-primary)' }}>
                     {formatCurrency(calculation.gross_sale_proceeds)}
                   </div>
                 </div>
-              </div>
 
-              <div className="my-2 border-t" style={dividerStyle} />
+                {/* Transaction Costs - Simple P&L style */}
+                {transactionCosts.map((row, index) => (
+                  <div key={row.type} className="flex justify-between items-center mb-2 pl-4">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>Less: {row.label}</div>
+                      {!row.isFixed && (
+                        <TextField
+                          type="number"
+                          value={(row.rate * 100).toFixed(1)}
+                          onChange={(e) => handleTransactionCostChange(index, Number(e.target.value) / 100)}
+                          size="small"
+                          sx={{
+                            width: '70px',
+                            '& input': {
+                              fontSize: '0.75rem',
+                              padding: '2px 8px',
+                              color: 'var(--cui-body-color)',
+                              textAlign: 'right'
+                            }
+                          }}
+                          inputProps={{ step: 0.1, min: 0, max: 20 }}
+                          InputProps={{
+                            endAdornment: <span className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>%</span>,
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="text-base font-semibold" style={{ color: 'var(--cui-danger)' }}>
+                      -{formatCurrency(row.amount)}
+                    </div>
+                  </div>
+                ))}
 
-              {/* Transaction Costs - TABLE */}
-              <div className="mb-3" style={basePanelStyle}>
-                <div className="font-semibold text-sm mb-2" style={{ color: 'var(--cui-body-color)' }}>Less: Transaction Costs</div>
-
-                <table
-                  className="w-full text-sm"
-                  style={{ borderCollapse: 'separate', borderSpacing: 0 }}
-                >
-                  <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>
-                    <tr>
-                      <th
-                        className="px-2 py-1 text-left font-semibold"
-                        style={{ border: '1px solid var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}
+                {/* Custom Costs - Simple rows */}
+                {customCosts.map((cost, index) => (
+                  <div key={`custom-${index}`} className="flex justify-between items-center mb-2 pl-4">
+                    <div className="flex items-center gap-2">
+                      <TextField
+                        value={cost.name}
+                        onChange={(e) => handleUpdateCustomCost(index, 'name', e.target.value)}
+                        placeholder="Less: Cost of Sale"
+                        size="small"
+                        sx={{
+                          width: '200px',
+                          '& input': {
+                            fontSize: '0.875rem',
+                            padding: '4px 8px',
+                            color: 'var(--cui-body-color)'
+                          }
+                        }}
+                      />
+                      <TextField
+                        type="number"
+                        value={cost.amount}
+                        onChange={(e) => {
+                          handleUpdateCustomCost(index, 'amount', Number(e.target.value));
+                          setTimeout(() => handleRecalculate(), 0);
+                        }}
+                        size="small"
+                        sx={{
+                          width: '100px',
+                          '& input': {
+                            fontSize: '0.75rem',
+                            padding: '4px 8px',
+                            color: 'var(--cui-body-color)'
+                          }
+                        }}
+                        InputProps={{
+                          startAdornment: <span className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>$</span>,
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveCustomCost(index)}
+                        sx={{ padding: '4px' }}
                       >
-                        Item
-                      </th>
-                      <th
-                        className="px-2 py-1 text-center font-semibold w-24"
-                        style={{ border: '1px solid var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}
-                      >
-                        Rate
-                      </th>
-                      <th
-                        className="px-2 py-1 text-right font-semibold w-28"
-                        style={{ border: '1px solid var(--cui-border-color)', color: 'var(--cui-secondary-color)' }}
-                      >
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactionCosts.map((row, index) => (
-                      <tr key={row.type} className="hover:bg-[var(--surface-card)] transition-colors">
-                        <td className="px-2 py-1" style={{ border: '1px solid var(--cui-border-color)' }}>{row.label}</td>
-                        <td className="px-2 py-1 text-center" style={{ border: '1px solid var(--cui-border-color)' }}>
-                          {row.isFixed ? (
-                            <span className="text-sm">Fixed</span>
-                          ) : (
-                            <TextField
-                              type="number"
-                              value={(row.rate * 100).toFixed(1)}
-                              onChange={(e) => handleTransactionCostChange(index, Number(e.target.value) / 100)}
-                              size="small"
-                              sx={{ width: '80px' }}
-                              inputProps={{ step: 0.1, min: 0, max: 20 }}
-                              InputProps={{
-                                endAdornment: <span className="text-xs text-gray-500">%</span>,
-                              }}
-                            />
-                          )}
-                        </td>
-                        <td
-                          className="px-2 py-1 text-right"
-                          style={{ border: '1px solid var(--cui-border-color)', color: 'var(--cui-danger)' }}
-                        >
-                          ({formatCurrency(row.amount)})
-                        </td>
-                      </tr>
-                    ))}
-
-                    {/* Custom Costs */}
-                    {customCosts.map((cost, index) => (
-                      <tr key={`custom-${index}`} style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-                        <td className="px-3 py-2" style={{ border: '1px solid var(--cui-border-color)' }}>
-                          <TextField
-                            value={cost.name}
-                            onChange={(e) => handleUpdateCustomCost(index, 'name', e.target.value)}
-                            placeholder="Custom cost name"
-                            size="small"
-                            fullWidth
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-center" style={{ border: '1px solid var(--cui-border-color)' }}>
-                          <TextField
-                            type="number"
-                            value={cost.amount}
-                            onChange={(e) => {
-                              handleUpdateCustomCost(index, 'amount', Number(e.target.value));
-                              setTimeout(() => handleRecalculate(), 0);
-                            }}
-                            size="small"
-                            sx={{ width: '90px' }}
-                            InputProps={{
-                              startAdornment: cost.type === '$' ? <span className="text-xs text-gray-500 mr-1">$</span> : null,
-                              endAdornment: cost.type === '%' ? <span className="text-xs text-gray-500 ml-1">%</span> : null,
-                            }}
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-center" style={{ border: '1px solid var(--cui-border-color)' }}>
-                          <div className="flex justify-center gap-1">
-                            <Tooltip title="Save as benchmark">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleSaveAsBenchmark(cost)}
-                                disabled={!cost.name}
-                              >
-                                <BookmarkIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleRemoveCustomCost(index)}
-                              color="error"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </div>
-                        </td>
-                        <td
-                          className="px-3 py-2 text-right font-mono"
-                          style={{ border: '1px solid var(--cui-border-color)', color: 'var(--cui-danger)' }}
-                        >
-                          ({formatCurrency(cost.amount)})
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </div>
+                    <div className="text-base font-semibold" style={{ color: 'var(--cui-danger)' }}>
+                      -{formatCurrency(cost.amount)}
+                    </div>
+                  </div>
+                ))}
 
                 <Button
-                  variant="outlined"
+                  variant="text"
                   startIcon={<AddIcon />}
                   onClick={handleAddCustomCost}
                   size="small"
-                  sx={{ mt: 2 }}
+                  sx={{ mt: 0, mb: 0, ml: 2, textTransform: 'none', fontSize: '0.875rem' }}
                 >
-                  Add Custom Cost
+                  Add Cost
                 </Button>
-              </div>
 
-              <div className="my-2 border-t" style={dividerStyle} />
-
-              {/* Net Sale Proceeds - BLUE BOX (final result) */}
-              <div className="p-3" style={infoPanelStyle}>
-                <div className="flex justify-between items-center">
-                  <div className="font-bold text-sm" style={{ color: 'var(--cui-body-color)' }}>Net Sale Proceeds</div>
+                {/* Net Proceeds - Final total */}
+                <div className="flex justify-between items-center mt-3 pt-3" style={{ borderTop: '2px solid var(--cui-border-color)' }}>
+                  <div className="font-bold text-lg" style={{ color: 'var(--cui-body-color)' }}>Net Proceeds</div>
                   <div className="flex items-baseline gap-2">
-                    <div className="text-xs" style={{ color: 'var(--cui-info)' }}>
+                    <div className="text-xs" style={{ color: 'var(--cui-body-color)', opacity: 0.7 }}>
                       {formatCurrencyDetailed(calculation.net_proceeds_per_uom)} / {calculation.price_uom}
                     </div>
-                    <div className="text-xl font-bold" style={{ color: 'var(--cui-info)' }}>
+                    <div className="text-2xl font-bold" style={{ color: 'var(--cui-success)' }}>
                       {formatCurrency(calculation.net_sale_proceeds)}
                     </div>
                   </div>
@@ -582,7 +542,7 @@ export default function SaleCalculationModal({
             backgroundColor: 'var(--surface-card)'
           }}
         >
-          <Button onClick={onClose} disabled={isSaving} color="inherit" size="small">
+          <Button onClick={onClose} disabled={isSaving} color="inherit" size="small" sx={{ color: 'var(--cui-body-color)' }}>
             Cancel
           </Button>
           <Button

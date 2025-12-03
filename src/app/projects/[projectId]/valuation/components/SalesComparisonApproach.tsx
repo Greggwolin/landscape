@@ -7,29 +7,35 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type { SalesComparable, ValuationReconciliation } from '@/types/valuation';
+import type { SalesComparable, SalesComparableForm, ValuationReconciliation } from '@/types/valuation';
 import { ComparablesGrid } from './ComparablesGrid';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
 import { LandscaperChatPanel } from './LandscaperChatPanel';
 import { ComparablesMap } from './ComparablesMap';
 import ValuationSalesCompMap from '@/components/map/ValuationSalesCompMap';
 import { LandscapeButton } from '@/components/ui/landscape';
+import { SalesComparableModal } from './SalesComparableModal';
+import { createSalesComparable, updateSalesComparable, deleteSalesComparable } from '@/lib/api/valuation';
 
 interface SalesComparisonApproachProps {
   projectId: number;
   comparables: SalesComparable[];
   reconciliation: ValuationReconciliation | null;
   onRefresh?: () => void;
+  mode?: 'multifamily' | 'land'; // Field label mode for ComparablesGrid
 }
 
 export function SalesComparisonApproach({
   projectId,
   comparables,
   reconciliation,
-  onRefresh
+  onRefresh,
+  mode = 'multifamily'
 }: SalesComparisonApproachProps) {
   const [selectedComp, setSelectedComp] = useState<SalesComparable | null>(null);
   const [mapHeight, setMapHeight] = useState<string>('800px');
+  const [showModal, setShowModal] = useState(false);
+  const [editingComp, setEditingComp] = useState<SalesComparable | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Measure the grid height and set map to match
@@ -60,26 +66,43 @@ export function SalesComparisonApproach({
   }, [comparables]);
 
   const handleEditComp = (comp: SalesComparable) => {
-    setSelectedComp(comp);
-    // In production, open modal/drawer for editing
-    alert(`Edit functionality for "${comp.property_name}" - Coming in Phase 2`);
+    setEditingComp(comp);
+    setShowModal(true);
   };
 
   const handleDeleteComp = async (compId: number) => {
+    if (!confirm('Are you sure you want to delete this comparable? This action cannot be undone.')) {
+      return;
+    }
+
     try {
-      // In production, call API to delete
-      alert(`Delete functionality for comparable ID ${compId} - Coming in Phase 2`);
-      // await deleteSalesComparable(compId);
-      // onRefresh?.();
+      await deleteSalesComparable(compId);
+      onRefresh?.();
     } catch (error) {
       console.error('Error deleting comparable:', error);
-      alert('Error deleting comparable');
+      alert(`Error deleting comparable: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleAddComp = () => {
-    // In production, open modal/drawer for adding new comp
-    alert('Add comparable functionality - Coming in Phase 2');
+    setEditingComp(null);
+    setShowModal(true);
+  };
+
+  const handleSaveComp = async (data: SalesComparableForm) => {
+    if (editingComp) {
+      // Update existing
+      await updateSalesComparable(editingComp.comparable_id, data);
+    } else {
+      // Create new
+      await createSalesComparable(data);
+    }
+    onRefresh?.();
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingComp(null);
   };
 
   // Determine layout based on number of comps
@@ -96,6 +119,16 @@ export function SalesComparisonApproach({
 
   return (
     <div className="space-y-6">
+      {/* Sales Comparable Modal */}
+      <SalesComparableModal
+        visible={showModal}
+        comparable={editingComp}
+        projectId={projectId}
+        mode={mode}
+        onClose={handleCloseModal}
+        onSave={handleSaveComp}
+      />
+
       {/* Map Above Grid (when more than 5 comps) */}
       {comparables.length > 0 && showMapAbove && (
         <ValuationSalesCompMap
@@ -145,8 +178,10 @@ export function SalesComparisonApproach({
                 comparables={comparables}
                 projectId={projectId}
                 onEdit={handleEditComp}
+                onDelete={handleDeleteComp}
                 onRefresh={onRefresh}
                 onAddComp={handleAddComp}
+                mode={mode}
               />
             </div>
 

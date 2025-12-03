@@ -315,7 +315,7 @@ export function useBudgetGrouping(projectId: number) {
 
   /**
    * Flatten tree to array of GroupedRow with expand/collapse logic
-   * Only include parent rows that have DIRECT items (not just children with items)
+   * Include parent rows for all categories that have items (direct or via children)
    */
   const flattenTree = useCallback((
     groups: Map<number, CategoryGroup>,
@@ -326,17 +326,12 @@ export function useBudgetGrouping(projectId: number) {
     const result: GroupedRow[] = [];
 
     groups.forEach(group => {
-      const hasDirectItems = group.items.length > 0;
       const totalItems = countItems(group);
       const currentPathIds = [...parentPathIds, group.category_id];
       const currentPathNames = [...parentPathNames, group.category_name];
 
-      // Only include parent row if it has direct items
-      if (!hasDirectItems) {
-        // Skip this level, but recurse to children
-        if (group.children.size > 0) {
-          result.push(...flattenTree(group.children, depth, currentPathIds, currentPathNames));
-        }
+      // Skip categories with no items at all (neither direct nor in children)
+      if (totalItems === 0) {
         return;
       }
 
@@ -349,7 +344,7 @@ export function useBudgetGrouping(projectId: number) {
         ? currentPathNames.slice(1).join(' → ')
         : currentPathNames[0];
 
-      // Add parent row
+      // Add parent row - subtotal includes all direct items AND all children items
       result.push({
         row_type: 'parent',
         category_level: group.level,
@@ -367,7 +362,7 @@ export function useBudgetGrouping(projectId: number) {
 
       // Add children if expanded
       if (isExpanded) {
-        // Add direct items
+        // Add direct items first
         group.items.forEach(item => {
           result.push({
             row_type: 'item',

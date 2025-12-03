@@ -1,0 +1,77 @@
+.uom-table {
+  width: 100%;
+  margin-top: 0;
+  color: #fff;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.uom-table th {
+  background-color: var(--cui-table-header-bg, #1f2937);
+  color: var(--cui-table-header-color, #e5e7eb);
+  font-weight: 600;
+}
+
+.uom-table td,
+.uom-table th {
+  border: 1px solid rgba(51, 65, 85, 0.35);
+  border-color: rgba(51, 65, 85, 0.35);
+  padding: 0.65rem 0.75rem;
+  vertical-align: middle;
+}
+
+.uom-table thead th {
+  border-top: 0 !important;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4) !important;
+}
+
+.uom-table tr {
+  background-color: var(--cui-body-bg, #0b1220);
+}
+
+.uom-table tbody td {
+  border-top: 1px solid rgba(51, 65, 85, 0.35);
+}
+
+.uom-row-editing {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.uom-code-cell {
+  font-family: var(--cui-font-sans-serif, inherit);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.uom-category-badge {
+  font-size: 0.75rem;
+  background-color: rgba(var(--cui-secondary-rgb, 108, 117, 125), 0.36);
+  border: 1px solid rgba(var(--cui-secondary-rgb, 108, 117, 125), 0.6);
+  color: #fff;
+  font-weight: 600;
+}
+
+.uom-inactive {
+  text-decoration: line-through;
+  color: var(--cui-secondary-color);
+}
+
+.uom-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.uom-context-badge {
+  border: 1px solid transparent;
+}
+
+.uom-table-card {
+  background-color: var(--cui-card-bg, #0f172a);
+  border: 1px solid var(--cui-border-color, #334155);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+}

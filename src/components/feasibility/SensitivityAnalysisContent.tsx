@@ -1,0 +1,501 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import {
+  CCard,
+  CCardBody,
+  CCardHeader,
+  CButton,
+  CSpinner,
+  CFormLabel,
+  CFormInput,
+  CBadge,
+  CRow,
+  CCol,
+} from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilSave, cilX, cilReload } from '@coreui/icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/toast';
+import { useDebouncedCallback } from 'use-debounce';
+
+interface SensitivityAnalysisContentProps {
+  projectId: number;
+}
+
+interface Assumption {
+  key: string;
+  label: string;
+  baseValue: number;
+  adjustment: number; // -100 to +100
+  formatType: 'currency' | 'percentage' | 'number';
+  step: number;
+}
+
+interface ImpactMetrics {
+  landValue: number;
+  irr: number;
+  npv: number;
+  calculating: boolean;
+}
+
+interface SavedScenario {
+  id: number;
+  name: string;
+  assumptions: Record<string, number>;
+  metrics: {
+    landValue: number;
+    irr: number | null;
+    npv: number;
+  };
+  created_at: string;
+}
+
+/**
+ * SensitivityAnalysisContent Component
+ *
+ * Phase 4: Feasibility/Valuation Tab - Sensitivity Analysis subtab
+ *
+ * Features:
+ * - Assumption sliders (±100% adjustment range)
+ * - Real-time calculation with 300ms debounce
+ * - Impact metric cards (Land Value, IRR, NPV)
+ * - Negative land value warning (inline red card)
+ * - Saved scenarios (chip-based UI)
+ * - IRR convergence handling (displays "N/A")
+ */
+export default function SensitivityAnalysisContent({ projectId }: SensitivityAnalysisContentProps) {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  const [assumptions, setAssumptions] = useState<Assumption[]>([
+    { key: 'units_sold', label: 'Units Sold', baseValue: 0, adjustment: 0, formatType: 'number', step: 5 },
+    { key: 'price_per_unit', label: 'Price Per Unit', baseValue: 0, adjustment: 0, formatType: 'currency', step: 5 },
+    { key: 'absorption_rate', label: 'Absorption Rate (units/mo)', baseValue: 0, adjustment: 0, formatType: 'number', step: 5 },
+    { key: 'development_cost', label: 'Development Cost', baseValue: 0, adjustment: 0, formatType: 'currency', step: 5 },
+    { key: 'operating_expenses', label: 'Operating Expenses', baseValue: 0, adjustment: 0, formatType: 'currency', step: 5 },
+    { key: 'discount_rate', label: 'Discount Rate', baseValue: 0, adjustment: 0, formatType: 'percentage', step: 5 },
+  ]);
+
+  const [impactMetrics, setImpactMetrics] = useState<ImpactMetrics>({
+    landValue: 0,
+    irr: null,
+    npv: 0,
+    calculating: false,
+  });
+
+  const [scenarioName, setScenarioName] = useState('');
+  const [savingScenario, setSavingScenario] = useState(false);
+
+  // Fetch base assumptions from project data
+  const { data: baseAssumptions, isLoading: loadingBase } = useQuery({
+    queryKey: ['sensitivity', 'base-assumptions', projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/assumptions/base`);
+      if (!response.ok) throw new Error('Failed to fetch base assumptions');
+      const data = await response.json();
+
+      // Update assumptions with base values
+      setAssumptions((prev) =>
+        prev.map((assumption) => ({
+          ...assumption,
+          baseValue: data[assumption.key] || 0,
+        }))
+      );
+
+      return data;
+    },
+  });
+
+  // Fetch saved scenarios
+  const { data: savedScenarios = [] } = useQuery<SavedScenario[]>({
+    queryKey: ['sensitivity', 'scenarios', projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/scenarios`);
+      if (!response.ok) throw new Error('Failed to fetch scenarios');
+      const data = await response.json();
+      return data.scenarios || [];
+    },
+  });
+
+  // Calculate sensitivity metrics
+  const calculateMetrics = async (currentAssumptions: Assumption[]) => {
+    setImpactMetrics((prev) => ({ ...prev, calculating: true }));
+
+    try {
+      const adjustments = currentAssumptions.reduce((acc, assumption) => {
+        acc[assumption.key] = {
+          baseValue: assumption.baseValue,
+          adjustment: assumption.adjustment,
+          adjustedValue: assumption.baseValue * (1 + assumption.adjustment / 100),
+        };
+        return acc;
+      }, {} as Record<string, any>);
+
+      const response = await fetch(`/api/projects/${projectId}/sensitivity/calculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adjustments }),
+      });
+
+      if (!response.ok) throw new Error('Failed to calculate metrics');
+
+      const data = await response.json();
+      setImpactMetrics({
+        landValue: data.landValue,
+        irr: data.irr, // May be null if didn't converge
+        npv: data.npv,
+        calculating: false,
+      });
+    } catch (error) {
+      console.error('Failed to calculate sensitivity:', error);
+      setImpactMetrics((prev) => ({ ...prev, calculating: false }));
+      showToast({
+        title: 'Calculation Error',
+        message: 'Failed to calculate sensitivity metrics',
+        type: 'error',
+      });
+    }
+  };
+
+  // Debounced calculation (300ms delay)
+  const debouncedCalculate = useDebouncedCallback(calculateMetrics, 300);
+
+  // Handle slider change
+  const handleAdjustmentChange = (key: string, newAdjustment: number) => {
+    const updatedAssumptions = assumptions.map((a) =>
+      a.key === key ? { ...a, adjustment: newAdjustment } : a
+    );
+    setAssumptions(updatedAssumptions);
+    debouncedCalculate(updatedAssumptions);
+  };
+
+  // Reset all adjustments
+  const handleReset = () => {
+    const resetAssumptions = assumptions.map((a) => ({ ...a, adjustment: 0 }));
+    setAssumptions(resetAssumptions);
+    calculateMetrics(resetAssumptions);
+  };
+
+  // Save scenario
+  const saveScenarioMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const scenarioData = {
+        name,
+        assumptions: assumptions.reduce((acc, a) => {
+          acc[a.key] = a.adjustment;
+          return acc;
+        }, {} as Record<string, number>),
+        metrics: impactMetrics,
+      };
+
+      const response = await fetch(`/api/projects/${projectId}/scenarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scenarioData),
+      });
+
+      if (!response.ok) throw new Error('Failed to save scenario');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sensitivity', 'scenarios', projectId] });
+      setScenarioName('');
+      showToast({
+        title: 'Success',
+        message: 'Scenario saved successfully',
+        type: 'success',
+      });
+    },
+    onError: () => {
+      showToast({
+        title: 'Error',
+        message: 'Failed to save scenario',
+        type: 'error',
+      });
+    },
+  });
+
+  const handleSaveScenario = async () => {
+    if (!scenarioName.trim()) {
+      showToast({
+        title: 'Validation Error',
+        message: 'Please enter a scenario name',
+        type: 'error',
+      });
+      return;
+    }
+
+    setSavingScenario(true);
+    await saveScenarioMutation.mutateAsync(scenarioName);
+    setSavingScenario(false);
+  };
+
+  // Load scenario
+  const handleLoadScenario = (scenario: SavedScenario) => {
+    const loadedAssumptions = assumptions.map((a) => ({
+      ...a,
+      adjustment: scenario.assumptions[a.key] || 0,
+    }));
+    setAssumptions(loadedAssumptions);
+    setImpactMetrics({
+      landValue: scenario.metrics.landValue,
+      irr: scenario.metrics.irr,
+      npv: scenario.metrics.npv,
+      calculating: false,
+    });
+  };
+
+  // Delete scenario
+  const deleteScenarioMutation = useMutation({
+    mutationFn: async (scenarioId: number) => {
+      const response = await fetch(`/api/projects/${projectId}/scenarios/${scenarioId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete scenario');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sensitivity', 'scenarios', projectId] });
+      showToast({
+        title: 'Success',
+        message: 'Scenario deleted successfully',
+        type: 'success',
+      });
+    },
+  });
+
+  // Format value based on type
+  const formatValue = (value: number, formatType: string): string => {
+    if (formatType === 'currency') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(value);
+    } else if (formatType === 'percentage') {
+      return `${value.toFixed(2)}%`;
+    } else {
+      return new Intl.NumberFormat('en-US').format(value);
+    }
+  };
+
+  // Check if land value is negative
+  const isNegativeLandValue = impactMetrics.landValue < 0;
+
+  if (loadingBase) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+        <CSpinner color="primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="p-4 space-y-4 min-h-screen"
+      style={{ backgroundColor: 'var(--cui-body-bg)' }}
+    >
+      {/* Impact Metrics Cards */}
+      <CRow className="g-3">
+        {/* Land Value */}
+        <CCol xs={12} md={4}>
+          <CCard
+            style={{
+              background: isNegativeLandValue ? 'var(--cui-danger-bg)' : 'var(--cui-card-bg)',
+              border: `1px solid ${isNegativeLandValue ? 'var(--cui-danger)' : 'var(--cui-border-color)'}`,
+            }}
+          >
+            <CCardBody>
+              <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                Residual Land Value
+              </div>
+              <div className="text-2xl font-bold" style={{ color: isNegativeLandValue ? 'var(--cui-danger)' : 'var(--cui-success)' }}>
+                {impactMetrics.calculating ? (
+                  <CSpinner size="sm" />
+                ) : (
+                  formatValue(impactMetrics.landValue, 'currency')
+                )}
+              </div>
+              {isNegativeLandValue && (
+                <div className="mt-2 text-sm" style={{ color: 'var(--cui-danger)' }}>
+                  ⚠️ Negative land value - project may not be feasible
+                </div>
+              )}
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* IRR */}
+        <CCol xs={12} md={4}>
+          <CCard>
+            <CCardBody>
+              <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                Internal Rate of Return (IRR)
+              </div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
+                {impactMetrics.calculating ? (
+                  <CSpinner size="sm" />
+                ) : impactMetrics.irr !== null && !isNaN(impactMetrics.irr) ? (
+                  formatValue(impactMetrics.irr * 100, 'percentage')
+                ) : (
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>
+                    N/A{' '}
+                    <span
+                      className="text-xs"
+                      title="IRR could not be calculated for this scenario"
+                      style={{ cursor: 'help' }}
+                    >
+                      ⓘ
+                    </span>
+                  </span>
+                )}
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* NPV */}
+        <CCol xs={12} md={4}>
+          <CCard>
+            <CCardBody>
+              <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                Net Present Value (NPV)
+              </div>
+              <div className="text-2xl font-bold" style={{ color: impactMetrics.npv >= 0 ? 'var(--cui-success)' : 'var(--cui-danger)' }}>
+                {impactMetrics.calculating ? (
+                  <CSpinner size="sm" />
+                ) : (
+                  formatValue(impactMetrics.npv, 'currency')
+                )}
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* Assumption Sliders */}
+      <CCard>
+        <CCardHeader className="d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Adjust Assumptions</h5>
+          <CButton
+            color="ghost-secondary"
+            size="sm"
+            onClick={handleReset}
+            aria-label="Reset all adjustments"
+          >
+            <CIcon icon={cilReload} className="me-1" />
+            Reset All
+          </CButton>
+        </CCardHeader>
+        <CCardBody>
+          <div className="space-y-4">
+            {assumptions.map((assumption) => {
+              const adjustedValue = assumption.baseValue * (1 + assumption.adjustment / 100);
+
+              return (
+                <div key={assumption.key} className="pb-3" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <CFormLabel className="mb-0">{assumption.label}</CFormLabel>
+                    <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                      Base: {formatValue(assumption.baseValue, assumption.formatType)} →{' '}
+                      <span style={{ color: 'var(--cui-body-color)', fontWeight: 'bold' }}>
+                        {formatValue(adjustedValue, assumption.formatType)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-3">
+                    <span className="text-sm" style={{ minWidth: '50px' }}>-100%</span>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      step={assumption.step}
+                      value={assumption.adjustment}
+                      onChange={(e) => handleAdjustmentChange(assumption.key, Number(e.target.value))}
+                      className="flex-grow-1"
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span className="text-sm" style={{ minWidth: '50px', textAlign: 'right' }}>+100%</span>
+                    <div
+                      className="text-sm font-mono"
+                      style={{
+                        minWidth: '70px',
+                        textAlign: 'right',
+                        color: assumption.adjustment === 0 ? 'var(--cui-secondary-color)' : 'var(--cui-primary)',
+                      }}
+                    >
+                      {assumption.adjustment > 0 ? '+' : ''}{assumption.adjustment}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CCardBody>
+      </CCard>
+
+      {/* Save Scenario */}
+      <CCard>
+        <CCardHeader>
+          <h5 className="mb-0">Save Scenario</h5>
+        </CCardHeader>
+        <CCardBody>
+          <div className="d-flex gap-2 mb-3">
+            <CFormInput
+              type="text"
+              placeholder="Scenario name (e.g., 'Optimistic Case')"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+            />
+            <CButton
+              color="primary"
+              onClick={handleSaveScenario}
+              disabled={savingScenario || !scenarioName.trim()}
+            >
+              <CIcon icon={cilSave} className="me-1" />
+              Save
+            </CButton>
+          </div>
+
+          {/* Saved Scenarios Chips */}
+          {savedScenarios.length > 0 && (
+            <div>
+              <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                Saved Scenarios:
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {savedScenarios.map((scenario) => (
+                  <CBadge
+                    key={scenario.id}
+                    color="secondary"
+                    className="d-flex align-items-center gap-2"
+                    style={{
+                      cursor: 'pointer',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    <span onClick={() => handleLoadScenario(scenario)}>
+                      {scenario.name}
+                    </span>
+                    <CIcon
+                      icon={cilX}
+                      size="sm"
+                      onClick={() => deleteScenarioMutation.mutate(scenario.id)}
+                      style={{ cursor: 'pointer' }}
+                      aria-label={`Delete ${scenario.name}`}
+                    />
+                  </CBadge>
+                ))}
+              </div>
+            </div>
+          )}
+        </CCardBody>
+      </CCard>
+    </div>
+  );
+}

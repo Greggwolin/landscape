@@ -199,6 +199,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   const [sharedFamilies, setSharedFamilies] = useState<{ family_id: string; name: string }[]>([])
   const [sharedFamiliesLoading, setSharedFamiliesLoading] = useState(false)
 
+  // Shared lot products cache - keyed by type_id
+  const [sharedLotProducts, setSharedLotProducts] = useState<Map<string, any[]>>(new Map())
+
   // Load families data once for all parcel rows
   useEffect(() => {
     if (projectId && !sharedFamiliesLoading && sharedFamilies.length === 0) {
@@ -780,6 +783,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
                   formatParcelIdDisplay={formatParcelIdDisplay}
                   projectId={projectId}
                   sharedFamilies={sharedFamilies}
+                  sharedLotProducts={sharedLotProducts}
+                  setSharedLotProducts={setSharedLotProducts}
                   planningEfficiency={planningEfficiency}
                 />
               ))}
@@ -907,13 +912,15 @@ const EditableParcelRow: React.FC<{
   formatParcelIdDisplay: (dbId: string) => string;
   projectId?: number | null;
   sharedFamilies?: { family_id: string; name: string }[];
+  sharedLotProducts?: Map<string, any[]>;
+  setSharedLotProducts?: React.Dispatch<React.SetStateAction<Map<string, any[]>>>;
   planningEfficiency?: number | null;
-}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [], planningEfficiency }) => {
+}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [], sharedLotProducts = new Map(), setSharedLotProducts, planningEfficiency }) => {
   const [editing, setEditing] = useState(false)
   const [editingFamily, setEditingFamily] = useState(false)
   const [editingType, setEditingType] = useState(false)
   const [editingProduct, setEditingProduct] = useState(false)
-  const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string }[]>([])
+  const [products, setProducts] = useState<{ product_id: string; code: string; name?: string; subtype_id?: string; lot_width?: number; lot_depth?: number; lot_area?: number }[]>([])
   const [families, setFamilies] = useState<{ family_id: string; name: string }[]>([])
   const [types, setTypes] = useState<{ type_id: string; family_id: string; name: string }[]>([])
   const [selectedFamily, setSelectedFamily] = useState<string>('')
@@ -923,6 +930,7 @@ const EditableParcelRow: React.FC<{
     acres: parcel.acres ?? 0,
     units: parcel.units ?? 0,
     frontfeet: parcel.frontfeet ?? 0,
+    lot_width: parcel.lot_width ?? 0,
   })
 
   const normalizeProducts = (input: unknown): { product_id: string; code: string; name?: string; subtype_id?: string }[] => {
@@ -1010,6 +1018,13 @@ const EditableParcelRow: React.FC<{
 
   const loadProductsForType = async (typeId: string) => {
     try {
+      // Check if we already have this data in the shared cache
+      if (sharedLotProducts.has(typeId)) {
+        console.log('Using cached lot products for type_id:', typeId)
+        setProducts(sharedLotProducts.get(typeId) || [])
+        return
+      }
+
       // The types API returns subtype_id as type_id, so we can use it directly
       console.log('Loading products for type_id (which is actually subtype_id):', typeId)
 
@@ -1018,10 +1033,17 @@ const EditableParcelRow: React.FC<{
       if (response.ok) {
         const lotProductsData = await response.json()
         console.log('Raw lot products response:', lotProductsData)
-        const normalizedProducts = normalizeProducts(lotProductsData)
-        console.log('Normalized products:', normalizedProducts)
-        setProducts(normalizedProducts)
-        console.log('Loaded', normalizedProducts.length, 'products for subtype_id:', typeId)
+
+        // Store the raw data with lot_width included
+        const productsWithWidth = Array.isArray(lotProductsData) ? lotProductsData : []
+        setProducts(productsWithWidth)
+
+        // Cache it for future use
+        if (setSharedLotProducts) {
+          setSharedLotProducts(prev => new Map(prev).set(typeId, productsWithWidth))
+        }
+
+        console.log('Loaded', productsWithWidth.length, 'products for subtype_id:', typeId)
       } else {
         console.error('Failed to fetch lot products:', response.statusText)
         setProducts([])
@@ -1053,6 +1075,7 @@ const EditableParcelRow: React.FC<{
             acres: parcel.acres || 0,
             units: parcel.units || 0,
             frontfeet: parcel.frontfeet || 0,
+            lot_width: parcel.lot_width || 0,
           })
 
           // Pre-populate dropdowns from existing parcel data
@@ -1119,6 +1142,7 @@ const EditableParcelRow: React.FC<{
       acres: parcel.acres || 0,
       units: parcel.units || 0,
       frontfeet: parcel.frontfeet || 0,
+      lot_width: parcel.lot_width || 0,
     })
     setSelectedFamily('')
     setSelectedType('')
@@ -1157,6 +1181,7 @@ const EditableParcelRow: React.FC<{
       const payload: Record<string, unknown> = {
         acres: Number(draft.acres),
         frontfeet: Number(draft.frontfeet),
+        lot_width: Number(draft.lot_width),
       }
 
       // Only include units for Residential family
@@ -1340,7 +1365,14 @@ const EditableParcelRow: React.FC<{
                 border: '1px solid'
               }}
               value={draft.product}
-              onChange={e => setDraft(d => ({ ...d, product: e.target.value }))}
+              onChange={e => {
+                const selectedCode = e.target.value
+                // Find the selected product to get its lot_width
+                const selectedProduct = products.find(p => p.code === selectedCode)
+                const lotWidth = selectedProduct?.lot_width || 0
+                console.log('Selected product:', selectedCode, 'with lot_width:', lotWidth)
+                setDraft(d => ({ ...d, product: selectedCode, lot_width: lotWidth }))
+              }}
             >
               <option value="">Select Product</option>
               {products.map(p => (

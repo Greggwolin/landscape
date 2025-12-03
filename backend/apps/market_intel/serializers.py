@@ -1,7 +1,7 @@
 """Serializers for Market Intelligence application."""
 
 from rest_framework import serializers
-from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis
+from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData
 
 
 class AIIngestionHistorySerializer(serializers.ModelSerializer):
@@ -115,3 +115,52 @@ class MarketReportSerializer(serializers.Serializer):
     data_type = serializers.CharField()
     metrics = serializers.JSONField()
     date_range = serializers.DictField(required=False)
+
+
+class MarketCompetitiveProjectSerializer(serializers.ModelSerializer):
+    """Serializer for Competitive Land Development Projects."""
+
+    class Meta:
+        model = MarketCompetitiveProject
+        fields = [
+            'id',
+            'project',
+            'comp_name',
+            'comp_address',
+            'latitude',
+            'longitude',
+            'total_units',
+            'price_min',
+            'price_max',
+            'absorption_rate_monthly',
+            'status',
+            'data_source',
+            'source_url',
+            'notes',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class MarketMacroDataSerializer(serializers.ModelSerializer):
+    """Serializer for Market Macro-Economic Data."""
+
+    class Meta:
+        model = MarketMacroData
+        fields = [
+            'id',
+            'project',
+            'population_growth_rate',
+            'employment_trend',
+            'household_formation_rate',
+            'building_permits_annual',
+            'median_income',
+            'data_year',
+            'data_source',
+            'source_url',
+            'notes',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

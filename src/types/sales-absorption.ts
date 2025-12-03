@@ -129,6 +129,7 @@ export interface ParcelWithSale {
   sale_phase_label?: string | null;
   sale_phase_number?: number | null; // short integer entered by user
   sale_date?: string | null;
+  sale_period?: number | null; // Absolute month index for sale timing
   onsite_cost_pct?: number | null;
   onsite_cost_amount?: number | null;
   commission_pct?: number | null;

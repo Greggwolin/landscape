@@ -256,6 +256,13 @@ const DevStatus: React.FC = () => {
             functionality: 'in-progress',
             priority: 'high',
             completion: 75
+          },
+          {
+            name: 'Sales & Marketing',
+            design: 'complete',
+            functionality: 'complete',
+            priority: 'high',
+            completion: 95
           }
         ],
         issues: {
@@ -392,6 +399,15 @@ const DevStatus: React.FC = () => {
           'Load remaining 32 leases (currently 6 of 38)',
           'Add PDF export functionality',
           'Add Excel export functionality'
+        ]
+      },
+      'Sales & Marketing': {
+        context: 'Complete pricing assumptions table with database-driven UOM and growth rate benchmarks. Parcel sales table with phase grouping and detail modal. Modal and table net proceeds calculations now match exactly. Monthly compounding for price inflation. Fixed Nov 26: Growth rate dropdown persistence and net proceeds divergence ($7.78M matches in both views).',
+        outstanding: [
+          'MUI to CoreUI migration for 3 modal components (SaleCalculationModal, CreateSalePhaseModal)',
+          'Bulk parcel operations for phase assignment',
+          'Export functionality for sales projections',
+          'Historical sale tracking with closings'
         ]
       }
     };

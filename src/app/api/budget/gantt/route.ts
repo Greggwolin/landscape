@@ -3,10 +3,14 @@
  *
  * Fetches budget items formatted for Gantt chart display.
  * Query params: projectId, scope, level, entityId
+ *
+ * Response includes phase measurements (units, acres, front_feet) aggregated
+ * from parcel data for auto-populating Qty based on UOM selection.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { getPhaseMeasurements } from '@/lib/budget/phaseMeasurements';
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,6 +53,8 @@ export async function GET(request: NextRequest) {
         fb.uom_code,
         fb.start_date,
         fb.end_date,
+        fb.start_period,
+        fb.periods_to_complete,
         fb.notes,
         fb.escalation_rate,
         fb.contingency_pct,
@@ -63,8 +69,31 @@ export async function GET(request: NextRequest) {
       ORDER BY fb.division_id NULLS LAST, fb.fact_id
     `;
 
-    // Neon returns array directly
-    return NextResponse.json(result);
+    // Fetch phase measurements (units, acres, front_feet) aggregated from parcels
+    const phaseMeasurements = await getPhaseMeasurements(Number(projectId));
+
+    // Enrich budget items with phase measurements for UOM auto-population
+    const enrichedItems = result.map((item: any) => {
+      const measurements = item.division_id
+        ? phaseMeasurements.get(Number(item.division_id))
+        : null;
+      return {
+        ...item,
+        phase_units: measurements?.total_units ?? null,
+        phase_acres: measurements?.total_acres ?? null,
+        phase_front_feet: measurements?.total_front_feet ?? null,
+      };
+    });
+
+    // Check if any items have front feet data (for conditional column visibility)
+    const hasFrontFeet = enrichedItems.some(
+      (item: any) => item.phase_front_feet && item.phase_front_feet > 0
+    );
+
+    return NextResponse.json({
+      items: enrichedItems,
+      hasFrontFeet,
+    });
   } catch (error) {
     console.error('Error fetching budget gantt data:', error);
     return NextResponse.json(

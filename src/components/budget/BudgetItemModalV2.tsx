@@ -26,6 +26,7 @@ import type { BudgetMode } from './ModeSelector';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 import { useUnitCostCategoriesForBudget } from '@/hooks/useUnitCostCategoriesForBudget';
 import './BudgetItemModal.css';
+import { UOMSelect } from '@/components/common/UOMSelect';
 
 export interface BudgetItemFormValues {
   fact_id?: number;
@@ -85,18 +86,6 @@ interface UnitCostCategory {
   category_name: string;
   template_count: number;
 }
-
-const uomOptions = [
-  { value: 'EA', label: 'Each' },
-  { value: 'AC', label: 'Acre' },
-  { value: 'SF', label: 'Square Feet' },
-  { value: 'SY', label: 'Square Yards' },
-  { value: 'LF', label: 'Linear Feet' },
-  { value: 'CY', label: 'Cubic Yards' },
-  { value: 'LOT', label: 'Lot' },
-  { value: 'LS', label: 'Lump Sum' },
-  { value: 'MO', label: 'Month' },
-];
 
 export default function BudgetItemModalV2({
   open,
@@ -643,22 +632,12 @@ export default function BudgetItemModalV2({
             </CCol>
             <CCol xs={6} sm={4} md={2}>
               <CFormLabel htmlFor="uom" className="w-100 text-center">UOM</CFormLabel>
-              <CFormSelect
-                id="uom"
+              <UOMSelect
+                context="budget_cost"
                 value={uom}
-                onChange={(e) => setUom(e.target.value)}
-                style={{
-                  fontSize: '0.875rem',
-                  maxWidth: '9.6ch',
-                  margin: '0 auto'
-                }}
-              >
-                {uomOptions.map((u) => (
-                  <option key={u.value} value={u.value}>
-                    {u.value}
-                  </option>
-                ))}
-              </CFormSelect>
+                onChange={setUom}
+                className="w-100"
+              />
             </CCol>
             <CCol xs={6} sm={4} md={2}>
               <CFormLabel htmlFor="rate" className="w-100 text-end">$/Unit</CFormLabel>

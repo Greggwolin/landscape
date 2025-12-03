@@ -1,0 +1,147 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { CCard, CCardBody, CCardHeader, CButton, CSpinner } from '@coreui/react'
+
+interface Props {
+  projectId: number
+}
+
+export default function ProjectDates({ projectId }: Props) {
+  const [dates, setDates] = useState({
+    start_date: '',
+    analysis_start_date: '',
+    analysis_end_date: ''
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [hasChanges, setHasChanges] = useState(false)
+
+  useEffect(() => {
+    async function fetchProject() {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`)
+        if (!response.ok) throw new Error('Failed to fetch project')
+        const data = await response.json()
+
+        setDates({
+          start_date: data.start_date || '',
+          analysis_start_date: data.analysis_start_date || '',
+          analysis_end_date: data.analysis_end_date || ''
+        })
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Error fetching project:', error)
+        setIsLoading(false)
+      }
+    }
+
+    fetchProject()
+  }, [projectId])
+
+  const handleChange = (field: keyof typeof dates, value: string) => {
+    setDates(prev => ({ ...prev, [field]: value }))
+    setHasChanges(true)
+    setSaveStatus('idle')
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setSaveStatus('idle')
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dates)
+      })
+
+      if (!response.ok) throw new Error('Failed to save')
+
+      setSaveStatus('success')
+      setHasChanges(false)
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (error) {
+      console.error('Error saving dates:', error)
+      setSaveStatus('error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <CCard>
+        <CCardBody className="text-center py-5">
+          <CSpinner color="primary" />
+        </CCardBody>
+      </CCard>
+    )
+  }
+
+  return (
+    <CCard>
+      <CCardHeader>
+        <h5 className="mb-0">Project Timeline</h5>
+      </CCardHeader>
+      <CCardBody>
+        <p className="text-secondary mb-4">
+          Configure project dates and analysis timeframe. The analysis start date is used to calculate absolute dates from period indices.
+        </p>
+
+        <div className="row g-3">
+          <div className="col-md-4">
+            <label className="form-label fw-semibold">Project Start Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={dates.start_date}
+              onChange={(e) => handleChange('start_date', e.target.value)}
+            />
+            <div className="form-text">When project development begins</div>
+          </div>
+
+          <div className="col-md-4">
+            <label className="form-label fw-semibold">Analysis Start Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={dates.analysis_start_date}
+              onChange={(e) => handleChange('analysis_start_date', e.target.value)}
+            />
+            <div className="form-text">T0 for period calculations (month 1 = this date)</div>
+          </div>
+
+          <div className="col-md-4">
+            <label className="form-label fw-semibold">Analysis End Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={dates.analysis_end_date}
+              onChange={(e) => handleChange('analysis_end_date', e.target.value)}
+            />
+            <div className="form-text">End of analysis timeframe</div>
+          </div>
+        </div>
+
+        <div className="mt-4 d-flex align-items-center gap-2">
+          <CButton
+            color="primary"
+            onClick={handleSave}
+            disabled={!hasChanges || isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </CButton>
+
+          {saveStatus === 'success' && (
+            <span className="text-success">✓ Saved successfully</span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-danger">Failed to save changes</span>
+          )}
+        </div>
+      </CCardBody>
+    </CCard>
+  )
+}

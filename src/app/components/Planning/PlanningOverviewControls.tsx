@@ -77,7 +77,7 @@ export default function PlanningOverviewControls({ projectId }: Props) {
           level3Enabled: true,
           level3Label: data?.level3Label ?? 'Parcel',
           autoNumber: Boolean(data?.autoNumber),
-          planningEfficiency: typeof data?.planningEfficiency === 'number' ? data.planningEfficiency : null
+          planningEfficiency: data?.planningEfficiency != null ? Number(data.planningEfficiency) : null
         };
         setSettings(normalized);
         setEfficiencyInput(
@@ -153,7 +153,12 @@ export default function PlanningOverviewControls({ projectId }: Props) {
 
     // Debounce save to server (wait 800ms after user stops typing)
     efficiencyTimeoutRef.current = setTimeout(async () => {
-      if (!projectId) return;
+      if (!projectId) {
+        console.warn('Cannot save efficiency: no projectId');
+        return;
+      }
+
+      console.log('Saving planning efficiency:', { value, numeric, efficiencyValue, updatedSettings });
 
       try {
         const response = await fetch(`/api/project/granularity-settings?project_id=${projectId}`, {
@@ -163,11 +168,27 @@ export default function PlanningOverviewControls({ projectId }: Props) {
         });
 
         if (response.ok) {
+          console.log('Planning efficiency saved successfully');
           // Revalidate the project config via SWR to update DUA calculations everywhere
           await mutate(`/api/projects/${projectId}/config`);
+
+          // Show brief success indicator
+          const indicator = document.createElement('div');
+          indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-3 py-1.5 rounded shadow-lg z-50 text-sm';
+          indicator.textContent = '✓ Efficiency saved';
+          document.body.appendChild(indicator);
+          setTimeout(() => {
+            indicator.style.opacity = '0';
+            indicator.style.transition = 'opacity 200ms';
+            setTimeout(() => indicator.remove(), 200);
+          }, 1500);
+        } else {
+          console.error('Failed to save efficiency: HTTP', response.status);
+          alert('Failed to save planning efficiency. Please try again.');
         }
       } catch (error) {
         console.error('Failed to save planning efficiency:', error);
+        alert('Error saving planning efficiency. Check console for details.');
       }
     }, 800);
   };

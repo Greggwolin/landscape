@@ -2,14 +2,18 @@
  * FeasibilityTab Component
  *
  * Wrapper for the Feasibility analysis feature for Land Development projects.
- * Displays three analysis approaches: Sales Comparison, Residual Land Value, and Cash Flow (DCF).
+ * Displays four analysis approaches: Validation Report, Cash Flow (DCF), Sales Comparison, and Residual Land Value.
  */
 
 'use client';
 
 import { useState, memo } from 'react';
+import { ExportButton } from '@/components/admin';
+import MarketDataContent from '@/components/feasibility/MarketDataContent';
+import { CashFlowAnalysisTab } from '@/components/analysis/cashflow';
+import ValidationReport from '@/components/analysis/validation/ValidationReport';
 
-type Tab = 'sales-comparison' | 'residual' | 'cash-flow';
+type Tab = 'validation' | 'cash-flow' | 'sales-comparison' | 'residual';
 
 interface FeasibilityTabProps {
   project: any;
@@ -18,12 +22,13 @@ interface FeasibilityTabProps {
 function FeasibilityTab({ project }: FeasibilityTabProps) {
   const projectId = project.project_id;
   const isLandDevelopment = project.project_type_code === 'LAND';
-  const [activeTab, setActiveTab] = useState<Tab>('sales-comparison');
+  const [activeTab, setActiveTab] = useState<Tab>('validation');
 
   const tabs: { id: Tab; label: string; enabled: boolean }[] = [
-    { id: 'sales-comparison', label: 'Sales Comparison', enabled: false },
-    { id: 'residual', label: 'Residual Land Value', enabled: false },
-    { id: 'cash-flow', label: 'Cash Flow Analysis', enabled: false }
+    { id: 'validation', label: 'Validation Report', enabled: true },
+    { id: 'cash-flow', label: 'Cash Flow Analysis', enabled: true },
+    { id: 'sales-comparison', label: 'Sales Comparison', enabled: true },
+    { id: 'residual', label: 'Residual Land Value', enabled: false }
   ];
 
   // Show message for non-land development projects
@@ -94,6 +99,12 @@ function FeasibilityTab({ project }: FeasibilityTabProps) {
 
   return (
     <div>
+      {/* Header with Export Button */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="mb-0">Feasibility Analysis</h2>
+        <ExportButton tabName="Feasibility" projectId={projectId.toString()} />
+      </div>
+
       {/* Sub-Tab Bar for Feasibility Approaches */}
       <div
         className="border-b mb-6"
@@ -155,34 +166,16 @@ function FeasibilityTab({ project }: FeasibilityTabProps) {
       </div>
 
       {/* Content */}
+      {activeTab === 'validation' && (
+        <ValidationReport projectId={projectId} />
+      )}
+
+      {activeTab === 'cash-flow' && (
+        <CashFlowAnalysisTab projectId={projectId} />
+      )}
+
       {activeTab === 'sales-comparison' && (
-        <div
-          className="text-center py-20 rounded-lg border"
-          style={{
-            backgroundColor: 'var(--cui-card-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div className="text-6xl mb-4">🏘️</div>
-          <h3
-            className="text-xl font-bold mb-2"
-            style={{ color: 'var(--cui-body-color)' }}
-          >
-            Sales Comparison Approach
-          </h3>
-          <p
-            className="text-sm mb-2"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            Analyze comparable land sales and finished lot values
-          </p>
-          <p
-            className="text-xs"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            Coming Soon
-          </p>
-        </div>
+        <MarketDataContent projectId={projectId} />
       )}
 
       {activeTab === 'residual' && (
@@ -205,36 +198,6 @@ function FeasibilityTab({ project }: FeasibilityTabProps) {
             style={{ color: 'var(--cui-secondary-color)' }}
           >
             Calculate land value by deducting development costs from finished product value
-          </p>
-          <p
-            className="text-xs"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            Coming Soon
-          </p>
-        </div>
-      )}
-
-      {activeTab === 'cash-flow' && (
-        <div
-          className="text-center py-20 rounded-lg border"
-          style={{
-            backgroundColor: 'var(--cui-card-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div className="text-6xl mb-4">📊</div>
-          <h3
-            className="text-xl font-bold mb-2"
-            style={{ color: 'var(--cui-body-color)' }}
-          >
-            Cash Flow Analysis (DCF)
-          </h3>
-          <p
-            className="text-sm mb-2"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            Discounted cash flow analysis with phased revenue and cost projections
           </p>
           <p
             className="text-xs"

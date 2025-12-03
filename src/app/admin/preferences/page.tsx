@@ -10,6 +10,7 @@ import { ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { LandscapeButton } from '@/components/ui/landscape';
+import { useUserTier, useUpdateUserTier } from '@/hooks/useUserTier';
 
 // Dynamically import TaxonomyPage to avoid SSR issues
 const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
@@ -19,6 +20,16 @@ const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
 // Dynamically import UnitCostCategoryManager to avoid SSR issues
 const UnitCostCategoryManager = dynamic(
   () => import('./components/UnitCostCategoryManager'),
+  { ssr: false }
+);
+
+const UnitOfMeasureManager = dynamic(
+  () => import('./components/UnitOfMeasureManager'),
+  { ssr: false }
+);
+
+const SystemPicklistsAccordion = dynamic(
+  () => import('@/components/admin/SystemPicklistsAccordion').then((mod) => mod.SystemPicklistsAccordion),
   { ssr: false }
 );
 
@@ -32,6 +43,12 @@ interface PreferenceCategory {
 
 const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
   {
+    key: 'pro_features',
+    label: 'Pro Features',
+    description: 'Enable access to capitalization modeling, debt/equity structures, and waterfall distributions',
+    icon: 'Star'
+  },
+  {
     key: 'unit_cost_categories',
     label: 'Unit Cost Categories',
     description: 'Manage global cost categories across all lifecycle stages',
@@ -42,14 +59,38 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     label: 'Land Use Taxonomy Manager',
     description: 'Configure land use types, families, and product categories',
     icon: 'Map'
+  },
+  {
+    key: 'uom_manager',
+    label: 'Units of Measure Manager',
+    description: 'Configure measurement units used throughout the application',
+    icon: 'Ruler'
+  },
+  {
+    key: 'system_picklists',
+    label: 'System Picklists',
+    description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
+    icon: 'List'
   }
 ];
 
 export default function SystemPreferencesPage() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('unit_cost_categories');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const { data: tierLevel, isLoading: isTierLoading } = useUserTier();
+  const updateTierMutation = useUpdateUserTier();
 
   const toggleCategory = (key: string) => {
     setExpandedCategory(expandedCategory === key ? null : key);
+  };
+
+  const handleTierToggle = async (checked: boolean) => {
+    try {
+      const newTier = checked ? 'pro' : 'analyst';
+      await updateTierMutation.mutateAsync(newTier);
+    } catch (error) {
+      console.error('Failed to update tier:', error);
+      alert('Failed to update tier setting. Please try again.');
+    }
   };
 
   return (
@@ -118,13 +159,63 @@ export default function SystemPreferencesPage() {
                 {/* Expanded Content */}
                 {isExpanded && (
                   <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                    {category.key === 'land_use_taxonomy' ? (
+                    {category.key === 'pro_features' ? (
+                      <div className="px-6 py-4">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <div>
+                            <strong style={{ color: 'var(--cui-body-color)' }}>Enable Pro Features</strong>
+                            <p className="text-muted small mb-0">
+                              Access capitalization modeling, debt/equity structures, and waterfall distributions
+                            </p>
+                          </div>
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              role="switch"
+                              id="proTierSwitch"
+                              checked={tierLevel === 'pro'}
+                              onChange={(e) => handleTierToggle(e.target.checked)}
+                              disabled={isTierLoading || updateTierMutation.isPending}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <label
+                              className="form-check-label ms-2"
+                              htmlFor="proTierSwitch"
+                              style={{
+                                color: 'var(--cui-body-color)',
+                                fontWeight: tierLevel === 'pro' ? '600' : '400'
+                              }}
+                            >
+                              {tierLevel === 'pro' ? 'Pro' : 'Analyst'}
+                            </label>
+                          </div>
+                        </div>
+
+                        {tierLevel === 'pro' && (
+                          <div className="alert alert-info mb-0">
+                            <small>
+                              <strong>Pro Mode Active:</strong> You now have access to the Capitalization tile
+                              in project navigation. You can toggle back to Analyst mode at any time.
+                            </small>
+                          </div>
+                        )}
+                      </div>
+                    ) : category.key === 'land_use_taxonomy' ? (
                       <div className="px-6 py-4">
                         <TaxonomyPage />
                       </div>
                     ) : category.key === 'unit_cost_categories' ? (
                       <div style={{ minHeight: '600px' }}>
                         <UnitCostCategoryManager />
+                      </div>
+                    ) : category.key === 'uom_manager' ? (
+                      <div className="px-6 py-4">
+                        <UnitOfMeasureManager />
+                      </div>
+                    ) : category.key === 'system_picklists' ? (
+                      <div className="px-6 py-4">
+                        <SystemPicklistsAccordion />
                       </div>
                     ) : null}
                   </div>

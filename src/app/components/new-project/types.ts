@@ -1,15 +1,33 @@
-import type { AnalysisType, PropertySubtype, PropertyClass } from '@/types/project-taxonomy'
+import type { AnalysisType } from '@/types/project-taxonomy'
 
 // Re-export for backwards compatibility
 export type DevelopmentType = AnalysisType
 
-export type LocationMode = 'address' | 'cross_streets' | 'coordinates'
+export type LocationMode = 'address' | 'cross_streets' | 'coordinates' | 'map_pin'
 
 export type SiteAreaUnit = 'AC' | 'SF' | 'SM'
 
 export type ScaleInputMethod = 'units' | 'density' | 'later'
 
 export type ProjectCreationPath = 'immediate' | 'extended_wizard' | 'ai_extraction'
+
+// Property subtype options used in the New Project modal (value codes)
+export type PropertySubtypeCode =
+  | 'MPC'
+  | 'INFILL'
+  | 'LAND_BANK'
+  | 'LOT_DEVELOPMENT'
+  | 'ENTITLED_LAND'
+  | 'MULTIFAMILY'
+  | 'OFFICE'
+  | 'RETAIL'
+  | 'INDUSTRIAL'
+  | 'MIXED_USE'
+  | 'HOTEL'
+  | 'SELF_STORAGE'
+
+// Property class options (Income Property only)
+export type PropertyClassCode = 'CLASS_A' | 'CLASS_B' | 'CLASS_C' | 'CLASS_D'
 
 export interface UploadedDocument {
   id: string
@@ -24,8 +42,8 @@ export interface UploadedDocument {
 export interface NewProjectFormData {
   // Step 1: Asset Type
   analysis_type: AnalysisType | '' // NEW: replaces development_type
-  property_subtype: PropertySubtype | '' // UPDATED: now cascades from analysis_type
-  property_class: PropertyClass | '' // NEW: Income Property only
+  property_subtype: PropertySubtypeCode | '' // UPDATED: now cascades from analysis_type
+  property_class: PropertyClassCode | '' // NEW: Income Property only
 
   // DEPRECATED: keeping for backwards compatibility
   development_type: AnalysisType | ''

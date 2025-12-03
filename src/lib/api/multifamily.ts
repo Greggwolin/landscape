@@ -296,6 +296,57 @@ export const leasesAPI = {
       method: 'DELETE',
     });
   },
+
+  /**
+   * Check if proposed unit field changes differ from the floorplan
+   */
+  async checkFloorplanDiff(leaseId: number, proposedChanges: {
+    unit_type?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    square_feet?: number;
+  }): Promise<{
+    differs_from_floorplan: boolean;
+    floorplan: {
+      unit_type_id: number;
+      unit_type_code: string;
+      bedrooms: number;
+      bathrooms: number;
+      avg_square_feet: number;
+      total_units: number;
+    } | null;
+    differences: {
+      bedrooms?: { floorplan: number; proposed: number };
+      bathrooms?: { floorplan: number; proposed: number };
+      square_feet?: { floorplan: number; proposed: number };
+      message?: string;
+    };
+    unit_type: string;
+  }> {
+    return fetchAPI(`${DJANGO_API_BASE}/api/multifamily/leases/${leaseId}/check-floorplan-diff/`, {
+      method: 'POST',
+      body: JSON.stringify(proposedChanges),
+    });
+  },
+
+  /**
+   * Update unit fields with floorplan handling
+   */
+  async updateWithFloorplan(leaseId: number, data: {
+    unit_fields: {
+      unit_type?: string;
+      bedrooms?: number;
+      bathrooms?: number;
+      square_feet?: number;
+    };
+    floorplan_action: 'create' | 'update' | 'none';
+    new_unit_type_code?: string;
+  }): Promise<Lease> {
+    return fetchAPI(`${DJANGO_API_BASE}/api/multifamily/leases/${leaseId}/update-with-floorplan/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 // ============================================================================

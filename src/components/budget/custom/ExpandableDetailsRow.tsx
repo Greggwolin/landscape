@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CBadge,
   CFormLabel,
@@ -12,11 +12,14 @@ import type { BudgetItem } from '@/types/budget';
 import type { BudgetMode } from '@/types/budget';
 import { getFieldGroupsByMode, shouldShowField } from '../config/fieldGroups';
 import { FieldRenderer } from '../fields/FieldRenderer';
+import TimingEscalationTile from '../tiles/TimingEscalationTile';
+import CostControlsTile from '../tiles/CostControlsTile';
 
 interface ExpandableDetailsRowProps {
   item: BudgetItem;
   mode: BudgetMode;
   columnCount: number;
+  projectId: number; // Added for fetching project start date
   projectTypeCode?: string;
   onInlineCommit?: (
     item: BudgetItem,
@@ -29,6 +32,7 @@ function ExpandableDetailsRow({
   item,
   mode,
   columnCount,
+  projectId,
   projectTypeCode,
   onInlineCommit,
 }: ExpandableDetailsRowProps) {
@@ -37,6 +41,21 @@ function ExpandableDetailsRow({
   const [expandedSections, setExpandedSections] = useState<Set<number>>(() =>
     new Set(fieldGroups.map((_, index) => index))
   );
+  const [projectStartDate, setProjectStartDate] = useState<string | null>(null);
+
+  // Fetch project start date for timing calculations
+  useEffect(() => {
+    if (projectId) {
+      fetch(`/api/projects/${projectId}`)
+        .then(res => res.json())
+        .then(data => {
+          setProjectStartDate(data.project?.start_date || null);
+        })
+        .catch(err => {
+          console.error('Failed to fetch project start date:', err);
+        });
+    }
+  }, [projectId]);
 
   // Don't show for napkin mode (early return AFTER hooks)
   if (mode === 'napkin') return null;
@@ -59,26 +78,27 @@ function ExpandableDetailsRow({
     });
   };
 
-  return (
-    <tr className="expandable-details-row">
-      <td colSpan={columnCount} style={{ padding: '0.75rem' }}>
-        <div>
-          {fieldGroups.map((group, index) => {
-            const groupColor = group.color || (group.mode === 'standard' ? 'var(--cui-warning)' : 'var(--cui-danger)');
-            const isExpanded = expandedSections.has(index);
+  // Separate timing and cost_controls groups for two-column layout
+  const timingGroup = fieldGroups.find(g => g.id === 'timing');
+  const costControlsGroup = fieldGroups.find(g => g.id === 'cost_controls');
+  const otherGroups = fieldGroups.filter(g => g.id !== 'timing' && g.id !== 'cost_controls');
 
-            return (
-              <div
-                key={index}
-                style={{
-                  marginBottom: '0.5rem',
-                  border: '1px solid var(--cui-border-color)',
-                  borderRadius: '0.375rem',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Header */}
-                <button
+  const renderAccordion = (group: typeof fieldGroups[0], index: number) => {
+    const groupColor = group.color || (group.mode === 'standard' ? 'var(--cui-warning)' : 'var(--cui-danger)');
+    const isExpanded = expandedSections.has(index);
+
+    return (
+      <div
+        key={index}
+        style={{
+          marginBottom: '0.5rem',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: '0.375rem',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -128,7 +148,7 @@ function ExpandableDetailsRow({
                   </CBadge>
                 </button>
 
-                {/* Body - 3-column layout with minimal spacing */}
+                {/* Body - Custom renderer for timing group, standard layout for others */}
                 {isExpanded && (
                   <div
                     style={{
@@ -137,62 +157,97 @@ function ExpandableDetailsRow({
                       borderTop: '1px solid var(--cui-border-color)',
                     }}
                   >
-                    <div className="row g-2" style={{ width: '100%', rowGap: '0.5rem' }}>
-                      {group.fields.map((field) => {
-                        const value = item[field.name];
+                    {group.id === 'timing' ? (
+                      // Custom timing tile renderer
+                      <TimingEscalationTile
+                        item={item}
+                        projectId={projectId}
+                        projectStartDate={projectStartDate}
+                        onFieldChange={handleFieldChange}
+                      />
+                    ) : group.id === 'cost_controls' ? (
+                      // Custom cost controls tile renderer
+                      <CostControlsTile
+                        item={item}
+                        projectId={projectId}
+                        onFieldChange={handleFieldChange}
+                      />
+                    ) : (
+                      // Standard field grid for all other groups
+                      <div className="row g-2" style={{ width: '100%', rowGap: '0.5rem' }}>
+                        {group.fields.map((field) => {
+                          const value = item[field.name];
 
-                        // Check if field should be visible based on dependencies and project type
-                        if (!shouldShowField(field, item, projectTypeCode)) {
-                          return null;
-                        }
+                          // Check if field should be visible based on dependencies and project type
+                          if (!shouldShowField(field, item, projectTypeCode)) {
+                            return null;
+                          }
 
-                        // Determine column class: full-width > auto > standard 3-column
-                        const colClass = field.fullWidth
-                          ? 'col-12'
-                          : field.colWidth === 'auto'
-                            ? 'col-auto'
-                            : 'col-md-4';
+                          // Determine column class: full-width > auto > standard 3-column
+                          const colClass = field.fullWidth
+                            ? 'col-12'
+                            : field.colWidth === 'auto'
+                              ? 'col-auto'
+                              : 'col-md-4';
 
-                        return (
-                          <div key={field.name} className={colClass} style={{ marginBottom: '0.25rem' }}>
-                            {/* Field Label - Minimal */}
-                            <CFormLabel
-                              className="small text-muted d-flex align-items-center gap-1"
-                              style={{
-                                fontSize: '0.75rem',
-                                marginBottom: '0.125rem',
-                                lineHeight: 1.2,
-                              }}
-                            >
-                              <span>{field.label}</span>
-                              {field.readonly && (
-                                <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
-                                  RO
-                                </CBadge>
-                              )}
-                              {field.computed && (
-                                <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
-                                  calc
-                                </CBadge>
-                              )}
-                            </CFormLabel>
+                          return (
+                            <div key={field.name} className={colClass} style={{ marginBottom: '0.25rem' }}>
+                              {/* Field Label - Minimal */}
+                              <CFormLabel
+                                className="small text-muted d-flex align-items-center gap-1"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  marginBottom: '0.125rem',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                <span>{field.label}</span>
+                                {field.readonly && (
+                                  <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
+                                    RO
+                                  </CBadge>
+                                )}
+                                {field.computed && (
+                                  <CBadge color="light" textColor="dark" style={{ fontSize: '0.6rem', padding: '0.05rem 0.2rem' }}>
+                                    calc
+                                  </CBadge>
+                                )}
+                              </CFormLabel>
 
-                            {/* Field Input */}
-                            <FieldRenderer
-                              field={field}
-                              value={value}
-                              item={item}
-                              onChange={handleFieldChange}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
+                              {/* Field Input */}
+                              <FieldRenderer
+                                field={field}
+                                value={value}
+                                item={item}
+                                onChange={handleFieldChange}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            );
-          })}
+    );
+  };
+
+  return (
+    <tr className="expandable-details-row">
+      <td colSpan={columnCount} style={{ padding: '0.75rem' }}>
+        {/* Two-column layout for Timing & Escalation (left) and Cost Controls (right) */}
+        <div className="row g-2 mb-2">
+          <div className="col-md-6">
+            {timingGroup && renderAccordion(timingGroup, 0)}
+          </div>
+          <div className="col-md-6">
+            {costControlsGroup && renderAccordion(costControlsGroup, 1)}
+          </div>
+        </div>
+
+        {/* Full-width layout for remaining groups */}
+        <div>
+          {otherGroups.map((group, idx) => renderAccordion(group, idx + 2))}
         </div>
       </td>
     </tr>

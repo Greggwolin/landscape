@@ -13,9 +13,11 @@ import AreaTiles from '@/components/shared/AreaTiles';
 import PhaseTiles from './PhaseTiles';
 import ParcelSalesTable from './ParcelSalesTable';
 import PricingTable from './PricingTable';
+import SaleTransactionDetails from './SaleTransactionDetails';
 import ModeSelector from '@/components/budget/ModeSelector';
 import { useContainers } from '@/hooks/useContainers';
-import { usePhaseStats } from '@/hooks/useSalesAbsorption';
+import { usePhaseStats, useParcelsWithSales } from '@/hooks/useSalesAbsorption';
+import { usePreference } from '@/hooks/useUserPreferences';
 import type { BudgetMode } from '@/components/budget/ModeSelector';
 
 // Sales mode uses the same type as Budget mode for consistency
@@ -26,11 +28,19 @@ interface Props {
 }
 
 export default function SalesContent({ projectId }: Props) {
-  const [mode, setMode] = useState<SalesMode>('napkin');
+  // Mode state with database persistence via usePreference hook
+  const [mode, setMode] = usePreference<SalesMode>({
+    key: 'sales.mode',
+    defaultValue: 'napkin',
+    scopeType: 'project',
+    scopeId: projectId,
+    migrateFrom: `sales_mode_${projectId}`, // Auto-migrate from old localStorage key
+  });
   const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
   const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
   const { phases: containerPhases } = useContainers({ projectId, includeCosts: false });
   const { data: phases } = usePhaseStats(projectId);
+  const { data: parcelSalesData } = useParcelsWithSales(projectId, selectedPhaseIds);
 
   const handleAreaSelect = (areaId: number | null) => {
     if (areaId === null) {
@@ -114,8 +124,8 @@ export default function SalesContent({ projectId }: Props) {
 
       {/* Areas/Phases and Land Use Pricing - Side by Side */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Left Column: Areas and Phases (5 columns) */}
-        <div className="col-span-5">
+        {/* Left Column: Areas and Phases (wider) */}
+        <div className="col-span-7">
           <CollapsibleSection
             title="Areas and Phases"
             itemCount={1}
@@ -162,8 +172,8 @@ export default function SalesContent({ projectId }: Props) {
           </CollapsibleSection>
         </div>
 
-        {/* Right Column: Land Use Pricing (7 columns) */}
-        <div className="col-span-7">
+        {/* Right Column: Land Use Pricing (narrower) */}
+        <div className="col-span-5" style={{ maxWidth: '720px' }}>
           <CollapsibleSection
             title={
               hasFilters
@@ -202,6 +212,14 @@ export default function SalesContent({ projectId }: Props) {
           />
         </div>
       </CollapsibleSection>
+
+      {/* Sale Transaction Details - Phase 3 Addition */}
+      {parcelSalesData?.parcels && (
+        <SaleTransactionDetails
+          projectId={projectId}
+          parcels={parcelSalesData.parcels}
+        />
+      )}
     </div>
   );
 }
