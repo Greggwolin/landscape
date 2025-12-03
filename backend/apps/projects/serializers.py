@@ -53,6 +53,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'location_lat',
             'location_lon',
             'is_active',
+            'analysis_mode',
             'created_at',
             'updated_at',
         ]

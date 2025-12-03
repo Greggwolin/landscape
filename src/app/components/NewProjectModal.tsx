@@ -245,13 +245,32 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
 
     try {
       const projectName = generateProjectName(data)
+      // For Land Development, always use 'LAND' as the project_type_code
+      // For Income Property, map property_subtype to valid codes
+      const getProjectTypeCode = () => {
+        if (data.analysis_type === 'Land Development') {
+          return 'LAND'
+        }
+        // Map Income Property subtypes to valid project_type_codes
+        const subtypeMap: Record<string, string> = {
+          'MULTIFAMILY': 'MF',
+          'OFFICE': 'OFF',
+          'RETAIL': 'RET',
+          'INDUSTRIAL': 'IND',
+          'HOTEL': 'HTL',
+          'MIXED_USE': 'MXU',
+          'SELF_STORAGE': 'IND' // Map to Industrial
+        }
+        return subtypeMap[data.property_subtype || ''] || 'MF'
+      }
+      const projectTypeCode = getProjectTypeCode()
       const payload = {
         project_name: projectName,
         analysis_type: data.analysis_type,
         property_subtype: data.property_subtype || undefined,
         property_class: data.property_class || undefined,
         development_type: data.analysis_type,
-        project_type_code: data.property_subtype || '',
+        project_type_code: projectTypeCode,
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,
         city: data.city || undefined,

@@ -1,0 +1,10 @@
+{
+  "target_market": "Phoenix, AZ – Lennar",
+  "entry_url": "https://phxlennar.com/",
+  "max_communities": 20,
+  "max_plans_per_community": 10,
+  "max_listings_per_community": 20,
+  "user_agent": "LandscapeLennarBot/0.1 (contact: gregg@wolinfamily.com)",
+  "respect_robots_txt": true,
+  "request_delay_seconds": 1.5
+}

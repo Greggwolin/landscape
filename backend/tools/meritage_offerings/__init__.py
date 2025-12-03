@@ -1,0 +1,2 @@
+"""Meritage offerings ingestion package."""
+

@@ -23,6 +23,7 @@ type RawProjectRow = {
   analysis_type?: string | null
   property_subtype?: string | null
   property_class?: string | null
+  analysis_mode?: string | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
   updated_at?: string | null
@@ -62,6 +63,7 @@ const CARNEY_FALLBACK_PROJECT: RawProjectRow = {
   analysis_type: null,
   property_subtype: null,
   property_class: null,
+  analysis_mode: 'napkin',
   total_residential_units: null,
   total_commercial_sqft: null,
   updated_at: new Date().toISOString()
@@ -100,6 +102,7 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         analysis_type,
         property_subtype,
         property_class,
+        COALESCE(analysis_mode, 'napkin') AS analysis_mode,
         -- Phase 5 fields (nullable in legacy DB)
         NULL::numeric AS total_residential_units,
         NULL::numeric AS total_commercial_sqft,
@@ -143,7 +146,8 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
       is_active: true,
       analysis_type: null,
       property_subtype: null,
-      property_class: null
+      property_class: null,
+      analysis_mode: 'napkin'
     }))
   }
 }
@@ -174,6 +178,7 @@ export async function GET(request: NextRequest) {
       ...project,
       project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
       is_active: project.is_active ?? true,
+      analysis_mode: project.analysis_mode ?? 'napkin',
     }))
 
     const filtered = propertyTypeFilter

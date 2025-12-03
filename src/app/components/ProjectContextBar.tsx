@@ -107,6 +107,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
             <LifecycleTileNav
               projectId={projectId.toString()}
               propertyType={project.project_type_code}
+              analysisMode={project.analysis_mode}
             />
           </div>
           <InflationRateDisplay projectId={projectId} />

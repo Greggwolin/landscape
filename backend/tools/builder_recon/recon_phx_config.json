@@ -1,0 +1,11 @@
+{
+  "target_market": "Phoenix, AZ – Zonda Nov 2025",
+  "top_n": 20,
+  "builders_filter": [],
+  "respect_robots_txt": true,
+  "request_delay_seconds": 1.5,
+  "max_communities_per_builder": 20,
+  "max_plans_per_builder": 10,
+  "max_listings_per_builder": 20,
+  "output_path": "backend/tools/builder_recon/top20_builder_recon_phx.json"
+}

@@ -1,0 +1,8 @@
+{
+  "target_market": "Phoenix, AZ – Meritage",
+  "entry_url": "https://www.meritagehomes.com/state/az/phoenix",
+  "max_communities": 30,
+  "user_agent": "LandscapeMeritageBot/0.1 (+contact: ops@landscaper.ai)",
+  "respect_robots_txt": true,
+  "request_delay_seconds": 1.5
+}

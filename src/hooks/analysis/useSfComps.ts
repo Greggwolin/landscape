@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
 export type SfComp = {
   mlsId: string;
@@ -31,6 +31,8 @@ export type SfCompsStats = {
   sqftRange: { min: number | null; max: number | null };
 };
 
+export type PropertyType = 'house' | 'condo' | 'townhouse' | 'attached' | 'all';
+
 export type SfCompsResponse = {
   projectId: number;
   asOfDate: string;
@@ -38,6 +40,7 @@ export type SfCompsResponse = {
   soldWithinDays: number;
   minYearBuilt?: number;
   maxYearBuilt?: number;
+  propertyType?: PropertyType;
   stats: SfCompsStats;
   comps: SfComp[];
 };
@@ -47,6 +50,7 @@ export type SfCompsQuery = {
   soldWithinDays?: number;
   minYearBuilt?: number;
   maxYearBuilt?: number;
+  propertyType?: PropertyType;
 };
 
 async function fetchSfComps(projectId: number, params?: SfCompsQuery): Promise<SfCompsResponse> {
@@ -62,6 +66,9 @@ async function fetchSfComps(projectId: number, params?: SfCompsQuery): Promise<S
   }
   if (params?.maxYearBuilt !== undefined) {
     url.searchParams.set('maxYear', String(params.maxYearBuilt));
+  }
+  if (params?.propertyType !== undefined) {
+    url.searchParams.set('propertyType', params.propertyType);
   }
 
   const res = await fetch(url.toString(), {
@@ -83,10 +90,14 @@ async function fetchSfComps(projectId: number, params?: SfCompsQuery): Promise<S
 
 export function useSfComps(projectId: number, params?: SfCompsQuery) {
   return useQuery<SfCompsResponse, Error>({
-    queryKey: ['sfComps', projectId, params?.radiusMiles, params?.soldWithinDays, params?.minYearBuilt, params?.maxYearBuilt],
+    queryKey: ['sfComps', projectId, params?.radiusMiles, params?.soldWithinDays, params?.minYearBuilt, params?.maxYearBuilt, params?.propertyType],
     queryFn: () => fetchSfComps(projectId, params),
     enabled: Number.isFinite(projectId) && projectId > 0,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000     // 5 minutes garbage collection
+    staleTime: 5 * 60 * 1000, // 5 minutes - keep data fresh longer
+    gcTime: 10 * 60 * 1000,   // 10 minutes garbage collection
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    placeholderData: keepPreviousData,  // Keep showing old data while fetching new
   });
 }

@@ -3,9 +3,11 @@ import { sql } from '@/lib/db'
 
 type MinimalProjectRequest = {
   project_name: string
+  analysis_type?: string
   development_type?: string
   project_type_code: string
   property_subtype?: string
+  property_class?: string
   street_address?: string
   cross_streets?: string
   city?: string
@@ -75,17 +77,20 @@ export async function POST(request: NextRequest) {
       : null
     const jurisdictionCity = city
     const jurisdictionState = state
-    const projectStatus = 'PLANNING'
 
     const inserted = await sql<{
       project_id: number
       project_name: string
       project_type_code: string | null
+      analysis_mode: string
     }[]>`
       INSERT INTO landscape.tbl_project (
         project_name,
         project_type_code,
         project_type,
+        analysis_type,
+        property_subtype,
+        property_class,
         street_address,
         city,
         state,
@@ -98,8 +103,8 @@ export async function POST(request: NextRequest) {
         location_lon,
         total_units,
         gross_sf,
-        project_status,
-        start_date,
+        analysis_start_date,
+        analysis_mode,
         is_active,
         created_at,
         updated_at
@@ -107,6 +112,9 @@ export async function POST(request: NextRequest) {
         ${body.project_name},
         ${body.project_type_code},
         ${body.property_subtype || body.development_type || null},
+        ${body.analysis_type || null},
+        ${body.property_subtype || null},
+        ${body.property_class || null},
         ${streetAddress},
         ${city},
         ${state},
@@ -119,13 +127,13 @@ export async function POST(request: NextRequest) {
         ${longitude},
         ${totalUnits},
         ${grossSf},
-        ${projectStatus},
         ${body.analysis_start_date || null},
+        'napkin',
         true,
         NOW(),
         NOW()
       )
-      RETURNING project_id, project_name, project_type_code
+      RETURNING project_id, project_name, project_type_code, analysis_mode
     `
 
     if (inserted.length === 0) {

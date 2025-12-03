@@ -83,6 +83,9 @@ class Project(models.Model):
     # Template
     template_id = models.BigIntegerField(blank=True, null=True)
 
+    # Analysis Mode (napkin = simplified, developer = full tabs)
+    analysis_mode = models.CharField(max_length=20, blank=True, null=True, default='napkin')
+
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

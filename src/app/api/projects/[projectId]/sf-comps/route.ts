@@ -34,6 +34,8 @@ export type SfCompsStats = {
   sqftRange: { min: number | null; max: number | null };
 };
 
+export type PropertyType = 'house' | 'condo' | 'townhouse' | 'attached' | 'all';
+
 export type SfCompsResponse = {
   projectId: number;
   asOfDate: string;
@@ -41,6 +43,7 @@ export type SfCompsResponse = {
   soldWithinDays: number;
   minYearBuilt?: number;
   maxYearBuilt?: number;
+  propertyType?: PropertyType;
   stats: SfCompsStats;
   comps: SfComp[];
 };
@@ -221,8 +224,16 @@ export async function GET(req: NextRequest, context: Params) {
     return NextResponse.json({ error: 'Invalid maxYear' }, { status: 400 });
   }
 
+  // Parse property type parameter
+  const propertyTypeParam = url.searchParams.get('propertyType') as PropertyType | null;
+  const validPropertyTypes: PropertyType[] = ['house', 'condo', 'townhouse', 'attached', 'all'];
+  if (propertyTypeParam && !validPropertyTypes.includes(propertyTypeParam)) {
+    return NextResponse.json({ error: 'Invalid propertyType' }, { status: 400 });
+  }
+
   const searchRadiusMiles = radiusParam ?? DEFAULT_RADIUS_MILES;
   const soldWithinDays = daysParam ?? DEFAULT_SOLD_WITHIN_DAYS;
+  const propertyType: PropertyType = propertyTypeParam ?? 'house';
 
   // Default to homes built within last 2 years if no minYear specified
   const currentYear = new Date().getFullYear();
@@ -258,7 +269,7 @@ export async function GET(req: NextRequest, context: Params) {
       soldWithinDays,
       minYearBuilt,
       maxYearBuilt: maxYearParam ?? undefined,
-      propertyType: 'house'
+      propertyType
     });
 
     // Normalize comps to our format
@@ -276,6 +287,7 @@ export async function GET(req: NextRequest, context: Params) {
       soldWithinDays,
       minYearBuilt,
       ...(maxYearParam && { maxYearBuilt: maxYearParam }),
+      propertyType,
       stats,
       comps
     };

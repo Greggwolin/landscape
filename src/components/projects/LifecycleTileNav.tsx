@@ -17,9 +17,10 @@ interface TileConfig {
 interface LifecycleTileNavProps {
   projectId: string;
   propertyType?: string;
+  analysisMode?: 'napkin' | 'developer' | null;
 }
 
-// Land Development Tiles
+// Land Development Tiles - Full Developer Mode
 const LAND_DEV_TILES: TileConfig[] = [
   {
     id: 'home',
@@ -88,6 +89,34 @@ const LAND_DEV_TILES: TileConfig[] = [
   },
 ];
 
+// Land Development Tiles - Napkin Mode (simplified, 3 tiles)
+const LAND_DEV_NAPKIN_TILES: TileConfig[] = [
+  {
+    id: 'home',
+    label: 'Project Home',
+    colorClass: '',
+    textClass: 'text-white',
+    borderClass: 'border-primary',
+    route: ''
+  },
+  {
+    id: 'napkin',
+    label: 'Napkin Analysis',
+    colorClass: '', // Amber color
+    textClass: 'text-dark',
+    borderClass: 'border-warning',
+    route: '/napkin'
+  },
+  {
+    id: 'documents',
+    label: 'Documents',
+    colorClass: '',
+    textClass: 'text-white',
+    borderClass: 'border-dark',
+    route: '/documents'
+  },
+];
+
 // Multifamily / Income Property Tiles
 const MULTIFAMILY_TILES: TileConfig[] = [
   {
@@ -149,7 +178,7 @@ const MULTIFAMILY_TILES: TileConfig[] = [
   },
 ];
 
-export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavProps) {
+export function LifecycleTileNav({ projectId, propertyType, analysisMode }: LifecycleTileNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -163,9 +192,14 @@ export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavPr
   const propertyTypeCode = propertyType?.toUpperCase() || '';
   const isMultifamily = ['MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'].includes(propertyTypeCode);
   const isLandDev = ['LAND', 'MPC'].includes(propertyTypeCode);
+  const isNapkinMode = analysisMode === 'napkin';
 
-  // Select tile configuration
-  const tiles = isMultifamily ? MULTIFAMILY_TILES : LAND_DEV_TILES;
+  // Select tile configuration based on analysis mode
+  const tiles = isMultifamily
+    ? MULTIFAMILY_TILES
+    : (isLandDev && isNapkinMode)
+      ? LAND_DEV_NAPKIN_TILES
+      : LAND_DEV_TILES;
 
   // Filter tiles based on tier level
   const visibleTiles = tiles.filter((tile: TileConfig) => {
@@ -228,6 +262,8 @@ export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavPr
       switch (tileId) {
         case 'home':
           return '#3d99f5'; // Primary base
+        case 'napkin':
+          return '#d97706'; // Amber-600 for Napkin Analysis tile
         case 'acquisition':
           return '#7a80ec'; // Info base
         case 'planning':
