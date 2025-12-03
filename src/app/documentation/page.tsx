@@ -24,11 +24,19 @@ const DocumentationIndex: React.FC = () => {
     // Status Reports
     {
       title: 'Implementation Status',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-02.md',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-03.md',
       category: 'Status',
-      description: 'Current implementation status - Updated with Redfin Python Ingestion Tool (Dec 2)',
+      description: 'Current implementation status - Updated with Zonda, HBACA ingestion tools + repo cleanup (Dec 3)',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-12-02'
+      lastModified: '2025-12-03'
+    },
+    {
+      title: 'Market Data Ingestion Tools (HBACA + Zonda)',
+      path: '/docs/session-notes/2025-12-03-market-data-ingestion-tools.md',
+      category: 'Technical',
+      description: 'HBACA permit activity (9,392 records) and Zonda subdivision inventory (704 records) ingestion pipelines - Python CLIs with deduplication',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-12-03'
     },
     {
       title: 'Redfin Python Ingestion Tool',
