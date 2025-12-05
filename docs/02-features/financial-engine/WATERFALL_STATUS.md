@@ -26,6 +26,13 @@ The waterfall distribution engine calculates LP/GP profit splits based on multi-
 
 ### Recent Updates (Dec 5, 2025)
 
+- **$800K Excel Variance Fixed** - IRR waterfall now matches Excel within $187 (0.00008%)
+  - First period: contribution processed BEFORE accruals (matches Excel)
+  - Subsequent periods: accruals processed before contributions (original behavior)
+  - Fix isolated to period_id == 1 to avoid overcorrection
+- **Hurdle Display by Mode** - Hurdle column now updates when switching IRR/EM/IRR+EM modes
+  - API transforms tier definitions based on `hurdle_method` query param
+  - Correct suffixes shown (% for IRR, x for EMx)
 - **NapkinWaterfallForm Redesign** - Complete restructure with:
   - Equity Contributions section (GP input, LP calculated, dollar amounts)
   - Waterfall Type toggle (IRR / Equity Mult / IRR + EM)
@@ -386,15 +393,15 @@ Creates/updates LP/GP partners and tier configuration from napkin inputs.
 
 ## Current Results - Project 9
 
-As of 2025-12-04, Project 9 (Peoria Lakes) produces:
+As of 2025-12-05, Project 9 (Peoria Lakes) produces validated results matching Excel:
 
 ### Database Tier Configuration
 
-| Tier | Name | IRR Hurdle | LP Split | GP Split |
-|------|------|------------|----------|----------|
-| 1 | Preferred Return + Capital | 8% | 90% | 10% |
-| 2 | Promote | 15% | 72% | 28% |
-| 3 | Residual | None | 45% | 55% |
+| Tier | Name | IRR Hurdle | EMx Hurdle | LP Split | GP Split |
+|------|------|------------|------------|----------|----------|
+| 1 | Preferred Return + Capital | 8% | 1.0x | 90% | 10% |
+| 2 | Hurdle 1 | 15% | 1.5x | 72% | 28% |
+| 3 | Residual | — | — | 45% | 55% |
 
 ### Cash Flow Summary
 
@@ -402,12 +409,14 @@ As of 2025-12-04, Project 9 (Peoria Lakes) produces:
 - **Total Revenue:** $299.8M (distributions)
 - **Net Profit:** $155.1M
 
-### Distribution Summary
+### Distribution Summary (IRR Mode - Validated vs Excel)
 
-| Partner | Contributed | Distributed | Profit | EMx | IRR |
-|---------|-------------|-------------|--------|-----|-----|
-| LP (90%) | $130.2M | ~$223M | ~$93M | ~1.71x | ~XX% |
-| GP (10%) | $14.5M | ~$77M | ~$62M | ~5.3x | ~XX% |
+| Partner | Contributed | Distributed | Excel Distributed | Variance |
+|---------|-------------|-------------|-------------------|----------|
+| LP (90%) | $130.2M | $223,787,714 | $223,787,901 | -$187 |
+| GP (10%) | $14.5M | $71,031,059 | $71,030,872 | +$187 |
+
+**Variance:** 0.00008% - within acceptable tolerance
 
 ---
 

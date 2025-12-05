@@ -34,7 +34,7 @@ const DocumentationIndex: React.FC = () => {
       title: 'Waterfall Napkin Form Redesign',
       path: '/docs/session-notes/2025-12-05-waterfall-napkin-form-redesign.md',
       category: 'Component',
-      description: 'NapkinWaterfallForm redesign with IRR/EM toggle, structured tables, cumulative accrued tracking, and period table updates',
+      description: 'NapkinWaterfallForm redesign with IRR/EM toggle, $800K Excel variance fix (now <$200), hurdle display by mode, cumulative accrued tracking',
       icon: <DollarSign className="w-5 h-5" />,
       lastModified: '2025-12-05'
     },
@@ -42,7 +42,7 @@ const DocumentationIndex: React.FC = () => {
       title: 'Waterfall Engine Status',
       path: '/docs/02-features/financial-engine/WATERFALL_STATUS.md',
       category: 'Status',
-      description: 'Python waterfall engine status - Multi-tier distributions, IRR/EMx calculations, napkin form with IRR/EM toggle',
+      description: 'Python waterfall engine - Excel-validated IRR distributions ($187 variance), dynamic hurdle display, multi-tier promote structures',
       icon: <DollarSign className="w-5 h-5" />,
       lastModified: '2025-12-05'
     },
