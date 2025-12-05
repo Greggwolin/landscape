@@ -31,6 +31,22 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2025-12-03'
     },
     {
+      title: 'Waterfall Napkin Form Redesign',
+      path: '/docs/session-notes/2025-12-05-waterfall-napkin-form-redesign.md',
+      category: 'Component',
+      description: 'NapkinWaterfallForm redesign with IRR/EM toggle, structured tables, cumulative accrued tracking, and period table updates',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-12-05'
+    },
+    {
+      title: 'Waterfall Engine Status',
+      path: '/docs/02-features/financial-engine/WATERFALL_STATUS.md',
+      category: 'Status',
+      description: 'Python waterfall engine status - Multi-tier distributions, IRR/EMx calculations, napkin form with IRR/EM toggle',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2025-12-05'
+    },
+    {
       title: 'Market Data Ingestion Tools (HBACA + Zonda)',
       path: '/docs/session-notes/2025-12-03-market-data-ingestion-tools.md',
       category: 'Technical',

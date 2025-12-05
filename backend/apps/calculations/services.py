@@ -6,6 +6,10 @@ Bridges Django ORM and the Python financial calculation engine.
 
 from typing import Dict, List, Optional
 from decimal import Decimal
+from pathlib import Path
+import pandas as pd
+import calendar
+from datetime import date
 from apps.projects.models import Project
 from apps.financial.models import BudgetItem, ActualItem
 from apps.multifamily.models import MultifamilyUnit, MultifamilyLease
@@ -25,10 +29,174 @@ except ImportError:
     PYTHON_ENGINE_AVAILABLE = False
     print("Warning: Python financial engine not available")
 
+# Import Python waterfall engine
+try:
+    from financial_engine.waterfall import (
+        WaterfallEngine,
+        WaterfallTierConfig,
+        WaterfallSettings,
+        CashFlow as WaterfallCashFlow,
+        HurdleMethod,
+        ReturnOfCapital,
+    )
+    from financial_engine.waterfall.runtime import build_project_engine
+    WATERFALL_ENGINE_AVAILABLE = True
+except ImportError:
+    WATERFALL_ENGINE_AVAILABLE = False
+    print("Warning: Python waterfall engine not available")
+
 
 class CalculationService:
     """Service for performing financial calculations."""
     
+    @staticmethod
+    def _period_to_date(fiscal_year: Optional[int], period: Optional[int]) -> date:
+        """Convert fiscal year + period to a period-end date (last day of month)."""
+        fy = fiscal_year or date.today().year
+        month = period or 1
+        try:
+            last_day = calendar.monthrange(fy, month)[1]
+            return date(fy, month, last_day)
+        except Exception:
+            return date(fy, 1, 1)
+
+    @staticmethod
+    def _load_projection_cashflows(project_id: int):
+        """Fallback to budget/actual projection when summary table is empty."""
+        try:
+            projection = CalculationService.generate_cashflow_projection(project_id, include_actuals=True)
+        except Exception:
+            return []
+
+        rows = []
+        for idx, entry in enumerate(sorted(projection.get('projection', []), key=lambda x: (x.get('fiscal_year') or 0, x.get('period') or 0)), start=1):
+            fy = entry.get('fiscal_year')
+            period = entry.get('period')
+            dt = CalculationService._period_to_date(fy, period)
+            rows.append((idx, dt, entry.get('net_cashflow', 0)))
+        return rows
+
+    @staticmethod
+    def _fetch_cashflows_from_ts_engine(project_id: int):
+        """
+        Fetch cash flows from the TypeScript cash flow engine API.
+
+        The TypeScript engine at /api/projects/[projectId]/cash-flow/generate
+        is the authoritative source that produces the correct totals
+        ($144.7M costs, $299.8M revenue for project 9).
+
+        Returns list of (period_id, period_date, net_cash_flow) tuples.
+        Net cash flow is negative for costs (contributions) and positive for revenue (distributions).
+        """
+        import urllib.request
+        import json
+        from datetime import datetime
+        from collections import defaultdict
+
+        try:
+            # Call the TypeScript cash flow API
+            url = f'http://localhost:3000/api/projects/{project_id}/cash-flow/generate'
+            req = urllib.request.Request(
+                url,
+                data=json.dumps({}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = json.loads(response.read().decode('utf-8'))
+
+            cf_data = data.get('data', {})
+            summary = cf_data.get('summary', {})
+            periods = cf_data.get('periods', [])
+            sections = cf_data.get('sections', [])
+
+            # Validate totals
+            total_costs = summary.get('totalCosts', 0)
+            total_net_revenue = summary.get('totalNetRevenue', 0)
+            print(f"[waterfall] TS engine: costs=${total_costs:,.2f}, net_revenue=${total_net_revenue:,.2f}")
+
+            if not periods:
+                return []
+
+            # Parse the sections to get per-period costs and revenue
+            # Cost sections: Development Costs, Planning & Engineering, Land Acquisition
+            # Revenue section: NET REVENUE (to avoid double-counting gross + deductions)
+            cost_section_names = {'Development Costs', 'Planning & Engineering', 'Land Acquisition'}
+            revenue_section_names = {'NET REVENUE'}
+
+            period_costs = defaultdict(float)
+            period_revenue = defaultdict(float)
+
+            for section in sections:
+                sname = section.get('sectionName', '')
+                is_cost = sname in cost_section_names
+                is_revenue = sname in revenue_section_names
+
+                if is_cost or is_revenue:
+                    for line_item in section.get('lineItems', []):
+                        for period_data in line_item.get('periods', []):
+                            ps = period_data.get('periodSequence')
+                            if ps is None:
+                                continue
+                            # Costs are stored as negative, revenue as positive
+                            amt = period_data.get('amount', 0)
+                            if is_cost:
+                                # Store as positive for aggregation, will negate later
+                                period_costs[ps] += abs(amt)
+                            if is_revenue:
+                                period_revenue[ps] += abs(amt)
+
+            # Get period dates from TypeScript response
+            period_dates = {}
+            for p in periods:
+                ps = p.get('periodSequence', 0)
+                end_date_str = p.get('endDate', '')
+                if end_date_str:
+                    try:
+                        period_dates[ps] = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')).date()
+                    except ValueError:
+                        pass
+
+            # Build output: net_cf = revenue - costs (negative = contribution, positive = distribution)
+            if not period_costs and not period_revenue:
+                return []
+
+            max_period = max(
+                max(period_costs.keys()) if period_costs else 0,
+                max(period_revenue.keys()) if period_revenue else 0,
+                len(periods)
+            )
+
+            rows = []
+            for period_seq in range(1, max_period + 1):
+                costs = period_costs.get(period_seq, 0)
+                revenue = period_revenue.get(period_seq, 0)
+                net_cf = revenue - costs  # negative when costs > revenue (contribution)
+
+                # Get date
+                if period_seq in period_dates:
+                    period_date = period_dates[period_seq]
+                else:
+                    # Fallback to calculated date
+                    from dateutil.relativedelta import relativedelta
+                    from datetime import date
+                    period_date = date(2025, 1, 31) + relativedelta(months=period_seq - 1)
+
+                rows.append((period_seq, period_date, net_cf))
+
+            # Log summary
+            total_contrib = sum(r[2] for r in rows if r[2] < 0)
+            total_dist = sum(r[2] for r in rows if r[2] > 0)
+            print(f"[waterfall] Parsed {len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}")
+
+            return rows
+
+        except Exception as e:
+            import traceback
+            print(f"[waterfall] Error fetching from TS engine: {e}")
+            traceback.print_exc()
+            return []
+
     @staticmethod
     def calculate_irr(project_id: int) -> Dict:
         """
@@ -245,3 +413,326 @@ class CalculationService:
                 'net_cashflow': cumulative,
             },
         }
+
+    # ========================================================================
+    # WATERFALL CALCULATIONS
+    # ========================================================================
+
+    @staticmethod
+    def calculate_waterfall(
+        tiers: List[Dict],
+        settings: Dict,
+        cash_flows: List[Dict],
+    ) -> Dict:
+        """
+        Calculate waterfall distribution using Python engine.
+
+        Args:
+            tiers: List of tier configurations
+            settings: Waterfall settings
+            cash_flows: List of cash flows
+
+        Returns:
+            Dictionary with waterfall calculation results
+        """
+        if not WATERFALL_ENGINE_AVAILABLE:
+            return {
+                'error': 'Python waterfall engine not available',
+                'engine': 'unavailable',
+            }
+
+        from datetime import datetime
+        from decimal import Decimal
+
+        try:
+            # Convert tiers to WaterfallTierConfig objects
+            tier_configs = [
+                WaterfallTierConfig(
+                    tier_number=t['tier_number'],
+                    tier_name=t.get('tier_name', f"Tier {t['tier_number']}"),
+                    irr_hurdle=Decimal(str(t['irr_hurdle'])) if t.get('irr_hurdle') is not None else None,
+                    emx_hurdle=Decimal(str(t['emx_hurdle'])) if t.get('emx_hurdle') is not None else None,
+                    promote_percent=Decimal(str(t.get('promote_percent', 0))),
+                    lp_split_pct=Decimal(str(t['lp_split_pct'])),
+                    gp_split_pct=Decimal(str(t['gp_split_pct'])),
+                )
+                for t in tiers
+            ]
+
+            # Convert settings to WaterfallSettings object
+            hurdle_method_map = {
+                'IRR': HurdleMethod.IRR,
+                'EMx': HurdleMethod.EMX,
+                'IRR_EMx': HurdleMethod.IRR_EMX,
+            }
+            return_of_capital_map = {
+                'LP First': ReturnOfCapital.LP_FIRST,
+                'Pari Passu': ReturnOfCapital.PARI_PASSU,
+            }
+
+            waterfall_settings = WaterfallSettings(
+                hurdle_method=hurdle_method_map.get(settings.get('hurdle_method', 'IRR'), HurdleMethod.IRR),
+                num_tiers=settings.get('num_tiers', 3),
+                return_of_capital=return_of_capital_map.get(settings.get('return_of_capital', 'Pari Passu'), ReturnOfCapital.PARI_PASSU),
+                gp_catch_up=settings.get('gp_catch_up', True),
+                lp_ownership=Decimal(str(settings.get('lp_ownership', 0.90))),
+                preferred_return_pct=Decimal(str(settings.get('preferred_return_pct', 8))),
+            )
+
+            # Convert cash flows to WaterfallCashFlow objects
+            waterfall_cash_flows = []
+            for cf in cash_flows:
+                cf_date = cf['date']
+                if isinstance(cf_date, str):
+                    cf_date = datetime.strptime(cf_date, '%Y-%m-%d').date()
+                waterfall_cash_flows.append(
+                    WaterfallCashFlow(
+                        period_id=cf['period_id'],
+                        date=cf_date,
+                        amount=Decimal(str(cf['amount'])),
+                    )
+                )
+
+            # Run waterfall calculation
+            engine = WaterfallEngine(
+                tiers=tier_configs,
+                settings=waterfall_settings,
+                cash_flows=waterfall_cash_flows,
+            )
+            result = engine.calculate()
+
+            # Convert result to serializable format
+            return CalculationService._serialize_waterfall_result(result)
+
+        except Exception as e:
+            return {
+                'error': str(e),
+                'engine': 'python',
+            }
+
+    @staticmethod
+    def _serialize_waterfall_result(result) -> Dict:
+        """Convert WaterfallResult to JSON-serializable dictionary."""
+
+        def decimal_to_float(val):
+            if val is None:
+                return None
+            return float(val)
+
+        period_results = []
+        for pr in result.period_results:
+            period_results.append({
+                'period_id': pr.period_id,
+                'date': pr.date.isoformat(),
+                'net_cash_flow': decimal_to_float(pr.net_cash_flow),
+                'cumulative_cash_flow': decimal_to_float(pr.cumulative_cash_flow),
+                'lp_contribution': decimal_to_float(pr.lp_contribution),
+                'gp_contribution': decimal_to_float(pr.gp_contribution),
+                'tier1_lp_dist': decimal_to_float(pr.tier1_lp_dist),
+                'tier1_gp_dist': decimal_to_float(pr.tier1_gp_dist),
+                'tier2_lp_dist': decimal_to_float(pr.tier2_lp_dist),
+                'tier2_gp_dist': decimal_to_float(pr.tier2_gp_dist),
+                'tier3_lp_dist': decimal_to_float(pr.tier3_lp_dist),
+                'tier3_gp_dist': decimal_to_float(pr.tier3_gp_dist),
+                'tier4_lp_dist': decimal_to_float(pr.tier4_lp_dist),
+                'tier4_gp_dist': decimal_to_float(pr.tier4_gp_dist),
+                'tier5_lp_dist': decimal_to_float(pr.tier5_lp_dist),
+                'tier5_gp_dist': decimal_to_float(pr.tier5_gp_dist),
+                'lp_irr': decimal_to_float(pr.lp_irr),
+                'gp_irr': decimal_to_float(pr.gp_irr),
+                'lp_emx': decimal_to_float(pr.lp_emx),
+                'gp_emx': decimal_to_float(pr.gp_emx),
+                # Capital account balances (what's still owed)
+                'lp_capital_tier1': decimal_to_float(pr.lp_capital_tier1),
+                'gp_capital_tier1': decimal_to_float(pr.gp_capital_tier1),
+                'lp_capital_tier2': decimal_to_float(pr.lp_capital_tier2),
+                # Cumulative accrued returns (compounded interest only, less paid down)
+                # These are the "Accrued Pref" and "Accrued Hurdle" values for the UI
+                'cumulative_accrued_pref': decimal_to_float(pr.cumulative_accrued_pref),
+                'cumulative_accrued_hurdle': decimal_to_float(pr.cumulative_accrued_hurdle),
+            })
+
+        def serialize_partner_summary(ps):
+            return {
+                'partner_id': ps.partner_id,
+                'partner_type': ps.partner_type,
+                'partner_name': ps.partner_name,
+                'preferred_return': decimal_to_float(ps.preferred_return),
+                'return_of_capital': decimal_to_float(ps.return_of_capital),
+                'excess_cash_flow': decimal_to_float(ps.excess_cash_flow),
+                'promote': decimal_to_float(ps.promote),
+                'total_distributions': decimal_to_float(ps.total_distributions),
+                'total_contributions': decimal_to_float(ps.total_contributions),
+                'total_profit': decimal_to_float(ps.total_profit),
+                'irr': decimal_to_float(ps.irr),
+                'equity_multiple': decimal_to_float(ps.equity_multiple),
+                'tier1': decimal_to_float(ps.tier1),
+                'tier2': decimal_to_float(ps.tier2),
+                'tier3': decimal_to_float(ps.tier3),
+                'tier4': decimal_to_float(ps.tier4),
+                'tier5': decimal_to_float(ps.tier5),
+            }
+
+        return {
+            'period_results': period_results,
+            'lp_summary': serialize_partner_summary(result.lp_summary),
+            'gp_summary': serialize_partner_summary(result.gp_summary),
+            'project_summary': {
+                'total_equity': decimal_to_float(result.project_summary.total_equity),
+                'lp_equity': decimal_to_float(result.project_summary.lp_equity),
+                'gp_equity': decimal_to_float(result.project_summary.gp_equity),
+                'total_distributed': decimal_to_float(result.project_summary.total_distributed),
+                'lp_distributed': decimal_to_float(result.project_summary.lp_distributed),
+                'gp_distributed': decimal_to_float(result.project_summary.gp_distributed),
+                'project_irr': decimal_to_float(result.project_summary.project_irr),
+                'project_emx': decimal_to_float(result.project_summary.project_emx),
+            },
+            'success': True,
+            'engine': 'python',
+        }
+
+    @staticmethod
+    def calculate_project_waterfall(project_id: int) -> Dict:
+        """
+        Calculate waterfall distribution for a project using database configuration.
+
+        Args:
+            project_id: Project ID
+
+        Returns:
+            Dictionary with waterfall calculation results
+        """
+        if not WATERFALL_ENGINE_AVAILABLE:
+            return {
+                'error': 'Python waterfall engine not available',
+                'engine': 'unavailable',
+            }
+
+        from django.db import connection
+
+        try:
+            # Load tier configuration from database (authoritative tables)
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        tier_number,
+                        tier_name,
+                        COALESCE(irr_threshold_pct, hurdle_rate) AS irr_hurdle,
+                        equity_multiple_threshold AS emx_hurdle,
+                        lp_split_pct,
+                        gp_split_pct
+                    FROM landscape.tbl_waterfall_tier
+                    WHERE project_id = %s
+                      AND (is_active IS NULL OR is_active = TRUE)
+                    ORDER BY COALESCE(display_order, tier_number)
+                """, [project_id])
+                tier_rows = cursor.fetchall()
+
+            if not tier_rows:
+                return {
+                    'error': f'No waterfall tiers found for project {project_id}',
+                    'project_id': project_id,
+                }
+
+            # Convert to tier dicts
+            tiers = []
+            for row in tier_rows:
+                tiers.append({
+                    'tier_number': row[0],
+                    'tier_name': row[1] or f"Tier {row[0]}",
+                    'irr_hurdle': float(row[2]) if row[2] else None,
+                    'emx_hurdle': float(row[3]) if row[3] else None,
+                    'promote_percent': 0,  # Calculate from splits
+                    'lp_split_pct': float(row[4]) if row[4] else 90,
+                    'gp_split_pct': float(row[5]) if row[5] else 10,
+                })
+
+            # Fetch cash flows from the TypeScript engine (authoritative source)
+            # Uses pre-computed allocations from tbl_budget_timing + parcel sales
+            cf_rows = CalculationService._fetch_cashflows_from_ts_engine(project_id)
+
+            if not cf_rows:
+                # Fallback to pre-populated summary table if exists
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT
+                            cs.period_id,
+                            cp.period_end_date,
+                            cs.net_cash_flow
+                        FROM landscape.tbl_cashflow_summary cs
+                        JOIN landscape.tbl_calculation_period cp
+                          ON cp.project_id = cs.project_id
+                         AND cp.period_id = cs.period_id
+                        WHERE cs.project_id = %s
+                        ORDER BY cp.period_end_date
+                    """, [project_id])
+                    cf_rows = cursor.fetchall()
+
+            if not cf_rows:
+                return {
+                    'error': f'No cash flows found for project {project_id}',
+                    'project_id': project_id,
+                }
+
+            cash_flows = [
+                {
+                    'period_id': row[0],
+                    'date': row[1].isoformat() if hasattr(row[1], 'isoformat') else str(row[1]),
+                    'amount': float(row[2]),
+                }
+                for row in cf_rows
+            ]
+
+            # Convert database tiers to WaterfallTierConfig objects
+            tier_configs = [
+                WaterfallTierConfig(
+                    tier_number=t['tier_number'],
+                    tier_name=t['tier_name'],
+                    irr_hurdle=Decimal(str(t['irr_hurdle'])) if t['irr_hurdle'] else None,
+                    emx_hurdle=Decimal(str(t['emx_hurdle'])) if t['emx_hurdle'] else None,
+                    lp_split_pct=Decimal(str(t['lp_split_pct'])),
+                    gp_split_pct=Decimal(str(t['gp_split_pct'])),
+                )
+                for t in tiers
+            ]
+
+            # Build settings from database (with defaults)
+            waterfall_settings = WaterfallSettings(
+                hurdle_method=HurdleMethod.IRR,
+                num_tiers=len(tiers),
+                return_of_capital=ReturnOfCapital.PARI_PASSU,
+                gp_catch_up=False,  # No catch-up unless configured
+                lp_ownership=Decimal('0.90'),
+                preferred_return_pct=Decimal('8'),
+            )
+
+            # Build cash flows
+            waterfall_cash_flows = [
+                WaterfallCashFlow(
+                    period_id=cf['period_id'],
+                    date=cf['date'] if isinstance(cf['date'], date) else date.fromisoformat(str(cf['date'])),
+                    amount=Decimal(str(cf['amount'])),
+                )
+                for cf in cash_flows
+            ]
+
+            # Create engine with database tiers (not hardcoded)
+            from financial_engine.waterfall import WaterfallEngine
+            engine = WaterfallEngine(
+                tiers=tier_configs,
+                settings=waterfall_settings,
+                cash_flows=waterfall_cash_flows,
+            )
+            result = engine.calculate()
+
+            # Serialize result and include tier configuration
+            serialized = CalculationService._serialize_waterfall_result(result)
+            serialized['tier_config'] = tiers  # Include database tier config for UI
+            return serialized
+
+        except Exception as e:
+            return {
+                'error': str(e),
+                'project_id': project_id,
+                'engine': 'python',
+            }
