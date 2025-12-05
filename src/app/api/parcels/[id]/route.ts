@@ -97,6 +97,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       hasUpdates = true
     }
 
+    // Handle sale_period (allow null to clear the field)
+    if (body.sale_period !== undefined) {
+      const salePeriod = body.sale_period === null || body.sale_period === '' ? null : body.sale_period
+      await sql`UPDATE landscape.tbl_parcel SET sale_period = ${salePeriod}::integer WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
     if (!hasUpdates) {
       return NextResponse.json({ ok: true, message: 'No fields to update' })
     }

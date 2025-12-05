@@ -148,7 +148,8 @@ export function generatePeriods(
   periodType: PeriodType = 'month'
 ): CalculationPeriod[] {
   const periods: CalculationPeriod[] = [];
-  let currentDate = new Date(startDate);
+  // Normalize to first of month at noon local time to avoid timezone issues
+  let currentDate = normalizeToFirstOfMonth(startDate);
   let sequence = 1;
 
   while (currentDate <= endDate) {
@@ -175,6 +176,15 @@ export function generatePeriods(
   }
 
   return periods;
+}
+
+/**
+ * Normalize a date to the first of its month at noon local time
+ * This prevents timezone issues where midnight UTC becomes previous day in local time
+ */
+function normalizeToFirstOfMonth(date: Date): Date {
+  const normalized = new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0);
+  return normalized;
 }
 
 /**

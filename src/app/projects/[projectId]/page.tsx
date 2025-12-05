@@ -57,7 +57,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div style={{ paddingLeft: '1rem', paddingRight: '1rem', paddingTop: '1rem', paddingBottom: '1rem' }}>
+    <div className="app-content">
       {/* Universal tabs */}
       {activeTab === 'project' && <ProjectTab project={project} />}
       {activeTab === 'capitalization' && <CapitalizationTab project={project} />}

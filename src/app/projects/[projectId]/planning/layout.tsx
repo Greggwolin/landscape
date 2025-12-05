@@ -32,7 +32,7 @@ export default function PlanningLayout({
   ];
 
   return (
-    <div style={{ marginLeft: '1rem', marginRight: '1rem' }}>
+    <div className="app-content">
       {/* Subtab Navigation */}
       <ul
         className="nav nav-tabs sticky"

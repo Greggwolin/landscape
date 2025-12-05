@@ -114,7 +114,7 @@ export default function MarketAnalysisPage() {
   };
 
   return (
-    <div style={{ paddingTop: '1rem' }}>
+    <div className="app-content">
       {/* Two Column Layout - 50/50 split */}
       <div className="row g-3">
         {/* Left Column - 50% - SFD Pricing & Competitive Projects */}

@@ -121,6 +121,18 @@ export async function POST(
     const useEm = waterfallType === 'EM' || waterfallType === 'IRR_EM';
     const hurdleTypeStr = waterfallType === 'IRR_EM' ? 'hybrid' : waterfallType === 'EM' ? 'equity_multiple' : 'irr';
 
+    // Always save BOTH IRR and EMx thresholds regardless of current mode selection.
+    // This allows seamless switching between modes without losing data.
+    // The hurdle_type just indicates the user's current UI preference.
+
+    // IRR defaults: Tier 1 = 8% (pref), Tier 2 = 15% (hurdle)
+    const tier1IrrThreshold = prefRate !== undefined && prefRate !== null ? prefRate : 8;
+    const tier2IrrThreshold = hurdleIrr !== undefined && hurdleIrr !== null ? hurdleIrr : 15;
+
+    // EMx defaults: Tier 1 = 1.0x (return capital), Tier 2 = 1.5x (hurdle)
+    const tier1EmxThreshold = prefRateEm !== undefined && prefRateEm !== null ? prefRateEm : 1.0;
+    const tier2EmxThreshold = hurdleEm !== undefined && hurdleEm !== null ? hurdleEm : 1.5;
+
     // Tier 1: Preferred Return + Capital
     const tier1 = await sql`
       INSERT INTO landscape.tbl_waterfall_tier (
@@ -145,9 +157,9 @@ export async function POST(
         ${'Preferred Return + Capital'},
         ${`${prefRate}% pref return, then return of capital`},
         ${hurdleTypeStr},
-        ${useIrr ? prefRate : null},
-        ${useIrr ? prefRate : null},
-        ${useEm && prefRateEm ? prefRateEm : null},
+        ${tier1IrrThreshold},
+        ${tier1IrrThreshold},
+        ${tier1EmxThreshold},
         ${tier1LpSplit},
         ${tier1GpSplit},
         ${true},
@@ -182,9 +194,9 @@ export async function POST(
         ${'Hurdle 1'},
         ${`${promotePct}% promote until LP achieves ${hurdleIrr}% IRR`},
         ${hurdleTypeStr},
-        ${useIrr ? hurdleIrr : null},
-        ${useIrr ? hurdleIrr : null},
-        ${useEm && hurdleEm ? hurdleEm : null},
+        ${tier2IrrThreshold},
+        ${tier2IrrThreshold},
+        ${tier2EmxThreshold},
         ${tier2LpSplit},
         ${tier2GpSplit},
         ${false},

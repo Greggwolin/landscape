@@ -535,3 +535,30 @@ export function useDeleteParcelSale(projectId: number) {
     },
   });
 }
+
+/**
+ * Update the sale_period for a parcel
+ */
+export function useUpdateParcelSalePeriod(projectId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ parcelId, salePeriod }: { parcelId: number; salePeriod: number | null }) => {
+      const response = await fetch(`/api/parcels/${parcelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sale_period: salePeriod }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'Failed to update sale period');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parcels-with-sales', projectId] });
+    },
+  });
+}

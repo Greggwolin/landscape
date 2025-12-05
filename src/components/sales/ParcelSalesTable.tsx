@@ -24,6 +24,7 @@ import {
   useCreateParcelSale,
   useParcelsWithSales,
   useUpdateParcelSaleDate,
+  useUpdateParcelSalePeriod,
 } from '@/hooks/useSalesAbsorption';
 import type {
   ParcelWithSale,
@@ -37,12 +38,9 @@ import SaleCalculationModal from './SaleCalculationModal';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import { calculateGrossValue, calculateInflatedValue } from '@/utils/sales/calculations';
 import {
-  calculateInflatedPrice,
   calculateInflatedPriceFromPeriods,
-  calculateNetProceeds,
-  formatDateForAPI,
-  parseISODate,
 } from '@/lib/sales/calculations';
+import { useProjectConfig } from '@/hooks/useProjectConfig';
 import type { SaveAssumptionsPayload, CreateBenchmarkPayload } from '@/types/sales-absorption';
 
 interface Props {
@@ -99,6 +97,23 @@ function formatSaleDate(value?: string | null) {
   }
 }
 
+/**
+ * Calculate sale date from sale_period and project start date
+ * sale_period is 1-based (month 1 = first month of project)
+ * Returns date in YYYY-MM-DD format for input fields
+ */
+function calculateSaleDateFromPeriod(salePeriod: number | null | undefined, projectStartDate: Date): string {
+  if (!salePeriod || salePeriod < 1) return '';
+
+  // Clone the start date to avoid mutation
+  const saleDate = new Date(projectStartDate);
+  // sale_period 1 = month 0 offset, sale_period 48 = month 47 offset
+  saleDate.setMonth(saleDate.getMonth() + (salePeriod - 1));
+
+  // Return in YYYY-MM-DD format
+  return saleDate.toISOString().split('T')[0];
+}
+
 function applyCalculatedPricing(parcel: ParcelWithSale): ParcelWithSale {
   const saleDate = parcel.sale_date || parcel.sale_event?.contract_date || null;
   const inflatedValue = calculateInflatedValue(
@@ -119,16 +134,29 @@ function applyCalculatedPricing(parcel: ParcelWithSale): ParcelWithSale {
 
 export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napkin' }: Props) {
   const { data, isLoading, error } = useParcelsWithSales(projectId, phaseFilters);
+  const { settings } = useProjectConfig(projectId);
   const queryClient = useQueryClient();
   const assignPhase = useAssignParcelToPhase(projectId);
   const createPhase = useCreateSalePhase(projectId);
   const updateSaleDate = useUpdateParcelSaleDate(projectId);
   const createParcelSale = useCreateParcelSale(projectId);
+  const updateSalePeriod = useUpdateParcelSalePeriod(projectId);
+
+  // Get project start date for calculating sale dates from periods
+  const projectStartDate = useMemo(() => {
+    if (settings?.analysis_start_date) {
+      return new Date(settings.analysis_start_date);
+    }
+    // Default to Jan 1, 2025 if no start date configured
+    return new Date('2025-01-01');
+  }, [settings?.analysis_start_date]);
 
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'parcel_code', desc: false },
   ]);
   const [pendingDates, setPendingDates] = useState<Record<number, string>>({});
+  const [pendingSalePeriods, setPendingSalePeriods] = useState<Record<number, string>>({});
+  const [salePeriodUpdatingParcelId, setSalePeriodUpdatingParcelId] = useState<number | null>(null);
   const [phaseActionParcelId, setPhaseActionParcelId] = useState<number | null>(null);
   const [dateUpdatingParcelId, setDateUpdatingParcelId] = useState<number | null>(null);
   const [phaseModalParcel, setPhaseModalParcel] = useState<ParcelWithSale | null>(null);
@@ -189,6 +217,49 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       ...prev,
       [parcelId]: value
     }));
+  };
+
+  const handleLocalSalePeriodChange = (parcelId: number, value: string) => {
+    setPendingSalePeriods((prev) => ({
+      ...prev,
+      [parcelId]: value
+    }));
+  };
+
+  const handleSalePeriodCommit = async (parcel: ParcelWithSale) => {
+    const pendingValue = pendingSalePeriods[parcel.parcel_id];
+    // Only commit if there's a pending change
+    if (pendingValue === undefined) return;
+
+    // Parse the value - empty string or invalid becomes null
+    const parsedValue = pendingValue === '' ? null : parseInt(pendingValue, 10);
+    const finalValue = parsedValue !== null && !isNaN(parsedValue) ? parsedValue : null;
+
+    // Skip if value hasn't actually changed
+    if (finalValue === parcel.sale_period) {
+      setPendingSalePeriods((prev) => {
+        const next = { ...prev };
+        delete next[parcel.parcel_id];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      setActionError(null);
+      setSalePeriodUpdatingParcelId(parcel.parcel_id);
+      await updateSalePeriod.mutateAsync({ parcelId: parcel.parcel_id, salePeriod: finalValue });
+      setPendingSalePeriods((prev) => {
+        const next = { ...prev };
+        delete next[parcel.parcel_id];
+        return next;
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update sale period';
+      setActionError(message);
+    } finally {
+      setSalePeriodUpdatingParcelId(null);
+    }
   };
 
   const handleSaleDateCommit = async (parcel: ParcelWithSale) => {
@@ -555,21 +626,35 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         enableSorting: false,
         cell: ({ row }) => {
           const parcel = row.original;
+          const isUpdating = salePeriodUpdatingParcelId === parcel.parcel_id;
+          // Use pending value if exists, otherwise use the parcel's current value
+          const displayValue = pendingSalePeriods[parcel.parcel_id] !== undefined
+            ? pendingSalePeriods[parcel.parcel_id]
+            : (parcel.sale_period ?? '');
           return (
             <div className="text-center">
               <input
                 type="number"
-                value={parcel.sale_period ?? ''}
+                value={displayValue}
+                onChange={(e) => handleLocalSalePeriodChange(parcel.parcel_id, e.target.value)}
+                onBlur={() => handleSalePeriodCommit(parcel)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                disabled={isUpdating}
                 className="border rounded px-2 py-1 text-sm text-center"
                 style={{
                   borderColor: 'var(--cui-border-color)',
                   backgroundColor: 'var(--cui-body-bg)',
                   color: 'var(--cui-body-color)',
                   width: '80px',
+                  opacity: isUpdating ? 0.6 : 1,
                 }}
                 placeholder="-"
                 title="Absolute month index (e.g., month 26 = 2 years, 2 months)"
-                readOnly
+                min={1}
               />
             </div>
           );
@@ -581,27 +666,9 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         enableSorting: false,
         cell: ({ row }) => {
           const parcel = row.original;
-          const value = pendingDates[parcel.parcel_id] ?? parcel.sale_date ?? '';
-          const hasPendingChange = pendingDates[parcel.parcel_id] !== undefined;
-          const isSaving = savingParcelId === parcel.parcel_id;
-
-          // Determine which quantity field to check based on land use type
-          const isResidential = ['SFD', 'SFA', 'MF', 'VLDR'].includes(parcel.type_code);
-          const quantity = isResidential ? parcel.units : parcel.acres;
-          const hasQuantity = quantity && quantity > 0;
-          const fieldName = isResidential ? 'units' : 'acres';
-
-          const handleDateChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-            const newDate = event.target.value;
-            handleLocalSaleDateChange(parcel.parcel_id, newDate);
-
-            // Auto-save after a short delay
-            if (hasQuantity && newDate) {
-              setTimeout(async () => {
-                await handleSaveSale(parcel);
-              }, 500);
-            }
-          };
+          // Calculate sale date from sale_period + project start date (not from stored sale_date)
+          const calculatedDate = calculateSaleDateFromPeriod(parcel.sale_period, projectStartDate);
+          const value = calculatedDate || '';
 
           return (
             <div className="flex items-center justify-end gap-2">
@@ -617,15 +684,9 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                   cursor: 'not-allowed',
                   opacity: 0.7,
                 }}
-                disabled={!hasQuantity || isSaving}
-                title="Sale date is automatically calculated from Sale Period"
+                disabled
+                title={parcel.sale_period ? `Calculated from Sale Period ${parcel.sale_period}` : 'No sale period set'}
               />
-              {isSaving && (
-                <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Saving...</span>
-              )}
-              {!hasQuantity && (
-                <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Configure {fieldName} first</span>
-              )}
             </div>
           );
         },
@@ -687,7 +748,8 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         enableSorting: false,
         cell: ({ row }) => {
           const parcel = row.original;
-          const saleDate = pendingDates[parcel.parcel_id] ?? parcel.sale_date;
+          // Use calculated sale date from sale_period
+          const saleDate = calculateSaleDateFromPeriod(parcel.sale_period, projectStartDate);
           const currentPrice = parcel.base_price_per_unit ?? parcel.current_value_per_unit;
 
           // If no pricing configured, show "-" with value of 0
@@ -724,7 +786,8 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         enableSorting: false,
         cell: ({ row }) => {
           const parcel = row.original;
-          const saleDate = pendingDates[parcel.parcel_id] ?? parcel.sale_date;
+          // Use calculated sale date from sale_period
+          const saleDate = calculateSaleDateFromPeriod(parcel.sale_period, projectStartDate);
           const hasCalculation = Boolean(parcel.net_proceeds);
 
           return (
@@ -748,7 +811,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                   onClick={() => {
                     // Clear any previous errors
                     setActionError(null);
-                    // Create a parcel object with the current sale_date (including pending changes)
+                    // Create a parcel object with the calculated sale_date
                     const parcelWithDate: ParcelWithSale = {
                       ...parcel,
                       sale_date: saleDate || null,
@@ -802,7 +865,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
 
     return baseColumns;
   },
-    [pendingDates, savingParcelId, mode]
+    [pendingDates, pendingSalePeriods, salePeriodUpdatingParcelId, savingParcelId, mode, projectStartDate]
   );
 
   const table = useReactTable({

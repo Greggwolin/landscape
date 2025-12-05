@@ -105,6 +105,7 @@ export interface ParcelSale {
   closingCosts: number;
   onsiteCostPct?: number;     // Default 6.5% (0.065) if applicable
   onsiteCosts: number;
+  subdivisionCosts: number;   // Improvement offset total
 
   // Net proceeds
   totalDeductions: number;
@@ -131,6 +132,7 @@ export interface AbsorptionSchedule {
   totalNetRevenue: number;
   totalCommissions: number;
   totalClosingCosts: number;
+  totalSubdivisionCosts: number;
 }
 
 export interface PeriodSales {

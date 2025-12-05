@@ -73,7 +73,7 @@ export function getTabDefaultRoute(projectId: number, tabId: string): string {
     case 'landscaper':
       return `/projects/${projectId}/landscaper`;
     case 'documents':
-      return `/projects/${projectId}/documents/files`;
+      return `/projects/${projectId}/documents`;
     default:
       return `/projects/${projectId}`;
   }

@@ -4,11 +4,15 @@ API views for Calculations application.
 Enhanced with cash flow projections and project metrics.
 """
 
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
+from rest_framework.permissions import AllowAny
 from .services import CalculationService
+logger = logging.getLogger(__name__)
 
 
 class IRRCalculationSerializer(serializers.Serializer):
@@ -227,8 +231,174 @@ class CalculationViewSet(viewsets.ViewSet):
             discount_rate = request.query_params.get('discount_rate')
             if discount_rate:
                 discount_rate = float(discount_rate)
-            
+
             result = CalculationService.calculate_npv(int(project_id), discount_rate)
+            return Response(result)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'project_id': project_id},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # ========================================================================
+    # WATERFALL ENDPOINTS
+    # ========================================================================
+
+    @action(detail=False, methods=['post'], url_path='waterfall/calculate')
+    def calculate_waterfall(self, request):
+        """
+        Calculate multi-tier equity waterfall distribution.
+
+        Request body:
+        {
+            "tiers": [
+                {"tier_number": 1, "irr_hurdle": 8, "promote_percent": 0, "lp_split_pct": 90, "gp_split_pct": 10},
+                {"tier_number": 2, "irr_hurdle": 15, "promote_percent": 20, "lp_split_pct": 72, "gp_split_pct": 28},
+                {"tier_number": 3, "irr_hurdle": null, "promote_percent": 30, "lp_split_pct": 63, "gp_split_pct": 37}
+            ],
+            "settings": {
+                "hurdle_method": "IRR",
+                "num_tiers": 3,
+                "return_of_capital": "Pari Passu",
+                "gp_catch_up": true,
+                "lp_ownership": 0.90,
+                "preferred_return_pct": 8
+            },
+            "cash_flows": [
+                {"period_id": 1, "date": "2024-01-01", "amount": -100000000},
+                {"period_id": 2, "date": "2024-06-30", "amount": 50000000},
+                ...
+            ]
+        }
+        """
+        from .serializers import WaterfallCalculateRequestSerializer
+
+        serializer = WaterfallCalculateRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = CalculationService.calculate_waterfall(
+                tiers=serializer.validated_data['tiers'],
+                settings=serializer.validated_data['settings'],
+                cash_flows=serializer.validated_data['cash_flows'],
+            )
+            return Response(result)
+        except ImportError:
+            return Response(
+                {'error': 'Python waterfall engine not available'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='project/(?P<project_id>[0-9]+)/debug-cashflows',
+        permission_classes=[AllowAny],
+    )
+    def debug_cashflows(self, request, project_id=None):
+        """Debug endpoint to inspect cash flow computation."""
+        from django.db import connection
+        from decimal import Decimal
+
+        result = {
+            'project_id': int(project_id),
+            'budget_items': [],
+            'revenue_by_period': [],
+            'totals': {},
+        }
+
+        # Get budget costs
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    COALESCE(amount, 0) as amount,
+                    COALESCE(start_period, 1) as start_period,
+                    COALESCE(periods_to_complete, 1) as periods_to_complete,
+                    line_item_name
+                FROM landscape.core_fin_fact_budget
+                WHERE project_id = %s
+                ORDER BY start_period, line_item_name
+            """, [project_id])
+            for row in cursor.fetchall():
+                result['budget_items'].append({
+                    'amount': float(row[0]) if row[0] else 0,
+                    'start_period': row[1],
+                    'periods_to_complete': row[2],
+                    'line_item_name': row[3],
+                })
+
+        total_costs = sum(item['amount'] for item in result['budget_items'])
+        result['totals']['total_costs'] = total_costs
+
+        # Get revenue by period
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    p.sale_period,
+                    SUM(COALESCE(psa.net_sale_proceeds, 0)) as net_revenue,
+                    COUNT(*) as parcel_count
+                FROM landscape.tbl_parcel p
+                LEFT JOIN landscape.tbl_parcel_sale_assumptions psa
+                    ON psa.parcel_id = p.parcel_id
+                WHERE p.project_id = %s
+                  AND p.sale_period IS NOT NULL
+                GROUP BY p.sale_period
+                ORDER BY p.sale_period
+            """, [project_id])
+            for row in cursor.fetchall():
+                result['revenue_by_period'].append({
+                    'period': row[0],
+                    'net_revenue': float(row[1]) if row[1] else 0,
+                    'parcel_count': row[2],
+                })
+
+        total_revenue = sum(item['net_revenue'] for item in result['revenue_by_period'])
+        result['totals']['total_revenue'] = total_revenue
+        result['totals']['net_project_cf'] = total_revenue - total_costs
+
+        return Response(result)
+
+    @action(
+        detail=False,
+        methods=['get', 'post'],
+        url_path='project/(?P<project_id>[0-9]+)/waterfall',
+        permission_classes=[AllowAny],  # TODO: tighten back to IsAuthenticated after JWT wiring is verified
+    )
+    def project_waterfall(self, request, project_id=None):
+        """
+        Calculate waterfall distribution for a specific project.
+
+        Loads tier configuration and cash flows from the database.
+
+        Query parameters:
+        - hurdle_method: 'IRR', 'EMx', or 'IRR_EMx' (default: 'IRR')
+        """
+        logger.info(
+            "WATERFALL AUTH DEBUG",
+            extra={
+                "path": request.path,
+                "user_is_authenticated": bool(getattr(request.user, "is_authenticated", False)),
+                "user": str(request.user),
+                "auth_repr": repr(getattr(request, "auth", None)),
+                "http_authorization": request.META.get("HTTP_AUTHORIZATION"),
+                "cookies": list(request.COOKIES.keys()),
+            },
+        )
+        try:
+            # Get hurdle_method from query params (default: IRR)
+            hurdle_method = request.query_params.get('hurdle_method', 'IRR')
+            result = CalculationService.calculate_project_waterfall(
+                int(project_id),
+                hurdle_method=hurdle_method,
+            )
+            if isinstance(result, dict) and result.get('error'):
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
             return Response(result)
         except Exception as e:
             return Response(

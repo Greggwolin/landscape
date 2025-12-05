@@ -14,8 +14,10 @@ type Params = { params: Promise<{ projectId: string }> };
 /**
  * Transform Django waterfall response to match WaterfallApiResponse interface
  * expected by the WaterfallResults component.
+ * @param data - Django response data
+ * @param hurdleMethod - The hurdle method from query params ('IRR', 'EMx', or 'IRR_EMx')
  */
-function transformDjangoResponse(data: any) {
+function transformDjangoResponse(data: any, hurdleMethod: string | null) {
   // If there's an error, pass it through
   if (data.error) {
     return data;
@@ -23,19 +25,50 @@ function transformDjangoResponse(data: any) {
 
   const { period_results = [], lp_summary = {}, gp_summary = {}, project_summary = {}, tier_config = [] } = data;
 
+  // Determine display mode based on hurdleMethod query param
+  const isEmxMode = hurdleMethod === 'EMx';
+  const isIrrEmxMode = hurdleMethod === 'IRR_EMx';
+
   // Build tier definitions from database config (or use defaults)
+  // Determine hurdle type and rate based on the hurdle_method parameter (not just what's in DB)
   const tierDefinitions = tier_config.length > 0
-    ? tier_config.map((t: any) => ({
-        tierNumber: t.tier_number,
-        tierName: t.tier_name,
-        hurdleType: t.irr_hurdle ? 'IRR' as const : null,
-        hurdleRate: t.irr_hurdle,
-        lpSplitPct: t.lp_split_pct,
-        gpSplitPct: t.gp_split_pct,
-      }))
+    ? tier_config.map((t: any) => {
+        const hasEmx = t.emx_hurdle !== null && t.emx_hurdle !== undefined;
+        const hasIrr = t.irr_hurdle !== null && t.irr_hurdle !== undefined;
+        let hurdleType: 'IRR' | 'equity_multiple' | null = null;
+        let hurdleRate: number | null = null;
+
+        // Use the hurdle_method to determine which value to display
+        if (isEmxMode && hasEmx) {
+          hurdleType = 'equity_multiple';
+          hurdleRate = t.emx_hurdle;
+        } else if (isIrrEmxMode) {
+          // For IRR+EMx mode, show both values - primary display is IRR
+          // but we still need to indicate it's a combined mode
+          if (hasIrr) {
+            hurdleType = 'IRR';
+            hurdleRate = t.irr_hurdle;
+          }
+        } else if (hasIrr) {
+          // Default IRR mode
+          hurdleType = 'IRR';
+          hurdleRate = t.irr_hurdle;
+        }
+
+        return {
+          tierNumber: t.tier_number,
+          tierName: t.tier_name,
+          hurdleType,
+          hurdleRate,
+          emxHurdle: t.emx_hurdle,
+          irrHurdle: t.irr_hurdle,
+          lpSplitPct: t.lp_split_pct,
+          gpSplitPct: t.gp_split_pct,
+        };
+      })
     : [
-        { tierNumber: 1, tierName: 'Return of Capital', hurdleType: null, hurdleRate: null, lpSplitPct: 90, gpSplitPct: 10 },
-        { tierNumber: 2, tierName: 'Preferred Return', hurdleType: 'IRR' as const, hurdleRate: 8, lpSplitPct: 90, gpSplitPct: 10 },
+        { tierNumber: 1, tierName: 'Return of Capital', hurdleType: null, hurdleRate: null, emxHurdle: null, irrHurdle: null, lpSplitPct: 90, gpSplitPct: 10 },
+        { tierNumber: 2, tierName: 'Preferred Return', hurdleType: 'IRR' as const, hurdleRate: 8, emxHurdle: null, irrHurdle: 8, lpSplitPct: 90, gpSplitPct: 10 },
       ];
 
   // Helper to get tier info by number
@@ -167,11 +200,15 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const { searchParams } = new URL(request.url);
     const trace = searchParams.get('trace');
+    const hurdleMethod = searchParams.get('hurdle_method');
 
     const base = DJANGO_API_URL.replace(/\/$/, '');
     const url = new URL(`${base}/api/calculations/project/${id}/waterfall/`);
     if (trace) {
       url.searchParams.set('trace', trace);
+    }
+    if (hurdleMethod) {
+      url.searchParams.set('hurdle_method', hurdleMethod);
     }
 
     const headers: HeadersInit = {
@@ -251,7 +288,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const data = await response.json();
 
     // Transform Django response to match WaterfallApiResponse interface
-    const transformed = transformDjangoResponse(data);
+    const transformed = transformDjangoResponse(data, hurdleMethod);
     return NextResponse.json(transformed);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

@@ -62,9 +62,8 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
     SELECT
       p.project_id,
       p.project_name,
-      ps.analysis_start_date
+      p.analysis_start_date
     FROM landscape.tbl_project p
-    LEFT JOIN landscape.tbl_project_settings ps ON p.project_id = ps.project_id
     WHERE p.project_id = ${projectId}
   `;
 
@@ -74,10 +73,38 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
 
   const project = result[0];
 
-  // Use project settings start date if set, otherwise default to today
-  const startDate = project.analysis_start_date
-    ? new Date(project.analysis_start_date)
-    : new Date('2025-01-01'); // Default start date for projects without settings
+  // Use project settings start date if set, otherwise default to Jan 1, 2025
+  // IMPORTANT: Use explicit year/month/day constructor to avoid timezone issues
+  // new Date('2025-01-01') creates UTC midnight which becomes Dec 31 in Pacific time
+  let startDate: Date;
+  if (project.analysis_start_date) {
+    const rawDate = project.analysis_start_date;
+    console.log(`[CashFlow] Raw analysis_start_date type: ${typeof rawDate}, value: ${rawDate}`);
+
+    // Handle Date object, string, or other formats from database
+    if (rawDate instanceof Date) {
+      startDate = rawDate;
+    } else if (typeof rawDate === 'string') {
+      // Handle both ISO timestamp and date-only string formats
+      if (rawDate.includes('T')) {
+        startDate = new Date(rawDate);
+      } else {
+        startDate = new Date(rawDate + 'T12:00:00');
+      }
+    } else {
+      // Try to coerce to Date
+      startDate = new Date(rawDate);
+    }
+
+    // Validate the parsed date
+    if (isNaN(startDate.getTime())) {
+      console.warn(`[CashFlow] Invalid analysis_start_date "${rawDate}", falling back to default`);
+      startDate = new Date(2025, 0, 1, 12, 0, 0);
+    }
+  } else {
+    startDate = new Date(2025, 0, 1, 12, 0, 0); // Jan 1, 2025 at noon local time
+  }
+  console.log(`[CashFlow] Using startDate: ${startDate.toISOString()}`);
 
   // Fetch project-level cost inflation rate from growth rate settings
   let costInflationRate: number | undefined;
@@ -130,7 +157,7 @@ async function determineRequiredPeriods(
         SELECT MAX(COALESCE(end_period, start_period + COALESCE(periods_to_complete, 1) - 1)) as max_period
         FROM landscape.core_fin_fact_budget
         WHERE project_id = ${projectId}
-          AND container_id = ANY(${containerIds})
+          AND division_id = ANY(${containerIds})
       `
     : sql<{ max_period: number | null }>`
         SELECT MAX(COALESCE(end_period, start_period + COALESCE(periods_to_complete, 1) - 1)) as max_period
@@ -142,13 +169,19 @@ async function determineRequiredPeriods(
   const maxBudgetPeriod = budgetResult[0]?.max_period || 0;
 
   // Get max period from parcel sales
+  // containerIds are division_ids (tier 2 = phases) - need to join through tbl_phase to match
   const parcelQuery = containerIds && containerIds.length > 0
     ? sql<{ max_period: number | null }>`
-        SELECT MAX(sale_period) as max_period
-        FROM landscape.tbl_parcel
-        WHERE project_id = ${projectId}
-          AND (area_id = ANY(${containerIds}) OR phase_id = ANY(${containerIds}))
-          AND sale_period IS NOT NULL
+        SELECT MAX(p.sale_period) as max_period
+        FROM landscape.tbl_parcel p
+        LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+        LEFT JOIN landscape.tbl_division d_phase
+          ON ph.phase_name = d_phase.display_name
+          AND ph.project_id = d_phase.project_id
+          AND d_phase.tier = 2
+        WHERE p.project_id = ${projectId}
+          AND d_phase.division_id = ANY(${containerIds})
+          AND p.sale_period IS NOT NULL
       `
     : sql<{ max_period: number | null }>`
         SELECT MAX(sale_period) as max_period
@@ -284,75 +317,217 @@ export async function generateCashFlow(
     });
   }
 
-  // Revenue sections
+  // Revenue sections - create line items by container for phase grouping
+  // Group parcel sales by container (phase)
+  const revenueByContainer = new Map<number | undefined, {
+    containerId?: number;
+    containerLabel?: string;
+    grossRevenue: number;
+    netRevenue: number;
+    subdivisionCosts: number;
+    periodValues: Map<number, { gross: number; net: number; subdivision: number }>;
+  }>();
+
+  for (const periodSale of absorptionSchedule.periodSales) {
+    for (const parcel of periodSale.parcels) {
+      const containerId = parcel.containerId;
+
+      if (!revenueByContainer.has(containerId)) {
+        revenueByContainer.set(containerId, {
+          containerId,
+          containerLabel: undefined, // Will be fetched later if needed
+          grossRevenue: 0,
+          netRevenue: 0,
+          subdivisionCosts: 0,
+          periodValues: new Map(),
+        });
+      }
+
+      const containerData = revenueByContainer.get(containerId)!;
+      containerData.grossRevenue += parcel.grossRevenue;
+      containerData.netRevenue += parcel.netRevenue;
+      containerData.subdivisionCosts += parcel.subdivisionCosts;
+
+      // Add to period values
+      const periodIdx = periodSale.periodIndex;
+      if (!containerData.periodValues.has(periodIdx)) {
+        containerData.periodValues.set(periodIdx, { gross: 0, net: 0, subdivision: 0 });
+      }
+      const pv = containerData.periodValues.get(periodIdx)!;
+      pv.gross += parcel.grossRevenue;
+      pv.net += parcel.netRevenue;
+      pv.subdivision += parcel.subdivisionCosts;
+    }
+  }
+
+  // Fetch container labels (phase names)
+  const containerIds_list = Array.from(revenueByContainer.keys()).filter((id): id is number => id !== undefined);
+  if (containerIds_list.length > 0) {
+    const containerLabels = await sql<{ phase_id: number; phase_name: string }>`
+      SELECT phase_id, phase_name
+      FROM landscape.tbl_phase
+      WHERE phase_id = ANY(${containerIds_list})
+    `;
+    for (const row of containerLabels) {
+      const containerData = revenueByContainer.get(row.phase_id);
+      if (containerData) {
+        containerData.containerLabel = row.phase_name;
+      }
+    }
+  }
+
+  // Create gross revenue line items by container
+  const grossRevenueLineItems: CashFlowLineItem[] = [];
+  for (const [containerId, data] of revenueByContainer) {
+    const periods: PeriodValue[] = [];
+    for (const [periodIdx, values] of data.periodValues) {
+      periods.push({
+        periodIndex: periodIdx,
+        periodSequence: periodIdx + 1,
+        amount: values.gross,
+        source: 'absorption',
+      });
+    }
+    periods.sort((a, b) => a.periodIndex - b.periodIndex);
+
+    grossRevenueLineItems.push({
+      lineId: `revenue-gross-${containerId ?? 'project'}`,
+      category: 'revenue',
+      subcategory: 'Parcel Sales',
+      description: data.containerLabel || 'Project Level',
+      containerId: data.containerId,
+      containerLabel: data.containerLabel,
+      periods,
+      total: data.grossRevenue,
+      sourceType: 'parcel',
+    });
+  }
+
+  // Sort by container label
+  grossRevenueLineItems.sort((a, b) => (a.containerLabel || '').localeCompare(b.containerLabel || ''));
+
   sections.push({
     sectionId: 'revenue-gross',
     sectionName: 'GROSS REVENUE',
-    lineItems: [
-      {
-        lineId: 'revenue-sales',
-        category: 'revenue',
-        subcategory: 'Parcel Sales',
-        description: 'Gross Parcel Sales Revenue',
-        periods: revenuePeriodValues.grossRevenue,
-        total: absorptionSchedule.totalGrossRevenue,
-        sourceType: 'parcel',
-      },
-    ],
+    lineItems: grossRevenueLineItems,
     subtotals: revenuePeriodValues.grossRevenue,
     sectionTotal: absorptionSchedule.totalGrossRevenue,
     sortOrder: sortOrder++,
   });
 
+  // Revenue Deductions = Subdivision Costs ONLY
+  // Commissions and closing costs are already deducted in net_sale_proceeds
+  const subdivisionCosts = absorptionSchedule.totalSubdivisionCosts;
+
+  // Create period values for subdivision costs proportional to gross revenue
+  const deductionPeriods: PeriodValue[] = [];
+  if (subdivisionCosts > 0 && absorptionSchedule.totalGrossRevenue > 0) {
+    for (const grossPeriod of revenuePeriodValues.grossRevenue) {
+      const proportion = grossPeriod.amount / absorptionSchedule.totalGrossRevenue;
+      deductionPeriods.push({
+        periodIndex: grossPeriod.periodIndex,
+        periodSequence: grossPeriod.periodSequence,
+        amount: -(subdivisionCosts * proportion), // negative because it's a deduction
+        source: 'calculated',
+      });
+    }
+  }
+
+  // Create deduction line items by container
+  const deductionLineItems: CashFlowLineItem[] = [];
+  for (const [containerId, data] of revenueByContainer) {
+    if (data.subdivisionCosts > 0) {
+      const periods: PeriodValue[] = [];
+      for (const [periodIdx, values] of data.periodValues) {
+        if (values.subdivision > 0) {
+          periods.push({
+            periodIndex: periodIdx,
+            periodSequence: periodIdx + 1,
+            amount: -values.subdivision, // negative because it's a deduction
+            source: 'calculated',
+          });
+        }
+      }
+      periods.sort((a, b) => a.periodIndex - b.periodIndex);
+
+      deductionLineItems.push({
+        lineId: `revenue-deduction-${containerId ?? 'project'}`,
+        category: 'revenue',
+        subcategory: 'Revenue Deductions',
+        description: data.containerLabel || 'Project Level',
+        containerId: data.containerId,
+        containerLabel: data.containerLabel,
+        periods,
+        total: -data.subdivisionCosts,
+        sourceType: 'calculated',
+      });
+    }
+  }
+
+  // Sort by container label
+  deductionLineItems.sort((a, b) => (a.containerLabel || '').localeCompare(b.containerLabel || ''));
+
   sections.push({
     sectionId: 'revenue-deductions',
     sectionName: 'REVENUE DEDUCTIONS',
-    lineItems: [
-      {
-        lineId: 'revenue-commissions',
-        category: 'revenue',
-        subcategory: 'Sales Commissions',
-        description: 'Sales Commissions (3%)',
-        periods: revenuePeriodValues.commissions,
-        total: -absorptionSchedule.totalCommissions,
-        sourceType: 'calculated',
-      },
-      {
-        lineId: 'revenue-closing-costs',
-        category: 'revenue',
-        subcategory: 'Closing Costs',
-        description: 'Closing Costs',
-        periods: revenuePeriodValues.closingCosts,
-        total: -absorptionSchedule.totalClosingCosts,
-        sourceType: 'calculated',
-      },
-    ],
-    subtotals: combinePeriodValues([
-      revenuePeriodValues.commissions,
-      revenuePeriodValues.closingCosts,
-    ]),
-    sectionTotal: -(
-      absorptionSchedule.totalCommissions + absorptionSchedule.totalClosingCosts
-    ),
+    lineItems: deductionLineItems,
+    subtotals: deductionPeriods,
+    sectionTotal: -subdivisionCosts,
     sortOrder: sortOrder++,
   });
+
+  // Net Revenue = Gross Revenue - Subdivision Costs
+  const netRevenue = absorptionSchedule.totalGrossRevenue - subdivisionCosts;
+
+  // Create period values for net revenue (gross - subdivision costs per period)
+  const netRevenuePeriods: PeriodValue[] = [];
+  for (let i = 0; i < revenuePeriodValues.grossRevenue.length; i++) {
+    const grossPeriod = revenuePeriodValues.grossRevenue[i];
+    const deductionPeriod = deductionPeriods[i];
+    netRevenuePeriods.push({
+      periodIndex: grossPeriod.periodIndex,
+      periodSequence: grossPeriod.periodSequence,
+      amount: grossPeriod.amount + (deductionPeriod?.amount || 0), // deduction is already negative
+      source: 'calculated',
+    });
+  }
+
+  // Create net revenue line items by container
+  const netRevenueLineItems: CashFlowLineItem[] = [];
+  for (const [containerId, data] of revenueByContainer) {
+    const periods: PeriodValue[] = [];
+    for (const [periodIdx, values] of data.periodValues) {
+      periods.push({
+        periodIndex: periodIdx,
+        periodSequence: periodIdx + 1,
+        amount: values.gross - values.subdivision, // net = gross - subdivision costs
+        source: 'calculated',
+      });
+    }
+    periods.sort((a, b) => a.periodIndex - b.periodIndex);
+
+    netRevenueLineItems.push({
+      lineId: `revenue-net-${containerId ?? 'project'}`,
+      category: 'revenue',
+      subcategory: 'Net Revenue',
+      description: data.containerLabel || 'Project Level',
+      containerId: data.containerId,
+      containerLabel: data.containerLabel,
+      periods,
+      total: data.grossRevenue - data.subdivisionCosts,
+      sourceType: 'calculated',
+    });
+  }
+
+  // Sort by container label
+  netRevenueLineItems.sort((a, b) => (a.containerLabel || '').localeCompare(b.containerLabel || ''));
 
   sections.push({
     sectionId: 'revenue-net',
     sectionName: 'NET REVENUE',
-    lineItems: [
-      {
-        lineId: 'revenue-net',
-        category: 'revenue',
-        subcategory: 'Net Revenue',
-        description: 'Net Parcel Sales Revenue',
-        periods: revenuePeriodValues.netRevenue,
-        total: absorptionSchedule.totalNetRevenue,
-        sourceType: 'calculated',
-      },
-    ],
-    subtotals: revenuePeriodValues.netRevenue,
-    sectionTotal: absorptionSchedule.totalNetRevenue,
+    lineItems: netRevenueLineItems,
+    subtotals: netRevenuePeriods,
+    sectionTotal: netRevenue,
     sortOrder: sortOrder++,
   });
 
@@ -399,9 +574,10 @@ function calculateSummaryMetrics(
 ): CashFlowSummary {
   // Revenue summary
   const totalGrossRevenue = absorptionSchedule.totalGrossRevenue;
-  const totalRevenueDeductions =
-    absorptionSchedule.totalCommissions + absorptionSchedule.totalClosingCosts;
-  const totalNetRevenue = absorptionSchedule.totalNetRevenue;
+  // Revenue Deductions = Subdivision Costs ONLY
+  const totalRevenueDeductions = absorptionSchedule.totalSubdivisionCosts;
+  // Net Revenue = Gross Revenue - Subdivision Costs
+  const totalNetRevenue = totalGrossRevenue - totalRevenueDeductions;
 
   // Cost summary by category
   const costsByCategory = {
@@ -416,16 +592,17 @@ function calculateSummaryMetrics(
 
   for (const category in costSchedule.categorySummary) {
     const amount = costSchedule.categorySummary[category].total;
+    const categoryUpper = category.toUpperCase();
 
-    if (category.includes('ACQUISITION')) {
+    if (categoryUpper.includes('ACQUISITION')) {
       costsByCategory.acquisition += amount;
-    } else if (category.includes('PLANNING') || category.includes('ENGINEERING')) {
+    } else if (categoryUpper.includes('PLANNING') || categoryUpper.includes('ENGINEERING')) {
       costsByCategory.planning += amount;
-    } else if (category.includes('DEVELOPMENT')) {
+    } else if (categoryUpper.includes('DEVELOPMENT')) {
       costsByCategory.development += amount;
-    } else if (category.includes('FINANCING')) {
+    } else if (categoryUpper.includes('FINANCING')) {
       costsByCategory.financing += amount;
-    } else if (category.includes('CONTINGENCY')) {
+    } else if (categoryUpper.includes('CONTINGENCY')) {
       costsByCategory.contingency += amount;
     } else {
       costsByCategory.other += amount;

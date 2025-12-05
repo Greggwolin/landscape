@@ -11,7 +11,7 @@ export default function NapkinLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ marginLeft: '1rem', marginRight: '1rem' }}>
+    <div className="app-content">
       {children}
     </div>
   );

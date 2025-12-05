@@ -32,7 +32,7 @@ export default function AccordionFilters({
   activeFilter
 }: AccordionFiltersProps) {
   const headerStyle: React.CSSProperties = {
-    backgroundColor: 'var(--cui-card-bg)',
+    backgroundColor: '#ffffff',
     color: 'var(--cui-body-color)'
   };
 
@@ -41,7 +41,7 @@ export default function AccordionFilters({
   };
 
   const expandedStyle: React.CSSProperties = {
-    backgroundColor: 'var(--cui-body-bg)',
+    backgroundColor: '#ffffff',
     borderColor: 'var(--cui-border-color)'
   };
 
@@ -75,10 +75,10 @@ export default function AccordionFilters({
           : rowStyle;
 
         return (
-          <div key={filter.doc_type} style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+          <div key={filter.doc_type} style={{ backgroundColor: '#ffffff' }}>
             {/* Accordion Header Row */}
             <div
-              className="flex items-center gap-3 px-6 py-3 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.25 transition-colors"
               style={{
                 ...headerDynamicStyle,
                 borderBottomWidth: '1px',
@@ -129,7 +129,7 @@ export default function AccordionFilters({
             {/* Expanded Document List */}
             {filter.is_expanded && (
               <div
-                className="px-12 py-3 space-y-2 border-t"
+                className="px-4 py-2 space-y-1 border-t"
                 style={expandedStyle}
               >
                 {!filter.documents || filter.documents.length === 0 ? (
@@ -140,10 +140,11 @@ export default function AccordionFilters({
                   filter.documents.map((doc) => (
                     <div
                       key={doc.doc_id}
-                      className="flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors"
+                      className="flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-colors border-b last:border-b-0"
                       style={{
                         ...rowStyle,
-                        backgroundColor: 'var(--cui-card-bg)'
+                        backgroundColor: '#ffffff',
+                        borderColor: 'var(--cui-border-color)'
                       }}
                       onClick={() => onDocumentSelect(doc)}
                     >

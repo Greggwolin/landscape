@@ -1,6 +1,6 @@
 /**
  * GET /api/dms/filters/counts
- * Fetch document type counts for accordion filters
+ * Fetch document type counts and smart filters for doc type panel
  * Query params: ?project_id=123
  */
 
@@ -19,16 +19,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const project = parseInt(projectId);
+
     // Query doc_type counts
     const docTypeCounts = await sql`
       SELECT
-        doc_type,
+        COALESCE(doc_type, 'general') AS doc_type,
         COUNT(*) as count
       FROM landscape.core_doc
-      WHERE project_id = ${parseInt(projectId)}
+      WHERE project_id = ${project}
         AND status NOT IN ('deleted', 'archived')
-      GROUP BY doc_type
-      ORDER BY doc_type ASC
+      GROUP BY COALESCE(doc_type, 'general')
+      ORDER BY COALESCE(doc_type, 'general') ASC
+    `;
+
+    // Query smart filters with counts (best-effort; tags match is simplified to doc_type + project)
+    const smartFilters = await sql`
+      SELECT 
+        f.filter_id,
+        f.filter_name,
+        f.doc_type,
+        COALESCE(f.tags, ARRAY[]::text[]) AS tags,
+        COALESCE(f.count_override, 0) AS count_override,
+        COUNT(d.doc_id) AS matched_docs
+      FROM landscape.core_doc_smartfilter f
+      LEFT JOIN landscape.core_doc d
+        ON d.project_id = ${project}
+       AND d.doc_type = f.doc_type
+      WHERE f.project_id = ${project}
+         OR f.project_id IS NULL
+      GROUP BY f.filter_id, f.filter_name, f.doc_type, f.tags, f.count_override
+      ORDER BY f.filter_name ASC
     `;
 
     return NextResponse.json({
@@ -36,6 +57,13 @@ export async function GET(request: NextRequest) {
       doc_type_counts: docTypeCounts.map(row => ({
         doc_type: row.doc_type || 'general',
         count: parseInt(row.count as string)
+      })),
+      smart_filters: smartFilters.map(row => ({
+        filter_id: row.filter_id,
+        filter_name: row.filter_name,
+        doc_type: row.doc_type || 'general',
+        tags: row.tags || [],
+        count: row.count_override || parseInt(row.matched_docs as string)
       }))
     });
   } catch (error) {

@@ -20,7 +20,7 @@ export default function AcquisitionPage() {
   });
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+    <div className="app-content" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       <AcquisitionLedgerGrid
         projectId={projectId}
         mode={mode}

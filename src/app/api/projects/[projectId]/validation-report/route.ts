@@ -95,6 +95,16 @@ interface ParcelSalePeriodRow {
   sale_period: number | null;
 }
 
+interface ParcelSubdivisionCostRow {
+  phase_id: number | null;
+  phase_name: string;
+  price_uom: string | null;
+  sale_period: number | null;
+  lot_width: number | null;
+  units_total: number | null;
+  improvement_offset_per_uom: number | null;
+}
+
 // ============================================================================
 // MAIN HANDLER
 // ============================================================================
@@ -151,7 +161,7 @@ export async function GET(
 
     // 3. Fetch phase pricing/revenue data for SFD lots only
     // Note: closing costs now come from global benchmarks, not parcel-level data
-    // improvement_offset_total is the "subdivision cost" - credit given to buyer for improvements they complete
+    // improvement_offset totals are recalculated below using base per-UOM values to respect current inflation settings
     const phasePricing = await sql<PhasePricingRow>`
       SELECT
         p.phase_id,
@@ -187,6 +197,31 @@ export async function GET(
         AND (project_id = ${projectId} OR project_id IS NULL)
       ORDER BY benchmark_type, project_id NULLS LAST
     `;
+
+    // 3a1. Fetch improvement offset benchmark (used when per-UOM is not stored on parcel)
+    // Priority: project-specific with value > project-specific without > global
+    const improvementOffsetBenchmark = await sql`
+      SELECT
+        benchmark_id,
+        amount_per_uom,
+        fixed_amount,
+        uom_code,
+        scope_level
+      FROM landscape.tbl_sale_benchmarks
+      WHERE is_active = true
+        AND benchmark_type = 'improvement_offset'
+        AND (project_id = ${projectId} OR project_id IS NULL)
+      ORDER BY
+        project_id NULLS LAST,
+        scope_level = 'project' DESC,
+        amount_per_uom NULLS LAST
+      LIMIT 1
+    `;
+    // Use amount_per_uom (primary) or fixed_amount (fallback)
+    const benchmarkImprovementOffsetPerUom =
+      Number(improvementOffsetBenchmark[0]?.amount_per_uom) ||
+      Number(improvementOffsetBenchmark[0]?.fixed_amount) ||
+      0;
 
     // 3a2. Fetch project cost inflation rate
     const costInflationRows = await sql<CostInflationRow>`
@@ -225,6 +260,34 @@ export async function GET(
       }
       phaseSalePeriods.set(row.phase_id, periods);
     }
+
+    // 3a4. Fetch parcel-level improvement offset inputs so subdivision costs can respect current inflation
+    // Note: Only include SFD/SFA parcels - other land types have separate improvement offsets tracked elsewhere
+    const parcelSubdivisionCosts = await sql<ParcelSubdivisionCostRow>`
+      SELECT
+        p.phase_id,
+        COALESCE(ph.phase_name, 'Unassigned') AS phase_name,
+        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom,
+        p.sale_period,
+        p.lot_width,
+        p.units_total,
+        psa.improvement_offset_per_uom
+      FROM landscape.tbl_parcel p
+      LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+      LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
+      LEFT JOIN LATERAL (
+        SELECT unit_of_measure
+        FROM landscape.land_use_pricing lup
+        WHERE lup.project_id = p.project_id
+          AND lup.lu_type_code = p.type_code
+          AND (lup.product_code = p.product_code OR lup.product_code IS NULL)
+        ORDER BY lup.product_code NULLS LAST
+        LIMIT 1
+      ) lup ON TRUE
+      WHERE p.project_id = ${projectId}
+        AND p.type_code IN ('SFD', 'SFA')
+        AND p.units_total > 0
+    `;
 
     // 3b. Fetch Other Land parcels (MF, BTR, etc. - non-SFD)
     const otherLandParcels = await sql<OtherLandRow>`
@@ -380,15 +443,12 @@ export async function GET(
       const netProceeds = Number(parcel.net_sale_proceeds) || 0;
       const acres = Number(parcel.acres_gross) || 0;
       const pricePerUnit = Number(parcel.price_per_unit) || 0;
-      const improvementOffset = Number(parcel.improvement_offset_total) || 0;
       const commission = Number(parcel.commission_amount) || 0;
 
       phase.otherLandAcres += acres;
       phase.otherLandUnits += units;
       phase.otherLandGrossRevenue += grossPrice;
       phase.otherLandNetRevenue += netProceeds;
-      // Add Other Land improvement offset to subdivision cost
-      phase.subdivisionCost += improvementOffset;
       // Add Other Land commission to phase commissions
       phase.commissions += commission;
 
@@ -414,6 +474,70 @@ export async function GET(
       if (pricePerUnit > 0) typeEntry.pricePerUnit = pricePerUnit;
       typeEntry.grossRevenue += grossPrice;
       typeEntry.netRevenue += netProceeds;
+    }
+
+    // Recompute subdivision costs (improvement offsets) using current inflation settings
+    const normalizeUom = (rawUom: string | null): string => {
+      if (!rawUom) return 'EA';
+      return rawUom.replace('$/', '').toUpperCase();
+    };
+
+    const calculateParcelSubdivisionCost = (row: ParcelSubdivisionCostRow): number => {
+      const uom = normalizeUom(row.price_uom);
+
+      // Only $/FF parcels should contribute to subdivision cost
+      // Other UOMs ($/Unit, $/SF, $/AC) are tracked separately
+      if (uom !== 'FF') return 0;
+
+      // Use parcel-level per-UOM if available, otherwise fall back to benchmark
+      let basePerUom = Number(row.improvement_offset_per_uom) || 0;
+      if (!basePerUom) {
+        basePerUom = benchmarkImprovementOffsetPerUom;
+      }
+
+      // If we still don't have a per-UOM amount, skip this parcel
+      if (!basePerUom) return 0;
+
+      // Get parcel dimensions
+      const units = Number(row.units_total) || 0;
+      const lotWidth = Number(row.lot_width) || 0;
+
+      // Calculate: basePerUom * lotWidth * units
+      // If cost inflation is zero, use base rate directly
+      if (costInflationRate === 0) {
+        return basePerUom * lotWidth * units;
+      }
+
+      // Apply inflation when rate > 0 and parcel has a sale period
+      const salePeriod = row.sale_period || 0;
+      const inflatedPerUom =
+        costInflationRate > 0 && salePeriod > 0
+          ? basePerUom * Math.pow(1 + costInflationRate / 12, salePeriod)
+          : basePerUom;
+
+      return inflatedPerUom * lotWidth * units;
+    };
+
+    const subdivisionCostByPhase = new Map<number | null, number>();
+    const subdivisionPhaseNames = new Map<number | null, string>();
+
+    for (const row of parcelSubdivisionCosts) {
+      const amount = calculateParcelSubdivisionCost(row);
+      if (amount === 0) continue;
+      subdivisionCostByPhase.set(row.phase_id, (subdivisionCostByPhase.get(row.phase_id) || 0) + amount);
+      if (!subdivisionPhaseNames.has(row.phase_id)) {
+        subdivisionPhaseNames.set(row.phase_id, row.phase_name);
+      }
+    }
+
+    for (const [phaseId, amount] of subdivisionCostByPhase.entries()) {
+      let phase = phaseMap.get(phaseId);
+      if (!phase) {
+        const phaseName = subdivisionPhaseNames.get(phaseId) || 'Unassigned';
+        phase = createEmptyPhaseData(phaseName, phaseId);
+        phaseMap.set(phaseId, phase);
+      }
+      phase.subdivisionCost = amount;
     }
 
     // Calculate base per-parcel closing costs from transaction benchmarks
@@ -443,9 +567,6 @@ export async function GET(
         phase.grossRevenuePerLot = phase.lots > 0 ? phase.grossRevenue / phase.lots : 0;
         // Add SFD commissions to any already accumulated from Other Land parcels
         phase.commissions += Number(pricing.total_commissions) || 0;
-
-        // Add SFD improvement offset to any already accumulated from Other Land parcels
-        phase.subdivisionCost += Number(pricing.improvement_offset_total) || 0;
 
         // Calculate closing costs with inflation applied per-parcel based on sale period
         const salePeriods = phaseSalePeriods.get(pricing.phase_id) || [];
@@ -534,7 +655,7 @@ export async function GET(
       // Calculate combined revenue totals
       phase.totalGrossRevenue = phase.grossRevenue + phase.otherLandGrossRevenue;
 
-      // subdivisionCost is already set from improvement_offset_total in the pricing loop
+      // subdivisionCost is already set from parcel improvement offsets using the current cost inflation rate
       // It represents the credit given to buyer for improvements they'll complete post-closing
 
       // Gross sale proceeds = gross revenue minus subdivision costs (before commissions/closing)

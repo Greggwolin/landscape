@@ -1,4 +1,5 @@
 import { ComplexityModeProvider } from '@/contexts/ComplexityModeContext';
+import { ProjectModeProvider } from '@/contexts/ProjectModeContext';
 import ProjectContextBar from '@/app/components/ProjectContextBar';
 
 type Params = { projectId: string };
@@ -17,12 +18,14 @@ export default async function ProjectLayout({
       userId="demo_user"
       projectId={parseInt(projectId)}
     >
-      <>
-        <ProjectContextBar projectId={parseInt(projectId)} />
-        <main style={{ overflow: 'visible' }}>
-          {children}
-        </main>
-      </>
+      <ProjectModeProvider projectId={parseInt(projectId)}>
+        <div className="app-page">
+          <ProjectContextBar projectId={parseInt(projectId)} />
+          <main className="app-content" style={{ overflow: 'visible' }}>
+            {children}
+          </main>
+        </div>
+      </ProjectModeProvider>
     </ComplexityModeProvider>
   );
 }

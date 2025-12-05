@@ -77,6 +77,31 @@ div.planning-tile.planning-tile-active div.planning-tile-header,
   --foreground: var(--text-primary);
 }
 
+/* Universal spacing + layout helpers */
+.app-shell {
+  padding: var(--app-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--component-gap);
+}
+
+.app-page,
+.app-content,
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--component-gap);
+}
+
+.card,
+.panel {
+  margin-bottom: var(--component-gap);
+}
+
+.section-spacing {
+  margin-bottom: var(--component-gap);
+}
+
 @theme inline {
   --color-background: var(--surface-bg);
   --color-foreground: var(--text-primary);

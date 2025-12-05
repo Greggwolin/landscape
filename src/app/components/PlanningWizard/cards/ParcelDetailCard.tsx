@@ -69,7 +69,8 @@ const ParcelDetailCard: React.FC<ParcelDetailCardProps> = ({
   onSave,
   onClose,
   onDelete,
-  onAddParcel
+  onAddParcel,
+  planningEfficiency
 }) => {
   const [formData, setFormData] = useState({
     name: '',

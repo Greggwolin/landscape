@@ -430,10 +430,13 @@ def is_hurdle_met(
         return emx_threshold is not None and current_emx >= emx_threshold
 
     elif settings.hurdle_method == HurdleMethod.IRR_EMX:
-        # Max of both - hurdle is met when EITHER is met
-        irr_met = irr_threshold is not None and current_irr >= irr_threshold
-        emx_met = emx_threshold is not None and current_emx >= emx_threshold
-        return irr_met or emx_met
+        # BOTH thresholds must be met (stricter than individual methods)
+        # If only one threshold is configured, only that one needs to be met
+        irr_met = irr_threshold is None or current_irr >= irr_threshold
+        emx_met = emx_threshold is None or current_emx >= emx_threshold
+        # At least one threshold must be configured
+        has_threshold = irr_threshold is not None or emx_threshold is not None
+        return has_threshold and irr_met and emx_met
 
     return False
 

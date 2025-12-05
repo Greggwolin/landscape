@@ -17,7 +17,7 @@ export default function BudgetPage() {
   const projectId = parseInt(params.projectId as string);
 
   return (
-    <div className="container-fluid px-4">
+    <div className="app-content">
       <BudgetGridTab projectId={projectId} />
     </div>
   );

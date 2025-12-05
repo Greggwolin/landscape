@@ -592,12 +592,13 @@ class CalculationService:
         }
 
     @staticmethod
-    def calculate_project_waterfall(project_id: int) -> Dict:
+    def calculate_project_waterfall(project_id: int, hurdle_method: str = 'IRR') -> Dict:
         """
         Calculate waterfall distribution for a project using database configuration.
 
         Args:
             project_id: Project ID
+            hurdle_method: Hurdle method - 'IRR', 'EMx', or 'IRR_EMx' (default: 'IRR')
 
         Returns:
             Dictionary with waterfall calculation results
@@ -634,14 +635,25 @@ class CalculationService:
                     'project_id': project_id,
                 }
 
-            # Convert to tier dicts
+            # Convert to tier dicts with sensible defaults for EMx mode
+            # Default EMx thresholds when not set in database:
+            # - Tier 1: 1.0x (return of capital)
+            # - Tier 2: 1.5x (typical promote hurdle)
+            # - Tier 3+: None (residual tiers)
+            default_emx_thresholds = {1: 1.0, 2: 1.5}
+
             tiers = []
             for row in tier_rows:
+                tier_num = row[0]
+                emx_from_db = float(row[3]) if row[3] else None
+                # Apply default EMx if not set and not a residual tier
+                emx_value = emx_from_db if emx_from_db is not None else default_emx_thresholds.get(tier_num)
+
                 tiers.append({
-                    'tier_number': row[0],
-                    'tier_name': row[1] or f"Tier {row[0]}",
+                    'tier_number': tier_num,
+                    'tier_name': row[1] or f"Tier {tier_num}",
                     'irr_hurdle': float(row[2]) if row[2] else None,
-                    'emx_hurdle': float(row[3]) if row[3] else None,
+                    'emx_hurdle': emx_value,
                     'promote_percent': 0,  # Calculate from splits
                     'lp_split_pct': float(row[4]) if row[4] else 90,
                     'gp_split_pct': float(row[5]) if row[5] else 10,
@@ -696,12 +708,20 @@ class CalculationService:
                 for t in tiers
             ]
 
+            # Map string hurdle_method to enum
+            hurdle_method_map = {
+                'IRR': HurdleMethod.IRR,
+                'EMx': HurdleMethod.EMX,
+                'IRR_EMx': HurdleMethod.IRR_EMX,
+            }
+            resolved_hurdle_method = hurdle_method_map.get(hurdle_method, HurdleMethod.IRR)
+
             # Build settings from database (with defaults)
             waterfall_settings = WaterfallSettings(
-                hurdle_method=HurdleMethod.IRR,
+                hurdle_method=resolved_hurdle_method,
                 num_tiers=len(tiers),
                 return_of_capital=ReturnOfCapital.PARI_PASSU,
-                gp_catch_up=False,  # No catch-up unless configured
+                gp_catch_up=True,  # Enable GP catch-up to match Excel model
                 lp_ownership=Decimal('0.90'),
                 preferred_return_pct=Decimal('8'),
             )

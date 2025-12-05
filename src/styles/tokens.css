@@ -45,6 +45,10 @@
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
+
+  /* Spacing */
+  --app-padding: 0.75rem; /* align to nav bar horizontal padding */
+  --component-gap: 0.75rem;
 }
 
 /* Dark theme scope - matches CoreUI theme attribute */

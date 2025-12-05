@@ -1,22 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilFilterSquare, cilPencil, cilApple, cilSend, cilCheck } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import FilterDetailView from '@/components/dms/views/FilterDetailView';
 import Dropzone from '@/components/dms/upload/Dropzone';
 import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
-import type { DMSDocument } from '@/types/dms';
+import DocTypeFilters from '@/components/dms/filters/DocTypeFilters';
 import { LandscapeButton } from '@/components/ui/landscape';
 import styles from './page.module.css';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type TabType = 'documents' | 'upload';
 
 export default function DMSPage() {
   const { activeProject: currentProject } = useProjectContext();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -34,9 +36,7 @@ export default function DMSPage() {
 
   // Documents tab state
   const [selectedFilterType, setSelectedFilterType] = useState<string | null>(null);
-  const [allFilters, setAllFilters] = useState<FilterAccordion[]>([]);
-  const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
-  const [isLoadingFilters, setIsLoadingFilters] = useState(true);
+  const [totalItemCount, setTotalItemCount] = useState<number>(0);
 
   // Upload tab state
   const [uploadedFiles, setUploadedFiles] = useState<Array<{
@@ -51,154 +51,54 @@ export default function DMSPage() {
     profile_json?: Record<string, unknown>;
   }>>([]);
   const [selectedUploadFile, setSelectedUploadFile] = useState<typeof uploadedFiles[number] | null>(null);
+  const selectedDocTypeParam = searchParams.get('doc_type');
 
-  // Fetch filter data when Documents tab is active
-  useEffect(() => {
-    if (currentProject?.project_id && activeTab === 'documents') {
-      void loadFilters();
+  const handleDocTypeChange = (docType: string | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (docType) {
+      params.set('doc_type', docType);
+    } else {
+      params.delete('doc_type');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject?.project_id, currentProject?.project_type, activeTab]);
-
-  const loadFilters = async () => {
-    if (!currentProject) return;
-    setIsLoadingFilters(true);
-    try {
-      const docTypeParams = new URLSearchParams({
-        project_id: currentProject.project_id.toString(),
-        workspace_id: defaultWorkspaceId.toString()
-      });
-      if (currentProject.project_type) {
-        docTypeParams.append('project_type', currentProject.project_type);
-      }
-
-      const [docTypesResponse, countsResponse] = await Promise.all([
-        fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`),
-        fetch(`/api/dms/filters/counts?project_id=${currentProject.project_id}`)
-      ]);
-
-      let docTypeOptions: string[] = [];
-      if (docTypesResponse.ok) {
-        const data = await docTypesResponse.json();
-        docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
-      }
-
-      if (!countsResponse.ok) {
-        throw new Error('Failed to fetch filter counts');
-      }
-
-      const { doc_type_counts } = await countsResponse.json();
-      const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(doc_type_counts)
-        ? doc_type_counts
-        : [];
-
-      const countMap = new Map<string, number>();
-      countEntries.forEach(({ doc_type, count }) => {
-        if (doc_type) {
-          countMap.set(doc_type, count);
-          countMap.set(doc_type.toLowerCase(), count);
-        }
-      });
-
-      const templateFilters = docTypeOptions.map((type: string) => {
-        const normalized = type.toLowerCase();
-        const count =
-          countMap.get(type) ??
-          countMap.get(normalized) ??
-          0;
-
-        return {
-          doc_type: type,
-          icon: '📁',
-          count,
-          is_expanded: false,
-          documents: []
-        };
-      });
-
-      const templateSet = new Set(docTypeOptions.map(type => type.toLowerCase()));
-      const extraFilters = countEntries
-        .filter(({ doc_type }) => doc_type && !templateSet.has(doc_type.toLowerCase()))
-        .map(({ doc_type, count }) => ({
-          doc_type,
-          icon: '📁',
-          count: count ?? 0,
-          is_expanded: false,
-          documents: []
-        }));
-
-      setAllFilters([...templateFilters, ...extraFilters]);
-      setExpandedFilter(null);
-    } catch (error) {
-      console.error('Error loading filters:', error);
-      setAllFilters([]);
-    } finally {
-      setIsLoadingFilters(false);
-    }
-  };
-
-  const totalItemCount = useMemo(() => {
-    return allFilters.reduce((sum, f) => sum + (Number.isFinite(f.count) ? f.count : 0), 0);
-  }, [allFilters]);
-
-  // Split filters into two columns
-  const leftColumnFilters = useMemo(() => {
-    return allFilters.slice(0, Math.ceil(allFilters.length / 2));
-  }, [allFilters]);
-
-  const rightColumnFilters = useMemo(() => {
-    return allFilters.slice(Math.ceil(allFilters.length / 2));
-  }, [allFilters]);
-
-  // Handle accordion expand/collapse
-  const handleAccordionExpand = async (docType: string) => {
-    if (expandedFilter === docType) {
-      setExpandedFilter(null);
-      setAllFilters((prev) =>
-        prev.map((f) => ({ ...f, is_expanded: false, documents: [] }))
-      );
-      return;
-    }
-
-    setAllFilters((prev) => prev.map((f) => ({ ...f, is_expanded: false })));
-    setExpandedFilter(docType);
-
-    try {
-      const response = await fetch(
-        `/api/dms/search?project_id=${currentProject.project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
-      }
-
-      const data = await response.json();
-
-      setAllFilters((prev) =>
-        prev.map((f) =>
-          f.doc_type === docType
-            ? { ...f, is_expanded: true, documents: data.results || [] }
-            : f
-        )
-      );
-    } catch (error) {
-      console.error('Error fetching documents for filter:', error);
-    }
-  };
-
-  // Handle clicking folder icon - navigate to filter detail view
-  const handleFilterClick = (docType: string) => {
+    router.push(`?${params.toString()}`);
     setSelectedFilterType(docType);
   };
 
-  const handleCloseDetail = () => {
-    setSelectedFilterType(null);
-  };
+  // Track selected doc_type from URL
+  useEffect(() => {
+    const docTypeParam = searchParams.get('doc_type');
+    setSelectedFilterType(docTypeParam);
+  }, [searchParams]);
 
-  // Handle document selection from accordion
-  const handleDocumentSelect = (doc: DMSDocument) => {
-    console.log('Document selected:', doc);
-    // TODO: Open document preview or navigate to document page
+  // Fetch total doc count for toolbar
+  useEffect(() => {
+    const loadCounts = async () => {
+      if (!currentProject?.project_id || activeTab !== 'documents') return;
+    try {
+      const response = await fetch(`/api/dms/filters/counts?project_id=${currentProject.project_id}`);
+      if (!response.ok) throw new Error('Failed to fetch filter counts');
+        const data = await response.json();
+        const total = Array.isArray(data.doc_type_counts)
+          ? data.doc_type_counts.reduce(
+              (sum: number, entry: { count: number }) => sum + (Number.isFinite(entry.count) ? entry.count : 0),
+              0
+            )
+          : 0;
+        setTotalItemCount(total);
+      } catch (error) {
+        console.error('Error loading totals:', error);
+        setTotalItemCount(0);
+      }
+    };
+
+    void loadCounts();
+  }, [currentProject?.project_id, activeTab]);
+
+  const handleCloseDetail = () => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('doc_type');
+    router.push(`?${params.toString()}`);
+    setSelectedFilterType(null);
   };
 
   // Upload handlers
@@ -261,7 +161,7 @@ export default function DMSPage() {
     <div className="h-screen flex flex-col">
       {/* Tabs */}
       <div className={`border-b ${styles.tabsBar}`}>
-        <div className="px-6">
+        <div className="px-6 flex items-center justify-between">
           <nav className="flex space-x-8" aria-label="Tabs">
             <LandscapeButton
               onClick={() => setActiveTab('documents')}
@@ -299,6 +199,12 @@ export default function DMSPage() {
               </div>
             </LandscapeButton>
           </nav>
+          <button
+            onClick={() => router.push('/admin/dms/templates')}
+            className="pb-3 text-gray-600 hover:text-gray-900 text-sm font-medium"
+          >
+            ADMIN
+          </button>
         </div>
       </div>
 
@@ -360,65 +266,34 @@ export default function DMSPage() {
               </div>
             </div>
 
-            <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-              <div className={`flex-1 overflow-y-auto ${selectedFilterType ? 'lg:w-2/3' : 'w-full'}`}>
-                {isLoadingFilters ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${styles.loadingSpinner}`}></div>
-                    <span className="ml-3 text-text-secondary">Loading filters...</span>
-                  </div>
-                ) : allFilters.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-text-secondary">
-                    <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3 text-text-secondary" />
-                    <p className="text-sm text-text-secondary">No documents found in this project</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2">
-                    {/* Left Column */}
-                    <div className="border-r border-line-soft">
-                      <AccordionFilters
-                        projectId={currentProject.project_id}
-                        filters={leftColumnFilters}
-                        onExpand={handleAccordionExpand}
-                        onFilterClick={handleFilterClick}
-                        onDocumentSelect={handleDocumentSelect}
-                        expandedFilter={expandedFilter}
-                        activeFilter={selectedFilterType}
-                      />
-                    </div>
+            <div className="flex-1 flex overflow-hidden">
+              <div className="w-[250px] border-r border-line-soft bg-white dark:bg-gray-900 overflow-y-auto">
+                <div className="p-4 border-b border-line-soft">
+                  <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider">
+                    Document Types
+                  </h2>
+                </div>
+                <DocTypeFilters
+                  projectId={currentProject.project_id}
+                  selectedDocType={selectedDocTypeParam}
+                  onFilterChange={handleDocTypeChange}
+                  className="divide-y divide-line-soft"
+                />
+              </div>
 
-                    {/* Right Column */}
-                    <div>
-                      <AccordionFilters
-                        projectId={currentProject.project_id}
-                        filters={rightColumnFilters}
-                        onExpand={handleAccordionExpand}
-                        onFilterClick={handleFilterClick}
-                        onDocumentSelect={handleDocumentSelect}
-                        expandedFilter={expandedFilter}
-                        activeFilter={selectedFilterType}
-                      />
-                    </div>
+              <div className="flex-1 overflow-hidden">
+                {selectedFilterType ? (
+                  <FilterDetailView
+                    projectId={currentProject.project_id}
+                    docType={selectedFilterType}
+                    onBack={handleCloseDetail}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-text-secondary text-sm">
+                    Select a document type to view documents.
                   </div>
                 )}
               </div>
-
-              {selectedFilterType && (
-                <>
-                  <div
-                    className={`fixed inset-0 z-40 lg:hidden ${styles.detailBackdrop}`}
-                    onClick={handleCloseDetail}
-                    role="presentation"
-                  />
-                  <div className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l border-line-soft bg-surface-card shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3">
-                    <FilterDetailView
-                      projectId={currentProject.project_id}
-                      docType={selectedFilterType}
-                      onBack={handleCloseDetail}
-                    />
-                  </div>
-                </>
-              )}
             </div>
           </div>
         )}

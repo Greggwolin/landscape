@@ -3,9 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CAlert, CCard, CCardBody } from '@coreui/react';
 
+type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
+
 interface NapkinWaterfallFormProps {
   projectId: number;
   onSaved?: (data: unknown) => void;
+  waterfallType?: WaterfallType;
+  onWaterfallTypeChange?: (type: WaterfallType) => void;
 }
 
 type SaveState =
@@ -13,8 +17,6 @@ type SaveState =
   | { status: 'saving' }
   | { status: 'success'; message: string }
   | { status: 'error'; message: string };
-
-type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
 
 const formatInt = (value: number | null | undefined) => {
   if (value === null || value === undefined || Number.isNaN(value) || value === 0) return '—';
@@ -32,10 +34,12 @@ const parseNumber = (value: string): number | '' => {
 };
 
 // Styles for input cells (grey background)
+const cellBorder = '1px solid #e5e7eb';
+
 const inputCellStyle: React.CSSProperties = {
-  backgroundColor: '#f3f4f6',
-  border: '1px solid #e5e7eb',
-  padding: '4px 8px',
+  backgroundColor: '#ffffff',
+  border: cellBorder,
+  padding: '6px 10px',
   textAlign: 'center',
   minWidth: '70px',
 };
@@ -43,35 +47,92 @@ const inputCellStyle: React.CSSProperties = {
 // Styles for calculated cells (white background)
 const calcCellStyle: React.CSSProperties = {
   backgroundColor: '#ffffff',
-  padding: '4px 8px',
+  border: cellBorder,
+  padding: '6px 10px',
   textAlign: 'center',
   minWidth: '70px',
 };
 
 // Styles for header cells
 const headerCellStyle: React.CSSProperties = {
-  padding: '6px 8px',
+  padding: '8px 10px',
   textAlign: 'center',
   fontWeight: 600,
   color: 'var(--cui-secondary-color)',
   fontSize: '0.75rem',
+  backgroundColor: '#f8fafc',
+  borderBottom: cellBorder,
+  borderTop: cellBorder,
+  borderLeft: cellBorder,
+  borderRight: cellBorder,
 };
 
 // Styles for row label cells
 const labelCellStyle: React.CSSProperties = {
-  padding: '6px 8px',
-  textAlign: 'right',
+  padding: '10px',
+  textAlign: 'left',
   fontWeight: 500,
   color: 'var(--cui-body-color)',
   fontSize: '0.75rem',
+  border: cellBorder,
+};
+
+const inputFieldStyle: React.CSSProperties = {
+  backgroundColor: '#ffffff',
+  border: '1px solid #d1d5db',
+  borderRadius: 8,
+  padding: '8px 10px',
+  textAlign: 'center',
+  fontSize: '0.8rem',
+  lineHeight: 1.2,
+  width: '64px',
+};
+
+const tableWrapperStyle: React.CSSProperties = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 10,
+  overflow: 'hidden',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+};
+
+const tableStyle: React.CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: '0.8rem',
+  backgroundColor: '#ffffff',
+};
+
+const headerRowStyle: React.CSSProperties = {
+  backgroundColor: '#f8fafc',
+  height: '44px',
+};
+
+const bodyRowStyle: React.CSSProperties = {
+  backgroundColor: '#ffffff',
+  height: '44px',
+};
+
+const formatWithSuffix = (value: number | '' | null | undefined, suffix: string) => {
+  if (value === '' || value === null || value === undefined) return '';
+  return `${value}${suffix}`;
 };
 
 export default function NapkinWaterfallForm({
   projectId,
   onSaved,
+  waterfallType: controlledWaterfallType,
+  onWaterfallTypeChange,
 }: NapkinWaterfallFormProps) {
-  // Waterfall type toggle
-  const [waterfallType, setWaterfallType] = useState<WaterfallType>('IRR');
+  // Waterfall type toggle - use controlled value if provided, otherwise internal state
+  const [internalWaterfallType, setInternalWaterfallType] = useState<WaterfallType>('IRR');
+  const waterfallType = controlledWaterfallType ?? internalWaterfallType;
+  const setWaterfallType = onWaterfallTypeChange ?? setInternalWaterfallType;
+  const [inputsOpen, setInputsOpen] = useState(true);
+
+  const waterfallHeaderLabel =
+    waterfallType === 'IRR' ? 'IRR Waterfall' :
+    waterfallType === 'EM' ? 'Equity Multiple Waterfall' :
+    'IRR + EM Waterfall';
 
   // Equity Contributions
   const [gpContributionPct, setGpContributionPct] = useState<number | ''>(10);
@@ -98,41 +159,99 @@ export default function NapkinWaterfallForm({
   useEffect(() => {
     let cancelled = false;
 
-    async function loadEquity() {
+    async function loadData() {
       try {
         setEquityError(null);
 
-        const res = await fetch(`/api/projects/${projectId}/cash-flow/summary`);
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || 'Failed to load equity requirement');
+        // Load equity requirement and waterfall config in parallel
+        const [equityRes, waterfallRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/cash-flow/summary`),
+          fetch(`/api/projects/${projectId}/waterfall`),
+        ]);
+
+        // Process equity requirement
+        if (equityRes.ok) {
+          const equityJson = await equityRes.json();
+          const equity =
+            equityJson?.data?.summary?.peakEquity !== undefined
+              ? Math.abs(Number(equityJson.data.summary.peakEquity))
+              : null;
+
+          if (!cancelled) {
+            setTotalEquityRequired(
+              typeof equity === 'number' && Number.isFinite(equity) ? equity : null
+            );
+          }
         }
 
-        const json = await res.json();
-        const equity =
-          json?.data?.summary?.peakEquity !== undefined
-            ? Math.abs(Number(json.data.summary.peakEquity))
-            : null;
+        // Process waterfall config to populate form
+        if (waterfallRes.ok && !cancelled) {
+          const waterfallJson = await waterfallRes.json();
+          const tiers = waterfallJson?.waterfallTiers || [];
+          const partners = waterfallJson?.equityPartners || [];
 
-        if (!cancelled) {
-          setTotalEquityRequired(
-            typeof equity === 'number' && Number.isFinite(equity) ? equity : null
-          );
+          if (tiers.length > 0) {
+            // Derive waterfallType from hurdleType
+            const tier1 = tiers.find((t: any) => t.tierNumber === 1);
+            const tier2 = tiers.find((t: any) => t.tierNumber === 2);
+            const tier3 = tiers.find((t: any) => t.tierNumber === 3);
+
+            const hurdleType = tier1?.hurdleType || 'irr';
+            let derivedWaterfallType: WaterfallType = 'IRR';
+            if (hurdleType === 'hybrid') {
+              derivedWaterfallType = 'IRR_EM';
+            } else if (hurdleType === 'equity_multiple') {
+              derivedWaterfallType = 'EM';
+            }
+            setWaterfallType(derivedWaterfallType);
+
+            // IRR thresholds
+            if (tier1?.hurdleRate !== null && tier1?.hurdleRate !== undefined) {
+              setPrefRateIrr(tier1.hurdleRate);
+            }
+            if (tier2?.hurdleRate !== null && tier2?.hurdleRate !== undefined) {
+              setHurdleIrr(tier2.hurdleRate);
+            }
+
+            // EMx thresholds
+            if (tier1?.equityMultipleThreshold !== null && tier1?.equityMultipleThreshold !== undefined) {
+              setPrefRateEm(tier1.equityMultipleThreshold);
+            }
+            if (tier2?.equityMultipleThreshold !== null && tier2?.equityMultipleThreshold !== undefined) {
+              setHurdleEm(tier2.equityMultipleThreshold);
+            }
+
+            // Split percentages
+            if (tier1?.lpSplitPct !== undefined) setPrefLpPct(tier1.lpSplitPct);
+            if (tier2?.lpSplitPct !== undefined) setPromoteLpPct(tier2.lpSplitPct);
+            if (tier3?.lpSplitPct !== undefined) setResidualLpPct(tier3.lpSplitPct);
+          }
+
+          // GP contribution percentage from partners
+          const gpPartner = partners.find((p: any) => p.partnerType === 'GP');
+          if (gpPartner?.ownershipPct !== null && gpPartner?.ownershipPct !== undefined) {
+            setGpContributionPct(gpPartner.ownershipPct);
+          }
+
+          // Promote percentage from GP partner
+          if (gpPartner?.promotePct !== null && gpPartner?.promotePct !== undefined) {
+            setPromotePct(gpPartner.promotePct);
+          }
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Unable to load equity requirement.';
+          const message = err instanceof Error ? err.message : 'Unable to load data.';
           setEquityError(message);
         }
       }
     }
 
-    loadEquity();
+    loadData();
 
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, setWaterfallType]);
 
   const effectiveTotalEquity = totalEquityRequired ?? 0;
 
@@ -216,7 +335,7 @@ export default function NapkinWaterfallForm({
       }
 
       const payload = await response.json();
-      setSaveState({ status: 'success', message: 'Napkin waterfall saved.' });
+      setSaveState({ status: 'idle' });
       onSaved?.(payload);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save waterfall.';
@@ -244,71 +363,98 @@ export default function NapkinWaterfallForm({
   const showIrrTable = waterfallType === 'IRR' || waterfallType === 'IRR_EM';
   const showEmTable = waterfallType === 'EM' || waterfallType === 'IRR_EM';
 
+  // Auto-save when waterfall type changes (after initial load)
+  const isInitialMount = React.useRef(true);
+  const prevWaterfallType = React.useRef(waterfallType);
+
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevWaterfallType.current = waterfallType;
+      return;
+    }
+
+    // Skip if waterfall type hasn't actually changed
+    if (prevWaterfallType.current === waterfallType) {
+      return;
+    }
+    prevWaterfallType.current = waterfallType;
+
+    // Auto-save the new waterfall type to database
+    // This ensures EMx thresholds are saved when switching to EM mode
+    if (effectiveTotalEquity > 0 && typeof gpContributionPct === 'number') {
+      handleSave();
+    }
+  }, [waterfallType, effectiveTotalEquity, gpContributionPct, handleSave]);
+
   return (
     <CCard>
-      <CCardBody>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="mb-0">Napkin Mode Waterfall</h5>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={handleSave}
-            disabled={saveState.status === 'saving'}
-          >
-            {saveState.status === 'saving' ? 'Saving…' : 'Save Waterfall'}
-          </button>
-        </div>
+      <div className="card-header d-flex align-items-center gap-2">
+        <h5 className="mb-0">Equity Waterfall</h5>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm ms-auto"
+          onClick={handleSave}
+          disabled={saveState.status === 'saving'}
+        >
+          {saveState.status === 'saving' ? 'Saving…' : 'Save Waterfall'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => setInputsOpen(!inputsOpen)}
+          aria-expanded={inputsOpen}
+          aria-label="Toggle Waterfall Inputs"
+        >
+          {inputsOpen ? '▾' : '▸'}
+        </button>
+      </div>
+      {inputsOpen && (
+      <CCardBody className="pt-2">
 
         {saveState.status === 'error' && (
           <CAlert color="danger" className="mb-3">{saveState.message}</CAlert>
-        )}
-        {saveState.status === 'success' && (
-          <CAlert color="success" className="mb-3">{saveState.message}</CAlert>
         )}
         {equityError && (
           <CAlert color="warning" className="mb-3">{equityError}</CAlert>
         )}
 
         {/* Equity Contributions Section */}
-        <div className="mb-4">
-          <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr>
-                <th style={{ ...headerCellStyle, textAlign: 'right', minWidth: '160px' }}>Equity Contributions</th>
-                <th style={headerCellStyle}>GP</th>
-                <th style={headerCellStyle}>LP</th>
-                <th style={headerCellStyle}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={labelCellStyle}>Equity Contributions %</td>
-                <td style={inputCellStyle}>
-                  <input
-                    type="text"
-                    value={typeof gpContributionPct === 'number' ? gpContributionPct.toString() : ''}
-                    onChange={(e) => setGpContributionPct(parseNumber(e.target.value))}
-                    style={{
-                      width: '50px',
-                      textAlign: 'center',
-                      border: 'none',
-                      background: 'transparent',
-                      fontSize: '0.8rem',
-                    }}
-                  />
-                  <span>%</span>
-                </td>
-                <td style={calcCellStyle}>{lpOwnershipPct}%</td>
-                <td style={calcCellStyle}>100%</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Equity Contributions $</td>
-                <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(gpCapital) : '—'}</td>
-                <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(lpCapital) : '—'}</td>
-                <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(effectiveTotalEquity) : '—'}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="mb-3">
+          <div style={tableWrapperStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr style={headerRowStyle}>
+                  <th style={{ ...headerCellStyle, textAlign: 'left', minWidth: '160px' }}>Equity Contributions</th>
+                  <th style={headerCellStyle}>GP</th>
+                  <th style={headerCellStyle}>LP</th>
+                  <th style={headerCellStyle}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={bodyRowStyle}>
+                  <td style={labelCellStyle}>Equity Contributions %</td>
+                  <td style={inputCellStyle}>
+                    <input
+                      type="text"
+                      value={formatWithSuffix(gpContributionPct, '%')}
+                      onChange={(e) => setGpContributionPct(parseNumber(e.target.value))}
+                      style={{ ...inputFieldStyle, width: '72px' }}
+                    />
+                  </td>
+                  <td style={calcCellStyle}>{lpOwnershipPct}%</td>
+                  <td style={calcCellStyle}>100%</td>
+                </tr>
+                <tr style={{ ...bodyRowStyle, borderBottom: 'none' }}>
+                  <td style={labelCellStyle}>Equity Contributions $</td>
+                  <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(gpCapital) : '—'}</td>
+                  <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(lpCapital) : '—'}</td>
+                  <td style={calcCellStyle}>{effectiveTotalEquity > 0 ? formatInt(effectiveTotalEquity) : '—'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Waterfall Type Toggle */}
@@ -344,130 +490,87 @@ export default function NapkinWaterfallForm({
         {/* IRR Waterfall Table */}
         {showIrrTable && (
           <div className="mb-4">
-            <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '8px', color: 'var(--cui-body-color)' }}>
-              IRR Waterfall
+            <div style={tableWrapperStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr style={headerRowStyle}>
+                    <th style={{ ...headerCellStyle, textAlign: 'left', minWidth: '160px' }}>{waterfallHeaderLabel}</th>
+                    <th style={headerCellStyle}>Rate</th>
+                    <th style={headerCellStyle}>Promote</th>
+                    <th style={headerCellStyle}>LP</th>
+                    <th style={headerCellStyle}>GP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Preferred + Capital Row */}
+                  <tr style={bodyRowStyle}>
+                    <td style={labelCellStyle}>Preferred + Capital</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(prefRateIrr, '%')}
+                        onChange={(e) => setPrefRateIrr(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(prefLpPct, '%')}
+                        onChange={(e) => setPrefLpPct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={calcCellStyle}>{prefGpPct}%</td>
+                  </tr>
+                  {/* Hurdle Row */}
+                  <tr style={bodyRowStyle}>
+                    <td style={labelCellStyle}>Hurdle 1</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(hurdleIrr, '%')}
+                        onChange={(e) => setHurdleIrr(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(promotePct, '%')}
+                        onChange={(e) => setPromotePct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(promoteLpPct, '%')}
+                        onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={calcCellStyle}>{promoteGpPct}%</td>
+                  </tr>
+                  {/* Residual Row */}
+                  <tr style={{ ...bodyRowStyle, borderBottom: 'none' }}>
+                    <td style={labelCellStyle}>Residual</td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(residualLpPct, '%')}
+                        onChange={(e) => setResidualLpPct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
+                    </td>
+                    <td style={calcCellStyle}>{residualGpPct}%</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr>
-                  <th style={{ ...headerCellStyle, textAlign: 'right', minWidth: '160px' }}></th>
-                  <th style={headerCellStyle}>Rate</th>
-                  <th style={headerCellStyle}>Promote</th>
-                  <th style={headerCellStyle}>LP</th>
-                  <th style={headerCellStyle}>GP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Preferred + Capital Row */}
-                <tr>
-                  <td style={labelCellStyle}>Preferred + Capital</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof prefRateIrr === 'number' ? prefRateIrr.toString() : ''}
-                      onChange={(e) => setPrefRateIrr(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof prefLpPct === 'number' ? prefLpPct.toString() : ''}
-                      onChange={(e) => setPrefLpPct(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={calcCellStyle}>{prefGpPct}%</td>
-                </tr>
-                {/* Hurdle Row */}
-                <tr>
-                  <td style={labelCellStyle}>Hurdle 1</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof hurdleIrr === 'number' ? hurdleIrr.toString() : ''}
-                      onChange={(e) => setHurdleIrr(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof promotePct === 'number' ? promotePct.toString() : ''}
-                      onChange={(e) => setPromotePct(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof promoteLpPct === 'number' ? promoteLpPct.toString() : ''}
-                      onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={calcCellStyle}>{promoteGpPct}%</td>
-                </tr>
-                {/* Residual Row */}
-                <tr>
-                  <td style={labelCellStyle}>Residual</td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof residualLpPct === 'number' ? residualLpPct.toString() : ''}
-                      onChange={(e) => setResidualLpPct(parseNumber(e.target.value))}
-                      style={{
-                        width: '40px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>%</span>
-                  </td>
-                  <td style={calcCellStyle}>{residualGpPct}%</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         )}
 
@@ -477,154 +580,125 @@ export default function NapkinWaterfallForm({
             <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '8px', color: 'var(--cui-body-color)' }}>
               Equity Multiples
             </div>
-            <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr>
-                  <th style={{ ...headerCellStyle, textAlign: 'right', minWidth: '160px' }}></th>
-                  <th style={headerCellStyle}>Rate</th>
-                  <th style={headerCellStyle}>Promote</th>
-                  <th style={headerCellStyle}>LP</th>
-                  <th style={headerCellStyle}>GP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Preferred + Capital Row */}
-                <tr>
-                  <td style={labelCellStyle}>Preferred + Capital</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof prefRateEm === 'number' ? prefRateEm.toFixed(2) : ''}
-                      onChange={(e) => setPrefRateEm(parseNumber(e.target.value))}
-                      style={{
-                        width: '50px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>x</span>
-                  </td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                    {waterfallType === 'IRR_EM' ? (
-                      <span>{typeof prefLpPct === 'number' ? prefLpPct : 90}%</span>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={typeof prefLpPct === 'number' ? prefLpPct.toString() : ''}
-                          onChange={(e) => setPrefLpPct(parseNumber(e.target.value))}
-                          style={{
-                            width: '40px',
-                            textAlign: 'center',
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: '0.8rem',
-                          }}
-                        />
-                        <span>%</span>
-                      </>
-                    )}
-                  </td>
-                  <td style={calcCellStyle}>{prefGpPct}%</td>
-                </tr>
-                {/* Hurdle Row */}
-                <tr>
-                  <td style={labelCellStyle}>Hurdle 1</td>
-                  <td style={inputCellStyle}>
-                    <input
-                      type="text"
-                      value={typeof hurdleEm === 'number' ? hurdleEm.toFixed(2) : ''}
-                      onChange={(e) => setHurdleEm(parseNumber(e.target.value))}
-                      style={{
-                        width: '50px',
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                      }}
-                    />
-                    <span>x</span>
-                  </td>
-                  <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                    {waterfallType === 'IRR_EM' ? (
-                      <span>{typeof promotePct === 'number' ? promotePct : 20}%</span>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={typeof promotePct === 'number' ? promotePct.toString() : ''}
-                          onChange={(e) => setPromotePct(parseNumber(e.target.value))}
-                          style={{
-                            width: '40px',
-                            textAlign: 'center',
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: '0.8rem',
-                          }}
-                        />
-                        <span>%</span>
-                      </>
-                    )}
-                  </td>
-                  <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                    {waterfallType === 'IRR_EM' ? (
-                      <span>{typeof promoteLpPct === 'number' ? promoteLpPct : 72}%</span>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={typeof promoteLpPct === 'number' ? promoteLpPct.toString() : ''}
-                          onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
-                          style={{
-                            width: '40px',
-                            textAlign: 'center',
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: '0.8rem',
-                          }}
-                        />
-                        <span>%</span>
-                      </>
-                    )}
-                  </td>
-                  <td style={calcCellStyle}>{promoteGpPct}%</td>
-                </tr>
-                {/* Residual Row */}
-                <tr>
-                  <td style={labelCellStyle}>Residual</td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={calcCellStyle}>—</td>
-                  <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                    {waterfallType === 'IRR_EM' ? (
-                      <span>{typeof residualLpPct === 'number' ? residualLpPct : 45}%</span>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={typeof residualLpPct === 'number' ? residualLpPct.toString() : ''}
-                          onChange={(e) => setResidualLpPct(parseNumber(e.target.value))}
-                          style={{
-                            width: '40px',
-                            textAlign: 'center',
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: '0.8rem',
-                          }}
-                        />
-                        <span>%</span>
-                      </>
-                    )}
-                  </td>
-                  <td style={calcCellStyle}>{residualGpPct}%</td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={tableWrapperStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr style={headerRowStyle}>
+                    <th style={{ ...headerCellStyle, textAlign: 'left', minWidth: '160px' }}>
+                      {waterfallType === 'IRR_EM' ? 'IRR + EM Waterfall' : 'Equity Multiple Waterfall'}
+                    </th>
+                    <th style={headerCellStyle}>Rate</th>
+                    <th style={headerCellStyle}>Promote</th>
+                    <th style={headerCellStyle}>LP</th>
+                    <th style={headerCellStyle}>GP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Preferred + Capital Row */}
+                  <tr style={bodyRowStyle}>
+                    <td style={labelCellStyle}>Preferred + Capital</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={
+                          typeof prefRateEm === 'number'
+                            ? formatWithSuffix(prefRateEm.toFixed(2), 'x')
+                            : ''
+                        }
+                        onChange={(e) => setPrefRateEm(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '72px' }}
+                      />
+                    </td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
+                      {waterfallType === 'IRR_EM' ? (
+                        <span>{typeof prefLpPct === 'number' ? prefLpPct : 90}%</span>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={formatWithSuffix(prefLpPct, '%')}
+                            onChange={(e) => setPrefLpPct(parseNumber(e.target.value))}
+                            style={{ ...inputFieldStyle, width: '64px' }}
+                          />
+                        </>
+                      )}
+                    </td>
+                    <td style={calcCellStyle}>{prefGpPct}%</td>
+                  </tr>
+                  {/* Hurdle Row */}
+                  <tr style={bodyRowStyle}>
+                    <td style={labelCellStyle}>Hurdle 1</td>
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={
+                          typeof hurdleEm === 'number'
+                            ? formatWithSuffix(hurdleEm.toFixed(2), 'x')
+                            : ''
+                        }
+                        onChange={(e) => setHurdleEm(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '72px' }}
+                      />
+                    </td>
+                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
+                      {waterfallType === 'IRR_EM' ? (
+                        <span>{typeof promotePct === 'number' ? promotePct : 20}%</span>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={formatWithSuffix(promotePct, '%')}
+                            onChange={(e) => setPromotePct(parseNumber(e.target.value))}
+                            style={{ ...inputFieldStyle, width: '64px' }}
+                          />
+                        </>
+                      )}
+                    </td>
+                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
+                      {waterfallType === 'IRR_EM' ? (
+                        <span>{typeof promoteLpPct === 'number' ? promoteLpPct : 72}%</span>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={formatWithSuffix(promoteLpPct, '%')}
+                            onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
+                            style={{ ...inputFieldStyle, width: '64px' }}
+                          />
+                        </>
+                      )}
+                    </td>
+                    <td style={calcCellStyle}>{promoteGpPct}%</td>
+                  </tr>
+                  {/* Residual Row */}
+                  <tr style={{ ...bodyRowStyle, borderBottom: 'none' }}>
+                    <td style={labelCellStyle}>Residual</td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={calcCellStyle}>—</td>
+                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
+                      {waterfallType === 'IRR_EM' ? (
+                        <span>{typeof residualLpPct === 'number' ? residualLpPct : 45}%</span>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={formatWithSuffix(residualLpPct, '%')}
+                            onChange={(e) => setResidualLpPct(parseNumber(e.target.value))}
+                            style={{ ...inputFieldStyle, width: '64px' }}
+                          />
+                        </>
+                      )}
+                    </td>
+                    <td style={calcCellStyle}>{residualGpPct}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </CCardBody>
+      )}
     </CCard>
   );
 }

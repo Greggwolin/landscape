@@ -126,7 +126,13 @@ class WaterfallEngine:
         cumulative_cash_flow = ZERO
 
         for i, cf in enumerate(self.cash_flows):
-            prior_date = self.cash_flows[i - 1].date if i > 0 else cf.date
+            if i > 0:
+                prior_date = self.cash_flows[i - 1].date
+            else:
+                # First period: prior_date is START of month (day 1)
+                # This matches Excel where the initial contribution happens at beginning
+                # of period and accrues through the period end date
+                prior_date = cf.date.replace(day=1)
             cumulative_cash_flow += cf.amount
 
             period_result = self._process_period(
@@ -178,7 +184,6 @@ class WaterfallEngine:
             cumulative_cash_flow=cumulative_cash_flow,
         )
 
-        # Step 1: Calculate accruals for all active tiers (based on beginning balances)
         debug_this_period = cf.period_id == getattr(self, "debug_period", -1)
         if debug_this_period:
             logger.info(
@@ -186,6 +191,24 @@ class WaterfallEngine:
                 f"{self.lp_state.capital_accounts} GP tiers {self.gp_state.capital_accounts}"
             )
 
+        # For FIRST period only: process contribution BEFORE accrual
+        # This matches Excel where initial contribution accrues from period start
+        is_first_period = cf.period_id == 1
+
+        if is_first_period and cf.amount < ZERO:
+            lp_contrib, gp_contrib = allocate_contribution(
+                cf.amount,
+                self.settings.lp_ownership,
+            )
+            result.lp_contribution = lp_contrib
+            result.gp_contribution = gp_contrib
+            self._add_contribution(lp_contrib, gp_contrib, cf.date)
+            logger.debug(
+                f"Period {cf.period_id}: Contribution LP ${float(lp_contrib):,.0f}, "
+                f"GP ${float(gp_contrib):,.0f}"
+            )
+
+        # Step 1: Calculate accruals for all active tiers
         accruals = self._calculate_all_accruals(cf.date, prior_date)
         result.accrued_pref_lp = accruals.get('tier1_lp', ZERO)
         result.accrued_pref_gp = accruals.get('tier1_gp', ZERO)
@@ -195,23 +218,18 @@ class WaterfallEngine:
         result.accrued_hurdle5_lp = accruals.get('tier5_lp', ZERO)
 
         # Add this period's accruals to cumulative totals
-        # Pref accrues at 8% (Tier 1) for both LP and GP
         self.cumulative_accrued_pref += accruals.get('tier1_lp', ZERO) + accruals.get('tier1_gp', ZERO)
-        # Hurdle accrues at 15% (Tier 2) for LP only
         self.cumulative_accrued_hurdle += accruals.get('tier2_lp', ZERO)
 
-        # Step 2: Handle contributions (negative cash flows) after accrual is applied
-        if cf.amount < ZERO:
+        # Step 2: Handle contributions (negative cash flows) - for periods after first
+        if not is_first_period and cf.amount < ZERO:
             lp_contrib, gp_contrib = allocate_contribution(
                 cf.amount,
                 self.settings.lp_ownership,
             )
             result.lp_contribution = lp_contrib
             result.gp_contribution = gp_contrib
-
-            # Add to capital accounts and tracking
             self._add_contribution(lp_contrib, gp_contrib, cf.date)
-
             logger.debug(
                 f"Period {cf.period_id}: Contribution LP ${float(lp_contrib):,.0f}, "
                 f"GP ${float(gp_contrib):,.0f}"
@@ -285,31 +303,79 @@ class WaterfallEngine:
         gp_contrib: Decimal,
         contrib_date: date,
     ) -> None:
-        """Add contributions to partner states and capital accounts."""
-        # Update LP
+        """Add contributions to partner states and capital accounts.
+
+        For IRR mode: Capital accounts = contributions (accruals added later)
+        For EMx mode: Capital accounts = contributions * EMx_threshold for each tier
+        """
+        use_emx_targets = self.settings.hurdle_method == HurdleMethod.EMX
+
+        # Update LP totals
         self.lp_state.total_contributions += lp_contrib
-        self.lp_state.capital_accounts.tier1 += lp_contrib
-        self.lp_state.capital_accounts.tier2 += lp_contrib
-        self.lp_state.capital_accounts.tier3 += lp_contrib
-        self.lp_state.capital_accounts.tier4 += lp_contrib
-        self.lp_state.capital_accounts.tier5 += lp_contrib
         self.lp_state.cash_flow_dates.append(contrib_date)
         self.lp_state.cash_flow_amounts.append(-lp_contrib)  # Outflow
 
-        # Update GP
+        # Update GP totals
         self.gp_state.total_contributions += gp_contrib
-        self.gp_state.capital_accounts.tier1 += gp_contrib
         self.gp_state.cash_flow_dates.append(contrib_date)
         self.gp_state.cash_flow_amounts.append(-gp_contrib)  # Outflow
+
+        if use_emx_targets:
+            # EMx mode: Set capital accounts to contribution * EMx threshold
+            # This is the target amount LP needs to receive before moving to next tier
+            # Tier 3+ (residual tiers) have no EMx target - they receive whatever is left
+            for tier in self.tiers:
+                tier_attr = f'tier{tier.tier_number}'
+
+                # Residual tier (no EMx threshold) - skip setting capital target
+                if tier.emx_hurdle is None:
+                    continue
+
+                emx_threshold = tier.emx_hurdle
+
+                # LP capital accounts are set based on EMx target
+                lp_target = lp_contrib * emx_threshold
+                current_lp = getattr(self.lp_state.capital_accounts, tier_attr)
+                setattr(self.lp_state.capital_accounts, tier_attr, current_lp + lp_target)
+
+                # GP only has Tier 1 capital account (for pref return)
+                if tier.tier_number == 1:
+                    gp_target = gp_contrib * emx_threshold
+                    self.gp_state.capital_accounts.tier1 += gp_target
+        else:
+            # IRR mode: Capital accounts start at contributions (accruals added each period)
+            self.lp_state.capital_accounts.tier1 += lp_contrib
+            self.lp_state.capital_accounts.tier2 += lp_contrib
+            self.lp_state.capital_accounts.tier3 += lp_contrib
+            self.lp_state.capital_accounts.tier4 += lp_contrib
+            self.lp_state.capital_accounts.tier5 += lp_contrib
+            self.gp_state.capital_accounts.tier1 += gp_contrib
 
     def _calculate_all_accruals(
         self,
         current_date: date,
         prior_date: date,
     ) -> dict:
-        """Calculate accruals for all active tiers."""
+        """Calculate accruals for all active tiers.
+
+        For IRR/IRR_EMx mode: Time-based interest accrual on capital accounts
+        For EMx mode: No time-based accruals - targets set when contributions made
+        """
         accruals = {}
 
+        # EMx mode: No time-based accruals (targets already set in _add_contribution)
+        if self.settings.hurdle_method == HurdleMethod.EMX:
+            for tier in self.tiers:
+                if tier.tier_number > self.settings.num_tiers:
+                    continue
+                if tier.tier_number == 1:
+                    accruals['tier1_lp'] = ZERO
+                    accruals['tier1_gp'] = ZERO
+                else:
+                    accruals[f'tier{tier.tier_number}_lp'] = ZERO
+            return accruals
+
+        # IRR/IRR_EMx mode: Time-based accruals
         for tier in self.tiers:
             if tier.tier_number > self.settings.num_tiers:
                 continue
@@ -365,7 +431,12 @@ class WaterfallEngine:
         dist_date: date,
         period_id: int,
     ) -> dict:
-        """Distribute positive cash flow through waterfall tiers."""
+        """Distribute positive cash flow through waterfall tiers.
+
+        Implements STRICT HURDLE GATING:
+        - No cash flows to higher tiers until current tier's hurdle is met
+        - For IRR_EMx mode: BOTH thresholds must be met (not just one)
+        """
         distributions = {
             'tier1_lp': ZERO, 'tier1_gp': ZERO,
             'tier2_lp': ZERO, 'tier2_gp': ZERO,
@@ -436,6 +507,16 @@ class WaterfallEngine:
 
             else:
                 # Tiers 2-5: Promote tiers
+                # Note: Hurdle gating is NOT applied here. The waterfall distributes
+                # through tiers sequentially based on capital account needs:
+                # - Tier 1: Return capital + pref (fills capital accounts first)
+                # - Tier 2: Promote distributions (fills until LP capital account satisfied)
+                # - Tier 3: Residual distributions (all remaining cash)
+                #
+                # The hurdle rates on each tier define the ACCRUAL rate, not a gate.
+                # Whether LP achieves the target IRR depends on project performance,
+                # but cash always flows through the tiers in order.
+
                 # Use tier config splits directly (convert from percentage to decimal)
                 lp_split = tier.lp_split_pct / HUNDRED
                 gp_split = tier.gp_split_pct / HUNDRED

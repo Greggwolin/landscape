@@ -96,7 +96,7 @@
   background: var(--nav-bg);
   border-bottom: 1px solid var(--nav-border);
   height: 58px;
-  padding: 0 1.5rem;
+  padding: 0 var(--app-padding);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -107,7 +107,7 @@
   background: var(--cui-body-bg);
   border-bottom: 1px solid var(--cui-border-color);
   height: 56px;
-  padding: 0 1.5rem;
+  padding: 0 var(--app-padding);
   position: sticky;
   top: 58px;
   z-index: 999;
