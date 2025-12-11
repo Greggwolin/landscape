@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Session XK-83: Project Cleanup & Type Rename',
+      path: '/docs/session-notes/2025-12-11-session-xk83-cleanup.md',
+      category: 'Status',
+      description: 'Deleted 4 test projects, renamed LAND→DEV project type code across database and frontend (9 files)',
+      icon: <Database className="w-5 h-5" />,
+      lastModified: '2025-12-11'
+    },
+    {
+      title: 'DMS Implementation Status',
+      path: '/docs/02-features/dms/DMS-Implementation-Status.md',
+      category: 'Status',
+      description: 'DMS implementation guide - Multi-select delete, toast notifications, multi-filter expansion (Dec 11)',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-12-11'
+    },
+    {
       title: 'Implementation Status',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-03.md',
       category: 'Status',
