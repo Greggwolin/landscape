@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { ActivityFeedItem, ActivityItem } from './ActivityFeedItem';
+import { useActivityFeed, useMarkActivityRead } from '@/hooks/useActivityFeed';
 import CIcon from '@coreui/icons-react';
 import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
 
@@ -11,8 +13,8 @@ interface ActivityFeedProps {
   onToggle: () => void;
 }
 
-// Mock data for Phase 1 - will be replaced with real API data in Phase 3
-function useMockActivityData(projectId: number): ActivityItem[] {
+// Fallback mock data when API is unavailable
+function getMockActivityData(projectId: number): ActivityItem[] {
   return [
     {
       id: '1',
@@ -23,7 +25,7 @@ function useMockActivityData(projectId: number): ActivityItem[] {
       confidence: 'high',
       timestamp: new Date().toISOString(),
       read: false,
-      link: `/projects/${projectId}/market`,
+      link: `/projects/${projectId}/planning/market`,
       details: ['Based on Zonda Nov 2025 data', '3 comparable subdivisions analyzed'],
     },
     {
@@ -65,20 +67,43 @@ function useMockActivityData(projectId: number): ActivityItem[] {
 }
 
 export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedProps) {
-  const activities = useMockActivityData(projectId);
-  const unreadCount = activities.filter((a) => !a.read).length;
+  const router = useRouter();
+  const { data, isLoading, error } = useActivityFeed(projectId);
+  const { mutate: markRead } = useMarkActivityRead(projectId);
+
+  // Use API data if available, otherwise fall back to mock data
+  const activities = data?.activities ?? getMockActivityData(projectId);
+  const unreadCount = data?.unread_count ?? activities.filter((a) => !a.read).length;
+
+  // Handle activity item click - navigate and mark as read
+  const handleActivityClick = (item: ActivityItem) => {
+    // Mark as read if not already
+    if (!item.read) {
+      markRead(item.id);
+    }
+
+    // Navigate to the linked page with optional field highlighting
+    if (item.link) {
+      const basePath = `/projects/${projectId}${item.link}`;
+      const highlightParams = item.highlightFields?.length
+        ? `?highlight=${item.highlightFields.join(',')}`
+        : '';
+      router.push(`${basePath}${highlightParams}`);
+    }
+  };
 
   return (
     <div
-      className={`border-t flex flex-col ${isExpanded ? 'flex-1 min-h-[200px]' : 'flex-none'}`}
-      style={{ borderColor: 'var(--cui-border-color)' }}
+      className={`flex flex-col h-full ${isExpanded ? 'flex-1' : 'flex-none'}`}
     >
-      {/* Header - always visible */}
+      {/* Header - always visible, styled like card header */}
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between transition-colors"
+        className="w-full flex items-center justify-between transition-colors border-b"
         style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
+          padding: '0.5rem 1rem',
+          backgroundColor: 'var(--surface-card-header)',
+          borderColor: 'var(--cui-border-color)',
           color: 'var(--cui-body-color)',
         }}
       >
@@ -94,6 +119,11 @@ export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedPr
               {unreadCount}
             </span>
           )}
+          {isLoading && (
+            <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              Loading...
+            </span>
+          )}
         </div>
         <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
           {activities.length} items
@@ -103,11 +133,18 @@ export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedPr
       {/* Content - only when expanded */}
       {isExpanded && (
         <div
-          className="flex-1 overflow-y-auto px-3 pb-3 space-y-2"
+          className="flex-1 overflow-y-auto px-3 pb-3 pt-2 space-y-2"
           style={{ backgroundColor: 'var(--cui-body-bg)' }}
         >
+          {error && (
+            <div className="text-xs text-red-500 p-2">
+              Using cached data - API unavailable
+            </div>
+          )}
           {activities.map((item) => (
-            <ActivityFeedItem key={item.id} item={item} projectId={projectId} />
+            <div key={item.id} onClick={() => handleActivityClick(item)}>
+              <ActivityFeedItem item={item} projectId={projectId} />
+            </div>
           ))}
         </div>
       )}

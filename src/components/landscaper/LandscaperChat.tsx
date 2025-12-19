@@ -84,16 +84,17 @@ export function LandscaperChat({ projectId }: LandscaperChatProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
+      {/* Header - matches CoreUI card header padding (0.5rem 1rem) */}
       <div
-        className="flex items-center gap-2 px-4 py-3 border-b"
+        className="flex items-center gap-2 border-b"
         style={{
+          padding: '0.5rem 1rem',
           borderColor: 'var(--cui-border-color)',
-          backgroundColor: 'var(--cui-tertiary-bg)',
+          backgroundColor: 'var(--surface-card-header)',
         }}
       >
-        <span className="text-lg">🌿</span>
-        <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+        <span>🌿</span>
+        <span className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
           Landscaper
         </span>
       </div>

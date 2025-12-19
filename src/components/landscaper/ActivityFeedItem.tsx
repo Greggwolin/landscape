@@ -1,20 +1,20 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 
 export interface ActivityItem {
   id: string;
   type: 'status' | 'decision' | 'update' | 'alert';
   title: string;
   summary: string;
-  status?: 'complete' | 'partial' | 'blocked' | 'not-started';
+  status?: 'complete' | 'partial' | 'blocked' | 'pending' | 'not-started';
   confidence?: 'high' | 'medium' | 'low' | null;
   timestamp: string;
   read: boolean;
   link?: string;
   details?: string[];
   blockedBy?: string;
+  highlightFields?: string[];
 }
 
 interface ActivityFeedItemProps {
@@ -26,6 +26,7 @@ const statusConfig = {
   complete: { icon: '✓', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
   partial: { icon: '⚠', color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
   blocked: { icon: '✗', color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
+  pending: { icon: '◐', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
   'not-started': { icon: '○', color: 'text-gray-500', bg: 'bg-gray-50 dark:bg-gray-800' },
 };
 
@@ -35,6 +36,7 @@ const confidenceColors = {
   low: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
   const config = item.status ? statusConfig[item.status] : statusConfig['not-started'];
 
@@ -92,13 +94,6 @@ export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
     </div>
   );
 
-  if (item.link) {
-    return (
-      <Link href={item.link} className="block">
-        {content}
-      </Link>
-    );
-  }
-
+  // Navigation is now handled by parent component
   return content;
 }

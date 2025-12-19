@@ -27,22 +27,24 @@ export function LandscaperPanel({ projectId }: LandscaperPanelProps) {
   };
 
   return (
-    <div className="h-full p-3">
-      {/* Card wrapper with elevation */}
+    <div className="flex flex-col h-full gap-3">
+      {/* Landscaper Chat Card */}
       <div
-        className="flex flex-col h-full rounded-xl shadow-lg overflow-hidden"
+        className={`flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden ${
+          isActivityExpanded ? 'flex-[0.4]' : 'flex-1'
+        }`}
         style={{ backgroundColor: 'var(--cui-card-bg)' }}
       >
-        {/* Chat section - grows when Activity collapsed */}
-        <div
-          className={`flex flex-col min-h-0 ${
-            isActivityExpanded ? 'flex-[0.6]' : 'flex-1'
-          }`}
-        >
-          <LandscaperChat projectId={projectId} />
-        </div>
+        <LandscaperChat projectId={projectId} />
+      </div>
 
-        {/* Activity Feed accordion */}
+      {/* Activity Feed Card - Separate standalone, taller to show more content */}
+      <div
+        className={`rounded-xl shadow-lg overflow-hidden ${
+          isActivityExpanded ? 'flex-[0.6] min-h-[300px]' : 'flex-none'
+        }`}
+        style={{ backgroundColor: 'var(--cui-card-bg)' }}
+      >
         <ActivityFeed
           projectId={projectId}
           isExpanded={isActivityExpanded}

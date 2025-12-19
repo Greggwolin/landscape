@@ -3,7 +3,7 @@ Serializers for Landscaper AI models.
 """
 
 from rest_framework import serializers
-from .models import ChatMessage, LandscaperAdvice
+from .models import ChatMessage, LandscaperAdvice, ActivityItem
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
@@ -83,3 +83,54 @@ class VarianceItemSerializer(serializers.Serializer):
     confidence_level = serializers.CharField()
     advice_date = serializers.DateTimeField()
     notes = serializers.CharField(allow_null=True)
+
+
+class ActivityItemSerializer(serializers.ModelSerializer):
+    """Serializer for ActivityItem model."""
+
+    # Map model fields to frontend expected format
+    id = serializers.CharField(source='activity_id', read_only=True)
+    type = serializers.CharField(source='activity_type')
+    read = serializers.BooleanField(source='is_read')
+    timestamp = serializers.DateTimeField(source='created_at', read_only=True)
+    blockedBy = serializers.CharField(source='blocked_by', allow_null=True)
+    highlightFields = serializers.JSONField(source='highlight_fields', allow_null=True)
+
+    class Meta:
+        model = ActivityItem
+        fields = [
+            'id',
+            'type',
+            'title',
+            'summary',
+            'status',
+            'confidence',
+            'timestamp',
+            'read',
+            'link',
+            'blockedBy',
+            'details',
+            'highlightFields',
+        ]
+        read_only_fields = ['id', 'timestamp']
+
+
+class ActivityItemCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating activity items."""
+
+    class Meta:
+        model = ActivityItem
+        fields = [
+            'project',
+            'activity_type',
+            'title',
+            'summary',
+            'status',
+            'confidence',
+            'link',
+            'blocked_by',
+            'details',
+            'highlight_fields',
+            'source_type',
+            'source_id',
+        ]

@@ -158,3 +158,131 @@ class LandscaperAdvice(models.Model):
 
     def __str__(self):
         return f"{self.project.project_name} - {self.assumption_key}: {self.suggested_value}"
+
+
+class ActivityItem(models.Model):
+    """
+    Stores activity feed items for Landscaper panel.
+
+    Activities are generated from:
+    - Document extractions (complete/partial/blocked)
+    - Budget changes
+    - Market data updates
+    - AI analysis completion
+    - User decisions requiring attention
+
+    Maps to landscape.landscaper_activity table.
+    """
+
+    TYPE_CHOICES = [
+        ('status', 'Status'),       # Analysis status update
+        ('decision', 'Decision'),   # Needs user decision
+        ('update', 'Update'),       # Data update notification
+        ('alert', 'Alert'),         # Warning or important notice
+    ]
+
+    STATUS_CHOICES = [
+        ('complete', 'Complete'),
+        ('partial', 'Partial'),
+        ('blocked', 'Blocked'),
+        ('pending', 'Pending'),
+    ]
+
+    CONFIDENCE_CHOICES = [
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+        (None, 'N/A'),
+    ]
+
+    activity_id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='landscaper_activities'
+    )
+    activity_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        help_text='Type of activity: status, decision, update, alert'
+    )
+    title = models.CharField(
+        max_length=100,
+        help_text='Short title for the activity (e.g., "Market Analysis")'
+    )
+    summary = models.TextField(
+        help_text='Brief summary of the activity status'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        help_text='Activity status: complete, partial, blocked, pending'
+    )
+    confidence = models.CharField(
+        max_length=20,
+        choices=CONFIDENCE_CHOICES,
+        null=True,
+        blank=True,
+        help_text='Confidence level for this data'
+    )
+    link = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Navigation link relative to project (e.g., /market)'
+    )
+    blocked_by = models.TextField(
+        null=True,
+        blank=True,
+        help_text='What is blocking this activity'
+    )
+    details = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Additional details as a list of strings'
+    )
+    highlight_fields = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='List of field names to highlight when navigating'
+    )
+    is_read = models.BooleanField(
+        default=False,
+        help_text='Whether user has viewed this activity'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When activity was created'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text='When activity was last updated'
+    )
+    source_type = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='Source of activity: document, budget, market, ai_analysis'
+    )
+    source_id = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text='Reference ID to source record'
+    )
+
+    class Meta:
+        db_table = 'landscape"."landscaper_activity'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', '-created_at']),
+            models.Index(fields=['project', 'is_read']),
+            models.Index(fields=['source_type', 'source_id']),
+        ]
+        verbose_name = 'Activity Item'
+        verbose_name_plural = 'Activity Items'
+
+    def __str__(self):
+        return f"{self.project.project_name} - {self.title} ({self.status})"

@@ -13,12 +13,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Q
 from decimal import Decimal
-from .models import ChatMessage, LandscaperAdvice
+from .models import ChatMessage, LandscaperAdvice, ActivityItem
 from .serializers import (
     ChatMessageSerializer,
     ChatMessageCreateSerializer,
     LandscaperAdviceSerializer,
     VarianceItemSerializer,
+    ActivityItemSerializer,
+    ActivityItemCreateSerializer,
 )
 from .ai_handler import get_landscaper_response
 
@@ -245,3 +247,171 @@ class VarianceView(APIView):
         }
 
         return stub_actuals.get(assumption_key)
+
+
+class ActivityFeedViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for activity feed items.
+
+    Endpoints:
+    - GET /api/projects/{project_id}/landscaper/activities/ - Get activities
+    - POST /api/projects/{project_id}/landscaper/activities/ - Create activity
+    - PATCH /api/projects/{project_id}/landscaper/activities/{id}/read/ - Mark as read
+    """
+
+    queryset = ActivityItem.objects.select_related('project')
+    serializer_class = ActivityItemSerializer
+
+    def get_queryset(self):
+        """Filter activities by project_id from URL."""
+        project_id = self.kwargs.get('project_id')
+        if project_id:
+            return self.queryset.filter(
+                project_id=project_id
+            ).order_by('-created_at')[:50]
+        return self.queryset.none()
+
+    def list(self, request, *args, **kwargs):
+        """GET activity feed for a project."""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        unread_count = queryset.filter(is_read=False).count()
+
+        return Response({
+            'activities': serializer.data,
+            'count': len(serializer.data),
+            'unread_count': unread_count,
+        })
+
+    def create(self, request, *args, **kwargs):
+        """POST new activity item."""
+        project_id = self.kwargs.get('project_id')
+
+        try:
+            data = {
+                **request.data,
+                'project': project_id,
+            }
+            serializer = ActivityItemCreateSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            activity = serializer.save()
+
+            return Response({
+                'success': True,
+                'activity': ActivityItemSerializer(activity).data,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, project_id=None, pk=None):
+        """Mark a specific activity as read."""
+        try:
+            activity = ActivityItem.objects.get(
+                activity_id=pk,
+                project_id=project_id
+            )
+            activity.is_read = True
+            activity.save()
+
+            return Response({
+                'success': True,
+                'activity': ActivityItemSerializer(activity).data,
+            })
+        except ActivityItem.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Activity not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request, project_id=None):
+        """Mark all activities for a project as read."""
+        try:
+            count = ActivityItem.objects.filter(
+                project_id=project_id,
+                is_read=False
+            ).update(is_read=True)
+
+            return Response({
+                'success': True,
+                'updated_count': count,
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def generate_activity_from_extraction(project_id: int, extraction_data: dict) -> ActivityItem:
+    """
+    Generate an activity item from a document extraction result.
+
+    Called after document extraction completes.
+
+    Args:
+        project_id: Project ID
+        extraction_data: Dict with extraction results including:
+            - doc_id: Document ID
+            - doc_name: Document name
+            - status: 'completed', 'partial', 'failed'
+            - fields_extracted: Number of fields extracted
+            - fields_missing: List of missing field names
+            - confidence: Overall confidence score
+
+    Returns:
+        Created ActivityItem
+    """
+    doc_name = extraction_data.get('doc_name', 'Document')
+    doc_status = extraction_data.get('status', 'pending')
+    fields_extracted = extraction_data.get('fields_extracted', 0)
+    fields_missing = extraction_data.get('fields_missing', [])
+    confidence = extraction_data.get('confidence', 0)
+
+    # Determine activity status based on extraction result
+    if doc_status == 'completed' and confidence >= 0.8:
+        status = 'complete'
+        confidence_level = 'high'
+        summary = f'{fields_extracted} fields extracted successfully'
+    elif doc_status == 'completed':
+        status = 'partial'
+        confidence_level = 'medium' if confidence >= 0.5 else 'low'
+        summary = f'{fields_extracted} fields extracted, {len(fields_missing)} need review'
+    elif doc_status == 'partial':
+        status = 'partial'
+        confidence_level = 'low'
+        summary = f'Partial extraction: {len(fields_missing)} fields missing'
+    else:
+        status = 'blocked'
+        confidence_level = None
+        summary = 'Extraction failed - manual entry required'
+
+    # Create details list
+    details = []
+    if fields_extracted > 0:
+        details.append(f'{fields_extracted} fields extracted')
+    if fields_missing:
+        details.append(f'Missing: {", ".join(fields_missing[:3])}{"..." if len(fields_missing) > 3 else ""}')
+    if confidence:
+        details.append(f'{int(confidence * 100)}% confidence')
+
+    activity = ActivityItem.objects.create(
+        project_id=project_id,
+        activity_type='update',
+        title=doc_name[:50],
+        summary=summary,
+        status=status,
+        confidence=confidence_level,
+        link='/documents',
+        details=details,
+        highlight_fields=fields_missing[:5] if fields_missing else None,
+        source_type='document',
+        source_id=str(extraction_data.get('doc_id', '')),
+    )
+
+    return activity
