@@ -31,6 +31,8 @@ export interface ProjectProfile {
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
+  market?: string; // Free text market field (fallback when no MSA)
+  submarket?: string; // Free text submarket field
   apn?: string;
   ownership_type?: string;
   created_at?: Date;
@@ -67,6 +69,8 @@ export async function GET(
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
+        p.market,
+        p.submarket,
         COALESCE(p.apn_primary, '') as apn,
         p.ownership_type,
         p.created_at,
@@ -284,6 +288,8 @@ export async function PATCH(
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
+        p.market,
+        p.submarket,
         COALESCE(p.apn_primary, '') as apn,
         p.ownership_type,
         p.updated_at

@@ -138,7 +138,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             />
             <ProfileField
               label="Market"
-              value={formatMSADisplay(profile.msa_name, profile.state_abbreviation)}
+              value={formatMSADisplay(profile.msa_name, profile.state_abbreviation, profile.market)}
             />
             <ProfileField
               label="APN"

@@ -25,6 +25,8 @@ export interface ProjectProfile {
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
+  market?: string; // Free text market field (fallback when no MSA)
+  submarket?: string; // Free text submarket field
   apn?: string;
   ownership_type?: OwnershipType;
   property_class?: PropertyClass;
@@ -131,12 +133,13 @@ export function formatTargetUnits(units?: number | null): string {
 }
 
 /**
- * Format MSA display name
+ * Format MSA display name with fallback to market field
  */
-export function formatMSADisplay(msaName?: string, stateAbbr?: string): string {
-  if (!msaName) return 'Not specified';
-  // MSA name already includes state, no need to append
-  return msaName;
+export function formatMSADisplay(msaName?: string, stateAbbr?: string, market?: string): string {
+  // Prefer MSA name, fall back to free-text market field
+  if (msaName) return msaName;
+  if (market) return market;
+  return 'Not specified';
 }
 
 /**
