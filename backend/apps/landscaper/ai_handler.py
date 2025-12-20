@@ -114,6 +114,30 @@ Use this to verify current state before making changes.""",
             },
             "required": ["fields"]
         }
+    },
+    {
+        "name": "get_field_schema",
+        "description": """Get metadata about available fields including data types, valid values, and whether they're editable.
+Use this to understand what fields exist and their constraints before updating.
+Returns field_name, display_name, description, data_type, is_editable, valid_values, unit_of_measure, and field_group.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Filter by table (e.g., tbl_project, tbl_parcel, tbl_phase). Omit for all tables."
+                },
+                "field_group": {
+                    "type": "string",
+                    "description": "Filter by field group (e.g., Location, Financial, Size, Market, Timing)"
+                },
+                "field_name": {
+                    "type": "string",
+                    "description": "Search for specific field by name (partial match)"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -135,6 +159,19 @@ Bad: "I need to check the current address first. Let me retrieve that informatio
 FIELD UPDATES:
 - Use tools to update fields when user asks or when you can infer missing data
 - After updating, briefly confirm: "Updated [field] from [old] to [new]."
+- If unsure about a field name, use get_field_schema to find the correct field
+- Check is_editable before updating - don't attempt to update calculated fields (NOI, IRR)
+- For fields with valid_values, only use allowed values
+
+SCHEMA AWARENESS:
+You have access to a complete field catalog via get_field_schema. Common field mappings:
+- "city" → city or jurisdiction_city (tbl_project)
+- "county" → county or jurisdiction_county (tbl_project)
+- "state" → state or jurisdiction_state (tbl_project)
+- "zip" → zip_code (tbl_project)
+- "address" → project_address or street_address (tbl_project)
+- "market" → market (tbl_project)
+- "type" → project_type (tbl_project)
 
 ANALYSIS RESPONSES:
 - Use bullet points for lists

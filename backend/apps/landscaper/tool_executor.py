@@ -351,10 +351,100 @@ def execute_tool(
             'values': values
         }
 
+    elif tool_name == 'get_field_schema':
+        return get_field_schema(
+            table_name=tool_input.get('table_name'),
+            field_group=tool_input.get('field_group'),
+            field_name=tool_input.get('field_name')
+        )
+
     else:
         return {
             'success': False,
             'error': f"Unknown tool: {tool_name}"
+        }
+
+
+def get_field_schema(
+    table_name: str = None,
+    field_group: str = None,
+    field_name: str = None
+) -> Dict[str, Any]:
+    """
+    Get field metadata from the catalog.
+
+    Args:
+        table_name: Filter by table (e.g., tbl_project)
+        field_group: Filter by group (e.g., Location, Financial)
+        field_name: Search for field by name (partial match)
+
+    Returns:
+        Dict with field_count and list of field metadata
+    """
+    try:
+        with connection.cursor() as cursor:
+            query = """
+                SELECT
+                    table_name,
+                    field_name,
+                    display_name,
+                    description,
+                    data_type,
+                    is_editable,
+                    is_calculated,
+                    valid_values,
+                    unit_of_measure,
+                    field_group,
+                    applies_to_types
+                FROM landscape.tbl_field_catalog
+                WHERE is_active = true
+            """
+            params = []
+
+            if table_name:
+                query += " AND table_name = %s"
+                params.append(table_name)
+
+            if field_group:
+                query += " AND field_group ILIKE %s"
+                params.append(f"%{field_group}%")
+
+            if field_name:
+                query += " AND (field_name ILIKE %s OR display_name ILIKE %s)"
+                params.append(f"%{field_name}%")
+                params.append(f"%{field_name}%")
+
+            query += " ORDER BY table_name, display_order, field_name LIMIT 50"
+
+            cursor.execute(query, params)
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        fields = []
+        for row in rows:
+            field_dict = dict(zip(columns, row))
+            # Convert valid_values from JSON if present
+            if field_dict.get('valid_values'):
+                # Already parsed by psycopg2 for JSONB
+                pass
+            # Convert applies_to_types from array
+            if field_dict.get('applies_to_types'):
+                field_dict['applies_to_types'] = list(field_dict['applies_to_types'])
+            fields.append(field_dict)
+
+        return {
+            'success': True,
+            'field_count': len(fields),
+            'fields': fields
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting field schema: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'field_count': 0,
+            'fields': []
         }
 
 
