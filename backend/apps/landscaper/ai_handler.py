@@ -32,18 +32,17 @@ MAX_TOKENS = 2048
 LANDSCAPER_TOOLS = [
     {
         "name": "update_project_field",
-        "description": """Update any field on the project. Use this when:
-- User explicitly asks to change project data
-- You can infer missing data from context (e.g., county from address, state from city)
-- You notice data inconsistencies that should be corrected
-- You want to populate empty fields with reasonable defaults based on the conversation
+        "description": """Update a project field. Use when user asks to change data or you can infer missing data.
 
-Common fields you can update (use these exact field names):
-- tbl_project: project_name, project_address, jurisdiction_city, jurisdiction_state, jurisdiction_county, county, location_lat, location_lon, project_type, description, acres_gross, target_units, price_range_low, price_range_high
-- tbl_parcel: parcel_name, lot_count, net_acres, gross_acres, avg_lot_size_sf, avg_lot_price, absorption_rate
-- tbl_phase: phase_name, phase_number, lot_count, budget_amount
+tbl_project fields:
+- Location: city, state, county, zip_code, project_address, street_address
+- Also: jurisdiction_city, jurisdiction_state, jurisdiction_county (jurisdiction-specific)
+- Sizing: acres_gross, target_units
+- Financial: price_range_low, price_range_high, discount_rate_pct
+- Other: project_name, description, project_type
 
-You can also use friendly aliases: city (maps to jurisdiction_city), state (maps to jurisdiction_state), address (maps to project_address), total_acres (maps to acres_gross), total_units (maps to target_units)""",
+tbl_parcel fields: parcel_name, lot_count, net_acres, gross_acres, avg_lot_price, absorption_rate
+tbl_phase fields: phase_name, phase_number, lot_count, budget_amount""",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -123,22 +122,23 @@ Use this to verify current state before making changes.""",
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE_INSTRUCTIONS = """
-You are having a conversation about a specific real estate project. Keep responses concise and actionable.
+RESPONSE STYLE - Be concise:
+- 1-2 sentences for routine updates
+- Don't narrate your thinking or explain what you're checking
+- Just do the task and confirm what you did
+- Only ask questions if truly necessary
 
-Guidelines:
-- Be direct and specific to the project context provided
+Good: "Updated the county to Ventura County based on the Thousand Oaks address."
+Bad: "I need to check the current address first. Let me retrieve that information..."
+
+FIELD UPDATES:
+- Use tools to update fields when user asks or when you can infer missing data
+- After updating, briefly confirm: "Updated [field] from [old] to [new]."
+
+ANALYSIS RESPONSES:
 - Use bullet points for lists
-- Cite specific numbers when discussing financials
-- If you don't have enough data to answer precisely, say so and explain what you'd need
 - Format currency as $X,XXX and percentages as X.X%
-- Keep responses under 300 words unless detailed analysis is requested
-
-IMPORTANT - Field Updates:
-- You have the ability to update project fields directly using tools
-- When you can infer data (like county from city, or state from address), proactively update it
-- When the user asks to change something, use the update tools
-- Always explain what you updated in your response
-- Example: "I noticed the address is in Thousand Oaks, CA - I've updated the county to Ventura County."
+- Keep under 200 words unless detailed analysis is requested
 """
 
 SYSTEM_PROMPTS = {

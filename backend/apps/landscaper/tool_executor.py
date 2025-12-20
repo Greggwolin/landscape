@@ -23,10 +23,13 @@ ALLOWED_UPDATES = {
         'fields': [
             # Core identifiers
             'project_name', 'description', 'project_type', 'financial_model_type',
-            # Location - note actual column names
-            'project_address', 'jurisdiction_city', 'jurisdiction_state',
-            'jurisdiction_county', 'county', 'location_lat', 'location_lon',
-            'location_description',
+            # Location - all address columns (both naming conventions exist)
+            'project_address', 'street_address',
+            'city', 'jurisdiction_city',
+            'state', 'jurisdiction_state',
+            'county', 'jurisdiction_county',
+            'zip_code',
+            'location_lat', 'location_lon', 'location_description',
             # Sizing
             'acres_gross', 'target_units',
             # Pricing
@@ -40,16 +43,15 @@ ALLOWED_UPDATES = {
             # Status
             'is_active',
         ],
-        # Map friendly names to actual column names
+        # Map friendly names to actual column names (for convenience)
         'field_aliases': {
-            'city': 'jurisdiction_city',
-            'state': 'jurisdiction_state',
             'address': 'project_address',
             'latitude': 'location_lat',
             'longitude': 'location_lon',
             'total_acres': 'acres_gross',
             'total_units': 'target_units',
             'discount_rate': 'discount_rate_pct',
+            'zip': 'zip_code',
         },
         'pk_field': 'project_id',
         'schema': 'landscape'
