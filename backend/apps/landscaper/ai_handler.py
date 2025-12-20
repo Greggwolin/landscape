@@ -37,6 +37,7 @@ LANDSCAPER_TOOLS = [
 tbl_project fields:
 - Location: city, state, county, zip_code, project_address, street_address
 - Also: jurisdiction_city, jurisdiction_state, jurisdiction_county (jurisdiction-specific)
+- Market: market, submarket, market_velocity_annual
 - Sizing: acres_gross, target_units
 - Financial: price_range_low, price_range_high, discount_rate_pct
 - Other: project_name, description, project_type
