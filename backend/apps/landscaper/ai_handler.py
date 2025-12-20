@@ -2,19 +2,47 @@
 Landscaper AI Handler
 
 Provides AI-powered responses for real estate project analysis.
-Currently uses stub responses with placeholder data.
-Will integrate with Claude API in future phase.
+Uses Claude API (Anthropic) with context-aware system prompts.
 """
 
-from typing import Dict, List, Any
+import logging
+from typing import Dict, List, Any, Optional
+
+import anthropic
+from decouple import config
+
+logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Model to use for responses
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+# Maximum tokens for response
+MAX_TOKENS = 1024
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # System Prompts by Project Type
 # ─────────────────────────────────────────────────────────────────────────────
 
+BASE_INSTRUCTIONS = """
+You are having a conversation about a specific real estate project. Keep responses concise and actionable.
+
+Guidelines:
+- Be direct and specific to the project context provided
+- Use bullet points for lists
+- Cite specific numbers when discussing financials
+- If you don't have enough data to answer precisely, say so and explain what you'd need
+- Format currency as $X,XXX and percentages as X.X%
+- Keep responses under 300 words unless detailed analysis is requested
+"""
+
 SYSTEM_PROMPTS = {
-    'land_development': """You are Landscaper, an AI assistant specialized in land development real estate analysis.
+    'land_development': f"""You are Landscaper, an AI assistant specialized in land development real estate analysis.
 
 Your expertise includes:
 - Land acquisition and pricing analysis
@@ -30,9 +58,10 @@ When analyzing projects:
 - Consider absorption rates from comparable subdivisions
 - Analyze builder takedown schedules
 - Review infrastructure cost benchmarks
-- Evaluate entitlement risk and timeline""",
+- Evaluate entitlement risk and timeline
+{BASE_INSTRUCTIONS}""",
 
-    'multifamily': """You are Landscaper, an AI assistant specialized in multifamily real estate analysis.
+    'multifamily': f"""You are Landscaper, an AI assistant specialized in multifamily real estate analysis.
 
 Your expertise includes:
 - Rent roll analysis and income optimization
@@ -48,9 +77,10 @@ When analyzing properties:
 - Analyze operating expense ratios
 - Review comparable sales and cap rates
 - Consider renovation potential and value-add opportunities
-- Evaluate occupancy trends and lease terms""",
+- Evaluate occupancy trends and lease terms
+{BASE_INSTRUCTIONS}""",
 
-    'office': """You are Landscaper, an AI assistant specialized in office real estate analysis.
+    'office': f"""You are Landscaper, an AI assistant specialized in office real estate analysis.
 
 Your expertise includes:
 - Lease analysis and tenant creditworthiness
@@ -65,9 +95,10 @@ When analyzing properties:
 - Analyze rent per RSF vs market
 - Review operating expense pass-throughs
 - Consider tenant improvement costs
-- Evaluate parking ratios and amenities""",
+- Evaluate parking ratios and amenities
+{BASE_INSTRUCTIONS}""",
 
-    'retail': """You are Landscaper, an AI assistant specialized in retail real estate analysis.
+    'retail': f"""You are Landscaper, an AI assistant specialized in retail real estate analysis.
 
 Your expertise includes:
 - Tenant sales performance (PSF analysis)
@@ -82,9 +113,10 @@ When analyzing properties:
 - Analyze anchor tenant credit and sales
 - Review lease structures and renewal options
 - Consider trade area competition
-- Evaluate parking and visibility""",
+- Evaluate parking and visibility
+{BASE_INSTRUCTIONS}""",
 
-    'industrial': """You are Landscaper, an AI assistant specialized in industrial real estate analysis.
+    'industrial': f"""You are Landscaper, an AI assistant specialized in industrial real estate analysis.
 
 Your expertise includes:
 - Clear height and loading dock analysis
@@ -99,9 +131,10 @@ When analyzing properties:
 - Analyze loading capacity and dock doors
 - Review tenant credit and lease terms
 - Consider location for logistics
-- Evaluate building specifications""",
+- Evaluate building specifications
+{BASE_INSTRUCTIONS}""",
 
-    'default': """You are Landscaper, an AI assistant specialized in real estate development analysis.
+    'default': f"""You are Landscaper, an AI assistant specialized in real estate development analysis.
 
 Your expertise spans multiple property types including:
 - Land development and lot sales
@@ -115,7 +148,8 @@ You can help with:
 - Market research and comparables
 - Budget analysis and cost estimation
 - Cash flow projections
-- Investment return calculations"""
+- Investment return calculations
+{BASE_INSTRUCTIONS}"""
 }
 
 
@@ -140,48 +174,178 @@ def get_system_prompt(project_type: str) -> str:
     return SYSTEM_PROMPTS.get(category, SYSTEM_PROMPTS['default'])
 
 
+def _build_project_context_message(project_context: Dict[str, Any]) -> str:
+    """Build a context message with project details for Claude."""
+    project_name = project_context.get('project_name', 'Unknown Project')
+    project_type = project_context.get('project_type', '')
+
+    # Get additional context if available
+    budget_summary = project_context.get('budget_summary', {})
+    market_data = project_context.get('market_data', {})
+
+    context_parts = [
+        f"**Current Project: {project_name}**",
+    ]
+
+    if project_type:
+        type_labels = {
+            'land': 'Land Development',
+            'mf': 'Multifamily',
+            'off': 'Office',
+            'ret': 'Retail',
+            'ind': 'Industrial',
+        }
+        context_parts.append(f"Type: {type_labels.get(project_type.lower(), project_type)}")
+
+    # Add budget context if available
+    if budget_summary:
+        if budget_summary.get('total_budget'):
+            context_parts.append(f"Total Budget: ${budget_summary['total_budget']:,.0f}")
+        if budget_summary.get('total_actual'):
+            context_parts.append(f"Total Actual: ${budget_summary['total_actual']:,.0f}")
+
+    # Add market data if available
+    if market_data:
+        if market_data.get('absorption_rate'):
+            context_parts.append(f"Absorption Rate: {market_data['absorption_rate']} lots/month")
+        if market_data.get('avg_lot_price'):
+            context_parts.append(f"Avg Lot Price: ${market_data['avg_lot_price']:,.0f}")
+
+    return "\n".join(context_parts)
+
+
+def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
+    """Get Anthropic client, returns None if API key not configured."""
+    api_key = config('ANTHROPIC_API_KEY', default='')
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set, falling back to stub responses")
+        return None
+
+    try:
+        return anthropic.Anthropic(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Failed to create Anthropic client: {e}")
+        return None
+
+
 def get_landscaper_response(
     messages: List[Dict[str, str]],
     project_context: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Generate AI response to user message.
-
-    Currently uses stub responses. Will integrate with Claude API in future.
+    Generate AI response to user message using Claude API.
 
     Args:
         messages: List of previous messages in format:
                   [{'role': 'user'|'assistant', 'content': str}, ...]
         project_context: Dict containing project info:
-                         {'project_id': int, 'project_name': str, 'project_type': str}
+                         {'project_id': int, 'project_name': str, 'project_type': str,
+                          'budget_summary': {...}, 'market_data': {...}}
 
     Returns:
         Dict with:
         - content: str (response text)
-        - metadata: dict (confidence, suggested_values, system_prompt, etc.)
+        - metadata: dict (model, tokens used, etc.)
     """
-
-    project_name = project_context.get('project_name', 'your project')
     project_type = project_context.get('project_type', '')
-    last_user_message = _get_last_user_message(messages)
-
-    # Get context-aware system prompt
     system_prompt = get_system_prompt(project_type)
 
-    # Generate contextual placeholder response
-    response_content = _generate_stub_response(last_user_message, project_name, project_type)
+    # Add project context to system prompt
+    project_context_msg = _build_project_context_message(project_context)
+    full_system = f"{system_prompt}\n\n---\n{project_context_msg}"
 
-    # Optionally generate some sample advice data
-    suggested_values = _generate_stub_advice(last_user_message, project_type)
+    # Try Claude API first
+    client = _get_anthropic_client()
+    if client:
+        try:
+            # Convert messages to Claude format
+            claude_messages = []
+            for msg in messages:
+                role = msg.get('role', 'user')
+                content = msg.get('content', '')
+                if role in ('user', 'assistant') and content:
+                    claude_messages.append({
+                        'role': role,
+                        'content': content
+                    })
+
+            # Make API call
+            response = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=MAX_TOKENS,
+                system=full_system,
+                messages=claude_messages
+            )
+
+            # Extract response content
+            response_content = ""
+            if response.content:
+                for block in response.content:
+                    if hasattr(block, 'text'):
+                        response_content += block.text
+
+            return {
+                'content': response_content,
+                'metadata': {
+                    'model': CLAUDE_MODEL,
+                    'input_tokens': response.usage.input_tokens,
+                    'output_tokens': response.usage.output_tokens,
+                    'stop_reason': response.stop_reason,
+                    'system_prompt_category': project_type or 'default',
+                }
+            }
+
+        except anthropic.APIConnectionError as e:
+            logger.error(f"Claude API connection error: {e}")
+            return _generate_fallback_response(messages, project_context, str(e))
+        except anthropic.RateLimitError as e:
+            logger.error(f"Claude API rate limit: {e}")
+            return _generate_fallback_response(messages, project_context, "Rate limit exceeded")
+        except anthropic.APIStatusError as e:
+            logger.error(f"Claude API status error: {e.status_code} - {e.message}")
+            return _generate_fallback_response(messages, project_context, str(e.message))
+        except Exception as e:
+            logger.error(f"Unexpected error calling Claude API: {e}")
+            return _generate_fallback_response(messages, project_context, str(e))
+
+    # Fallback to stub response if no API key
+    return _generate_fallback_response(messages, project_context, "API key not configured")
+
+
+def _generate_fallback_response(
+    messages: List[Dict[str, str]],
+    project_context: Dict[str, Any],
+    error_reason: str
+) -> Dict[str, Any]:
+    """Generate a fallback response when Claude API is unavailable."""
+    project_name = project_context.get('project_name', 'your project')
+    last_user_message = _get_last_user_message(messages)
+
+    response_content = f"""I apologize, but I'm currently unable to provide a full AI-powered response.
+
+**Reason:** {error_reason}
+
+**Your Question:**
+"{last_user_message[:200]}{'...' if len(last_user_message) > 200 else ''}"
+
+**What I Can Tell You:**
+I'm Landscaper, your AI assistant for analyzing {project_name}. Once the connection is restored, I can help with:
+• Budget analysis and cost optimization
+• Market intelligence and absorption forecasts
+• Pricing strategies based on comparables
+• Risk assessment and flagging unusual assumptions
+
+**In the meantime:**
+• Your message has been saved to your project history
+• Try again in a few moments
+• Check that the API key is properly configured"""
 
     return {
         'content': response_content,
         'metadata': {
-            'confidence_level': 'placeholder',
-            'suggested_values': suggested_values,
-            'model': 'stub-phase6',
-            'system_prompt_category': project_type or 'default',
-            'note': 'Real AI integration coming soon'
+            'model': 'fallback',
+            'error': error_reason,
+            'system_prompt_category': project_context.get('project_type', 'default'),
         }
     }
 
@@ -192,203 +356,3 @@ def _get_last_user_message(messages: List[Dict[str, str]]) -> str:
         if msg.get('role') == 'user':
             return msg.get('content', '')
     return ''
-
-
-def _generate_stub_response(user_message: str, project_name: str, project_type: str = '') -> str:
-    """
-    Generate a contextual placeholder response.
-
-    In Phase 7+, this will be replaced with actual Claude API calls.
-    """
-
-    user_lower = user_message.lower()
-    type_lower = (project_type or '').lower()
-
-    # Project type specific intro
-    type_labels = {
-        'land': 'land development',
-        'mf': 'multifamily',
-        'off': 'office',
-        'ret': 'retail',
-        'ind': 'industrial',
-    }
-    type_label = type_labels.get(type_lower, 'real estate')
-
-    # Context-aware responses based on keywords
-    if any(word in user_lower for word in ['land', 'acre', 'price', 'lot']):
-        return f"""I'm analyzing land costs for {project_name}.
-
-**Placeholder Response:**
-Based on typical market data for your area, residential land typically trades between $50,000-$120,000 per acre depending on:
-• Entitlement status
-• Infrastructure proximity
-• Market velocity
-• Zoning flexibility
-
-*Note: This is a placeholder response. Real AI integration will provide project-specific analysis based on your actual data and current market conditions.*
-
-**Next Steps:**
-• Type questions about your project
-• All messages are saved to your project history
-• Manual AI suggestions can be entered via the Advice panel"""
-
-    elif any(word in user_lower for word in ['rent', 'lease', 'tenant', 'unit']):
-        if type_lower == 'mf':
-            return f"""I'm analyzing the rent roll for {project_name}.
-
-**Placeholder Response:**
-Key metrics I typically analyze for multifamily:
-• Average rent per unit type
-• Rent per square foot vs market
-• Occupancy rate and trends
-• Lease expiration schedule
-• Loss to lease analysis
-
-*Note: Placeholder response. Real integration will analyze your actual rent roll data.*
-
-**Available Analysis:**
-• Market rent comparison
-• Unit mix optimization
-• Renovation ROI projections"""
-        else:
-            return f"""I'm analyzing lease data for {project_name}.
-
-**Placeholder Response:**
-Lease analysis typically includes:
-• Base rent and escalations
-• Tenant creditworthiness
-• Lease term and options
-• Operating expense pass-throughs
-
-*Note: Placeholder response. Real integration will analyze your lease abstracts.*"""
-
-    elif any(word in user_lower for word in ['budget', 'cost', 'expense']):
-        return f"""I'm reviewing budget assumptions for {project_name}.
-
-**Placeholder Response:**
-Key budget considerations for {type_label}:
-• Hard costs by category
-• Soft costs (design, permits, legal)
-• Contingencies (typically 5-10%)
-• Timeline impacts on cost escalation
-
-*Note: This is a placeholder. Real AI will analyze your actual budget items and suggest optimizations based on historical data.*
-
-**How I Can Help:**
-• Ask about specific budget categories
-• Request benchmark comparisons
-• Get timeline-based cost projections"""
-
-    elif any(word in user_lower for word in ['market', 'absorption', 'velocity', 'sales', 'comp']):
-        return f"""I'm analyzing market dynamics for {project_name}.
-
-**Placeholder Response:**
-Market analysis for {type_label} typically includes:
-• Historical absorption rates
-• Current inventory levels
-• Price trends over 12-24 months
-• Competitor activity
-
-*Note: Placeholder response. Real integration will pull live market data and provide actionable insights.*
-
-**Available Analysis:**
-• Absorption rate forecasting
-• Pricing strategy recommendations
-• Comparable sales analysis"""
-
-    elif any(word in user_lower for word in ['noi', 'cap rate', 'value', 'valuation']):
-        return f"""I'm analyzing valuation metrics for {project_name}.
-
-**Placeholder Response:**
-Key valuation considerations:
-• Net Operating Income (NOI)
-• Market cap rates by submarket
-• Comparable sales analysis
-• Growth rate assumptions
-
-*Note: Placeholder response. Real integration will calculate valuations based on your actual financials.*
-
-**Available Analysis:**
-• Cap rate sensitivity
-• IRR projections
-• Comparable value reconciliation"""
-
-    else:
-        # Generic response for unrecognized queries
-        return f"""I'm Landscaper AI, analyzing {project_name} ({type_label}).
-
-**Placeholder Response:**
-This is a demonstration of the chat interface. Real AI integration is coming soon.
-
-**What I Can Do (When Fully Integrated):**
-• Analyze project budgets and suggest optimizations
-• Provide market intelligence and absorption forecasts
-• Recommend pricing strategies based on comps
-• Flag unusual assumptions or risks
-• Calculate variances between my suggestions and your decisions
-
-**Current Functionality:**
-✓ Messages save to your project history
-✓ Chat persists across sessions
-✓ Variance tracking UI is ready
-✓ Manual advice entry available
-
-**Your Message:**
-"{user_message[:100]}{'...' if len(user_message) > 100 else ''}"
-
-*Ask me anything about {project_name} - responses will be saved for future reference!*"""
-
-
-def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str, Any]:
-    """
-    Generate sample advice data for demonstration.
-
-    In Phase 7+, this will be real AI-generated suggestions.
-    Returns float values (not Decimal) for JSON serialization.
-    """
-
-    user_lower = user_message.lower()
-    type_lower = (project_type or '').lower()
-
-    # Land development specific advice
-    if type_lower == 'land' or 'land' in user_lower or 'acre' in user_lower:
-        return {
-            'land_price_per_acre': {
-                'value': 75000.00,
-                'confidence': 'medium',
-                'stage': 'ACQUISITION',
-                'notes': 'Based on comparable land sales in the area'
-            }
-        }
-
-    # Multifamily specific advice
-    if type_lower == 'mf' or 'rent' in user_lower:
-        return {
-            'market_rent_psf': {
-                'value': 2.15,
-                'confidence': 'high',
-                'stage': 'OPERATIONS',
-                'notes': 'Based on comparable Class B properties'
-            }
-        }
-
-    # General development advice
-    if 'grading' in user_lower:
-        return {
-            'grading_cost_per_sf': {
-                'value': 2.50,
-                'confidence': 'high',
-                'stage': 'PLANNING'
-            }
-        }
-    elif 'contingency' in user_lower:
-        return {
-            'contingency_percent': {
-                'value': 7.5,
-                'confidence': 'high',
-                'stage': 'PLANNING'
-            }
-        }
-
-    # No specific advice for this query
-    return {}
