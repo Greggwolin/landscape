@@ -6,9 +6,7 @@ Currently uses stub responses with placeholder data.
 Will integrate with Claude API in future phase.
 """
 
-import random
-from decimal import Decimal
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -346,6 +344,7 @@ def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str
     Generate sample advice data for demonstration.
 
     In Phase 7+, this will be real AI-generated suggestions.
+    Returns float values (not Decimal) for JSON serialization.
     """
 
     user_lower = user_message.lower()
@@ -355,7 +354,7 @@ def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str
     if type_lower == 'land' or 'land' in user_lower or 'acre' in user_lower:
         return {
             'land_price_per_acre': {
-                'value': Decimal('75000.00'),
+                'value': 75000.00,
                 'confidence': 'medium',
                 'stage': 'ACQUISITION',
                 'notes': 'Based on comparable land sales in the area'
@@ -366,7 +365,7 @@ def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str
     if type_lower == 'mf' or 'rent' in user_lower:
         return {
             'market_rent_psf': {
-                'value': Decimal('2.15'),
+                'value': 2.15,
                 'confidence': 'high',
                 'stage': 'OPERATIONS',
                 'notes': 'Based on comparable Class B properties'
@@ -377,7 +376,7 @@ def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str
     if 'grading' in user_lower:
         return {
             'grading_cost_per_sf': {
-                'value': Decimal('2.50'),
+                'value': 2.50,
                 'confidence': 'high',
                 'stage': 'PLANNING'
             }
@@ -385,7 +384,7 @@ def _generate_stub_advice(user_message: str, project_type: str = '') -> Dict[str
     elif 'contingency' in user_lower:
         return {
             'contingency_percent': {
-                'value': Decimal('7.5'),
+                'value': 7.5,
                 'confidence': 'high',
                 'stage': 'PLANNING'
             }

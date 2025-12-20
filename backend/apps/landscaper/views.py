@@ -11,6 +11,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
 from django.db.models import Q
 from decimal import Decimal
 from .models import ChatMessage, LandscaperAdvice, ActivityItem
@@ -36,6 +37,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
     queryset = ChatMessage.objects.select_related('project', 'user')
     serializer_class = ChatMessageSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get_queryset(self):
         """Filter messages by project_id from URL."""
@@ -181,6 +183,7 @@ class VarianceView(APIView):
         "count": 1
     }
     """
+    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get(self, request, project_id):
         """Calculate and return variances above threshold."""
@@ -261,6 +264,7 @@ class ActivityFeedViewSet(viewsets.ModelViewSet):
 
     queryset = ActivityItem.objects.select_related('project')
     serializer_class = ActivityItemSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get_queryset(self):
         """Filter activities by project_id from URL."""
@@ -268,14 +272,17 @@ class ActivityFeedViewSet(viewsets.ModelViewSet):
         if project_id:
             return self.queryset.filter(
                 project_id=project_id
-            ).order_by('-created_at')[:50]
+            ).order_by('-created_at')
         return self.queryset.none()
 
     def list(self, request, *args, **kwargs):
         """GET activity feed for a project."""
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+        # Get unread count before slicing
         unread_count = queryset.filter(is_read=False).count()
+        # Limit to 50 items for display
+        items = list(queryset[:50])
+        serializer = self.get_serializer(items, many=True)
 
         return Response({
             'activities': serializer.data,
