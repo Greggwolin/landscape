@@ -2,7 +2,7 @@
 Landscaper AI Handler
 
 Provides AI-powered responses for real estate project analysis.
-Uses Claude API (Anthropic) with context-aware system prompts.
+Uses Claude API (Anthropic) with context-aware system prompts and tool use.
 """
 
 import logging
@@ -22,7 +22,100 @@ logger = logging.getLogger(__name__)
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 # Maximum tokens for response
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tool Definitions for Field Updates
+# ─────────────────────────────────────────────────────────────────────────────
+
+LANDSCAPER_TOOLS = [
+    {
+        "name": "update_project_field",
+        "description": """Update any field on the project. Use this when:
+- User explicitly asks to change project data
+- You can infer missing data from context (e.g., county from address, state from city)
+- You notice data inconsistencies that should be corrected
+- You want to populate empty fields with reasonable defaults based on the conversation
+
+Common fields you can update (use these exact field names):
+- tbl_project: project_name, project_address, jurisdiction_city, jurisdiction_state, jurisdiction_county, county, location_lat, location_lon, project_type, description, acres_gross, target_units, price_range_low, price_range_high
+- tbl_parcel: parcel_name, lot_count, net_acres, gross_acres, avg_lot_size_sf, avg_lot_price, absorption_rate
+- tbl_phase: phase_name, phase_number, lot_count, budget_amount
+
+You can also use friendly aliases: city (maps to jurisdiction_city), state (maps to jurisdiction_state), address (maps to project_address), total_acres (maps to acres_gross), total_units (maps to target_units)""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "table": {
+                    "type": "string",
+                    "description": "Table name (e.g., tbl_project, tbl_project_details, tbl_assumptions)"
+                },
+                "field": {
+                    "type": "string",
+                    "description": "Field/column name to update"
+                },
+                "value": {
+                    "type": "string",
+                    "description": "New value (will be cast to appropriate type)"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Brief explanation of why this update is being made"
+                }
+            },
+            "required": ["table", "field", "value", "reason"]
+        }
+    },
+    {
+        "name": "bulk_update_fields",
+        "description": """Update multiple fields at once. Use when you need to make several related updates,
+like setting city, state, and county together, or updating multiple assumptions.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "table": {"type": "string"},
+                            "field": {"type": "string"},
+                            "value": {"type": "string"},
+                            "reason": {"type": "string"}
+                        },
+                        "required": ["table", "field", "value", "reason"]
+                    },
+                    "description": "List of field updates to make"
+                }
+            },
+            "required": ["updates"]
+        }
+    },
+    {
+        "name": "get_project_fields",
+        "description": """Retrieve current values of specific project fields to check before updating.
+Use this to verify current state before making changes.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "table": {"type": "string"},
+                            "field": {"type": "string"}
+                        },
+                        "required": ["table", "field"]
+                    },
+                    "description": "List of table.field pairs to retrieve"
+                }
+            },
+            "required": ["fields"]
+        }
+    }
+]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +132,13 @@ Guidelines:
 - If you don't have enough data to answer precisely, say so and explain what you'd need
 - Format currency as $X,XXX and percentages as X.X%
 - Keep responses under 300 words unless detailed analysis is requested
+
+IMPORTANT - Field Updates:
+- You have the ability to update project fields directly using tools
+- When you can infer data (like county from city, or state from address), proactively update it
+- When the user asks to change something, use the update tools
+- Always explain what you updated in your response
+- Example: "I noticed the address is in Thousand Oaks, CA - I've updated the county to Ventura County."
 """
 
 SYSTEM_PROMPTS = {
@@ -178,13 +278,15 @@ def _build_project_context_message(project_context: Dict[str, Any]) -> str:
     """Build a context message with project details for Claude."""
     project_name = project_context.get('project_name', 'Unknown Project')
     project_type = project_context.get('project_type', '')
+    project_id = project_context.get('project_id', '')
 
     # Get additional context if available
     budget_summary = project_context.get('budget_summary', {})
     market_data = project_context.get('market_data', {})
+    project_details = project_context.get('project_details', {})
 
     context_parts = [
-        f"**Current Project: {project_name}**",
+        f"**Current Project: {project_name}** (ID: {project_id})",
     ]
 
     if project_type:
@@ -196,6 +298,22 @@ def _build_project_context_message(project_context: Dict[str, Any]) -> str:
             'ind': 'Industrial',
         }
         context_parts.append(f"Type: {type_labels.get(project_type.lower(), project_type)}")
+
+    # Add project details if available
+    if project_details:
+        if project_details.get('address'):
+            context_parts.append(f"Address: {project_details['address']}")
+        if project_details.get('city'):
+            city_state = project_details['city']
+            if project_details.get('state'):
+                city_state += f", {project_details['state']}"
+            context_parts.append(f"Location: {city_state}")
+        if project_details.get('county'):
+            context_parts.append(f"County: {project_details['county']}")
+        if project_details.get('total_acres'):
+            context_parts.append(f"Total Acres: {project_details['total_acres']}")
+        if project_details.get('total_lots'):
+            context_parts.append(f"Total Lots: {project_details['total_lots']}")
 
     # Add budget context if available
     if budget_summary:
@@ -230,22 +348,26 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 
 def get_landscaper_response(
     messages: List[Dict[str, str]],
-    project_context: Dict[str, Any]
+    project_context: Dict[str, Any],
+    tool_executor: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
-    Generate AI response to user message using Claude API.
+    Generate AI response to user message using Claude API with tool use.
 
     Args:
         messages: List of previous messages in format:
                   [{'role': 'user'|'assistant', 'content': str}, ...]
         project_context: Dict containing project info:
                          {'project_id': int, 'project_name': str, 'project_type': str,
-                          'budget_summary': {...}, 'market_data': {...}}
+                          'budget_summary': {...}, 'market_data': {...}, 'project_details': {...}}
+        tool_executor: Optional callable to execute tool calls. If None, tools are disabled.
 
     Returns:
         Dict with:
         - content: str (response text)
         - metadata: dict (model, tokens used, etc.)
+        - tool_calls: list (any tool calls made)
+        - field_updates: list (any field updates that were executed)
     """
     project_type = project_context.get('project_type', '')
     system_prompt = get_system_prompt(project_type)
@@ -256,60 +378,140 @@ def get_landscaper_response(
 
     # Try Claude API first
     client = _get_anthropic_client()
-    if client:
-        try:
-            # Convert messages to Claude format
-            claude_messages = []
-            for msg in messages:
-                role = msg.get('role', 'user')
-                content = msg.get('content', '')
-                if role in ('user', 'assistant') and content:
-                    claude_messages.append({
-                        'role': role,
-                        'content': content
+    if not client:
+        return _generate_fallback_response(messages, project_context, "API key not configured")
+
+    try:
+        # Convert messages to Claude format
+        claude_messages = []
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            if role in ('user', 'assistant') and content:
+                claude_messages.append({
+                    'role': role,
+                    'content': content
+                })
+
+        # Make API call with tools if executor is provided
+        api_kwargs = {
+            'model': CLAUDE_MODEL,
+            'max_tokens': MAX_TOKENS,
+            'system': full_system,
+            'messages': claude_messages
+        }
+
+        if tool_executor:
+            api_kwargs['tools'] = LANDSCAPER_TOOLS
+
+        response = client.messages.create(**api_kwargs)
+
+        # Process response with potential tool use loop
+        field_updates = []
+        tool_calls_made = []
+        final_content = ""
+        total_input_tokens = response.usage.input_tokens
+        total_output_tokens = response.usage.output_tokens
+
+        # Handle tool use loop
+        while response.stop_reason == "tool_use" and tool_executor:
+            # Extract tool calls and text from response
+            tool_use_blocks = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_use_blocks.append(block)
+                elif hasattr(block, 'text'):
+                    final_content += block.text
+
+            # Execute each tool call
+            tool_results = []
+            for tool_block in tool_use_blocks:
+                tool_name = tool_block.name
+                tool_input = tool_block.input
+                tool_id = tool_block.id
+
+                logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+                tool_calls_made.append({
+                    'tool': tool_name,
+                    'input': tool_input
+                })
+
+                # Execute the tool
+                try:
+                    result = tool_executor(
+                        tool_name=tool_name,
+                        tool_input=tool_input,
+                        project_id=project_context.get('project_id')
+                    )
+
+                    # Track field updates
+                    if tool_name in ('update_project_field', 'bulk_update_fields'):
+                        if result.get('success'):
+                            field_updates.extend(result.get('updates', []))
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": str(result)
+                    })
+                except Exception as e:
+                    logger.error(f"Tool execution error: {e}")
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": f"Error executing tool: {str(e)}",
+                        "is_error": True
                     })
 
-            # Make API call
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=MAX_TOKENS,
-                system=full_system,
-                messages=claude_messages
-            )
+            # Continue conversation with tool results
+            claude_messages.append({
+                "role": "assistant",
+                "content": response.content
+            })
+            claude_messages.append({
+                "role": "user",
+                "content": tool_results
+            })
 
-            # Extract response content
-            response_content = ""
-            if response.content:
-                for block in response.content:
-                    if hasattr(block, 'text'):
-                        response_content += block.text
+            # Get next response
+            response = client.messages.create(**{
+                **api_kwargs,
+                'messages': claude_messages
+            })
 
-            return {
-                'content': response_content,
-                'metadata': {
-                    'model': CLAUDE_MODEL,
-                    'input_tokens': response.usage.input_tokens,
-                    'output_tokens': response.usage.output_tokens,
-                    'stop_reason': response.stop_reason,
-                    'system_prompt_category': project_type or 'default',
-                }
-            }
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
 
-        except anthropic.APIConnectionError as e:
-            logger.error(f"Claude API connection error: {e}")
-            return _generate_fallback_response(messages, project_context, str(e))
-        except anthropic.RateLimitError as e:
-            logger.error(f"Claude API rate limit: {e}")
-            return _generate_fallback_response(messages, project_context, "Rate limit exceeded")
-        except anthropic.APIStatusError as e:
-            logger.error(f"Claude API status error: {e.status_code} - {e.message}")
-            return _generate_fallback_response(messages, project_context, str(e.message))
-        except Exception as e:
-            logger.error(f"Unexpected error calling Claude API: {e}")
-            return _generate_fallback_response(messages, project_context, str(e))
+        # Extract final text content
+        for block in response.content:
+            if hasattr(block, 'text'):
+                final_content += block.text
 
-    # Fallback to stub response if no API key
-    return _generate_fallback_response(messages, project_context, "API key not configured")
+        return {
+            'content': final_content,
+            'metadata': {
+                'model': CLAUDE_MODEL,
+                'input_tokens': total_input_tokens,
+                'output_tokens': total_output_tokens,
+                'stop_reason': response.stop_reason,
+                'system_prompt_category': project_type or 'default',
+            },
+            'tool_calls': tool_calls_made,
+            'field_updates': field_updates
+        }
+
+    except anthropic.APIConnectionError as e:
+        logger.error(f"Claude API connection error: {e}")
+        return _generate_fallback_response(messages, project_context, str(e))
+    except anthropic.RateLimitError as e:
+        logger.error(f"Claude API rate limit: {e}")
+        return _generate_fallback_response(messages, project_context, "Rate limit exceeded")
+    except anthropic.APIStatusError as e:
+        logger.error(f"Claude API status error: {e.status_code} - {e.message}")
+        return _generate_fallback_response(messages, project_context, str(e.message))
+    except Exception as e:
+        logger.error(f"Unexpected error calling Claude API: {e}")
+        return _generate_fallback_response(messages, project_context, str(e))
 
 
 def _generate_fallback_response(
@@ -346,7 +548,9 @@ I'm Landscaper, your AI assistant for analyzing {project_name}. Once the connect
             'model': 'fallback',
             'error': error_reason,
             'system_prompt_category': project_context.get('project_type', 'default'),
-        }
+        },
+        'tool_calls': [],
+        'field_updates': []
     }
 
 

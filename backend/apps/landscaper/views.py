@@ -24,6 +24,7 @@ from .serializers import (
     ActivityItemCreateSerializer,
 )
 from .ai_handler import get_landscaper_response
+from .tool_executor import execute_tool
 
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
@@ -96,17 +97,41 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 for msg in messages
             ]
 
-            # Get project context
+            # Get project context with full details
             from apps.projects.models import Project
             project = Project.objects.get(project_id=project_id)
             project_context = {
                 'project_id': project.project_id,
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
+                'project_details': {
+                    'address': getattr(project, 'address', None),
+                    'city': getattr(project, 'city', None),
+                    'state': getattr(project, 'state', None),
+                    'county': getattr(project, 'county', None),
+                    'zip_code': getattr(project, 'zip_code', None),
+                    'total_acres': getattr(project, 'total_acres', None),
+                    'total_lots': getattr(project, 'total_lots', None),
+                }
             }
 
-            # Generate AI response (stubbed for Phase 6)
-            ai_response = get_landscaper_response(message_history, project_context)
+            # Create tool executor bound to this project
+            def tool_executor_fn(tool_name, tool_input, project_id=None):
+                return execute_tool(tool_name, tool_input, project_id or project.project_id)
+
+            # Generate AI response with tool support
+            ai_response = get_landscaper_response(
+                message_history,
+                project_context,
+                tool_executor=tool_executor_fn
+            )
+
+            # Include tool calls and field updates in metadata
+            assistant_metadata = ai_response.get('metadata', {})
+            if ai_response.get('tool_calls'):
+                assistant_metadata['tool_calls'] = ai_response['tool_calls']
+            if ai_response.get('field_updates'):
+                assistant_metadata['field_updates'] = ai_response['field_updates']
 
             # Create assistant message
             assistant_message_data = {
@@ -114,7 +139,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 'user': None,  # Assistant messages don't have a user
                 'role': 'assistant',
                 'content': ai_response['content'],
-                'metadata': ai_response.get('metadata'),
+                'metadata': assistant_metadata,
             }
             assistant_message_serializer = ChatMessageCreateSerializer(data=assistant_message_data)
             assistant_message_serializer.is_valid(raise_exception=True)
@@ -129,12 +154,18 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                     suggested_values
                 )
 
-            # Return both messages
-            return Response({
+            # Return both messages with field update info
+            response_data = {
                 'success': True,
                 'user_message': ChatMessageSerializer(user_message).data,
                 'assistant_message': ChatMessageSerializer(assistant_message).data,
-            }, status=status.HTTP_201_CREATED)
+            }
+
+            # Include field updates at top level for easy access
+            if ai_response.get('field_updates'):
+                response_data['field_updates'] = ai_response['field_updates']
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             return Response({
