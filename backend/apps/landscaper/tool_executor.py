@@ -30,6 +30,8 @@ ALLOWED_UPDATES = {
             'county', 'jurisdiction_county',
             'zip_code',
             'location_lat', 'location_lon', 'location_description',
+            # Market geography
+            'market', 'submarket', 'market_velocity_annual',
             # Sizing
             'acres_gross', 'target_units',
             # Pricing
