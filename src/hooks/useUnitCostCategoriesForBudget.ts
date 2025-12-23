@@ -44,7 +44,7 @@ interface UseUnitCostCategoriesResult {
 
 const LIFECYCLE_STAGES = [
   { code: 'Acquisition', name: 'Acquisition', sortOrder: 1 },
-  { code: 'Development', name: 'Development', sortOrder: 2 },
+  { code: 'Improvements', name: 'Improvements', sortOrder: 2 },  // Renamed from Development
   { code: 'Operations', name: 'Operations', sortOrder: 3 },
   { code: 'Disposition', name: 'Disposition', sortOrder: 4 },
   { code: 'Financing', name: 'Financing', sortOrder: 5 },

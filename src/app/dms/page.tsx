@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
+import React, { useState, useEffect, Suspense } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilFilterSquare, cilPencil, cilApple, cilSend, cilCheck } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
@@ -15,7 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 type TabType = 'documents' | 'upload';
 
-export default function DMSPage() {
+function DMSPageContent() {
   const { activeProject: currentProject } = useProjectContext();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -386,5 +389,13 @@ export default function DMSPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DMSPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+      <DMSPageContent />
+    </Suspense>
   );
 }

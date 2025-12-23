@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
+import Image from 'next/image'
 
 // Inline Field Control Component
 interface InlineFieldControlProps {
@@ -293,6 +294,246 @@ const InlineFieldControl: React.FC<InlineFieldControlProps> = ({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Field category mapping helper
+const FIELD_CATEGORIES: Record<string, string> = {
+  // Property fields
+  project_name: 'property',
+  property_name: 'property',
+  address: 'property',
+  city: 'property',
+  state: 'property',
+  zip: 'property',
+  county: 'property',
+  latitude: 'property',
+  longitude: 'property',
+  total_acres: 'property',
+  net_acres: 'property',
+  site_area: 'property',
+  parcel_number: 'property',
+  legal_description: 'property',
+  year_built: 'property',
+  total_units: 'property',
+  zoning: 'property',
+
+  // Budget fields
+  land_cost: 'budget',
+  acquisition_cost: 'budget',
+  development_cost: 'budget',
+  construction_cost: 'budget',
+  soft_costs: 'budget',
+  contingency: 'budget',
+  closing_costs: 'budget',
+  financing_costs: 'budget',
+
+  // Market fields
+  cap_rate: 'market',
+  market_rent: 'market',
+  vacancy_rate: 'market',
+  absorption_rate: 'market',
+  price_per_unit: 'market',
+  price_per_sf: 'market',
+  rental_growth: 'market',
+  expense_ratio: 'market',
+
+  // Underwriting fields
+  noi: 'underwriting',
+  irr: 'underwriting',
+  cash_on_cash: 'underwriting',
+  debt_service: 'underwriting',
+  dscr: 'underwriting',
+  loan_amount: 'underwriting',
+  ltv: 'underwriting',
+  equity_multiple: 'underwriting',
+  hold_period: 'underwriting',
+  exit_cap: 'underwriting',
+}
+
+const getCategoryForField = (fieldName: string): string => {
+  const normalized = fieldName.toLowerCase().replace(/\s+/g, '_')
+  return FIELD_CATEGORIES[normalized] || 'property'
+}
+
+interface FieldMappingAccordionsProps {
+  fieldMappings: Array<{
+    source_text: string
+    suggested_field: string
+    suggested_value: string
+    confidence: number
+    confirmed: boolean
+  }>
+  inlineFieldValues: Record<string, InlineFieldValue>
+  onFieldChange: (fieldId: string, choice: 'ai' | 'custom' | 'skip', customValue?: string) => void
+  onFieldCommit: (fieldId: string) => void
+  onChatWithAI: (fieldId: string, fieldContext: string, question: string) => void
+  toggleFieldMapping: (index: number) => void
+  initializeInlineField: (fieldId: string, aiValue: string | number | null, confidence: number) => void
+}
+
+const FieldMappingAccordions: React.FC<FieldMappingAccordionsProps> = ({
+  fieldMappings,
+  inlineFieldValues,
+  onFieldChange,
+  onFieldCommit,
+  onChatWithAI,
+  toggleFieldMapping,
+  initializeInlineField
+}) => {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['property', 'budget']))
+
+  // Group fields by category
+  const groupedMappings = useMemo(() => {
+    const groups: Record<string, Array<{ mapping: typeof fieldMappings[0]; originalIndex: number }>> = {
+      property: [],
+      budget: [],
+      market: [],
+      underwriting: []
+    }
+
+    fieldMappings.forEach((mapping, index) => {
+      const category = getCategoryForField(mapping.suggested_field)
+      if (groups[category]) {
+        groups[category].push({ mapping, originalIndex: index })
+      } else {
+        groups.property.push({ mapping, originalIndex: index })
+      }
+    })
+
+    return groups
+  }, [fieldMappings])
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(section)) {
+        newSet.delete(section)
+      } else {
+        newSet.add(section)
+      }
+      return newSet
+    })
+  }
+
+  const categoryLabels: Record<string, { label: string; icon: string }> = {
+    property: { label: 'Property', icon: '🏢' },
+    budget: { label: 'Budget', icon: '💰' },
+    market: { label: 'Market', icon: '📊' },
+    underwriting: { label: 'Underwriting', icon: '📋' }
+  }
+
+  const categories = ['property', 'budget', 'market', 'underwriting']
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-3 mb-4">
+        <Image
+          src="/landscaper-icon.png"
+          alt="Landscaper"
+          width={24}
+          height={24}
+          className="rounded"
+        />
+        <h3 className="text-lg font-medium text-white">
+          Confirm Field Population
+        </h3>
+        <span className="text-sm text-gray-400">
+          AI extracted data for confirmation
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {categories.map(category => {
+          const items = groupedMappings[category] || []
+          if (items.length === 0) return null
+
+          const isExpanded = expandedSections.has(category)
+          const { label, icon } = categoryLabels[category]
+          const populatedCount = items.filter(item => {
+            const fieldId = `mapping_${item.originalIndex}`
+            const fieldValue = inlineFieldValues[fieldId]
+            return fieldValue?.isCommitted || item.mapping.confirmed
+          }).length
+
+          return (
+            <div key={category} className="bg-gray-700 rounded-lg overflow-hidden border border-gray-600">
+              {/* Accordion Header */}
+              <button
+                onClick={() => toggleSection(category)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-600/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{icon}</span>
+                  <span className="text-white font-medium">{label}</span>
+                  <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                    {items.length}
+                  </span>
+                  {populatedCount > 0 && (
+                    <span className="bg-green-600 text-white text-xs px-2 py-0.5 rounded-full">
+                      {populatedCount} confirmed
+                    </span>
+                  )}
+                </div>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Accordion Content */}
+              {isExpanded && (
+                <div className="border-t border-gray-600 p-4 space-y-4">
+                  {items.map(({ mapping, originalIndex }) => (
+                    <div key={originalIndex} className="bg-gray-800 rounded-lg p-4 border border-gray-600">
+                      <div className="mb-3">
+                        <div className="text-white text-sm font-medium mb-1">
+                          {mapping.suggested_field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          Found in document: "{mapping.source_text.length > 100 ? mapping.source_text.substring(0, 100) + '...' : mapping.source_text}"
+                        </div>
+                      </div>
+
+                      <InlineFieldControl
+                        label={`field_${originalIndex}_${mapping.suggested_field}`}
+                        aiValue={mapping.suggested_value}
+                        confidence={mapping.confidence}
+                        fieldType="text"
+                        fieldContext={`Field: ${mapping.suggested_field}, Source: ${mapping.source_text}`}
+                        onValueChange={(choice, customValue) => {
+                          const fieldId = `mapping_${originalIndex}`
+                          onFieldChange(fieldId, choice, customValue)
+                          initializeInlineField(fieldId, mapping.suggested_value, mapping.confidence)
+                          if (choice === 'ai' || (choice === 'custom' && customValue)) {
+                            if (!mapping.confirmed) {
+                              toggleFieldMapping(originalIndex)
+                            }
+                          } else {
+                            if (mapping.confirmed) {
+                              toggleFieldMapping(originalIndex)
+                            }
+                          }
+                        }}
+                        onCommit={() => onFieldCommit(`mapping_${originalIndex}`)}
+                        onChatWithAI={(fieldContext, question) => onChatWithAI(`mapping_${originalIndex}`, fieldContext, question)}
+                        initialChoice={inlineFieldValues[`mapping_${originalIndex}`]?.choice}
+                        initialCustomValue={inlineFieldValues[`mapping_${originalIndex}`]?.customValue}
+                        isCommitted={inlineFieldValues[`mapping_${originalIndex}`]?.isCommitted || false}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1090,10 +1331,21 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
         <div className="border-b border-gray-700 px-6 py-4">
-          <h2 className="text-xl font-semibold text-white">Upload Project Documents</h2>
-          <p className="text-gray-400 text-sm mt-1">
-            Upload marketing packages, site plans, studies, entitlement files, and other project documents for AI analysis
-          </p>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/landscaper-icon.png"
+              alt="Landscaper"
+              width={32}
+              height={32}
+              className="rounded"
+            />
+            <div>
+              <h2 className="text-xl font-semibold text-white">Upload Project Documents</h2>
+              <p className="text-gray-400 text-sm mt-1">
+                Upload marketing packages, site plans, studies, entitlement files, and other project documents for AI analysis
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="p-6">
@@ -1338,63 +1590,17 @@ const PropertyPackageUpload: React.FC<PropertyPackageUploadProps> = ({
             </div>
           )}
 
-          {/* Field Mapping Confirmation */}
+          {/* Field Mapping Confirmation - Accordion Layout */}
           {showFieldMappings && extractedData && extractedData.field_mappings.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-medium text-white mb-4">
-                📋 Confirm Field Population
-                <span className="text-sm text-gray-400 ml-2">
-                  AI extracted data for confirmation
-                </span>
-              </h3>
-              <div className="bg-gray-700 rounded-lg p-4">
-                <div className="text-sm text-gray-300 mb-4">
-                  AI found the following data in your documents. For each field, choose to accept the AI suggestion or enter your own value:
-                </div>
-                <div className="space-y-4">
-                  {extractedData.field_mappings.map((mapping, index) => (
-                    <div key={index} className="bg-gray-800 rounded-lg p-4 border border-gray-600">
-                      <div className="mb-3">
-                        <div className="text-white text-sm font-medium mb-1">
-                          {mapping.suggested_field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </div>
-                        <div className="text-gray-400 text-xs">
-                          Found in document: "{mapping.source_text.length > 100 ? mapping.source_text.substring(0, 100) + '...' : mapping.source_text}"
-                        </div>
-                      </div>
-
-                      <InlineFieldControl
-                        label={`field_${index}_${mapping.suggested_field}`}
-                        aiValue={mapping.suggested_value}
-                        confidence={mapping.confidence}
-                        fieldType="text"
-                        fieldContext={`Field: ${mapping.suggested_field}, Source: ${mapping.source_text}`}
-                        onValueChange={(choice, customValue) => {
-                          const fieldId = `mapping_${index}`
-                          handleInlineFieldChange(fieldId, choice, customValue)
-                          initializeInlineField(fieldId, mapping.suggested_value, mapping.confidence)
-                          // Also toggle the field mapping confirmation
-                          if (choice === 'ai' || (choice === 'custom' && customValue)) {
-                            if (!mapping.confirmed) {
-                              toggleFieldMapping(index)
-                            }
-                          } else {
-                            if (mapping.confirmed) {
-                              toggleFieldMapping(index)
-                            }
-                          }
-                        }}
-                        onCommit={() => handleFieldCommit(`mapping_${index}`)}
-                        onChatWithAI={(fieldContext, question) => handleChatWithAI(`mapping_${index}`, fieldContext, question)}
-                        initialChoice={inlineFieldValues[`mapping_${index}`]?.choice}
-                        initialCustomValue={inlineFieldValues[`mapping_${index}`]?.customValue}
-                        isCommitted={inlineFieldValues[`mapping_${index}`]?.isCommitted || false}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <FieldMappingAccordions
+              fieldMappings={extractedData.field_mappings}
+              inlineFieldValues={inlineFieldValues}
+              onFieldChange={handleInlineFieldChange}
+              onFieldCommit={handleFieldCommit}
+              onChatWithAI={handleChatWithAI}
+              toggleFieldMapping={toggleFieldMapping}
+              initializeInlineField={initializeInlineField}
+            />
           )}
 
 

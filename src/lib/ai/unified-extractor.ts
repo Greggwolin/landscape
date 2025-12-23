@@ -302,6 +302,7 @@ export function parseUnifiedExtractionResult(response: string): UnifiedExtractio
 
 /**
  * Convert unified extraction result to field mappings for the UI
+ * Supports both land development and multifamily document types
  */
 export function convertToFieldMappings(result: UnifiedExtractionResult): Array<{
   source_text: string;
@@ -318,48 +319,252 @@ export function convertToFieldMappings(result: UnifiedExtractionResult): Array<{
     user_confirmable: boolean;
   }> = [];
 
-  // Project fields
-  if (result.mapped.tbl_project.project_name) {
+  const proj = result.mapped.tbl_project as any; // Extended type for multifamily fields
+
+  // Core property fields
+  if (proj.project_name || proj.property_name) {
     mappings.push({
-      source_text: `Project Name: ${result.mapped.tbl_project.project_name}`,
-      suggested_field: 'project_name',
-      suggested_value: result.mapped.tbl_project.project_name,
+      source_text: `Property Name: ${proj.property_name || proj.project_name}`,
+      suggested_field: 'property_name',
+      suggested_value: proj.property_name || proj.project_name,
       confidence: 0.95,
       user_confirmable: true
     });
   }
 
-  if (result.mapped.tbl_project.acres_gross) {
+  if (proj.address) {
     mappings.push({
-      source_text: `Total Acres: ${result.mapped.tbl_project.acres_gross} ac`,
-      suggested_field: 'total_acres',
-      suggested_value: result.mapped.tbl_project.acres_gross.toString(),
+      source_text: `Address: ${proj.address}`,
+      suggested_field: 'address',
+      suggested_value: proj.address,
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.city || proj.jurisdiction_city) {
+    mappings.push({
+      source_text: `City: ${proj.city || proj.jurisdiction_city}`,
+      suggested_field: 'city',
+      suggested_value: proj.city || proj.jurisdiction_city,
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.state || proj.jurisdiction_state) {
+    mappings.push({
+      source_text: `State: ${proj.state || proj.jurisdiction_state}`,
+      suggested_field: 'state',
+      suggested_value: proj.state || proj.jurisdiction_state,
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.zip) {
+    mappings.push({
+      source_text: `Zip: ${proj.zip}`,
+      suggested_field: 'zip',
+      suggested_value: proj.zip,
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.county || proj.jurisdiction_county) {
+    mappings.push({
+      source_text: `County: ${proj.county || proj.jurisdiction_county}`,
+      suggested_field: 'county',
+      suggested_value: proj.county || proj.jurisdiction_county,
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  // Property characteristics
+  if (proj.year_built) {
+    mappings.push({
+      source_text: `Year Built: ${proj.year_built}`,
+      suggested_field: 'year_built',
+      suggested_value: proj.year_built.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.total_units) {
+    mappings.push({
+      source_text: `Total Units: ${proj.total_units}`,
+      suggested_field: 'total_units',
+      suggested_value: proj.total_units.toString(),
       confidence: 0.98,
       user_confirmable: true
     });
   }
 
-  if (result.mapped.tbl_project.jurisdiction_city) {
+  if (proj.rentable_sf) {
     mappings.push({
-      source_text: `City: ${result.mapped.tbl_project.jurisdiction_city}`,
-      suggested_field: 'city',
-      suggested_value: result.mapped.tbl_project.jurisdiction_city,
+      source_text: `Rentable SF: ${proj.rentable_sf.toLocaleString()}`,
+      suggested_field: 'rentable_sf',
+      suggested_value: proj.rentable_sf.toString(),
       confidence: 0.95,
       user_confirmable: true
     });
   }
 
-  if (result.mapped.tbl_project.jurisdiction_county) {
+  if (proj.lot_size_acres || proj.acres_gross) {
     mappings.push({
-      source_text: `County: ${result.mapped.tbl_project.jurisdiction_county}`,
-      suggested_field: 'county',
-      suggested_value: result.mapped.tbl_project.jurisdiction_county,
+      source_text: `Lot Size: ${proj.lot_size_acres || proj.acres_gross} acres`,
+      suggested_field: 'lot_size_acres',
+      suggested_value: (proj.lot_size_acres || proj.acres_gross).toString(),
       confidence: 0.95,
       user_confirmable: true
     });
   }
 
-  // Parcel fields
+  // Financial metrics
+  if (proj.asking_price) {
+    mappings.push({
+      source_text: `Asking Price: $${proj.asking_price.toLocaleString()}`,
+      suggested_field: 'asking_price',
+      suggested_value: proj.asking_price.toString(),
+      confidence: 0.98,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.price_per_unit) {
+    mappings.push({
+      source_text: `Price/Unit: $${proj.price_per_unit.toLocaleString()}`,
+      suggested_field: 'price_per_unit',
+      suggested_value: proj.price_per_unit.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.price_per_sf) {
+    mappings.push({
+      source_text: `Price/SF: $${proj.price_per_sf.toLocaleString()}`,
+      suggested_field: 'price_per_sf',
+      suggested_value: proj.price_per_sf.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.cap_rate) {
+    mappings.push({
+      source_text: `Cap Rate: ${(proj.cap_rate * 100).toFixed(2)}%`,
+      suggested_field: 'cap_rate',
+      suggested_value: proj.cap_rate.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.noi) {
+    mappings.push({
+      source_text: `NOI: $${proj.noi.toLocaleString()}`,
+      suggested_field: 'noi',
+      suggested_value: proj.noi.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.goi) {
+    mappings.push({
+      source_text: `GOI: $${proj.goi.toLocaleString()}`,
+      suggested_field: 'goi',
+      suggested_value: proj.goi.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.effective_gross_income) {
+    mappings.push({
+      source_text: `EGI: $${proj.effective_gross_income.toLocaleString()}`,
+      suggested_field: 'effective_gross_income',
+      suggested_value: proj.effective_gross_income.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  // Occupancy metrics
+  if (proj.physical_occupancy) {
+    mappings.push({
+      source_text: `Physical Occupancy: ${(proj.physical_occupancy * 100).toFixed(1)}%`,
+      suggested_field: 'physical_occupancy',
+      suggested_value: proj.physical_occupancy.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.economic_occupancy) {
+    mappings.push({
+      source_text: `Economic Occupancy: ${(proj.economic_occupancy * 100).toFixed(1)}%`,
+      suggested_field: 'economic_occupancy',
+      suggested_value: proj.economic_occupancy.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  if (proj.vacancy_rate) {
+    mappings.push({
+      source_text: `Vacancy Rate: ${(proj.vacancy_rate * 100).toFixed(1)}%`,
+      suggested_field: 'vacancy_rate',
+      suggested_value: proj.vacancy_rate.toString(),
+      confidence: 0.95,
+      user_confirmable: true
+    });
+  }
+
+  // Unit Mix (for multifamily)
+  const unitMix = (result.mapped as any).unit_mix;
+  if (unitMix && Array.isArray(unitMix)) {
+    unitMix.forEach((unit: any, index: number) => {
+      if (unit.unit_type && unit.count) {
+        mappings.push({
+          source_text: `Unit Mix: ${unit.unit_type} - ${unit.count} units @ ${unit.unit_sf || '?'} SF, Rent: $${unit.market_rent || unit.in_place_rent || '?'}`,
+          suggested_field: `unit_mix_${index + 1}`,
+          suggested_value: JSON.stringify({
+            type: unit.unit_type,
+            beds: unit.beds,
+            baths: unit.baths,
+            sf: unit.unit_sf,
+            count: unit.count,
+            rent: unit.market_rent || unit.in_place_rent
+          }),
+          confidence: 0.90,
+          user_confirmable: true
+        });
+      }
+    });
+  }
+
+  // Operating Expenses (for multifamily)
+  const opex = (result.mapped as any).operating_expenses;
+  if (opex && Array.isArray(opex)) {
+    opex.forEach((expense: any, index: number) => {
+      if (expense.category && expense.annual_amount) {
+        mappings.push({
+          source_text: `Operating Expense: ${expense.category} - $${expense.annual_amount.toLocaleString()}/yr ($${expense.per_unit || '?'}/unit)`,
+          suggested_field: `opex_${expense.category.toLowerCase().replace(/\s+/g, '_')}`,
+          suggested_value: expense.annual_amount.toString(),
+          confidence: 0.90,
+          user_confirmable: true
+        });
+      }
+    });
+  }
+
+  // Land Development: Parcel fields
   result.mapped.tbl_parcel.forEach((parcel, index) => {
     const parcelId = parcel.parcel_id || (index + 1).toString();
 
@@ -409,7 +614,6 @@ export function convertToFieldMappings(result: UnifiedExtractionResult): Array<{
     const parcelId = product.parcel.toString();
     const lotSize = `${product.width_ft}x${product.depth_ft}`;
 
-    // If confidence is low (<0.5), set empty value and ask user
     if (product.confidence < 0.5) {
       mappings.push({
         source_text: `Parcel ${parcelId}: Unable to determine lot product with confidence. Found lot size ${lotSize} in document. Please verify.`,
@@ -424,6 +628,19 @@ export function convertToFieldMappings(result: UnifiedExtractionResult): Array<{
         suggested_field: `parcel_${parcelId}_lot_product`,
         suggested_value: lotSize,
         confidence: product.confidence,
+        user_confirmable: true
+      });
+    }
+  });
+
+  // Add unmapped fields with lower confidence
+  result.unmapped.forEach((item) => {
+    if (item.key && item.value) {
+      mappings.push({
+        source_text: `${item.key}: ${item.value}`,
+        suggested_field: item.key.toLowerCase().replace(/\s+/g, '_'),
+        suggested_value: String(item.value),
+        confidence: 0.70,
         user_confirmable: true
       });
     }

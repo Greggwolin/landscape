@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @deprecated This context is deprecated as of Phase 2 Nav Tile Restructure.
+ *
+ * The project mode toggle UI has been removed from ProjectContextBar.
+ * Navigation tiles are now static (7 tiles always visible) with contextual
+ * labels based on project type (land_development vs income properties).
+ *
+ * This context is kept for backwards compatibility with components that
+ * may still reference the mode value. It will be removed in a future cleanup.
+ *
+ * See: /src/components/projects/tiles/tileConfig.ts for new tile configuration.
+ */
+
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type ProjectMode = 'napkin' | 'standard';

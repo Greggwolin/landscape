@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
 import { useState, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';

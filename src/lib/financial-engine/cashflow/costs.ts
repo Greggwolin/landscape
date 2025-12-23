@@ -87,9 +87,9 @@ const ACTIVITY_CATEGORY_MAP: Record<string, CategoryMapping> = {
     category: 'Planning & Engineering',
     sortOrder: 2,
   },
-  'Development': {
-    activity: 'Development',
-    category: 'Development Costs',
+  'Improvements': {
+    activity: 'Improvements',
+    category: 'Improvement Costs',  // Renamed from Development Costs
     sortOrder: 3,
   },
   'Operations': {

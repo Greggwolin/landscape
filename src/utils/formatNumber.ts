@@ -15,12 +15,15 @@ export function formatNumber(value: number | null | undefined): string {
 
 /**
  * Format a currency value, showing "-" for 0 or null/undefined
+ * Always rounds to whole dollars unless showCents is true
  */
 export function formatCurrency(value: number | null | undefined, showCents: boolean = false): string {
   if (value === null || value === undefined || value === 0) {
     return '—';
   }
-  const formatted = value.toLocaleString(undefined, {
+  // Round to whole dollars unless showing cents
+  const roundedValue = showCents ? value : Math.round(value);
+  const formatted = roundedValue.toLocaleString('en-US', {
     minimumFractionDigits: showCents ? 2 : 0,
     maximumFractionDigits: showCents ? 2 : 0
   });
