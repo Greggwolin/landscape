@@ -128,6 +128,12 @@ rejected → pending (restore)
 - Screenshot saved: `docs/opex/screenshots/lynn_villa_operating_statement_page26.png`
 - Added shared OpEx helpers and standalone replay tooling (mapping aliases for Professional Fees, Miscellaneous) to enable future multi-scenario persistence without Django dependency.
 
+### 5. Documentation Sync & Status Verification ✅
+
+- Ran `/update-docs` workflow checklist: confirmed parser proof + Dec 23 implementation status are surfaced in documentation center (`src/app/documentation/page.tsx`)
+- Verified key status docs remain current (`docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-23.md`)
+- No new doc tiles needed; next updates will accompany OpEx persistence/active discriminator work
+
 ---
 
 ## Next Steps

@@ -286,6 +286,7 @@ GET      /api/projects/{id}/validation-report/
 ### Immediate
 1. **BUG-002: Extraction Commit Endpoint** - Needs design clarification for table mapping
 2. **FEAT-001: Claude API Full Integration** - Remove remaining mocked responses
+3. **OpEx Phase 1A: Multi-Scenario Persistence & Active Discriminator** - Wire parser proof into `tbl_operating_expenses` with `statement_discriminator`, add project-level active scenario selection
 
 ### Near-term (Phase 4-6)
 1. **Document Extraction → Activity Generation** - Create activities when extraction completes
