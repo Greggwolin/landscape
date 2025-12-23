@@ -1,12 +1,48 @@
 # Landscape Implementation Status
 
-**Version:** 6.8
-**Last Updated:** 2025-12-19
+**Version:** 7.0
+**Last Updated:** 2025-12-21
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (December 3 - December 19, 2025)
+## 🆕 Recent Updates (December 3 - December 21, 2025)
+
+### Knowledge Extraction Platform (Dec 20-21, 2025) ⭐ NEW
+- ✅ **New Django App** - `apps.knowledge` with registry-based extraction, classification, and status APIs
+- ✅ **Extraction Services** - Batched extractor (`extract_document_batched`), registry writer, rent-roll chunker, document processor, and field registry
+- ✅ **Embeddings Pipeline** - Text extraction → chunking → OpenAI embeddings → `knowledge_embeddings` storage
+- ✅ **Queueing & Processing** - `doc_processing_queue` table plus synchronous `/process/` endpoint for immediate ingestion
+- ✅ **API Coverage** - Project-level extraction listings/validation, document classification, extractable-field previews, reprocess endpoints
+- ✅ **Frontend Wiring** - Next.js proxy routes for extractions, pending queue, validation, apply; upload flow calls Python extraction
+- 📁 Files Created:
+  - `backend/apps/knowledge/*` (models, services, views, migrations 0001-0002, management commands)
+  - `src/app/api/projects/[projectId]/extractions/*` (list, validate, apply, pending)
+  - `src/components/landscaper/ExtractionValidation.tsx`, `src/components/landscaper/ExtractionReviewModal.tsx`
+- 📁 Files Modified:
+  - `backend/apps/landscaper/views.py`, `serializers.py`, `urls.py` (integrations)
+  - `src/components/landscaper/LandscaperPanel.tsx` (processing + extraction pipeline)
+  - `src/lib/ai/unified-extractor.ts`, `src/lib/ai/claude-extractor.ts`
+- 🎯 Status: In Progress - Registry/batched extraction operational; AI responses still mocked in some flows
+
+### Developer Operations & Capitalization (Dec 20-21, 2025) ⭐ NEW
+- ✅ **Developer Ops Models/APIs** - Fees, overhead items CRUD + serializers and routes
+- ✅ **Capitalization UI** - Waterfall distributions, overhead table, developer fee modal
+- ✅ **Budget Hooks** - `useDeveloperOperations.ts` for fee/overhead data flows
+- 📁 Files Created: `src/app/api/developer-operations/*`, `src/components/capitalization/*`
+- 🎯 Status: In Progress - Data model in place, UI wired; validations & analytics next
+
+### Project Onboarding + Readiness (Dec 20-21, 2025) ⭐ NEW
+- ✅ **New Onboarding Flow** - Channel tabs, drop zone, field table, readiness display
+- ✅ **Project Context UI** - Simplified channel view and model readiness component
+- 📁 Files Created: `src/components/projects/onboarding/*`
+- 🎯 Status: In Progress - UX live; data hooks in early use
+
+### Market Intelligence Enhancements (Dec 20-21, 2025) ⭐ NEW
+- ✅ **Competitor APIs/UI** - CRUD, exclusions, nearby search, pricing by lot width, sync radius
+- ✅ **Market Components** - Competitive projects panel, add competitor modal, GIS map updates
+- 📁 Files Created: `src/app/api/projects/[projectId]/market/competitors/*`, `src/components/market/*`, `src/components/map/PropertyTabMapWithComps.tsx`
+- 🎯 Status: In Progress - Data plumbing complete; scoring/insights next
 
 ### Landscaper Phase 3 - Real Data & AI Wiring (Dec 19, 2025) ⭐ NEW
 - ✅ **Chat API Connection** - Next.js proxy routes to Django `/api/projects/{id}/landscaper/chat/`
@@ -99,22 +135,25 @@
 | Chat API | ✅ Complete | Django backend wired |
 | Activity Feed | ✅ Complete | Real data infrastructure |
 | Context Prompts | ✅ Complete | Property-type aware |
-| Document Extraction | 🔄 In Progress | Rent roll, T12 |
+| Document Extraction | 🔄 In Progress | Registry-based, batched extraction + validation UI (Claude mock in some flows) |
 | Real AI Responses | 📋 Planned | Claude API integration |
 
 ### Document Extraction
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Rent Roll | 🔄 In Progress | Chunked extraction |
-| T12/Operating | 🔄 In Progress | Expense categories |
+| Rent Roll | 🔄 In Progress | Chunked extraction (Python + Claude) |
+| T12/Operating | 🔄 In Progress | Registry field coverage expanding |
 | Parcel Table | ✅ Complete | Land dev specific |
-| Field Registry | ✅ Complete | 150+ fields defined |
+| Field Registry | ✅ Complete | 150+ fields defined; registry served via API |
 
 ---
 
 ## Database Schema
 
 ### Recent Additions
+- `landscape.developer_fee`, `landscape.overhead_item` (via Django dev-ops models/serializers)
+- `landscape.knowledge_entities`, `knowledge_facts`, `knowledge_embeddings`, `knowledge_sessions`, `knowledge_interactions`, `knowledge_insights` - Knowledge graph + embeddings
+- `landscape.doc_processing_queue` - Document ingestion queue
 - `landscape.landscaper_activity` - Activity feed items (Dec 19)
 - `landscape.zonda_subdivisions` - Zonda market data (Dec 3)
 - `landscape.market_activity` - HBACA permit data (Dec 3)
@@ -132,6 +171,41 @@
 ---
 
 ## API Endpoints
+
+### Knowledge / Extraction (NEW)
+```
+POST    /api/knowledge/projects/{project_id}/extract/
+POST    /api/knowledge/projects/{project_id}/extract-all/
+GET     /api/knowledge/projects/{project_id}/extractions/
+GET     /api/knowledge/projects/{project_id}/extractions/pending/
+POST    /api/knowledge/projects/{project_id}/extractions/{id}/validate/
+POST    /api/knowledge/projects/{project_id}/extractions/{id}/validate-v2/
+POST    /api/knowledge/projects/{project_id}/extractions/bulk-validate/
+POST    /api/knowledge/documents/{doc_id}/extract-batched/
+POST    /api/knowledge/documents/{doc_id}/extract-rent-roll/
+GET     /api/knowledge/documents/{doc_id}/status/
+POST    /api/knowledge/documents/{doc_id}/process/
+GET     /api/knowledge/documents/{doc_id}/classify/
+GET     /api/knowledge/field-registry/
+```
+
+### Developer Operations (NEW)
+```
+GET/POST /api/developer-operations/fees/
+GET/PUT  /api/developer-operations/fees/{id}/
+GET/POST /api/developer-operations/overhead/
+GET/PUT  /api/developer-operations/overhead/{id}/
+```
+
+### Projects / Market Competitors (NEW)
+```
+GET/POST /api/projects/{projectId}/market/competitors/
+GET/PUT  /api/projects/{projectId}/market/competitors/{competitorId}/
+POST     /api/projects/{projectId}/market/competitors/exclusions/
+GET      /api/projects/{projectId}/market/competitors/nearby/
+GET      /api/projects/{projectId}/market/competitors/pricing-by-lot-width/
+POST     /api/projects/{projectId}/market/competitors/sync-radius/
+```
 
 ### Landscaper (NEW)
 ```
@@ -184,12 +258,12 @@ GET      /api/projects/{id}/validation-report/
 
 | Directory | Files | Description |
 |-----------|-------|-------------|
-| `src/app/api/` | 89 | API routes (migrating to Django) |
-| `src/components/` | 215 | React components |
-| `backend/apps/` | 48 | Django applications |
-| `migrations/` | 37 | Database migrations |
-| `docs/` | 85 | Documentation |
+| `src/app/api/` | 395 | API routes (Next.js) |
+| `src/components/` | 270 | React components |
+| `backend/apps/` | 519 | Django applications/files |
+| `migrations/` | 95 | Database migrations (SQL + Django) |
+| `docs/` | 853 | Documentation |
 
 ---
 
-*Last updated: 2025-12-19 by documentation update workflow*
+*Last updated: 2025-12-21 by documentation update workflow*
