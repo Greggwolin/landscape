@@ -1,0 +1,70 @@
+field_key,property_type,analytical_tier,override_reason
+# ============================================================
+# TIER OVERRIDES BY PROPERTY TYPE
+# Only fields that differ from default tier in main registry
+# ============================================================
+#
+# MULTIFAMILY URBAN (high-density, transit-oriented)
+# ============================================================
+parking_spaces_total,multifamily_urban,important,Parking premium significant in urban markets
+parking_ratio,multifamily_urban,important,Low ratios acceptable; high ratios add value
+transit_score,multifamily_urban,important,Transit access drives rents in urban locations
+walk_score,multifamily_urban,important,Walkability premium in urban submarkets
+ev_charging_spaces,multifamily_urban,supporting,EV infrastructure increasingly valued
+#
+# MULTIFAMILY SUBURBAN
+# ============================================================
+parking_spaces_total,multifamily_suburban,critical,Parking expected; shortages kill deals
+parking_ratio,multifamily_suburban,critical,Must meet minimum thresholds
+lot_size_acres,multifamily_suburban,supporting,Expansion/density potential
+#
+# RETAIL
+# ============================================================
+parking_spaces_total,retail,critical,Retail dies without adequate parking
+parking_ratio,retail,critical,Industry minimums must be met
+commercial_sf,retail,critical,Primary revenue driver
+lot_size_sf,retail,important,Pad site potential
+walk_score,retail,important,Foot traffic correlation
+total_units,retail,descriptive,Not applicable to retail
+rentable_sf,retail,critical,Primary metric for retail
+#
+# OFFICE
+# ============================================================
+parking_ratio,office,critical,Tenant requirement
+parking_spaces_total,office,critical,Employee/visitor capacity
+total_building_sf,office,critical,Primary size metric
+stories,office,important,Class indicator
+transit_score,office,critical,Commute access drives leasing
+walk_score,office,important,Amenity access for tenants
+total_units,office,descriptive,Not applicable to office
+rentable_sf,office,critical,Primary revenue metric
+#
+# INDUSTRIAL
+# ============================================================
+lot_size_sf,industrial,critical,Yard/trailer parking capacity
+lot_size_acres,industrial,critical,Expansion potential
+parking_spaces_total,industrial,supporting,Less critical than other types
+total_building_sf,industrial,critical,Clear height × footprint
+stories,industrial,descriptive,Usually single-story
+transit_score,industrial,descriptive,Not relevant
+walk_score,industrial,descriptive,Not relevant
+total_units,industrial,descriptive,Not applicable
+rentable_sf,industrial,critical,Warehouse/manufacturing space
+#
+# LAND DEVELOPMENT
+# ============================================================
+lot_size_sf,land_dev,critical,Developable area
+lot_size_acres,land_dev,critical,Primary metric
+total_units,land_dev,critical,Entitlement capacity
+parking_spaces_total,land_dev,descriptive,Future consideration
+year_built,land_dev,descriptive,Not applicable
+rentable_sf,land_dev,descriptive,Not applicable
+submarket_vacancy,land_dev,important,Absorption indicator
+new_supply_pipeline,land_dev,critical,Competition risk
+#
+# MIXED-USE
+# ============================================================
+commercial_sf,mixed_use,critical,Retail/office component value
+has_commercial_space,mixed_use,critical,Defines property type
+parking_ratio,mixed_use,critical,Must serve all uses
+income_commercial,mixed_use,critical,Revenue component
