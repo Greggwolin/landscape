@@ -12,9 +12,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from django.db.models import Q
+from django.db.models import Q, Count, Avg
+from django.db import connection
+from django.utils import timezone
 from decimal import Decimal
-from .models import ChatMessage, LandscaperAdvice, ActivityItem
+from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
 from .serializers import (
     ChatMessageSerializer,
     ChatMessageCreateSerializer,
@@ -22,6 +24,10 @@ from .serializers import (
     VarianceItemSerializer,
     ActivityItemSerializer,
     ActivityItemCreateSerializer,
+    ExtractionMappingSerializer,
+    ExtractionMappingCreateSerializer,
+    ExtractionLogSerializer,
+    ExtractionLogReviewSerializer,
 )
 from .ai_handler import get_landscaper_response
 from .tool_executor import execute_tool
@@ -453,3 +459,300 @@ def generate_activity_from_extraction(project_id: int, extraction_data: dict) ->
     )
 
     return activity
+
+
+class ExtractionMappingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for extraction field mappings.
+
+    Endpoints:
+    - GET /api/landscaper/mappings/ - List mappings with filters
+    - POST /api/landscaper/mappings/ - Create new mapping
+    - GET /api/landscaper/mappings/{id}/ - Get single mapping
+    - PUT /api/landscaper/mappings/{id}/ - Update mapping
+    - DELETE /api/landscaper/mappings/{id}/ - Delete (user-created only)
+    - GET /api/landscaper/mappings/stats/ - Get mappings with usage stats
+    - POST /api/landscaper/mappings/bulk-toggle/ - Toggle multiple active
+    - GET /api/landscaper/mappings/document-types/ - Get doc types with counts
+    - GET /api/landscaper/mappings/target-tables/ - Get tables with counts
+    """
+
+    queryset = ExtractionMapping.objects.all()
+    serializer_class = ExtractionMappingSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
+
+    def get_queryset(self):
+        """Filter mappings based on query params."""
+        queryset = self.queryset
+
+        # Filter by document_type
+        doc_type = self.request.query_params.get('document_type')
+        if doc_type:
+            queryset = queryset.filter(document_type=doc_type)
+
+        # Filter by target_table
+        target_table = self.request.query_params.get('target_table')
+        if target_table:
+            queryset = queryset.filter(target_table=target_table)
+
+        # Filter by confidence
+        confidence = self.request.query_params.get('confidence')
+        if confidence:
+            queryset = queryset.filter(confidence=confidence)
+
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        # Search by pattern, table, or field
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(source_pattern__icontains=search) |
+                Q(target_table__icontains=search) |
+                Q(target_field__icontains=search)
+            )
+
+        return queryset.order_by('document_type', 'source_pattern')
+
+    def list(self, request, *args, **kwargs):
+        """GET list of mappings."""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response({
+            'mappings': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    def create(self, request, *args, **kwargs):
+        """POST create new mapping."""
+        serializer = ExtractionMappingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # User-created mappings are not system mappings
+        mapping = serializer.save(is_system=False)
+
+        return Response({
+            'success': True,
+            'mapping': ExtractionMappingSerializer(mapping).data,
+        }, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """PUT update mapping."""
+        instance = self.get_object()
+        serializer = ExtractionMappingCreateSerializer(
+            instance, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        mapping = serializer.save()
+
+        return Response({
+            'success': True,
+            'mapping': ExtractionMappingSerializer(mapping).data,
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        """DELETE mapping (user-created only)."""
+        instance = self.get_object()
+
+        # Prevent deletion of system mappings
+        if instance.is_system:
+            return Response({
+                'success': False,
+                'error': 'System mappings cannot be deleted. You can deactivate them instead.',
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        instance.delete()
+        return Response({
+            'success': True,
+            'message': 'Mapping deleted successfully',
+        })
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """GET mappings with usage statistics from the stats view."""
+        try:
+            # Query the stats view directly
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        mapping_id,
+                        document_type,
+                        source_pattern,
+                        target_table,
+                        target_field,
+                        confidence,
+                        is_active,
+                        times_extracted,
+                        projects_used,
+                        documents_processed,
+                        avg_confidence_score,
+                        write_rate,
+                        acceptance_rate,
+                        last_used_at
+                    FROM landscape.vw_extraction_mapping_stats
+                    ORDER BY document_type, source_pattern
+                """)
+                columns = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+
+            # Build response with stats
+            mappings_with_stats = []
+            for row in rows:
+                stat_dict = dict(zip(columns, row))
+                # Get full mapping data
+                try:
+                    mapping = ExtractionMapping.objects.get(mapping_id=stat_dict['mapping_id'])
+                    mapping_data = ExtractionMappingSerializer(mapping).data
+                    # Overlay stats
+                    mapping_data.update({
+                        'times_extracted': stat_dict.get('times_extracted', 0),
+                        'projects_used': stat_dict.get('projects_used', 0),
+                        'documents_processed': stat_dict.get('documents_processed', 0),
+                        'avg_confidence_score': float(stat_dict['avg_confidence_score']) if stat_dict.get('avg_confidence_score') else None,
+                        'write_rate': float(stat_dict['write_rate']) if stat_dict.get('write_rate') else None,
+                        'acceptance_rate': float(stat_dict['acceptance_rate']) if stat_dict.get('acceptance_rate') else None,
+                        'last_used_at': stat_dict.get('last_used_at').isoformat() if stat_dict.get('last_used_at') else None,
+                    })
+                    mappings_with_stats.append(mapping_data)
+                except ExtractionMapping.DoesNotExist:
+                    pass
+
+            return Response({
+                'mappings': mappings_with_stats,
+                'count': len(mappings_with_stats),
+            })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='bulk-toggle')
+    def bulk_toggle(self, request):
+        """POST toggle active status for multiple mappings."""
+        mapping_ids = request.data.get('mapping_ids', [])
+        is_active = request.data.get('is_active', True)
+
+        if not mapping_ids:
+            return Response({
+                'success': False,
+                'error': 'No mapping_ids provided',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_count = ExtractionMapping.objects.filter(
+            mapping_id__in=mapping_ids
+        ).update(is_active=is_active, updated_at=timezone.now())
+
+        return Response({
+            'success': True,
+            'updated_count': updated_count,
+        })
+
+    @action(detail=False, methods=['get'], url_path='document-types')
+    def document_types(self, request):
+        """GET list of document types with counts."""
+        type_counts = ExtractionMapping.objects.values('document_type').annotate(
+            count=Count('mapping_id'),
+            active_count=Count('mapping_id', filter=Q(is_active=True))
+        ).order_by('document_type')
+
+        return Response({
+            'document_types': list(type_counts),
+        })
+
+    @action(detail=False, methods=['get'], url_path='target-tables')
+    def target_tables(self, request):
+        """GET list of target tables with counts."""
+        table_counts = ExtractionMapping.objects.values('target_table').annotate(
+            count=Count('mapping_id'),
+            active_count=Count('mapping_id', filter=Q(is_active=True))
+        ).order_by('target_table')
+
+        return Response({
+            'target_tables': list(table_counts),
+        })
+
+
+class ExtractionLogViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for extraction logs.
+
+    Endpoints:
+    - GET /api/landscaper/logs/ - List logs with filters
+    - GET /api/landscaper/logs/{id}/ - Get single log
+    - POST /api/landscaper/logs/{id}/review/ - Accept/reject extraction
+    """
+
+    queryset = ExtractionLog.objects.select_related('mapping', 'project')
+    serializer_class = ExtractionLogSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter logs based on query params."""
+        queryset = self.queryset
+
+        # Filter by project
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        # Filter by document
+        doc_id = self.request.query_params.get('doc_id')
+        if doc_id:
+            queryset = queryset.filter(doc_id=doc_id)
+
+        # Filter by mapping
+        mapping_id = self.request.query_params.get('mapping_id')
+        if mapping_id:
+            queryset = queryset.filter(mapping_id=mapping_id)
+
+        # Filter by review status
+        review_status = self.request.query_params.get('review_status')
+        if review_status == 'pending':
+            queryset = queryset.filter(was_accepted__isnull=True)
+        elif review_status == 'accepted':
+            queryset = queryset.filter(was_accepted=True)
+        elif review_status == 'rejected':
+            queryset = queryset.filter(was_accepted=False)
+
+        return queryset.order_by('-extracted_at')
+
+    def list(self, request, *args, **kwargs):
+        """GET list of extraction logs."""
+        queryset = self.get_queryset()[:100]  # Limit to 100 most recent
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response({
+            'logs': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    @action(detail=True, methods=['post'])
+    def review(self, request, pk=None):
+        """POST accept or reject an extraction."""
+        try:
+            log = self.get_object()
+
+            serializer = ExtractionLogReviewSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            log.was_accepted = serializer.validated_data['was_accepted']
+            log.rejection_reason = serializer.validated_data.get('rejection_reason', '')
+            log.reviewed_at = timezone.now()
+            # log.reviewed_by = request.user if request.user.is_authenticated else None
+            log.save()
+
+            return Response({
+                'success': True,
+                'log': ExtractionLogSerializer(log).data,
+            })
+
+        except ExtractionLog.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Log not found',
+            }, status=status.HTTP_404_NOT_FOUND)

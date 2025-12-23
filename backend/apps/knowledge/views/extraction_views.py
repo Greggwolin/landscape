@@ -61,12 +61,14 @@ def get_pending_extractions(request, project_id: int):
     """
     GET /api/knowledge/projects/{project_id}/extractions/pending/
 
-    Get all pending extractions for user validation.
+    Get all pending and conflict extractions for user validation.
+    Includes summary counts and conflict details.
     """
     from ..services.extraction_service import ExtractionService
 
     service = ExtractionService(int(project_id))
     extractions = service.get_pending_extractions()
+    summary = service.get_extraction_summary()
 
     # Serialize datetime objects
     for ext in extractions:
@@ -77,6 +79,7 @@ def get_pending_extractions(request, project_id: int):
         'success': True,
         'project_id': int(project_id),
         'count': len(extractions),
+        'summary': summary,
         'extractions': extractions
     })
 
@@ -910,3 +913,409 @@ def extract_rent_roll(request, doc_id: int):
 
     status = 200 if result.get('success') else 400
     return JsonResponse(result, status=status)
+
+
+# ============================================================================
+# Extraction History Report Endpoint
+# ============================================================================
+
+# Category mapping for filter pills - maps field_key patterns to categories
+FIELD_CATEGORY_MAPPING = {
+    # Project category - property identification
+    'project': [
+        'property_name', 'street_address', 'city', 'state', 'county', 'zip_code',
+        'submarket', 'market', 'apn_primary', 'listing_brokerage', 'property_class',
+        'property_subtype', 'location_lat', 'location_lon', 'location_description',
+        'year_built', 'year_renovated', 'zoning', 'zoning_description', 'neighborhood'
+    ],
+    # Physical category - property characteristics
+    'physical': [
+        'total_units', 'total_sf', 'rentable_sf', 'avg_unit_size', 'stories',
+        'buildings', 'parking_spaces', 'parking_ratio', 'lot_size', 'lot_acres',
+        'density', 'condition', 'construction_type', 'amenities', 'unit_mix',
+        'covered_parking', 'carport_spaces', 'garage_spaces', 'surface_spaces'
+    ],
+    # Pricing category - valuation metrics
+    'pricing': [
+        'purchase_price', 'asking_price', 'price_per_unit', 'price_per_sf',
+        'cap_rate', 'going_in_cap', 'exit_cap', 'offer_price', 'list_price',
+        'market_value', 'appraised_value', 'stabilized_value', 'grm', 'price_to_rent'
+    ],
+    # Income category - revenue and rent
+    'income': [
+        'gross_potential_rent', 'gpr', 'effective_gross_income', 'egi',
+        'vacancy_rate', 'economic_vacancy', 'physical_vacancy', 'concessions',
+        'loss_to_lease', 'other_income', 'laundry_income', 'parking_income',
+        'pet_income', 'utility_reimbursement', 'storage_income', 'late_fees',
+        'application_fees', 'noi', 'net_operating_income',
+        # Rent roll / unit fields
+        'unit_number', 'unit_type', 'unit_rent', 'market_rent', 'lease_start',
+        'lease_end', 'tenant_name', 'deposit', 'move_in_date', 'in_place_rent',
+        'bed_count', 'bath_count'
+    ],
+    # Expenses category - operating expenses
+    'expenses': [
+        'total_operating_expenses', 'opex', 'expense_ratio',
+        'property_taxes', 'real_estate_taxes', 'insurance', 'utilities',
+        'repairs_maintenance', 'property_management', 'management_fee',
+        'payroll', 'administrative', 'marketing', 'contract_services',
+        'turnover_costs', 'reserves', 'replacement_reserves', 'professional_fees',
+        'landscaping', 'trash', 'pest_control', 'security', 'elevator', 'hvac'
+    ],
+    # Market category - demographics and comps
+    'market': [
+        'submarket', 'msa', 'population', 'median_income', 'avg_household_income',
+        'employment_growth', 'rent_growth', 'absorption_rate', 'occupancy_rate',
+        'comp_rent', 'comp_cap_rate', 'comp_price_per_unit', 'comp_property_name',
+        'comp_sale_date', 'comp_sale_price'
+    ],
+    # Debt category - financing
+    'debt': [
+        'loan_amount', 'loan_to_value', 'ltv', 'debt_service_coverage', 'dscr',
+        'interest_rate', 'loan_term', 'amortization', 'lender', 'loan_type',
+        'prepayment_penalty', 'maturity_date', 'debt_yield', 'debt_service',
+        'io_period', 'balloon_amount'
+    ]
+}
+
+# Reverse mapping: field_key -> category
+def get_field_category(field_key: str) -> str:
+    """Get category for a field key using pattern matching."""
+    if not field_key:
+        return 'other'
+
+    field_lower = field_key.lower()
+
+    for category, patterns in FIELD_CATEGORY_MAPPING.items():
+        for pattern in patterns:
+            if pattern in field_lower or field_lower.startswith(pattern):
+                return category
+
+    # Fall back to scope-based categorization
+    return 'other'
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_extraction_history(request, project_id: int):
+    """
+    GET /api/knowledge/projects/{project_id}/extraction-history/
+
+    Get extraction history for reports tab with category filtering and history tracking.
+
+    CRITICAL: Only returns fields where field_role = 'input' from the field registry.
+    Output/calculated fields are filtered out even if they were incorrectly extracted.
+
+    Query params:
+    - category: comma-separated list of categories to filter (project,physical,pricing,income,expenses,market,debt)
+    - status: filter by status (all, pending, accepted, rejected, applied)
+    - include_history: if 'true', include superseded extractions for each field
+    - sort: field to sort by (extracted_at, field_key, confidence_score)
+    - order: asc or desc (default: desc)
+
+    Response:
+    {
+        "success": true,
+        "project_id": 17,
+        "extractions": [...],
+        "category_counts": {"project": 12, "physical": 8, ...},
+        "total": 73
+    }
+    """
+    from django.db import connection
+    from ..services.field_registry import get_registry
+
+    # Parse query params
+    categories = request.GET.get('category', '').split(',') if request.GET.get('category') else None
+    categories = [c.strip().lower() for c in categories if c.strip()] if categories else None
+    status_filter = request.GET.get('status', 'all')
+    include_history = request.GET.get('include_history', '').lower() == 'true'
+    sort_field = request.GET.get('sort', 'created_at')
+    sort_order = request.GET.get('order', 'desc')
+
+    # Validate sort field
+    valid_sort_fields = ['created_at', 'field_key', 'confidence_score', 'status']
+    if sort_field not in valid_sort_fields:
+        sort_field = 'created_at'
+
+    # Build query - get project type and extractions
+    with connection.cursor() as cursor:
+        # First get the project's property type
+        cursor.execute("""
+            SELECT project_type FROM landscape.tbl_project WHERE project_id = %s
+        """, [int(project_id)])
+        project_row = cursor.fetchone()
+        project_type = project_row[0] if project_row else 'MF'
+
+        # Map project_type code to registry property_type
+        # LAND -> land_development, MF/default -> multifamily
+        if project_type == 'LAND':
+            registry_property_type = 'land_development'
+        else:
+            registry_property_type = 'multifamily'
+
+        # Get all extractions for this project with document info
+        query = """
+            SELECT
+                e.extraction_id,
+                e.doc_id,
+                d.doc_name,
+                e.field_key,
+                e.target_table,
+                e.target_field,
+                e.extracted_value,
+                e.validated_value,
+                e.extraction_type,
+                e.source_text,
+                e.source_snippet,
+                e.source_page,
+                e.confidence_score,
+                e.status,
+                e.scope,
+                e.scope_label,
+                e.validated_by,
+                e.validated_at,
+                e.rejection_reason,
+                e.created_at,
+                e.created_by
+            FROM landscape.ai_extraction_staging e
+            LEFT JOIN landscape.core_doc d ON e.doc_id = d.doc_id
+            WHERE e.project_id = %s
+        """
+        params = [int(project_id)]
+
+        # Add status filter
+        if status_filter and status_filter != 'all':
+            query += " AND e.status = %s"
+            params.append(status_filter)
+
+        # Add sort
+        order_dir = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+        query += f" ORDER BY e.{sort_field} {order_dir}"
+
+        cursor.execute(query, params)
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    # Get the field registry to filter by field_role = 'input'
+    # Use the project's property type to load the correct registry
+    registry = get_registry()
+    property_mappings = registry.get_all_mappings(registry_property_type)
+
+    # Build set of input field keys (exclude output/calculated fields)
+    input_field_keys = set()
+    field_labels = {}  # Cache field labels from registry
+    for field_key, mapping in property_mappings.items():
+        if mapping.field_role == 'input':
+            input_field_keys.add(field_key)
+            field_labels[field_key] = mapping.label
+
+    # Process results and categorize
+    extractions = []
+    category_counts = {
+        'project': 0,
+        'physical': 0,
+        'pricing': 0,
+        'income': 0,
+        'expenses': 0,
+        'market': 0,
+        'debt': 0,
+        'other': 0
+    }
+
+    for row in rows:
+        ext = dict(zip(columns, row))
+
+        # Get field key
+        field_key = ext.get('field_key') or ext.get('target_field') or ''
+
+        # CRITICAL: Filter out output/calculated fields
+        # Only include fields where field_role = 'input' in the registry
+        if field_key and field_key not in input_field_keys:
+            # Skip this extraction - it's an output field or not in registry
+            continue
+
+        # Determine category for this extraction
+        category = get_field_category(field_key)
+        ext['category'] = category
+
+        # Increment category count
+        if category in category_counts:
+            category_counts[category] += 1
+        else:
+            category_counts['other'] += 1
+
+        # Skip if category filter active and doesn't match
+        if categories and category not in categories:
+            continue
+
+        # Use label from registry if available, otherwise derive from field_key
+        label = field_labels.get(field_key)
+        if not label:
+            label = field_key.replace('_', ' ').title() if field_key else ext.get('target_field', 'Unknown')
+        ext['field_label'] = label
+
+        # Format confidence
+        confidence = ext.get('confidence_score')
+        if confidence is not None:
+            confidence = float(confidence)
+            if confidence >= 0.9:
+                ext['confidence_label'] = 'High'
+            elif confidence >= 0.7:
+                ext['confidence_label'] = 'Medium'
+            elif confidence >= 0.5:
+                ext['confidence_label'] = 'Low'
+            else:
+                ext['confidence_label'] = 'Review'
+            ext['confidence_percent'] = int(confidence * 100)
+        else:
+            ext['confidence_label'] = None
+            ext['confidence_percent'] = None
+
+        # Format value for display
+        extracted_value = ext.get('extracted_value')
+        if extracted_value is not None:
+            if isinstance(extracted_value, dict):
+                # JSON object - try to get a display value
+                ext['formatted_value'] = str(extracted_value.get('value', extracted_value))
+            elif isinstance(extracted_value, list):
+                ext['formatted_value'] = f"[{len(extracted_value)} items]"
+            else:
+                ext['formatted_value'] = str(extracted_value)
+        else:
+            ext['formatted_value'] = None
+
+        # Serialize datetime objects
+        if ext.get('created_at'):
+            ext['created_at'] = ext['created_at'].isoformat()
+        if ext.get('validated_at'):
+            ext['validated_at'] = ext['validated_at'].isoformat()
+
+        extractions.append(ext)
+
+    return JsonResponse({
+        'success': True,
+        'project_id': int(project_id),
+        'extractions': extractions,
+        'category_counts': category_counts,
+        'total': len(extractions)
+    })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_field_history(request, project_id: int, field_key: str):
+    """
+    GET /api/knowledge/projects/{project_id}/extraction-history/{field_key}/
+
+    Get history of values for a specific field.
+
+    CRITICAL: Only returns history for fields where field_role = 'input'.
+    Returns 404 if field is not an input field.
+
+    Returns all extractions for this field across all documents,
+    ordered by date with the most recent (current) first.
+    """
+    from django.db import connection
+    from ..services.field_registry import get_registry
+
+    with connection.cursor() as cursor:
+        # First get the project's property type
+        cursor.execute("""
+            SELECT project_type FROM landscape.tbl_project WHERE project_id = %s
+        """, [int(project_id)])
+        project_row = cursor.fetchone()
+        project_type = project_row[0] if project_row else 'MF'
+
+        # Map project_type code to registry property_type
+        if project_type == 'LAND':
+            registry_property_type = 'land_development'
+        else:
+            registry_property_type = 'multifamily'
+
+    # Verify field is an input field (not output/calculated)
+    # Use the project's property type to load the correct registry
+    registry = get_registry()
+    property_mappings = registry.get_all_mappings(registry_property_type)
+    field_mapping = property_mappings.get(field_key)
+
+    if field_mapping and field_mapping.field_role != 'input':
+        return JsonResponse({
+            'success': False,
+            'error': f'Field {field_key} is an output/calculated field and cannot be extracted'
+        }, status=404)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                e.extraction_id,
+                e.doc_id,
+                d.doc_name,
+                e.extracted_value,
+                e.validated_value,
+                e.confidence_score,
+                e.status,
+                e.source_snippet,
+                e.source_page,
+                e.validated_by,
+                e.validated_at,
+                e.rejection_reason,
+                e.created_at
+            FROM landscape.ai_extraction_staging e
+            LEFT JOIN landscape.core_doc d ON e.doc_id = d.doc_id
+            WHERE e.project_id = %s AND e.field_key = %s
+            ORDER BY e.created_at DESC
+        """, [int(project_id), field_key])
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    history = []
+    for i, row in enumerate(rows):
+        entry = dict(zip(columns, row))
+
+        # First row is current, rest are historical
+        entry['is_current'] = i == 0
+
+        # Format confidence
+        confidence = entry.get('confidence_score')
+        if confidence is not None:
+            entry['confidence_percent'] = int(float(confidence) * 100)
+
+        # Format value
+        value = entry.get('validated_value') or entry.get('extracted_value')
+        if isinstance(value, dict):
+            entry['formatted_value'] = str(value.get('value', value))
+        elif isinstance(value, list):
+            entry['formatted_value'] = f"[{len(value)} items]"
+        else:
+            entry['formatted_value'] = str(value) if value else None
+
+        # Serialize datetimes
+        if entry.get('created_at'):
+            entry['created_at'] = entry['created_at'].isoformat()
+        if entry.get('validated_at'):
+            entry['validated_at'] = entry['validated_at'].isoformat()
+
+        # Add superseded info for non-current entries
+        if i > 0 and len(history) > 0:
+            entry['superseded_by'] = history[i - 1].get('doc_name', 'Newer extraction')
+        elif i == 0:
+            entry['superseded_by'] = None
+
+        history.append(entry)
+
+    # Determine category and get label from registry
+    category = get_field_category(field_key)
+    label = field_mapping.label if field_mapping else field_key.replace('_', ' ').title()
+
+    return JsonResponse({
+        'success': True,
+        'project_id': int(project_id),
+        'field_key': field_key,
+        'field_label': label,
+        'category': category,
+        'current': history[0] if history else None,
+        'history': history[1:] if len(history) > 1 else [],
+        'total_versions': len(history)
+    })

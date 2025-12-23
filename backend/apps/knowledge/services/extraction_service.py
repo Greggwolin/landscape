@@ -41,6 +41,276 @@ def _get_anthropic_client() -> Anthropic:
 
     return Anthropic(api_key=api_key)
 
+
+# =============================================================================
+# Conflict Detection Helpers
+# =============================================================================
+
+def normalize_value_for_comparison(value: Any) -> str:
+    """
+    Normalize value for comparison to detect conflicts.
+    Handles numeric precision, string casing, whitespace.
+    """
+    if value is None:
+        return ''
+
+    # Handle JSON values (stored as jsonb)
+    if isinstance(value, dict):
+        value = json.dumps(value, sort_keys=True)
+    elif isinstance(value, list):
+        value = json.dumps(value, sort_keys=True)
+
+    # Convert to string
+    str_val = str(value).strip()
+
+    # Empty string is treated as "no value" - return empty
+    if not str_val:
+        return ''
+
+    # Normalize numbers (handle float precision issues)
+    try:
+        # Remove common formatting characters
+        cleaned = str_val.replace(',', '').replace('$', '').replace('%', '').strip()
+        num = float(cleaned)
+        # Round to 2 decimal places for comparison
+        return f"{num:.2f}"
+    except (ValueError, TypeError):
+        pass
+
+    # Normalize strings - lowercase and strip whitespace
+    return str_val.lower().strip()
+
+
+def is_empty_value(value: Any) -> bool:
+    """
+    Check if a value is empty/null for conflict detection.
+    Returns True if value is None, empty string, 'null', etc.
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        return normalized in ('', 'null', 'none', 'n/a', '-')
+    return False
+
+
+def deduplicate_extractions(extractions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ISSUE 1 FIX: Deduplicate extractions within a single batch.
+
+    The Claude extraction sometimes returns the same field multiple times
+    from different source snippets. This function keeps only the best value
+    for each field_key.
+
+    For each duplicate:
+    - Higher confidence wins
+    - If confidence equal, prefer more specific/longer value
+    - For property_class, prefer standard terms
+
+    Args:
+        extractions: Dict mapping field_key -> extraction dict
+                    or field_key -> list (for array scopes)
+
+    Returns:
+        Deduplicated extractions dict
+    """
+    # Since extractions is already a dict keyed by field_key,
+    # true duplicates can't exist at this level. However, the issue
+    # might be that multiple batches run and produce overlapping fields.
+    # The ON CONFLICT clause in SQL handles cross-batch deduplication.
+    #
+    # But if the JSON response somehow has multiple values for same field
+    # (which shouldn't be possible with JSON), or if values are in arrays
+    # when they should be single values, we handle that here.
+
+    deduplicated = {}
+
+    for field_key, extraction in extractions.items():
+        if not extraction:
+            continue
+
+        # Skip non-dict extractions (already handled by JSON structure)
+        if not isinstance(extraction, dict):
+            deduplicated[field_key] = extraction
+            continue
+
+        # If this is a list value that should be single (based on field type),
+        # take the best one
+        value = extraction.get('value')
+        if isinstance(value, list) and len(value) > 0:
+            # Check if this looks like duplicate single values
+            # (vs legitimate array like unit_types)
+            if all(isinstance(v, (str, int, float, bool)) for v in value):
+                # Take the most specific/longest value
+                best_value = _select_best_value(value, field_key)
+                extraction = dict(extraction)
+                extraction['value'] = best_value
+
+        deduplicated[field_key] = extraction
+
+    return deduplicated
+
+
+def _select_best_value(values: List[Any], field_key: str) -> Any:
+    """
+    Select the best value from a list of duplicates.
+    Used when extraction returns multiple values for same field.
+    """
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+
+    # Filter out empty values
+    non_empty = [v for v in values if not is_empty_value(v)]
+    if not non_empty:
+        return values[0]
+    if len(non_empty) == 1:
+        return non_empty[0]
+
+    # For property_class, prefer standard terms
+    if field_key.lower() == 'property_class':
+        standard_classes = ['multifamily', 'office', 'retail', 'industrial',
+                          'land', 'hotel', 'mixed use', 'residential']
+        for v in non_empty:
+            if str(v).lower() in standard_classes:
+                return v
+
+    # For state fields, prefer 2-letter abbreviations
+    if field_key.lower() in ('state', 'property_state'):
+        for v in non_empty:
+            if isinstance(v, str) and len(v) == 2 and v.isalpha():
+                return v.upper()
+
+    # Default: prefer longer/more specific values (for text)
+    # For numbers, they should all be the same - take first
+    if all(isinstance(v, (int, float)) for v in non_empty):
+        return non_empty[0]
+
+    # For text, prefer longer values (more complete)
+    return max(non_empty, key=lambda v: len(str(v)))
+
+
+def get_existing_accepted_value(
+    project_id: int,
+    field_key: str,
+    scope_label: Optional[str] = None,
+    array_index: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get existing accepted/applied extraction for this field.
+    Returns None if no accepted value exists.
+
+    Only returns values that have been accepted/applied (not pending).
+    These are the values we check for conflicts against.
+    """
+    # Handle nullable scope_label and array_index for the query
+    scope_label_val = scope_label or ''
+    array_index_val = array_index if array_index is not None else 0
+
+    query = """
+        SELECT
+            extraction_id,
+            doc_id,
+            extracted_value,
+            confidence_score,
+            status,
+            validated_at,
+            created_at
+        FROM landscape.ai_extraction_staging
+        WHERE project_id = %s
+          AND field_key = %s
+          AND COALESCE(scope_label, '') = %s
+          AND COALESCE(array_index, 0) = %s
+          AND status IN ('accepted', 'applied', 'validated')
+        ORDER BY validated_at DESC NULLS LAST, created_at DESC
+        LIMIT 1
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, [project_id, field_key, scope_label_val, array_index_val])
+        row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        'extraction_id': row[0],
+        'doc_id': row[1],
+        'value': row[2],
+        'confidence': float(row[3]) if row[3] else 0.0,
+        'status': row[4],
+        'validated_at': row[5],
+        'created_at': row[6],
+    }
+
+
+def check_for_conflict(
+    project_id: int,
+    field_key: str,
+    new_value: Any,
+    new_doc_id: int,
+    new_confidence: float,
+    scope_label: Optional[str] = None,
+    array_index: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Check if a new extraction conflicts with an existing accepted value.
+
+    Returns:
+        None if no conflict (field is new, existing is empty, or same value)
+        Dict with conflict info if non-empty values differ
+    """
+    existing = get_existing_accepted_value(
+        project_id, field_key, scope_label, array_index
+    )
+
+    if not existing:
+        # No existing accepted value - no conflict
+        return None
+
+    # ISSUE 2 FIX: Empty existing value is NOT a conflict
+    # This handles the case where a field was previously extracted as empty/null
+    # and now we have an actual value - that's an update, not a conflict
+    if is_empty_value(existing['value']):
+        return None
+
+    # Empty new value is NOT a conflict (nothing to compare)
+    if is_empty_value(new_value):
+        return None
+
+    # Normalize both values for comparison
+    norm_existing = normalize_value_for_comparison(existing['value'])
+    norm_new = normalize_value_for_comparison(new_value)
+
+    if norm_existing == norm_new:
+        # Same value - no conflict
+        return None
+
+    # Values differ - REAL conflict detected!
+    return {
+        'type': 'value_mismatch',
+        'existing_extraction_id': existing['extraction_id'],
+        'existing_value': existing['value'],
+        'existing_doc_id': existing['doc_id'],
+        'existing_confidence': existing['confidence'],
+        'existing_status': existing['status'],
+        'new_value': new_value,
+        'new_doc_id': new_doc_id,
+        'new_confidence': new_confidence,
+    }
+
+
+def get_doc_name(doc_id: int) -> Optional[str]:
+    """Get document name by ID."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT doc_name FROM landscape.core_doc WHERE doc_id = %s
+        """, [doc_id])
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
 # Extraction type configurations
 EXTRACTION_CONFIGS = {
     'unit_mix': {
@@ -393,32 +663,96 @@ DOCUMENT CONTENT:
         return staging_ids
 
     def get_pending_extractions(self) -> List[Dict]:
-        """Get all pending extractions for this project."""
+        """Get all pending and conflict extractions for this project."""
         with connection.cursor() as cursor:
+            # Get pending and conflict extractions with conflict details
             cursor.execute("""
                 SELECT
                     e.extraction_id,
                     e.doc_id,
                     d.doc_name,
+                    e.field_key,
                     e.target_table,
                     e.target_field,
                     e.extracted_value,
                     e.extraction_type,
                     e.source_text,
+                    e.source_snippet,
                     e.confidence_score,
                     e.status,
-                    e.created_at
+                    e.scope,
+                    e.scope_label,
+                    e.created_at,
+                    e.conflict_with_extraction_id,
+                    -- Conflict details (from the conflicting accepted extraction)
+                    c.extracted_value as conflict_existing_value,
+                    c.doc_id as conflict_existing_doc_id,
+                    cd.doc_name as conflict_existing_doc_name,
+                    c.confidence_score as conflict_existing_confidence
                 FROM landscape.ai_extraction_staging e
                 LEFT JOIN landscape.core_doc d ON e.doc_id = d.doc_id
+                LEFT JOIN landscape.ai_extraction_staging c ON e.conflict_with_extraction_id = c.extraction_id
+                LEFT JOIN landscape.core_doc cd ON c.doc_id = cd.doc_id
                 WHERE e.project_id = %s
-                AND e.status = 'pending'
-                ORDER BY e.created_at DESC
+                AND e.status IN ('pending', 'conflict')
+                ORDER BY
+                    CASE WHEN e.status = 'conflict' THEN 0 ELSE 1 END,
+                    e.created_at DESC
             """, [self.project_id])
 
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
 
-            return [dict(zip(columns, row)) for row in rows]
+            results = []
+            for row in rows:
+                extraction = dict(zip(columns, row))
+
+                # Build conflict object if this extraction has a conflict
+                if extraction.get('conflict_with_extraction_id'):
+                    extraction['conflict'] = {
+                        'existing_extraction_id': extraction.pop('conflict_with_extraction_id'),
+                        'existing_value': extraction.pop('conflict_existing_value'),
+                        'existing_doc_id': extraction.pop('conflict_existing_doc_id'),
+                        'existing_doc_name': extraction.pop('conflict_existing_doc_name'),
+                        'existing_confidence': float(extraction.pop('conflict_existing_confidence')) if extraction.get('conflict_existing_confidence') else None,
+                    }
+                else:
+                    # Remove conflict-related None values
+                    extraction.pop('conflict_with_extraction_id', None)
+                    extraction.pop('conflict_existing_value', None)
+                    extraction.pop('conflict_existing_doc_id', None)
+                    extraction.pop('conflict_existing_doc_name', None)
+                    extraction.pop('conflict_existing_confidence', None)
+
+                results.append(extraction)
+
+            return results
+
+    def get_extraction_summary(self) -> Dict[str, Any]:
+        """Get summary counts for extractions in this project."""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'pending') as pending,
+                    COUNT(*) FILTER (WHERE status = 'conflict') as conflicts,
+                    COUNT(*) FILTER (WHERE status IN ('accepted', 'validated')) as accepted,
+                    COUNT(*) FILTER (WHERE status = 'applied') as applied,
+                    COUNT(*) FILTER (WHERE status = 'rejected') as rejected
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s
+            """, [self.project_id])
+
+            row = cursor.fetchone()
+            return {
+                'total': row[0],
+                'pending': row[1],
+                'conflicts': row[2],
+                'accepted': row[3],
+                'applied': row[4],
+                'rejected': row[5],
+                'awaiting_review': row[1] + row[2],  # pending + conflicts
+            }
 
     def validate_extraction(
         self,
@@ -1602,6 +1936,9 @@ class BatchedExtractionService:
         self.property_type = property_type
         self.registry = get_registry()
         self.classifier = DocumentClassifier()
+        # Import here to avoid circular imports at module load
+        from .document_processor import processor as doc_processor
+        self.doc_processor = doc_processor
 
     def extract_document_batched(
         self,
@@ -1638,6 +1975,19 @@ class BatchedExtractionService:
 
         # Get document content once (reuse across batches)
         doc_content = self._get_document_content(doc_id)
+        if not doc_content:
+            # Attempt to process the document inline to populate embeddings/text
+            try:
+                process_result = self.doc_processor.process_document(doc_id)
+                if process_result.get('success'):
+                    doc_content = self._get_document_content(doc_id)
+                else:
+                    logger.warning(
+                        f"Inline processing failed for doc {doc_id}: {process_result.get('error')}"
+                    )
+            except Exception as e:
+                logger.exception(f"Inline processing exception for doc {doc_id}: {e}")
+
         if not doc_content:
             return {
                 'success': False,
@@ -1750,6 +2100,9 @@ class BatchedExtractionService:
 
             response_text = response.content[0].text
             extractions = self._parse_batch_response(response_text, fields, scopes)
+
+            # ISSUE 1 FIX: Deduplicate within batch before staging
+            extractions = deduplicate_extractions(extractions)
 
             if not extractions:
                 return {
@@ -1962,7 +2315,7 @@ Extract ALL rent comps as array under "rent_comp_name":
         return "\n".join(instructions)
 
     def _get_document_content(self, doc_id: int) -> Optional[str]:
-        """Get document text content from embeddings."""
+        """Get document text content from embeddings or direct extraction."""
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT content_text
@@ -1975,6 +2328,30 @@ Extract ALL rent comps as array under "rent_comp_name":
 
         if rows:
             return "\n\n".join(row[0] for row in rows if row[0])
+
+        # Fallback: fetch document storage_uri and extract text directly
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT storage_uri, mime_type, doc_name
+                FROM landscape.core_doc
+                WHERE doc_id = %s
+            """, [doc_id])
+            doc_row = cursor.fetchone()
+
+        if not doc_row:
+            return None
+
+        storage_uri, mime_type, _doc_name = doc_row
+        try:
+            from .text_extraction import extract_text_from_url
+            extracted_text, extract_error = extract_text_from_url(storage_uri, mime_type)
+            if extracted_text:
+                return extracted_text
+            if extract_error:
+                logger.warning(f"[doc_id={doc_id}] Direct text extraction failed: {extract_error}")
+        except Exception as e:
+            logger.exception(f"[doc_id={doc_id}] Direct text extraction exception: {e}")
+
         return None
 
     def _get_document_info(self, doc_id: int) -> Optional[Dict[str, Any]]:
@@ -2087,15 +2464,57 @@ Extract ALL rent comps as array under "rent_comp_name":
                         # Get extraction_type from doc_info
                         extraction_type = doc_info.get('doc_type', 'unknown')
 
+                        # Check for conflict with existing accepted value (for array items)
+                        conflict = check_for_conflict(
+                            project_id=self.project_id,
+                            field_key=field_key,
+                            new_value=item,
+                            new_doc_id=doc_id,
+                            new_confidence=conf_score,
+                            scope_label=scope_label,
+                            array_index=array_idx
+                        )
+
+                        # Determine status and conflict reference
+                        status = 'conflict' if conflict else 'pending'
+                        conflict_extraction_id = conflict['existing_extraction_id'] if conflict else None
+
+                        # Use ON CONFLICT to dedupe array items: update if new confidence is higher
                         cursor.execute("""
                             INSERT INTO landscape.ai_extraction_staging (
                                 project_id, doc_id, field_key, extracted_value,
                                 confidence_score, source_snippet, status, scope,
                                 scope_label, array_index, target_table, target_field,
-                                db_write_type, selector_json, property_type, extraction_type, created_at
+                                db_write_type, selector_json, property_type, extraction_type,
+                                conflict_with_extraction_id, created_at
                             ) VALUES (
-                                %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
                             )
+                            ON CONFLICT (project_id, field_key, COALESCE(scope_label, ''), COALESCE(array_index, 0))
+                            WHERE status = 'pending'
+                            DO UPDATE SET
+                                extracted_value = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.extracted_value
+                                    ELSE landscape.ai_extraction_staging.extracted_value
+                                END,
+                                confidence_score = GREATEST(EXCLUDED.confidence_score, landscape.ai_extraction_staging.confidence_score),
+                                source_snippet = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.source_snippet
+                                    ELSE landscape.ai_extraction_staging.source_snippet
+                                END,
+                                doc_id = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.doc_id
+                                    ELSE landscape.ai_extraction_staging.doc_id
+                                END,
+                                conflict_with_extraction_id = COALESCE(EXCLUDED.conflict_with_extraction_id, landscape.ai_extraction_staging.conflict_with_extraction_id),
+                                status = CASE
+                                    WHEN EXCLUDED.conflict_with_extraction_id IS NOT NULL THEN 'conflict'
+                                    ELSE landscape.ai_extraction_staging.status
+                                END,
+                                created_at = NOW()
                         """, [
                             self.project_id,
                             doc_id,
@@ -2103,6 +2522,7 @@ Extract ALL rent comps as array under "rent_comp_name":
                             json.dumps(item),
                             conf_score,
                             source_quote[:500] if source_quote else None,
+                            status,
                             field.scope,
                             scope_label,
                             array_idx,
@@ -2112,35 +2532,83 @@ Extract ALL rent comps as array under "rent_comp_name":
                             json.dumps(field.selector_json) if field.selector_json else None,
                             self.property_type,
                             extraction_type,
+                            conflict_extraction_id,
                         ])
                         staged_count += 1
                 else:
                     # Single value extraction
                     extraction_type = doc_info.get('doc_type', 'unknown')
 
+                    # Check for conflict with existing accepted value
+                    json_value = json.dumps(value) if not isinstance(value, (str, int, float, bool)) else json.dumps(value)
+                    conflict = check_for_conflict(
+                        project_id=self.project_id,
+                        field_key=field_key,
+                        new_value=value,
+                        new_doc_id=doc_id,
+                        new_confidence=conf_score,
+                        scope_label=None,
+                        array_index=None
+                    )
+
+                    # Determine status and conflict reference
+                    status = 'conflict' if conflict else 'pending'
+                    conflict_extraction_id = conflict['existing_extraction_id'] if conflict else None
+
+                    # Use ON CONFLICT to dedupe: update if new confidence is higher
                     cursor.execute("""
                         INSERT INTO landscape.ai_extraction_staging (
                             project_id, doc_id, field_key, extracted_value,
                             confidence_score, source_snippet, status, scope,
+                            scope_label, array_index,
                             target_table, target_field, db_write_type, selector_json,
-                            property_type, extraction_type, created_at
+                            property_type, extraction_type, conflict_with_extraction_id, created_at
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, NOW()
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
                         )
+                        ON CONFLICT (project_id, field_key, COALESCE(scope_label, ''), COALESCE(array_index, 0))
+                        WHERE status = 'pending'
+                        DO UPDATE SET
+                            extracted_value = CASE
+                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                THEN EXCLUDED.extracted_value
+                                ELSE landscape.ai_extraction_staging.extracted_value
+                            END,
+                            confidence_score = GREATEST(EXCLUDED.confidence_score, landscape.ai_extraction_staging.confidence_score),
+                            source_snippet = CASE
+                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                THEN EXCLUDED.source_snippet
+                                ELSE landscape.ai_extraction_staging.source_snippet
+                            END,
+                            doc_id = CASE
+                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                THEN EXCLUDED.doc_id
+                                ELSE landscape.ai_extraction_staging.doc_id
+                            END,
+                            conflict_with_extraction_id = COALESCE(EXCLUDED.conflict_with_extraction_id, landscape.ai_extraction_staging.conflict_with_extraction_id),
+                            status = CASE
+                                WHEN EXCLUDED.conflict_with_extraction_id IS NOT NULL THEN 'conflict'
+                                ELSE landscape.ai_extraction_staging.status
+                            END,
+                            created_at = NOW()
                     """, [
                         self.project_id,
                         doc_id,
                         field_key,
-                        json.dumps(value) if not isinstance(value, (str, int, float, bool)) else json.dumps(value),
+                        json_value,
                         conf_score,
                         source_quote[:500] if source_quote else None,
+                        status,
                         field.scope,
+                        None,  # scope_label for single values
+                        None,  # array_index for single values
                         field.table_name,
                         field.column_name,
                         field.db_write_type,
                         json.dumps(field.selector_json) if field.selector_json else None,
                         self.property_type,
                         extraction_type,
+                        conflict_extraction_id,
                     ])
                     staged_count += 1
 

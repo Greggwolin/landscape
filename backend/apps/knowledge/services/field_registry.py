@@ -266,17 +266,30 @@ class FieldRegistry:
         return {}
 
     def get_extractable_fields(self, property_type: str = 'multifamily') -> List[FieldMapping]:
-        """Get fields that can be extracted (not user_only)."""
+        """Get fields that can be extracted (not user_only, not output fields)."""
         mappings = self.get_all_mappings(property_type)
         return [
             m for m in mappings.values()
-            if m.resolved and m.extract_policy != 'user_only'
+            if m.resolved and m.extract_policy != 'user_only' and m.field_role != 'output'
         ]
 
-    def get_fields_by_scope(self, scope: str, property_type: str = 'multifamily') -> List[FieldMapping]:
-        """Get all fields for a specific scope (project, unit_type, etc.)."""
+    def get_fields_by_scope(self, scope: str, property_type: str = 'multifamily', extractable_only: bool = True) -> List[FieldMapping]:
+        """Get all fields for a specific scope (project, unit_type, etc.).
+
+        Args:
+            scope: Field scope (project, mf_property, opex, etc.)
+            property_type: 'multifamily' or 'land_development'
+            extractable_only: If True (default), exclude field_role='output' fields
+                              which are calculated, not extracted from documents.
+        """
         mappings = self.get_all_mappings(property_type)
-        return [m for m in mappings.values() if m.scope == scope and m.resolved]
+        results = [m for m in mappings.values() if m.scope == scope and m.resolved]
+
+        if extractable_only:
+            # Filter out calculated/output fields - these should be computed, not extracted
+            results = [m for m in results if m.field_role != 'output']
+
+        return results
 
     def get_fields_by_table(self, table_name: str, property_type: str = 'multifamily') -> List[FieldMapping]:
         """Get all fields that write to a specific table."""
@@ -298,11 +311,13 @@ class FieldRegistry:
 
         Returns:
             List of FieldMapping objects whose evidence_types include this evidence_type
+            (excludes output fields which are calculated, not extracted)
         """
         mappings = self.get_all_mappings(property_type)
         results = []
         for m in mappings.values():
-            if m.resolved and m.extract_policy != 'user_only':
+            # Exclude output fields - they are calculated, not extracted from documents
+            if m.resolved and m.extract_policy != 'user_only' and m.field_role != 'output':
                 # Check if evidence_type is in the field's evidence_types list
                 if evidence_type in m.evidence_types:
                     results.append(m)
@@ -373,8 +388,10 @@ class FieldRegistry:
             high_extractability_only: If True, only return fields with extractability='high'
 
         Returns:
-            List of FieldMapping objects sorted by extractability (high first)
+            List of FieldMapping objects sorted by extractability (high first).
+            Excludes output fields (field_role='output') which are calculated, not extracted.
         """
+        # get_fields_by_evidence_type already filters out output fields
         fields = self.get_fields_by_evidence_type(doc_type, property_type)
 
         if high_extractability_only:

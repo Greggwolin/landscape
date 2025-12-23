@@ -286,3 +286,280 @@ class ActivityItem(models.Model):
 
     def __str__(self):
         return f"{self.project.project_name} - {self.title} ({self.status})"
+
+
+class ExtractionMapping(models.Model):
+    """
+    Configurable field mappings for AI document extraction.
+
+    Maps source patterns from documents (e.g., "Year Built", "Total Units")
+    to database fields (e.g., tbl_project.year_built).
+
+    Maps to landscape.tbl_extraction_mapping table.
+    """
+
+    DOCUMENT_TYPE_CHOICES = [
+        ('OM', 'Offering Memorandum'),
+        ('RENT_ROLL', 'Rent Roll'),
+        ('T12', 'T12 / Operating Statement'),
+        ('APPRAISAL', 'Appraisal'),
+        ('LOAN_DOC', 'Loan Documents'),
+        ('PSA', 'Purchase Agreement'),
+        ('PCR', 'Property Condition Report'),
+        ('ENVIRONMENTAL', 'Environmental Report'),
+        ('SURVEY', 'Survey / Plat'),
+        ('ZONING', 'Zoning Letter'),
+        ('TAX_BILL', 'Tax Bill / Assessment'),
+        ('INSURANCE', 'Insurance Policy'),
+        ('MARKET_STUDY', 'Market Study'),
+        ('DEV_BUDGET', 'Development Budget'),
+        ('PROFORMA', 'Proforma / Cash Flow'),
+    ]
+
+    CONFIDENCE_CHOICES = [
+        ('High', 'High'),
+        ('Medium', 'Medium'),
+        ('Low', 'Low'),
+    ]
+
+    DATA_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('integer', 'Integer'),
+        ('decimal', 'Decimal'),
+        ('boolean', 'Boolean'),
+        ('date', 'Date'),
+        ('json', 'JSON'),
+    ]
+
+    TRANSFORM_RULE_CHOICES = [
+        ('none', 'None'),
+        ('strip_currency', 'Strip Currency'),
+        ('percent_to_decimal', 'Percent to Decimal'),
+        ('parse_date', 'Parse Date'),
+        ('extract_number', 'Extract Number'),
+    ]
+
+    mapping_id = models.AutoField(primary_key=True)
+
+    # Document classification
+    document_type = models.CharField(
+        max_length=50,
+        choices=DOCUMENT_TYPE_CHOICES,
+        help_text='Type of document this mapping applies to'
+    )
+
+    # Source pattern
+    source_pattern = models.CharField(
+        max_length=200,
+        help_text='Label or pattern to look for in documents'
+    )
+    source_aliases = models.JSONField(
+        null=True,
+        blank=True,
+        default=list,
+        help_text='Additional patterns that map to the same field'
+    )
+
+    # Target destination
+    target_table = models.CharField(
+        max_length=100,
+        help_text='Database table name (e.g., tbl_project)'
+    )
+    target_field = models.CharField(
+        max_length=100,
+        help_text='Database field name (e.g., year_built)'
+    )
+
+    # Data handling
+    data_type = models.CharField(
+        max_length=20,
+        choices=DATA_TYPE_CHOICES,
+        default='text',
+        help_text='Data type for the extracted value'
+    )
+    transform_rule = models.CharField(
+        max_length=100,
+        choices=TRANSFORM_RULE_CHOICES,
+        null=True,
+        blank=True,
+        help_text='Transformation to apply to extracted value'
+    )
+
+    # Confidence and behavior
+    confidence = models.CharField(
+        max_length=10,
+        choices=CONFIDENCE_CHOICES,
+        default='Medium',
+        help_text='Extraction confidence level'
+    )
+    auto_write = models.BooleanField(
+        default=True,
+        help_text='Automatically write to database on extraction'
+    )
+    overwrite_existing = models.BooleanField(
+        default=False,
+        help_text='Overwrite existing values when extracting'
+    )
+
+    # Admin
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this mapping is active'
+    )
+    is_system = models.BooleanField(
+        default=True,
+        help_text='System mappings cannot be deleted'
+    )
+    notes = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Additional notes about this mapping'
+    )
+
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='created_by',
+        related_name='extraction_mappings_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='updated_by',
+        related_name='extraction_mappings_updated'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_extraction_mapping'
+        ordering = ['document_type', 'source_pattern']
+        unique_together = [['document_type', 'source_pattern', 'target_table', 'target_field']]
+        verbose_name = 'Extraction Mapping'
+        verbose_name_plural = 'Extraction Mappings'
+
+    def __str__(self):
+        return f"{self.document_type}: {self.source_pattern} -> {self.target_table}.{self.target_field}"
+
+
+class ExtractionLog(models.Model):
+    """
+    Audit log for all extraction attempts.
+
+    Tracks extracted values, transformations, and user accept/reject decisions.
+
+    Maps to landscape.tbl_extraction_log table.
+    """
+
+    log_id = models.AutoField(primary_key=True)
+    mapping = models.ForeignKey(
+        ExtractionMapping,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='mapping_id',
+        related_name='extraction_logs'
+    )
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        db_column='project_id',
+        related_name='extraction_logs'
+    )
+    doc_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Document ID that was extracted from'
+    )
+
+    # What was extracted
+    source_pattern_matched = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text='Actual pattern that matched'
+    )
+    extracted_value = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Raw value extracted from document'
+    )
+    transformed_value = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Value after transformation'
+    )
+    previous_value = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Previous value in database before extraction'
+    )
+
+    # Quality
+    confidence_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text='Confidence score (0-1)'
+    )
+    extraction_context = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Surrounding text for debugging'
+    )
+
+    # Result
+    was_written = models.BooleanField(
+        default=False,
+        help_text='Whether the value was written to database'
+    )
+    was_accepted = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text='NULL=pending, True=accepted, False=rejected'
+    )
+    rejection_reason = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Reason for rejection if rejected'
+    )
+
+    # Timestamps
+    extracted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When extraction was reviewed'
+    )
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='reviewed_by',
+        related_name='extraction_reviews'
+    )
+
+    class Meta:
+        db_table = 'landscape"."tbl_extraction_log'
+        ordering = ['-extracted_at']
+        indexes = [
+            models.Index(fields=['mapping']),
+            models.Index(fields=['project']),
+            models.Index(fields=['doc_id']),
+            models.Index(fields=['extracted_at']),
+        ]
+        verbose_name = 'Extraction Log'
+        verbose_name_plural = 'Extraction Logs'
+
+    def __str__(self):
+        status = 'pending' if self.was_accepted is None else ('accepted' if self.was_accepted else 'rejected')
+        return f"Log {self.log_id}: {self.source_pattern_matched} ({status})"

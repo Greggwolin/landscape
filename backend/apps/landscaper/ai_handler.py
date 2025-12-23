@@ -138,6 +138,158 @@ Returns field_name, display_name, description, data_type, is_editable, valid_val
             },
             "required": []
         }
+    },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Document Reading Tools
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "get_project_documents",
+        "description": """List all documents uploaded to this project.
+Returns doc_id, doc_name, doc_type, extraction_status, and assertion_count for each document.
+Use this to see what documents are available before reading their content.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status_filter": {
+                    "type": "string",
+                    "description": "Filter by extraction status: 'indexed' (completed), 'pending', 'failed', or 'all' (default)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_document_content",
+        "description": """Get the extracted content from a document.
+Use this to read OMs, rent rolls, reports, and other uploaded files.
+Returns structured extraction data including property info, unit types, units, and leases.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "Document ID to retrieve content from (get from get_project_documents)"
+                },
+                "max_length": {
+                    "type": "integer",
+                    "description": "Maximum characters to return (default 50000)"
+                }
+            },
+            "required": ["doc_id"]
+        }
+    },
+    {
+        "name": "get_document_assertions",
+        "description": """Get structured data assertions extracted from documents.
+Assertions are key-value pairs like unit types, financial figures, dates, etc.
+Each assertion has a confidence score and links back to the source document.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "Filter to assertions from a specific document. If omitted, returns all project assertions."
+                },
+                "subject_type": {
+                    "type": "string",
+                    "description": "Filter by assertion type (e.g., 'unit_type', 'unit', 'lease', 'property')"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "ingest_document",
+        "description": """Auto-populate project fields from a document.
+Reads the document content and uses OM field mapping to identify and populate empty project fields.
+Useful for quickly populating property data from an Offering Memorandum or similar document.
+
+Examples of fields that can be auto-populated:
+- Property: address, city, state, county, year_built, total_units, parking
+- Pricing: asking_price, price_per_unit, cap_rate
+- Income: current_rent, market_rent, occupancy_rate
+- Expenses: operating_expenses, management_fee, taxes
+
+By default, only populates empty fields. Set overwrite_existing=true to update all fields.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "Document ID to extract data from"
+                },
+                "overwrite_existing": {
+                    "type": "boolean",
+                    "description": "If true, overwrite fields that already have values. Default is false (only populate empty fields)."
+                },
+                "field_filter": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of field names to limit ingestion to (e.g., ['total_units', 'year_built'])"
+                }
+            },
+            "required": ["doc_id"]
+        }
+    },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Operating Expense Tools
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "update_operating_expenses",
+        "description": """Add or update operating expenses for the project.
+Use this to populate the Operations tab with expense line items extracted from OMs or entered manually.
+
+Each expense maps to the Chart of Accounts (tbl_opex_accounts) automatically based on the label.
+Supported expense categories: taxes, insurance, utilities, repairs/maintenance, management, other.
+
+Examples of expense labels that are recognized:
+- Taxes: "Property Taxes", "Real Estate Taxes", "Insurance"
+- Utilities: "Water & Sewer", "Electricity", "Gas", "Trash"
+- Maintenance: "Repairs & Maintenance", "Landscaping", "Pest Control", "Pool Maintenance"
+- Management: "Property Management", "Management Fee", "Administrative", "Payroll"
+- Other: "Advertising", "Professional Services", "Security"
+
+After using this tool, the data will appear in the Operations tab.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "expenses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": "Expense name (e.g., 'Property Taxes', 'Insurance', 'Water & Sewer')"
+                            },
+                            "annual_amount": {
+                                "type": "number",
+                                "description": "Annual expense amount in dollars"
+                            },
+                            "expense_type": {
+                                "type": "string",
+                                "description": "Override type: CAM, TAXES, INSURANCE, MANAGEMENT, UTILITIES, REPAIRS, OTHER"
+                            },
+                            "escalation_rate": {
+                                "type": "number",
+                                "description": "Annual escalation rate as decimal (default 0.03 = 3%)"
+                            },
+                            "is_recoverable": {
+                                "type": "boolean",
+                                "description": "Whether expense is recoverable from tenants (default false)"
+                            }
+                        },
+                        "required": ["label", "annual_amount"]
+                    },
+                    "description": "List of operating expenses to add/update"
+                },
+                "source_document": {
+                    "type": "string",
+                    "description": "Optional document name where expenses were extracted from (for activity logging)"
+                }
+            },
+            "required": ["expenses"]
+        }
     }
 ]
 
@@ -155,6 +307,23 @@ RESPONSE STYLE - Be concise:
 
 Good: "Updated the county to Ventura County based on the Thousand Oaks address."
 Bad: "I need to check the current address first. Let me retrieve that information..."
+
+DOCUMENT READING:
+You have access to documents uploaded to this project. You can:
+- List all project documents with get_project_documents
+- Read extracted document content with get_document_content
+- View structured assertions with get_document_assertions
+- Auto-populate fields with ingest_document
+
+When asked to read a document and populate fields:
+1. Use get_project_documents to find the document
+2. Use ingest_document to auto-populate fields from the document
+3. Report what was updated and what was skipped
+
+For manual extraction (more control):
+1. Use get_document_content to read the document
+2. Use bulk_update_fields to update specific fields
+3. Report what you updated
 
 FIELD UPDATES:
 - Use tools to update fields when user asks or when you can infer missing data
@@ -486,6 +655,14 @@ def get_landscaper_response(
                     if tool_name in ('update_project_field', 'bulk_update_fields'):
                         if result.get('success'):
                             field_updates.extend(result.get('updates', []))
+                    elif tool_name == 'update_operating_expenses':
+                        if result.get('success') or result.get('created', 0) > 0 or result.get('updated', 0) > 0:
+                            field_updates.append({
+                                'type': 'operating_expenses',
+                                'created': result.get('created', 0),
+                                'updated': result.get('updated', 0),
+                                'summary': result.get('summary', '')
+                            })
 
                     tool_results.append({
                         "type": "tool_result",

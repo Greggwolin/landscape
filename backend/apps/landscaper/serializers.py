@@ -3,7 +3,7 @@ Serializers for Landscaper AI models.
 """
 
 from rest_framework import serializers
-from .models import ChatMessage, LandscaperAdvice, ActivityItem
+from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
@@ -134,3 +134,121 @@ class ActivityItemCreateSerializer(serializers.ModelSerializer):
             'source_type',
             'source_id',
         ]
+
+
+class ExtractionMappingSerializer(serializers.ModelSerializer):
+    """Serializer for ExtractionMapping model."""
+
+    # Add stats from the view when available
+    times_extracted = serializers.IntegerField(read_only=True, required=False)
+    projects_used = serializers.IntegerField(read_only=True, required=False)
+    documents_processed = serializers.IntegerField(read_only=True, required=False)
+    avg_confidence_score = serializers.DecimalField(
+        max_digits=5, decimal_places=4, read_only=True, required=False
+    )
+    write_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=4, read_only=True, required=False
+    )
+    acceptance_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=4, read_only=True, required=False
+    )
+    last_used_at = serializers.DateTimeField(read_only=True, required=False)
+
+    class Meta:
+        model = ExtractionMapping
+        fields = [
+            'mapping_id',
+            'document_type',
+            'source_pattern',
+            'source_aliases',
+            'target_table',
+            'target_field',
+            'data_type',
+            'transform_rule',
+            'confidence',
+            'auto_write',
+            'overwrite_existing',
+            'is_active',
+            'is_system',
+            'notes',
+            'created_at',
+            'updated_at',
+            # Stats fields (optional)
+            'times_extracted',
+            'projects_used',
+            'documents_processed',
+            'avg_confidence_score',
+            'write_rate',
+            'acceptance_rate',
+            'last_used_at',
+        ]
+        read_only_fields = ['mapping_id', 'created_at', 'updated_at']
+
+
+class ExtractionMappingCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating/updating extraction mappings."""
+
+    class Meta:
+        model = ExtractionMapping
+        fields = [
+            'document_type',
+            'source_pattern',
+            'source_aliases',
+            'target_table',
+            'target_field',
+            'data_type',
+            'transform_rule',
+            'confidence',
+            'auto_write',
+            'overwrite_existing',
+            'is_active',
+            'notes',
+        ]
+
+
+class ExtractionLogSerializer(serializers.ModelSerializer):
+    """Serializer for ExtractionLog model."""
+
+    mapping_pattern = serializers.CharField(
+        source='mapping.source_pattern', read_only=True
+    )
+    mapping_target = serializers.SerializerMethodField()
+    project_name = serializers.CharField(
+        source='project.project_name', read_only=True
+    )
+
+    class Meta:
+        model = ExtractionLog
+        fields = [
+            'log_id',
+            'mapping',
+            'mapping_pattern',
+            'mapping_target',
+            'project',
+            'project_name',
+            'doc_id',
+            'source_pattern_matched',
+            'extracted_value',
+            'transformed_value',
+            'previous_value',
+            'confidence_score',
+            'extraction_context',
+            'was_written',
+            'was_accepted',
+            'rejection_reason',
+            'extracted_at',
+            'reviewed_at',
+        ]
+        read_only_fields = ['log_id', 'extracted_at']
+
+    def get_mapping_target(self, obj):
+        if obj.mapping:
+            return f"{obj.mapping.target_table}.{obj.mapping.target_field}"
+        return None
+
+
+class ExtractionLogReviewSerializer(serializers.Serializer):
+    """Serializer for reviewing (accepting/rejecting) extractions."""
+
+    was_accepted = serializers.BooleanField(required=True)
+    rejection_reason = serializers.CharField(required=False, allow_blank=True)
