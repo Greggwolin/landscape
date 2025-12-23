@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
 import React, { useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import DMSView from '@/components/dms/DMSView';

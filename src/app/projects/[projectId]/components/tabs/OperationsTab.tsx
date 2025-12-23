@@ -172,49 +172,64 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         if (data.accounts && data.accounts.length > 0) {
           console.log('[OperationsTab] Using Chart of Accounts data, accounts count:', data.accounts.length);
 
-          // Map Chart of Accounts to expected expense type keys and categories
+          // Map Chart of Accounts to multifamilyOpExFields keys
+          // These MUST match the 'key' values in src/config/opex/multifamily-fields.ts
           const accountToExpenseTypeMap: Record<string, { expenseType: string; category: string }> = {
-            // Taxes & Insurance
-            '5100': { expenseType: 'property_taxes', category: 'taxes' },
-            '5110': { expenseType: 'property_taxes', category: 'taxes' },
-            '5111': { expenseType: 'property_taxes', category: 'taxes' },
-            '5112': { expenseType: 'property_taxes', category: 'taxes' },
+            // Taxes & Insurance (5100 series)
+            '5100': { expenseType: 'property_taxes', category: 'taxes' },      // Parent rollup
+            '5110': { expenseType: 'property_taxes', category: 'taxes' },      // Maps to basic tier parent
+            '5111': { expenseType: 'property_taxes', category: 'taxes' },      // Real Estate Taxes -> property_taxes
+            '5112': { expenseType: 'property_taxes', category: 'taxes' },      // Direct Assessment -> property_taxes
             '5120': { expenseType: 'insurance', category: 'insurance' },
 
-            // Utilities
+            // Utilities (5200 series)
             '5200': { expenseType: 'utilities_combined', category: 'utilities' },
             '5210': { expenseType: 'water_sewer', category: 'utilities' },
-            '5220': { expenseType: 'gas_electric', category: 'utilities' },
+            '5220': { expenseType: 'trash_removal', category: 'utilities' },   // Maps to trash_removal
+            '5230': { expenseType: 'gas_electric', category: 'utilities' },    // Electricity -> gas_electric
+            '5240': { expenseType: 'gas_electric', category: 'utilities' },    // Gas -> gas_electric
 
-            // Payroll
-            '5300': { expenseType: 'property_management', category: 'management' },
-            '5310': { expenseType: 'payroll_onsite', category: 'management' },
-            '5320': { expenseType: 'payroll_offsite', category: 'management' },
+            // Repairs & Maintenance (5300 series)
+            '5300': { expenseType: 'repairs_maintenance', category: 'maintenance' },
+            '5310': { expenseType: 'unit_turnover', category: 'maintenance' }, // Repairs & Labor -> unit_turnover
+            '5320': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Maintenance Contracts
+            '5321': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Janitorial
+            '5322': { expenseType: 'landscaping', category: 'other' },         // Gardening -> landscaping
+            '5323': { expenseType: 'pest_control', category: 'other' },
+            '5324': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Elevator
 
-            // Repairs & Maintenance
-            '5400': { expenseType: 'repairs_maintenance', category: 'maintenance' },
-            '5410': { expenseType: 'unit_turnover', category: 'maintenance' },
-            '5420': { expenseType: 'general_repairs', category: 'maintenance' },
+            // Administrative / Management (5400 series)
+            '5400': { expenseType: 'property_management', category: 'management' },
+            '5410': { expenseType: 'property_management', category: 'management' }, // Management Fee
+            '5420': { expenseType: 'administrative', category: 'other' },      // Professional Services -> administrative
+            '5421': { expenseType: 'administrative', category: 'other' },
+            '5422': { expenseType: 'administrative', category: 'other' },
+            '5423': { expenseType: 'security_service', category: 'other' },
+            '5424': { expenseType: 'administrative', category: 'other' },
+            '5425': { expenseType: 'administrative', category: 'other' },
 
-            // General & Administrative
-            '5500': { expenseType: 'other_operating', category: 'other' },
-            '5510': { expenseType: 'landscaping', category: 'other' },
-            '5520': { expenseType: 'trash_removal', category: 'other' },
-            '5530': { expenseType: 'pest_control', category: 'other' },
-            '5540': { expenseType: 'pool_amenity', category: 'other' },
-            '5550': { expenseType: 'administrative', category: 'other' }
+            // Marketing (5500 series)
+            '5500': { expenseType: 'marketing_advertising', category: 'other' },
+            '5510': { expenseType: 'marketing_advertising', category: 'other' }
           };
 
           // Flatten the hierarchical accounts into expense format
+          // Only use leaf accounts (those with actual opex_id) or parent accounts if they have direct data
           const flattenAccounts = (accounts: any[]): ExpenseData[] => {
             const result: ExpenseData[] = [];
 
             accounts.forEach((account) => {
               const mapping = accountToExpenseTypeMap[account.account_number];
+              const hasChildren = account.children && account.children.length > 0;
+              const hasDirectData = account.opex_id !== null; // Has actual expense record
+              const isCalculatedParent = account.is_calculated && hasChildren;
 
-              // Add this account if we have a mapping for it
-              if (mapping) {
-                const annualAmount = parseFloat(account.calculated_total) || 0;
+              // Only add leaf accounts with data, or parents without children that have data
+              // Skip calculated parents (they just sum children)
+              if (mapping && hasDirectData && !isCalculatedParent) {
+                const annualAmount = parseFloat(account.annual_amount) || parseFloat(account.calculated_total) || 0;
+                const escalation = parseFloat(account.escalation_rate) || 0.03;
+
                 result.push({
                   expense_type: mapping.expenseType,
                   expense_category: mapping.category,
@@ -222,14 +237,14 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
                   annual_amount: annualAmount,
                   per_unit: propertyData?.unitCount ? annualAmount / propertyData.unitCount : 0,
                   per_sf: propertyData?.totalSF ? annualAmount / propertyData.totalSF : 0,
-                  escalation_rate: 0.03, // Default 3%
+                  escalation_rate: escalation,
                   is_recoverable: false,
                   recovery_rate: 0
                 });
               }
 
               // Recursively process children
-              if (account.children && account.children.length > 0) {
+              if (hasChildren) {
                 result.push(...flattenAccounts(account.children));
               }
             });

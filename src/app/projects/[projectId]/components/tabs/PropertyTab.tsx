@@ -28,17 +28,6 @@ interface FloorPlan {
   aiEstimate: number; // AI-estimated market rent from comparables
 }
 
-interface ComparableRental {
-  id: string;
-  name: string;
-  distance: number; // miles
-  askingRent: number;
-  bedrooms: number;
-  bathrooms: number;
-  sqft: number;
-  lat: number;
-  lng: number;
-}
 
 interface Unit {
   id: string;
@@ -79,13 +68,29 @@ const mockFloorPlans: FloorPlan[] = [
   { id: '5', name: 'C1', bedrooms: 3, bathrooms: 2, sqft: 1250, unitCount: 16, currentRent: 2100, marketRent: 2250, aiEstimate: 2300 },
 ];
 
-const mockComparables: ComparableRental[] = [
-  { id: '1', name: 'Riverside Apartments', distance: 0.8, askingRent: 1375, bedrooms: 1, bathrooms: 1, sqft: 680, lat: 33.4484, lng: -112.0740 },
-  { id: '2', name: 'Sunset Villas', distance: 1.2, askingRent: 1825, bedrooms: 2, bathrooms: 2, sqft: 975, lat: 33.4494, lng: -112.0750 },
-  { id: '3', name: 'Park Place', distance: 1.5, askingRent: 1425, bedrooms: 1, bathrooms: 1, sqft: 730, lat: 33.4474, lng: -112.0730 },
-  { id: '4', name: 'Valley View', distance: 2.1, askingRent: 1950, bedrooms: 2, bathrooms: 2, sqft: 1080, lat: 33.4464, lng: -112.0720 },
-  { id: '5', name: 'Desert Oaks', distance: 2.3, askingRent: 2300, bedrooms: 3, bathrooms: 2, sqft: 1280, lat: 33.4454, lng: -112.0710 },
-];
+// RentalComparable type matching database schema
+interface RentalComparable {
+  comparable_id: number;
+  property_name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  distance_miles?: number;
+  year_built?: number;
+  total_units?: number;
+  unit_type?: string;
+  bedrooms: number;
+  bathrooms: number;
+  avg_sqft: number;
+  asking_rent: number;
+  effective_rent?: number;
+  concessions?: string;
+  amenities?: string;
+  notes?: string;
+  data_source?: string;
+  as_of_date?: string;
+  is_active?: boolean;
+}
 
 const mockUnits: Unit[] = [
   { id: '1', unitNumber: '101', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1200, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-01-15', leaseEnd: '2025-01-14', tenantName: 'John Smith', status: 'Occupied', deposit: 1200, monthlyIncome: 1200, rentPerSF: 1.85, proformaRentPerSF: 2.12, notes: '' },
@@ -132,7 +137,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   const isMultifamily = projectType === 'MF';
 
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
-  const [comparables] = useState<ComparableRental[]>(mockComparables);
+  const [comparables, setComparables] = useState<RentalComparable[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
@@ -163,9 +168,9 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           bathrooms: Number(ut.bathrooms),
           sqft: ut.avg_square_feet,
           unitCount: ut.total_units,
-          currentRent: ut.current_market_rent,
-          marketRent: ut.current_market_rent,
-          aiEstimate: ut.current_market_rent * 1.05 // 5% above current as estimate
+          currentRent: Math.round(ut.current_market_rent || 0),
+          marketRent: Math.round(ut.current_market_rent || 0),
+          aiEstimate: Math.round((ut.current_market_rent || 0) * 1.05) // 5% above current as estimate
         }));
 
         // Fetch units
@@ -177,6 +182,8 @@ export default function PropertyTab({ project }: PropertyTabProps) {
 
         const transformedUnits: Unit[] = unitsData.map(u => {
           const lease = leasesByUnit.get(u.unit_id);
+          const baseRent = lease ? Math.round(lease.base_rent_monthly || 0) : 0;
+          const marketRent = Math.round(u.market_rent || 0);
           return {
             id: u.unit_id.toString(),
             unitNumber: u.unit_number,
@@ -184,20 +191,29 @@ export default function PropertyTab({ project }: PropertyTabProps) {
             sqft: u.square_feet,
             bedrooms: Number(u.bedrooms || 0),
             bathrooms: Number(u.bathrooms || 0),
-            currentRent: lease ? lease.base_rent_monthly : 0,
-            marketRent: u.market_rent || 0,
-            proformaRent: (u.market_rent || 0) * 1.05,
+            currentRent: baseRent,
+            marketRent: marketRent,
+            proformaRent: Math.round(marketRent * 1.05),
             leaseStart: lease?.lease_start_date || '',
             leaseEnd: lease?.lease_end_date || '',
             tenantName: lease?.resident_name || '',
             status: lease?.lease_status === 'ACTIVE' ? 'Occupied' : 'Vacant',
-            deposit: lease?.security_deposit || 0,
-            monthlyIncome: lease ? lease.base_rent_monthly : 0,
-            rentPerSF: u.square_feet > 0 && lease ? lease.base_rent_monthly / u.square_feet : 0,
-            proformaRentPerSF: u.square_feet > 0 && u.market_rent ? u.market_rent / u.square_feet : 0,
+            deposit: Math.round(lease?.security_deposit || 0),
+            monthlyIncome: baseRent,
+            rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
+            proformaRentPerSF: u.square_feet > 0 && marketRent ? marketRent / u.square_feet : 0,
             notes: u.other_features || ''
           };
         });
+
+        // Fetch rental comparables
+        const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`);
+        if (compsResponse.ok) {
+          const compsData = await compsResponse.json();
+          if (compsData.success && compsData.data) {
+            setComparables(compsData.data);
+          }
+        }
 
         // Always use real data (even if empty)
         setFloorPlans(transformedFloorPlans);
@@ -209,6 +225,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         // On error, set empty arrays instead of mock data
         setFloorPlans([]);
         setUnits([]);
+        setComparables([]);
         setLoading(false);
       }
     };
@@ -476,10 +493,10 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   // Show loading state
   if (loading) {
     return (
-      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-          <p className="text-gray-400">Loading rent roll data...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4" style={{ borderColor: 'var(--cui-primary)' }}></div>
+          <p style={{ color: 'var(--cui-secondary-color)' }}>Loading rent roll data...</p>
         </div>
       </div>
     );
@@ -497,8 +514,8 @@ export default function PropertyTab({ project }: PropertyTabProps) {
     };
 
     return (
-      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
             <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -532,8 +549,8 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   // Show empty state if no data for multifamily project
   if (units.length === 0 && floorPlans.length === 0) {
     return (
-      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
+      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
             <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -562,15 +579,15 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   }
 
   return (
-    <div className="p-4 space-y-4 bg-gray-950 min-h-screen">
+    <div className="space-y-4">
       {/* Upper Row: Floor Plans (left) + Comparables Map (right) */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
         {/* Floor Plan Matrix - Upper Left (WIDER) */}
-        <div className="bg-gray-800 rounded border border-gray-700">
-          <div className="px-4 py-2 border-b border-gray-700" style={{ backgroundColor: 'var(--surface-card-header)' }}>
+        <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+          <div className="border-b" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h3 className="text-xl font-semibold text-white">Floor Plan Matrix</h3>
+                <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Floor Plan Matrix</h3>
                 <div className="flex items-center gap-2 px-2 py-1 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
                   <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
@@ -591,20 +608,20 @@ export default function PropertyTab({ project }: PropertyTabProps) {
               </div>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-4" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-900">
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Plan</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Bed</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Bath</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">SF</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Units</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Current</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Market</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Variance</th>
-                    <th className="text-center px-3 py-2 font-medium text-gray-300 whitespace-nowrap">Actions</th>
+                <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Plan</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Units</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Current</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Market</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Variance</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -615,7 +632,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                     const variancePct = draft.currentRent > 0 ? ((variance / draft.currentRent) * 100).toFixed(1) : '0.0';
 
                     return (
-                      <tr key={plan.id} className={`border-b border-gray-700 ${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}>
+                      <tr key={plan.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
                         <td className="px-3 py-2">
                           {editing ? (
                             <input
@@ -708,7 +725,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                           <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
                             variance > 0 ? 'bg-green-900 text-green-300' : variance < 0 ? 'bg-red-900 text-red-300' : 'bg-gray-700 text-gray-300'
                           }`}>
-                            {variance > 0 ? '+' : ''}${variance} ({variancePct}%)
+                            {variance >= 0 ? '+' : '-'}${Math.abs(variance).toLocaleString()} ({variancePct}%)
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -784,40 +801,42 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         </div>
 
         {/* Comparable Rentals - Upper Right */}
-        <div className="bg-gray-800 rounded border border-gray-700">
-          <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between" style={{ backgroundColor: 'var(--surface-card-header)' }}>
-            <h3 className="text-lg font-semibold text-white">Comparable Rentals</h3>
-            <p className="text-xs text-gray-400">AI-analyzed nearby properties</p>
+        <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+          <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+            <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
+            <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>AI-analyzed nearby properties</p>
           </div>
-          <div className="p-4 space-y-3">
-            {/* Project Map */}
-            <div className="h-[400px]">
+          <div className="p-4 space-y-3" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+            {/* Project Map with Rental Comparables */}
+            <div className="h-[400px] rounded-lg overflow-hidden">
               <ProjectTabMap
                 projectId={projectId.toString()}
                 styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+                tabId="property"
+                rentalComparables={comparables}
               />
             </div>
 
             {/* Comparables Table - COMPACT */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-gray-900">
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left px-2 py-1.5 font-medium text-gray-400">Property</th>
-                    <th className="text-center px-2 py-1.5 font-medium text-gray-400">Bed/Ba</th>
-                    <th className="text-center px-2 py-1.5 font-medium text-gray-400">SF</th>
-                    <th className="text-center px-2 py-1.5 font-medium text-gray-400">Dist</th>
-                    <th className="text-right px-2 py-1.5 font-medium text-gray-400">Rent</th>
+                <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                    <th className="text-left px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Property</th>
+                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bed/Ba</th>
+                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
+                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Dist</th>
+                    <th className="text-right px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Rent</th>
                   </tr>
                 </thead>
                 <tbody>
                   {comparables.map((comp, index) => (
-                    <tr key={comp.id} className={`border-b border-gray-700 ${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}>
-                      <td className="px-2 py-1.5 text-gray-300">{comp.name}</td>
-                      <td className="px-2 py-1.5 text-center text-gray-300">{formatNumber(comp.bedrooms)}/{formatNumber(comp.bathrooms)}</td>
-                      <td className="px-2 py-1.5 text-center text-gray-300">{formatNumber(comp.sqft)}</td>
-                      <td className="px-2 py-1.5 text-center text-gray-300">{comp.distance ? `${comp.distance} mi` : '—'}</td>
-                      <td className="px-2 py-1.5 text-right text-white font-medium">{formatCurrency(comp.askingRent)}</td>
+                    <tr key={comp.comparable_id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
+                      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{comp.property_name}</td>
+                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatNumber(comp.bedrooms)}/{formatNumber(comp.bathrooms)}</td>
+                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatNumber(comp.avg_sqft)}</td>
+                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{comp.distance_miles ? `${comp.distance_miles} mi` : '—'}</td>
+                      <td className="px-2 py-1.5 text-right font-medium" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(comp.asking_rent)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -828,11 +847,11 @@ export default function PropertyTab({ project }: PropertyTabProps) {
       </div>
 
       {/* Detailed Rent Roll Table - Bottom (FULL WIDTH) */}
-      <div className="bg-gray-800 rounded border border-gray-700">
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between" style={{ backgroundColor: 'var(--surface-card-header)' }}>
+      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+        <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-xl font-semibold text-white">Detailed Rent Roll</h3>
+              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Detailed Rent Roll</h3>
               <div className="flex items-center gap-2 px-2 py-1 bg-green-900/20 border border-green-700/40 rounded text-xs">
                 <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
@@ -862,7 +881,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         </div>
 
         {/* KPI Tiles */}
-        <div className="px-4 py-3 grid grid-cols-6 gap-3 border-b border-gray-700">
+        <div className="px-4 py-3 grid grid-cols-6 gap-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
           {/* Occupancy Rate */}
           <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
             <div className="flex items-center justify-between mb-1">

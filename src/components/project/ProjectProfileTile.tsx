@@ -7,15 +7,16 @@
  * Shows all core project information with an EDIT button
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { CCard, CCardHeader, CCardBody, CButton } from '@coreui/react';
 import useSWR from 'swr';
 import ProfileField from './ProfileField';
 import ProjectProfileEditModal from './ProjectProfileEditModal';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile } from '@/types/project-profile';
-import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
+import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
 
 interface ProjectProfileTileProps {
   projectId: number;
@@ -32,6 +33,14 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
     fetcher,
     { revalidateOnFocus: false }
   );
+
+  // Listen for Landscaper field updates and auto-refresh
+  const handleFieldUpdate = useCallback(() => {
+    mutate(); // Refresh profile data when Landscaper updates fields
+    refreshProjects(); // Also refresh global project list
+  }, [mutate, refreshProjects]);
+
+  useFieldRefreshListener(projectId, handleFieldUpdate);
 
   const handleEditClick = () => {
     setIsEditModalOpen(true);
@@ -82,7 +91,15 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   return (
     <>
       <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
-        <CCardHeader className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ backgroundColor: 'var(--cui-card-cap-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+        <CCardHeader
+          className="d-flex align-items-center justify-content-between"
+          style={{
+            backgroundColor: 'var(--cui-card-cap-bg)',
+            color: 'var(--cui-body-color)',
+            borderColor: 'var(--cui-border-color)',
+            padding: '0.5rem 1rem'
+          }}
+        >
           <span className="fw-semibold" style={{ letterSpacing: '0.02em' }}>
             Project Profile
           </span>
@@ -109,8 +126,8 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               value={profile.property_subtype}
             />
             <ProfileField
-              label="Target Units"
-              value={profile.target_units ? formatTargetUnits(profile.target_units) : undefined}
+              label={getUnitsLabel(profile)}
+              value={getUnitCount(profile) ? formatUnits(getUnitCount(profile)) : undefined}
             />
             <ProfileField
               label="Gross Acres"

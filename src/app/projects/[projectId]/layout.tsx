@@ -21,7 +21,7 @@ export default async function ProjectLayout({
       projectId={projectIdNum}
     >
       <ProjectModeProvider projectId={projectIdNum}>
-        <div className="flex flex-col h-screen">
+        <div className="app-page flex-1 min-h-0">
           {/* Full-width header */}
           <ProjectContextBar projectId={projectIdNum} />
 
