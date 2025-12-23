@@ -65,7 +65,8 @@ def resolve_opex_category(conn, label: str, selector: Dict) -> Optional[Dict[str
 
     # First, consult tbl_extraction_mapping for an explicit pattern match
     doc_type = selector.get('document_type') or selector.get('doc_type') or 'T12'
-    mapping_label = _lookup_extraction_mapping_label(conn, normalized_label, doc_type)
+    skip_override = 'utilities fuel gas electric' in normalized_label or 'utilities (fuel, gas, electric)' in normalized_label
+    mapping_label = None if skip_override else _lookup_extraction_mapping_label(conn, normalized_label, doc_type)
     if mapping_label:
         normalized_label = mapping_label
 
@@ -79,16 +80,30 @@ def resolve_opex_category(conn, label: str, selector: Dict) -> Optional[Dict[str
 
     category_id = None
     matched_key = None
+    # First pass: exact match only (prefer specific labels)
     for cand in candidates:
         norm_cand = _normalize_label(str(cand))
         for key, cid in OPEX_ACCOUNT_MAPPING.items():
             norm_key = _normalize_label(key)
-            if norm_cand == norm_key or norm_key in norm_cand or norm_cand in norm_key:
+            if norm_cand == norm_key:
                 category_id = cid
                 matched_key = key
                 break
         if category_id:
             break
+
+    # Second pass: substring match
+    if not category_id:
+        for cand in candidates:
+            norm_cand = _normalize_label(str(cand))
+            for key, cid in OPEX_ACCOUNT_MAPPING.items():
+                norm_key = _normalize_label(key)
+                if norm_key in norm_cand or norm_cand in norm_key:
+                    category_id = cid
+                    matched_key = key
+                    break
+            if category_id:
+                break
 
     if not category_id:
         # Try fuzzy against the provided label
@@ -135,6 +150,8 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
     """
     selector = selector or {}
     statement_discriminator = selector.get('statement_discriminator') or 'default'
+    unit_count = selector.get('unit_count')
+    total_sf = selector.get('total_sf')
 
     try:
         dec_amount = Decimal(str(amount).replace(',', '').replace('$', ''))
@@ -173,6 +190,19 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             if cursor.fetchone() is None:
                 account_id = None
 
+    unit_amount = None
+    amount_per_sf = None
+    if unit_count:
+        try:
+            unit_amount = (dec_amount / Decimal(str(unit_count))).quantize(Decimal('0.01'))
+        except (InvalidOperation, ZeroDivisionError):
+            unit_amount = None
+    if total_sf:
+        try:
+            amount_per_sf = (dec_amount / Decimal(str(total_sf))).quantize(Decimal('0.01'))
+        except (InvalidOperation, ZeroDivisionError):
+            amount_per_sf = None
+
     with conn.cursor() as cursor:
         cursor.execute("""
             SELECT opex_id FROM landscape.tbl_operating_expenses
@@ -191,14 +221,16 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             cursor.execute("""
                 UPDATE landscape.tbl_operating_expenses
                 SET annual_amount = %s,
+                    amount_per_sf = %s,
                     expense_category = %s,
                     expense_type = %s,
                     category_id = %s,
                     account_id = %s,
+                    unit_amount = %s,
                     statement_discriminator = %s,
                     updated_at = NOW()
                 WHERE opex_id = %s
-            """, [dec_amount, expense_category, expense_type, category_id, account_id, statement_discriminator, opex_id])
+            """, [dec_amount, amount_per_sf, expense_category, expense_type, category_id, account_id, unit_amount, statement_discriminator, opex_id])
             return {'success': True, 'action': 'updated', 'opex_id': opex_id}
 
         cursor.execute("""
@@ -224,9 +256,9 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
                 created_at,
                 updated_at
             ) VALUES (
-                %s, %s, %s, %s, NULL, TRUE, 1.0,
+                %s, %s, %s, %s, %s, TRUE, 1.0,
                 'FIXED_PERCENT', 0.03, 1, 'MONTHLY', NULL,
-                %s, 'FIXED_AMOUNT', NULL, FALSE, %s, %s, NOW(), NOW()
+                %s, 'FIXED_AMOUNT', %s, FALSE, %s, %s, NOW(), NOW()
             )
             RETURNING opex_id
         """, [
@@ -234,7 +266,9 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             expense_category,
             expense_type,
             dec_amount,
+            amount_per_sf,
             account_id,
+            unit_amount,
             category_id,
             statement_discriminator
         ])
@@ -298,6 +332,41 @@ def persist_parsed_scenarios(
         'operating expenses',
         'operating'
     ]
+
+    unit_count = None
+    total_sf = None
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*)::int, COALESCE(SUM(square_feet), 0)::numeric
+                FROM landscape.tbl_multifamily_unit
+                WHERE project_id = %s
+                """,
+                [project_id]
+            )
+            row = cursor.fetchone()
+            if row:
+                unit_count = row[0]
+                total_sf = row[1]
+        if not unit_count or not total_sf:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        COALESCE(SUM(COALESCE(unit_count, total_units)), 0)::int AS units,
+                        COALESCE(SUM(COALESCE(unit_count, total_units) * COALESCE(avg_square_feet, 0)), 0)::numeric AS total_sf
+                    FROM landscape.tbl_multifamily_unit_type
+                    WHERE project_id = %s
+                    """,
+                    [project_id]
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    unit_count = row[0]
+                    total_sf = row[1]
+    except Exception as e:
+        logger.warning(f"Failed to load unit stats for project {project_id}: {e}")
 
     # Group rows by discriminator
     rows_by_discriminator: Dict[str, list] = {}
@@ -383,7 +452,9 @@ def persist_parsed_scenarios(
                 'document_type': row.get('document_type') or default_doc_type,
                 'statement_discriminator': discriminator,
                 'page': row.get('page'),
-                'column_header': row.get('column_header')
+                'column_header': row.get('column_header'),
+                'unit_count': unit_count,
+                'total_sf': total_sf
             }
 
             result = upsert_opex_entry(conn, project_id, label, amount, selector)

@@ -192,7 +192,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
             '5120': { expenseType: 'insurance', category: 'insurance' },
 
             // Utilities (5200 series)
-            '5200': { expenseType: 'utilities_combined', category: 'utilities' },
+            '5200': { expenseType: 'gas_electric', category: 'utilities' },
             '5210': { expenseType: 'water_sewer', category: 'utilities' },
             '5220': { expenseType: 'trash_removal', category: 'utilities' },   // Maps to trash_removal
             '5230': { expenseType: 'gas_electric', category: 'utilities' },    // Electricity -> gas_electric
@@ -203,9 +203,12 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
             '5310': { expenseType: 'unit_turnover', category: 'maintenance' }, // Repairs & Labor -> unit_turnover
             '5320': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Maintenance Contracts
             '5321': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Janitorial
-            '5322': { expenseType: 'landscaping', category: 'other' },         // Gardening -> landscaping
-            '5323': { expenseType: 'pest_control', category: 'other' },
+            '5322': { expenseType: 'landscaping', category: 'maintenance' },   // Gardening -> landscaping
+            '5323': { expenseType: 'pest_control', category: 'maintenance' },
             '5324': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Elevator
+            '5330': { expenseType: 'repairs_maintenance', category: 'maintenance' }, // Misc R&M
+            '5331': { expenseType: 'landscaping', category: 'maintenance' },   // Landscaping & Grounds
+            '5332': { expenseType: 'pest_control', category: 'maintenance' },  // Pool & Amenity Service
 
             // Administrative / Management (5400 series)
             '5400': { expenseType: 'property_management', category: 'management' },
@@ -219,7 +222,9 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
             // Marketing (5500 series)
             '5500': { expenseType: 'marketing_advertising', category: 'other' },
-            '5510': { expenseType: 'marketing_advertising', category: 'other' }
+            '5510': { expenseType: 'marketing_advertising', category: 'other' },
+            // Payroll & Personnel (5550 series)
+            '5550': { expenseType: 'payroll', category: 'other' }
           };
 
           // Flatten the hierarchical accounts into expense format
