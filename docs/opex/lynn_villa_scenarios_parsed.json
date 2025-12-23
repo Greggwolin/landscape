@@ -1,0 +1,1703 @@
+[
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Statement",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 2024.0,
+    "raw_amount": "Dec 2024 - T3 Annualized",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Current Rent Roll Pro forma",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Post-Reno Market Rent Pro Forma",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "% /$/Unit",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "% /$/Unit",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating",
+    "normalized_label": "operating",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "% /$/Unit",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1875128.0,
+    "raw_amount": "$1,875,128 $21,069",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 2045450.0,
+    "raw_amount": "$2,045,450 $22,983",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 2045450.0,
+    "raw_amount": "$2,045,450 $22,983",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Scheduled Market Rent",
+    "normalized_label": "scheduled market rent",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Based on 12/31/24 RR with vacant units rolled to market rents and 90% of rents increased by 5% prior to COE",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 1024150.0,
+    "raw_amount": "$1,024,150 50.07%Post-Reno",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Market Rents: Based on premium from renovations",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Rehab Value Add Income",
+    "normalized_label": "plus: rehab value add income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -1.5,
+    "raw_amount": "-1.50%Current RR Pro Forma: No LTL",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -46044.0,
+    "raw_amount": "($46,044)",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Loss to Lease",
+    "normalized_label": "less: loss to lease",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Post-Reno Market Rent: 1.50% LTL",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Subtotal Gross Potential Rent (GPR)",
+    "normalized_label": "subtotal gross potential rent (gpr)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1875128.0,
+    "raw_amount": "$1,875,128 100.00%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Subtotal Gross Potential Rent (GPR)",
+    "normalized_label": "subtotal gross potential rent (gpr)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 2045450.0,
+    "raw_amount": "$2,045,450 100.00%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Subtotal Gross Potential Rent (GPR)",
+    "normalized_label": "subtotal gross potential rent (gpr)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 3023556.0,
+    "raw_amount": "$3,023,556 147.82%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": -61363.0,
+    "raw_amount": "($61,363) -3.00%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -90707.0,
+    "raw_amount": "($90,707) -3.00%Marked",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 1.12,
+    "raw_amount": "to market; Current RR vacancy is 1.12%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Physical Vacancy",
+    "normalized_label": "less: physical vacancy",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -1.15,
+    "raw_amount": "-1.15%Current RR Pro Forma: One employee unit recurring moving forward ($2,200/month)",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": -26400.0,
+    "raw_amount": "($26,400) -1.41%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": -25200.0,
+    "raw_amount": "($25,200) -1.23%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -34800.0,
+    "raw_amount": "($34,800)",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Employee Unit",
+    "normalized_label": "less: employee unit",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Post-Reno Market Rents: One employee unit recurring moving forward ($2,900/month)",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Bad Debt",
+    "normalized_label": "less: bad debt",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Less: Bad Debt",
+    "normalized_label": "less: bad debt",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 0.0,
+    "raw_amount": "$0 0.00%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Less: Bad Debt",
+    "normalized_label": "less: bad debt",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": -7559.0,
+    "raw_amount": "($7,559) -0.25%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Rental Income",
+    "normalized_label": "net rental income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1848728.0,
+    "raw_amount": "$1,848,728 $20,772",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Net Rental Income",
+    "normalized_label": "net rental income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 1958886.0,
+    "raw_amount": "$1,958,886 $22,010",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Rental Income",
+    "normalized_label": "net rental income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 2890490.0,
+    "raw_amount": "$2,890,490 $32,477",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Economic Occupancy",
+    "normalized_label": "economic occupancy",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 98.59,
+    "raw_amount": "98.59%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Economic Occupancy",
+    "normalized_label": "economic occupancy",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 95.77,
+    "raw_amount": "95.77%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Economic Occupancy",
+    "normalized_label": "economic occupancy",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 95.6,
+    "raw_amount": "95.60%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Effective Rent",
+    "normalized_label": "effective rent",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1.86,
+    "raw_amount": "$1.86 $1,756",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Effective Rent",
+    "normalized_label": "effective rent",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 2.03,
+    "raw_amount": "$2.03 $1,915",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Effective Rent",
+    "normalized_label": "effective rent",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 3.0,
+    "raw_amount": "$3.00 $2,831",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 340.0,
+    "raw_amount": "$340 $4",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 809.0,
+    "raw_amount": "$809",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 9.0,
+    "raw_amount": "$9 $833 $9",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Late Charges Income",
+    "normalized_label": "plus: late charges income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Current Rent Roll Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 16608.0,
+    "raw_amount": "$16,608 $187",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 23158.0,
+    "raw_amount": "$23,158 $260",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 23853.0,
+    "raw_amount": "$23,853 $268",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: Laundry Vending",
+    "normalized_label": "plus: laundry vending",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Current Rent Roll Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 0.0,
+    "raw_amount": "$0 $0",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 144539.0,
+    "raw_amount": "$144,539 $1,624",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 148875.0,
+    "raw_amount": "$148,875 $1,673",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Plus: RUBs Income",
+    "normalized_label": "plus: rubs income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Current Rent Roll Pro Forma & Post-Reno Market Rent assume 70% of utilities being recovered through RUBs program",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Subtotal Other Income",
+    "normalized_label": "subtotal other income",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 16948.0,
+    "raw_amount": "$16,948 $190",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Subtotal Other Income",
+    "normalized_label": "subtotal other income",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 168506.0,
+    "raw_amount": "$168,506 $1,893",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Subtotal Other Income",
+    "normalized_label": "subtotal other income",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 173561.0,
+    "raw_amount": "$173,561 $1,950",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Effective Gross Income (EGI)",
+    "normalized_label": "effective gross income (egi)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1865676.0,
+    "raw_amount": "$1,865,676 $20,963",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Effective Gross Income (EGI)",
+    "normalized_label": "effective gross income (egi)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 2127392.0,
+    "raw_amount": "$2,127,392 $23,903",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Effective Gross Income (EGI)",
+    "normalized_label": "effective gross income (egi)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 3064051.0,
+    "raw_amount": "$3,064,051 $34,428",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating Expenses",
+    "normalized_label": "operating expenses",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 12.0,
+    "raw_amount": "T12",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Operating Expenses",
+    "normalized_label": "operating expenses",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Berkadia Pro Forma",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Operating Expenses",
+    "normalized_label": "operating expenses",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Berkadia Pro Forma",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 51328.0,
+    "raw_amount": "$51,328 $577",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 32246.0,
+    "raw_amount": "$32,246 $362",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 32246.0,
+    "raw_amount": "$32,246 $362",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Apartment Prep/Turnover",
+    "normalized_label": "apartment prep/turnover",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "T12 includes Cap Ex: $8.5k in appliance replacement; $10.5k in flooring replacement (Mar '24)",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 15830.0,
+    "raw_amount": "$15,830 $178",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 15830.0,
+    "raw_amount": "$15,830 $178",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 15830.0,
+    "raw_amount": "$15,830 $178",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Administrative",
+    "normalized_label": "administrative",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Based on T12; Includes Telephone, Cable, Supplies, Fire, Business License, & Professional Fees",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 39432.0,
+    "raw_amount": "$39,432 $443",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 39432.0,
+    "raw_amount": "$39,432 $443",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 39432.0,
+    "raw_amount": "$39,432 $443",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Contracted Services (Pool Service, Pest Control, Landscaping)",
+    "normalized_label": "contracted services (pool service, pest control, landscaping)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Based on T12",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 185453.0,
+    "raw_amount": "$185,453 $2,084",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 53400.0,
+    "raw_amount": "$53,400 $600",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 53400.0,
+    "raw_amount": "$53,400 $600",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Repairs & Maintenance",
+    "normalized_label": "repairs & maintenance",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 135809.0,
+    "raw_amount": "Marked to Market; Historical Excludes CapEx of $135,809 A/C and Heating & $304,356 Plumbing",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 124481.0,
+    "raw_amount": "$124,481 $1,399",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 125001.0,
+    "raw_amount": "$125,001 $1,405",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 125001.0,
+    "raw_amount": "$125,001 $1,405",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Payroll",
+    "normalized_label": "payroll",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 1.0,
+    "raw_amount": "Assumes 1 FT Mgr ($50K+Benefits/Taxes) & 1 FT Maint Supervisor ($50K+Benefits/Taxes) & Mgr receiving free unit",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 62299.0,
+    "raw_amount": "$62,299 $700",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 62299.0,
+    "raw_amount": "$62,299 $700",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 64168.0,
+    "raw_amount": "$64,168 $721",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Utilities (fuel, gas, electric)",
+    "normalized_label": "utilities (fuel, gas, electric)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 122406.0,
+    "raw_amount": "$122,406 $1,375",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 122406.0,
+    "raw_amount": "$122,406 $1,375",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 126078.0,
+    "raw_amount": "$126,078 $1,417",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Water & Sewer",
+    "normalized_label": "water & sewer",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 21779.0,
+    "raw_amount": "$21,779 $245",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 21779.0,
+    "raw_amount": "$21,779 $245",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 22432.0,
+    "raw_amount": "$22,432 $252",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Rubbish Removal",
+    "normalized_label": "rubbish removal",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 15405.0,
+    "raw_amount": "$15,405 $173",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 0.0,
+    "raw_amount": "$0",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 0.0,
+    "raw_amount": "$0 $0 $0",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Owner Specific - CPA Fees & Legal Expense",
+    "normalized_label": "owner specific - cpa fees & legal expense",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Zeroed out as this is owner specific expenses",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Controllable Expenses",
+    "normalized_label": "total controllable expenses",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 638413.0,
+    "raw_amount": "$638,413 $7,173",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Total Controllable Expenses",
+    "normalized_label": "total controllable expenses",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 472393.0,
+    "raw_amount": "$472,393 $5,308",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Controllable Expenses",
+    "normalized_label": "total controllable expenses",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 478588.0,
+    "raw_amount": "$478,588 $5,377",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 80119.0,
+    "raw_amount": "$80,119 4.29%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 79777.0,
+    "raw_amount": "$79,777 3.75%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 107242.0,
+    "raw_amount": "$107,242 3.75%Marked",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Management Fee",
+    "normalized_label": "management fee",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "to Market",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 115379.0,
+    "raw_amount": "$115,379 $1,296",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 89000.0,
+    "raw_amount": "$89,000 $1,000",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 89000.0,
+    "raw_amount": "$89,000 $1,000",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Insurance",
+    "normalized_label": "insurance",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 12.0,
+    "raw_amount": "Marked to Market; T12 of $115k includes earthquake insurance",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 264373.0,
+    "raw_amount": "$264,373 $2,970",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 264373.0,
+    "raw_amount": "$264,373 $2,970",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 264373.0,
+    "raw_amount": "$264,373 $2,970",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Real Estate Taxes",
+    "normalized_label": "real estate taxes",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 1.0491,
+    "raw_amount": "Based on 1.0491 millage rate at 100% of asking price; historicals adjusted to reflect pro forma taxes",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 2573.0,
+    "raw_amount": "$2,573 $29",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 2573.0,
+    "raw_amount": "$2,573 $29",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 2573.0,
+    "raw_amount": "$2,573 $29",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Other Taxes & Assessments",
+    "normalized_label": "other taxes & assessments",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "Based on direct assessment provided by assessor's office; historicals adjusted to show pro forma taxes",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Non-Controllable Expenses",
+    "normalized_label": "total non-controllable expenses",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 462445.0,
+    "raw_amount": "$462,445 $5,196",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Total Non-Controllable Expenses",
+    "normalized_label": "total non-controllable expenses",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 435724.0,
+    "raw_amount": "$435,724 $4,896",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Non-Controllable Expenses",
+    "normalized_label": "total non-controllable expenses",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 463188.0,
+    "raw_amount": "$463,188 $5,204",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Operating Expenses",
+    "normalized_label": "total operating expenses",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 1100858.0,
+    "raw_amount": "$1,100,858 $12,369",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Total Operating Expenses",
+    "normalized_label": "total operating expenses",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 908117.0,
+    "raw_amount": "$908,117 $10,204",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Total Operating Expenses",
+    "normalized_label": "total operating expenses",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 941776.0,
+    "raw_amount": "$941,776 $10,582",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Expense Ratio (% of EGI)",
+    "normalized_label": "expense ratio (% of egi)",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 59.0,
+    "raw_amount": "59%",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Expense Ratio (% of EGI)",
+    "normalized_label": "expense ratio (% of egi)",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 43.0,
+    "raw_amount": "43%",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Expense Ratio (% of EGI)",
+    "normalized_label": "expense ratio (% of egi)",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Cash Flow",
+    "normalized_label": "net cash flow",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 764818.0,
+    "raw_amount": "$764,818 $8,593",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Net Cash Flow",
+    "normalized_label": "net cash flow",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 1219275.0,
+    "raw_amount": "$1,219,275 $13,700",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Cash Flow",
+    "normalized_label": "net cash flow",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 2122275.0,
+    "raw_amount": "$2,122,275 $23,846",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Replacement Reserves",
+    "normalized_label": "replacement reserves",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Replacement Reserves",
+    "normalized_label": "replacement reserves",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 22250.0,
+    "raw_amount": "$22,250 $250",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Replacement Reserves",
+    "normalized_label": "replacement reserves",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 22250.0,
+    "raw_amount": "$22,250 $250",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Cash Flow after Reserves",
+    "normalized_label": "net cash flow after reserves",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": 764818.0,
+    "raw_amount": "$764,818 $8,593",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "Net Cash Flow after Reserves",
+    "normalized_label": "net cash flow after reserves",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": 1197025.0,
+    "raw_amount": "$1,197,025 $13,450",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "Net Cash Flow after Reserves",
+    "normalized_label": "net cash flow after reserves",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 2100025.0,
+    "raw_amount": "$2,100,025 $23,596",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  },
+  {
+    "source_row_label": "62",
+    "normalized_label": "62",
+    "scenario_discriminator": "T3_ANNUALIZED",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "T3_ANNUALIZED"
+  },
+  {
+    "source_row_label": "62",
+    "normalized_label": "62",
+    "scenario_discriminator": "CURRENT_PRO_FORMA",
+    "amount": null,
+    "raw_amount": "",
+    "page": 26,
+    "column_header": "CURRENT_PRO_FORMA"
+  },
+  {
+    "source_row_label": "62",
+    "normalized_label": "62",
+    "scenario_discriminator": "POST_RENO_PRO_FORMA",
+    "amount": 63.0,
+    "raw_amount": "63",
+    "page": 26,
+    "column_header": "POST_RENO_PRO_FORMA"
+  }
+]

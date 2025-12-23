@@ -119,6 +119,15 @@ pending → rejected
 rejected → pending (restore)
 ```
 
+### 4. Lynn Villa Multi-Scenario OpEx Parser Proof ✅
+
+- Located OM PDF: `reference/multifam/Lynn Villas OM 2025_FINAL FOR MARKETING.pdf` (SHA256 `635e7074...eb4b4ee`)
+- Built scenario-aware extractor for operating statement page (page 26) to split columns into `T3_ANNUALIZED`, `CURRENT_PRO_FORMA`, `POST_RENO_PRO_FORMA`
+- Outputs (no DB writes): `docs/opex/lynn_villa_scenarios_parsed.json`, `docs/opex/lynn_villa_scenarios_parsed.csv`
+- Proof note: `docs/opex/Project42_MultiScenario_ParserProof.md`
+- Screenshot saved: `docs/opex/screenshots/lynn_villa_operating_statement_page26.png`
+- Added shared OpEx helpers and standalone replay tooling (mapping aliases for Professional Fees, Miscellaneous) to enable future multi-scenario persistence without Django dependency.
+
 ---
 
 ## Next Steps

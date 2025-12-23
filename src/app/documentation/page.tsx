@@ -47,6 +47,14 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2025-12-21'
     },
     {
+      title: 'Project 42 Multi-Scenario OpEx Parser Proof',
+      path: '/docs/opex/Project42_MultiScenario_ParserProof.md',
+      category: 'AI',
+      description: 'Scenario-aware operating statement parse for Lynn Villa OM (T3 Annualized, Current Pro Forma, Post-Reno Pro Forma); JSON/CSV outputs saved for validation',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-12-23'
+    },
+    {
       title: 'Landscaper Phase 3 - Real Data & AI Wiring',
       path: '/docs/session-notes/2025-12-19-landscaper-phase3-wiring.md',
       category: 'AI',

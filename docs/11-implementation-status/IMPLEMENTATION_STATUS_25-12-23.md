@@ -41,6 +41,11 @@
   - `src/components/reports/ExtractionHistoryReport.tsx` (complete rewrite)
 - 🎯 Status: Complete - Branch: work
 
+### Lynn Villa Multi-Scenario OpEx Parser Proof (Dec 23, 2025) ⭐ NEW
+- ✅ **Scenario-Aware Parsing** - Extracted T3 Annualized, Current Rent Roll Pro Forma, and Post-Reno Market Rent Pro Forma columns from Lynn Villa OM (page 26)
+- ✅ **Artifacts** - Normalized outputs saved to `docs/opex/lynn_villa_scenarios_parsed.json` and `.csv`; proof note at `docs/opex/Project42_MultiScenario_ParserProof.md`; screenshot captured
+- 🎯 Status: Read-only parser validated; ready to wire persistence/active discriminator in next phase
+
 ---
 
 ## Recent Updates (December 3 - December 21, 2025)
