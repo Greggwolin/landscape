@@ -1319,3 +1319,459 @@ def get_field_history(request, project_id: int, field_key: str):
         'history': history[1:] if len(history) > 1 else [],
         'total_versions': len(history)
     })
+
+
+# ============================================================================
+# Extraction Approval Workflow Endpoints
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def update_extraction_status(request, project_id: int, extraction_id: int):
+    """
+    PATCH /api/knowledge/projects/{project_id}/extractions/{extraction_id}/status/
+
+    Update status of a single extraction with approval workflow logic.
+
+    High confidence (>=0.90): pending -> applied (direct write)
+    Lower confidence: pending -> accepted -> applied (two-step)
+
+    Request body:
+    {
+        "status": "accepted" | "applied" | "rejected" | "pending",
+        "validated_value": optional - if user edited the value
+    }
+
+    Response:
+    {
+        "success": true,
+        "extraction_id": 123,
+        "status": "accepted",
+        "previous_status": "pending",
+        "updated_at": "2025-12-23T15:30:00Z",
+        "write_result": "optional message if applied"
+    }
+    """
+    from django.db import connection
+    from ..services.extraction_writer import ExtractionWriter
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    new_status = body.get('status')
+    validated_value = body.get('validated_value')
+
+    valid_statuses = ['pending', 'accepted', 'applied', 'rejected']
+    if new_status not in valid_statuses:
+        return JsonResponse({
+            'success': False,
+            'error': f'Invalid status. Must be one of: {valid_statuses}'
+        }, status=400)
+
+    # Get username
+    validated_by = getattr(request, 'user', None)
+    if validated_by and hasattr(validated_by, 'username'):
+        validated_by = validated_by.username
+    else:
+        validated_by = 'user'
+
+    with connection.cursor() as cursor:
+        # Get the extraction
+        cursor.execute("""
+            SELECT
+                extraction_id, field_key, property_type, extracted_value,
+                target_table, target_field, db_write_type, selector_json,
+                scope, scope_id, doc_id, source_page, status, confidence_score
+            FROM landscape.ai_extraction_staging
+            WHERE extraction_id = %s AND project_id = %s
+        """, [int(extraction_id), int(project_id)])
+
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({'success': False, 'error': 'Extraction not found'}, status=404)
+
+        columns = ['extraction_id', 'field_key', 'property_type', 'extracted_value',
+                  'target_table', 'target_field', 'db_write_type', 'selector_json',
+                  'scope', 'scope_id', 'doc_id', 'source_page', 'status', 'confidence_score']
+        extraction = dict(zip(columns, row))
+        previous_status = extraction['status']
+
+        # Cannot modify applied extractions
+        if previous_status == 'applied' and new_status != 'applied':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot modify applied extractions'
+            }, status=400)
+
+        # Parse extracted value
+        extracted_value = extraction['extracted_value']
+        if isinstance(extracted_value, str):
+            try:
+                extracted_value = json.loads(extracted_value)
+            except json.JSONDecodeError:
+                pass
+
+        # Determine final value
+        final_value = validated_value if validated_value is not None else extracted_value
+        user_modified = validated_value is not None
+
+        # Update the staging record
+        cursor.execute("""
+            UPDATE landscape.ai_extraction_staging
+            SET status = %s,
+                validated_value = %s,
+                validated_by = %s,
+                validated_at = NOW(),
+                rejection_reason = CASE WHEN %s = 'rejected' THEN 'User rejected' ELSE NULL END
+            WHERE extraction_id = %s
+            RETURNING extraction_id
+        """, [
+            new_status,
+            json.dumps(final_value) if new_status not in ['rejected', 'pending'] else None,
+            validated_by,
+            new_status,
+            int(extraction_id)
+        ])
+
+    # If applying, write to production database
+    write_result = None
+    if new_status == 'applied' and extraction.get('field_key'):
+        property_type = extraction.get('property_type', 'multifamily')
+        writer = ExtractionWriter(int(project_id), property_type)
+        success, message = writer.write_extraction(
+            extraction_id=int(extraction_id),
+            field_key=extraction['field_key'],
+            value=final_value,
+            scope_id=extraction['scope_id'],
+            source_doc_id=extraction['doc_id'],
+            source_page=extraction['source_page']
+        )
+
+        if not success:
+            # Rollback status to accepted (not pending, since user intended to apply)
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'accepted'
+                    WHERE extraction_id = %s
+                """, [int(extraction_id)])
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to write to database: {message}'
+            }, status=500)
+
+        write_result = message
+
+    return JsonResponse({
+        'success': True,
+        'extraction_id': int(extraction_id),
+        'status': new_status,
+        'previous_status': previous_status,
+        'user_modified': user_modified,
+        'write_result': write_result
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def bulk_update_status(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/extractions/bulk-status/
+
+    Update status of multiple extractions at once.
+
+    Request body:
+    {
+        "extraction_ids": [1, 2, 3, ...],
+        "status": "accepted" | "applied" | "rejected"
+    }
+
+    Response:
+    {
+        "success": true,
+        "updated": 3,
+        "failed": 0,
+        "results": [...]
+    }
+    """
+    from django.db import connection
+    from ..services.extraction_writer import ExtractionWriter
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    extraction_ids = body.get('extraction_ids', [])
+    new_status = body.get('status')
+
+    if not extraction_ids:
+        return JsonResponse({'success': False, 'error': 'No extraction_ids provided'}, status=400)
+
+    valid_statuses = ['accepted', 'applied', 'rejected', 'pending']
+    if new_status not in valid_statuses:
+        return JsonResponse({
+            'success': False,
+            'error': f'Invalid status. Must be one of: {valid_statuses}'
+        }, status=400)
+
+    # Get username
+    validated_by = getattr(request, 'user', None)
+    if validated_by and hasattr(validated_by, 'username'):
+        validated_by = validated_by.username
+    else:
+        validated_by = 'user'
+
+    results = []
+    updated_count = 0
+    failed_count = 0
+
+    for ext_id in extraction_ids:
+        try:
+            with connection.cursor() as cursor:
+                # Get extraction
+                cursor.execute("""
+                    SELECT
+                        extraction_id, field_key, property_type, extracted_value,
+                        scope_id, doc_id, source_page, status
+                    FROM landscape.ai_extraction_staging
+                    WHERE extraction_id = %s AND project_id = %s
+                """, [int(ext_id), int(project_id)])
+
+                row = cursor.fetchone()
+                if not row:
+                    results.append({'id': ext_id, 'success': False, 'error': 'Not found'})
+                    failed_count += 1
+                    continue
+
+                columns = ['extraction_id', 'field_key', 'property_type', 'extracted_value',
+                          'scope_id', 'doc_id', 'source_page', 'status']
+                extraction = dict(zip(columns, row))
+
+                if extraction['status'] == 'applied':
+                    results.append({'id': ext_id, 'success': False, 'error': 'Already applied'})
+                    failed_count += 1
+                    continue
+
+                # Parse value
+                extracted_value = extraction['extracted_value']
+                if isinstance(extracted_value, str):
+                    try:
+                        extracted_value = json.loads(extracted_value)
+                    except json.JSONDecodeError:
+                        pass
+
+                # Update status
+                cursor.execute("""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = %s,
+                        validated_value = %s,
+                        validated_by = %s,
+                        validated_at = NOW()
+                    WHERE extraction_id = %s
+                """, [
+                    new_status,
+                    json.dumps(extracted_value) if new_status not in ['rejected', 'pending'] else None,
+                    validated_by,
+                    int(ext_id)
+                ])
+
+            # If applying, write to database
+            if new_status == 'applied' and extraction.get('field_key'):
+                property_type = extraction.get('property_type', 'multifamily')
+                writer = ExtractionWriter(int(project_id), property_type)
+                success, message = writer.write_extraction(
+                    extraction_id=int(ext_id),
+                    field_key=extraction['field_key'],
+                    value=extracted_value,
+                    scope_id=extraction['scope_id'],
+                    source_doc_id=extraction['doc_id'],
+                    source_page=extraction['source_page']
+                )
+
+                if not success:
+                    # Rollback
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            UPDATE landscape.ai_extraction_staging
+                            SET status = 'accepted'
+                            WHERE extraction_id = %s
+                        """, [int(ext_id)])
+                    results.append({'id': ext_id, 'success': False, 'error': message})
+                    failed_count += 1
+                    continue
+
+            results.append({'id': ext_id, 'success': True, 'status': new_status})
+            updated_count += 1
+
+        except Exception as e:
+            logger.error(f"Bulk status update error for {ext_id}: {e}")
+            results.append({'id': ext_id, 'success': False, 'error': str(e)})
+            failed_count += 1
+
+    return JsonResponse({
+        'success': True,
+        'updated': updated_count,
+        'failed': failed_count,
+        'results': results
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def approve_high_confidence(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/extractions/approve-high-confidence/
+
+    One-click approve all high-confidence pending extractions.
+
+    Request body:
+    {
+        "confidence_threshold": 0.90 (optional, default 0.90),
+        "category": "optional - limit to specific category"
+    }
+
+    Response:
+    {
+        "success": true,
+        "approved": 15,
+        "applied_to_model": 15,
+        "fields": ["property_name", "total_units", ...]
+    }
+    """
+    from django.db import connection
+    from ..services.extraction_writer import ExtractionWriter
+    from ..services.field_registry import get_registry
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    confidence_threshold = float(body.get('confidence_threshold', 0.90))
+    category_filter = body.get('category')
+
+    # Get username
+    validated_by = getattr(request, 'user', None)
+    if validated_by and hasattr(validated_by, 'username'):
+        validated_by = validated_by.username
+    else:
+        validated_by = 'user'
+
+    # Get project type for registry
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT project_type FROM landscape.tbl_project WHERE project_id = %s
+        """, [int(project_id)])
+        project_row = cursor.fetchone()
+        project_type_code = project_row[0] if project_row else 'MF'
+
+    registry_property_type = 'land_development' if project_type_code == 'LAND' else 'multifamily'
+
+    # Get input fields from registry
+    registry = get_registry()
+    property_mappings = registry.get_all_mappings(registry_property_type)
+    input_field_keys = {k for k, m in property_mappings.items() if m.field_role == 'input'}
+
+    # Get high-confidence pending extractions
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                extraction_id, field_key, property_type, extracted_value,
+                scope_id, doc_id, source_page, confidence_score
+            FROM landscape.ai_extraction_staging
+            WHERE project_id = %s
+              AND status = 'pending'
+              AND confidence_score >= %s
+            ORDER BY created_at DESC
+        """, [int(project_id), confidence_threshold])
+
+        columns = ['extraction_id', 'field_key', 'property_type', 'extracted_value',
+                  'scope_id', 'doc_id', 'source_page', 'confidence_score']
+        rows = cursor.fetchall()
+
+    approved = []
+    applied = []
+    failed = []
+
+    for row in rows:
+        extraction = dict(zip(columns, row))
+        field_key = extraction.get('field_key')
+
+        # Filter by input fields only
+        if field_key and field_key not in input_field_keys:
+            continue
+
+        # Filter by category if specified
+        if category_filter:
+            field_category = get_field_category(field_key)
+            if field_category != category_filter:
+                continue
+
+        ext_id = extraction['extraction_id']
+
+        # Parse value
+        extracted_value = extraction['extracted_value']
+        if isinstance(extracted_value, str):
+            try:
+                extracted_value = json.loads(extracted_value)
+            except json.JSONDecodeError:
+                pass
+
+        try:
+            # Update to applied
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'applied',
+                        validated_value = %s,
+                        validated_by = %s,
+                        validated_at = NOW()
+                    WHERE extraction_id = %s
+                """, [
+                    json.dumps(extracted_value),
+                    validated_by,
+                    ext_id
+                ])
+
+            # Write to database
+            if field_key:
+                property_type = extraction.get('property_type', registry_property_type)
+                writer = ExtractionWriter(int(project_id), property_type)
+                success, message = writer.write_extraction(
+                    extraction_id=ext_id,
+                    field_key=field_key,
+                    value=extracted_value,
+                    scope_id=extraction['scope_id'],
+                    source_doc_id=extraction['doc_id'],
+                    source_page=extraction['source_page']
+                )
+
+                if success:
+                    applied.append(field_key)
+                else:
+                    # Rollback
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            UPDATE landscape.ai_extraction_staging
+                            SET status = 'pending', validated_value = NULL, validated_at = NULL
+                            WHERE extraction_id = %s
+                        """, [ext_id])
+                    failed.append({'id': ext_id, 'field': field_key, 'error': message})
+                    continue
+
+            approved.append(ext_id)
+
+        except Exception as e:
+            logger.error(f"High-confidence approval error for {ext_id}: {e}")
+            failed.append({'id': ext_id, 'error': str(e)})
+
+    return JsonResponse({
+        'success': True,
+        'approved': len(approved),
+        'applied_to_model': len(applied),
+        'fields': list(set(applied)),
+        'failed': failed
+    })

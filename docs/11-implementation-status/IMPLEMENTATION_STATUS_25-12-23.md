@@ -22,6 +22,25 @@
 - 📖 Commit: `89da8d3`
 - 🎯 Status: Complete - Pushed to origin/work
 
+### Extraction History Approval Workflow (Dec 23, 2025) ⭐ NEW
+- ✅ **Backend API** - 3 new Django endpoints for extraction status management
+  - `PATCH .../extractions/{id}/status/` - Single extraction status update
+  - `POST .../extractions/bulk-status/` - Bulk update multiple extractions
+  - `POST .../extractions/approve-high-confidence/` - One-click approve all ≥90% confidence
+- ✅ **Frontend UI** - Complete approval workflow in ExtractionHistoryReport
+  - Row selection checkboxes for bulk operations
+  - Status filter buttons (All/Pending/Accepted/Applied/Rejected)
+  - Confidence-based action buttons (Approve for ≥90%, Accept for <90%)
+  - Bulk actions toolbar (Accept/Reject Selected)
+  - Row styling by status (green for applied, gray for rejected)
+- ✅ **Database Writes** - ExtractionWriter integration for "applied" status
+- 📁 Files Modified:
+  - `backend/apps/knowledge/views/extraction_views.py` (+450 lines)
+  - `backend/apps/knowledge/urls.py` (3 routes)
+  - `src/hooks/useExtractionHistory.ts` (API wrappers)
+  - `src/components/reports/ExtractionHistoryReport.tsx` (complete rewrite)
+- 🎯 Status: Complete - Branch: work
+
 ---
 
 ## Recent Updates (December 3 - December 21, 2025)
@@ -129,6 +148,7 @@
 | Activity Feed | ✅ Complete | Real data infrastructure |
 | Context Prompts | ✅ Complete | Property-type aware |
 | Document Extraction | 🔄 In Progress | Registry-based, batched extraction + validation UI |
+| Extraction Approval Workflow | ✅ Complete | Confidence-based approve/accept/apply/reject (Dec 23) |
 | Real AI Responses | 📋 Planned | Claude API integration (partial) |
 
 ### Multifamily
@@ -190,6 +210,11 @@ GET     /api/knowledge/projects/{project_id}/extractions/pending/
 POST    /api/knowledge/projects/{project_id}/extractions/{id}/validate/
 POST    /api/knowledge/projects/{project_id}/extractions/{id}/validate-v2/
 POST    /api/knowledge/projects/{project_id}/extractions/bulk-validate/
+PATCH   /api/knowledge/projects/{project_id}/extractions/{id}/status/      # NEW - Single status update
+POST    /api/knowledge/projects/{project_id}/extractions/bulk-status/      # NEW - Bulk status update
+POST    /api/knowledge/projects/{project_id}/extractions/approve-high-confidence/  # NEW - Approve ≥90%
+GET     /api/knowledge/projects/{project_id}/extraction-history/           # Extraction history report
+GET     /api/knowledge/projects/{project_id}/extraction-history/{field}/   # Field version history
 POST    /api/knowledge/documents/{doc_id}/extract-batched/
 POST    /api/knowledge/documents/{doc_id}/extract-rent-roll/
 GET     /api/knowledge/documents/{doc_id}/status/

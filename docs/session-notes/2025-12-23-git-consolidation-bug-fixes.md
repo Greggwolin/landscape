@@ -83,11 +83,49 @@ expiring_soon = leases.filter(
 
 ---
 
+### 3. Extraction History Approval Workflow ✅ (Dec 23, Later)
+
+**Feature:** Complete approval workflow for AI-extracted data with confidence-based UX.
+
+**Backend API Endpoints Added:**
+- `PATCH /api/knowledge/projects/{id}/extractions/{id}/status/` - Update single extraction status
+- `POST /api/knowledge/projects/{id}/extractions/bulk-status/` - Bulk update multiple extractions
+- `POST /api/knowledge/projects/{id}/extractions/approve-high-confidence/` - One-click approve all ≥90% confidence
+
+**Frontend Implementation:**
+- Row selection with checkboxes
+- Status filter buttons (All/Pending/Accepted/Applied/Rejected)
+- Action buttons per row based on status & confidence:
+  - **Pending (≥90%)**: "Approve" → applied directly
+  - **Pending (<90%)**: "Accept" → accepted (staging)
+  - **Accepted**: "Apply" → applied (writes to DB)
+  - **Rejected**: "Restore" → pending
+- Bulk actions toolbar (Accept/Reject Selected)
+- "Approve All High Confidence" button
+- Row styling (green for applied, gray for rejected)
+- Toast messages for feedback
+
+**Files Modified:**
+- `backend/apps/knowledge/views/extraction_views.py` - Added 3 approval workflow endpoints (~450 lines)
+- `backend/apps/knowledge/urls.py` - Added 3 new URL routes
+- `src/hooks/useExtractionHistory.ts` - Added API wrapper functions
+- `src/components/reports/ExtractionHistoryReport.tsx` - Complete rewrite with approval workflow
+
+**Status Lifecycle:**
+```
+pending → accepted → applied
+pending → applied (high confidence shortcut)
+pending → rejected
+rejected → pending (restore)
+```
+
+---
+
 ## Next Steps
 
 1. Continue with TASK_QUEUE.md priorities
 2. Consider adding tests for multifamily endpoints
-3. BUG-002 (Extraction Commit) still needs design clarification
+3. BUG-002 (Extraction Commit) still needs design clarification - partially addressed by approval workflow
 4. FEAT-001 (Claude Full Integration) is in progress
 
 ---

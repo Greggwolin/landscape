@@ -38,6 +38,11 @@ urlpatterns = [
     path('projects/<int:project_id>/extraction-history/', extraction_views.get_extraction_history, name='knowledge-extraction-history'),
     path('projects/<int:project_id>/extraction-history/<str:field_key>/', extraction_views.get_field_history, name='knowledge-field-history'),
 
+    # Extraction approval workflow endpoints
+    path('projects/<int:project_id>/extractions/<int:extraction_id>/status/', extraction_views.update_extraction_status, name='knowledge-extraction-status'),
+    path('projects/<int:project_id>/extractions/bulk-status/', extraction_views.bulk_update_status, name='knowledge-extractions-bulk-status'),
+    path('projects/<int:project_id>/extractions/approve-high-confidence/', extraction_views.approve_high_confidence, name='knowledge-extractions-approve-high-confidence'),
+
     # Status endpoints
     path('projects/<int:project_id>/processing-status/', status_views.get_project_processing_status, name='knowledge-processing-status'),
     path('projects/<int:project_id>/confidence/', status_views.get_project_confidence, name='knowledge-confidence'),

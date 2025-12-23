@@ -223,3 +223,106 @@ export function useFieldHistory(projectId: number | null, fieldKey: string | nul
 export function getAllCategories(): ExtractionCategory[] {
   return Object.keys(CATEGORY_CONFIG) as ExtractionCategory[];
 }
+
+// ============================================================================
+// Extraction Approval Workflow API Functions
+// ============================================================================
+
+export type ExtractionStatus = 'pending' | 'accepted' | 'applied' | 'rejected';
+
+interface UpdateStatusResponse {
+  success: boolean;
+  extraction_id: number;
+  status: ExtractionStatus;
+  previous_status: ExtractionStatus;
+  user_modified?: boolean;
+  write_result?: string;
+  error?: string;
+}
+
+interface BulkUpdateResponse {
+  success: boolean;
+  updated: number;
+  failed: number;
+  results: Array<{
+    id: number;
+    success: boolean;
+    status?: ExtractionStatus;
+    error?: string;
+  }>;
+}
+
+interface ApproveHighConfidenceResponse {
+  success: boolean;
+  approved: number;
+  applied_to_model: number;
+  fields: string[];
+  failed: Array<{ id: number; field?: string; error: string }>;
+}
+
+/**
+ * Update status of a single extraction
+ */
+export async function updateExtractionStatus(
+  projectId: number,
+  extractionId: number,
+  status: ExtractionStatus,
+  validatedValue?: unknown
+): Promise<UpdateStatusResponse> {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  const res = await fetch(
+    `${backendUrl}/api/knowledge/projects/${projectId}/extractions/${extractionId}/status/`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status,
+        ...(validatedValue !== undefined && { validated_value: validatedValue }),
+      }),
+    }
+  );
+  return res.json();
+}
+
+/**
+ * Bulk update status of multiple extractions
+ */
+export async function bulkUpdateStatus(
+  projectId: number,
+  extractionIds: number[],
+  status: ExtractionStatus
+): Promise<BulkUpdateResponse> {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  const res = await fetch(
+    `${backendUrl}/api/knowledge/projects/${projectId}/extractions/bulk-status/`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ extraction_ids: extractionIds, status }),
+    }
+  );
+  return res.json();
+}
+
+/**
+ * Approve all high-confidence pending extractions
+ */
+export async function approveHighConfidence(
+  projectId: number,
+  confidenceThreshold = 0.90,
+  category?: ExtractionCategory
+): Promise<ApproveHighConfidenceResponse> {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  const res = await fetch(
+    `${backendUrl}/api/knowledge/projects/${projectId}/extractions/approve-high-confidence/`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        confidence_threshold: confidenceThreshold,
+        ...(category && { category }),
+      }),
+    }
+  );
+  return res.json();
+}

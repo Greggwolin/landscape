@@ -23,10 +23,10 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
-      title: 'Git Consolidation & Bug Fixes (Dec 23)',
+      title: 'Git Consolidation, Bug Fixes & Approval Workflow (Dec 23)',
       path: '/docs/session-notes/2025-12-23-git-consolidation-bug-fixes.md',
       category: 'Status',
-      description: 'Feature branch merge (25 commits, 299 files), BUG-001 fix for multifamily expiring_soon query, git cleanup',
+      description: 'Feature branch merge (25 commits, 299 files), BUG-001 fix, Extraction History Approval Workflow with confidence-based approve/apply actions',
       icon: <Code className="w-5 h-5" />,
       lastModified: '2025-12-23'
     },
@@ -34,7 +34,7 @@ const DocumentationIndex: React.FC = () => {
       title: 'Implementation Status (Dec 23)',
       path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-23.md',
       category: 'Status',
-      description: 'Current implementation status - BUG-001 fixed, feature branch merged, Knowledge Extraction Platform operational',
+      description: 'Current implementation status - Extraction Approval Workflow complete, BUG-001 fixed, Knowledge Extraction Platform operational',
       icon: <FileText className="w-5 h-5" />,
       lastModified: '2025-12-23'
     },

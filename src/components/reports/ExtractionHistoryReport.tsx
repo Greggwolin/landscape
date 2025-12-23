@@ -10,6 +10,7 @@ import {
   type ColumnDef,
   type SortingState,
   type ExpandedState,
+  type RowSelectionState,
 } from '@tanstack/react-table';
 import {
   CCard,
@@ -19,6 +20,9 @@ import {
   CSpinner,
   CButton,
   CTooltip,
+  CButtonGroup,
+  CFormCheck,
+  CAlert,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -27,14 +31,23 @@ import {
   cilChevronBottom,
   cilFile,
   cilCloudUpload,
+  cilCheckCircle,
+  cilXCircle,
+  cilArrowRight,
+  cilReload,
+  cilCheckAlt,
 } from '@coreui/icons';
 import { format, parseISO } from 'date-fns';
 import {
   useExtractionHistory,
   type ExtractionRecord,
   type ExtractionCategory,
+  type ExtractionStatus,
   CATEGORY_CONFIG,
   getAllCategories,
+  updateExtractionStatus,
+  bulkUpdateStatus,
+  approveHighConfidence,
 } from '@/hooks/useExtractionHistory';
 import { ExtractionFilterPills } from './ExtractionFilterPills';
 
@@ -45,9 +58,9 @@ interface ExtractionHistoryReportProps {
 // Status badge colors
 const STATUS_COLORS: Record<string, string> = {
   pending: 'warning',
-  accepted: 'success',
+  accepted: 'info',
   rejected: 'danger',
-  applied: 'info',
+  applied: 'success',
   conflict: 'secondary',
 };
 
@@ -195,21 +208,35 @@ function CategoryPill({ category }: { category: ExtractionCategory }) {
   );
 }
 
+// Status filter options
+const STATUS_OPTIONS: { value: ExtractionStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'applied', label: 'Applied' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
 export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportProps) {
   // Filter state
   const [selectedCategories, setSelectedCategories] = useState<ExtractionCategory[]>(
     getAllCategories().filter((c) => c !== 'other')
   );
+  const [statusFilter, setStatusFilter] = useState<ExtractionStatus | 'all'>('all');
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
   ]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Fetch data
-  const { extractions, categoryCounts, total, isLoading, error } = useExtractionHistory(
+  const { extractions, categoryCounts, total, isLoading, error, mutate } = useExtractionHistory(
     projectId,
     {
       categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+      status: statusFilter,
       sort: 'created_at',
       order: 'desc',
     }
@@ -230,9 +257,238 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
     setSelectedCategories([]);
   }, []);
 
+  // Get selected extraction IDs
+  const selectedIds = useMemo(() => {
+    return Object.keys(rowSelection)
+      .filter((key) => rowSelection[key])
+      .map((key) => extractions[parseInt(key)]?.extraction_id)
+      .filter(Boolean) as number[];
+  }, [rowSelection, extractions]);
+
+  // Count high-confidence pending extractions
+  const highConfidencePendingCount = useMemo(() => {
+    return extractions.filter(
+      (e) => e.status === 'pending' && (e.confidence_percent || 0) >= 90
+    ).length;
+  }, [extractions]);
+
+  // Action handlers
+  const handleStatusUpdate = useCallback(
+    async (extractionId: number, newStatus: ExtractionStatus) => {
+      setIsProcessing(true);
+      setMessage(null);
+      try {
+        const result = await updateExtractionStatus(projectId, extractionId, newStatus);
+        if (result.success) {
+          setMessage({ type: 'success', text: `Extraction ${newStatus}` });
+          mutate(); // Refresh data
+        } else {
+          setMessage({ type: 'error', text: result.error || 'Update failed' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'Network error' });
+      }
+      setIsProcessing(false);
+    },
+    [projectId, mutate]
+  );
+
+  const handleBulkUpdate = useCallback(
+    async (status: ExtractionStatus) => {
+      if (selectedIds.length === 0) return;
+      setIsProcessing(true);
+      setMessage(null);
+      try {
+        const result = await bulkUpdateStatus(projectId, selectedIds, status);
+        if (result.success) {
+          setMessage({
+            type: 'success',
+            text: `${result.updated} extraction(s) ${status}`,
+          });
+          setRowSelection({});
+          mutate();
+        } else {
+          setMessage({ type: 'error', text: 'Bulk update failed' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'Network error' });
+      }
+      setIsProcessing(false);
+    },
+    [projectId, selectedIds, mutate]
+  );
+
+  const handleApproveHighConfidence = useCallback(async () => {
+    setIsProcessing(true);
+    setMessage(null);
+    try {
+      const result = await approveHighConfidence(projectId, 0.90);
+      if (result.success) {
+        setMessage({
+          type: 'success',
+          text: `${result.approved} high-confidence extraction(s) approved and applied`,
+        });
+        mutate();
+      } else {
+        setMessage({ type: 'error', text: 'Approval failed' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Network error' });
+    }
+    setIsProcessing(false);
+  }, [projectId, mutate]);
+
+  // Action buttons component for each row
+  const ActionButtons = useCallback(
+    ({ row }: { row: ExtractionRecord }) => {
+      const { status, confidence_percent, extraction_id } = row;
+      const isHighConfidence = (confidence_percent || 0) >= 90;
+
+      if (status === 'applied') {
+        return (
+          <CBadge color="success" className="d-flex align-items-center gap-1">
+            <CIcon icon={cilCheckCircle} size="sm" />
+            Applied
+          </CBadge>
+        );
+      }
+
+      if (status === 'rejected') {
+        return (
+          <div className="d-flex align-items-center gap-1">
+            <CBadge color="secondary" className="text-decoration-line-through opacity-75">
+              Rejected
+            </CBadge>
+            <CTooltip content="Restore to pending">
+              <CButton
+                color="light"
+                size="sm"
+                className="p-1"
+                disabled={isProcessing}
+                onClick={() => handleStatusUpdate(extraction_id, 'pending')}
+              >
+                <CIcon icon={cilReload} size="sm" />
+              </CButton>
+            </CTooltip>
+          </div>
+        );
+      }
+
+      if (status === 'accepted') {
+        return (
+          <div className="d-flex align-items-center gap-1">
+            <CTooltip content="Apply to model">
+              <CButton
+                color="primary"
+                size="sm"
+                className="py-0 px-2"
+                disabled={isProcessing}
+                onClick={() => handleStatusUpdate(extraction_id, 'applied')}
+              >
+                <CIcon icon={cilArrowRight} size="sm" className="me-1" />
+                Apply
+              </CButton>
+            </CTooltip>
+            <CTooltip content="Return to pending">
+              <CButton
+                color="light"
+                size="sm"
+                className="p-1"
+                disabled={isProcessing}
+                onClick={() => handleStatusUpdate(extraction_id, 'pending')}
+              >
+                <CIcon icon={cilReload} size="sm" />
+              </CButton>
+            </CTooltip>
+          </div>
+        );
+      }
+
+      // Pending status
+      if (isHighConfidence) {
+        // High confidence: single "Approve" button that goes directly to applied
+        return (
+          <div className="d-flex align-items-center gap-1">
+            <CTooltip content="Approve and apply to model (high confidence)">
+              <CButton
+                color="success"
+                size="sm"
+                className="py-0 px-2"
+                disabled={isProcessing}
+                onClick={() => handleStatusUpdate(extraction_id, 'applied')}
+              >
+                <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                Approve
+              </CButton>
+            </CTooltip>
+            <CTooltip content="Reject">
+              <CButton
+                color="light"
+                size="sm"
+                className="p-1 text-danger"
+                disabled={isProcessing}
+                onClick={() => handleStatusUpdate(extraction_id, 'rejected')}
+              >
+                <CIcon icon={cilXCircle} size="sm" />
+              </CButton>
+            </CTooltip>
+          </div>
+        );
+      }
+
+      // Lower confidence: two-step "Accept" then "Apply"
+      return (
+        <div className="d-flex align-items-center gap-1">
+          <CTooltip content="Accept (stage for review)">
+            <CButton
+              color="warning"
+              size="sm"
+              className="py-0 px-2 text-dark"
+              disabled={isProcessing}
+              onClick={() => handleStatusUpdate(extraction_id, 'accepted')}
+            >
+              <CIcon icon={cilCheckAlt} size="sm" className="me-1" />
+              Accept
+            </CButton>
+          </CTooltip>
+          <CTooltip content="Reject">
+            <CButton
+              color="light"
+              size="sm"
+              className="p-1 text-danger"
+              disabled={isProcessing}
+              onClick={() => handleStatusUpdate(extraction_id, 'rejected')}
+            >
+              <CIcon icon={cilXCircle} size="sm" />
+            </CButton>
+          </CTooltip>
+        </div>
+      );
+    },
+    [isProcessing, handleStatusUpdate]
+  );
+
   // Define table columns
   const columns = useMemo<ColumnDef<ExtractionRecord>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <CFormCheck
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+          />
+        ),
+        cell: ({ row }) => (
+          <CFormCheck
+            checked={row.getIsSelected()}
+            disabled={row.original.status === 'applied'}
+            onChange={row.getToggleSelectedHandler()}
+          />
+        ),
+        size: 40,
+      },
       {
         id: 'expander',
         header: () => null,
@@ -251,7 +507,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
             </button>
           );
         },
-        size: 40,
+        size: 30,
       },
       {
         accessorKey: 'created_at',
@@ -259,7 +515,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
         cell: ({ getValue }) => (
           <span className="text-nowrap small">{formatDate(getValue() as string)}</span>
         ),
-        size: 140,
+        size: 130,
       },
       {
         accessorKey: 'field_label',
@@ -270,13 +526,13 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
             <div className="text-muted small">{row.original.scope_label || row.original.scope}</div>
           </div>
         ),
-        size: 180,
+        size: 160,
       },
       {
         accessorKey: 'category',
         header: 'Category',
         cell: ({ getValue }) => <CategoryPill category={getValue() as ExtractionCategory} />,
-        size: 100,
+        size: 90,
       },
       {
         accessorKey: 'formatted_value',
@@ -289,11 +545,11 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
           );
           return (
             <CTooltip content={String(row.original.extracted_value || '')}>
-              <span>{truncate(formattedVal)}</span>
+              <span>{truncate(formattedVal, 30)}</span>
             </CTooltip>
           );
         },
-        size: 200,
+        size: 150,
       },
       {
         accessorKey: 'doc_name',
@@ -310,25 +566,25 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
                 className="text-decoration-none d-flex align-items-center gap-1"
               >
                 <CIcon icon={cilFile} size="sm" />
-                <span className="text-truncate" style={{ maxWidth: '180px' }}>
-                  {truncate(docName, 30)}
+                <span className="text-truncate" style={{ maxWidth: '140px' }}>
+                  {truncate(docName, 20)}
                 </span>
               </a>
             </CTooltip>
           );
         },
-        size: 220,
+        size: 160,
       },
       {
         accessorKey: 'confidence_percent',
-        header: 'Confidence',
+        header: 'Conf.',
         cell: ({ row }) => (
           <ConfidenceBadge
             percent={row.original.confidence_percent}
             label={row.original.confidence_label}
           />
         ),
-        size: 100,
+        size: 70,
       },
       {
         accessorKey: 'status',
@@ -336,27 +592,35 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
         cell: ({ getValue }) => {
           const status = getValue() as string;
           return (
-            <CBadge color={STATUS_COLORS[status] || 'secondary'}>
+            <CBadge color={STATUS_COLORS[status] || 'secondary'} size="sm">
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </CBadge>
           );
         },
-        size: 100,
+        size: 80,
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => <ActionButtons row={row.original} />,
+        size: 140,
       },
     ],
-    [projectId]
+    [projectId, ActionButtons]
   );
 
   // Create table instance
   const table = useReactTable({
     data: extractions,
     columns,
-    state: { sorting, expanded },
+    state: { sorting, expanded, rowSelection },
     onSortingChange: setSorting,
     onExpandedChange: setExpanded,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
+    enableRowSelection: (row) => row.original.status !== 'applied',
   });
 
   // Loading state
@@ -409,6 +673,18 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
 
   return (
     <div className="extraction-history-report">
+      {/* Message Alert */}
+      {message && (
+        <CAlert
+          color={message.type === 'success' ? 'success' : 'danger'}
+          dismissible
+          onClose={() => setMessage(null)}
+          className="mb-3"
+        >
+          {message.text}
+        </CAlert>
+      )}
+
       {/* Filter Pills */}
       <CCard className="mb-3">
         <CCardBody className="py-2">
@@ -419,6 +695,76 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
             onSelectAll={handleSelectAll}
             onDeselectAll={handleDeselectAll}
           />
+        </CCardBody>
+      </CCard>
+
+      {/* Status Filter & Bulk Actions */}
+      <CCard className="mb-3">
+        <CCardBody className="py-2">
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            {/* Status Filter */}
+            <div className="d-flex align-items-center gap-2">
+              <span className="text-body-secondary small">Status:</span>
+              <CButtonGroup size="sm">
+                {STATUS_OPTIONS.map((opt) => (
+                  <CButton
+                    key={opt.value}
+                    color={statusFilter === opt.value ? 'primary' : 'outline-secondary'}
+                    onClick={() => setStatusFilter(opt.value)}
+                  >
+                    {opt.label}
+                  </CButton>
+                ))}
+              </CButtonGroup>
+            </div>
+
+            {/* Bulk Actions */}
+            <div className="d-flex align-items-center gap-2">
+              {selectedIds.length > 0 && (
+                <>
+                  <span className="text-body-secondary small">
+                    {selectedIds.length} selected
+                  </span>
+                  <CButton
+                    color="warning"
+                    size="sm"
+                    disabled={isProcessing}
+                    onClick={() => handleBulkUpdate('accepted')}
+                  >
+                    Accept Selected
+                  </CButton>
+                  <CButton
+                    color="danger"
+                    size="sm"
+                    variant="outline"
+                    disabled={isProcessing}
+                    onClick={() => handleBulkUpdate('rejected')}
+                  >
+                    Reject Selected
+                  </CButton>
+                  <CButton
+                    color="light"
+                    size="sm"
+                    onClick={() => setRowSelection({})}
+                  >
+                    Clear
+                  </CButton>
+                </>
+              )}
+
+              {highConfidencePendingCount > 0 && selectedIds.length === 0 && (
+                <CButton
+                  color="success"
+                  size="sm"
+                  disabled={isProcessing}
+                  onClick={handleApproveHighConfidence}
+                >
+                  <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                  Approve All High Confidence ({highConfidencePendingCount})
+                </CButton>
+              )}
+            </div>
+          </div>
         </CCardBody>
       </CCard>
 
@@ -441,7 +787,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
                       <th
                         key={header.id}
                         style={{ width: header.getSize() }}
-                        onClick={header.column.getToggleSortingHandler()}
+                        onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                         className={header.column.getCanSort() ? 'cursor-pointer' : ''}
                       >
                         <div className="d-flex align-items-center gap-1">
@@ -458,15 +804,22 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
                 ))}
               </thead>
               <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {table.getRowModel().rows.map((row) => {
+                  const status = row.original.status;
+                  let rowClass = '';
+                  if (status === 'applied') rowClass = 'table-success bg-opacity-25';
+                  else if (status === 'rejected') rowClass = 'table-secondary bg-opacity-25 opacity-75';
+
+                  return (
+                    <tr key={row.id} className={rowClass}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -486,6 +839,14 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
         .extraction-history-report .table td {
           vertical-align: middle;
           padding: 0.5rem;
+        }
+
+        .extraction-history-report .table-success.bg-opacity-25 {
+          background-color: rgba(var(--cui-success-rgb), 0.1) !important;
+        }
+
+        .extraction-history-report .table-secondary.bg-opacity-25 {
+          background-color: rgba(var(--cui-secondary-rgb), 0.1) !important;
         }
       `}</style>
     </div>
