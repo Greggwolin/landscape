@@ -1,0 +1,265 @@
+field_key,label,data_type,scope,target_table,target_column,db_write_type,selector_json,evidence_types,extract_policy,description
+# ============================================================
+# SECTION 1: PROPERTY IDENTIFICATION (15 fields)
+# ============================================================
+property_name,Property Name,text,project,tbl_project,project_name,update,,offering_memorandum,validate,Legal or marketing name of the property
+street_address,Street Address,text,project,tbl_project,street_address,update,,offering_memorandum,validate,Property street address
+city,City,text,project,tbl_project,city,update,,offering_memorandum,validate,City where property is located
+state,State,text,project,tbl_project,state,update,,offering_memorandum,validate,State abbreviation (e.g. CA)
+zip_code,ZIP Code,text,project,tbl_project,zip_code,update,,offering_memorandum,validate,5-digit ZIP code
+county,County,text,project,tbl_project,county,update,,offering_memorandum,validate,County name
+submarket,Submarket,text,project,tbl_project,submarket,update,,offering_memorandum,validate,Real estate submarket designation
+market,Market/MSA,text,project,tbl_project,market,update,,offering_memorandum,validate,Metropolitan statistical area or market name
+apn_primary,Primary APN,text,project,tbl_project,apn_primary,update,,offering_memorandum,validate,Primary assessor parcel number
+listing_brokerage,Listing Brokerage,text,project,tbl_project,listing_brokerage,update,,offering_memorandum,validate,Name of brokerage marketing the property
+property_class,Property Class,text,project,tbl_project,property_class,update,,offering_memorandum,validate,Class A/B/C designation
+property_subtype,Property Subtype,text,project,tbl_project,property_subtype,update,,offering_memorandum,validate,Garden/Mid-rise/High-rise/Mixed-use
+location_lat,Latitude,number,project,tbl_project,location_lat,update,,offering_memorandum,auto,Property latitude coordinate
+location_lon,Longitude,number,project,tbl_project,location_lon,update,,offering_memorandum,auto,Property longitude coordinate
+location_description,Location Description,text,project,tbl_project,location_description,update,,offering_memorandum,validate,Narrative description of property location
+# ============================================================
+# SECTION 2: PHYSICAL CHARACTERISTICS (30 fields)
+# ============================================================
+total_units,Total Units,integer,project,tbl_project,total_units,update,,offering_memorandum,validate,Total residential unit count
+year_built,Year Built,integer,project,tbl_project,year_built,update,,offering_memorandum,validate,Original construction year
+year_renovated,Year Renovated,integer,mf_property,tbl_multifamily_property,year_renovated,update,,offering_memorandum,validate,Most recent renovation year
+stories,Number of Stories,integer,project,tbl_project,stories,update,,offering_memorandum,validate,Building height in floors
+number_of_buildings,Number of Buildings,integer,mf_property,tbl_multifamily_property,number_of_buildings,update,,offering_memorandum,validate,Count of buildings in complex
+total_building_sf,Total Building SF,number,mf_property,tbl_multifamily_property,total_building_sf,update,,offering_memorandum,validate,Gross building square footage
+rentable_sf,Rentable SF,number,project,tbl_project,gross_sf,update,,offering_memorandum,validate,Net rentable square footage
+avg_unit_sf,Average Unit SF,number,mf_property,tbl_multifamily_property,avg_unit_sf,update,,offering_memorandum,validate,Average square feet per unit
+lot_size_sf,Lot Size (SF),number,project,tbl_project,lot_size_sf,update,,offering_memorandum,validate,Land area in square feet
+lot_size_acres,Lot Size (Acres),number,project,tbl_project,lot_size_acres,update,,offering_memorandum,validate,Land area in acres
+parking_spaces_total,Total Parking Spaces,integer,mf_property,tbl_multifamily_property,parking_spaces_total,update,,offering_memorandum,validate,Total parking spaces all types
+parking_ratio,Parking Ratio,number,mf_property,tbl_multifamily_property,parking_ratio,update,,offering_memorandum,validate,Parking spaces per unit
+surface_spaces,Surface Parking Spaces,integer,mf_property,tbl_multifamily_property,surface_spaces,update,,offering_memorandum,validate,Open-lot surface parking count
+garage_spaces,Garage Spaces,integer,mf_property,tbl_multifamily_property,garage_spaces,update,,offering_memorandum,validate,Enclosed garage parking count
+covered_spaces,Covered Spaces,integer,mf_property,tbl_multifamily_property,covered_spaces,update,,offering_memorandum,validate,Carport/covered parking count
+ev_charging_spaces,EV Charging Spaces,integer,mf_property,tbl_multifamily_property,ev_charging_spaces,update,,offering_memorandum,validate,Electric vehicle charging stations
+has_commercial_space,Has Commercial Space,boolean,mf_property,tbl_multifamily_property,has_commercial_space,update,,offering_memorandum,validate,Property includes retail/commercial
+commercial_sf,Commercial SF,number,mf_property,tbl_multifamily_property,commercial_sf,update,,offering_memorandum,validate,Square footage of commercial space
+commercial_unit_count,Commercial Unit Count,integer,mf_property,tbl_multifamily_property,commercial_unit_count,update,,offering_memorandum,validate,Number of commercial units/spaces
+leasing_office_sf,Leasing Office SF,integer,mf_property,tbl_multifamily_property,leasing_office_sf,update,,offering_memorandum,validate,Square footage of leasing office
+has_manager_unit,Has Manager Unit,boolean,mf_property,tbl_multifamily_property,has_manager_unit,update,,offering_memorandum,validate,Property has on-site manager housing
+manager_unit_count,Manager Unit Count,integer,mf_property,tbl_multifamily_property,manager_unit_count,update,,offering_memorandum,validate,Number of manager/employee units
+has_solar_panels,Has Solar Panels,boolean,mf_property,tbl_multifamily_property,has_solar_panels,update,,offering_memorandum,validate,Property has solar installation
+solar_capacity_kw,Solar Capacity (kW),number,mf_property,tbl_multifamily_property,solar_capacity_kw,update,,offering_memorandum,validate,Solar panel capacity in kilowatts
+has_ev_charging,Has EV Charging,boolean,mf_property,tbl_multifamily_property,has_ev_charging,update,,offering_memorandum,validate,Property has EV charging infrastructure
+has_tankless_water_heaters,Has Tankless Water Heaters,boolean,mf_property,tbl_multifamily_property,has_tankless_water_heaters,update,,offering_memorandum,validate,Units have tankless water heaters
+electric_metered_individually,Electric Individually Metered,boolean,mf_property,tbl_multifamily_property,electric_metered_individually,update,,offering_memorandum,validate,Each unit has separate electric meter
+gas_metered_individually,Gas Individually Metered,boolean,mf_property,tbl_multifamily_property,gas_metered_individually,update,,offering_memorandum,validate,Each unit has separate gas meter
+water_metered_individually,Water Individually Metered,boolean,mf_property,tbl_multifamily_property,water_metered_individually,update,,offering_memorandum,validate,Each unit has separate water meter
+energy_star_certified,Energy Star Certified,boolean,mf_property,tbl_multifamily_property,energy_star_certified,update,,offering_memorandum,validate,Property has Energy Star certification
+# ============================================================
+# SECTION 3: PRICING & VALUATION METRICS (20 fields)
+# ============================================================
+asking_price,Asking Price,currency,project,tbl_project,asking_price,update,,offering_memorandum,validate,Listed asking price
+acquisition_price,Acquisition/Contract Price,currency,project,tbl_project,acquisition_price,update,,offering_memorandum,validate,Contracted or target acquisition price
+price_per_unit,Price Per Unit,currency,project,tbl_project,price_per_unit,update,,offering_memorandum,validate,Purchase price divided by unit count
+price_per_sf,Price Per SF,currency,project,tbl_project,price_per_sf,update,,offering_memorandum,validate,Purchase price divided by rentable SF
+cap_rate_current,Current Cap Rate,percentage,project,tbl_project,cap_rate_current,update,,offering_memorandum,validate,NOI / Purchase Price based on current income
+cap_rate_proforma,Proforma Cap Rate,percentage,project,tbl_project,cap_rate_proforma,update,,offering_memorandum,validate,NOI / Purchase Price based on proforma income
+grm_current,Current GRM,number,project,tbl_property_acquisition,grm,update,,offering_memorandum,validate,Gross Rent Multiplier based on current income
+grm_proforma,Proforma GRM,number,project,tbl_property_acquisition,grm,update,,offering_memorandum,validate,Gross Rent Multiplier based on proforma income
+current_gpr,Current Gross Potential Rent,currency,project,tbl_project,current_gpr,update,,offering_memorandum,validate,Annual GPR at current rents
+current_egi,Current Effective Gross Income,currency,project,tbl_project,current_egi,update,,offering_memorandum,validate,GPR minus vacancy and concessions
+current_opex,Current Operating Expenses,currency,project,tbl_project,current_opex,update,,offering_memorandum,validate,Annual operating expenses - current
+current_noi,Current NOI,currency,project,tbl_project,current_noi,update,,offering_memorandum,validate,Net Operating Income - current
+current_vacancy_rate,Current Vacancy Rate,percentage,project,tbl_project,current_vacancy_rate,update,,offering_memorandum,validate,Physical vacancy as percentage
+proforma_gpr,Proforma Gross Potential Rent,currency,project,tbl_project,proforma_gpr,update,,offering_memorandum,validate,Annual GPR at market rents
+proforma_egi,Proforma Effective Gross Income,currency,project,tbl_project,proforma_egi,update,,offering_memorandum,validate,Proforma EGI after stabilization
+proforma_opex,Proforma Operating Expenses,currency,project,tbl_project,proforma_opex,update,,offering_memorandum,validate,Annual operating expenses - stabilized
+proforma_noi,Proforma NOI,currency,project,tbl_project,proforma_noi,update,,offering_memorandum,validate,Net Operating Income - stabilized
+proforma_vacancy_rate,Proforma Vacancy Rate,percentage,project,tbl_project,proforma_vacancy_rate,update,,offering_memorandum,validate,Stabilized vacancy assumption
+assessed_value,Assessed Value,currency,mf_property,tbl_multifamily_property,assessed_value,update,,offering_memorandum,validate,Tax assessed value
+assessment_year,Assessment Year,integer,mf_property,tbl_multifamily_property,assessment_year,update,,offering_memorandum,validate,Year of most recent tax assessment
+# ============================================================
+# SECTION 4: UNIT MIX / UNIT TYPES (12 fields per type - array extraction)
+# ============================================================
+unit_type_name,Unit Type Name,text,unit_type,tbl_multifamily_unit_type,unit_type_name,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Unit type designation (e.g. 1BR/1BA or Studio)
+unit_type_code,Unit Type Code,text,unit_type,tbl_multifamily_unit_type,unit_type_code,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Short code for unit type (e.g. 1x1)
+unit_count,Unit Count by Type,integer,unit_type,tbl_multifamily_unit_type,unit_count,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Number of units of this type
+bedrooms,Bedrooms,integer,unit_type,tbl_multifamily_unit_type,bedrooms,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Number of bedrooms
+bathrooms,Bathrooms,number,unit_type,tbl_multifamily_unit_type,bathrooms,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Number of bathrooms (can be 1.5 etc)
+avg_square_feet,Average SF by Type,integer,unit_type,tbl_multifamily_unit_type,avg_square_feet,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Average square feet for this unit type
+market_rent,Market Rent,currency,unit_type,tbl_multifamily_unit_type,market_rent,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Current market rent for this unit type
+current_rent_avg,Current Average Rent,currency,unit_type,tbl_multifamily_unit_type,current_rent_avg,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Average in-place rent for this unit type
+concessions_avg,Average Concessions,currency,unit_type,tbl_multifamily_unit_type,concessions_avg,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Average concession amount per unit type
+total_units_by_type,Total Units by Type,integer,unit_type,tbl_multifamily_unit_type,total_units,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum|rent_roll,validate,Total unit count for this type
+notes_unit_type,Unit Type Notes,text,unit_type,tbl_multifamily_unit_type,notes,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum,validate,Additional notes about this unit type
+other_features,Other Features,text,unit_type,tbl_multifamily_unit_type,other_features,upsert,"{""match_on"": ""unit_type_name""}",offering_memorandum,validate,Amenities or features specific to unit type
+# ============================================================
+# SECTION 5: INDIVIDUAL UNITS / RENT ROLL (20 fields per unit - array extraction)
+# ============================================================
+unit_number,Unit Number,text,unit,tbl_multifamily_unit,unit_number,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Individual unit identifier (e.g. 101 or A-203)
+unit_unit_type,Unit Type,text,unit,tbl_multifamily_unit,unit_type,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit type classification for this unit
+unit_bedrooms,Bedrooms,integer,unit,tbl_multifamily_unit,bedrooms,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Number of bedrooms in unit
+unit_bathrooms,Bathrooms,number,unit,tbl_multifamily_unit,bathrooms,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Number of bathrooms in unit
+unit_square_feet,Square Feet,integer,unit,tbl_multifamily_unit,square_feet,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit square footage
+unit_current_rent,Current Rent,currency,unit,tbl_multifamily_unit,current_rent,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Current monthly rent
+unit_market_rent,Market Rent,currency,unit,tbl_multifamily_unit,market_rent,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Market rent for this unit
+unit_lease_start,Lease Start Date,date,unit,tbl_multifamily_unit,lease_start_date,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Current lease start date
+unit_lease_end,Lease End Date,date,unit,tbl_multifamily_unit,lease_end_date,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Current lease expiration date
+unit_occupancy_status,Occupancy Status,text,unit,tbl_multifamily_unit,occupancy_status,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Occupied/Vacant/Notice/Down
+unit_building,Building,text,unit,tbl_multifamily_unit,building_name,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Building name or number
+unit_floor,Floor,integer,unit,tbl_multifamily_unit,floor_number,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Floor number within building
+is_section8,Is Section 8,boolean,unit,tbl_multifamily_unit,is_section8,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit is Section 8/voucher
+section8_contract_rent,Section 8 Contract Rent,currency,unit,tbl_multifamily_unit,section8_contract_rent,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,HAP contract rent amount
+is_manager_unit,Is Manager Unit,boolean,unit,tbl_multifamily_unit,is_manager,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit occupied by property manager
+has_balcony,Has Balcony,boolean,unit,tbl_multifamily_unit,has_balcony,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit has balcony
+has_patio,Has Patio,boolean,unit,tbl_multifamily_unit,has_patio,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Unit has patio
+view_type,View Type,text,unit,tbl_multifamily_unit,view_type,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,View description (Pool/City/Mountain etc)
+renovation_status,Renovation Status,text,unit,tbl_multifamily_unit,renovation_status,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Classic/Partial/Full renovation status
+unit_notes,Unit Notes,text,unit,tbl_multifamily_unit,other_features,upsert,"{""match_on"": ""unit_number""}",rent_roll,validate,Additional notes about unit
+# ============================================================
+# SECTION 6: OPERATING EXPENSES - DETAILED (25 categories)
+# ============================================================
+opex_real_estate_taxes,Real Estate Taxes,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""real_estate_taxes""}",offering_memorandum|t12,validate,Annual property tax expense
+opex_direct_assessments,Direct Assessments,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""direct_assessments""}",offering_memorandum|t12,validate,Special assessments and direct charges
+opex_property_insurance,Property Insurance,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""property_insurance""}",offering_memorandum|t12,validate,Property and liability insurance
+opex_utilities_water,Utilities - Water/Sewer,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""utilities_water""}",offering_memorandum|t12,validate,Water and sewer expense
+opex_utilities_trash,Utilities - Trash,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""utilities_trash""}",offering_memorandum|t12,validate,Trash and recycling service
+opex_utilities_electric,Utilities - Electric,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""utilities_electric""}",offering_memorandum|t12,validate,Common area electric expense
+opex_utilities_gas,Utilities - Gas,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""utilities_gas""}",offering_memorandum|t12,validate,Common area gas expense
+opex_repairs_maintenance,Repairs & Maintenance,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""repairs_maintenance""}",offering_memorandum|t12,validate,General repairs and maintenance
+opex_contract_services,Contract Services,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""contract_services""}",offering_memorandum|t12,validate,Contracted maintenance services
+opex_turnover_costs,Turnover/Make-Ready,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""turnover_costs""}",offering_memorandum|t12,validate,Unit turn and make-ready expense
+opex_landscaping,Landscaping/Grounds,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""landscaping""}",offering_memorandum|t12,validate,Landscaping and grounds maintenance
+opex_janitorial,Janitorial,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""janitorial""}",offering_memorandum|t12,validate,Cleaning and janitorial services
+opex_pest_control,Pest Control,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""pest_control""}",offering_memorandum|t12,validate,Pest control services
+opex_pool_spa,Pool/Spa Maintenance,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""pool_spa""}",offering_memorandum|t12,validate,Pool and spa maintenance
+opex_elevator,Elevator Maintenance,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""elevator""}",offering_memorandum|t12,validate,Elevator service and maintenance
+opex_security,Security,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""security""}",offering_memorandum|t12,validate,Security services and systems
+opex_management_fee,Management Fee,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""management_fee""}",offering_memorandum|t12,validate,Property management fee
+opex_management_fee_pct,Management Fee %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""management_fee_pct""}",offering_memorandum,validate,Management fee as percentage of EGI
+opex_payroll,On-Site Payroll,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""payroll""}",offering_memorandum|t12,validate,On-site employee wages and benefits
+opex_manager_rent_credit,Manager Rent Credit,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""manager_rent_credit""}",offering_memorandum|t12,validate,Rent credit for on-site manager
+opex_advertising,Advertising/Marketing,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""advertising""}",offering_memorandum|t12,validate,Marketing and advertising expense
+opex_professional_fees,Professional Fees,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""professional_fees""}",offering_memorandum|t12,validate,Legal and accounting fees
+opex_telephone,Telephone/Communications,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""telephone""}",offering_memorandum|t12,validate,Phone and internet service
+opex_licenses_permits,Licenses & Permits,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""licenses_permits""}",offering_memorandum|t12,validate,Business licenses and permits
+opex_miscellaneous,Miscellaneous,currency,opex,tbl_operating_expense,amount,upsert,"{""match_on"": ""expense_category"", ""category"": ""miscellaneous""}",offering_memorandum|t12,validate,Other operating expenses
+# ============================================================
+# SECTION 7: OTHER INCOME (12 fields)
+# ============================================================
+income_parking,Parking Income,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""parking""}",offering_memorandum|t12,validate,Monthly parking revenue
+income_laundry,Laundry/Vending Income,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""laundry""}",offering_memorandum|t12,validate,Laundry and vending machine revenue
+income_pet_fees,Pet Fees/Rent,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""pet_fees""}",offering_memorandum|t12,validate,Pet deposits and monthly pet rent
+income_storage,Storage Income,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""storage""}",offering_memorandum|t12,validate,Storage unit rental revenue
+income_utility_reimbursement,Utility Reimbursements,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""utility_reimb""}",offering_memorandum|t12,validate,RUBS or utility billback revenue
+income_late_fees,Late Fees,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""late_fees""}",offering_memorandum|t12,validate,Late payment fee revenue
+income_application_fees,Application Fees,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""application_fees""}",offering_memorandum|t12,validate,Application and processing fee revenue
+income_cable_telecom,Cable/Telecom Income,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""cable_telecom""}",offering_memorandum|t12,validate,Cable/internet revenue sharing
+income_commercial,Commercial/Retail Income,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""commercial""}",offering_memorandum|t12,validate,Retail tenant rent revenue
+income_amenity_fees,Amenity Fees,currency,income,tbl_revenue_other,amount,upsert,"{""match_on"": ""income_category"", ""category"": ""amenity_fees""}",offering_memorandum|t12,validate,Amenity access and reservation fees
+income_miscellaneous,Miscellaneous Income,currency,income,tbl_revenue_other,other_miscellaneous,upsert,"{""match_on"": ""income_category"", ""category"": ""miscellaneous""}",offering_memorandum|t12,validate,Other income sources
+income_total_other,Total Other Income,currency,project,tbl_project,current_other_income,update,,offering_memorandum|t12,validate,Sum of all non-rent income
+# ============================================================
+# SECTION 8: ASSUMPTIONS & PROJECTIONS (20 fields)
+# ============================================================
+cap_rate_going_in,Going-In Cap Rate,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""cap_rate_going_in""}",offering_memorandum|proforma,validate,Acquisition cap rate assumption
+cap_rate_exit,Exit Cap Rate,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""cap_rate_exit""}",offering_memorandum|proforma,validate,Disposition cap rate assumption
+physical_vacancy_pct,Physical Vacancy %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""physical_vacancy_pct""}",offering_memorandum|proforma,validate,Stabilized physical vacancy assumption
+economic_vacancy_pct,Economic Vacancy %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""economic_vacancy_pct""}",offering_memorandum|proforma,validate,Economic vacancy including concessions
+concessions_pct,Concessions %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""concessions_pct""}",offering_memorandum|proforma,validate,Concessions as percentage of GPR
+bad_debt_pct,Bad Debt %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""bad_debt_pct""}",offering_memorandum|proforma,validate,Bad debt/credit loss percentage
+rent_growth_year_1,Year 1 Rent Growth,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""rent_growth_year_1""}",proforma,validate,First year rent growth projection
+rent_growth_year_2,Year 2 Rent Growth,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""rent_growth_year_2""}",proforma,validate,Second year rent growth projection
+rent_growth_stabilized,Stabilized Rent Growth,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""rent_growth_stabilized""}",proforma,validate,Long-term rent growth assumption
+expense_growth_pct,Expense Growth %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""expense_growth_pct""}",proforma,validate,Annual operating expense growth
+hold_period_years,Hold Period (Years),number,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""hold_period_years""}",offering_memorandum|proforma,validate,Projected investment hold period
+discount_rate,Discount Rate,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""discount_rate""}",proforma,validate,Discount rate for DCF analysis
+loss_to_lease_pct,Loss to Lease %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""loss_to_lease_pct""}",offering_memorandum,validate,Current rent vs market rent gap
+stabilization_months,Months to Stabilization,integer,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""stabilization_months""}",proforma,validate,Time to reach stabilized occupancy
+capex_per_unit,CapEx Reserve Per Unit,currency,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""capex_per_unit""}",proforma,validate,Annual capital reserve per unit
+replacement_reserve_pct,Replacement Reserve %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""replacement_reserve_pct""}",proforma,validate,Replacement reserve as % of EGI
+tax_reassessment_pct,Tax Reassessment %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""tax_reassessment_pct""}",proforma,validate,Expected property tax increase at sale
+insurance_growth_pct,Insurance Growth %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""insurance_growth_pct""}",proforma,validate,Annual insurance premium growth
+utility_growth_pct,Utility Growth %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""utility_growth_pct""}",proforma,validate,Annual utility expense growth
+payroll_growth_pct,Payroll Growth %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""payroll_growth_pct""}",proforma,validate,Annual payroll expense growth
+# ============================================================
+# SECTION 9: RENT CONTROL & REGULATORY (10 fields)
+# ============================================================
+rent_control_exempt,Rent Control Exempt,boolean,mf_property,tbl_multifamily_property,rent_control_exempt,update,,offering_memorandum,validate,Property exempt from rent control
+exemption_reason,Exemption Reason,text,mf_property,tbl_multifamily_property,exemption_reason,update,,offering_memorandum,validate,Basis for rent control exemption
+rent_control_ordinance,Rent Control Ordinance,text,mf_property,tbl_multifamily_property,rent_control_ordinance,update,,offering_memorandum,validate,Applicable rent control regulation
+max_rent_increase_pct,Max Rent Increase %,percentage,assumption,tbl_project_assumption,assumption_value,upsert,"{""match_on"": ""assumption_key"", ""key"": ""max_rent_increase_pct""}",offering_memorandum,validate,Maximum allowable rent increase
+has_section8_units,Has Section 8 Units,boolean,mf_property,tbl_multifamily_property,has_section8_units,update,,offering_memorandum|rent_roll,validate,Property has Section 8 tenants
+section8_unit_count,Section 8 Unit Count,integer,mf_property,tbl_multifamily_property,section8_unit_count,update,,offering_memorandum|rent_roll,validate,Number of Section 8 units
+affordable_housing_program,Affordable Program,text,mf_property,tbl_multifamily_property,affordable_housing_program,update,,offering_memorandum,validate,LIHTC/Section 8/HAP designation
+utility_recovery_method,Utility Recovery Method,text,mf_property,tbl_multifamily_property,utility_recovery_method,update,,offering_memorandum,validate,RUBS/Submeter/Master-meter
+rubs_recovery_pct,RUBS Recovery %,percentage,mf_property,tbl_multifamily_property,rubs_recovery_pct,update,,offering_memorandum,validate,Percentage of utilities recovered via RUBS
+property_tax_rate,Property Tax Rate,percentage,mf_property,tbl_multifamily_property,property_tax_rate,update,,offering_memorandum,validate,Annual property tax rate
+# ============================================================
+# SECTION 10: SALES COMPARABLES (15 fields per comp - array extraction)
+# ============================================================
+sales_comp_name,Property Name,text,sales_comp,tbl_sales_comparables,property_name,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Comparable property name
+sales_comp_address,Address,text,sales_comp,tbl_sales_comparables,address,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Comparable property address
+sales_comp_city,City,text,sales_comp,tbl_sales_comparables,city,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Comparable city
+sales_comp_state,State,text,sales_comp,tbl_sales_comparables,state,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Comparable state
+sales_comp_sale_date,Sale Date,date,sales_comp,tbl_sales_comparables,sale_date,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Date of sale
+sales_comp_sale_price,Sale Price,currency,sales_comp,tbl_sales_comparables,sale_price,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Transaction price
+sales_comp_units,Units,integer,sales_comp,tbl_sales_comparables,units,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Number of units
+sales_comp_year_built,Year Built,integer,sales_comp,tbl_sales_comparables,year_built,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Construction year
+sales_comp_price_per_unit,Price Per Unit,currency,sales_comp,tbl_sales_comparables,price_per_unit,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Price divided by units
+sales_comp_price_per_sf,Price Per SF,currency,sales_comp,tbl_sales_comparables,price_per_sf,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Price divided by building SF
+sales_comp_cap_rate,Cap Rate,percentage,sales_comp,tbl_sales_comparables,cap_rate,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Transaction cap rate
+sales_comp_grm,GRM,number,sales_comp,tbl_sales_comparables,grm,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Gross rent multiplier
+sales_comp_building_sf,Building SF,integer,sales_comp,tbl_sales_comparables,building_sf,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Total building square footage
+sales_comp_distance,Distance (miles),number,sales_comp,tbl_sales_comparables,distance_from_subject,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Distance from subject property
+sales_comp_notes,Notes,text,sales_comp,tbl_sales_comparables,notes,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,Additional comp notes
+# ============================================================
+# SECTION 11: RENT COMPARABLES (15 fields per comp - array extraction)
+# ============================================================
+rent_comp_name,Property Name,text,rent_comp,tbl_rent_comparable,property_name,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Comparable property name
+rent_comp_address,Address,text,rent_comp,tbl_rent_comparable,address,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Comparable property address
+rent_comp_year_built,Year Built,integer,rent_comp,tbl_rent_comparable,year_built,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Construction year
+rent_comp_total_units,Total Units,integer,rent_comp,tbl_rent_comparable,total_units,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Number of units
+rent_comp_unit_type,Unit Type,text,rent_comp,tbl_rent_comparable,unit_type,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Unit type being compared
+rent_comp_bedrooms,Bedrooms,integer,rent_comp,tbl_rent_comparable,bedrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Number of bedrooms
+rent_comp_bathrooms,Bathrooms,number,rent_comp,tbl_rent_comparable,bathrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Number of bathrooms
+rent_comp_avg_sqft,Average SF,integer,rent_comp,tbl_rent_comparable,avg_sqft,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Average unit square footage
+rent_comp_asking_rent,Asking Rent,currency,rent_comp,tbl_rent_comparable,asking_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Current asking rent
+rent_comp_effective_rent,Effective Rent,currency,rent_comp,tbl_rent_comparable,effective_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Net effective rent after concessions
+rent_comp_concessions,Concessions,text,rent_comp,tbl_rent_comparable,concessions,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Current concession offerings
+rent_comp_amenities,Amenities,text,rent_comp,tbl_rent_comparable,amenities,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Notable amenities
+rent_comp_distance,Distance (miles),number,rent_comp,tbl_rent_comparable,distance_miles,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Distance from subject property
+rent_comp_as_of_date,As Of Date,date,rent_comp,tbl_rent_comparable,as_of_date,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Date rent data was collected
+rent_comp_notes,Notes,text,rent_comp,tbl_rent_comparable,notes,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,Additional notes
+# ============================================================
+# SECTION 12: ACQUISITION / DEAL TERMS (15 fields)
+# ============================================================
+acquisition_date,Acquisition Date,date,project,tbl_project,acquisition_date,update,,offering_memorandum,validate,Target or actual acquisition date
+earnest_money,Earnest Money,currency,acquisition,tbl_property_acquisition,earnest_money,update,,offering_memorandum,validate,Earnest money deposit amount
+due_diligence_days,Due Diligence Period,integer,acquisition,tbl_property_acquisition,due_diligence_days,update,,offering_memorandum,validate,Due diligence period in days
+closing_costs_pct,Closing Costs %,percentage,acquisition,tbl_property_acquisition,closing_costs_pct,update,,offering_memorandum,validate,Closing costs as percentage of price
+broker_commission_pct,Broker Commission %,percentage,acquisition,tbl_property_acquisition,broker_commission_pct,update,,offering_memorandum,validate,Broker commission percentage
+legal_fees,Legal Fees,currency,acquisition,tbl_property_acquisition,legal_fees,update,,offering_memorandum,validate,Legal costs for transaction
+third_party_reports,Third Party Reports,currency,acquisition,tbl_property_acquisition,third_party_reports,update,,offering_memorandum,validate,Appraisal/PCA/Phase I costs
+financing_fees,Financing Fees,currency,acquisition,tbl_property_acquisition,financing_fees,update,,offering_memorandum,validate,Loan origination and related fees
+land_pct,Land Allocation %,percentage,acquisition,tbl_property_acquisition,land_pct,update,,appraisal,validate,Land value as percentage of total
+improvement_pct,Improvement Allocation %,percentage,acquisition,tbl_property_acquisition,improvement_pct,update,,appraisal,validate,Improvement value as percentage
+depreciation_basis,Depreciation Basis,currency,acquisition,tbl_property_acquisition,depreciation_basis,update,,appraisal,validate,Depreciable basis for tax purposes
+is_1031_exchange,Is 1031 Exchange,boolean,acquisition,tbl_property_acquisition,is_1031_exchange,update,,offering_memorandum,validate,Transaction is 1031 exchange
+exit_cap_rate_acq,Exit Cap Rate Assumption,percentage,acquisition,tbl_property_acquisition,exit_cap_rate,update,,proforma,validate,Exit cap rate from acquisition model
+sale_costs_pct,Disposition Costs %,percentage,acquisition,tbl_property_acquisition,sale_costs_pct,update,,proforma,validate,Costs to sell as percentage of price
+acq_hold_period,Hold Period,number,acquisition,tbl_property_acquisition,hold_period_years,update,,proforma,validate,Projected hold period in years
+# ============================================================
+# SECTION 13: MARKET DATA (15 fields)
+# ============================================================
+walk_score,Walk Score,integer,project,tbl_project,walk_score,update,,offering_memorandum,validate,Walk Score rating (0-100)
+bike_score,Bike Score,integer,project,tbl_project,bike_score,update,,offering_memorandum,validate,Bike Score rating (0-100)
+transit_score,Transit Score,integer,project,tbl_project,transit_score,update,,offering_memorandum,validate,Transit Score rating (0-100)
+population_1mi,Population (1 mi),integer,market,tbl_market_rate_analysis,population_1mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Population within 1 mile radius
+population_3mi,Population (3 mi),integer,market,tbl_market_rate_analysis,population_3mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Population within 3 mile radius
+population_5mi,Population (5 mi),integer,market,tbl_market_rate_analysis,population_5mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Population within 5 mile radius
+median_hh_income_1mi,Median HH Income (1 mi),currency,market,tbl_market_rate_analysis,median_hh_income_1mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Median household income 1 mi radius
+median_hh_income_3mi,Median HH Income (3 mi),currency,market,tbl_market_rate_analysis,median_hh_income_3mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Median household income 3 mi radius
+avg_hh_income_5mi,Avg HH Income (5 mi),currency,market,tbl_market_rate_analysis,avg_hh_income_5mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Average household income 5 mi radius
+employment_5mi,Employment (5 mi),integer,market,tbl_market_rate_analysis,employment_5mi,upsert,"{""match_on"": ""project_id""}",offering_memorandum,validate,Employment within 5 mile radius
+submarket_vacancy,Submarket Vacancy %,percentage,market,tbl_market_rate_analysis,submarket_vacancy,upsert,"{""match_on"": ""project_id""}",offering_memorandum|comp_report,validate,Current submarket vacancy rate
+submarket_rent_growth,Submarket Rent Growth,percentage,market,tbl_market_rate_analysis,submarket_rent_growth,upsert,"{""match_on"": ""project_id""}",offering_memorandum|comp_report,validate,Historical/projected rent growth
+submarket_avg_rent,Submarket Avg Rent,currency,market,tbl_market_rate_analysis,submarket_avg_rent,upsert,"{""match_on"": ""project_id""}",offering_memorandum|comp_report,validate,Average submarket rent
+submarket_occupancy,Submarket Occupancy %,percentage,market,tbl_market_rate_analysis,submarket_occupancy,upsert,"{""match_on"": ""project_id""}",offering_memorandum|comp_report,validate,Average submarket occupancy
+new_supply_pipeline,New Supply (units),integer,market,tbl_market_rate_analysis,new_supply_pipeline,upsert,"{""match_on"": ""project_id""}",offering_memorandum|comp_report,validate,Units under construction in submarket
+parking_type,Parking Type,text,mf_property,tbl_multifamily_property,parking_type,update,"",offering_memorandum,validate,Type of parking (surface/garage/covered)
