@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { emitFieldUpdate } from './useFieldRefresh';
 
 export interface ColumnDef {
   key: string;
@@ -37,6 +38,15 @@ interface ChatHistoryResponse {
   error?: string;
 }
 
+export interface FieldUpdate {
+  table: string;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  reason: string;
+  success: boolean;
+}
+
 interface SendMessageResponse {
   success: boolean;
   messageId: string;
@@ -48,6 +58,8 @@ interface SendMessageResponse {
   dataType?: 'table' | 'list';
   dataTitle?: string;
   columns?: ColumnDef[];
+  // Field updates from Landscaper tool calls
+  fieldUpdates?: FieldUpdate[];
   error?: string;
 }
 
@@ -74,6 +86,7 @@ export function useLandscaperChat(projectId?: string | number) {
 
 /**
  * Send a message to Landscaper AI.
+ * Automatically invalidates project data queries when field updates occur.
  */
 export function useSendMessage(projectId?: string | number) {
   const queryClient = useQueryClient();
@@ -99,8 +112,29 @@ export function useSendMessage(projectId?: string | number) {
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Always invalidate chat history
       queryClient.invalidateQueries({ queryKey: ['landscaper-chat', id] });
+
+      // If there were field updates, invalidate project-related queries AND emit event
+      if (data.fieldUpdates && data.fieldUpdates.length > 0) {
+        // Invalidate React Query caches
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${id}/profile`] });
+        queryClient.invalidateQueries({ queryKey: ['project-details', id] });
+        queryClient.invalidateQueries({ queryKey: ['project', id] });
+        queryClient.invalidateQueries({ queryKey: ['landscaper-activities', id] });
+
+        // Emit event for SWR-based components (like ProjectProfileTile)
+        emitFieldUpdate({
+          projectId: id,
+          updates: data.fieldUpdates.map((u) => ({
+            table: u.table,
+            field: u.field,
+            old_value: u.old_value,
+            new_value: u.new_value,
+          })),
+        });
+      }
     },
   });
 }

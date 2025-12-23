@@ -107,6 +107,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       content: djangoData.assistant_message?.content || '',
       metadata: djangoData.assistant_message?.metadata || {},
       context: {},
+      // Pass through field updates for auto-refresh
+      fieldUpdates: djangoData.field_updates || [],
     };
 
     return NextResponse.json(frontendResponse);

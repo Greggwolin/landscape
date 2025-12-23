@@ -5,6 +5,7 @@ export { ActivityFeed } from './ActivityFeed';
 export { ActivityFeedItem, type ActivityItem } from './ActivityFeedItem';
 export { ChatMessageBubble } from './ChatMessageBubble';
 export { DataTableModal, type ColumnDef } from './DataTableModal';
+export { ExtractionReviewModal } from './ExtractionReviewModal';
 
 // Legacy exports (for backwards compatibility)
 export { default as ChatInterface } from './ChatInterface';

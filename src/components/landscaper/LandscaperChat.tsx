@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import {
   useSendMessage,
   useLandscaperChat,
@@ -10,14 +11,18 @@ import { ChatMessageBubble } from './ChatMessageBubble';
 
 interface LandscaperChatProps {
   projectId: number;
+  isIngesting?: boolean;
+  ingestionProgress?: number; // 0-100
+  ingestionMessage?: string;
 }
 
-export function LandscaperChat({ projectId }: LandscaperChatProps) {
+export function LandscaperChat({ projectId, isIngesting, ingestionProgress = 0, ingestionMessage }: LandscaperChatProps) {
   const [input, setInput] = useState('');
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userHasSentMessage = useRef(false);
   const prevMessageCount = useRef(0);
+  const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
 
   const { data: chatHistory } = useLandscaperChat(projectId);
   const { mutate: sendMessage, isPending } = useSendMessage(projectId);
@@ -93,10 +98,58 @@ export function LandscaperChat({ projectId }: LandscaperChatProps) {
           backgroundColor: 'var(--surface-card-header)',
         }}
       >
-        <span>🌿</span>
+        <Image src="/landscaper-icon.png" alt="Landscaper icon" width={20} height={20} />
         <span className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
           Landscaper
         </span>
+
+        {/* Ingestion Progress Gauge */}
+        {isIngesting && (
+          <div className="flex items-center gap-2 ml-auto">
+            <div
+              className="relative"
+              style={{ width: '32px', height: '32px' }}
+              title={ingestionMessage || 'Processing...'}
+            >
+              {/* Background circle */}
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="var(--cui-border-color)"
+                  strokeWidth="3"
+                />
+                {/* Progress arc */}
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="var(--cui-primary)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(ingestionProgress / 100) * 87.96} 87.96`}
+                  style={{ transition: 'stroke-dasharray 0.3s ease' }}
+                />
+              </svg>
+              {/* Percentage text in center */}
+              <div
+                className="absolute inset-0 flex items-center justify-center text-xs font-medium"
+                style={{ color: 'var(--cui-body-color)' }}
+              >
+                {Math.round(ingestionProgress)}
+              </div>
+            </div>
+            <span
+              className="text-xs truncate max-w-[120px]"
+              style={{ color: 'var(--cui-secondary-color)' }}
+            >
+              {ingestionMessage || 'Ingesting...'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -106,7 +159,7 @@ export function LandscaperChat({ projectId }: LandscaperChatProps) {
       >
         {localMessages.length === 0 ? (
           <div className="py-8 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
-            <p className="text-sm">Ask Landscaper anything about this project.</p>
+            <p className="text-sm">{promptCopy}</p>
             <p className="text-xs mt-1">Budget, market analysis, assumptions, documents...</p>
           </div>
         ) : (
@@ -135,7 +188,7 @@ export function LandscaperChat({ projectId }: LandscaperChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder="Ask a question..."
+            placeholder={promptCopy}
             className="flex-1 rounded-lg border px-3 py-2 text-sm"
             style={{
               borderColor: 'var(--cui-border-color)',
