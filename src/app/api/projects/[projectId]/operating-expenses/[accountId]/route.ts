@@ -29,6 +29,16 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const searchParams = request.nextUrl.searchParams;
+    const overrideDiscriminator = searchParams.get('statement_discriminator') || body.statement_discriminator;
+
+    const activeResult = await sql<{ active_opex_discriminator: string }[]>`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectId}
+      LIMIT 1
+    `;
+    const discriminator = overrideDiscriminator || activeResult[0]?.active_opex_discriminator || 'default';
     const hasRecognizedField = [
       'annual_amount',
       'calculation_basis',
@@ -141,6 +151,7 @@ export async function PUT(
       FROM landscape.tbl_operating_expenses
       WHERE project_id = ${projectId}
         AND category_id = ${accountId}
+        AND statement_discriminator = ${discriminator}
       LIMIT 1
     `;
 
@@ -210,9 +221,11 @@ export async function PUT(
           start_period = ${finalStartPeriod},
           payment_frequency = ${finalPaymentFrequency},
           notes = ${finalNotes},
+          statement_discriminator = ${discriminator},
           updated_at = NOW()
       WHERE project_id = ${projectId}
         AND category_id = ${accountId}
+        AND statement_discriminator = ${discriminator}
       RETURNING
         opex_id,
         annual_amount,

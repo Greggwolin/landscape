@@ -178,7 +178,21 @@ class MultifamilyCalculator:
             'credit_loss_rate': credit_loss_rate
         }
 
-    def calculate_opex(self, year: int = 1) -> Dict:
+    def _active_opex_discriminator(self, override: Optional[str] = None) -> str:
+        if override:
+            return override
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT active_opex_discriminator
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+                LIMIT 1
+            """, [self.project_id])
+            row = cursor.fetchone()
+            return row[0] if row and row[0] else 'default'
+
+    def calculate_opex(self, year: int = 1, statement_discriminator: Optional[str] = None) -> Dict:
         """
         Calculate operating expenses with escalations.
 
@@ -194,6 +208,8 @@ class MultifamilyCalculator:
         """
         from django.db import connection
 
+        discriminator = self._active_opex_discriminator(statement_discriminator)
+
         # Get expenses from database
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -206,8 +222,9 @@ class MultifamilyCalculator:
                 FROM landscape.tbl_operating_expenses oe
                 LEFT JOIN landscape.tbl_opex_accounts oa ON oe.account_id = oa.account_id
                 WHERE oe.project_id = %s
+                  AND oe.statement_discriminator = %s
                 ORDER BY oe.expense_category, oa.account_name
-            """, [self.project_id])
+            """, [self.project_id, discriminator])
 
             expenses = cursor.fetchall()
 
@@ -248,7 +265,8 @@ class MultifamilyCalculator:
         self,
         scenario: str = 'current',
         year: int = 1,
-        vacancy_rate: Decimal = Decimal('0.03')
+        vacancy_rate: Decimal = Decimal('0.03'),
+        statement_discriminator: Optional[str] = None
     ) -> Dict:
         """
         Calculate Net Operating Income.
@@ -271,7 +289,7 @@ class MultifamilyCalculator:
         egi_data = self.calculate_egi(scenario, vacancy_rate)
         egi = egi_data['effective_gross_income']
 
-        opex_data = self.calculate_opex(year)
+        opex_data = self.calculate_opex(year, statement_discriminator)
         total_opex = opex_data['total_opex']
 
         noi = egi - total_opex

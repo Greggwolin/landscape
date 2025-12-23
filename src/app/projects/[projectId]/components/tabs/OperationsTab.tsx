@@ -76,6 +76,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     advanced: Record<string, ExpenseData> | null;
   }>({ basic: null, standard: null, advanced: null });
   const [showRestoreNotice, setShowRestoreNotice] = useState<string | null>(null);
+  const [activeScenario, setActiveScenario] = useState<string>('default');
+  const [availableScenarios, setAvailableScenarios] = useState<string[]>([]);
 
   // Load property data on mount
   useEffect(() => {
@@ -158,12 +160,13 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     }
   }, [expenses, mode]);
 
-  const loadExpenses = async () => {
+  const loadExpenses = async (scenario?: string) => {
     try {
       setIsLoading(true);
 
       // Load from Chart of Accounts hierarchy API
-      const response = await fetch(`/api/projects/${project.project_id}/operating-expenses/hierarchy`);
+      const query = scenario ? `?statement_discriminator=${encodeURIComponent(scenario)}` : '';
+      const response = await fetch(`/api/projects/${project.project_id}/operating-expenses/hierarchy${query}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -171,6 +174,12 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
         if (data.accounts && data.accounts.length > 0) {
           console.log('[OperationsTab] Using Chart of Accounts data, accounts count:', data.accounts.length);
+          if (data.active_statement_discriminator) {
+            setActiveScenario(data.active_statement_discriminator);
+          }
+          if (Array.isArray(data.available_statement_discriminators)) {
+            setAvailableScenarios(data.available_statement_discriminators);
+          }
 
           // Map Chart of Accounts to multifamilyOpExFields keys
           // These MUST match the 'key' values in src/config/opex/multifamily-fields.ts
@@ -266,6 +275,23 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     } catch (error) {
       console.error('Error loading expenses:', error);
       setExpenses([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleScenarioChange = async (nextScenario: string) => {
+    try {
+      setIsLoading(true);
+      setActiveScenario(nextScenario);
+      await fetch(`/api/projects/${project.project_id}/opex/active-scenario`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statement_discriminator: nextScenario })
+      });
+      await loadExpenses(nextScenario);
+    } catch (error) {
+      console.error('Error updating active OpEx scenario', error);
     } finally {
       setIsLoading(false);
     }
@@ -519,6 +545,25 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           </button>
         </div>
       )}
+
+      <div className="flex items-center gap-3">
+        <div className="text-sm text-gray-400">Scenario:</div>
+        <select
+          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+          value={activeScenario}
+          onChange={(e) => handleScenarioChange(e.target.value)}
+          disabled={isLoading}
+        >
+          {(availableScenarios.length ? availableScenarios : [activeScenario || 'default']).map((scenario) => (
+            <option key={scenario} value={scenario}>
+              {scenario}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-gray-500">
+          Active scenario controls Operations view and valuation.
+        </span>
+      </div>
 
       {/* Summary Metrics Bar */}
       <div className="grid grid-cols-4 gap-4">

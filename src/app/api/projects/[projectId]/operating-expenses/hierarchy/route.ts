@@ -35,6 +35,8 @@ export async function GET(
 ) {
   try {
     const projectId = parseInt((await context.params).projectId);
+    const searchParams = request.nextUrl.searchParams;
+    const overrideDiscriminator = searchParams.get('statement_discriminator');
 
     if (isNaN(projectId)) {
       return NextResponse.json(
@@ -58,6 +60,31 @@ export async function GET(
     }
 
     const projectType = projectResult[0].project_type_code;
+    const activeDiscriminatorResult = await sql<{ active_opex_discriminator: string }[]>`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectId}
+      LIMIT 1
+    `;
+    const availableDiscriminators = await sql<{ statement_discriminator: string | null }[]>`
+      SELECT DISTINCT statement_discriminator
+      FROM landscape.tbl_operating_expenses
+      WHERE project_id = ${projectId}
+    `;
+    const available = availableDiscriminators
+      .map((row) => row.statement_discriminator)
+      .filter((v): v is string => !!v);
+
+    let effectiveDiscriminator =
+      overrideDiscriminator && available.includes(overrideDiscriminator)
+        ? overrideDiscriminator
+        : activeDiscriminatorResult[0]?.active_opex_discriminator || null;
+
+    if (!effectiveDiscriminator || !available.includes(effectiveDiscriminator)) {
+      effectiveDiscriminator = available.includes('CURRENT_PRO_FORMA')
+        ? 'CURRENT_PRO_FORMA'
+        : (available[0] || 'default');
+    }
 
     // Query core_unit_cost_category for Operations activity categories
     // This replaces the old tbl_opex_accounts query after migration 042
@@ -85,6 +112,7 @@ export async function GET(
         ON c.category_id = cls.category_id
       LEFT JOIN landscape.tbl_operating_expenses oe
         ON oe.category_id = c.category_id
+       AND oe.statement_discriminator = ${effectiveDiscriminator}
        AND oe.project_id = ${projectId}
       WHERE cls.activity = 'Operations'
         AND c.is_active = TRUE
@@ -119,11 +147,24 @@ export async function GET(
       }
     });
 
-    const totalOpex = rootAccounts.reduce((sum, acct) => sum + Number(acct.calculated_total), 0);
+    const computeTotal = (node: NestedAccount): number => {
+      if (!node.children.length) {
+        node.calculated_total = Number(node.annual_amount || 0);
+        return node.calculated_total;
+      }
+      const childTotal = node.children.reduce((sum, child) => sum + computeTotal(child), 0);
+      node.calculated_total = childTotal;
+      return childTotal;
+    };
+
+    rootAccounts.forEach((root) => computeTotal(root));
+    const totalOpex = rootAccounts.reduce((sum, acct) => sum + Number(acct.calculated_total || 0), 0);
     const leafAccounts = accounts.filter(a => !a.is_calculated);
 
     return NextResponse.json({
       project_type_code: projectType,
+      active_statement_discriminator: effectiveDiscriminator,
+      available_statement_discriminators: available,
       accounts: rootAccounts,
       summary: {
         total_operating_expenses: totalOpex,
