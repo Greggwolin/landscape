@@ -22,7 +22,7 @@ interface AddCategoryModalProps {
 const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',

@@ -1,0 +1,187 @@
+/* Channel Modal Styles */
+
+.channel-modal .modal-dialog {
+  max-width: calc(100vw - 48px);
+  width: calc(100vw - 260px);
+  margin-left: 240px;
+  margin-right: 12px;
+}
+
+@media (max-width: 1400px) {
+  .channel-modal .modal-dialog {
+    margin-left: 16px;
+    margin-right: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+
+.channel-modal .modal-content {
+  background: var(--cui-body-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.channel-modal .modal-body {
+  background: var(--cui-body-bg);
+}
+
+.channel-modal .modal-header {
+  background: var(--cui-tertiary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding: 0.75rem 1rem;
+}
+
+.channel-modal .modal-body {
+  padding: 0;
+}
+
+.channel-modal .modal-footer {
+  background: var(--cui-tertiary-bg);
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.channel-modal .bg-surface-subtle {
+  background: var(--cui-tertiary-bg) !important;
+}
+
+/* Greenhouse tiles - ensure theme-friendly backgrounds */
+.channel-modal .greenhouse-tile {
+  background: var(--cui-secondary-bg) !important;
+  color: var(--cui-body-color) !important;
+  border-color: var(--cui-border-color) !important;
+}
+
+.channel-modal .greenhouse-tile:hover {
+  background: var(--cui-secondary-bg) !important;
+  border-color: var(--cui-primary) !important;
+  color: var(--cui-body-color) !important;
+}
+
+/* Greenhouse tile styles */
+.greenhouse-tile {
+  background: var(--cui-secondary-bg) !important;
+  color: var(--cui-body-color) !important;
+  border-color: var(--cui-border-color) !important;
+}
+
+.greenhouse-tile:hover {
+  background: var(--cui-secondary-bg) !important;
+  border-color: var(--cui-primary) !important;
+  color: var(--cui-body-color) !important;
+}
+
+.greenhouse-tile {
+  transition: all 0.15s ease;
+}
+
+.greenhouse-tile:hover {
+  background: var(--cui-secondary-bg) !important;
+  border-color: var(--cui-primary) !important;
+}
+
+.greenhouse-tile:active {
+  transform: scale(0.98);
+}
+
+/* Channel activity feed styles */
+.channel-activity-feed {
+  padding: 1rem;
+}
+
+.channel-activity-item {
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background: var(--cui-tertiary-bg);
+  border-left: 3px solid transparent;
+}
+
+.channel-activity-item:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.channel-activity-item.activity-landscaper {
+  border-left-color: var(--cui-info);
+}
+
+.channel-activity-item.activity-market {
+  border-left-color: var(--cui-success);
+}
+
+.channel-activity-item.activity-budget {
+  border-left-color: var(--cui-warning);
+}
+
+.channel-activity-item.activity-underwriter {
+  border-left-color: var(--cui-purple, #8b5cf6);
+}
+
+.channel-activity-item.activity-docs {
+  border-left-color: var(--cui-secondary);
+}
+
+/* Channel tools panel tabs */
+.channel-tools .nav-pills .nav-link {
+  color: var(--cui-body-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+}
+
+.channel-tools .nav-pills .nav-link.active {
+  background: var(--cui-primary);
+  color: white;
+}
+
+.channel-tools .nav-pills .nav-link:not(.active):hover {
+  background: var(--cui-secondary-bg);
+}
+
+/* Completeness progress bars */
+.completeness-bar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Report type cards */
+.report-type-card {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.report-type-card:hover {
+  border-color: var(--cui-primary);
+  background: var(--cui-tertiary-bg);
+}
+
+.report-type-card.selected {
+  border-color: var(--cui-primary);
+  background: rgba(var(--cui-primary-rgb), 0.1);
+}
+
+/* Notes modal */
+.note-item {
+  background: var(--cui-tertiary-bg);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.note-item:hover {
+  background: var(--cui-secondary-bg);
+}
+
+/* Source document cards */
+.source-doc-card {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.15s ease;
+}
+
+.source-doc-card:hover {
+  border-color: var(--cui-primary);
+  background: var(--cui-tertiary-bg);
+}

@@ -20,7 +20,7 @@ import './category-taxonomy.css';
 const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',
@@ -33,8 +33,9 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, Activity> = {
   planning: 'Planning & Engineering',
   engineering: 'Planning & Engineering',
   predevelopment: 'Planning & Engineering',
-  development: 'Development',
-  construction: 'Development',
+  development: 'Improvements',  // Map old name to new
+  improvements: 'Improvements',
+  construction: 'Improvements',
   operations: 'Operations',
   operating: 'Operations',
   disposition: 'Disposition',
@@ -46,7 +47,7 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, Activity> = {
 
 const normalizeActivitys = (rawStages?: (string | null)[]): Activity[] => {
   if (!rawStages || rawStages.length === 0) {
-    return ['Development'];
+    return ['Improvements'];
   }
 
   const normalized = rawStages
@@ -66,7 +67,7 @@ const normalizeActivitys = (rawStages?: (string | null)[]): Activity[] => {
     .filter((stage): stage is Activity => stage !== null);
 
   if (normalized.length === 0) {
-    return ['Development'];
+    return ['Improvements'];
   }
 
   return Array.from(new Set(normalized));
@@ -216,8 +217,8 @@ export default function UnitCostCategoryManager() {
     const matchingIds = new Set<number>();
     categories.forEach((cat) => {
       const stages = cat.activitys && cat.activitys.length > 0
-        ? cat.activitys
-        : ['Development'];
+        ? (cat.activitys as Activity[])
+        : (['Improvements'] as Activity[]);
       if (stages.some((stage) => selectedStages.includes(stage))) {
         matchingIds.add(cat.category_id);
       }
@@ -243,15 +244,16 @@ export default function UnitCostCategoryManager() {
   const stageCounts = useMemo(() => {
     const counts: Record<Activity, number> = {
       Acquisition: 0,
-      Development: 0,
+      'Planning & Engineering': 0,
+      Improvements: 0,
       Operations: 0,
       Disposition: 0,
       Financing: 0,
     };
     categories.forEach((cat) => {
       const stages = cat.activitys && cat.activitys.length > 0
-        ? cat.activitys
-        : ['Development'];
+        ? (cat.activitys as Activity[])
+        : (['Improvements'] as Activity[]);
       stages.forEach((stage) => {
         counts[stage] = (counts[stage] || 0) + 1;
       });

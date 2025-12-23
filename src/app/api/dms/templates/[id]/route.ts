@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/dms/db';
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
+    const { id } = await context.params;
     const body = await request.json();
-    const templateId = parseInt(params.id);
+    const templateId = parseInt(id);
 
     const result = await sql`
       UPDATE landscape.dms_templates
@@ -43,10 +46,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
   try {
-    const templateId = parseInt(params.id);
+    const { id } = await context.params;
+    const templateId = parseInt(id);
 
     const result = await sql`
       DELETE FROM landscape.dms_templates

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LifecycleTileNav } from '@/components/projects/LifecycleTileNav';
 import { InflationRateDisplay } from '@/components/projects/InflationRateDisplay';
-import { useProjectMode } from '@/contexts/ProjectModeContext';
 
 /**
  * ProjectContextBar - Tier 2 Project Navigation
@@ -27,8 +26,7 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
-  const { mode, setMode } = useProjectMode();
-  const stickyTop = 'calc(58px + var(--app-padding))'; // top nav height + gap that matches nav padding
+  const stickyTop = 'calc(58px + var(--app-padding) + 16px)'; // top nav height + extra breathing room
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -53,8 +51,8 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         borderRadius: '12px',
         top: stickyTop,
         zIndex: 40,
-        marginTop: 'var(--component-gap)',
-        marginBottom: 'var(--component-gap)',
+        marginTop: '0',
+        marginBottom: 'calc(var(--app-padding) / 2)',
         overflow: 'hidden'
       }}
     >
@@ -98,28 +96,6 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
               ))}
             </select>
           </div>
-
-          <div className="d-flex align-items-center gap-2">
-            <span className="text-muted small text-uppercase fw-semibold">Mode</span>
-            <div className="btn-group" role="group" aria-label="Project mode toggle">
-              <button
-                type="button"
-                className={`btn btn-sm ${mode === 'napkin' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => setMode('napkin')}
-                aria-pressed={mode === 'napkin'}
-              >
-                Napkin
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${mode === 'standard' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => setMode('standard')}
-                aria-pressed={mode === 'standard'}
-              >
-                Standard
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -129,6 +105,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
           <div className="flex-grow-1">
             <LifecycleTileNav
               projectId={projectId.toString()}
+              propertyType={project.project_type_code}
             />
           </div>
           <InflationRateDisplay projectId={projectId} />

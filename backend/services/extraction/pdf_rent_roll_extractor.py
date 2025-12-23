@@ -26,19 +26,28 @@ class PDFRentRollExtractor:
         """
         Main extraction method for PDF rent rolls
 
-        Returns same structure as RentRollExtractor for consistency
+        Returns same structure as RentRollExtractor for consistency,
+        plus raw_text field containing the full document text.
         """
 
         # Step 1: Extract text from PDF
         pages_text = self._extract_pdf_text(file_path)
 
+        # Store full raw text for Landscaper access
+        full_text = "\n\n--- PAGE BREAK ---\n\n".join([
+            f"PAGE {p['page_num']}:\n{p['text']}"
+            for p in pages_text
+        ])
+
         # Step 2: Identify rent roll pages
         rent_roll_pages = self._identify_rent_roll_pages(pages_text)
 
         if not rent_roll_pages:
+            # Still return raw text even if no rent roll found
             return {
                 'error': 'No rent roll tables found in PDF',
-                'quality_score': 0.0
+                'quality_score': 0.0,
+                'raw_text': full_text
             }
 
         # Step 3: Extract tables using Claude
@@ -51,6 +60,9 @@ class PDFRentRollExtractor:
         validation = self._validate_extraction(result)
         result['quality_score'] = validation['overall_score']
         result['validation_warnings'] = validation['warnings']
+
+        # Add raw text to result
+        result['raw_text'] = full_text
 
         return result
 

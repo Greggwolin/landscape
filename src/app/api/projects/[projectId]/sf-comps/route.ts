@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRedfinComps, RedfinComp } from '@/lib/redfinClient';
 
-type Params = { params: { projectId: string } };
+type Params = { params: Promise<{ projectId: string }> };
 
 export type SfComp = {
   mlsId: string;
@@ -195,7 +195,7 @@ function calculateStats(comps: SfComp[]): SfCompsStats {
 }
 
 export async function GET(req: NextRequest, context: Params) {
-  const { projectId: projectIdRaw } = context.params;
+  const { projectId: projectIdRaw } = await context.params;
   const projectId = Number.parseInt(projectIdRaw, 10);
   if (!Number.isInteger(projectId) || projectId <= 0) {
     return NextResponse.json({ error: 'Invalid projectId' }, { status: 400 });

@@ -3,9 +3,12 @@ import { sql } from '@/lib/db';
 
 const normalizeType = (type: string) => type.toUpperCase().replace(/-/g, '_');
 
-export async function GET(_request: NextRequest, { params }: { params: { type: string } }) {
+type Params = { params: Promise<{ type: string }> };
+
+export async function GET(_request: NextRequest, context: Params) {
   try {
-    const picklistType = normalizeType(params.type);
+    const { type } = await context.params;
+    const picklistType = normalizeType(type);
 
     const rows = await sql`
       SELECT
@@ -35,9 +38,10 @@ export async function GET(_request: NextRequest, { params }: { params: { type: s
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { type: string } }) {
+export async function POST(request: NextRequest, context: Params) {
   try {
-    const picklistType = normalizeType(params.type);
+    const { type } = await context.params;
+    const picklistType = normalizeType(type);
     const body = await request.json();
     const codeRaw = body?.code;
     const nameRaw = body?.name;

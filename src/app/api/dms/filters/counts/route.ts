@@ -33,23 +33,15 @@ export async function GET(request: NextRequest) {
       ORDER BY COALESCE(doc_type, 'general') ASC
     `;
 
-    // Query smart filters with counts (best-effort; tags match is simplified to doc_type + project)
+    // Query smart filters (active only)
     const smartFilters = await sql`
-      SELECT 
+      SELECT
         f.filter_id,
-        f.filter_name,
-        f.doc_type,
-        COALESCE(f.tags, ARRAY[]::text[]) AS tags,
-        COALESCE(f.count_override, 0) AS count_override,
-        COUNT(d.doc_id) AS matched_docs
+        f.name AS filter_name,
+        f.query
       FROM landscape.core_doc_smartfilter f
-      LEFT JOIN landscape.core_doc d
-        ON d.project_id = ${project}
-       AND d.doc_type = f.doc_type
-      WHERE f.project_id = ${project}
-         OR f.project_id IS NULL
-      GROUP BY f.filter_id, f.filter_name, f.doc_type, f.tags, f.count_override
-      ORDER BY f.filter_name ASC
+      WHERE f.is_active = true
+      ORDER BY f.name ASC
     `;
 
     return NextResponse.json({
@@ -61,9 +53,7 @@ export async function GET(request: NextRequest) {
       smart_filters: smartFilters.map(row => ({
         filter_id: row.filter_id,
         filter_name: row.filter_name,
-        doc_type: row.doc_type || 'general',
-        tags: row.tags || [],
-        count: row.count_override || parseInt(row.matched_docs as string)
+        query: row.query
       }))
     });
   } catch (error) {

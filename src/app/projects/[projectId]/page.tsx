@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
 import { useParams, useSearchParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { CContainer } from '@coreui/react';

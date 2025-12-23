@@ -46,4 +46,5 @@ urlpatterns = [
     path("api/", include('apps.landscaper.urls')),  # Phase 6: Landscaper AI
     path("api/users/", include('apps.users.urls')),  # Phase 7: User settings
     path("api/", include('apps.acquisition.urls')),  # Acquisition tracking
+    path("api/knowledge/", include('apps.knowledge.urls')),  # Knowledge/extraction system
 ]

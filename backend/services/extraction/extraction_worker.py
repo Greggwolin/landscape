@@ -2,7 +2,7 @@
 Background worker for processing document extraction queue.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from apps.documents.models import Document, DMSExtractQueue, DMSAssertion
 from .document_classifier import DocumentClassifier
 from .rent_roll_extractor import RentRollExtractor
@@ -10,6 +10,82 @@ from .pdf_rent_roll_extractor import PDFRentRollExtractor
 import json
 from datetime import datetime
 from django.utils import timezone
+import tempfile
+import requests
+import os
+
+
+def _download_remote_file(url: str, doc_name: str) -> Optional[str]:
+    """
+    Download a remote file to a temporary location.
+    Returns the local file path or None if download fails.
+    """
+    try:
+        # Determine file extension from doc_name
+        ext = os.path.splitext(doc_name)[1] if doc_name else ''
+        if not ext:
+            # Try to guess from URL or default to .tmp
+            ext = '.tmp'
+
+        # Create temp file with appropriate extension
+        temp_fd, temp_path = tempfile.mkstemp(suffix=ext)
+        os.close(temp_fd)
+
+        print(f"Downloading {url} to {temp_path}")
+
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+
+        with open(temp_path, 'wb') as f:
+            f.write(response.content)
+
+        print(f"Downloaded {len(response.content)} bytes")
+        return temp_path
+
+    except Exception as e:
+        print(f"Failed to download {url}: {e}")
+        return None
+
+
+def _is_pdf_document(doc: Document) -> bool:
+    """
+    Determine if document is a PDF based on mime_type or doc_name.
+    """
+    # Check mime_type first
+    if doc.mime_type and 'pdf' in doc.mime_type.lower():
+        return True
+
+    # Check doc_name extension
+    if doc.doc_name and doc.doc_name.lower().endswith('.pdf'):
+        return True
+
+    # Check storage_uri extension (fallback)
+    if doc.storage_uri and doc.storage_uri.lower().endswith('.pdf'):
+        return True
+
+    return False
+
+
+def _is_excel_document(doc: Document) -> bool:
+    """
+    Determine if document is an Excel file based on mime_type or doc_name.
+    """
+    excel_mimes = ['spreadsheet', 'excel', 'xlsx', 'xls']
+    excel_exts = ['.xlsx', '.xls', '.csv']
+
+    # Check mime_type
+    if doc.mime_type:
+        for mime in excel_mimes:
+            if mime in doc.mime_type.lower():
+                return True
+
+    # Check doc_name extension
+    if doc.doc_name:
+        for ext in excel_exts:
+            if doc.doc_name.lower().endswith(ext):
+                return True
+
+    return False
 
 
 def process_extraction_queue():
@@ -28,6 +104,7 @@ def process_extraction_queue():
     pdf_extractor = PDFRentRollExtractor()
 
     for job in pending_jobs:
+        temp_file_path = None
         try:
             # Update status
             job.status = 'processing'
@@ -36,23 +113,40 @@ def process_extraction_queue():
 
             # Get document
             doc = Document.objects.get(doc_id=int(job.doc_id))
-            file_path = doc.storage_uri
+            storage_uri = doc.storage_uri
 
-            # Determine file type and extract
-            print(f"Processing job {job.queue_id}: {file_path}")
+            print(f"Processing job {job.queue_id}: {doc.doc_name} ({doc.mime_type})")
+            print(f"  Storage URI: {storage_uri}")
 
-            if file_path.lower().endswith('.pdf'):
-                # PDF extraction
+            # Determine if file is remote (HTTP/HTTPS URL)
+            is_remote = storage_uri.startswith('http://') or storage_uri.startswith('https://')
+
+            if is_remote:
+                # Download remote file to temp location
+                temp_file_path = _download_remote_file(storage_uri, doc.doc_name)
+                if not temp_file_path:
+                    raise Exception(f"Failed to download file from {storage_uri}")
+                file_path = temp_file_path
+            else:
+                # Use local file path directly
+                file_path = storage_uri
+
+            # Determine file type using mime_type/doc_name (not URL extension)
+            if _is_pdf_document(doc):
+                print(f"  Detected PDF document, using PDF extractor")
                 extraction_result = pdf_extractor.extract(file_path)
                 doc_type = 'rent_roll'
-            else:
-                # Excel/CSV extraction
+            elif _is_excel_document(doc):
+                print(f"  Detected Excel/CSV document, using Excel extractor")
                 extraction_result = excel_extractor.extract(file_path, {})
                 doc_type = 'rent_roll'
-
-                # Update document type
                 doc.doc_type = doc_type
                 doc.save()
+            else:
+                # Default to PDF extractor for unknown types
+                print(f"  Unknown document type, trying PDF extractor")
+                extraction_result = pdf_extractor.extract(file_path)
+                doc_type = 'general'
 
             # Check for extraction errors
             if 'error' in extraction_result:
@@ -80,12 +174,23 @@ def process_extraction_queue():
 
             job.status = 'completed'
             job.processed_at = timezone.now()
+
+            # Extract raw_text before cleaning (it's not in extracted_data JSONB)
+            raw_text = extraction_result.pop('raw_text', None)
+
             job.extracted_data = clean_nan(extraction_result)
+
+            # Store raw text separately in the extracted_text column
+            if raw_text:
+                job.extracted_text = raw_text
+
             job.save()
 
             # Update document status
             doc.status = 'indexed'
             doc.save()
+
+            print(f"Successfully processed job {job.queue_id}")
 
         except Exception as e:
             job.status = 'failed'
@@ -98,6 +203,15 @@ def process_extraction_queue():
                 doc.save()
 
             print(f"Error processing job {job.queue_id}: {e}")
+
+        finally:
+            # Clean up temp file if it was created
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                    print(f"Cleaned up temp file: {temp_file_path}")
+                except Exception as cleanup_error:
+                    print(f"Failed to clean up temp file: {cleanup_error}")
 
 
 def _store_assertions(doc_id: int, project_id: int, extraction_result: Dict):

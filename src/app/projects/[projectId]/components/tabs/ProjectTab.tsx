@@ -1,13 +1,12 @@
 'use client';
 
 import React, { ChangeEvent, useEffect, useState } from 'react';
-import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CFormSelect } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilLightbulb, cilCloudUpload, cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/market-intel';
 import ContactsSection from '@/components/projects/contacts/ContactsSection';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
-import { StepRateTable, StepRow } from '@/app/prototypes/multifam/rent-roll-inputs/components/StepRateTable';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
@@ -200,19 +199,7 @@ export default function ProjectTab({
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
   const [profileMapExpanded, setProfileMapExpanded] = useState(true);
   const [financialSummaryExpanded, setFinancialSummaryExpanded] = useState(false);
-  const [marketRatesExpanded, setMarketRatesExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(true);
-  const [showInflationModal, setShowInflationModal] = useState(false);
-  const [inflationScheduleName, setInflationScheduleName] = useState('');
-  const [inflationSteps, setInflationSteps] = useState<StepRow[]>([
-    { step: 1, fromPeriod: 1, rate: null, periods: null, thruPeriod: null }
-  ]);
-  const [savedInflationSchedules, setSavedInflationSchedules] = useState<Array<{
-    id: string;
-    name: string;
-    steps: StepRow[];
-    createdAt: Date;
-  }>>([]);
 
   const addressFields: (keyof Project)[] = ['street_address', 'city', 'county', 'state', 'zip_code'];
 
@@ -311,9 +298,6 @@ export default function ProjectTab({
       console.error('Error updating project profile with location fields:', error);
     }
   };
-  const [originalInflationSteps, setOriginalInflationSteps] = useState<StepRow[]>([]);
-  const scheduleNameInputRef = React.useRef<HTMLInputElement>(null);
-
   const handleProjectSelection = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value } = event.target;
     if (value === 'new') {
@@ -326,152 +310,6 @@ export default function ProjectTab({
       selectProject(nextId);
     }
   };
-
-  // Handle inflation step updates
-  const handleUpdateInflationStep = (stepIndex: number, field: 'rate' | 'periods', value: number | null) => {
-    let updatedSteps = [...inflationSteps];
-    updatedSteps[stepIndex] = {
-      ...updatedSteps[stepIndex],
-      [field]: value
-    };
-
-    // If periods field is being updated
-    if (field === 'periods') {
-      // Check if user entered "E" (null value represents "E" in the system)
-      // If "E" is entered, remove all subsequent steps
-      if (value === null && stepIndex < updatedSteps.length - 1) {
-        updatedSteps = updatedSteps.slice(0, stepIndex + 1);
-      }
-
-      // Recalculate From Period and Thru Period for all steps
-      for (let i = 0; i < updatedSteps.length; i++) {
-        const step = updatedSteps[i];
-
-        // From Period
-        if (i === 0) {
-          step.fromPeriod = 1;
-        } else {
-          const prevStep = updatedSteps[i - 1];
-          if (prevStep.thruPeriod && prevStep.thruPeriod !== null) {
-            step.fromPeriod = prevStep.thruPeriod + 1;
-          }
-        }
-
-        // Thru Period
-        if (step.fromPeriod && step.periods && step.periods !== null) {
-          step.thruPeriod = step.fromPeriod + step.periods - 1;
-        } else if (step.periods === null) {
-          step.thruPeriod = null; // Represents "E"
-        } else {
-          step.thruPeriod = null;
-        }
-      }
-
-      // Check if we should add a new step
-      const lastStep = updatedSteps[updatedSteps.length - 1];
-      const shouldAddStep = lastStep.rate !== null &&
-                           lastStep.periods !== null &&
-                           lastStep.periods > 0; // periods is a number, not "E"
-
-      if (shouldAddStep) {
-        const nextFromPeriod = lastStep.thruPeriod ? lastStep.thruPeriod + 1 : null;
-        updatedSteps.push({
-          step: updatedSteps.length + 1,
-          fromPeriod: nextFromPeriod,
-          rate: null,
-          periods: null,
-          thruPeriod: null
-        });
-      }
-    }
-
-    // If rate field is being updated, check if we should add new step
-    if (field === 'rate') {
-      const currentStep = updatedSteps[stepIndex];
-      const isLastStep = stepIndex === updatedSteps.length - 1;
-      const shouldAddStep = isLastStep &&
-                           currentStep.rate !== null &&
-                           currentStep.periods !== null &&
-                           currentStep.periods > 0;
-
-      if (shouldAddStep) {
-        const nextFromPeriod = currentStep.thruPeriod ? currentStep.thruPeriod + 1 : null;
-        updatedSteps.push({
-          step: updatedSteps.length + 1,
-          fromPeriod: nextFromPeriod,
-          rate: null,
-          periods: null,
-          thruPeriod: null
-        });
-      }
-    }
-
-    setInflationSteps(updatedSteps);
-  };
-
-  const hasInflationChanges = () => {
-    return JSON.stringify(inflationSteps) !== JSON.stringify(originalInflationSteps);
-  };
-
-  const handleCloseInflationModal = () => {
-    // Just close without any prompt or saving
-    setInflationScheduleName('');
-    setShowInflationModal(false);
-  };
-
-  const handleSaveInflationSteps = () => {
-    if (!inflationScheduleName.trim()) {
-      alert('Please enter a name for this inflation schedule');
-      return;
-    }
-
-    const newSchedule = {
-      id: `schedule_${Date.now()}`,
-      name: inflationScheduleName,
-      steps: [...inflationSteps],
-      createdAt: new Date()
-    };
-
-    setSavedInflationSchedules([...savedInflationSchedules, newSchedule]);
-
-    // TODO: Save to backend/database
-    console.log('Saving inflation schedule:', newSchedule);
-
-    // Reset modal and close
-    setInflationScheduleName('');
-    setShowInflationModal(false);
-  };
-
-  const handleLoadInflationSchedule = (schedule: { id: string; name: string; steps: StepRow[] }) => {
-    setInflationSteps([...schedule.steps]);
-    setOriginalInflationSteps([...schedule.steps]);
-    setInflationScheduleName(schedule.name);
-    setShowInflationModal(true);
-  };
-
-  const handleOpenNewInflationSchedule = () => {
-    const defaultSteps = [
-      { step: 1, fromPeriod: 1, rate: null, periods: null, thruPeriod: null }
-    ];
-    setInflationScheduleName('');
-    setInflationSteps(defaultSteps);
-    setOriginalInflationSteps(defaultSteps);
-    setShowInflationModal(true);
-  };
-
-  const handleDeleteInflationSchedule = (scheduleId: string) => {
-    setSavedInflationSchedules(savedInflationSchedules.filter(s => s.id !== scheduleId));
-  };
-
-  // Auto-focus and select schedule name field when modal opens
-  useEffect(() => {
-    if (showInflationModal && scheduleNameInputRef.current) {
-      setTimeout(() => {
-        scheduleNameInputRef.current?.focus();
-        scheduleNameInputRef.current?.select();
-      }, 100);
-    }
-  }, [showInflationModal]);
 
   // Fetch market data based on project location
   useEffect(() => {
@@ -1082,7 +920,10 @@ export default function ProjectTab({
 
   return (
     <>
-      <div className="d-flex flex-column gap-3">
+      <div
+        className="d-flex flex-column"
+        style={{ gap: 'var(--component-gap)', padding: '0 var(--app-padding)' }}
+      >
       {/* Section 1: Project Profile + Map */}
       <CCard>
       <CCardHeader
@@ -1335,201 +1176,32 @@ export default function ProjectTab({
         </CCard>
       )}
 
-      {/* Section 3: Market Rates + Contacts */}
-      <CRow className="g-3">
-        <CCol style={{ flexBasis: '40%', maxWidth: '40%' }}>
-          <CCard className="h-100">
-            <CCardHeader
-              className="d-flex justify-content-between align-items-center"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setMarketRatesExpanded(!marketRatesExpanded)}
-            >
-              <span>Global Assumptions</span>
-              <CIcon icon={marketRatesExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-            </CCardHeader>
-            {marketRatesExpanded && (
-              <CCardBody>
-                {/* Inflation / Growth Rates */}
-                <div className="mb-3">
-                  <h6 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>Inflation / Growth Rates</h6>
-
-                  {/* General Inflation Row */}
-                  <div className="mb-2 d-flex align-items-center">
-                    <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>Inflation: General</div>
-                    <div style={{ width: '120px', marginRight: '10px' }}>
-                      <CFormInput
-                        id="general_inflation"
-                        type="number"
-                        step="0.1"
-                        placeholder="2.5"
-                        defaultValue="2.5"
-                        size="sm"
-                      />
-                    </div>
-                    <div style={{ marginRight: '10px' }}>%</div>
-                    <CButton
-                      color="secondary"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenNewInflationSchedule();
-                      }}
-                    >
-                      Custom
-                    </CButton>
-                  </div>
-
-                  {/* Saved Inflation Schedules - Each on its own row */}
-                  {savedInflationSchedules.map((schedule) => (
-                    <div key={schedule.id} className="mb-2 d-flex align-items-center">
-                      <div style={{ fontWeight: 'bold', width: '180px', flexShrink: 0 }}>
-                        Inflation: {schedule.name}
-                      </div>
-                      <div
-                        style={{
-                          width: '120px',
-                          marginRight: '10px',
-                          padding: '0.25rem 0.5rem',
-                          backgroundColor: 'var(--cui-tertiary-bg)',
-                          border: '1px solid var(--cui-border-color)',
-                          borderRadius: '0.25rem',
-                          fontSize: '0.875rem',
-                          textAlign: 'center'
-                        }}
-                      >
-                        Custom
-                      </div>
-                      <div style={{ marginRight: '10px' }}>&nbsp;</div>
-                      <CButton
-                        color="primary"
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 me-1"
-                        style={{ minWidth: 'auto', fontSize: '0.75rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLoadInflationSchedule(schedule);
-                        }}
-                      >
-                        Edit
-                      </CButton>
-                      <CButton
-                        color="danger"
-                        variant="ghost"
-                        size="sm"
-                        className="p-1"
-                        style={{ minWidth: 'auto', fontSize: '0.75rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Delete schedule "${schedule.name}"?`)) {
-                            handleDeleteInflationSchedule(schedule.id);
-                          }
-                        }}
-                      >
-                        Delete
-                      </CButton>
-                    </div>
-                  ))}
-                </div>
-              </CCardBody>
-            )}
-          </CCard>
-        </CCol>
-        <CCol style={{ flexBasis: '60%', maxWidth: '60%' }}>
-          <CCard className="h-100">
-            <CCardHeader
-              className="d-flex justify-content-between align-items-center"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setContactsExpanded(!contactsExpanded)}
-            >
-              <span>Contacts</span>
-              <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-            </CCardHeader>
-            {contactsExpanded && (
-              <CCardBody>
-                {project.listing_brokerage && (
-                  <div className="mb-3">
-                    <strong>Listing Brokerage:</strong>
-                    <div>{project.listing_brokerage}</div>
-                  </div>
-                )}
-
-                {/* Contacts Section */}
-                <ContactsSection projectId={project.project_id} />
-              </CCardBody>
-            )}
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* Section 5: Landscaper AI Assistant with Document Upload */}
+      {/* Section 3: Contacts */}
       <CCard>
-        <CCardHeader>
-          <CIcon icon={cilLightbulb} className="me-2" />
-          Landscaper AI Assistant
+        <CCardHeader
+          className="d-flex justify-content-between align-items-center"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setContactsExpanded(!contactsExpanded)}
+        >
+          <span>Contacts</span>
+          <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
-        <CCardBody>
-          <CRow>
-            {/* Left side - AI Description */}
-            <CCol md={7}>
-              <h5>Welcome to your project!</h5>
-              <p>
-                Landscaper AI can help you get started by analyzing your planning documents,
-                site plans, market studies, and financial models.
-              </p>
-              <p><strong>Upload documents to automatically extract:</strong></p>
-              <ul>
-                <li>Project hierarchy and phasing</li>
-                <li>Development assumptions</li>
-                <li>Market comparables</li>
-                <li>Financial projections</li>
-              </ul>
-              <div className="mt-3">
-                <h6>Supported Documents:</h6>
-                <ul className="text-sm">
-                  <li>Site plans and plat maps (PDF, images)</li>
-                  <li>Market studies and feasibility reports (PDF, Word)</li>
-                  <li>Financial models (Excel, CSV)</li>
-                  <li>Entitlement documents (PDF)</li>
-                  <li>Engineering plans (PDF, CAD)</li>
-                </ul>
+        {contactsExpanded && (
+          <CCardBody>
+            {project.listing_brokerage && (
+              <div className="mb-3">
+                <strong>Listing Brokerage:</strong>
+                <div>{project.listing_brokerage}</div>
               </div>
-              <div className="mt-3">
-                <CButton color="link" href={`/projects/${project.project_id}?tab=documents`}>
-                  View all documents →
-                </CButton>
-              </div>
-            </CCol>
+            )}
 
-            {/* Right side - Drag & Drop Upload Area */}
-            <CCol md={5}>
-              <div
-                className="border-2 border-dashed rounded p-6 text-center h-100 d-flex flex-column justify-content-center"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-tertiary-bg)',
-                  minHeight: '300px'
-                }}
-              >
-                <CIcon icon={cilCloudUpload} size="xl" className="mb-3" style={{ color: 'var(--cui-secondary-color)' }} />
-                <p className="mb-2">Drag and drop files here</p>
-                <p className="text-sm mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                  or click to browse
-                </p>
-                <div>
-                  <CButton color="primary">Select Files</CButton>
-                </div>
-                <p className="text-xs mt-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                  PDF, Excel, Word, Images, CAD files
-                </p>
-              </div>
-            </CCol>
-          </CRow>
-        </CCardBody>
+            {/* Contacts Section */}
+            <ContactsSection projectId={project.project_id} />
+          </CCardBody>
+        )}
       </CCard>
 
-      {/* Section 7: Macro Conditions - Individual Colored Tiles */}
+      {/* Section 4: Macro Conditions - Individual Colored Tiles */}
       <div className="mb-2">
         <h5 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>
           Macro Conditions
@@ -1694,80 +1366,6 @@ export default function ProjectTab({
         </CCol>
       </CRow>
 
-      {/* Inflation Step Schedule Modal */}
-      <CModal
-        visible={showInflationModal}
-        onClose={handleCloseInflationModal}
-        alignment="center"
-      >
-        <style jsx global>{`
-          #inflation-schedule-modal .modal-dialog {
-            max-width: 450px !important;
-          }
-          #inflation-schedule-modal input,
-          #inflation-schedule-modal textarea,
-          #inflation-schedule-modal button {
-            transition: none !important;
-          }
-          #inflation-schedule-modal input:hover,
-          #inflation-schedule-modal textarea:hover {
-            border-color: var(--cui-border-color) !important;
-            background-color: var(--cui-body-bg) !important;
-          }
-          #inflation-schedule-modal input:focus,
-          #inflation-schedule-modal textarea:focus,
-          #inflation-schedule-modal button:focus {
-            outline: 2px solid #6c757d !important;
-            outline-offset: -2px;
-            box-shadow: none !important;
-            border-color: #6c757d !important;
-            background-color: var(--cui-body-bg) !important;
-          }
-          #inflation-schedule-modal input::selection,
-          #inflation-schedule-modal textarea::selection {
-            background-color: rgba(108, 117, 125, 0.2) !important;
-            color: inherit !important;
-          }
-        `}</style>
-        <div id="inflation-schedule-modal">
-          <CModalHeader>
-            <CModalTitle>Custom Inflation Schedule</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-          <div className="mb-3">
-            <label htmlFor="schedule_name" className="form-label" style={{ fontWeight: 500 }}>
-              Schedule Name
-            </label>
-            <CFormInput
-              id="schedule_name"
-              type="text"
-              placeholder="e.g., High Inflation Scenario"
-              value={inflationScheduleName}
-              onChange={(e) => setInflationScheduleName(e.target.value)}
-              onFocus={(e) => e.target.select()}
-              ref={scheduleNameInputRef}
-            />
-          </div>
-          <p className="mb-3" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
-            Define inflation rates by period. Use "E" to indicate the end of the analysis period.
-          </p>
-          <StepRateTable
-            steps={inflationSteps}
-            onUpdateStep={handleUpdateInflationStep}
-            rateUnit="%"
-            readonly={false}
-          />
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={handleCloseInflationModal}>
-              Cancel
-            </CButton>
-            <CButton color="primary" onClick={handleSaveInflationSteps}>
-              Save Schedule
-            </CButton>
-          </CModalFooter>
-        </div>
-      </CModal>
       </div>
       <NewProjectModal
         isOpen={isNewProjectModalOpen}

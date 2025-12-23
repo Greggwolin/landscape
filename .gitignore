@@ -48,6 +48,12 @@ next-env.d.ts
 *.tar.gz
 *.sql
 /LocalFiles/
+
+# Office temp files
+~$*
+
+# Claude session data
+.claude/plans/
 /.vscode/
 *.psd
 *.DS_Store

@@ -38,12 +38,15 @@ async function resetTimingIfNoDependencies(
   }
 }
 
+type Params = { params: Promise<{ dependencyId: string }> };
+
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { dependencyId: string } }
+  context: Params
 ) {
   try {
-    const dependencyId = Number(params.dependencyId);
+    const { dependencyId: depId } = await context.params;
+    const dependencyId = Number(depId);
     if (!dependencyId) {
       return NextResponse.json(
         { success: false, error: 'Invalid dependencyId' },

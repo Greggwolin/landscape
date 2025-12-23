@@ -1,116 +1,32 @@
 'use client';
 
 import React from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useUserTier } from '@/hooks/useUserTier';
-import { useProjectMode } from '@/contexts/ProjectModeContext';
-
-interface TileConfig {
-  id: string;
-  label: string;
-  route: string;
-  background: string;
-  proOnly?: boolean;
-}
+import {
+  createTileConfig,
+  isTwoLineLabel,
+  TileConfig,
+} from './tiles/tileConfig';
 
 interface LifecycleTileNavProps {
   projectId: string;
+  propertyType?: string;
 }
 
-const STANDARD_TILES: TileConfig[] = [
-  {
-    id: 'home',
-    label: 'Project Home',
-    background: '#3d99f5',
-    route: '' // Empty route = base project route
-  },
-  {
-    id: 'planning',
-    label: 'Planning',
-    background: '#57c68a',
-    route: '/planning/market'
-  },
-  {
-    id: 'budget',
-    label: 'Budget',
-    background: '#7a80ec',
-    route: '/budget'
-  },
-  {
-    id: 'sales',
-    label: 'Sales',
-    background: '#e64072',
-    route: '/sales-marketing'
-  },
-  {
-    id: 'cashflow',
-    label: 'Cash Flow',
-    background: '#f2c40d',
-    route: '/results'
-  },
-  {
-    id: 'waterfall',
-    label: 'Waterfall',
-    background: '#d97706',
-    route: '/capitalization/equity'
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
-    background: '#6b7785',
-    route: '/analysis'
-  },
-  {
-    id: 'documents',
-    label: 'Documents',
-    background: '#272d35',
-    route: '/documents'
-  }
-];
-
-const NAPKIN_TILES: TileConfig[] = [
-  {
-    id: 'home',
-    label: 'Project Home',
-    background: '#3d99f5',
-    route: ''
-  },
-  {
-    id: 'planning',
-    label: 'Planning',
-    background: '#57c68a',
-    route: '/planning/market'
-  },
-  {
-    id: 'budget',
-    label: 'Budget',
-    background: '#7a80ec',
-    route: '/budget'
-  },
-  {
-    id: 'waterfall',
-    label: 'Waterfall',
-    background: '#d97706',
-    route: '/napkin/waterfall'
-  },
-];
-
-const NAV_TILES: Record<'napkin' | 'standard', TileConfig[]> = {
-  napkin: NAPKIN_TILES,
-  standard: STANDARD_TILES
-};
-
-export function LifecycleTileNav({ projectId }: LifecycleTileNavProps) {
+export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: tierLevel, isLoading } = useUserTier();
-  const { mode } = useProjectMode();
+  const standardHomePath = `/projects/${projectId}`;
 
   // Detect if we're in dark mode
   const isDarkMode = typeof window !== 'undefined' &&
     document.documentElement.getAttribute('data-coreui-theme') === 'dark';
 
-  const tiles = NAV_TILES[mode] ?? STANDARD_TILES;
+  // Get tiles based on project type (7 static tiles)
+  const tiles = createTileConfig(propertyType);
 
   const visibleTiles = tiles.filter((tile: TileConfig) => {
     if (tile.proOnly && tierLevel !== 'pro') return false;
@@ -126,8 +42,15 @@ export function LifecycleTileNav({ projectId }: LifecycleTileNavProps) {
     );
   }
 
-  // Check if a tile is active based on current path
+  // Check if a tile is active based on current path or query param
   const isActive = (tile: TileConfig) => {
+    // Income property tiles use query param routing
+    if (tile.tabKey) {
+      const currentTab = searchParams.get('tab') || 'project';
+      const isProjectBase = pathname === standardHomePath || pathname === `${standardHomePath}/`;
+      return isProjectBase && currentTab === tile.tabKey;
+    }
+
     if (tile.route === '') {
       const projectBasePath = `/projects/${projectId}`;
       return pathname === projectBasePath || pathname === `${projectBasePath}/`;
@@ -137,11 +60,48 @@ export function LifecycleTileNav({ projectId }: LifecycleTileNavProps) {
 
   // Navigate to tile route
   const handleTileClick = (tile: TileConfig) => {
+    // Income property tiles use query param routing
+    if (tile.tabKey) {
+      const tabParam = tile.tabKey === 'project' ? '' : `?tab=${tile.tabKey}`;
+      router.push(`${standardHomePath}${tabParam}`);
+      return;
+    }
+
     if (tile.route === '') {
       router.push(`/projects/${projectId}`);
       return;
     }
     router.push(`/projects/${projectId}${tile.route}`);
+  };
+
+  // Render tile label (handles both simple string and two-line labels)
+  const renderLabel = (label: string | { primary: string; secondary?: string }) => {
+    if (isTwoLineLabel(label)) {
+      return (
+        <div className="d-flex flex-column align-items-center" style={{ lineHeight: 1.2 }}>
+          <span className="fw-semibold">{label.primary}</span>
+          <div
+            style={{
+              width: '100%',
+              height: '1px',
+              backgroundColor: 'var(--surface-card-header)',
+              margin: '2px 0',
+            }}
+          />
+          <span className="fw-semibold">{label.secondary}</span>
+        </div>
+      );
+    }
+    // Handle "Project Home" as two lines
+    if (label === 'Project Home') {
+      return (
+        <div className="d-flex flex-column align-items-center" style={{ lineHeight: 1.2 }}>
+          <span className="fw-semibold">Project</span>
+          <span className="fw-semibold">Home</span>
+        </div>
+      );
+    }
+    return <span className="fw-semibold">{label}</span>;
   };
 
   return (
@@ -183,7 +143,7 @@ export function LifecycleTileNav({ projectId }: LifecycleTileNavProps) {
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            <span className="fw-semibold">{tile.label}</span>
+            {renderLabel(tile.label)}
           </div>
         );
       })}

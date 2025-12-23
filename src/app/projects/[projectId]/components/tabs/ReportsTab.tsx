@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { CCard, CCardBody, CButton, CButtonGroup, CNav, CNavItem, CNavLink } from '@coreui/react';
 import { PropertySummaryView } from '@/components/reports/PropertySummaryView';
+import { ExtractionHistoryReport } from '@/components/reports/ExtractionHistoryReport';
 import CIcon from '@coreui/icons-react';
-import { cilDescription, cilSpreadsheet, cilHome } from '@coreui/icons';
+import { cilDescription, cilSpreadsheet, cilHome, cilHistory } from '@coreui/icons';
 
 interface Project {
   project_id: number;
@@ -15,7 +16,7 @@ interface ReportsTabProps {
   project: Project;
 }
 
-type ReportType = 'summary' | 'cashflow' | 'rentroll';
+type ReportType = 'summary' | 'cashflow' | 'rentroll' | 'extraction-history';
 
 export default function ReportsTab({ project }: ReportsTabProps) {
   const [scenario, setScenario] = useState<'current' | 'proforma'>('current');
@@ -78,44 +79,58 @@ export default function ReportsTab({ project }: ReportsTabProps) {
                     Rent Roll
                   </CNavLink>
                 </CNavItem>
+                <CNavItem>
+                  <CNavLink
+                    active={reportType === 'extraction-history'}
+                    onClick={() => setReportType('extraction-history')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <CIcon icon={cilHistory} className="me-2" />
+                    Extraction History
+                  </CNavLink>
+                </CNavItem>
               </CNav>
             </div>
-            <CButton
-              color="primary"
-              onClick={() => handleDownloadPDF(reportType)}
-            >
-              Download PDF
-            </CButton>
+            {reportType !== 'extraction-history' && (
+              <CButton
+                color="primary"
+                onClick={() => handleDownloadPDF(reportType)}
+              >
+                Download PDF
+              </CButton>
+            )}
           </div>
         </CCardBody>
       </CCard>
 
-      {/* Scenario Selector Card */}
-      <CCard className="mb-4">
-        <CCardBody>
-          <div className="d-flex align-items-center gap-3">
-            <label className="mb-0 fw-medium">Scenario:</label>
-            <CButtonGroup role="group">
-              <CButton
-                color="primary"
-                variant={scenario === 'current' ? 'outline' : 'ghost'}
-                active={scenario === 'current'}
-                onClick={() => setScenario('current')}
-              >
-                Current
-              </CButton>
-              <CButton
-                color="primary"
-                variant={scenario === 'proforma' ? 'outline' : 'ghost'}
-                active={scenario === 'proforma'}
-                onClick={() => setScenario('proforma')}
-              >
-                Proforma
-              </CButton>
-            </CButtonGroup>
-          </div>
-        </CCardBody>
-      </CCard>
+      {/* Scenario Selector Card - hidden for extraction history */}
+      {reportType !== 'extraction-history' && (
+        <CCard className="mb-4">
+          <CCardBody>
+            <div className="d-flex align-items-center gap-3">
+              <label className="mb-0 fw-medium">Scenario:</label>
+              <CButtonGroup role="group">
+                <CButton
+                  color="primary"
+                  variant={scenario === 'current' ? 'outline' : 'ghost'}
+                  active={scenario === 'current'}
+                  onClick={() => setScenario('current')}
+                >
+                  Current
+                </CButton>
+                <CButton
+                  color="primary"
+                  variant={scenario === 'proforma' ? 'outline' : 'ghost'}
+                  active={scenario === 'proforma'}
+                  onClick={() => setScenario('proforma')}
+                >
+                  Proforma
+                </CButton>
+              </CButtonGroup>
+            </div>
+          </CCardBody>
+        </CCard>
+      )}
 
       {/* Report Content */}
       {reportType === 'summary' && (
@@ -140,6 +155,9 @@ export default function ReportsTab({ project }: ReportsTabProps) {
             </p>
           </CCardBody>
         </CCard>
+      )}
+      {reportType === 'extraction-history' && (
+        <ExtractionHistoryReport projectId={project.project_id} />
       )}
     </div>
   );

@@ -17,8 +17,11 @@ export interface ProjectProfile {
   project_number?: string;
   analysis_type?: string;
   property_subtype?: string;
+  project_type?: string; // LAND, MF, OFF, etc.
   project_status?: string;
-  target_units?: number;
+  target_units?: number; // For development projects (planned units)
+  total_units?: number; // For operating projects (actual units)
+  calculated_units?: number; // Calculated from tbl_multifamily_unit
   gross_acres?: number;
   address?: string;
   city?: string;
@@ -31,6 +34,8 @@ export interface ProjectProfile {
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
+  market?: string; // Free text market field (fallback when no MSA)
+  submarket?: string; // Free text submarket field
   apn?: string;
   ownership_type?: string;
   created_at?: Date;
@@ -54,7 +59,10 @@ export async function GET(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
+        p.project_type,
         p.target_units,
+        p.total_units,
+        (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
@@ -67,6 +75,8 @@ export async function GET(
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
+        p.market,
+        p.submarket,
         COALESCE(p.apn_primary, '') as apn,
         p.ownership_type,
         p.created_at,
@@ -271,7 +281,10 @@ export async function PATCH(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
+        p.project_type,
         p.target_units,
+        p.total_units,
+        (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
@@ -284,6 +297,8 @@ export async function PATCH(
         p.msa_id,
         m.msa_name,
         m.state_abbreviation,
+        p.market,
+        p.submarket,
         COALESCE(p.apn_primary, '') as apn,
         p.ownership_type,
         p.updated_at

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
-type Params = { params: { projectId: string } };
+type Params = { params: Promise<{ projectId: string }> };
 
 function parseBoolean(value: string | null, defaultValue: boolean): boolean {
   if (value === null) return defaultValue;
@@ -21,9 +21,10 @@ function differenceInDays(start: string | null, end: string | null): number | nu
   return Math.round(diffMs / (24 * 60 * 60 * 1000));
 }
 
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, context: Params) {
   try {
-    const projectId = Number(params.projectId);
+    const { projectId: projId } = await context.params;
+    const projectId = Number(projId);
     if (!Number.isFinite(projectId) || projectId <= 0) {
       return NextResponse.json(
         { success: false, error: 'Invalid projectId' },

@@ -35,8 +35,9 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
   planning: 'Planning & Engineering',
   engineering: 'Planning & Engineering',
   predevelopment: 'Planning & Engineering',
-  development: 'Development',
-  construction: 'Development',
+  development: 'Improvements',  // Map old name to new
+  improvements: 'Improvements',
+  construction: 'Improvements',
   operations: 'Operations',
   operating: 'Operations',
   disposition: 'Disposition',
@@ -49,7 +50,7 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
 const VALID_LIFECYCLE_STAGES = new Set([
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',

@@ -201,6 +201,13 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
 
       if (onMapClick) {
         map.on('click', (event) => {
+          // Check if the click originated from a marker element
+          // MapLibre fires map click even when clicking markers, so we check originalEvent
+          const target = event.originalEvent?.target as HTMLElement;
+          if (target?.closest('.map-marker') || target?.closest('.maplibregl-marker')) {
+            // Click was on a marker, don't trigger map click handler
+            return;
+          }
           const { lng, lat } = event.lngLat;
           onMapClick([lng, lat]);
         });
@@ -370,38 +377,37 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             `;
           }
 
-          if (onFeatureClick) {
-            el.addEventListener('click', () => onFeatureClick(m.id));
-          }
-
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat(m.coordinates)
-            .addTo(map);
-
           const popupHtml = m.popup ?? m.tooltip;
+
+          // Create marker with popup attached directly (MapLibre's recommended pattern)
+          const marker = new maplibregl.Marker({ element: el })
+            .setLngLat(m.coordinates);
 
           if (popupHtml) {
             const popup = new maplibregl.Popup({
-              offset: variant === 'dot' ? 12 : 25,
-              closeButton: false,
-              closeOnClick: false
+              offset: [0, variant === 'dot' ? -12 : -30],
+              closeButton: true,
+              closeOnClick: true,
+              className: 'map-marker-popup',
+              maxWidth: '300px'
             }).setHTML(popupHtml);
+
+            // Attach popup to marker - this is the proper MapLibre pattern
             marker.setPopup(popup);
-
-            el.addEventListener('mouseenter', () => {
-              popup.addTo(map);
-              m.onHover?.();
-            });
-            el.addEventListener('mouseleave', () => {
-              popup.remove();
-              m.onLeave?.();
-            });
           }
 
-          if (!popupHtml) {
-            el.addEventListener('mouseenter', () => m.onHover?.());
-            el.addEventListener('mouseleave', () => m.onLeave?.());
-          }
+          // Add marker to map after popup is attached
+          marker.addTo(map);
+
+          // Handle click for feature selection (separate from popup)
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onFeatureClick?.(m.id);
+          });
+
+          // Handle hover callbacks
+          el.addEventListener('mouseenter', () => m.onHover?.());
+          el.addEventListener('mouseleave', () => m.onLeave?.());
 
           markersRef.current.push(marker);
         }

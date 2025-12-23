@@ -5,10 +5,14 @@ const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
   ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
   : null;
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
+  const { id } = await context.params;
+
   if (!DJANGO_FINANCIAL_BASE) {
     return NextResponse.json(
       { error: 'Django API not configured' },
@@ -18,7 +22,7 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/remove-tag/`;
+    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${id}/remove-tag/`;
 
     const response = await fetch(url, {
       method: 'POST',

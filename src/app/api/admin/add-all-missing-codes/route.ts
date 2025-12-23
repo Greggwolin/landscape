@@ -54,9 +54,10 @@ export async function POST() {
         `
         results.push({ code: landuse.code, status: 'success', data: result[0] })
         console.log(`✅ Added/Updated: ${landuse.code} - ${landuse.name}`)
-      } catch (error) {
-        results.push({ code: landuse.code, status: 'error', error: error.message })
-        console.error(`❌ Failed to add ${landuse.code}:`, error.message)
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ code: landuse.code, status: 'error', error: message })
+        console.error(`❌ Failed to add ${landuse.code}:`, message)
       }
     }
 
@@ -66,11 +67,11 @@ export async function POST() {
       results
     })
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ API failed:', error)
     return NextResponse.json({
       error: 'Failed to add missing codes',
-      details: error.message
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

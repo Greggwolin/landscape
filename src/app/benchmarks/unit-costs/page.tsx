@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import UnitCostsPanel, { DEFAULT_PROJECT_TYPE } from '@/components/benchmarks/unit-costs/UnitCostsPanel';
 import UnitCostTemplateModal from '@/components/benchmarks/unit-costs/UnitCostTemplateModal';
@@ -40,7 +43,7 @@ const formatDate = (dateString: string | null): string => {
   }
 };
 
-export default function UnitCostsPage() {
+function UnitCostsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialStage = (searchParams.get('stage') as DevelopmentStage) || 'stage3_development';
@@ -409,5 +412,13 @@ export default function UnitCostsPage() {
         onSave={handleSaveTemplate}
       />
     </div>
+  );
+}
+
+export default function UnitCostsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen" style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>}>
+      <UnitCostsPageContent />
+    </Suspense>
   );
 }

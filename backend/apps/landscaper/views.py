@@ -11,16 +11,26 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q
+from rest_framework.permissions import AllowAny
+from django.db.models import Q, Count, Avg
+from django.db import connection
+from django.utils import timezone
 from decimal import Decimal
-from .models import ChatMessage, LandscaperAdvice
+from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
 from .serializers import (
     ChatMessageSerializer,
     ChatMessageCreateSerializer,
     LandscaperAdviceSerializer,
     VarianceItemSerializer,
+    ActivityItemSerializer,
+    ActivityItemCreateSerializer,
+    ExtractionMappingSerializer,
+    ExtractionMappingCreateSerializer,
+    ExtractionLogSerializer,
+    ExtractionLogReviewSerializer,
 )
 from .ai_handler import get_landscaper_response
+from .tool_executor import execute_tool
 
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
@@ -34,6 +44,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
     queryset = ChatMessage.objects.select_related('project', 'user')
     serializer_class = ChatMessageSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get_queryset(self):
         """Filter messages by project_id from URL."""
@@ -92,17 +103,41 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 for msg in messages
             ]
 
-            # Get project context
+            # Get project context with full details
             from apps.projects.models import Project
             project = Project.objects.get(project_id=project_id)
             project_context = {
                 'project_id': project.project_id,
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
+                'project_details': {
+                    'address': getattr(project, 'address', None),
+                    'city': getattr(project, 'city', None),
+                    'state': getattr(project, 'state', None),
+                    'county': getattr(project, 'county', None),
+                    'zip_code': getattr(project, 'zip_code', None),
+                    'total_acres': getattr(project, 'total_acres', None),
+                    'total_lots': getattr(project, 'total_lots', None),
+                }
             }
 
-            # Generate AI response (stubbed for Phase 6)
-            ai_response = get_landscaper_response(message_history, project_context)
+            # Create tool executor bound to this project
+            def tool_executor_fn(tool_name, tool_input, project_id=None):
+                return execute_tool(tool_name, tool_input, project_id or project.project_id)
+
+            # Generate AI response with tool support
+            ai_response = get_landscaper_response(
+                message_history,
+                project_context,
+                tool_executor=tool_executor_fn
+            )
+
+            # Include tool calls and field updates in metadata
+            assistant_metadata = ai_response.get('metadata', {})
+            if ai_response.get('tool_calls'):
+                assistant_metadata['tool_calls'] = ai_response['tool_calls']
+            if ai_response.get('field_updates'):
+                assistant_metadata['field_updates'] = ai_response['field_updates']
 
             # Create assistant message
             assistant_message_data = {
@@ -110,7 +145,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 'user': None,  # Assistant messages don't have a user
                 'role': 'assistant',
                 'content': ai_response['content'],
-                'metadata': ai_response.get('metadata'),
+                'metadata': assistant_metadata,
             }
             assistant_message_serializer = ChatMessageCreateSerializer(data=assistant_message_data)
             assistant_message_serializer.is_valid(raise_exception=True)
@@ -125,12 +160,18 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                     suggested_values
                 )
 
-            # Return both messages
-            return Response({
+            # Return both messages with field update info
+            response_data = {
                 'success': True,
                 'user_message': ChatMessageSerializer(user_message).data,
                 'assistant_message': ChatMessageSerializer(assistant_message).data,
-            }, status=status.HTTP_201_CREATED)
+            }
+
+            # Include field updates at top level for easy access
+            if ai_response.get('field_updates'):
+                response_data['field_updates'] = ai_response['field_updates']
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             return Response({
@@ -179,6 +220,7 @@ class VarianceView(APIView):
         "count": 1
     }
     """
+    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get(self, request, project_id):
         """Calculate and return variances above threshold."""
@@ -245,3 +287,472 @@ class VarianceView(APIView):
         }
 
         return stub_actuals.get(assumption_key)
+
+
+class ActivityFeedViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for activity feed items.
+
+    Endpoints:
+    - GET /api/projects/{project_id}/landscaper/activities/ - Get activities
+    - POST /api/projects/{project_id}/landscaper/activities/ - Create activity
+    - PATCH /api/projects/{project_id}/landscaper/activities/{id}/read/ - Mark as read
+    """
+
+    queryset = ActivityItem.objects.select_related('project')
+    serializer_class = ActivityItemSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
+
+    def get_queryset(self):
+        """Filter activities by project_id from URL."""
+        project_id = self.kwargs.get('project_id')
+        if project_id:
+            return self.queryset.filter(
+                project_id=project_id
+            ).order_by('-created_at')
+        return self.queryset.none()
+
+    def list(self, request, *args, **kwargs):
+        """GET activity feed for a project."""
+        queryset = self.get_queryset()
+        # Get unread count before slicing
+        unread_count = queryset.filter(is_read=False).count()
+        # Limit to 50 items for display
+        items = list(queryset[:50])
+        serializer = self.get_serializer(items, many=True)
+
+        return Response({
+            'activities': serializer.data,
+            'count': len(serializer.data),
+            'unread_count': unread_count,
+        })
+
+    def create(self, request, *args, **kwargs):
+        """POST new activity item."""
+        project_id = self.kwargs.get('project_id')
+
+        try:
+            data = {
+                **request.data,
+                'project': project_id,
+            }
+            serializer = ActivityItemCreateSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            activity = serializer.save()
+
+            return Response({
+                'success': True,
+                'activity': ActivityItemSerializer(activity).data,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, project_id=None, pk=None):
+        """Mark a specific activity as read."""
+        try:
+            activity = ActivityItem.objects.get(
+                activity_id=pk,
+                project_id=project_id
+            )
+            activity.is_read = True
+            activity.save()
+
+            return Response({
+                'success': True,
+                'activity': ActivityItemSerializer(activity).data,
+            })
+        except ActivityItem.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Activity not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request, project_id=None):
+        """Mark all activities for a project as read."""
+        try:
+            count = ActivityItem.objects.filter(
+                project_id=project_id,
+                is_read=False
+            ).update(is_read=True)
+
+            return Response({
+                'success': True,
+                'updated_count': count,
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def generate_activity_from_extraction(project_id: int, extraction_data: dict) -> ActivityItem:
+    """
+    Generate an activity item from a document extraction result.
+
+    Called after document extraction completes.
+
+    Args:
+        project_id: Project ID
+        extraction_data: Dict with extraction results including:
+            - doc_id: Document ID
+            - doc_name: Document name
+            - status: 'completed', 'partial', 'failed'
+            - fields_extracted: Number of fields extracted
+            - fields_missing: List of missing field names
+            - confidence: Overall confidence score
+
+    Returns:
+        Created ActivityItem
+    """
+    doc_name = extraction_data.get('doc_name', 'Document')
+    doc_status = extraction_data.get('status', 'pending')
+    fields_extracted = extraction_data.get('fields_extracted', 0)
+    fields_missing = extraction_data.get('fields_missing', [])
+    confidence = extraction_data.get('confidence', 0)
+
+    # Determine activity status based on extraction result
+    if doc_status == 'completed' and confidence >= 0.8:
+        status = 'complete'
+        confidence_level = 'high'
+        summary = f'{fields_extracted} fields extracted successfully'
+    elif doc_status == 'completed':
+        status = 'partial'
+        confidence_level = 'medium' if confidence >= 0.5 else 'low'
+        summary = f'{fields_extracted} fields extracted, {len(fields_missing)} need review'
+    elif doc_status == 'partial':
+        status = 'partial'
+        confidence_level = 'low'
+        summary = f'Partial extraction: {len(fields_missing)} fields missing'
+    else:
+        status = 'blocked'
+        confidence_level = None
+        summary = 'Extraction failed - manual entry required'
+
+    # Create details list
+    details = []
+    if fields_extracted > 0:
+        details.append(f'{fields_extracted} fields extracted')
+    if fields_missing:
+        details.append(f'Missing: {", ".join(fields_missing[:3])}{"..." if len(fields_missing) > 3 else ""}')
+    if confidence:
+        details.append(f'{int(confidence * 100)}% confidence')
+
+    activity = ActivityItem.objects.create(
+        project_id=project_id,
+        activity_type='update',
+        title=doc_name[:50],
+        summary=summary,
+        status=status,
+        confidence=confidence_level,
+        link='/documents',
+        details=details,
+        highlight_fields=fields_missing[:5] if fields_missing else None,
+        source_type='document',
+        source_id=str(extraction_data.get('doc_id', '')),
+    )
+
+    return activity
+
+
+class ExtractionMappingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for extraction field mappings.
+
+    Endpoints:
+    - GET /api/landscaper/mappings/ - List mappings with filters
+    - POST /api/landscaper/mappings/ - Create new mapping
+    - GET /api/landscaper/mappings/{id}/ - Get single mapping
+    - PUT /api/landscaper/mappings/{id}/ - Update mapping
+    - DELETE /api/landscaper/mappings/{id}/ - Delete (user-created only)
+    - GET /api/landscaper/mappings/stats/ - Get mappings with usage stats
+    - POST /api/landscaper/mappings/bulk-toggle/ - Toggle multiple active
+    - GET /api/landscaper/mappings/document-types/ - Get doc types with counts
+    - GET /api/landscaper/mappings/target-tables/ - Get tables with counts
+    """
+
+    queryset = ExtractionMapping.objects.all()
+    serializer_class = ExtractionMappingSerializer
+    permission_classes = [AllowAny]  # Called from Next.js backend
+
+    def get_queryset(self):
+        """Filter mappings based on query params."""
+        queryset = self.queryset
+
+        # Filter by document_type
+        doc_type = self.request.query_params.get('document_type')
+        if doc_type:
+            queryset = queryset.filter(document_type=doc_type)
+
+        # Filter by target_table
+        target_table = self.request.query_params.get('target_table')
+        if target_table:
+            queryset = queryset.filter(target_table=target_table)
+
+        # Filter by confidence
+        confidence = self.request.query_params.get('confidence')
+        if confidence:
+            queryset = queryset.filter(confidence=confidence)
+
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+
+        # Search by pattern, table, or field
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(source_pattern__icontains=search) |
+                Q(target_table__icontains=search) |
+                Q(target_field__icontains=search)
+            )
+
+        return queryset.order_by('document_type', 'source_pattern')
+
+    def list(self, request, *args, **kwargs):
+        """GET list of mappings."""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response({
+            'mappings': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    def create(self, request, *args, **kwargs):
+        """POST create new mapping."""
+        serializer = ExtractionMappingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # User-created mappings are not system mappings
+        mapping = serializer.save(is_system=False)
+
+        return Response({
+            'success': True,
+            'mapping': ExtractionMappingSerializer(mapping).data,
+        }, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """PUT update mapping."""
+        instance = self.get_object()
+        serializer = ExtractionMappingCreateSerializer(
+            instance, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        mapping = serializer.save()
+
+        return Response({
+            'success': True,
+            'mapping': ExtractionMappingSerializer(mapping).data,
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        """DELETE mapping (user-created only)."""
+        instance = self.get_object()
+
+        # Prevent deletion of system mappings
+        if instance.is_system:
+            return Response({
+                'success': False,
+                'error': 'System mappings cannot be deleted. You can deactivate them instead.',
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        instance.delete()
+        return Response({
+            'success': True,
+            'message': 'Mapping deleted successfully',
+        })
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """GET mappings with usage statistics from the stats view."""
+        try:
+            # Query the stats view directly
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        mapping_id,
+                        document_type,
+                        source_pattern,
+                        target_table,
+                        target_field,
+                        confidence,
+                        is_active,
+                        times_extracted,
+                        projects_used,
+                        documents_processed,
+                        avg_confidence_score,
+                        write_rate,
+                        acceptance_rate,
+                        last_used_at
+                    FROM landscape.vw_extraction_mapping_stats
+                    ORDER BY document_type, source_pattern
+                """)
+                columns = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+
+            # Build response with stats
+            mappings_with_stats = []
+            for row in rows:
+                stat_dict = dict(zip(columns, row))
+                # Get full mapping data
+                try:
+                    mapping = ExtractionMapping.objects.get(mapping_id=stat_dict['mapping_id'])
+                    mapping_data = ExtractionMappingSerializer(mapping).data
+                    # Overlay stats
+                    mapping_data.update({
+                        'times_extracted': stat_dict.get('times_extracted', 0),
+                        'projects_used': stat_dict.get('projects_used', 0),
+                        'documents_processed': stat_dict.get('documents_processed', 0),
+                        'avg_confidence_score': float(stat_dict['avg_confidence_score']) if stat_dict.get('avg_confidence_score') else None,
+                        'write_rate': float(stat_dict['write_rate']) if stat_dict.get('write_rate') else None,
+                        'acceptance_rate': float(stat_dict['acceptance_rate']) if stat_dict.get('acceptance_rate') else None,
+                        'last_used_at': stat_dict.get('last_used_at').isoformat() if stat_dict.get('last_used_at') else None,
+                    })
+                    mappings_with_stats.append(mapping_data)
+                except ExtractionMapping.DoesNotExist:
+                    pass
+
+            return Response({
+                'mappings': mappings_with_stats,
+                'count': len(mappings_with_stats),
+            })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='bulk-toggle')
+    def bulk_toggle(self, request):
+        """POST toggle active status for multiple mappings."""
+        mapping_ids = request.data.get('mapping_ids', [])
+        is_active = request.data.get('is_active', True)
+
+        if not mapping_ids:
+            return Response({
+                'success': False,
+                'error': 'No mapping_ids provided',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_count = ExtractionMapping.objects.filter(
+            mapping_id__in=mapping_ids
+        ).update(is_active=is_active, updated_at=timezone.now())
+
+        return Response({
+            'success': True,
+            'updated_count': updated_count,
+        })
+
+    @action(detail=False, methods=['get'], url_path='document-types')
+    def document_types(self, request):
+        """GET list of document types with counts."""
+        type_counts = ExtractionMapping.objects.values('document_type').annotate(
+            count=Count('mapping_id'),
+            active_count=Count('mapping_id', filter=Q(is_active=True))
+        ).order_by('document_type')
+
+        return Response({
+            'document_types': list(type_counts),
+        })
+
+    @action(detail=False, methods=['get'], url_path='target-tables')
+    def target_tables(self, request):
+        """GET list of target tables with counts."""
+        table_counts = ExtractionMapping.objects.values('target_table').annotate(
+            count=Count('mapping_id'),
+            active_count=Count('mapping_id', filter=Q(is_active=True))
+        ).order_by('target_table')
+
+        return Response({
+            'target_tables': list(table_counts),
+        })
+
+
+class ExtractionLogViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for extraction logs.
+
+    Endpoints:
+    - GET /api/landscaper/logs/ - List logs with filters
+    - GET /api/landscaper/logs/{id}/ - Get single log
+    - POST /api/landscaper/logs/{id}/review/ - Accept/reject extraction
+    """
+
+    queryset = ExtractionLog.objects.select_related('mapping', 'project')
+    serializer_class = ExtractionLogSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter logs based on query params."""
+        queryset = self.queryset
+
+        # Filter by project
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        # Filter by document
+        doc_id = self.request.query_params.get('doc_id')
+        if doc_id:
+            queryset = queryset.filter(doc_id=doc_id)
+
+        # Filter by mapping
+        mapping_id = self.request.query_params.get('mapping_id')
+        if mapping_id:
+            queryset = queryset.filter(mapping_id=mapping_id)
+
+        # Filter by review status
+        review_status = self.request.query_params.get('review_status')
+        if review_status == 'pending':
+            queryset = queryset.filter(was_accepted__isnull=True)
+        elif review_status == 'accepted':
+            queryset = queryset.filter(was_accepted=True)
+        elif review_status == 'rejected':
+            queryset = queryset.filter(was_accepted=False)
+
+        return queryset.order_by('-extracted_at')
+
+    def list(self, request, *args, **kwargs):
+        """GET list of extraction logs."""
+        queryset = self.get_queryset()[:100]  # Limit to 100 most recent
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response({
+            'logs': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    @action(detail=True, methods=['post'])
+    def review(self, request, pk=None):
+        """POST accept or reject an extraction."""
+        try:
+            log = self.get_object()
+
+            serializer = ExtractionLogReviewSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            log.was_accepted = serializer.validated_data['was_accepted']
+            log.rejection_reason = serializer.validated_data.get('rejection_reason', '')
+            log.reviewed_at = timezone.now()
+            # log.reviewed_by = request.user if request.user.is_authenticated else None
+            log.save()
+
+            return Response({
+                'success': True,
+                'log': ExtractionLogSerializer(log).data,
+            })
+
+        except ExtractionLog.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Log not found',
+            }, status=status.HTTP_404_NOT_FOUND)

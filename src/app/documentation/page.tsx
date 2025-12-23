@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Landscaper Phase 3 - Real Data & AI Wiring',
+      path: '/docs/session-notes/2025-12-19-landscaper-phase3-wiring.md',
+      category: 'AI',
+      description: 'Chat API connection to Django, activity feed infrastructure, field highlighting, context-aware system prompts by property type',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-12-19'
+    },
+    {
+      title: 'Implementation Status (Dec 19)',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-19.md',
+      category: 'Status',
+      description: 'Current implementation status - Landscaper Phase 3, activity feed API, field highlighting, property-type prompts',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-12-19'
+    },
+    {
       title: 'Session XK-83: Project Cleanup & Type Rename',
       path: '/docs/session-notes/2025-12-11-session-xk83-cleanup.md',
       category: 'Status',

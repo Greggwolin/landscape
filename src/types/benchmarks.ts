@@ -144,7 +144,7 @@ export interface LandscaperAbsorptionDetail {
 export type Activity =
   | 'Acquisition'
   | 'Planning & Engineering'
-  | 'Development'
+  | 'Improvements'  // Renamed from 'Development' in migration 042
   | 'Operations'
   | 'Disposition'
   | 'Financing';
@@ -154,7 +154,7 @@ export type LifecycleStage = Activity;
 
 /**
  * Category tag for flexible classification
- * Tags can be context-specific (Development: Hard/Soft, Operations: OpEx/CapEx, etc.)
+ * Tags can be context-specific (Improvements: Hard/Soft, Operations: OpEx/CapEx, etc.)
  */
 export interface CategoryTag {
   tag_id: number;

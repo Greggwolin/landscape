@@ -94,7 +94,7 @@ export async function extractFromPDFWithClaude(
 ): Promise<UnifiedExtractionResult> {
   const {
     temperature = 0,
-    maxTokens = 8000,
+    maxTokens = 16000, // Increased for comprehensive multi-page extraction
     schemaProfile = DEFAULT_SCHEMA_PROFILE
   } = options;
 
@@ -105,93 +105,161 @@ export async function extractFromPDFWithClaude(
   // Convert PDF to base64
   const pdfBase64 = pdfBuffer.toString('base64');
 
-  // Create prompt with schema profile
-  const schemaProfileText = JSON.stringify(schemaProfile, null, 2);
-  const instructionText = `# Claude Prompt — Landscape DMS Extractor (Unified v2.0)
-
-## SCHEMA_PROFILE
-
-${schemaProfileText}
-
----
+  // Create comprehensive extraction prompt for all document types
+  const instructionText = `# Claude Prompt — Landscape DMS Universal Extractor v3.0
 
 ## ROLE & GOAL
 
-You are an extraction agent. Your job is to read the provided PDF document and emit **one strict JSON object** for a Landscape DMS intake queue. Do **not** summarize. Do **not** invent data. If something is missing or ambiguous, omit that field and add a short warning.
+You are an extraction agent for real estate documents. Your job is to read the ENTIRE PDF document (all pages) and emit **one strict JSON object** with ALL extractable data. Do **not** summarize. Do **not** invent data. Extract every field you can find with high confidence.
 
-Your JSON is staged in \`dms_extract_queue.extracted_data\` and later mapped to normalized Neon tables by a reviewer. Include **page numbers** when available.
+---
+
+## DOCUMENT TYPES SUPPORTED
+
+1. **Offering Memorandums (OMs)** - Investment sale packages for multifamily, office, retail, industrial
+2. **Preliminary Plat Narratives** - Land development documents
+3. **Staff Reports** - Municipal review documents
+4. **Rent Rolls** - Tenant and rent data
+5. **Operating Statements** - Income/expense reports
+6. **Appraisals** - Valuation reports
 
 ---
 
 ## EXTRACTION ALGORITHM (PDF-based)
 
-1. **Identify document type**: Preliminary Plat Narrative, Staff Report, Site Plan, Consultant Proposal, etc.
-2. **Extract tables**: Look for table structures with headers containing \`Parcel\`, \`Lots\`/\`Units\`, \`Acres\`, \`DU/AC\`, \`Open Space\`
-3. **Key-value anchors**: Extract *Project Name, City, County, State, APN, Zoning, General Plan, Utilities, Proposed Density, Total Lots, Open Space*
-4. **Parcel×Product association**: Parse lot sizes in format like "42' x 120'" or "42x120" and associate with parcels
-5. **Normalization (heuristic, no DB)**:
-   - **Zoning & GP**: lowercase/trim/collapse spaces
-   - **Utilities**: canonicalize common providers
-   - **Lot size**: coerce to integers in feet; accept \`×/x/X\` and \`'\` or \`′\` symbols
+### For ALL Documents:
+1. Read EVERY page of the document (not just the first few pages)
+2. Look for the **Executive Summary** or **Property Summary** pages first - these contain key data
+3. Extract property name, address, city, state, zip
+4. Extract total units/SF, year built, lot size
+
+### For Multifamily OMs:
+- **Property Info**: name, address, city, state, zip, county, year_built, total_units, rentable_sf, lot_size_acres
+- **Unit Mix**: For each unit type: beds, baths, unit_sf, count, market_rent, in_place_rent
+- **Financials**: asking_price, price_per_unit, price_per_sf, cap_rate, noi, goi, effective_gross_income
+- **Operating Expenses**: by category (insurance, taxes, utilities, repairs, management, etc.)
+- **Occupancy**: physical_occupancy, economic_occupancy, vacancy_rate
+
+### For Land Development:
+- **Project Info**: project_name, city, county, state, total_acres, net_acres
+- **Parcels**: For each parcel: acres, units, density, lot_sizes
+- **Zoning**: zoning_code, allowed_uses, density_limits
 
 ---
 
 ## AMBIGUITY & ERROR HANDLING
 
-* If a field or cell is unreadable, omit it and add a short \`warnings\` entry
-* If parcel counts don't sum to a stated total, keep both and add a warning
-* Do not guess values or invent rows
-* For parcel×product association: if you cannot reliably determine which lot size belongs to which parcel, set lower confidence (<0.5) and add a warning
+* If a field is unreadable, omit it and add a warning
+* If numbers don't reconcile, keep both and add a warning
+* Do NOT guess or invent values
+* Set confidence < 0.5 for uncertain extractions
 
 ---
 
 ## OUTPUT FORMAT
 
-Return **exactly one** JSON object with this structure:
+Return **exactly one** JSON object:
 
 \`\`\`json
 {
   "mapped": {
-    "core_doc": {"doc_name":"","doc_type":"","doc_date":"YYYY-MM-DD"},
-    "tbl_project": {"project_name":"","jurisdiction_city":"","jurisdiction_county":"","jurisdiction_state":"","acres_gross":0.0},
+    "core_doc": {
+      "doc_name": "",
+      "doc_type": "Offering Memorandum | Rent Roll | Staff Report | etc",
+      "doc_date": "YYYY-MM-DD"
+    },
+    "tbl_project": {
+      "project_name": "",
+      "property_name": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "county": "",
+      "year_built": 0,
+      "total_units": 0,
+      "rentable_sf": 0,
+      "lot_size_acres": 0,
+      "asking_price": 0,
+      "price_per_unit": 0,
+      "price_per_sf": 0,
+      "cap_rate": 0.0,
+      "noi": 0,
+      "goi": 0,
+      "effective_gross_income": 0,
+      "physical_occupancy": 0.0,
+      "economic_occupancy": 0.0,
+      "vacancy_rate": 0.0,
+      "acres_gross": 0.0,
+      "jurisdiction_city": "",
+      "jurisdiction_county": "",
+      "jurisdiction_state": ""
+    },
     "tbl_phase": [],
-    "tbl_parcel": [
+    "tbl_parcel": [],
+    "tbl_zoning_control": [],
+    "unit_mix": [
       {
-        "parcel_id": null,
-        "acres_gross": 0.0,
-        "units_total": 0,
-        "plan_density_du_ac": 0.0,
-        "open_space_ac": 0.0,
-        "open_space_pct": 0.0,
-        "lot_product": "",
+        "unit_type": "1BR/1BA",
+        "beds": 1,
+        "baths": 1,
+        "unit_sf": 0,
+        "count": 0,
+        "market_rent": 0,
+        "in_place_rent": 0,
         "page": 0
       }
     ],
-    "tbl_zoning_control": []
+    "operating_expenses": [
+      {
+        "category": "Insurance | Taxes | Utilities | Repairs | Management | etc",
+        "annual_amount": 0,
+        "per_unit": 0,
+        "page": 0
+      }
+    ]
   },
-  "unmapped": [],
-  "parcel_product_mix": [
+  "unmapped": [
     {
-      "parcel": 0,
-      "width_ft": 0,
-      "depth_ft": 0,
-      "count": 0,
-      "confidence": 0.0,
+      "key": "field_name",
+      "value": "extracted_value",
+      "target_table_candidates": ["tbl_project"],
       "page": 0
     }
   ],
+  "parcel_product_mix": [],
   "utilities": [],
   "approvals": {},
-  "doc_assertions": [],
+  "doc_assertions": [
+    {
+      "subject_type": "project",
+      "metric_key": "total_units",
+      "value_num": 0,
+      "confidence": 0.95,
+      "source": "table",
+      "page": 0
+    }
+  ],
   "warnings": []
 }
 \`\`\`
 
 ---
 
+## CRITICAL INSTRUCTIONS
+
+1. **READ ALL PAGES** - Do not stop at page 1-2. OMs typically have 30-50 pages.
+2. **Find the Property Summary** - Usually pages 3-10 contain the key data
+3. **Extract Unit Mix tables** - Look for tables with Beds, Baths, SF, Units, Rent columns
+4. **Extract Operating Expenses** - Look for T-12 or pro forma operating statements
+5. **Include page numbers** for each extraction to help verification
+
+---
+
 ## DELIVERABLES
 
-Return **only** the single JSON object described above. No prose, no markdown, no commentary before or after the JSON.`;
+Return **only** the JSON object. No prose, no markdown code blocks, no commentary.`;
+
 
   try {
     const message = await anthropic.messages.create({

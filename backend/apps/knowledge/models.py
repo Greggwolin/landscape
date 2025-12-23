@@ -189,7 +189,7 @@ class KnowledgeFact(models.Model):
         verbose_name_plural = 'Knowledge Facts'
 
     def __str__(self):
-        obj_display = self.object_value or f"’ {self.object_entity}"
+        obj_display = self.object_value or f"-> {self.object_entity}"
         return f"{self.subject_entity.canonical_name} | {self.predicate} | {obj_display}"
 
     def is_valid_at(self, date):

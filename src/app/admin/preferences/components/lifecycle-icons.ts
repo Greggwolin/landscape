@@ -4,7 +4,7 @@ import type { Activity } from '@/types/benchmarks';
 export const LIFECYCLE_STAGE_ICONS: Record<Activity, any> = {
   Acquisition: cilDollar,
   'Planning & Engineering': cilPencil,
-  Development: cilTerrain,
+  Improvements: cilTerrain,
   Operations: cilIndustry,
   Disposition: cilHandshake,
   Financing: cilBank,
