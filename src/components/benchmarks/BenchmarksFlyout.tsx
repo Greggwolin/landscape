@@ -24,6 +24,19 @@ interface BenchmarksFlyoutProps {
 }
 
 export default function BenchmarksFlyout({ selection, aiSuggestions, onRefresh }: BenchmarksFlyoutProps) {
+  // Hooks must be called unconditionally at the top level
+  const impact = useMemo(() => {
+    if (!selection) return { amount: '', pct: '', irr: '' };
+    return buildImpact(selection);
+  }, [selection]);
+
+  const relatedSuggestions = useMemo(() => {
+    if (!selection) return [];
+    return selectRelatedSuggestions(selection, aiSuggestions);
+  }, [selection, aiSuggestions]);
+
+  const hasCustomSteps = selection?.kind === 'growth_rate' && selection.set.rate_type === 'stepped' && (selection.set.steps?.length ?? 0) > 0;
+
   if (!selection) {
     return (
       <LandscaperPanel
@@ -33,10 +46,6 @@ export default function BenchmarksFlyout({ selection, aiSuggestions, onRefresh }
       />
     );
   }
-
-  const impact = useMemo(() => buildImpact(selection), [selection]);
-  const relatedSuggestions = useMemo(() => selectRelatedSuggestions(selection, aiSuggestions), [selection, aiSuggestions]);
-  const hasCustomSteps = selection.kind === 'growth_rate' && selection.set.rate_type === 'stepped' && (selection.set.steps?.length ?? 0) > 0;
 
   return (
     <div className="h-full overflow-y-auto bg-surface-card px-6 py-6">

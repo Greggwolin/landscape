@@ -191,7 +191,8 @@ export default function ValuationSalesCompMap({
       </div>
 
       {/* Map */}
-      <div style={{ height: 'calc(100% - 110px)' }}>
+      <div className="px-4 pb-4" style={{ height: 'calc(100% - 110px)' }}>
+        <div className="h-full rounded-lg overflow-hidden">
         <MapOblique
           ref={mapRef}
           center={data.center}
@@ -240,6 +241,7 @@ export default function ValuationSalesCompMap({
           ]}
           onFeatureClick={handleFeatureClick}
         />
+        </div>
       </div>
 
       {/* Legend */}
