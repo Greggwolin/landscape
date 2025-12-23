@@ -23,7 +23,7 @@ interface CategoryDetailPanelProps {
 const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',
@@ -97,7 +97,7 @@ export default function CategoryDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     category_name: '',
-    activitys: ['Development'] as Activity[],
+    activitys: ['Improvements'] as Activity[],  // Default to Improvements
     tags: [] as string[],
     sort_order: 0,
   });

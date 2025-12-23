@@ -11,15 +11,11 @@
  * - Category filtering and search
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Database } from 'lucide-react';
-import UnitCostsPanel, { DEFAULT_PROJECT_TYPE } from '@/components/benchmarks/unit-costs/UnitCostsPanel';
-
-const PROJECT_TYPE_OPTIONS = ['LAND'];
+import UnitCostsPanel from '@/components/benchmarks/unit-costs/UnitCostsPanel';
 
 export default function CostLibraryPage() {
-  const [projectTypeFilter, setProjectTypeFilter] = useState<string>(DEFAULT_PROJECT_TYPE);
-
   return (
     <div className="min-h-screen bg-surface-card text-text-primary">
       <div className="p-4 space-y-4">
@@ -27,25 +23,9 @@ export default function CostLibraryPage() {
           {/* Header */}
           <div className="border-b border-line-soft p-6">
             <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <Database size={24} className="text-brand-primary" />
-                  <h1 className="text-2xl font-bold whitespace-nowrap">Unit Cost Library</h1>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs uppercase tracking-wide text-text-secondary">Project Type</label>
-                  <select
-                    value={projectTypeFilter}
-                    onChange={(event) => setProjectTypeFilter(event.target.value)}
-                    className="rounded border border-line-soft bg-surface-bg px-3 py-1.5 text-sm text-text-primary shadow-sm focus:border-brand-primary focus:outline-none"
-                  >
-                    {PROJECT_TYPE_OPTIONS.map((code) => (
-                      <option key={code} value={code}>
-                        {code}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center gap-3">
+                <Database size={24} className="text-brand-primary" />
+                <h1 className="text-2xl font-bold whitespace-nowrap">Unit Cost Library</h1>
               </div>
               <p className="text-sm text-text-secondary">
                 Development cost templates and benchmark database
@@ -53,8 +33,8 @@ export default function CostLibraryPage() {
             </div>
           </div>
 
-          {/* Main Content - UnitCostsPanel */}
-          <UnitCostsPanel projectTypeFilter={projectTypeFilter} />
+          {/* Main Content - UnitCostsPanel with no filter (show all) */}
+          <UnitCostsPanel projectTypeFilter="" />
         </div>
       </div>
     </div>

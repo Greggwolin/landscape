@@ -127,12 +127,12 @@ export default function SystemPreferencesPage() {
                     backgroundColor: isExpanded ? 'var(--cui-tertiary-bg)' : 'transparent',
                     cursor: 'pointer'
                   }}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
                     if (!isExpanded) {
                       e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
                     }
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
                     if (!isExpanded) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
