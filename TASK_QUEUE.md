@@ -2,38 +2,32 @@
 
 **Purpose:** Ordered backlog of work with entry conditions and dependencies.
 **Last Updated:** 2025-12-23
-**Branch:** `feature/landscaper-panel-restructure`
+**Branch:** `work`
 
 ---
 
-## Active Work (In Progress - Uncommitted)
+## Completed Work (December 23, 2025)
 
-The current branch has significant uncommitted changes. Before starting new work, these must be addressed.
+### ✅ BLOCKED-000: Commit or Stash Current Changes
 
-### BLOCKED-000: Commit or Stash Current Changes
-
-**Status:** BLOCKING ALL OTHER WORK
-**Evidence:** Git status shows 150+ modified/added files
-
-**Entry Condition:** None - start here
-**Definition of Done:**
-- All staged changes committed with meaningful message
-- Or stashed if work is incomplete
-- Clean working tree for new tasks
-
-**Risk:** Large uncommitted changesets risk merge conflicts and lost work.
+**Status:** COMPLETE
+**Completed:** 2025-12-23
+**Resolution:**
+- Feature branch `feature/landscaper-panel-restructure` merged to `work` (25 commits)
+- 299 files consolidated into organized commits
+- Backup branch preserved: `backup-landscaper-panel-20251223`
+- Clean working tree achieved
 
 ---
 
-## Priority 1: Critical Bugs
+### ✅ BUG-001: Multifamily Lease "Expiring Soon" Query Bug
 
-### BUG-001: Multifamily Lease "Expiring Soon" Query Bug
+**Status:** COMPLETE
+**Completed:** 2025-12-23
+**Commit:** `89da8d3`
+**Source:** `backend/apps/multifamily/views.py:161-165`
 
-**Status:** READY TO FIX
-**Severity:** High (returns incorrect data)
-**Source:** `PROJECT_STATE.md` line 25, `backend/apps/multifamily/views.py:158-160`
-
-**Problem:**
+**Problem (was):**
 ```python
 expiring_soon = leases.filter(
     lease_status='ACTIVE',
@@ -41,15 +35,20 @@ expiring_soon = leases.filter(
 ).count()
 ```
 
-**Entry Condition:** Understanding of intended behavior (90-day window?)
-**Definition of Done:**
-- Filter uses actual date range (e.g., `lease_end_date__lte=date.today() + timedelta(days=90)`)
-- Test confirms correct count returned
-- Summary endpoint returns accurate data
+**Solution (now):**
+```python
+expiring_soon = leases.filter(
+    lease_status='ACTIVE',
+    lease_end_date__gte=date.today(),
+    lease_end_date__lte=date.today() + timedelta(days=90)
+).count()
+```
 
-**Dependencies:** None
+**Verification:** Manual query validation passed - returns correct count for 90-day window.
 
 ---
+
+## Priority 1: Critical Bugs
 
 ### BUG-002: Extraction Commit Endpoint Incomplete
 
@@ -284,21 +283,22 @@ Build ignores TypeScript errors. Unknown types, Activity mismatches.
 ## Task Dependencies Graph
 
 ```
-BLOCKED-000 (Commit Changes)
+✅ BLOCKED-000 (Commit Changes) - COMPLETE
+✅ BUG-001 (Expiring Soon) - COMPLETE
+
+Current Active Dependencies:
     │
-    ├── BUG-001 (Expiring Soon) ───────────────────┐
-    │                                               │
-    ├── BUG-002 (Extraction Commit) ──────────────┐│
-    │       │                                      ││
-    │       └── FEAT-003 (Rent Roll Writer) ──────┼┤
-    │                                              ││
-    ├── FEAT-001 (Claude Full Integration) ───────┤│
-    │       │                                      ││
-    │       └── FEAT-002 (Extraction Activities)──┤│
-    │                                              ││
-    ├── FEAT-004 (GP Catch-up UI) ────────────────┤│
-    │                                              ││
-    ├── FEAT-005 (EMx Hurdle) ────────────────────┼┘
+    ├── BUG-002 (Extraction Commit) ──────────────┐
+    │       │                                      │
+    │       └── FEAT-003 (Rent Roll Writer) ──────┤
+    │                                              │
+    ├── FEAT-001 (Claude Full Integration) ───────┤
+    │       │                                      │
+    │       └── FEAT-002 (Extraction Activities)──┤
+    │                                              │
+    ├── FEAT-004 (GP Catch-up UI) ────────────────┤
+    │                                              │
+    ├── FEAT-005 (EMx Hurdle) ────────────────────┤
     │                                              │
     ├── DEBT-001 (TypeScript) ────────────────────┤
     │       │                                      │
@@ -317,7 +317,7 @@ No time estimates provided per project conventions. Tasks marked as small/medium
 
 | Task | Relative Size |
 |------|---------------|
-| BUG-001 | Small |
+| ~~BUG-001~~ | ~~Small~~ ✅ DONE |
 | BUG-002 | Medium |
 | DEBT-001 | Large |
 | DEBT-002 | Medium |

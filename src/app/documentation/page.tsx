@@ -23,19 +23,35 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Git Consolidation & Bug Fixes (Dec 23)',
+      path: '/docs/session-notes/2025-12-23-git-consolidation-bug-fixes.md',
+      category: 'Status',
+      description: 'Feature branch merge (25 commits, 299 files), BUG-001 fix for multifamily expiring_soon query, git cleanup',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-12-23'
+    },
+    {
+      title: 'Implementation Status (Dec 23)',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-23.md',
+      category: 'Status',
+      description: 'Current implementation status - BUG-001 fixed, feature branch merged, Knowledge Extraction Platform operational',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-12-23'
+    },
+    {
+      title: 'Implementation Status (Dec 21)',
+      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md',
+      category: 'Status',
+      description: 'Knowledge Extraction Platform, Developer Operations, Project Onboarding, Market Intelligence',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2025-12-21'
+    },
+    {
       title: 'Landscaper Phase 3 - Real Data & AI Wiring',
       path: '/docs/session-notes/2025-12-19-landscaper-phase3-wiring.md',
       category: 'AI',
       description: 'Chat API connection to Django, activity feed infrastructure, field highlighting, context-aware system prompts by property type',
       icon: <Code className="w-5 h-5" />,
-      lastModified: '2025-12-19'
-    },
-    {
-      title: 'Implementation Status (Dec 19)',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-19.md',
-      category: 'Status',
-      description: 'Current implementation status - Landscaper Phase 3, activity feed API, field highlighting, property-type prompts',
-      icon: <FileText className="w-5 h-5" />,
       lastModified: '2025-12-19'
     },
     {
