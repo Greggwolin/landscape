@@ -8,12 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await context.params;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const scope = searchParams.get('scope');
@@ -52,10 +54,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await context.params;
     const body = await request.json();
 
     const response = await fetch(

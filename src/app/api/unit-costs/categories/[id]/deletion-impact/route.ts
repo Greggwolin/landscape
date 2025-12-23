@@ -5,10 +5,14 @@ const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
   ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
   : null;
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
+  const { id } = await context.params;
+
   if (!DJANGO_FINANCIAL_BASE) {
     return NextResponse.json(
       { error: 'Django API not configured' },
@@ -17,7 +21,7 @@ export async function GET(
   }
 
   try {
-    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/deletion-impact/`;
+    const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${id}/deletion-impact/`;
 
     const response = await fetch(url, {
       method: 'GET',

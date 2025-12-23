@@ -6,20 +6,24 @@ const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
   ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
   : null;
 
+type Params = { params: Promise<{ id: string }> };
+
 // PUT - Update category (kept for backwards compatibility)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
-  return processCategoryUpdate(request, params.id);
+  const { id } = await context.params;
+  return processCategoryUpdate(request, id);
 }
 
 // DELETE - Delete category (soft delete)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
-  const categoryId = parseInt(params.id);
+  const { id } = await context.params;
+  const categoryId = parseInt(id);
   if (isNaN(categoryId)) {
     return NextResponse.json({ error: 'Invalid category ID' }, { status: 400 });
   }
@@ -108,8 +112,9 @@ export async function DELETE(
 // GET deletion impact
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: Params
 ) {
+  const { id } = await context.params;
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
@@ -122,7 +127,7 @@ export async function GET(
     }
 
     try {
-      const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${params.id}/deletion-impact/`;
+      const url = `${DJANGO_FINANCIAL_BASE}/unit-costs/categories/${id}/deletion-impact/`;
 
       const response = await fetch(url, {
         method: 'GET',

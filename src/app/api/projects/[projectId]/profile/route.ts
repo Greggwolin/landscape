@@ -17,8 +17,11 @@ export interface ProjectProfile {
   project_number?: string;
   analysis_type?: string;
   property_subtype?: string;
+  project_type?: string; // LAND, MF, OFF, etc.
   project_status?: string;
-  target_units?: number;
+  target_units?: number; // For development projects (planned units)
+  total_units?: number; // For operating projects (actual units)
+  calculated_units?: number; // Calculated from tbl_multifamily_unit
   gross_acres?: number;
   address?: string;
   city?: string;
@@ -56,7 +59,10 @@ export async function GET(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
+        p.project_type,
         p.target_units,
+        p.total_units,
+        (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
@@ -275,7 +281,10 @@ export async function PATCH(
         p.project_name,
         p.analysis_type,
         p.property_subtype,
+        p.project_type,
         p.target_units,
+        p.total_units,
+        (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,

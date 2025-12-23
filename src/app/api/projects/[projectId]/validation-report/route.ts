@@ -109,14 +109,17 @@ interface ParcelSubdivisionCostRow {
 // MAIN HANDLER
 // ============================================================================
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   const startTime = Date.now();
 
   try {
-    const projectId = parseInt(params.projectId, 10);
+    const { projectId: projId } = await context.params;
+    const projectId = parseInt(projId, 10);
 
     if (isNaN(projectId)) {
       return NextResponse.json(

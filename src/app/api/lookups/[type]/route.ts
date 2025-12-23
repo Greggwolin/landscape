@@ -18,9 +18,12 @@ const TYPE_MAP: Record<string, LookupConfig> = {
   'analysis-types': { picklistType: 'ANALYSIS_TYPE' }
 };
 
-export async function GET(request: NextRequest, { params }: { params: { type: string } }) {
+type Params = { params: Promise<{ type: string }> };
+
+export async function GET(request: NextRequest, context: Params) {
   try {
-    const slug = params.type;
+    const { type } = await context.params;
+    const slug = type;
     const config = TYPE_MAP[slug];
     if (!config) {
       return NextResponse.json({ error: 'Unsupported picklist type' }, { status: 404 });

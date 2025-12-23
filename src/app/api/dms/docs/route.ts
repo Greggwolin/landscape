@@ -147,11 +147,61 @@ export async function POST(req: NextRequest) {
 
     console.log(`📝 Created ingestion history for doc_id=${doc.doc_id}`);
 
+    // Queue document for extraction (creates DMSExtractQueue job)
+    // Background worker will process it and create assertions/embeddings
+    let processing: {
+      status: string;
+      queue_id: number | null;
+      error: string | null;
+    } = {
+      status: 'pending',
+      queue_id: null,
+      error: null,
+    };
+
+    try {
+      // Determine extract type based on doc_type
+      const extractType = system.doc_type?.toLowerCase().includes('rent') ? 'rent_roll' : 'general';
+
+      // Insert into DMSExtractQueue directly
+      const queueResult = await sql`
+        INSERT INTO landscape.dms_extract_queue (
+          doc_id,
+          extract_type,
+          priority,
+          status,
+          created_at
+        ) VALUES (
+          ${parseInt(doc.doc_id)},
+          ${extractType},
+          5,
+          'pending',
+          NOW()
+        )
+        RETURNING queue_id, status
+      `;
+
+      if (queueResult.length > 0) {
+        processing = {
+          status: 'queued',
+          queue_id: queueResult[0].queue_id,
+          error: null,
+        };
+        console.log(`🔄 Queued document ${doc.doc_id} for extraction (queue_id=${processing.queue_id})`);
+      }
+    } catch (queueError) {
+      // Don't fail the upload if queueing fails - document is still created
+      processing.status = 'queue_failed';
+      processing.error = queueError instanceof Error ? queueError.message : 'Failed to queue for extraction';
+      console.warn(`⚠️ Failed to queue document ${doc.doc_id} for extraction:`, processing.error);
+    }
+
     return NextResponse.json(
       {
         success: true,
         duplicate: false,
         doc,
+        processing,
       },
       { status: 201 }
     );

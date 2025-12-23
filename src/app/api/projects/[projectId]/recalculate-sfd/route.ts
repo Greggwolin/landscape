@@ -8,12 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await context.params;
 
     const response = await fetch(
       `${DJANGO_API_URL}/api/projects/${projectId}/recalculate-sfd/`,

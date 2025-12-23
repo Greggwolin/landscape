@@ -9,12 +9,15 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   cancelled: []
 };
 
+type Params = { params: Promise<{ milestoneId: string }> };
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { milestoneId: string } }
+  context: Params
 ) {
   try {
-    const milestoneId = Number(params.milestoneId);
+    const { milestoneId: msId } = await context.params;
+    const milestoneId = Number(msId);
     if (!milestoneId) {
       return NextResponse.json(
         { success: false, error: 'Invalid milestoneId' },

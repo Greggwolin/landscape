@@ -3,10 +3,13 @@ import { sql } from '@/lib/db';
 
 const normalizeType = (type: string) => type.toUpperCase().replace(/-/g, '_');
 
-export async function PUT(request: NextRequest, { params }: { params: { type: string; id: string } }) {
+type Params = { params: Promise<{ type: string; id: string }> };
+
+export async function PUT(request: NextRequest, context: Params) {
   try {
-    const picklistType = normalizeType(params.type);
-    const picklistId = Number(params.id);
+    const { type, id } = await context.params;
+    const picklistType = normalizeType(type);
+    const picklistId = Number(id);
     if (!Number.isFinite(picklistId)) {
       return NextResponse.json({ error: 'Invalid picklist id' }, { status: 400 });
     }
@@ -55,10 +58,11 @@ export async function PUT(request: NextRequest, { params }: { params: { type: st
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { type: string; id: string } }) {
+export async function DELETE(_request: NextRequest, context: Params) {
   try {
-    const picklistType = normalizeType(params.type);
-    const picklistId = Number(params.id);
+    const { type, id } = await context.params;
+    const picklistType = normalizeType(type);
+    const picklistId = Number(id);
     if (!Number.isFinite(picklistId)) {
       return NextResponse.json({ error: 'Invalid picklist id' }, { status: 400 });
     }

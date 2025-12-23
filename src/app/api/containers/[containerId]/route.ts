@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
-type Params = {
-  divisionId: string
-}
+type Params = { params: Promise<{ containerId: string }> }
 
 type ContainerRow = {
   division_id: number
@@ -21,10 +19,10 @@ type ContainerRow = {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: Params
 ) {
-  const { divisionId } = await params
-  const id = Number(divisionId)
+  const { containerId } = await context.params
+  const id = Number(containerId)
 
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid container id' }, { status: 400 })
@@ -183,10 +181,10 @@ export async function PATCH(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: Params
 ) {
-  const { divisionId } = await params
-  const id = Number(divisionId)
+  const { containerId } = await context.params
+  const id = Number(containerId)
 
   if (!Number.isFinite(id)) {
     return NextResponse.json({ error: 'Invalid container id' }, { status: 400 })

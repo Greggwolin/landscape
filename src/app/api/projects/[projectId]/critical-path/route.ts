@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
 function durationDays(start: string | null, finish: string | null): number {
@@ -12,12 +12,15 @@ function durationDays(start: string | null, finish: string | null): number {
   return Math.max(diff, 0);
 }
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
-  request: Request,
-  { params }: { params: { projectId: string } }
+  request: NextRequest,
+  context: Params
 ) {
   try {
-    const projectId = Number(params.projectId);
+    const { projectId: projId } = await context.params;
+    const projectId = Number(projId);
     if (!projectId) {
       return NextResponse.json(
         { success: false, error: 'Invalid projectId' },
