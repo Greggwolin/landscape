@@ -149,15 +149,19 @@ class MultifamilyLeaseViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
         """Get all leases for a specific project."""
+        from datetime import date, timedelta
+
         leases = self.queryset.filter(unit__project_id=project_id)
         serializer = self.get_serializer(leases, many=True)
 
         # Calculate lease stats
         total_leases = leases.count()
         active_leases = leases.filter(lease_status='ACTIVE').count()
+        # Count active leases expiring within 90 days
         expiring_soon = leases.filter(
             lease_status='ACTIVE',
-            lease_end_date__lte=F('lease_end_date')  # placeholder for date logic
+            lease_end_date__gte=date.today(),
+            lease_end_date__lte=date.today() + timedelta(days=90)
         ).count()
 
         return Response({
