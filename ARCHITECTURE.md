@@ -11,7 +11,7 @@
 - `backend/apps/` – DRF apps for projects/containers/financial/calculations/multifamily/knowledge/landscaper and others (`project-structure.txt`, `backend/config/urls.py`).
 - `services/financial_engine_py/` – Python cashflow/metric engines consumed by DRF calculations (`services/financial_engine_py/financial_engine/core/cashflow.py`).
 - `services/market_ingest_py/` – Market data ingestion CLI and helpers (`services/market_ingest_py/README.md`).
-- `docs/` – Architecture/feature/database references and status reports (`docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md`).
+- `docs/` – Architecture/feature/database references and status reports (`docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md`).
 
 **Data Flow (request → processing → persistence → response)**
 - Container update: Next PATCH `src/app/api/containers/[containerId]/route.ts` reads JSON → validates duplicates/fields → executes SQL via `src/lib/db.ts` against `landscape.tbl_container` → returns `NextResponse` JSON.

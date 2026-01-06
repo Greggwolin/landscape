@@ -1,8 +1,11 @@
+> DEPRECATED (2025-12-23): Consolidated into `docs/00_overview/IMPLEMENTATION_STATUS.md`.
+> Retained for historical context; do not update here.
+
 **High-Level Summary**
 - Next.js 15 frontend with numerous App Router API routes querying Neon PostgreSQL via `src/lib/db.ts` (see `src/app/api/projects/[projectId]/route.ts` for direct table updates).
 - Django 5 REST backend wired under `backend/config/urls.py` with custom search_path handling for the `landscape` schema in `backend/db_backend/base.py`.
 - Python financial engine available for cashflow/metric computation alongside DRF endpoints in `backend/apps/calculations/views.py` and engine modules under `services/financial_engine_py/`.
-- AI/extraction and knowledge features documented as in-progress in `docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md`, with corresponding Next.js routes and Django apps present.
+- AI/extraction and knowledge features documented as in-progress in `docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md`, with corresponding Next.js routes and Django apps present.
 - Market ingestion CLI for macro data lives in `services/market_ingest_py/README.md`, targeting Postgres time-series tables.
 
 **Implemented Features**
@@ -35,7 +38,7 @@
 - No evidence of coverage around the newer developer-operations or extraction flows beyond the above files.
 
 **Evidence Index**
-- README/Status: `docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md`
+- README/Status: `docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md`
 - Frontend APIs & DB helper: `src/app/api/containers/[containerId]/route.ts`, `src/app/api/developer-operations/fees/route.ts`, `src/lib/db.ts`, `src/app/api/projects/[projectId]/landscaper/chat/route.ts`
 - Backend core: `backend/config/urls.py`, `backend/db_backend/base.py`, `backend/apps/calculations/views.py`, `backend/apps/multifamily/views.py`, `backend/apps/knowledge/models.py`
 - Services/Tools: `services/financial_engine_py/financial_engine/core/cashflow.py`, `services/market_ingest_py/README.md`

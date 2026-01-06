@@ -1,0 +1,64 @@
+{
+  "alias_notes": {
+    "num_parking_spaces": "Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.",
+    "parking_count": "Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.",
+    "parking_spaces": "Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.",
+    "project__parking_spaces_total": "Legacy project rollup / boundary leak. Canonicalized to property__parking_spaces_total for MF property scope.",
+    "project__total_units": "Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.",
+    "unit_count": "Context-dependent: used for per-unit-type row counts (not property rollup).",
+    "unit_type__total_units": "Context-dependent: unit-type level total; treat as row-level count."
+  },
+  "aliases_to_canonical": {
+    "base_rent_monthly": "current_market_rent",
+    "market_rent": "current_market_rent",
+    "num_parking_spaces": "property__parking_spaces_total",
+    "parking_count": "property__parking_spaces_total",
+    "parking_spaces": "property__parking_spaces_total",
+    "project__parking_spaces_total": "property__parking_spaces_total",
+    "project__total_units": "property__total_units",
+    "property__parking_spaces_total": "project__parking_spaces_total",
+    "square_feet": "avg_square_feet",
+    "street_address": "project_address",
+    "tax_rate_pct": "property_tax_rate",
+    "unit_count": "unit_type__unit_count",
+    "unit_type": "unit_type_code",
+    "unit_type__total_units": "unit_type__unit_count",
+    "unit_type_name": "unit_type_code"
+  },
+  "canonical_notes": {
+    "property__parking_spaces_total": "MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.",
+    "property__total_units": "MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup."
+  },
+  "canonical_to_aliases": {
+    "avg_square_feet": [
+      "square_feet"
+    ],
+    "current_market_rent": [
+      "market_rent",
+      "base_rent_monthly"
+    ],
+    "project_address": [
+      "street_address"
+    ],
+    "property__parking_spaces_total": [
+      "project__parking_spaces_total",
+      "parking_spaces",
+      "parking_count",
+      "num_parking_spaces"
+    ],
+    "property__total_units": [
+      "project__total_units"
+    ],
+    "property_tax_rate": [
+      "tax_rate_pct"
+    ],
+    "unit_type__unit_count": [
+      "unit_type__total_units",
+      "unit_count"
+    ],
+    "unit_type_code": [
+      "unit_type",
+      "unit_type_name"
+    ]
+  }
+}

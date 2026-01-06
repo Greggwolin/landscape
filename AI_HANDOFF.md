@@ -198,7 +198,7 @@ cd backend && ./venv/bin/python manage.py runserver 8000
 ### Step 4: Before Any Change
 - Check if endpoint exists in BOTH Next.js and Django
 - Search for related TODO/FIXME markers
-- Read `docs/session-notes/` for recent context on that area
+- Read `docs/09_session_notes/` for recent context on that area
 - Run TypeScript check: `npx tsc --noEmit`
 
 ### Step 5: Test Project

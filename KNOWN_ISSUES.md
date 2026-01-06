@@ -1,5 +1,8 @@
 # KNOWN ISSUES & PATTERNS
 
+> DEPRECATED (2025-12-23): Consolidated into `docs/00_overview/IMPLEMENTATION_STATUS.md`.
+> Retained for historical context; do not update here.
+
 Reference document for Claude Code and Codex to avoid reintroducing solved bugs.
 
 ---

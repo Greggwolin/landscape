@@ -1,0 +1,1006 @@
+field_key,base_field_key,is_disambiguated,canonical_field_key,canonical_note,alias_note,ui_section,ui_label,entity,data_type,unit_format,required,user_editable,derived,schema.table,column
+account_id,account_id,False,account_id,,,Operations > Operating Expenses,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,account_id
+acquisition_date,acquisition_date,False,acquisition_date,,,Property > MF Property Details,,property,date,,conditional,conditional,False,tbl_multifamily_property,acquisition_date
+acquisition_price,acquisition_price,False,acquisition_price,,,Property > MF Property Details,,property,currency,,conditional,conditional,False,tbl_multifamily_property,acquisition_price
+acres_gross,acres_gross,False,acres_gross,,,Project > Profile,,project,decimal,acres,conditional,conditional,False,tbl_project,acres_gross
+actions,actions,False,actions,,,Property > Rent Roll,,,string,,conditional,conditional,False,,
+actions,actions,False,actions,,,Property > Floor Plan Matrix,,,string,,conditional,conditional,False,,
+address,address,False,address,,,Project > Profile,,sales_comparable,string,,conditional,conditional,False,tbl_sales_comparables,address
+address,address,False,address,,,Property > Comparable Rentals,,sales_comparable,string,,conditional,conditional,False,tbl_sales_comparables,address
+address,address,False,address,,,Valuation > Sales Comparables,,sales_comparable,string,,conditional,conditional,False,tbl_sales_comparables,address
+adjusted_price_per_unit,adjusted_price_per_unit,False,adjusted_price_per_unit,,,,,,string,,conditional,conditional,True,,
+adjustment_amount,adjustment_amount,False,adjustment_amount,,,Valuation > Adjustments,,sales_comp_adjustment,currency,,conditional,conditional,False,tbl_sales_comp_adjustments,adjustment_amount
+adjustment_id,adjustment_id,False,adjustment_id,,,Valuation > Adjustments,,sales_comp_adjustment,integer,,conditional,conditional,False,tbl_sales_comp_adjustments,adjustment_id
+adjustment_pct,adjustment_pct,False,adjustment_pct,,,Valuation > Adjustments,,sales_comp_adjustment,percent,,conditional,conditional,False,tbl_sales_comp_adjustments,adjustment_pct
+adjustment_type_display,adjustment_type_display,False,adjustment_type_display,,,,,,string,,conditional,conditional,True,,
+affordable_housing_program,affordable_housing_program,False,affordable_housing_program,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,affordable_housing_program
+ai_accepted,ai_accepted,False,ai_accepted,,,Valuation > Adjustments,,sales_comp_adjustment,boolean,,conditional,conditional,False,tbl_sales_comp_adjustments,ai_accepted
+ai_adjustment_suggestion__adjustment_type,adjustment_type,True,ai_adjustment_suggestion__adjustment_type,,,Valuation > Adjustments,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,adjustment_type
+ai_adjustment_suggestion__adjustment_type,adjustment_type,True,ai_adjustment_suggestion__adjustment_type,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,adjustment_type
+ai_adjustment_suggestion__comparable_id,comparable_id,True,ai_adjustment_suggestion__comparable_id,,,Valuation > Adjustments,,ai_adjustment_suggestion,integer,,conditional,conditional,False,tbl_ai_adjustment_suggestions,comparable_id
+ai_adjustment_suggestion__comparable_id,comparable_id,True,ai_adjustment_suggestion__comparable_id,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,integer,,conditional,conditional,False,tbl_ai_adjustment_suggestions,comparable_id
+ai_adjustment_suggestion__comparable_id,comparable_id,True,ai_adjustment_suggestion__comparable_id,,,Property > Comparable Rentals,,ai_adjustment_suggestion,integer,,conditional,conditional,False,tbl_ai_adjustment_suggestions,comparable_id
+ai_adjustment_suggestion__comparable_id,comparable_id,True,ai_adjustment_suggestion__comparable_id,,,Valuation > Sales Comparables,,ai_adjustment_suggestion,integer,,conditional,conditional,False,tbl_ai_adjustment_suggestions,comparable_id
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Cap Rate Comps,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Sales Comparables,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Operations > Operating Expenses,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Income Approach,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Property > MF Property Details,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Cost Approach,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Reconciliation,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Property > Rent Roll,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Property > Floor Plan Matrix,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Operations > Turns,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Project > Profile,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__created_at,created_at,True,ai_adjustment_suggestion__created_at,,,Valuation > Adjustments,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,created_at
+ai_adjustment_suggestion__justification,justification,True,ai_adjustment_suggestion__justification,,,Valuation > Adjustments,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,justification
+ai_adjustment_suggestion__justification,justification,True,ai_adjustment_suggestion__justification,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,justification
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Operations > Operating Expenses,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Valuation > Sales Comparables,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Valuation > Income Approach,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Property > MF Property Details,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Valuation > Cost Approach,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Property > Rent Roll,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Property > Floor Plan Matrix,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Operations > Turns,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Project > Profile,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_adjustment_suggestion__updated_at,updated_at,True,ai_adjustment_suggestion__updated_at,,,Valuation > Reconciliation,,ai_adjustment_suggestion,datetime,,False,False,False,tbl_ai_adjustment_suggestions,updated_at
+ai_estimate,ai_estimate,False,ai_estimate,,,,,,string,,conditional,conditional,True,,
+ai_last_reviewed,ai_last_reviewed,False,ai_last_reviewed,,,Project > Profile,,project,datetime,,conditional,conditional,False,tbl_project,ai_last_reviewed
+ai_suggestion_id,ai_suggestion_id,False,ai_suggestion_id,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,integer,,conditional,conditional,False,tbl_ai_adjustment_suggestions,ai_suggestion_id
+amenities,amenities,False,amenities,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+amount_per_sf,amount_per_sf,False,amount_per_sf,,,Operations > Operating Expenses,,operating_expense,currency,USD/sf,conditional,conditional,False,tbl_operating_expenses,amount_per_sf
+analysis_end_date,analysis_end_date,False,analysis_end_date,,,Project > Profile,,project,date,,conditional,conditional,False,tbl_project,analysis_end_date
+analysis_start_date,analysis_start_date,False,analysis_start_date,,,Project > Profile,,project,date,,conditional,conditional,False,tbl_project,analysis_start_date
+analysis_type,analysis_type,False,analysis_type,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,analysis_type
+annual_amount,annual_amount,False,annual_amount,,,Operations > Operating Expenses,,operating_expense,currency,USD/yr,conditional,conditional,False,tbl_operating_expenses,annual_amount
+apn,apn,False,apn,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,apn
+apn_primary,apn_primary,False,apn_primary,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,apn_primary
+apn_secondary,apn_secondary,False,apn_secondary,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,apn_secondary
+appliance_cost,appliance_cost,False,appliance_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,appliance_cost
+appliance_replacement,appliance_replacement,False,appliance_replacement,,,Operations > Operating Expenses,Appliance Repairs & Replacement,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+as_of_date,as_of_date,False,as_of_date,,,Property > Comparable Rentals,,,date,,conditional,conditional,False,,
+asking_price,asking_price,False,asking_price,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,asking_price
+asking_rent,asking_rent,False,asking_rent,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+assessment_year,assessment_year,False,assessment_year,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,assessment_year
+avg_rent_per_unit,avg_rent_per_unit,False,avg_rent_per_unit,,,,,project,string,,conditional,conditional,False,tbl_project,avg_rent_per_unit
+avg_sqft,avg_sqft,False,avg_sqft,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+avg_square_feet,avg_square_feet,False,avg_square_feet,,,Property > Floor Plan Matrix,,unit_type,currency,,conditional,conditional,False,tbl_multifamily_unit_type,avg_square_feet
+balcony_sf,balcony_sf,False,balcony_sf,,,Property > Rent Roll,,unit,decimal,sf,conditional,conditional,False,tbl_multifamily_unit,balcony_sf
+base_rent_monthly,base_rent_monthly,False,current_market_rent,,,Property > Rent Roll,,lease,currency,USD/mo,conditional,conditional,False,tbl_multifamily_lease,base_rent_monthly
+base_replacement_cost,base_replacement_cost,False,base_replacement_cost,,,Valuation > Cost Approach,,cost_approach,currency,,conditional,conditional,False,tbl_cost_approach,base_replacement_cost
+building_area_sf,building_area_sf,False,building_area_sf,,,Valuation > Cost Approach,,cost_approach,decimal,sf,conditional,conditional,False,tbl_cost_approach,building_area_sf
+building_count,building_count,False,building_count,,,,,project,string,,conditional,conditional,False,tbl_project,building_count
+building_name,building_name,False,building_name,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,building_name
+building_sf,building_sf,False,building_sf,,,Valuation > Sales Comparables,,sales_comparable,decimal,sf,conditional,conditional,False,tbl_sales_comparables,building_sf
+building_sf_gross,building_sf_gross,False,building_sf_gross,,,,,project,string,,conditional,conditional,False,tbl_project,building_sf_gross
+building_sf_net,building_sf_net,False,building_sf_net,,,,,project,string,,conditional,conditional,False,tbl_project,building_sf_net
+calculated_units,calculated_units,False,calculated_units,,,Project > Profile,,,string,,conditional,conditional,False,,
+calculation_frequency,calculation_frequency,False,calculation_frequency,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,calculation_frequency
+cap_rate,cap_rate,False,cap_rate,,,Valuation > Sales Comparables,,sales_comparable,percent,,conditional,conditional,False,tbl_sales_comparables,cap_rate
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Cap Rate Comps,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Sales Comparables,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Operations > Operating Expenses,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Income Approach,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Property > MF Property Details,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Cost Approach,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Reconciliation,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Property > Rent Roll,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Property > Floor Plan Matrix,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Operations > Turns,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > AI Suggestions,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Project > Profile,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__created_at,created_at,True,cap_rate_comp__created_at,,,Valuation > Adjustments,,cap_rate_comp,datetime,,False,False,False,tbl_cap_rate_comps,created_at
+cap_rate_comp__income_approach_id,income_approach_id,True,cap_rate_comp__income_approach_id,,,Valuation > Cap Rate Comps,,cap_rate_comp,integer,,conditional,conditional,False,tbl_cap_rate_comps,income_approach_id
+cap_rate_comp__income_approach_id,income_approach_id,True,cap_rate_comp__income_approach_id,,,Valuation > Income Approach,,cap_rate_comp,integer,,conditional,conditional,False,tbl_cap_rate_comps,income_approach_id
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Valuation > Cap Rate Comps,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Valuation > Sales Comparables,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Operations > Operating Expenses,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Property > Comparable Rentals,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Property > Floor Plan Matrix,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Operations > Turns,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__notes,notes,True,cap_rate_comp__notes,,,Property > Rent Roll,Notes,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,notes
+cap_rate_comp__sale_date,sale_date,True,cap_rate_comp__sale_date,,,Valuation > Cap Rate Comps,,cap_rate_comp,date,,conditional,conditional,False,tbl_cap_rate_comps,sale_date
+cap_rate_comp__sale_date,sale_date,True,cap_rate_comp__sale_date,,,Valuation > Sales Comparables,,cap_rate_comp,date,,conditional,conditional,False,tbl_cap_rate_comps,sale_date
+cap_rate_comp__sale_price,sale_price,True,cap_rate_comp__sale_price,,,Valuation > Cap Rate Comps,,cap_rate_comp,currency,,conditional,conditional,False,tbl_cap_rate_comps,sale_price
+cap_rate_comp__sale_price,sale_price,True,cap_rate_comp__sale_price,,,Valuation > Sales Comparables,,cap_rate_comp,currency,,conditional,conditional,False,tbl_cap_rate_comps,sale_price
+cap_rate_comp_id,cap_rate_comp_id,False,cap_rate_comp_id,,,Valuation > Cap Rate Comps,,cap_rate_comp,integer,,conditional,conditional,False,tbl_cap_rate_comps,cap_rate_comp_id
+cap_rate_current,cap_rate_current,False,cap_rate_current,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,cap_rate_current
+cap_rate_going_in,cap_rate_going_in,False,cap_rate_going_in,,,,,project,string,,conditional,conditional,False,tbl_project,cap_rate_going_in
+cap_rate_justification,cap_rate_justification,False,cap_rate_justification,,,Valuation > Income Approach,,income_approach,string,,conditional,conditional,False,tbl_income_approach,cap_rate_justification
+cap_rate_proforma,cap_rate_proforma,False,cap_rate_proforma,,,Project > Profile,,project,percent,,conditional,conditional,False,tbl_project,cap_rate_proforma
+carpet_flooring_cost,carpet_flooring_cost,False,carpet_flooring_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,carpet_flooring_cost
+category_id,category_id,False,category_id,,,Operations > Operating Expenses,,opex_category,integer,,conditional,conditional,False,core_unit_cost_category,category_id
+category_name,category_name,False,category_name,,,Operations > Operating Expenses,,opex_category,string,,conditional,conditional,False,core_unit_cost_category,category_name
+ceiling_height_ft,ceiling_height_ft,False,ceiling_height_ft,,,Property > Rent Roll,,unit,decimal,,conditional,conditional,False,tbl_multifamily_unit,ceiling_height_ft
+cleaning_cost,cleaning_cost,False,cleaning_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,cleaning_cost
+collection_loss_pct,collection_loss_pct,False,collection_loss_pct,,,,,project,string,,conditional,conditional,False,tbl_project,collection_loss_pct
+commercial_sf,commercial_sf,False,commercial_sf,,,Property > MF Property Details,,property,decimal,sf,conditional,conditional,False,tbl_multifamily_property,commercial_sf
+commercial_type,commercial_type,False,commercial_type,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,commercial_type
+commercial_unit_count,commercial_unit_count,False,commercial_unit_count,,,Property > MF Property Details,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,commercial_unit_count
+comp_number,comp_number,False,comp_number,,,Valuation > Sales Comparables,,sales_comparable,integer,,conditional,conditional,False,tbl_sales_comparables,comp_number
+concession_amount,concession_amount,False,concession_amount,,,Property > Rent Roll,,lease,currency,,conditional,conditional,False,tbl_multifamily_lease,concession_amount
+concessions,concessions,False,concessions,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+concessions_pct,concessions_pct,False,concessions_pct,,,,,project,string,,conditional,conditional,False,tbl_project,concessions_pct
+confidence_level,confidence_level,False,confidence_level,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,confidence_level
+container_id,container_id,False,container_id,,,Property > Floor Plan Matrix,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,container_id
+contract_services,contract_services,False,contract_services,,,,,project,string,,conditional,conditional,False,tbl_project,contract_services
+contracted_services,contracted_services,False,contracted_services,,,Operations > Operating Expenses,Contracted Services,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Cap Rate Comps,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Sales Comparables,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Operations > Operating Expenses,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Income Approach,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Property > MF Property Details,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Cost Approach,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Reconciliation,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Property > Rent Roll,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Property > Floor Plan Matrix,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Operations > Turns,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > AI Suggestions,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Project > Profile,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__created_at,created_at,True,cost_approach__created_at,,,Valuation > Adjustments,,cost_approach,datetime,,False,False,False,tbl_cost_approach,created_at
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Valuation > Sales Comparables,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Operations > Operating Expenses,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Valuation > Income Approach,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Valuation > Cost Approach,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Property > MF Property Details,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Property > Rent Roll,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Property > Floor Plan Matrix,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Project > Profile,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__project_id,project_id,True,cost_approach__project_id,,,Valuation > Reconciliation,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,project_id
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Operations > Operating Expenses,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Valuation > Sales Comparables,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Valuation > Income Approach,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Property > MF Property Details,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Valuation > Cost Approach,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Property > Rent Roll,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Property > Floor Plan Matrix,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Operations > Turns,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Valuation > AI Suggestions,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Project > Profile,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach__updated_at,updated_at,True,cost_approach__updated_at,,,Valuation > Reconciliation,,cost_approach,datetime,,False,False,False,tbl_cost_approach,updated_at
+cost_approach_id,cost_approach_id,False,cost_approach_id,,,Valuation > Cost Approach,,cost_approach,integer,,conditional,conditional,False,tbl_cost_approach,cost_approach_id
+cost_approach_value,cost_approach_value,False,cost_approach_value,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,cost_approach_value
+cost_approach_weight,cost_approach_weight,False,cost_approach_weight,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,cost_approach_weight
+cost_method,cost_method,False,cost_method,,,Valuation > Cost Approach,,cost_approach,string,,conditional,conditional,False,tbl_cost_approach,cost_method
+cost_method_display,cost_method_display,False,cost_method_display,,,,,,string,,conditional,conditional,True,,
+cost_of_capital_pct,cost_of_capital_pct,False,cost_of_capital_pct,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,cost_of_capital_pct
+cost_per_sf,cost_per_sf,False,cost_per_sf,,,Valuation > Cost Approach,,cost_approach,currency,USD/sf,conditional,conditional,False,tbl_cost_approach,cost_per_sf
+country,country,False,country,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,country
+county,county,False,county,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,county
+covered_spaces,covered_spaces,False,covered_spaces,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,covered_spaces
+current_egi,current_egi,False,current_egi,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_egi
+current_gpi,current_gpi,False,current_gpi,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_gpi
+current_gpr,current_gpr,False,current_gpr,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_gpr
+current_lease,current_lease,False,current_lease,,,,,,string,,conditional,conditional,True,,
+current_market_rent,current_market_rent,False,current_market_rent,,,Property > Floor Plan Matrix,,unit_type,currency,,conditional,conditional,False,tbl_multifamily_unit_type,current_market_rent
+current_noi,current_noi,False,current_noi,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_noi
+current_opex,current_opex,False,current_opex,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_opex
+current_other_income,current_other_income,False,current_other_income,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_other_income
+current_rent_psf,current_rent_psf,False,current_rent_psf,,,Property > Rent Roll,,unit,currency,USD/sf,conditional,conditional,False,tbl_multifamily_unit,current_rent_psf
+current_vacancy_rate,current_vacancy_rate,False,current_vacancy_rate,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,current_vacancy_rate
+current_zoning,current_zoning,False,current_zoning,,,,,project,string,,conditional,conditional,False,tbl_project,current_zoning
+data_source,data_source,False,data_source,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+dcf_value,dcf_value,False,dcf_value,,,Valuation > Income Approach,,income_approach,currency,,conditional,conditional,False,tbl_income_approach,dcf_value
+deposit,deposit,False,deposit,,,Property > Rent Roll,Deposit,lease,currency,,conditional,conditional,False,tbl_multifamily_lease,security_deposit
+depreciated_improvements,depreciated_improvements,False,depreciated_improvements,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,depreciated_improvements
+description,description,False,description,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,description
+developer_owner,developer_owner,False,developer_owner,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,developer_owner
+direct_assessments_annual,direct_assessments_annual,False,direct_assessments_annual,,,Property > MF Property Details,,property,decimal,,conditional,conditional,False,tbl_multifamily_property,direct_assessments_annual
+direct_cap_value,direct_cap_value,False,direct_cap_value,,,Valuation > Income Approach,,income_approach,currency,,conditional,conditional,False,tbl_income_approach,direct_cap_value
+discount_rate,discount_rate,False,discount_rate,,,Valuation > Income Approach,,income_approach,percent,,conditional,conditional,False,tbl_income_approach,discount_rate
+discount_rate_pct,discount_rate_pct,False,discount_rate_pct,,,Project > Profile,,project,percent,,conditional,conditional,False,tbl_project,discount_rate_pct
+display_order,display_order,False,display_order,,,Project > Profile,,msa,integer,,conditional,conditional,False,tbl_msa,display_order
+distance_from_subject,distance_from_subject,False,distance_from_subject,,,Valuation > Sales Comparables,,sales_comparable,string,,conditional,conditional,False,tbl_sales_comparables,distance_from_subject
+distance_miles,distance_miles,False,distance_miles,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+dscr,dscr,False,dscr,,,,,project,string,,conditional,conditional,False,tbl_project,dscr
+effective_gross_income,effective_gross_income,False,effective_gross_income,,,,,project,string,,conditional,conditional,False,tbl_project,effective_gross_income
+effective_rent,effective_rent,False,effective_rent,,,Property > Comparable Rentals,,,string,,conditional,conditional,False,,
+effective_rent_monthly,effective_rent_monthly,False,effective_rent_monthly,,,Property > Rent Roll,,lease,currency,USD/mo,conditional,conditional,False,tbl_multifamily_lease,effective_rent_monthly
+electric_metered_individually,electric_metered_individually,False,electric_metered_individually,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,electric_metered_individually
+electrical_service,electrical_service,False,electrical_service,,,Operations > Operating Expenses,Electrical Service,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+energy_star_certified,energy_star_certified,False,energy_star_certified,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,energy_star_certified
+entrepreneurial_incentive_pct,entrepreneurial_incentive_pct,False,entrepreneurial_incentive_pct,,,Valuation > Cost Approach,,cost_approach,percent,,conditional,conditional,False,tbl_cost_approach,entrepreneurial_incentive_pct
+escalation_rate,escalation_rate,False,escalation_rate,,,Operations > Operating Expenses,,operating_expense,percent,,conditional,conditional,False,tbl_operating_expenses,escalation_rate
+escalation_type,escalation_type,False,escalation_type,,,Operations > Operating Expenses,,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,escalation_type
+ev_charging_spaces,ev_charging_spaces,False,ev_charging_spaces,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,ev_charging_spaces
+exemption_reason,exemption_reason,False,exemption_reason,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,exemption_reason
+existing_land_use,existing_land_use,False,existing_land_use,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,existing_land_use
+exit_cap_rate,exit_cap_rate,False,exit_cap_rate,,,,,project,string,,conditional,conditional,False,tbl_project,exit_cap_rate
+expense_category,expense_category,False,expense_category,,,Operations > Operating Expenses,,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,expense_category
+expense_ratio_pct,expense_ratio_pct,False,expense_ratio_pct,,,,,project,string,,conditional,conditional,False,tbl_project,expense_ratio_pct
+expense_type,expense_type,False,expense_type,,,Operations > Operating Expenses,,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,expense_type
+external_obsolescence,external_obsolescence,False,external_obsolescence,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,external_obsolescence
+final_reconciled_value,final_reconciled_value,False,final_reconciled_value,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,final_reconciled_value
+financial_model_type,financial_model_type,False,financial_model_type,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,financial_model_type
+flood_insurance,flood_insurance,False,flood_insurance,,,Operations > Operating Expenses,Flood Insurance,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+floor_plan,floor_plan,False,floor_plan,,,Property > Rent Roll,Plan,,string,,conditional,conditional,True,,
+floorplan_doc_id,floorplan_doc_id,False,floorplan_doc_id,,,Property > Floor Plan Matrix,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,floorplan_doc_id
+forecast_period_years,forecast_period_years,False,forecast_period_years,,,Valuation > Income Approach,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,forecast_period_years
+functional_curable,functional_curable,False,functional_curable,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,functional_curable
+functional_incurable,functional_incurable,False,functional_incurable,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,functional_incurable
+garage_spaces,garage_spaces,False,garage_spaces,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,garage_spaces
+gas_electric,gas_electric,False,gas_electric,,,Operations > Operating Expenses,Gas & Electric,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+gas_metered_individually,gas_metered_individually,False,gas_metered_individually,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,gas_metered_individually
+general_plan_designation,general_plan_designation,False,general_plan_designation,,,,,project,string,,conditional,conditional,False,tbl_project,general_plan_designation
+general_repairs,general_repairs,False,general_repairs,,,Operations > Operating Expenses,General Repairs,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+gis_metadata,gis_metadata,False,gis_metadata,,,Project > Profile,,project,json,,conditional,conditional,False,tbl_project,gis_metadata
+grm,grm,False,grm,,,Valuation > Sales Comparables,,sales_comparable,decimal,,conditional,conditional,False,tbl_sales_comparables,grm
+gross_acres,gross_acres,False,gross_acres,,,Project > Profile,,,string,,conditional,conditional,False,,
+gross_potential_rent,gross_potential_rent,False,gross_potential_rent,,,,,project,string,,conditional,conditional,False,tbl_project,gross_potential_rent
+gross_rent_multiplier,gross_rent_multiplier,False,gross_rent_multiplier,,,,,project,string,,conditional,conditional,False,tbl_project,gross_rent_multiplier
+gross_sf,gross_sf,False,gross_sf,,,Project > Profile,,project,decimal,sf,conditional,conditional,False,tbl_project,gross_sf
+has_balcony,has_balcony,False,has_balcony,,,Property > Rent Roll,,unit,boolean,,conditional,conditional,False,tbl_multifamily_unit,has_balcony
+has_commercial_space,has_commercial_space,False,has_commercial_space,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_commercial_space
+has_ev_charging,has_ev_charging,False,has_ev_charging,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_ev_charging
+has_manager_unit,has_manager_unit,False,has_manager_unit,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_manager_unit
+has_patio,has_patio,False,has_patio,,,Property > Rent Roll,,unit,boolean,,conditional,conditional,False,tbl_multifamily_unit,has_patio
+has_section8_units,has_section8_units,False,has_section8_units,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_section8_units
+has_solar_panels,has_solar_panels,False,has_solar_panels,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_solar_panels
+has_tankless_water_heaters,has_tankless_water_heaters,False,has_tankless_water_heaters,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,has_tankless_water_heaters
+hvac_service,hvac_service,False,hvac_service,,,Operations > Operating Expenses,HVAC Service,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+implied_cap_rate,implied_cap_rate,False,implied_cap_rate,,,Valuation > Cap Rate Comps,,cap_rate_comp,percent,,conditional,conditional,False,tbl_cap_rate_comps,implied_cap_rate
+in_place_rent_monthly,in_place_rent_monthly,False,in_place_rent_monthly,,,,,project,string,,conditional,conditional,False,tbl_project,in_place_rent_monthly
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Cap Rate Comps,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Sales Comparables,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Operations > Operating Expenses,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Income Approach,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Property > MF Property Details,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Cost Approach,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Reconciliation,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Property > Rent Roll,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Property > Floor Plan Matrix,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Operations > Turns,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > AI Suggestions,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Project > Profile,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__created_at,created_at,True,income_approach__created_at,,,Valuation > Adjustments,,income_approach,datetime,,False,False,False,tbl_income_approach,created_at
+income_approach__income_approach_id,income_approach_id,True,income_approach__income_approach_id,,,Valuation > Cap Rate Comps,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,income_approach_id
+income_approach__income_approach_id,income_approach_id,True,income_approach__income_approach_id,,,Valuation > Income Approach,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,income_approach_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Valuation > Sales Comparables,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Operations > Operating Expenses,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Valuation > Income Approach,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Valuation > Cost Approach,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Property > MF Property Details,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Property > Rent Roll,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Property > Floor Plan Matrix,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Project > Profile,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__project_id,project_id,True,income_approach__project_id,,,Valuation > Reconciliation,,income_approach,integer,,conditional,conditional,False,tbl_income_approach,project_id
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Operations > Operating Expenses,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Valuation > Sales Comparables,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Valuation > Income Approach,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Property > MF Property Details,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Valuation > Cost Approach,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Property > Rent Roll,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Property > Floor Plan Matrix,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Operations > Turns,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Valuation > AI Suggestions,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Project > Profile,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach__updated_at,updated_at,True,income_approach__updated_at,,,Valuation > Reconciliation,,income_approach,datetime,,False,False,False,tbl_income_approach,updated_at
+income_approach_value,income_approach_value,False,income_approach_value,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,income_approach_value
+income_approach_weight,income_approach_weight,False,income_approach_weight,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,income_approach_weight
+indicated_value,indicated_value,False,indicated_value,,,Valuation > Cost Approach,,cost_approach,currency,,conditional,conditional,False,tbl_cost_approach,indicated_value
+insurance,insurance,False,insurance,,,Operations > Operating Expenses,Insurance,operating_expense,currency,,True,True,False,tbl_operating_expenses,annual_amount
+irrigation_maintenance,irrigation_maintenance,False,irrigation_maintenance,,,Operations > Operating Expenses,Irrigation Maintenance,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+is_manager,is_manager,False,is_manager,,,Property > Rent Roll,,unit,boolean,,conditional,conditional,False,tbl_multifamily_unit,is_manager
+is_recoverable,is_recoverable,False,is_recoverable,,,Operations > Operating Expenses,,operating_expense,boolean,,conditional,conditional,False,tbl_operating_expenses,is_recoverable
+is_renewal,is_renewal,False,is_renewal,,,Property > Rent Roll,,lease,boolean,,conditional,conditional,False,tbl_multifamily_lease,is_renewal
+is_section8,is_section8,False,is_section8,,,Property > Rent Roll,,unit,boolean,,conditional,conditional,False,tbl_multifamily_unit,is_section8
+job_number,job_number,False,job_number,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,job_number
+jurisdiction_city,jurisdiction_city,False,jurisdiction_city,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,jurisdiction_city
+jurisdiction_county,jurisdiction_county,False,jurisdiction_county,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,jurisdiction_county
+jurisdiction_integrated,jurisdiction_integrated,False,jurisdiction_integrated,,,Project > Profile,,project,boolean,,conditional,conditional,False,tbl_project,jurisdiction_integrated
+jurisdiction_state,jurisdiction_state,False,jurisdiction_state,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,jurisdiction_state
+land_area_sf,land_area_sf,False,land_area_sf,,,Valuation > Cost Approach,,cost_approach,decimal,sf,conditional,conditional,False,tbl_cost_approach,land_area_sf
+land_valuation_method,land_valuation_method,False,land_valuation_method,,,Valuation > Cost Approach,,cost_approach,string,,conditional,conditional,False,tbl_cost_approach,land_valuation_method
+land_valuation_method_display,land_valuation_method_display,False,land_valuation_method_display,,,,,,string,,conditional,conditional,True,,
+land_value_per_sf,land_value_per_sf,False,land_value_per_sf,,,Valuation > Cost Approach,,cost_approach,currency,USD/sf,conditional,conditional,False,tbl_cost_approach,land_value_per_sf
+landscaping,landscaping,False,landscaping,,,Operations > Operating Expenses,Landscaping & Grounds,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+last_calculated_at,last_calculated_at,False,last_calculated_at,,,Project > Profile,,project,datetime,,conditional,conditional,False,tbl_project,last_calculated_at
+last_modified_by,last_modified_by,False,last_modified_by,,,Valuation > Adjustments,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,last_modified_by
+latitude,latitude,False,latitude,,,Property > Comparable Rentals,,sales_comparable,decimal,,conditional,conditional,False,tbl_sales_comparables,latitude
+latitude,latitude,False,latitude,,,Valuation > Sales Comparables,,sales_comparable,decimal,,conditional,conditional,False,tbl_sales_comparables,latitude
+laundry_income,laundry_income,False,laundry_income,,,,,project,string,,conditional,conditional,False,tbl_project,laundry_income
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Cap Rate Comps,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Sales Comparables,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Operations > Operating Expenses,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Income Approach,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Property > MF Property Details,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Cost Approach,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Reconciliation,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Property > Rent Roll,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Property > Floor Plan Matrix,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Operations > Turns,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > AI Suggestions,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Project > Profile,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__created_at,created_at,True,lease__created_at,,,Valuation > Adjustments,,lease,datetime,,False,False,False,tbl_multifamily_lease,created_at
+lease__current_rent,current_rent,True,lease__current_rent,,,Property > Rent Roll,Current Rent,lease,currency,,conditional,conditional,False,tbl_multifamily_lease,base_rent_monthly
+lease__lease_end_date,lease_end_date,True,lease__lease_end_date,,,Property > Rent Roll,,lease,date,,conditional,conditional,False,tbl_multifamily_lease,lease_end_date
+lease__lease_start_date,lease_start_date,True,lease__lease_start_date,,,Property > Rent Roll,,lease,date,,conditional,conditional,False,tbl_multifamily_lease,lease_start_date
+lease__unit_id,unit_id,True,lease__unit_id,,,Property > Rent Roll,,lease,integer,,conditional,conditional,False,tbl_multifamily_lease,unit_id
+lease__unit_id,unit_id,True,lease__unit_id,,,Operations > Turns,,lease,integer,,conditional,conditional,False,tbl_multifamily_lease,unit_id
+lease__updated_at,updated_at,True,lease__updated_at,,,Operations > Operating Expenses,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Valuation > Sales Comparables,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Valuation > Income Approach,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Property > MF Property Details,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Valuation > Cost Approach,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Property > Rent Roll,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Property > Floor Plan Matrix,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Operations > Turns,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Valuation > AI Suggestions,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Project > Profile,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease__updated_at,updated_at,True,lease__updated_at,,,Valuation > Reconciliation,,lease,datetime,,False,False,False,tbl_multifamily_lease,updated_at
+lease_end,lease_end,False,lease_end,,,Property > Rent Roll,Lease End,lease,date,,conditional,conditional,False,tbl_multifamily_lease,lease_end_date
+lease_id,lease_id,False,lease_id,,,Property > Rent Roll,,lease,integer,,conditional,conditional,False,tbl_multifamily_lease,lease_id
+lease_start,lease_start,False,lease_start,,,Property > Rent Roll,Lease Start,lease,date,,conditional,conditional,False,tbl_multifamily_lease,lease_start_date
+lease_status,lease_status,False,lease_status,,,Property > Rent Roll,,lease,string,,conditional,conditional,False,tbl_multifamily_lease,lease_status
+lease_term_months,lease_term_months,False,lease_term_months,,,Property > Rent Roll,,lease,integer,,conditional,conditional,False,tbl_multifamily_lease,lease_term_months
+leasing_commissions,leasing_commissions,False,leasing_commissions,,,Operations > Operating Expenses,Leasing Commissions,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+leasing_office_count,leasing_office_count,False,leasing_office_count,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,leasing_office_count
+leasing_office_sf,leasing_office_sf,False,leasing_office_sf,,,Property > MF Property Details,,property,decimal,sf,conditional,conditional,False,tbl_multifamily_property,leasing_office_sf
+legal_owner,legal_owner,False,legal_owner,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,legal_owner
+liability_insurance,liability_insurance,False,liability_insurance,,,Operations > Operating Expenses,Liability Insurance,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+licenses_permits,licenses_permits,False,licenses_permits,,,Operations > Operating Expenses,Licenses & Permits,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+listing_brokerage,listing_brokerage,False,listing_brokerage,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,listing_brokerage
+location_description,location_description,False,location_description,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,location_description
+location_lat,location_lat,False,location_lat,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,location_lat
+location_lon,location_lon,False,location_lon,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,location_lon
+longitude,longitude,False,longitude,,,Property > Comparable Rentals,,sales_comparable,decimal,,conditional,conditional,False,tbl_sales_comparables,longitude
+longitude,longitude,False,longitude,,,Valuation > Sales Comparables,,sales_comparable,decimal,,conditional,conditional,False,tbl_sales_comparables,longitude
+loss_to_lease,loss_to_lease,False,loss_to_lease,,,Property > Rent Roll,,project,string,,conditional,conditional,True,tbl_project,loss_to_lease
+lot_size_acres,lot_size_acres,False,lot_size_acres,,,Project > Profile,,project,decimal,acres,conditional,conditional,False,tbl_project,lot_size_acres
+lot_size_sf,lot_size_sf,False,lot_size_sf,,,Project > Profile,,project,decimal,sf,conditional,conditional,False,tbl_project,lot_size_sf
+make_ready_complete_date,make_ready_complete_date,False,make_ready_complete_date,,,Operations > Turns,,turn,date,,conditional,conditional,False,tbl_multifamily_turn,make_ready_complete_date
+management_fee,management_fee,False,management_fee,,,,,project,string,,conditional,conditional,False,tbl_project,management_fee
+management_fee_offsite,management_fee_offsite,False,management_fee_offsite,,,Operations > Operating Expenses,Off-Site Management Fee,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+management_fee_pct,management_fee_pct,False,management_fee_pct,,,,,project,string,,conditional,conditional,False,tbl_project,management_fee_pct
+manager_rent_credit_monthly,manager_rent_credit_monthly,False,manager_rent_credit_monthly,,,Property > MF Property Details,,property,currency,USD/mo,conditional,conditional,False,tbl_multifamily_property,manager_rent_credit_monthly
+manager_unit_count,manager_unit_count,False,manager_unit_count,,,Property > MF Property Details,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,manager_unit_count
+market,market,False,market,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,market
+market_avg_hh_income,market_avg_hh_income,False,market_avg_hh_income,,,,,project,string,,conditional,conditional,False,tbl_project,market_avg_hh_income
+market_cap_rate_method,market_cap_rate_method,False,market_cap_rate_method,,,Valuation > Income Approach,,income_approach,string,,conditional,conditional,False,tbl_income_approach,market_cap_rate_method
+market_cap_rate_method_display,market_cap_rate_method_display,False,market_cap_rate_method_display,,,,,,string,,conditional,conditional,True,,
+market_median_home_value,market_median_home_value,False,market_median_home_value,,,,,project,string,,conditional,conditional,False,tbl_project,market_median_home_value
+market_population,market_population,False,market_population,,,,,project,string,,conditional,conditional,False,tbl_project,market_population
+market_rent,market_rent,False,current_market_rent,,,Property > Rent Roll,Market Rent,unit,currency,,conditional,conditional,False,tbl_multifamily_unit,market_rent
+market_rent_monthly,market_rent_monthly,False,market_rent_monthly,,,,,project,string,,conditional,conditional,False,tbl_project,market_rent_monthly
+market_rent_psf,market_rent_psf,False,market_rent_psf,,,Property > Rent Roll,,unit,currency,USD/sf,conditional,conditional,False,tbl_multifamily_unit,market_rent_psf
+market_velocity_annual,market_velocity_annual,False,market_velocity_annual,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,market_velocity_annual
+marketing,marketing,False,marketing,,,,,project,string,,conditional,conditional,False,tbl_project,marketing
+marketing_advertising,marketing_advertising,False,marketing_advertising,,,Operations > Operating Expenses,Marketing & Advertising,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+model_version,model_version,False,model_version,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,string,,conditional,conditional,False,tbl_ai_adjustment_suggestions,model_version
+monthly_income,monthly_income,False,monthly_income,,,Property > Rent Roll,Monthly Income,,string,,conditional,conditional,True,,
+months_free_rent,months_free_rent,False,months_free_rent,,,Property > Rent Roll,,lease,currency,,conditional,conditional,False,tbl_multifamily_lease,months_free_rent
+move_out_date,move_out_date,False,move_out_date,,,Operations > Turns,,turn,date,,conditional,conditional,False,tbl_multifamily_turn,move_out_date
+msa,msa,False,msa,,,,,project,string,,conditional,conditional,False,tbl_project,msa
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Cap Rate Comps,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Sales Comparables,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Operations > Operating Expenses,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Income Approach,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Property > MF Property Details,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Cost Approach,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Reconciliation,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Property > Rent Roll,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Property > Floor Plan Matrix,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Operations > Turns,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > AI Suggestions,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Project > Profile,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__created_at,created_at,True,msa__created_at,,,Valuation > Adjustments,,msa,datetime,,False,False,False,tbl_msa,created_at
+msa__is_active,is_active,True,msa__is_active,,,Project > Profile,,msa,boolean,,conditional,conditional,False,tbl_msa,is_active
+msa__is_active,is_active,True,msa__is_active,,,Property > Comparable Rentals,,msa,boolean,,conditional,conditional,False,tbl_msa,is_active
+msa__is_active,is_active,True,msa__is_active,,,Operations > Operating Expenses,,msa,boolean,,conditional,conditional,False,tbl_msa,is_active
+msa__msa_id,msa_id,True,msa__msa_id,,,Project > Profile,,msa,integer,,conditional,conditional,False,tbl_msa,msa_id
+msa__updated_at,updated_at,True,msa__updated_at,,,Operations > Operating Expenses,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Valuation > Sales Comparables,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Valuation > Income Approach,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Property > MF Property Details,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Valuation > Cost Approach,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Property > Rent Roll,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Property > Floor Plan Matrix,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Operations > Turns,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Valuation > AI Suggestions,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Project > Profile,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa__updated_at,updated_at,True,msa__updated_at,,,Valuation > Reconciliation,,msa,datetime,,False,False,False,tbl_msa,updated_at
+msa_code,msa_code,False,msa_code,,,Project > Profile,,msa,string,,conditional,conditional,False,tbl_msa,msa_code
+msa_name,msa_name,False,msa_name,,,Project > Profile,,msa,string,,conditional,conditional,False,tbl_msa,msa_name
+multifamily_property_id,multifamily_property_id,False,multifamily_property_id,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,multifamily_property_id
+next_move_in_date,next_move_in_date,False,next_move_in_date,,,Operations > Turns,,turn,date,,conditional,conditional,False,tbl_multifamily_turn,next_move_in_date
+noi,noi,False,noi,,,Valuation > Cap Rate Comps,,cap_rate_comp,decimal,,conditional,conditional,False,tbl_cap_rate_comps,noi
+noi_current,noi_current,False,noi_current,,,,,project,string,,conditional,conditional,False,tbl_project,noi_current
+noi_proforma,noi_proforma,False,noi_proforma,,,,,project,string,,conditional,conditional,False,tbl_project,noi_proforma
+noi_t12,noi_t12,False,noi_t12,,,,,project,string,,conditional,conditional,False,tbl_project,noi_t12
+notice_date,notice_date,False,notice_date,,,Property > Rent Roll,,lease,date,,conditional,conditional,False,tbl_multifamily_lease,notice_date
+notice_to_vacate_days,notice_to_vacate_days,False,notice_to_vacate_days,,,Property > Rent Roll,,lease,integer,,conditional,conditional,False,tbl_multifamily_lease,notice_to_vacate_days
+number_of_buildings,number_of_buildings,False,number_of_buildings,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,number_of_buildings
+number_of_floors,number_of_floors,False,number_of_floors,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,number_of_floors
+occupancy_rate,occupancy_rate,False,occupancy_rate,,,,,project,string,,conditional,conditional,False,tbl_project,occupancy_rate
+occupancy_status,occupancy_status,False,occupancy_status,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,occupancy_status
+office_supplies,office_supplies,False,office_supplies,,,Operations > Operating Expenses,Office Supplies,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+onsite_payroll,onsite_payroll,False,onsite_payroll,,,Operations > Operating Expenses,On-Site Payroll,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+operating_expense__administrative,administrative,True,operating_expense__administrative,,,Operations > Operating Expenses,Administrative,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Cap Rate Comps,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Sales Comparables,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Operations > Operating Expenses,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Income Approach,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Property > MF Property Details,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Cost Approach,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Reconciliation,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Property > Rent Roll,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Property > Floor Plan Matrix,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Operations > Turns,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > AI Suggestions,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Project > Profile,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__created_at,created_at,True,operating_expense__created_at,,,Valuation > Adjustments,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,created_at
+operating_expense__notes,notes,True,operating_expense__notes,,,Valuation > Cap Rate Comps,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Valuation > Sales Comparables,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Operations > Operating Expenses,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Property > Comparable Rentals,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Property > Floor Plan Matrix,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Operations > Turns,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__notes,notes,True,operating_expense__notes,,,Property > Rent Roll,Notes,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,notes
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Valuation > Sales Comparables,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Operations > Operating Expenses,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Valuation > Income Approach,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Valuation > Cost Approach,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Property > MF Property Details,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Property > Rent Roll,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Property > Floor Plan Matrix,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Project > Profile,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__project_id,project_id,True,operating_expense__project_id,,,Valuation > Reconciliation,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,project_id
+operating_expense__property_insurance,property_insurance,True,operating_expense__property_insurance,,,Operations > Operating Expenses,Property Insurance,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+operating_expense__repairs_maintenance,repairs_maintenance,True,operating_expense__repairs_maintenance,,,Operations > Operating Expenses,Repairs & Maintenance,operating_expense,decimal,,True,True,False,tbl_operating_expenses,annual_amount
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Operations > Operating Expenses,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Valuation > Sales Comparables,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Valuation > Income Approach,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Property > MF Property Details,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Valuation > Cost Approach,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Property > Rent Roll,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Property > Floor Plan Matrix,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Operations > Turns,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Valuation > AI Suggestions,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Project > Profile,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+operating_expense__updated_at,updated_at,True,operating_expense__updated_at,,,Valuation > Reconciliation,,operating_expense,datetime,,False,False,False,tbl_operating_expenses,updated_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Cap Rate Comps,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Sales Comparables,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Operations > Operating Expenses,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Income Approach,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Property > MF Property Details,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Cost Approach,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Reconciliation,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Property > Rent Roll,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Property > Floor Plan Matrix,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Operations > Turns,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > AI Suggestions,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Project > Profile,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__created_at,created_at,True,opex_category__created_at,,,Valuation > Adjustments,,opex_category,datetime,,False,False,False,core_unit_cost_category,created_at
+opex_category__is_active,is_active,True,opex_category__is_active,,,Project > Profile,,opex_category,boolean,,conditional,conditional,False,core_unit_cost_category,is_active
+opex_category__is_active,is_active,True,opex_category__is_active,,,Property > Comparable Rentals,,opex_category,boolean,,conditional,conditional,False,core_unit_cost_category,is_active
+opex_category__is_active,is_active,True,opex_category__is_active,,,Operations > Operating Expenses,,opex_category,boolean,,conditional,conditional,False,core_unit_cost_category,is_active
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Operations > Operating Expenses,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Valuation > Sales Comparables,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Valuation > Income Approach,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Property > MF Property Details,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Valuation > Cost Approach,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Property > Rent Roll,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Property > Floor Plan Matrix,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Operations > Turns,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Valuation > AI Suggestions,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Project > Profile,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_category__updated_at,updated_at,True,opex_category__updated_at,,,Valuation > Reconciliation,,opex_category,datetime,,False,False,False,core_unit_cost_category,updated_at
+opex_id,opex_id,False,opex_id,,,Operations > Operating Expenses,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,opex_id
+opex_per_unit,opex_per_unit,False,opex_per_unit,,,,,project,string,,conditional,conditional,False,tbl_project,opex_per_unit
+other_cost,other_cost,False,other_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,other_cost
+other_income_total,other_income_total,False,other_income_total,,,,,project,string,,conditional,conditional,False,tbl_project,other_income_total
+other_operating,other_operating,False,other_operating,,,Operations > Operating Expenses,Other Operating Expenses,operating_expense,decimal,,True,True,False,tbl_operating_expenses,annual_amount
+ownership_type,ownership_type,False,ownership_type,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,ownership_type
+painting_cost,painting_cost,False,painting_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,painting_cost
+parcel_id,parcel_id,False,parcel_id,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,parcel_id
+parent_id,parent_id,False,parent_id,,,Operations > Operating Expenses,,opex_category,integer,,conditional,conditional,False,core_unit_cost_category,parent_id
+parking_income,parking_income,False,parking_income,,,,,project,string,,conditional,conditional,False,tbl_project,parking_income
+parking_rent_monthly,parking_rent_monthly,False,parking_rent_monthly,,,Property > Rent Roll,,lease,currency,USD/mo,conditional,conditional,False,tbl_multifamily_lease,parking_rent_monthly
+parking_type,parking_type,False,parking_type,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,parking_type
+payment_frequency,payment_frequency,False,payment_frequency,,,Operations > Operating Expenses,,operating_expense,string,,conditional,conditional,False,tbl_operating_expenses,payment_frequency
+payroll,payroll,False,payroll,,,,,project,string,,conditional,conditional,False,tbl_project,payroll
+pest_control,pest_control,False,pest_control,,,Operations > Operating Expenses,Pest Control,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+pet_income,pet_income,False,pet_income,,,,,project,string,,conditional,conditional,False,tbl_project,pet_income
+pet_rent_monthly,pet_rent_monthly,False,pet_rent_monthly,,,Property > Rent Roll,,lease,currency,USD/mo,conditional,conditional,False,tbl_multifamily_lease,pet_rent_monthly
+phone_internet,phone_internet,False,phone_internet,,,Operations > Operating Expenses,Phone & Internet,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+physical_curable,physical_curable,False,physical_curable,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,physical_curable
+physical_incurable_long,physical_incurable_long,False,physical_incurable_long,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,physical_incurable_long
+physical_incurable_short,physical_incurable_short,False,physical_incurable_short,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,physical_incurable_short
+physical_vacancy_pct,physical_vacancy_pct,False,physical_vacancy_pct,,,,,project,string,,conditional,conditional,False,tbl_project,physical_vacancy_pct
+planning_efficiency,planning_efficiency,False,planning_efficiency,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,planning_efficiency
+plumbing_service,plumbing_service,False,plumbing_service,,,Operations > Operating Expenses,Plumbing Service,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+pool_amenity_service,pool_amenity_service,False,pool_amenity_service,,,Operations > Operating Expenses,Pool & Amenity Service,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+price_range_high,price_range_high,False,price_range_high,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,price_range_high
+price_range_low,price_range_low,False,price_range_low,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,price_range_low
+primary_city,primary_city,False,primary_city,,,Project > Profile,,msa,string,,conditional,conditional,False,tbl_msa,primary_city
+professional_fees,professional_fees,False,professional_fees,,,Operations > Operating Expenses,Professional Fees,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+proforma_egi,proforma_egi,False,proforma_egi,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,proforma_egi
+proforma_gpi,proforma_gpi,False,proforma_gpi,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,proforma_gpi
+proforma_gpr,proforma_gpr,False,proforma_gpr,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,proforma_gpr
+proforma_noi,proforma_noi,False,proforma_noi,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,proforma_noi
+proforma_opex,proforma_opex,False,proforma_opex,,,Project > Profile,,project,decimal,,conditional,conditional,False,tbl_project,proforma_opex
+proforma_other_income,proforma_other_income,False,proforma_other_income,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,proforma_other_income
+proforma_rent,proforma_rent,False,proforma_rent,,,Property > Rent Roll,Proforma Rent,,string,,conditional,conditional,True,,
+proforma_rent_per_sf,proforma_rent_per_sf,False,proforma_rent_per_sf,,,Property > Rent Roll,Proforma $/SF,,string,,conditional,conditional,True,,
+proforma_vacancy_rate,proforma_vacancy_rate,False,proforma_vacancy_rate,,,Project > Profile,,project,percent,,conditional,conditional,False,tbl_project,proforma_vacancy_rate
+project__administrative,administrative,True,project__administrative,,,Operations > Operating Expenses,Administrative,project,decimal,,False,True,False,tbl_project,administrative
+project__assessed_value,assessed_value,True,project__assessed_value,,,Property > MF Property Details,,project,currency,,conditional,conditional,False,tbl_project,assessed_value
+project__assessed_value,assessed_value,True,project__assessed_value,,,Project > Profile,,project,currency,,conditional,conditional,False,tbl_project,assessed_value
+project__avg_unit_sf,avg_unit_sf,True,project__avg_unit_sf,,,Property > MF Property Details,,project,decimal,sf,conditional,conditional,False,tbl_project,avg_unit_sf
+project__city,city,True,project__city,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,city
+project__city,city,True,project__city,,,Valuation > Sales Comparables,,project,string,,conditional,conditional,False,tbl_project,city
+project__created_at,created_at,True,project__created_at,,,Valuation > Cap Rate Comps,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > Sales Comparables,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Operations > Operating Expenses,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > Income Approach,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Property > MF Property Details,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > Cost Approach,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > Reconciliation,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Property > Rent Roll,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Property > Floor Plan Matrix,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Operations > Turns,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > AI Suggestions,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Project > Profile,,project,datetime,,False,False,False,tbl_project,created_at
+project__created_at,created_at,True,project__created_at,,,Valuation > Adjustments,,project,datetime,,False,False,False,tbl_project,created_at
+project__is_active,is_active,True,project__is_active,,,Project > Profile,,project,boolean,,conditional,conditional,False,tbl_project,is_active
+project__is_active,is_active,True,project__is_active,,,Property > Comparable Rentals,,project,boolean,,conditional,conditional,False,tbl_project,is_active
+project__is_active,is_active,True,project__is_active,,,Operations > Operating Expenses,,project,boolean,,conditional,conditional,False,tbl_project,is_active
+project__msa_id,msa_id,True,project__msa_id,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,msa_id
+project__parking_ratio,parking_ratio,True,project__parking_ratio,,,Property > MF Property Details,,project,decimal,,conditional,conditional,False,tbl_project,parking_ratio
+project__parking_spaces_total,parking_spaces_total,True,property__parking_spaces_total,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,Legacy project rollup / boundary leak. Canonicalized to property__parking_spaces_total for MF property scope.,Property > MF Property Details,,project,integer,,conditional,conditional,False,tbl_project,parking_spaces_total
+project__price_per_sf,price_per_sf,True,project__price_per_sf,,,Valuation > Sales Comparables,,project,currency,USD/sf,conditional,conditional,False,tbl_project,price_per_sf
+project__price_per_sf,price_per_sf,True,project__price_per_sf,,,Project > Profile,,project,currency,USD/sf,conditional,conditional,False,tbl_project,price_per_sf
+project__price_per_unit,price_per_unit,True,project__price_per_unit,,,Valuation > Sales Comparables,,project,currency,USD/unit,conditional,conditional,False,tbl_project,price_per_unit
+project__price_per_unit,price_per_unit,True,project__price_per_unit,,,Project > Profile,,project,currency,USD/unit,conditional,conditional,False,tbl_project,price_per_unit
+project__project_id,project_id,True,project__project_id,,,Valuation > Sales Comparables,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Operations > Operating Expenses,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Valuation > Income Approach,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Valuation > Cost Approach,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Property > MF Property Details,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Property > Rent Roll,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Property > Floor Plan Matrix,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__project_id,project_id,True,project__project_id,,,Valuation > Reconciliation,,project,integer,,conditional,conditional,False,tbl_project,project_id
+project__property_class,property_class,True,project__property_class,,,Property > MF Property Details,,project,string,,conditional,conditional,False,tbl_project,property_class
+project__property_class,property_class,True,project__property_class,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,property_class
+project__property_insurance,property_insurance,True,project__property_insurance,,,Operations > Operating Expenses,Property Insurance,project,currency,,False,True,False,tbl_project,property_insurance
+project__property_subtype,property_subtype,True,project__property_subtype,,,Property > MF Property Details,,project,string,,conditional,conditional,False,tbl_project,property_subtype
+project__property_subtype,property_subtype,True,project__property_subtype,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,property_subtype
+project__repairs_maintenance,repairs_maintenance,True,project__repairs_maintenance,,,Operations > Operating Expenses,Repairs & Maintenance,project,decimal,,True,True,False,tbl_project,repairs_maintenance
+project__state,state,True,project__state,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,state
+project__state,state,True,project__state,,,Valuation > Sales Comparables,,project,string,,conditional,conditional,False,tbl_project,state
+project__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.,Property > MF Property Details,,project,integer,units,conditional,conditional,False,tbl_project,total_units
+project__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.,Property > Floor Plan Matrix,,project,integer,units,conditional,conditional,False,tbl_project,total_units
+project__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.,Property > Comparable Rentals,,project,integer,units,conditional,conditional,False,tbl_project,total_units
+project__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.,Project > Profile,,project,integer,units,conditional,conditional,False,tbl_project,total_units
+project__updated_at,updated_at,True,project__updated_at,,,Operations > Operating Expenses,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Valuation > Sales Comparables,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Valuation > Income Approach,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Property > MF Property Details,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Valuation > Cost Approach,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Property > Rent Roll,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Property > Floor Plan Matrix,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Operations > Turns,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Valuation > AI Suggestions,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Project > Profile,,project,datetime,,False,False,False,tbl_project,updated_at
+project__updated_at,updated_at,True,project__updated_at,,,Valuation > Reconciliation,,project,datetime,,False,False,False,tbl_project,updated_at
+project__year_built,year_built,True,project__year_built,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,year_built
+project__year_built,year_built,True,project__year_built,,,Property > MF Property Details,,project,integer,,conditional,conditional,False,tbl_project,year_built
+project__year_built,year_built,True,project__year_built,,,Property > Comparable Rentals,,project,integer,,conditional,conditional,False,tbl_project,year_built
+project__year_built,year_built,True,project__year_built,,,Valuation > Sales Comparables,,project,integer,,conditional,conditional,False,tbl_project,year_built
+project__year_renovated,year_renovated,True,project__year_renovated,,,Property > MF Property Details,,project,integer,,conditional,conditional,False,tbl_project,year_renovated
+project_address,project_address,False,project_address,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,project_address
+project_name,project_name,False,project_name,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,project_name
+project_number,project_number,False,project_number,,,Project > Profile,,,string,,conditional,conditional,False,,
+project_status,project_status,False,project_status,,,Project > Profile,,,string,,conditional,conditional,False,,
+project_type,project_type,False,project_type,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,project_type
+project_type_code,project_type_code,False,project_type_code,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,project_type_code
+property__assessed_value,assessed_value,True,property__assessed_value,,,Property > MF Property Details,,property,currency,,conditional,conditional,False,tbl_multifamily_property,assessed_value
+property__assessed_value,assessed_value,True,property__assessed_value,,,Project > Profile,,property,currency,,conditional,conditional,False,tbl_multifamily_property,assessed_value
+property__avg_unit_sf,avg_unit_sf,True,property__avg_unit_sf,,,Property > MF Property Details,,property,decimal,sf,conditional,conditional,False,tbl_multifamily_property,avg_unit_sf
+property__created_at,created_at,True,property__created_at,,,Valuation > Cap Rate Comps,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > Sales Comparables,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Operations > Operating Expenses,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > Income Approach,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Property > MF Property Details,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > Cost Approach,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > Reconciliation,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Property > Rent Roll,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Property > Floor Plan Matrix,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Operations > Turns,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > AI Suggestions,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Project > Profile,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__created_at,created_at,True,property__created_at,,,Valuation > Adjustments,,property,datetime,,False,False,False,tbl_multifamily_property,created_at
+property__parking_ratio,parking_ratio,True,property__parking_ratio,,,Property > MF Property Details,,property,decimal,,conditional,conditional,False,tbl_multifamily_property,parking_ratio
+property__parking_spaces_total,parking_spaces_total,True,project__parking_spaces_total,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,parking_spaces_total
+property__project_id,project_id,True,property__project_id,,,Valuation > Sales Comparables,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Operations > Operating Expenses,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Valuation > Income Approach,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Valuation > Cost Approach,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Property > Rent Roll,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Property > Floor Plan Matrix,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Project > Profile,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__project_id,project_id,True,property__project_id,,,Valuation > Reconciliation,,property,integer,,conditional,conditional,False,tbl_multifamily_property,project_id
+property__property_class,property_class,True,property__property_class,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_class
+property__property_class,property_class,True,property__property_class,,,Project > Profile,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_class
+property__property_name,property_name,True,property__property_name,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_name
+property__property_name,property_name,True,property__property_name,,,Property > Comparable Rentals,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_name
+property__property_name,property_name,True,property__property_name,,,Valuation > Sales Comparables,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_name
+property__property_subtype,property_subtype,True,property__property_subtype,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_subtype
+property__property_subtype,property_subtype,True,property__property_subtype,,,Project > Profile,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_subtype
+property__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,,Property > MF Property Details,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,total_units
+property__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,,Property > Floor Plan Matrix,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,total_units
+property__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,,Property > Comparable Rentals,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,total_units
+property__total_units,total_units,True,property__total_units,MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.,,Project > Profile,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,total_units
+property__updated_at,updated_at,True,property__updated_at,,,Operations > Operating Expenses,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Valuation > Sales Comparables,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Valuation > Income Approach,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Property > MF Property Details,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Valuation > Cost Approach,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Property > Rent Roll,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Property > Floor Plan Matrix,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Operations > Turns,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Valuation > AI Suggestions,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Project > Profile,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__updated_at,updated_at,True,property__updated_at,,,Valuation > Reconciliation,,property,datetime,,False,False,False,tbl_multifamily_property,updated_at
+property__year_built,year_built,True,property__year_built,,,Project > Profile,,property,integer,,conditional,conditional,False,tbl_multifamily_property,year_built
+property__year_built,year_built,True,property__year_built,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,year_built
+property__year_built,year_built,True,property__year_built,,,Property > Comparable Rentals,,property,integer,,conditional,conditional,False,tbl_multifamily_property,year_built
+property__year_built,year_built,True,property__year_built,,,Valuation > Sales Comparables,,property,integer,,conditional,conditional,False,tbl_multifamily_property,year_built
+property__year_renovated,year_renovated,True,property__year_renovated,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,year_renovated
+property_address,property_address,False,property_address,,,Valuation > Cap Rate Comps,,cap_rate_comp,string,,conditional,conditional,False,tbl_cap_rate_comps,property_address
+property_management,property_management,False,property_management,,,Operations > Operating Expenses,Property Management,operating_expense,percent,ratio_0_1,True,True,False,tbl_operating_expenses,annual_amount
+property_status,property_status,False,property_status,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,property_status
+property_tax_rate,property_tax_rate,False,property_tax_rate,,,Property > MF Property Details,,property,currency,,conditional,conditional,False,tbl_multifamily_property,property_tax_rate
+property_taxes,property_taxes,False,property_taxes,,,Operations > Operating Expenses,Property Taxes,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+real_estate_taxes,real_estate_taxes,False,real_estate_taxes,,,,,project,string,,conditional,conditional,False,tbl_project,real_estate_taxes
+reconciliation_id,reconciliation_id,False,reconciliation_id,,,Valuation > Reconciliation,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,reconciliation_id
+reconciliation_narrative,reconciliation_narrative,False,reconciliation_narrative,,,Valuation > Reconciliation,,valuation_reconciliation,string,,conditional,conditional,False,tbl_valuation_reconciliation,reconciliation_narrative
+recovery_rate,recovery_rate,False,recovery_rate,,,Operations > Operating Expenses,,operating_expense,percent,,conditional,conditional,False,tbl_operating_expenses,recovery_rate
+renovation_cost,renovation_cost,False,renovation_cost,,,Property > Rent Roll,,unit,currency,,conditional,conditional,False,tbl_multifamily_unit,renovation_cost
+renovation_date,renovation_date,False,renovation_date,,,Property > Rent Roll,,unit,date,,conditional,conditional,False,tbl_multifamily_unit,renovation_date
+renovation_status,renovation_status,False,renovation_status,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,renovation_status
+rent_control_exempt,rent_control_exempt,False,rent_control_exempt,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,rent_control_exempt
+rent_control_ordinance,rent_control_ordinance,False,rent_control_ordinance,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,rent_control_ordinance
+rent_per_sf,rent_per_sf,False,rent_per_sf,,,Property > Rent Roll,Rent/SF,,string,,conditional,conditional,True,,
+rentable_units,rentable_units,False,rentable_units,,,Property > MF Property Details,,property,currency,,conditional,conditional,False,tbl_multifamily_property,rentable_units
+replacement_reserves,replacement_reserves,False,replacement_reserves,,,,,project,string,,conditional,conditional,False,tbl_project,replacement_reserves
+reserves_capex,reserves_capex,False,reserves_capex,,,Operations > Operating Expenses,Replacement Reserves,operating_expense,currency,,False,True,False,tbl_operating_expenses,annual_amount
+resident_name,resident_name,False,resident_name,,,Property > Rent Roll,,lease,string,,conditional,conditional,False,tbl_multifamily_lease,resident_name
+rubs_recovery_pct,rubs_recovery_pct,False,rubs_recovery_pct,,,Property > MF Property Details,,property,percent,,conditional,conditional,False,tbl_multifamily_property,rubs_recovery_pct
+sales_comp__city,city,True,sales_comp__city,,,Project > Profile,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,city
+sales_comp__city,city,True,sales_comp__city,,,Valuation > Sales Comparables,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,city
+sales_comp__comparable_id,comparable_id,True,sales_comp__comparable_id,,,Valuation > Adjustments,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,comparable_id
+sales_comp__comparable_id,comparable_id,True,sales_comp__comparable_id,,,Valuation > AI Suggestions,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,comparable_id
+sales_comp__comparable_id,comparable_id,True,sales_comp__comparable_id,,,Property > Comparable Rentals,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,comparable_id
+sales_comp__comparable_id,comparable_id,True,sales_comp__comparable_id,,,Valuation > Sales Comparables,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,comparable_id
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Cap Rate Comps,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Sales Comparables,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Operations > Operating Expenses,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Income Approach,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Property > MF Property Details,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Cost Approach,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Reconciliation,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Property > Rent Roll,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Property > Floor Plan Matrix,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Operations > Turns,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > AI Suggestions,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Project > Profile,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__created_at,created_at,True,sales_comp__created_at,,,Valuation > Adjustments,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,created_at
+sales_comp__notes,notes,True,sales_comp__notes,,,Valuation > Cap Rate Comps,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Valuation > Sales Comparables,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Operations > Operating Expenses,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Property > Comparable Rentals,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Property > Floor Plan Matrix,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Operations > Turns,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__notes,notes,True,sales_comp__notes,,,Property > Rent Roll,Notes,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,notes
+sales_comp__price_per_sf,price_per_sf,True,sales_comp__price_per_sf,,,Valuation > Sales Comparables,,sales_comp,currency,USD/sf,conditional,conditional,False,tbl_sales_comparables,price_per_sf
+sales_comp__price_per_sf,price_per_sf,True,sales_comp__price_per_sf,,,Project > Profile,,sales_comp,currency,USD/sf,conditional,conditional,False,tbl_sales_comparables,price_per_sf
+sales_comp__price_per_unit,price_per_unit,True,sales_comp__price_per_unit,,,Valuation > Sales Comparables,,sales_comp,currency,USD/unit,conditional,conditional,False,tbl_sales_comparables,price_per_unit
+sales_comp__price_per_unit,price_per_unit,True,sales_comp__price_per_unit,,,Project > Profile,,sales_comp,currency,USD/unit,conditional,conditional,False,tbl_sales_comparables,price_per_unit
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Valuation > Sales Comparables,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Operations > Operating Expenses,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Valuation > Income Approach,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Valuation > Cost Approach,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Property > MF Property Details,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Property > Rent Roll,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Property > Floor Plan Matrix,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Project > Profile,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__project_id,project_id,True,sales_comp__project_id,,,Valuation > Reconciliation,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,project_id
+sales_comp__property_name,property_name,True,sales_comp__property_name,,,Property > MF Property Details,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,property_name
+sales_comp__property_name,property_name,True,sales_comp__property_name,,,Property > Comparable Rentals,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,property_name
+sales_comp__property_name,property_name,True,sales_comp__property_name,,,Valuation > Sales Comparables,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,property_name
+sales_comp__sale_date,sale_date,True,sales_comp__sale_date,,,Valuation > Cap Rate Comps,,sales_comp,date,,conditional,conditional,False,tbl_sales_comparables,sale_date
+sales_comp__sale_date,sale_date,True,sales_comp__sale_date,,,Valuation > Sales Comparables,,sales_comp,date,,conditional,conditional,False,tbl_sales_comparables,sale_date
+sales_comp__sale_price,sale_price,True,sales_comp__sale_price,,,Valuation > Cap Rate Comps,,sales_comp,currency,,conditional,conditional,False,tbl_sales_comparables,sale_price
+sales_comp__sale_price,sale_price,True,sales_comp__sale_price,,,Valuation > Sales Comparables,,sales_comp,currency,,conditional,conditional,False,tbl_sales_comparables,sale_price
+sales_comp__state,state,True,sales_comp__state,,,Project > Profile,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,state
+sales_comp__state,state,True,sales_comp__state,,,Valuation > Sales Comparables,,sales_comp,string,,conditional,conditional,False,tbl_sales_comparables,state
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Operations > Operating Expenses,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Valuation > Sales Comparables,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Valuation > Income Approach,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Property > MF Property Details,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Valuation > Cost Approach,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Property > Rent Roll,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Property > Floor Plan Matrix,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Operations > Turns,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Valuation > AI Suggestions,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Project > Profile,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__updated_at,updated_at,True,sales_comp__updated_at,,,Valuation > Reconciliation,,sales_comp,datetime,,False,False,False,tbl_sales_comparables,updated_at
+sales_comp__year_built,year_built,True,sales_comp__year_built,,,Project > Profile,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,year_built
+sales_comp__year_built,year_built,True,sales_comp__year_built,,,Property > MF Property Details,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,year_built
+sales_comp__year_built,year_built,True,sales_comp__year_built,,,Property > Comparable Rentals,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,year_built
+sales_comp__year_built,year_built,True,sales_comp__year_built,,,Valuation > Sales Comparables,,sales_comp,integer,,conditional,conditional,False,tbl_sales_comparables,year_built
+sales_comp_adjustment__adjustment_type,adjustment_type,True,sales_comp_adjustment__adjustment_type,,,Valuation > Adjustments,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,adjustment_type
+sales_comp_adjustment__adjustment_type,adjustment_type,True,sales_comp_adjustment__adjustment_type,,,Valuation > AI Suggestions,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,adjustment_type
+sales_comp_adjustment__comparable_id,comparable_id,True,sales_comp_adjustment__comparable_id,,,Valuation > Adjustments,,sales_comp_adjustment,integer,,conditional,conditional,False,tbl_sales_comp_adjustments,comparable_id
+sales_comp_adjustment__comparable_id,comparable_id,True,sales_comp_adjustment__comparable_id,,,Valuation > AI Suggestions,,sales_comp_adjustment,integer,,conditional,conditional,False,tbl_sales_comp_adjustments,comparable_id
+sales_comp_adjustment__comparable_id,comparable_id,True,sales_comp_adjustment__comparable_id,,,Property > Comparable Rentals,,sales_comp_adjustment,integer,,conditional,conditional,False,tbl_sales_comp_adjustments,comparable_id
+sales_comp_adjustment__comparable_id,comparable_id,True,sales_comp_adjustment__comparable_id,,,Valuation > Sales Comparables,,sales_comp_adjustment,integer,,conditional,conditional,False,tbl_sales_comp_adjustments,comparable_id
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Cap Rate Comps,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Sales Comparables,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Operations > Operating Expenses,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Income Approach,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Property > MF Property Details,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Cost Approach,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Reconciliation,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Property > Rent Roll,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Property > Floor Plan Matrix,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Operations > Turns,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > AI Suggestions,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Project > Profile,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__created_at,created_at,True,sales_comp_adjustment__created_at,,,Valuation > Adjustments,,sales_comp_adjustment,datetime,,False,False,False,tbl_sales_comp_adjustments,created_at
+sales_comp_adjustment__justification,justification,True,sales_comp_adjustment__justification,,,Valuation > Adjustments,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,justification
+sales_comp_adjustment__justification,justification,True,sales_comp_adjustment__justification,,,Valuation > AI Suggestions,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,justification
+sales_comparison_value,sales_comparison_value,False,sales_comparison_value,,,Valuation > Reconciliation,,valuation_reconciliation,currency,,conditional,conditional,False,tbl_valuation_reconciliation,sales_comparison_value
+sales_comparison_weight,sales_comparison_weight,False,sales_comparison_weight,,,Valuation > Reconciliation,,valuation_reconciliation,decimal,,conditional,conditional,False,tbl_valuation_reconciliation,sales_comparison_weight
+schema_version,schema_version,False,schema_version,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,schema_version
+section8_contract_date,section8_contract_date,False,section8_contract_date,,,Property > Rent Roll,,unit,date,,conditional,conditional,False,tbl_multifamily_unit,section8_contract_date
+section8_contract_rent,section8_contract_rent,False,section8_contract_rent,,,Property > Rent Roll,,unit,currency,,conditional,conditional,False,tbl_multifamily_unit,section8_contract_rent
+section8_unit_count,section8_unit_count,False,section8_unit_count,,,Property > MF Property Details,,property,integer,units,conditional,conditional,False,tbl_multifamily_property,section8_unit_count
+security_deposit,security_deposit,False,security_deposit,,,Property > Rent Roll,,lease,currency,,conditional,conditional,False,tbl_multifamily_lease,security_deposit
+security_service,security_service,False,security_service,,,Operations > Operating Expenses,Security Service,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+selected_cap_rate,selected_cap_rate,False,selected_cap_rate,,,Valuation > Income Approach,,income_approach,percent,,conditional,conditional,False,tbl_income_approach,selected_cap_rate
+site_improvements_cost,site_improvements_cost,False,site_improvements_cost,,,Valuation > Cost Approach,,cost_approach,currency,,conditional,conditional,False,tbl_cost_approach,site_improvements_cost
+site_improvements_description,site_improvements_description,False,site_improvements_description,,,Valuation > Cost Approach,,cost_approach,string,,conditional,conditional,False,tbl_cost_approach,site_improvements_description
+snow_removal,snow_removal,False,snow_removal,,,Operations > Operating Expenses,Snow Removal,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+solar_capacity_kw,solar_capacity_kw,False,solar_capacity_kw,,,Property > MF Property Details,,property,decimal,,conditional,conditional,False,tbl_multifamily_property,solar_capacity_kw
+sort_order,sort_order,False,sort_order,,,Operations > Operating Expenses,,opex_category,integer,,conditional,conditional,False,core_unit_cost_category,sort_order
+sqft,sqft,False,sqft,,,Property > Rent Roll,SF,,string,,conditional,conditional,False,,
+square_feet,square_feet,False,avg_square_feet,,,Property > Rent Roll,,unit,currency,,conditional,conditional,False,tbl_multifamily_unit,square_feet
+stabilization_date,stabilization_date,False,stabilization_date,,,Property > MF Property Details,,property,date,,conditional,conditional,False,tbl_multifamily_property,stabilization_date
+stabilized_occupancy_pct,stabilized_occupancy_pct,False,stabilized_occupancy_pct,,,Property > MF Property Details,,property,percent,,conditional,conditional,False,tbl_multifamily_property,stabilized_occupancy_pct
+start_date,start_date,False,start_date,,,Project > Profile,,project,date,,conditional,conditional,False,tbl_project,start_date
+start_period,start_period,False,start_period,,,Operations > Operating Expenses,,operating_expense,integer,,conditional,conditional,False,tbl_operating_expenses,start_period
+state_abbreviation,state_abbreviation,False,state_abbreviation,,,Project > Profile,,msa,string,,conditional,conditional,False,tbl_msa,state_abbreviation
+status,status,False,status,,,Property > Rent Roll,Status,lease,string,,conditional,conditional,False,tbl_multifamily_lease,lease_status
+stories,stories,False,stories,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,stories
+street_address,street_address,False,project_address,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,street_address
+submarket,submarket,False,submarket,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,submarket
+submarket_effective_rent,submarket_effective_rent,False,submarket_effective_rent,,,,,project,string,,conditional,conditional,False,tbl_project,submarket_effective_rent
+submarket_vacancy_pct,submarket_vacancy_pct,False,submarket_vacancy_pct,,,,,project,string,,conditional,conditional,False,tbl_project,submarket_vacancy_pct
+suggested_pct,suggested_pct,False,suggested_pct,,,Valuation > AI Suggestions,,ai_adjustment_suggestion,percent,,conditional,conditional,False,tbl_ai_adjustment_suggestions,suggested_pct
+surface_spaces,surface_spaces,False,surface_spaces,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,surface_spaces
+tags,tags,False,tags,,,Operations > Operating Expenses,,opex_category,json,,conditional,conditional,False,core_unit_cost_category,tags
+tandem_spaces,tandem_spaces,False,tandem_spaces,,,Property > MF Property Details,,property,integer,,conditional,conditional,False,tbl_multifamily_property,tandem_spaces
+target_units,target_units,False,target_units,,,Project > Profile,,project,integer,units,conditional,conditional,False,tbl_project,target_units
+tax_jurisdiction,tax_jurisdiction,False,tax_jurisdiction,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,tax_jurisdiction
+taxonomy_customized,taxonomy_customized,False,taxonomy_customized,,,Project > Profile,,project,boolean,,conditional,conditional,False,tbl_project,taxonomy_customized
+template_id,template_id,False,template_id,,,Project > Profile,,project,integer,,conditional,conditional,False,tbl_project,template_id
+tenant_name,tenant_name,False,tenant_name,,,Property > Rent Roll,Tenant,lease,string,,conditional,conditional,False,tbl_multifamily_lease,resident_name
+terminal_cap_rate,terminal_cap_rate,False,terminal_cap_rate,,,Valuation > Income Approach,,income_approach,percent,,conditional,conditional,False,tbl_income_approach,terminal_cap_rate
+total_adjustment_pct,total_adjustment_pct,False,total_adjustment_pct,,,,,,string,,conditional,conditional,True,,
+total_building_sf,total_building_sf,False,total_building_sf,,,Property > MF Property Details,,property,decimal,sf,conditional,conditional,False,tbl_multifamily_property,total_building_sf
+total_depreciation,total_depreciation,False,total_depreciation,,,Valuation > Cost Approach,,cost_approach,decimal,,conditional,conditional,False,tbl_cost_approach,total_depreciation
+total_land_value,total_land_value,False,total_land_value,,,Valuation > Cost Approach,,cost_approach,currency,,conditional,conditional,False,tbl_cost_approach,total_land_value
+total_make_ready_cost,total_make_ready_cost,False,total_make_ready_cost,,,Operations > Turns,,turn,currency,,conditional,conditional,False,tbl_multifamily_turn,total_make_ready_cost
+total_opex,total_opex,False,total_opex,,,,,project,string,,conditional,conditional,False,tbl_project,total_opex
+total_replacement_cost,total_replacement_cost,False,total_replacement_cost,,,Valuation > Cost Approach,,cost_approach,currency,,conditional,conditional,False,tbl_cost_approach,total_replacement_cost
+total_vacant_days,total_vacant_days,False,total_vacant_days,,,Operations > Turns,,turn,integer,,conditional,conditional,False,tbl_multifamily_turn,total_vacant_days
+total_weight,total_weight,False,total_weight,,,,,,string,,conditional,conditional,True,,
+trash_removal,trash_removal,False,trash_removal,,,Operations > Operating Expenses,Trash Removal,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Cap Rate Comps,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Sales Comparables,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Operations > Operating Expenses,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Income Approach,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Property > MF Property Details,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Cost Approach,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Reconciliation,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Property > Rent Roll,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Property > Floor Plan Matrix,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Operations > Turns,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > AI Suggestions,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Project > Profile,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__created_at,created_at,True,turn__created_at,,,Valuation > Adjustments,,turn,datetime,,False,False,False,tbl_multifamily_turn,created_at
+turn__notes,notes,True,turn__notes,,,Valuation > Cap Rate Comps,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Valuation > Sales Comparables,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Operations > Operating Expenses,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Property > Comparable Rentals,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Property > Floor Plan Matrix,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Operations > Turns,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__notes,notes,True,turn__notes,,,Property > Rent Roll,Notes,turn,string,,conditional,conditional,False,tbl_multifamily_turn,notes
+turn__unit_id,unit_id,True,turn__unit_id,,,Property > Rent Roll,,turn,integer,,conditional,conditional,False,tbl_multifamily_turn,unit_id
+turn__unit_id,unit_id,True,turn__unit_id,,,Operations > Turns,,turn,integer,,conditional,conditional,False,tbl_multifamily_turn,unit_id
+turn__updated_at,updated_at,True,turn__updated_at,,,Operations > Operating Expenses,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Valuation > Sales Comparables,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Valuation > Income Approach,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Property > MF Property Details,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Valuation > Cost Approach,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Property > Rent Roll,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Property > Floor Plan Matrix,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Operations > Turns,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Valuation > AI Suggestions,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Project > Profile,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn__updated_at,updated_at,True,turn__updated_at,,,Valuation > Reconciliation,,turn,datetime,,False,False,False,tbl_multifamily_turn,updated_at
+turn_id,turn_id,False,turn_id,,,Operations > Turns,,turn,integer,,conditional,conditional,False,tbl_multifamily_turn,turn_id
+turn_status,turn_status,False,turn_status,,,Operations > Turns,,turn,string,,conditional,conditional,False,tbl_multifamily_turn,turn_status
+turnover_costs,turnover_costs,False,turnover_costs,,,,,project,string,,conditional,conditional,False,tbl_project,turnover_costs
+unit__bathrooms,bathrooms,True,unit__bathrooms,,,Property > Rent Roll,Bath,unit,decimal,baths,conditional,conditional,False,tbl_multifamily_unit,bathrooms
+unit__bathrooms,bathrooms,True,unit__bathrooms,,,Property > Floor Plan Matrix,Bath,unit,decimal,baths,conditional,conditional,False,tbl_multifamily_unit,bathrooms
+unit__bathrooms,bathrooms,True,unit__bathrooms,,,Property > Comparable Rentals,Bath,unit,decimal,baths,conditional,conditional,False,tbl_multifamily_unit,bathrooms
+unit__bedrooms,bedrooms,True,unit__bedrooms,,,Property > Rent Roll,Bed,unit,decimal,beds,conditional,conditional,False,tbl_multifamily_unit,bedrooms
+unit__bedrooms,bedrooms,True,unit__bedrooms,,,Property > Floor Plan Matrix,Bed,unit,decimal,beds,conditional,conditional,False,tbl_multifamily_unit,bedrooms
+unit__bedrooms,bedrooms,True,unit__bedrooms,,,Property > Comparable Rentals,Bed,unit,decimal,beds,conditional,conditional,False,tbl_multifamily_unit,bedrooms
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Cap Rate Comps,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Sales Comparables,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Operations > Operating Expenses,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Income Approach,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Property > MF Property Details,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Cost Approach,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Reconciliation,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Property > Rent Roll,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Property > Floor Plan Matrix,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Operations > Turns,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > AI Suggestions,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Project > Profile,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__created_at,created_at,True,unit__created_at,,,Valuation > Adjustments,,unit,datetime,,False,False,False,tbl_multifamily_unit,created_at
+unit__current_rent,current_rent,True,unit__current_rent,,,Property > Rent Roll,Current Rent,unit,currency,,conditional,conditional,False,tbl_multifamily_unit,current_rent
+unit__lease_end_date,lease_end_date,True,unit__lease_end_date,,,Property > Rent Roll,,unit,date,,conditional,conditional,False,tbl_multifamily_unit,lease_end_date
+unit__lease_start_date,lease_start_date,True,unit__lease_start_date,,,Property > Rent Roll,,unit,date,,conditional,conditional,False,tbl_multifamily_unit,lease_start_date
+unit__notes,notes,True,unit__notes,,,Valuation > Cap Rate Comps,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Valuation > Sales Comparables,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Operations > Operating Expenses,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Property > Comparable Rentals,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Property > Floor Plan Matrix,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Operations > Turns,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__notes,notes,True,unit__notes,,,Property > Rent Roll,Notes,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__other_features,other_features,True,unit__other_features,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__other_features,other_features,True,unit__other_features,,,Property > Floor Plan Matrix,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,other_features
+unit__project_id,project_id,True,unit__project_id,,,Valuation > Sales Comparables,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Operations > Operating Expenses,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Valuation > Income Approach,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Valuation > Cost Approach,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Property > MF Property Details,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Property > Rent Roll,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Property > Floor Plan Matrix,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Project > Profile,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__project_id,project_id,True,unit__project_id,,,Valuation > Reconciliation,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,project_id
+unit__unit_id,unit_id,True,unit__unit_id,,,Property > Rent Roll,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,unit_id
+unit__unit_id,unit_id,True,unit__unit_id,,,Operations > Turns,,unit,integer,,conditional,conditional,False,tbl_multifamily_unit,unit_id
+unit__updated_at,updated_at,True,unit__updated_at,,,Operations > Operating Expenses,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Valuation > Sales Comparables,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Valuation > Income Approach,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Property > MF Property Details,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Valuation > Cost Approach,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Property > Rent Roll,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Property > Floor Plan Matrix,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Operations > Turns,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Valuation > AI Suggestions,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Project > Profile,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit__updated_at,updated_at,True,unit__updated_at,,,Valuation > Reconciliation,,unit,datetime,,False,False,False,tbl_multifamily_unit,updated_at
+unit_mix,unit_mix,False,unit_mix,,,Valuation > Sales Comparables,,sales_comparable,json,,conditional,conditional,False,tbl_sales_comparables,unit_mix
+unit_number,unit_number,False,unit_number,,,Property > Rent Roll,Unit,unit,string,,conditional,conditional,False,tbl_multifamily_unit,unit_number
+unit_turnover,unit_turnover,False,unit_turnover,,,Operations > Operating Expenses,Unit Turnover,operating_expense,decimal,,False,True,False,tbl_operating_expenses,annual_amount
+unit_type,unit_type,False,unit_type_code,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,unit_type
+unit_type,unit_type,False,unit_type_code,,,Property > Comparable Rentals,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,unit_type
+unit_type__bathrooms,bathrooms,True,unit_type__bathrooms,,,Property > Rent Roll,Bath,unit_type,decimal,baths,conditional,conditional,False,tbl_multifamily_unit_type,bathrooms
+unit_type__bathrooms,bathrooms,True,unit_type__bathrooms,,,Property > Floor Plan Matrix,Bath,unit_type,decimal,baths,conditional,conditional,False,tbl_multifamily_unit_type,bathrooms
+unit_type__bathrooms,bathrooms,True,unit_type__bathrooms,,,Property > Comparable Rentals,Bath,unit_type,decimal,baths,conditional,conditional,False,tbl_multifamily_unit_type,bathrooms
+unit_type__bedrooms,bedrooms,True,unit_type__bedrooms,,,Property > Rent Roll,Bed,unit_type,decimal,beds,conditional,conditional,False,tbl_multifamily_unit_type,bedrooms
+unit_type__bedrooms,bedrooms,True,unit_type__bedrooms,,,Property > Floor Plan Matrix,Bed,unit_type,decimal,beds,conditional,conditional,False,tbl_multifamily_unit_type,bedrooms
+unit_type__bedrooms,bedrooms,True,unit_type__bedrooms,,,Property > Comparable Rentals,Bed,unit_type,decimal,beds,conditional,conditional,False,tbl_multifamily_unit_type,bedrooms
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Cap Rate Comps,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Sales Comparables,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Operations > Operating Expenses,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Income Approach,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Property > MF Property Details,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Cost Approach,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Reconciliation,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Property > Rent Roll,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Property > Floor Plan Matrix,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Operations > Turns,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > AI Suggestions,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Project > Profile,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__created_at,created_at,True,unit_type__created_at,,,Valuation > Adjustments,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,created_at
+unit_type__notes,notes,True,unit_type__notes,,,Valuation > Cap Rate Comps,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Valuation > Sales Comparables,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Operations > Operating Expenses,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Property > Comparable Rentals,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Property > Floor Plan Matrix,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Operations > Turns,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__notes,notes,True,unit_type__notes,,,Property > Rent Roll,Notes,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,notes
+unit_type__other_features,other_features,True,unit_type__other_features,,,Property > Rent Roll,,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,other_features
+unit_type__other_features,other_features,True,unit_type__other_features,,,Property > Floor Plan Matrix,,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,other_features
+unit_type__project_id,project_id,True,unit_type__project_id,,,Valuation > Sales Comparables,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Operations > Operating Expenses,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Valuation > Income Approach,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Valuation > Cost Approach,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Property > MF Property Details,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Property > Rent Roll,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Property > Floor Plan Matrix,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Project > Profile,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__project_id,project_id,True,unit_type__project_id,,,Valuation > Reconciliation,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,project_id
+unit_type__total_units,total_units,True,unit_type__unit_count,,Context-dependent: unit-type level total; treat as row-level count.,Property > MF Property Details,,unit_type,integer,units,conditional,conditional,False,tbl_multifamily_unit_type,total_units
+unit_type__total_units,total_units,True,unit_type__unit_count,,Context-dependent: unit-type level total; treat as row-level count.,Property > Floor Plan Matrix,,unit_type,integer,units,conditional,conditional,False,tbl_multifamily_unit_type,total_units
+unit_type__total_units,total_units,True,unit_type__unit_count,,Context-dependent: unit-type level total; treat as row-level count.,Property > Comparable Rentals,,unit_type,integer,units,conditional,conditional,False,tbl_multifamily_unit_type,total_units
+unit_type__total_units,total_units,True,unit_type__unit_count,,Context-dependent: unit-type level total; treat as row-level count.,Project > Profile,,unit_type,integer,units,conditional,conditional,False,tbl_multifamily_unit_type,total_units
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Operations > Operating Expenses,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Valuation > Sales Comparables,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Valuation > Income Approach,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Property > MF Property Details,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Valuation > Cost Approach,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Property > Rent Roll,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Property > Floor Plan Matrix,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Operations > Turns,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Valuation > AI Suggestions,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Project > Profile,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type__updated_at,updated_at,True,unit_type__updated_at,,,Valuation > Reconciliation,,unit_type,datetime,,False,False,False,tbl_multifamily_unit_type,updated_at
+unit_type_code,unit_type_code,False,unit_type_code,,,Property > Floor Plan Matrix,,unit_type,string,,conditional,conditional,False,tbl_multifamily_unit_type,unit_type_code
+unit_type_id,unit_type_id,False,unit_type_id,,,Property > Floor Plan Matrix,,unit_type,integer,,conditional,conditional,False,tbl_multifamily_unit_type,unit_type_id
+units,units,False,units,,,Valuation > Sales Comparables,,sales_comparable,integer,units,conditional,conditional,False,tbl_sales_comparables,units
+user_adjustment_pct,user_adjustment_pct,False,user_adjustment_pct,,,Valuation > Adjustments,,sales_comp_adjustment,percent,,conditional,conditional,False,tbl_sales_comp_adjustments,user_adjustment_pct
+user_notes,user_notes,False,user_notes,,,Valuation > Adjustments,,sales_comp_adjustment,string,,conditional,conditional,False,tbl_sales_comp_adjustments,user_notes
+uses_global_taxonomy,uses_global_taxonomy,False,uses_global_taxonomy,,,Project > Profile,,project,boolean,,conditional,conditional,False,tbl_project,uses_global_taxonomy
+utilities_combined,utilities_combined,False,utilities_combined,,,Operations > Operating Expenses,Utilities,operating_expense,decimal,,True,True,False,tbl_operating_expenses,annual_amount
+utilities_electric,utilities_electric,False,utilities_electric,,,,,project,string,,conditional,conditional,False,tbl_project,utilities_electric
+utilities_gas,utilities_gas,False,utilities_gas,,,,,project,string,,conditional,conditional,False,tbl_project,utilities_gas
+utilities_total,utilities_total,False,utilities_total,,,,,project,string,,conditional,conditional,False,tbl_project,utilities_total
+utilities_trash,utilities_trash,False,utilities_trash,,,,,project,string,,conditional,conditional,False,tbl_project,utilities_trash
+utilities_water_sewer,utilities_water_sewer,False,utilities_water_sewer,,,,,project,string,,conditional,conditional,False,tbl_project,utilities_water_sewer
+utility_recovery_method,utility_recovery_method,False,utility_recovery_method,,,Property > MF Property Details,,property,string,,conditional,conditional,False,tbl_multifamily_property,utility_recovery_method
+utility_reimbursement,utility_reimbursement,False,utility_reimbursement,,,,,project,string,,conditional,conditional,False,tbl_project,utility_reimbursement
+valuation_date,valuation_date,False,valuation_date,,,Valuation > Reconciliation,,valuation_reconciliation,date,,conditional,conditional,False,tbl_valuation_reconciliation,valuation_date
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Cap Rate Comps,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Sales Comparables,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Operations > Operating Expenses,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Income Approach,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Property > MF Property Details,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Cost Approach,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Reconciliation,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Property > Rent Roll,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Property > Floor Plan Matrix,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Operations > Turns,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > AI Suggestions,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Project > Profile,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__created_at,created_at,True,valuation_reconciliation__created_at,,,Valuation > Adjustments,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,created_at
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Valuation > Sales Comparables,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Operations > Operating Expenses,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Valuation > Income Approach,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Valuation > Cost Approach,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Property > MF Property Details,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Property > Rent Roll,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Property > Floor Plan Matrix,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Project > Profile,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__project_id,project_id,True,valuation_reconciliation__project_id,,,Valuation > Reconciliation,,valuation_reconciliation,integer,,conditional,conditional,False,tbl_valuation_reconciliation,project_id
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Operations > Operating Expenses,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Valuation > Sales Comparables,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Valuation > Income Approach,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Property > MF Property Details,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Valuation > Cost Approach,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Property > Rent Roll,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Property > Floor Plan Matrix,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Operations > Turns,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Valuation > AI Suggestions,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Project > Profile,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+valuation_reconciliation__updated_at,updated_at,True,valuation_reconciliation__updated_at,,,Valuation > Reconciliation,,valuation_reconciliation,datetime,,False,False,False,tbl_valuation_reconciliation,updated_at
+velocity_override_reason,velocity_override_reason,False,velocity_override_reason,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,velocity_override_reason
+version_reference,version_reference,False,version_reference,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,version_reference
+view_type,view_type,False,view_type,,,Property > Rent Roll,,unit,string,,conditional,conditional,False,tbl_multifamily_unit,view_type
+water_metered_individually,water_metered_individually,False,water_metered_individually,,,Property > MF Property Details,,property,boolean,,conditional,conditional,False,tbl_multifamily_property,water_metered_individually
+water_sewer,water_sewer,False,water_sewer,,,Operations > Operating Expenses,Water & Sewer,operating_expense,decimal,,True,True,False,tbl_operating_expenses,annual_amount
+zip,zip,False,zip,,,Valuation > Sales Comparables,,sales_comparable,string,,conditional,conditional,False,tbl_sales_comparables,zip
+zip_code,zip_code,False,zip_code,,,Project > Profile,,project,string,,conditional,conditional,False,tbl_project,zip_code

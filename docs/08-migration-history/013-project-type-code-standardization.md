@@ -342,7 +342,7 @@ All 10 projects now have consistent `project_type_code` aligned with their `anal
 - ✅ Land Development projects: `project_type_code = 'LAND'`
 - ✅ Income Property projects: `project_type_code IN ('OFF', 'MF', 'RET', 'IND', 'HTL', 'MXU')`
 
-**Documentation:** [docs/session-notes/2025-11-05-project-type-data-consistency-fix.md](../session-notes/2025-11-05-project-type-data-consistency-fix.md)
+**Documentation:** [docs/09_session_notes/2025-11-05-project-type-data-consistency-fix.md](../09_session_notes/2025-11-05-project-type-data-consistency-fix.md)
 
 ---
 

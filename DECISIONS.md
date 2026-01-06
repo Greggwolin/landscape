@@ -93,7 +93,7 @@ const projects = await sql`SELECT * FROM tbl_project WHERE is_active = true`;
 
 **Date:** November 2025 (multiple session notes)
 **Status:** FINAL
-**Source:** `CLAUDE.md`, `docs/11-implementation-status/CONTAINER_INTEGRATION_COMPLETE_25-11-13.md`
+**Source:** `CLAUDE.md`, `docs/00_overview/status/CONTAINER_INTEGRATION_COMPLETE_25-11-13.md`
 
 **Decision:**
 Use `tbl_container` with flexible tree structure instead of rigid property-type hierarchies.
@@ -162,7 +162,7 @@ Every Django connection sets `search_path = landscape, public` on connection.
 
 **Date:** November 20, 2025 (Phase 6), December 19-21, 2025 (Phase 3 wiring)
 **Status:** UNDER REVIEW (Partial Claude integration exists)
-**Source:** `docs/session-notes/PHASE_6_LANDSCAPER_CHAT_IMPLEMENTATION_COMPLETE.md`
+**Source:** `docs/09_session_notes/PHASE_6_LANDSCAPER_CHAT_IMPLEMENTATION_COMPLETE.md`
 
 **Decision:**
 Landscaper chat originally implemented with stubbed AI responses. Real Claude API integration is planned for Phase 7+.

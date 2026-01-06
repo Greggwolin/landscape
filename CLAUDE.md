@@ -458,7 +458,7 @@ In-repo documentation (check `docs/` folder):
 - `docs/02-features/` - Feature documentation
 - `docs/03-api-reference/` - API documentation
 - `docs/05-database/` - Database schema
-- `docs/11-implementation-status/` - Current status
+- `docs/00_overview/status/` - Current status
 
 Key standalone files:
 

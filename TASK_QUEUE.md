@@ -1,5 +1,8 @@
 # TASK_QUEUE.md
 
+> DEPRECATED (2025-12-23): Consolidated into `docs/00_overview/IMPLEMENTATION_STATUS.md`.
+> Retained for historical context; do not update here.
+
 **Purpose:** Ordered backlog of work with entry conditions and dependencies.
 **Last Updated:** 2025-12-23
 **Branch:** `work`
@@ -142,7 +145,7 @@ Build ignores TypeScript errors. Unknown types, Activity mismatches.
 ### FEAT-001: Claude API Full Integration for Landscaper
 
 **Status:** IN PROGRESS (partial)
-**Source:** `docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md` line 139
+**Source:** `docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md` line 139
 
 **Current State:**
 - Claude API calls exist in `ai_handler.py`
@@ -178,7 +181,7 @@ Build ignores TypeScript errors. Unknown types, Activity mismatches.
 ### FEAT-003: Rent Roll Bulk Validation and Writing
 
 **Status:** PLANNED
-**Source:** `docs/session-notes/2025-12-18-chunked-rent-roll-extraction.md` lines 145-149
+**Source:** `docs/09_session_notes/2025-12-18-chunked-rent-roll-extraction.md` lines 145-149
 
 **Current State:**
 - Chunked extraction works (96 units extracted from Chadron)

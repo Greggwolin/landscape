@@ -23,8 +23,16 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Documentation Reorganization (Jan 6, 2026)',
+      path: '/docs/09_session_notes/2026-01-06-documentation-refresh.md',
+      category: 'Status',
+      description: 'Major docs restructure - consolidated status docs to 00_overview/, session notes to 09_session_notes/, removed obsolete directories',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-01-06'
+    },
+    {
       title: 'Git Consolidation, Bug Fixes & Approval Workflow (Dec 23)',
-      path: '/docs/session-notes/2025-12-23-git-consolidation-bug-fixes.md',
+      path: '/docs/09_session_notes/2025-12-23-git-consolidation-bug-fixes.md',
       category: 'Status',
       description: 'Feature branch merge (25 commits, 299 files), BUG-001 fix, Extraction History Approval Workflow with confidence-based approve/apply actions',
       icon: <Code className="w-5 h-5" />,
@@ -32,7 +40,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Implementation Status (Dec 23)',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-23.md',
+      path: '/docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-23.md',
       category: 'Status',
       description: 'Current implementation status - Extraction Approval Workflow complete, BUG-001 fixed, Knowledge Extraction Platform operational',
       icon: <FileText className="w-5 h-5" />,
@@ -40,7 +48,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Implementation Status (Dec 21)',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-21.md',
+      path: '/docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md',
       category: 'Status',
       description: 'Knowledge Extraction Platform, Developer Operations, Project Onboarding, Market Intelligence',
       icon: <FileText className="w-5 h-5" />,
@@ -56,7 +64,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Landscaper Phase 3 - Real Data & AI Wiring',
-      path: '/docs/session-notes/2025-12-19-landscaper-phase3-wiring.md',
+      path: '/docs/09_session_notes/2025-12-19-landscaper-phase3-wiring.md',
       category: 'AI',
       description: 'Chat API connection to Django, activity feed infrastructure, field highlighting, context-aware system prompts by property type',
       icon: <Code className="w-5 h-5" />,
@@ -64,7 +72,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Session XK-83: Project Cleanup & Type Rename',
-      path: '/docs/session-notes/2025-12-11-session-xk83-cleanup.md',
+      path: '/docs/09_session_notes/2025-12-11-session-xk83-cleanup.md',
       category: 'Status',
       description: 'Deleted 4 test projects, renamed LAND→DEV project type code across database and frontend (9 files)',
       icon: <Database className="w-5 h-5" />,
@@ -80,7 +88,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Implementation Status',
-      path: '/docs/11-implementation-status/IMPLEMENTATION_STATUS_25-12-03.md',
+      path: '/docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-03.md',
       category: 'Status',
       description: 'Current implementation status - Updated with Zonda, HBACA ingestion tools + repo cleanup (Dec 3)',
       icon: <FileText className="w-5 h-5" />,
@@ -88,7 +96,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Waterfall Napkin Form Redesign',
-      path: '/docs/session-notes/2025-12-05-waterfall-napkin-form-redesign.md',
+      path: '/docs/09_session_notes/2025-12-05-waterfall-napkin-form-redesign.md',
       category: 'Component',
       description: 'NapkinWaterfallForm redesign with IRR/EM toggle, $800K Excel variance fix (now <$200), hurdle display by mode, cumulative accrued tracking',
       icon: <DollarSign className="w-5 h-5" />,
@@ -104,7 +112,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Market Data Ingestion Tools (HBACA + Zonda)',
-      path: '/docs/session-notes/2025-12-03-market-data-ingestion-tools.md',
+      path: '/docs/09_session_notes/2025-12-03-market-data-ingestion-tools.md',
       category: 'Technical',
       description: 'HBACA permit activity (9,392 records) and Zonda subdivision inventory (704 records) ingestion pipelines - Python CLIs with deduplication',
       icon: <Database className="w-5 h-5" />,
@@ -112,7 +120,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Redfin Python Ingestion Tool',
-      path: '/docs/session-notes/2025-12-02-redfin-ingestion-tool.md',
+      path: '/docs/09_session_notes/2025-12-02-redfin-ingestion-tool.md',
       category: 'Technical',
       description: 'Python-based Redfin ingestion for unified data pipeline - Fetches sold comps, normalizes to UnifiedResaleClosing, persists to Neon',
       icon: <Database className="w-5 h-5" />,
@@ -128,7 +136,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Redfin Comps Integration',
-      path: '/docs/session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
+      path: '/docs/09_session_notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
       category: 'Component',
       description: 'Housing price comparables using Redfin API - Map visualization with price-tier markers, layer controls, and statistics',
       icon: <Map className="w-5 h-5" />,
@@ -136,7 +144,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'User Management System',
-      path: '/docs/session-notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
+      path: '/docs/09_session_notes/SESSION_NOTES_2025_11_30_REDFIN_COMPS_INTEGRATION.md',
       category: 'Component',
       description: 'Full CRUD user management in System Administration - Add/Edit/Delete users, password reset, active/inactive toggle',
       icon: <Code className="w-5 h-5" />,
@@ -152,7 +160,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Finance Structure Migration Complete',
-      path: '/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md',
+      path: '/docs/00_overview/status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md',
       category: 'Status',
       description: 'Finance Structure system migration to Django backend - Complete with auto-allocations, cost-to-complete, sale settlements, and participation tracking',
       icon: <DollarSign className="w-5 h-5" />,
@@ -160,7 +168,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Django Backend Implementation',
-      path: '/docs/DJANGO_BACKEND_IMPLEMENTATION.md',
+      path: '/docs/03-api-reference/DJANGO_BACKEND_IMPLEMENTATION.md',
       category: 'Status',
       description: 'Django backend Phase 1 complete - Admin panel with smart dropdowns, JWT auth, and Python engine integration',
       icon: <Code className="w-5 h-5" />,
@@ -168,11 +176,11 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Documentation Update System',
-      path: '/docs/DOCUMENTATION_UPDATE_WORKFLOW.md',
+      path: '/docs/process/DOCUMENTATION_UPDATE_WORKFLOW.md',
       category: 'Technical',
       description: 'Automated documentation update workflow - Slash command system with /update-docs for comprehensive doc management',
       icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-01-22'
+      lastModified: '2026-01-06'
     },
     {
       title: 'Claude Commands Guide',
@@ -184,7 +192,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Financial Engine Status',
-      path: '/docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md',
+      path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
       description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement)',
       icon: <DollarSign className="w-5 h-5" />,
@@ -192,7 +200,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'CRE Implementation Summary',
-      path: '/docs/CRE_IMPLEMENTATION_SUMMARY.md',
+      path: '/docs/02-features/cre/CRE_IMPLEMENTATION_SUMMARY.md',
       category: 'Status',
       description: 'Commercial real estate calculation engine implementation summary',
       icon: <FileText className="w-5 h-5" />,
@@ -200,7 +208,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Assumptions UI Final Status',
-      path: '/docs/ASSUMPTIONS_UI_FINAL_STATUS.md',
+      path: '/docs/09_session_notes/archive/ASSUMPTIONS_UI_FINAL_STATUS.md',
       category: 'Status',
       description: 'Final status of assumptions UI implementation',
       icon: <FileText className="w-5 h-5" />,
@@ -208,7 +216,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Scottsdale Promenade Data Summary',
-      path: '/docs/SCOTTSDALE_DATA_SUMMARY.md',
+      path: '/docs/09_session_notes/examples/SCOTTSDALE_DATA_SUMMARY.md',
       category: 'Status',
       description: 'Complete property data: 41 spaces, 39 tenants, 5 sample leases. Full rent roll with NNN, Modified Gross, and percentage rent structures. Ready for analysis.',
       icon: <DollarSign className="w-5 h-5" />,
@@ -216,7 +224,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'App Development Status (Archive)',
-      path: '/docs/archive/App-Development-Status.md',
+      path: '/docs/09_session_notes/archive/App-Development-Status.md',
       category: 'Status',
       description: 'Complete reference document with database tables, API routes, and architecture (archived)',
       icon: <FileText className="w-5 h-5" />,
@@ -226,11 +234,11 @@ const DocumentationIndex: React.FC = () => {
     // Architecture & System Design
     {
       title: 'System Architecture',
-      path: '/docs/09-technical-dd/02-architecture/system-architecture.md',
+      path: '/ARCHITECTURE.md',
       category: 'Architecture',
       description: 'Complete system architecture documentation - Updated with Migration 013 (Project Type Code Standardization)',
       icon: <Book className="w-5 h-5" />,
-      lastModified: '2025-11-02'
+      lastModified: '2026-01-06'
     },
     {
       title: 'Database Schema Design',
@@ -326,7 +334,7 @@ const DocumentationIndex: React.FC = () => {
     // Component Documentation
     {
       title: 'Property Analysis UI Implementation',
-      path: '/docs/PROPERTY_ANALYSIS_UI_IMPLEMENTATION.md',
+      path: '/docs/02-features/cre/PROPERTY_ANALYSIS_UI_IMPLEMENTATION.md',
       category: 'Component',
       description: 'Property analysis and CRE calculation UI implementation',
       icon: <Code className="w-5 h-5" />,
@@ -334,7 +342,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Assumptions UI Implementation',
-      path: '/docs/ASSUMPTIONS_UI_IMPLEMENTATION_SUMMARY.md',
+      path: '/docs/09_session_notes/archive/ASSUMPTIONS_UI_IMPLEMENTATION_SUMMARY.md',
       category: 'Component',
       description: 'Progressive disclosure assumptions UI implementation summary',
       icon: <Code className="w-5 h-5" />,
@@ -350,7 +358,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Parcel Cleanup Documentation',
-      path: '/docs/archive/parcel-cleanup-documentation.md',
+      path: '/docs/09_session_notes/archive/parcel-cleanup-documentation.md',
       category: 'Component',
       description: 'Parcel data cleanup and migration procedures',
       icon: <Code className="w-5 h-5" />,
@@ -358,7 +366,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Component Migration Plan',
-      path: '/docs/archive/COMPONENT_MIGRATION_PLAN.md',
+      path: '/docs/09_session_notes/archive/COMPONENT_MIGRATION_PLAN.md',
       category: 'Component',
       description: 'Strategy for component architecture migration',
       icon: <Code className="w-5 h-5" />,
@@ -366,7 +374,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Cleanup Completed',
-      path: '/docs/archive/CLEANUP_COMPLETED.md',
+      path: '/docs/09_session_notes/archive/CLEANUP_COMPLETED.md',
       category: 'Component',
       description: 'Record of completed cleanup tasks',
       icon: <FileText className="w-5 h-5" />,
@@ -374,6 +382,14 @@ const DocumentationIndex: React.FC = () => {
     },
 
     // Technical Implementation
+    {
+      title: 'CRE Calculation Engine',
+      path: '/docs/02-features/cre/CRE_CALCULATION_ENGINE_DOCUMENTATION.md',
+      category: 'Technical',
+      description: 'Commercial real estate calculation engine technical documentation',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2025-10-16'
+    },
     {
       title: 'Finance Structure API Testing Guide',
       path: '/backend/TESTING_GUIDE.md',
@@ -463,14 +479,6 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2025-10-07'
     },
     {
-      title: 'CRE Calculation Engine',
-      path: '/docs/CRE_CALCULATION_ENGINE_DOCUMENTATION.md',
-      category: 'Technical',
-      description: 'Commercial real estate calculation engine technical documentation',
-      icon: <Code className="w-5 h-5" />,
-      lastModified: '2025-10-16'
-    },
-    {
       title: 'Developer Guide',
       path: '/docs/00-getting-started/DEVELOPER_GUIDE.md',
       category: 'Technical',
@@ -498,7 +506,7 @@ const DocumentationIndex: React.FC = () => {
     },
     {
       title: 'Assumptions UI Test Checklist',
-      path: '/docs/ASSUMPTIONS_UI_TEST_CHECKLIST.md',
+      path: '/docs/09_session_notes/archive/ASSUMPTIONS_UI_TEST_CHECKLIST.md',
       category: 'AI',
       description: 'Comprehensive testing checklist for assumptions UI',
       icon: <FileText className="w-5 h-5" />,

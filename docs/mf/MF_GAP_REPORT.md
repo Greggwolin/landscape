@@ -1,0 +1,326 @@
+# MF Gap Report
+
+## Discovery Sources
+- DB schema: `neonDB_2025-11-14.json`
+- Backend models: `backend/apps/multifamily/models.py`, `backend/apps/financial/models_valuation.py`
+- Backend serializers: `backend/apps/multifamily/serializers.py`, `backend/apps/financial/serializers_valuation.py`
+- API routes: `src/app/api/projects/[projectId]/profile/route.ts`, `src/app/api/projects/[projectId]/opex/route.ts`, `src/app/api/projects/[projectId]/operations/route.ts`, `src/app/api/projects/[projectId]/rental-comparables/route.ts`
+- Frontend UI: `src/app/rent-roll/components/RentRollGrid.tsx`, `src/app/rent-roll/components/FloorplansGrid.tsx`, `src/app/projects/[projectId]/components/tabs/PropertyTab.tsx`, `src/app/projects/[projectId]/opex/page.tsx`
+- AI ingestion mappings: `backend/apps/landscaper/management/commands/seed_extraction_mappings.py`
+
+## Fields Referenced in Frontend/Backend With No DB Mapping
+- `actions` (derived=False)
+- `adjusted_price_per_unit` (derived=True)
+- `adjustment_type_display` (derived=True)
+- `ai_estimate` (derived=True)
+- `amenities` (derived=False)
+- `as_of_date` (derived=False)
+- `asking_rent` (derived=False)
+- `avg_sqft` (derived=False)
+- `calculated_units` (derived=False)
+- `concessions` (derived=False)
+- `cost_method_display` (derived=True)
+- `current_lease` (derived=True)
+- `data_source` (derived=False)
+- `distance_miles` (derived=False)
+- `effective_rent` (derived=False)
+- `floor_plan` (derived=True)
+- `gross_acres` (derived=False)
+- `land_valuation_method_display` (derived=True)
+- `market_cap_rate_method_display` (derived=True)
+- `monthly_income` (derived=True)
+- `proforma_rent` (derived=True)
+- `proforma_rent_per_sf` (derived=True)
+- `project_number` (derived=False)
+- `project_status` (derived=False)
+- `rent_per_sf` (derived=True)
+- `sqft` (derived=False)
+- `total_adjustment_pct` (derived=True)
+- `total_weight` (derived=True)
+
+## DB Columns in MF Tables Not Referenced by Code
+- `account_id`
+- `acres_gross`
+- `ai_last_reviewed`
+- `amount_per_sf`
+- `annual_amount`
+- `apn_primary`
+- `apn_secondary`
+- `asking_price`
+- `avg_rent_per_unit`
+- `building_count`
+- `building_sf_gross`
+- `building_sf_net`
+- `calculation_frequency`
+- `cap_rate_current`
+- `cap_rate_going_in`
+- `cap_rate_proforma`
+- `category_id`
+- `category_name`
+- `collection_loss_pct`
+- `concessions_pct`
+- `contract_services`
+- `cost_of_capital_pct`
+- `country`
+- `current_egi`
+- `current_gpi`
+- `current_gpr`
+- `current_noi`
+- `current_opex`
+- `current_other_income`
+- `current_vacancy_rate`
+- `current_zoning`
+- `description`
+- `developer_owner`
+- `discount_rate_pct`
+- `display_order`
+- `dscr`
+- `effective_gross_income`
+- `escalation_rate`
+- `escalation_type`
+- `existing_land_use`
+- `exit_cap_rate`
+- `expense_category`
+- `expense_ratio_pct`
+- `expense_type`
+- `financial_model_type`
+- `general_plan_designation`
+- `gis_metadata`
+- `gross_potential_rent`
+- `gross_rent_multiplier`
+- `gross_sf`
+- `in_place_rent_monthly`
+- `is_recoverable`
+- `job_number`
+- `jurisdiction_city`
+- `jurisdiction_county`
+- `jurisdiction_integrated`
+- `jurisdiction_state`
+- `last_calculated_at`
+- `laundry_income`
+- `legal_owner`
+- `listing_brokerage`
+- `location_description`
+- `location_lat`
+- `location_lon`
+- `lot_size_acres`
+- `lot_size_sf`
+- `management_fee`
+- `management_fee_pct`
+- `market_avg_hh_income`
+- `market_median_home_value`
+- `market_population`
+- `market_rent_monthly`
+- `market_velocity_annual`
+- `marketing`
+- `msa`
+- `msa_code`
+- `noi_current`
+- `noi_proforma`
+- `noi_t12`
+- `occupancy_rate`
+- `opex_id`
+- `opex_per_unit`
+- `other_income_total`
+- `parent_id`
+- `parking_income`
+- `payment_frequency`
+- `payroll`
+- `pet_income`
+- `physical_vacancy_pct`
+- `planning_efficiency`
+- `price_range_high`
+- `price_range_low`
+- `primary_city`
+- `proforma_egi`
+- `proforma_gpi`
+- `proforma_gpr`
+- `proforma_noi`
+- `proforma_opex`
+- `proforma_other_income`
+- `proforma_vacancy_rate`
+- `project_address`
+- `project_type_code`
+- `real_estate_taxes`
+- `recovery_rate`
+- `replacement_reserves`
+- `schema_version`
+- `sort_order`
+- `start_period`
+- `stories`
+- `street_address`
+- `submarket_effective_rent`
+- `submarket_vacancy_pct`
+- `tags`
+- `taxonomy_customized`
+- `template_id`
+- `total_opex`
+- `turnover_costs`
+- `uses_global_taxonomy`
+- `utilities_electric`
+- `utilities_gas`
+- `utilities_total`
+- `utilities_trash`
+- `utilities_water_sewer`
+- `utility_reimbursement`
+- `velocity_override_reason`
+- `version_reference`
+
+## Naming Inconsistencies
+- unit_type vs unit_type_code
+- current_market_rent vs market_rent vs base_rent_monthly
+- total_units vs unit_count
+- avg_square_feet vs square_feet
+- parking_spaces vs parking_spaces_total
+- project_address vs street_address
+- property_tax_rate vs tax_rate_pct
+- unit_type_name vs unit_type_code (ops API uses both)
+
+## UI Read-Only Panels That Should Be Editable
+- `Comparable Rentals` in `src/app/projects/[projectId]/components/tabs/PropertyTab.tsx` is read-only; requirement calls for editable comparables. No POST/PATCH endpoint exists for `tbl_rental_comparable`.
+
+## Disambiguation Summary
+- `adjustment_type` -> ai_adjustment_suggestion, sales_comp_adjustment
+- `administrative` -> operating_expense, project
+- `assessed_value` -> project, property
+- `avg_unit_sf` -> project, property
+- `bathrooms` -> unit, unit_type
+- `bedrooms` -> unit, unit_type
+- `city` -> project, sales_comp
+- `comparable_id` -> ai_adjustment_suggestion, sales_comp, sales_comp_adjustment
+- `created_at` -> ai_adjustment_suggestion, cap_rate_comp, cost_approach, income_approach, lease, msa, operating_expense, opex_category, project, property, sales_comp, sales_comp_adjustment, turn, unit, unit_type, valuation_reconciliation
+- `current_rent` -> lease, unit
+- `income_approach_id` -> cap_rate_comp, income_approach
+- `is_active` -> msa, opex_category, project
+- `justification` -> ai_adjustment_suggestion, sales_comp_adjustment
+- `lease_end_date` -> lease, unit
+- `lease_start_date` -> lease, unit
+- `msa_id` -> msa, project
+- `notes` -> cap_rate_comp, operating_expense, sales_comp, turn, unit, unit_type
+- `other_features` -> unit, unit_type
+- `parking_ratio` -> project, property
+- `parking_spaces_total` -> project, property
+- `price_per_sf` -> project, sales_comp
+- `price_per_unit` -> project, sales_comp
+- `project_id` -> cost_approach, income_approach, operating_expense, project, property, sales_comp, unit, unit_type, valuation_reconciliation
+- `property_class` -> project, property
+- `property_insurance` -> operating_expense, project
+- `property_name` -> property, sales_comp
+- `property_subtype` -> project, property
+- `repairs_maintenance` -> operating_expense, project
+- `sale_date` -> cap_rate_comp, sales_comp
+- `sale_price` -> cap_rate_comp, sales_comp
+- `state` -> project, sales_comp
+- `total_units` -> project, property, unit_type
+- `unit_id` -> lease, turn, unit
+- `updated_at` -> ai_adjustment_suggestion, cost_approach, income_approach, lease, msa, operating_expense, opex_category, project, property, sales_comp, turn, unit, unit_type, valuation_reconciliation
+- `year_built` -> project, property, sales_comp
+- `year_renovated` -> project, property
+
+## Typing Ambiguities
+- Percent basis uncertain:
+  - `adjustment_pct`
+  - `cap_rate`
+  - `cap_rate_proforma`
+  - `discount_rate`
+  - `discount_rate_pct`
+  - `entrepreneurial_incentive_pct`
+  - `escalation_rate`
+  - `implied_cap_rate`
+  - `proforma_vacancy_rate`
+  - `recovery_rate`
+  - `rubs_recovery_pct`
+  - `selected_cap_rate`
+  - `stabilized_occupancy_pct`
+  - `suggested_pct`
+  - `terminal_cap_rate`
+  - `user_adjustment_pct`
+- Currency periodicity uncertain:
+  - `acquisition_price`
+  - `adjustment_amount`
+  - `appliance_cost`
+  - `asking_price`
+  - `avg_square_feet`
+  - `base_replacement_cost`
+  - `cap_rate_comp__sale_price`
+  - `cap_rate_current`
+  - `carpet_flooring_cost`
+  - `cleaning_cost`
+  - `concession_amount`
+  - `cost_approach_value`
+  - `cost_approach_weight`
+  - `cost_of_capital_pct`
+  - `current_egi`
+  - `current_gpi`
+  - `current_gpr`
+  - `current_market_rent`
+  - `current_noi`
+  - `current_opex`
+  - `current_other_income`
+  - `current_vacancy_rate`
+  - `dcf_value`
+  - `deposit`
+  - `direct_cap_value`
+  - `final_reconciled_value`
+  - `flood_insurance`
+  - `income_approach_value`
+  - `income_approach_weight`
+  - `indicated_value`
+  - `insurance`
+  - `lease__current_rent`
+  - `leasing_commissions`
+  - `liability_insurance`
+  - `management_fee_offsite`
+  - `market_rent`
+  - `months_free_rent`
+  - `operating_expense__property_insurance`
+  - `other_cost`
+  - `painting_cost`
+  - `price_range_high`
+  - `price_range_low`
+  - `professional_fees`
+  - `proforma_other_income`
+  - `project__assessed_value`
+  - `project__property_insurance`
+  - `property__assessed_value`
+  - `property_tax_rate`
+  - `property_taxes`
+  - `renovation_cost`
+  - `rentable_units`
+  - `reserves_capex`
+  - `sales_comp__sale_price`
+  - `sales_comparison_value`
+  - `section8_contract_rent`
+  - `security_deposit`
+  - `site_improvements_cost`
+  - `square_feet`
+  - `total_land_value`
+  - `total_make_ready_cost`
+  - `total_replacement_cost`
+  - `unit__current_rent`
+- Rate dimensionality uncertain:
+  - `cap_rate`
+  - `cap_rate_proforma`
+  - `discount_rate`
+  - `discount_rate_pct`
+  - `escalation_rate`
+  - `implied_cap_rate`
+  - `proforma_vacancy_rate`
+  - `recovery_rate`
+  - `selected_cap_rate`
+  - `terminal_cap_rate`
+
+## Canonicalization Notes
+
+- Canonical notes:
+  - `property__parking_spaces_total`: MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.
+  - `property__total_units`: MF source of truth lives on tbl_multifamily_property; project-level total is a legacy rollup.
+
+- Alias notes:
+  - `num_parking_spaces`: Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.
+  - `parking_count`: Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.
+  - `parking_spaces`: Ambiguous scope. Treat as TOTAL spaces at canonical entity scope unless explicitly per-unit/per-acre.
+  - `project__parking_spaces_total`: Legacy project rollup / boundary leak. Canonicalized to property__parking_spaces_total for MF property scope.
+  - `project__total_units`: Legacy project rollup / boundary leak. Canonicalized to property__total_units for MF property scope.
+  - `unit_count`: Context-dependent: used for per-unit-type row counts (not property rollup).
+  - `unit_type__total_units`: Context-dependent: unit-type level total; treat as row-level count.

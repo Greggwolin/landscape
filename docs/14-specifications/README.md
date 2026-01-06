@@ -41,7 +41,7 @@ Each specification typically includes:
 
 - See [02-features/](../02-features/) for feature documentation
 - See [03-api-reference/](../03-api-reference/) for API reference
-- See [11-implementation-status/](../11-implementation-status/) for implementation status
+- See [00_overview/status/](../00_overview/status/) for implementation status
 
 ---
 
