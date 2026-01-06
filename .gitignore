@@ -120,3 +120,15 @@ services/**/.venv/
 # Archive and backup directories (historical code)
 archive/
 backup_*/
+
+# Working data files (Excel spreadsheets with local data)
+*.xlsx
+*.xlsm
+!reference/**/*.xlsx
+!reference/**/*.xlsm
+
+# Reference PDFs (large binary files)
+reference/**/*.pdf
+
+# Temporary working files
+tmp_*
