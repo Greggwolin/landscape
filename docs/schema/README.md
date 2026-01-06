@@ -87,3 +87,13 @@ These files should be regenerated when:
 The schema now separates internal parcel references from assessor parcel numbers (APN).
 See `docs/schema/parcel_id_audit.md` for the current parcel_id inventory and
 `docs/schema/parcel_id_cast_failures.csv` for cast backfill diagnostics.
+
+## Index Ownership Export (No Secrets)
+
+Generate constraint-owned index metadata using the same DB config as migrations:
+
+```bash
+python scripts/export_index_ownership.py
+```
+
+This writes `docs/schema/landscape_index_ownership.csv` and does not print secrets.
