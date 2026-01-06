@@ -50,7 +50,7 @@ export default function AdviceAdherencePanel({
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/landscaper/variances/?threshold=${threshold}`
+        `/api/projects/${projectId}/landscaper/variances?threshold=${threshold}`
       );
 
       if (!response.ok) {

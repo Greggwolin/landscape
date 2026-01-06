@@ -54,73 +54,118 @@ def store_embedding(
 
 
 def search_similar(
-    query_text: str,
-    limit: int = 10,
-    source_type_filter: Optional[str] = None,
-    similarity_threshold: float = 0.7
+    query_embedding: List[float],
+    project_id: int,
+    top_k: int = 5,
+    similarity_threshold: float = 0.7,
+    source_types: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Find similar content using vector similarity search.
-
-    Uses pgvector's cosine distance operator (<=>).
+    Search for similar embeddings, scoped to a specific project.
 
     Args:
-        query_text: Text to search for
-        limit: Max results to return
-        source_type_filter: Only search this source type (e.g., 'document')
-        similarity_threshold: Minimum similarity score (0-1)
+        query_embedding: Vector to search for
+        project_id: Project to scope search to (REQUIRED)
+        top_k: Number of results to return
+        similarity_threshold: Minimum similarity score
+        source_types: Optional list of source types to include.
+            If None, defaults to ['document'].
+            Use ['document', 'market_data', 'user_note'] to include others.
 
     Returns:
-        List of dicts: {embedding_id, content_text, source_type, source_id,
-                        entity_ids, tags, similarity}
+        List of matching chunks with similarity scores
     """
-    query_embedding = generate_embedding(query_text)
-
-    if query_embedding is None:
+    if not query_embedding:
         return []
 
-    # Convert to string format for SQL
-    embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+    if source_types is None:
+        source_types = ['document']
 
-    # Build the query with optional source_type filter
-    where_clause = ""
-    params = [embedding_str, embedding_str, similarity_threshold, embedding_str, limit]
+    results = []
 
-    if source_type_filter:
-        where_clause = "AND source_type = %s"
-        params = [embedding_str, embedding_str, similarity_threshold, source_type_filter, embedding_str, limit]
+    with connection.cursor() as cursor:
+        if 'document' in source_types:
+            cursor.execute("""
+                SELECT
+                    ke.embedding_id,
+                    ke.content_text,
+                    ke.source_id,
+                    ke.source_type,
+                    d.doc_name,
+                    1 - (ke.embedding <=> %s::vector) as similarity
+                FROM landscape.knowledge_embeddings ke
+                JOIN landscape.core_doc d ON ke.source_id = d.doc_id
+                WHERE d.project_id = %s
+                  AND ke.source_type = 'document_chunk'
+                  AND 1 - (ke.embedding <=> %s::vector) >= %s
+                ORDER BY ke.embedding <=> %s::vector
+                LIMIT %s
+            """, [
+                query_embedding,
+                project_id,
+                query_embedding,
+                similarity_threshold,
+                query_embedding,
+                top_k
+            ])
 
-    sql = f"""
-        SELECT
-            embedding_id,
-            content_text,
-            source_type,
-            source_id,
-            entity_ids,
-            tags,
-            1 - (embedding <=> %s::vector) as similarity
-        FROM landscape.knowledge_embeddings
-        WHERE embedding IS NOT NULL
-          AND 1 - (embedding <=> %s::vector) >= %s
-          {where_clause}
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s
-    """
-
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-
-            columns = ['embedding_id', 'content_text', 'source_type', 'source_id',
-                       'entity_ids', 'tags', 'similarity']
-            results = []
             for row in cursor.fetchall():
-                results.append(dict(zip(columns, row)))
+                results.append({
+                    'id': row[0],
+                    'content': row[1],
+                    'metadata': {},  # No metadata column in actual schema
+                    'source_doc_id': row[2],
+                    'source_type': row[3],
+                    'filename': row[4],
+                    'similarity': float(row[5])
+                })
 
-            return results
-    except Exception as e:
-        print(f"Similarity search error: {e}")
-        return []
+        non_doc_types = [t for t in source_types if t != 'document']
+        if non_doc_types:
+            cursor.execute("""
+                SELECT
+                    ke.id,
+                    ke.content,
+                    ke.metadata,
+                    ke.source_doc_id,
+                    ke.source_type,
+                    NULL as filename,
+                    1 - (ke.embedding <=> %s::vector) as similarity
+                FROM landscape.knowledge_embeddings ke
+                WHERE ke.source_type = ANY(%s)
+                  AND (
+                      %s::text = ANY(ke.entity_ids)
+                      OR ('project:' || %s::text) = ANY(ke.entity_ids)
+                      OR ke.metadata->>'project_id' = %s::text
+                  )
+                  AND 1 - (ke.embedding <=> %s::vector) >= %s
+                ORDER BY ke.embedding <=> %s::vector
+                LIMIT %s
+            """, [
+                query_embedding,
+                non_doc_types,
+                str(project_id),
+                str(project_id),
+                str(project_id),
+                query_embedding,
+                similarity_threshold,
+                query_embedding,
+                top_k
+            ])
+
+            for row in cursor.fetchall():
+                results.append({
+                    'id': row[0],
+                    'content': row[1],
+                    'metadata': row[2] or {},
+                    'source_doc_id': row[3],
+                    'source_type': row[4],
+                    'filename': row[5],
+                    'similarity': float(row[6])
+                })
+
+    results.sort(key=lambda x: x['similarity'], reverse=True)
+    return results[:top_k]
 
 
 def search_similar_by_vector(

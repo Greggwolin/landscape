@@ -28,7 +28,7 @@ export async function GET(
         project_id,
         workspace_id,
         phase_id,
-        parcel_id,
+        COALESCE(parcel_id_int, parcel_id)::integer as parcel_id,
         doc_name,
         doc_type,
         discipline,

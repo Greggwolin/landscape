@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from decimal import Decimal, InvalidOperation
 from django.db import connection
 from django.utils import timezone
+from .opex_mapping import OPEX_ACCOUNT_MAPPING
 
 logger = logging.getLogger(__name__)
 
@@ -97,148 +98,6 @@ ALLOWED_UPDATES = {
 #       SELECT new_category_id, account_number, account_name
 #       FROM landscape.opex_account_migration_map ORDER BY account_number;
 # ─────────────────────────────────────────────────────────────────────────────
-
-# OpEx Account Mapping - Updated for migration 042 (Dec 2024)
-# Maps extracted expense labels to core_unit_cost_category.category_id
-# Reference: landscape.opex_account_migration_map for old→new ID mappings
-OPEX_ACCOUNT_MAPPING = {
-    # --- TAXES & INSURANCE (5100) ---
-    'taxes': 53,                        # 5100 - Taxes & Insurance (parent)
-    'taxes & insurance': 53,
-    'property taxes': 65,               # 5110 - Property Taxes
-    'real estate taxes': 78,            # 5111 - Real Estate Taxes
-    'direct assessment': 79,            # 5112 - Direct Assessment Taxes
-    'assessment taxes': 79,
-    'other taxes & assessments': 79,
-    'taxes & assessments': 79,
-    'insurance': 66,                    # 5120 - Insurance
-    'property insurance': 66,
-    'liability insurance': 66,
-
-    # --- UTILITIES (5200) ---
-    'utilities': 54,                    # 5200 - Utilities (parent)
-    'water': 67,                        # 5210 - Water/Sewer
-    'water/sewer': 67,
-    'water & sewer': 67,
-    'water and sewer': 67,
-    'water sewer': 67,
-    'sewer': 67,
-    'trash': 68,                        # 5220 - Trash
-    'trash removal': 68,
-    'garbage': 68,
-    'refuse': 68,
-    'rubbish': 68,
-    'rubbish removal': 68,
-    'electricity': 69,                  # 5230 - Electricity
-    'electric': 69,
-    'power': 69,
-    'utilities (fuel, gas, electric)': 69,
-    'gas': 70,                          # 5240 - Gas
-    'natural gas': 70,
-    'fuel': 70,
-
-    # --- REPAIRS & MAINTENANCE (5300) ---
-    'repairs': 55,                      # 5300 - Repairs & Maintenance (parent)
-    'repairs & maintenance': 55,
-    'repairs and maintenance': 55,
-    'r&m': 55,
-    'maintenance': 55,
-    'repairs & labor': 71,              # 5310 - Repairs & Labor
-    'repair labor': 71,
-    'maintenance contracts': 72,        # 5320 - Maintenance Contracts
-    'contract services': 72,
-    'contracted services': 72,
-    'contracted services (pool service, pest control, landscaping)': 72,
-    'janitorial': 80,                   # 5321 - Janitorial Services
-    'janitorial services': 80,
-    'cleaning': 80,
-    'gardening': 81,                    # 5322 - Gardening
-    'landscaping': 81,
-    'grounds': 81,
-    'pest control': 82,                 # 5323 - Pest Control
-    'exterminator': 82,
-    'elevator': 83,                     # 5324 - Elevator Maintenance
-    'elevator maintenance': 83,
-    'pool service': 72,
-    'pool': 72,
-    'pool maintenance': 72,
-    'turnover': 71,                     # Unit turnover is R&M
-    'make ready': 71,
-    'unit turnover': 71,
-    'apartment prep/turnover': 71,
-    'apartment prep': 71,
-
-    # --- ADMINISTRATIVE (5400) ---
-    'administrative': 56,               # 5400 - Administrative (parent)
-    'admin': 56,
-    'g&a': 56,
-    'management fee': 73,               # 5410 - Management Fee
-    'management': 73,
-    'property management': 73,
-    'professional services': 74,        # 5420 - Professional Services
-    'legal': 74,
-    'accounting': 74,
-    'owner specific - cpa fees & legal expense': 74,
-    'owner specific': 74,
-    'cpa fees': 74,
-    'legal expense': 74,
-    'manager rent credit': 84,          # 5421 - Manager Rent Credit
-    'telephone': 85,                    # 5422 - Telephone Expense
-    'phone': 85,
-    'communications': 85,
-    'security': 86,                     # 5423 - Security/Fire/Alarm
-    'alarm': 86,
-    'fire alarm': 86,
-    'business license': 87,             # 5424 - Business License/Tax
-    'license': 87,
-    'internet': 88,                     # 5425 - Internet Service
-    'cable': 88,
-
-    # --- MARKETING (5500) ---
-    'marketing': 57,                    # 5500 - Marketing (parent)
-    'advertising': 75,                  # 5510 - Advertising
-    'leasing': 75,
-    'promotion': 75,
-
-    # --- PAYROLL & PERSONNEL (5550) - NEW ---
-    'payroll': 89,                      # 5550 - Payroll & Personnel (parent)
-    'personnel': 89,
-    'salaries': 89,
-    'wages': 89,
-    'manager salary': 90,               # 5551 - On-Site Manager Salary
-    'on-site manager': 90,
-    'leasing staff': 92,                # 5553 - Leasing Staff
-    'maintenance staff': 93,            # 5554 - Maintenance Staff
-    'payroll taxes': 94,                # 5555 - Payroll Taxes
-    'fica': 94,
-    'employee benefits': 95,            # 5556 - Employee Benefits
-    'benefits': 95,
-    'health insurance': 95,
-
-    # --- LAND DEVELOPMENT OPEX (5600-5900) ---
-    'property taxes land': 49,          # 5600 - Property Taxes & Insurance (Land)
-    'taxes unsold': 58,                 # 5610 - Property Taxes on Unsold Inventory
-    'ad valorem': 76,                   # 5611 - Ad Valorem Taxes
-    'special assessments': 77,          # 5612 - Special Assessments
-    'insurance unsold': 59,             # 5620 - Insurance on Unsold Parcels
-    'hoa': 50,                          # 5700 - HOA & Amenity Operations
-    'hoa operations': 50,
-    'amenity': 50,
-    'hoa management': 60,               # 5710 - HOA Management
-    'amenity operations': 61,           # 5720 - Amenity Operations
-    'common area': 51,                  # 5800 - Common Area Maintenance
-    'cam': 51,
-    'landscape maintenance': 62,        # 5810 - Landscape Maintenance
-    'infrastructure maintenance': 63,   # 5820 - Infrastructure Maintenance
-    'sales marketing': 64,              # 5910 - Sales & Marketing
-
-    # --- RESERVES (5990) - NEW ---
-    'reserves': 96,                     # 5990 - Reserves (parent)
-    'replacement reserves': 97,         # 5991 - Replacement Reserves
-    'capex reserve': 98,                # 5992 - Capital Expenditure Reserve
-    'capital reserve': 98,
-    'capital reserves': 98,
-}
 
 # Fields that should be cast to specific types
 FIELD_TYPES = {
@@ -829,6 +688,290 @@ def upsert_operating_expense(
         }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Rental Comparable Functions
+# ─────────────────────────────────────────────────────────────────────────────
+
+def upsert_rental_comparable(
+    project_id: int,
+    property_name: str,
+    unit_type: str,
+    bedrooms: float,
+    bathrooms: float,
+    avg_sqft: int,
+    asking_rent: float,
+    address: str = None,
+    latitude: float = None,
+    longitude: float = None,
+    distance_miles: float = None,
+    year_built: int = None,
+    total_units: int = None,
+    effective_rent: float = None,
+    notes: str = None,
+    data_source: str = None
+) -> Dict[str, Any]:
+    """
+    Upsert a rental comparable record for a project.
+
+    If a record already exists for this project/property/unit_type combo, it updates it.
+    Otherwise creates a new record.
+
+    Args:
+        project_id: Project to add comp to
+        property_name: Name of comparable property
+        unit_type: Unit type descriptor (e.g., "1BR/1BA")
+        bedrooms: Number of bedrooms
+        bathrooms: Number of bathrooms
+        avg_sqft: Average square footage
+        asking_rent: Monthly asking rent
+        address: Optional street address
+        latitude: Optional latitude
+        longitude: Optional longitude
+        distance_miles: Optional distance from subject
+        year_built: Optional year built
+        total_units: Optional total unit count
+        effective_rent: Optional effective rent
+        notes: Optional notes
+        data_source: Optional data source
+
+    Returns:
+        Dict with success status and created/updated record info
+    """
+    from datetime import date as date_type
+
+    try:
+        with connection.cursor() as cursor:
+            # Check if record exists for this project/property/unit_type combo
+            cursor.execute("""
+                SELECT comparable_id, asking_rent
+                FROM landscape.tbl_rental_comparable
+                WHERE project_id = %s
+                  AND LOWER(property_name) = LOWER(%s)
+                  AND LOWER(unit_type) = LOWER(%s)
+                  AND is_active = true
+            """, [project_id, property_name, unit_type])
+
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update existing record
+                comparable_id, old_rent = existing
+                old_rent_float = float(old_rent) if old_rent else 0
+
+                cursor.execute("""
+                    UPDATE landscape.tbl_rental_comparable
+                    SET asking_rent = %s,
+                        effective_rent = %s,
+                        address = COALESCE(%s, address),
+                        latitude = COALESCE(%s, latitude),
+                        longitude = COALESCE(%s, longitude),
+                        distance_miles = COALESCE(%s, distance_miles),
+                        year_built = COALESCE(%s, year_built),
+                        total_units = COALESCE(%s, total_units),
+                        avg_sqft = %s,
+                        notes = COALESCE(%s, notes),
+                        data_source = COALESCE(%s, data_source),
+                        as_of_date = %s,
+                        updated_at = NOW()
+                    WHERE comparable_id = %s
+                """, [
+                    asking_rent, effective_rent, address, latitude, longitude,
+                    distance_miles, year_built, total_units, avg_sqft,
+                    notes, data_source, date_type.today(), comparable_id
+                ])
+
+                logger.info(f"Updated rental comp {comparable_id} for project {project_id}: {property_name} {unit_type}")
+
+                return {
+                    'success': True,
+                    'action': 'updated',
+                    'comparable_id': comparable_id,
+                    'property_name': property_name,
+                    'unit_type': unit_type,
+                    'old_rent': old_rent_float,
+                    'new_rent': asking_rent
+                }
+            else:
+                # Insert new record
+                cursor.execute("""
+                    INSERT INTO landscape.tbl_rental_comparable
+                    (project_id, property_name, address, latitude, longitude,
+                     distance_miles, year_built, total_units, unit_type,
+                     bedrooms, bathrooms, avg_sqft, asking_rent, effective_rent,
+                     notes, data_source, as_of_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING comparable_id
+                """, [
+                    project_id, property_name, address, latitude, longitude,
+                    distance_miles, year_built, total_units, unit_type,
+                    bedrooms, bathrooms, avg_sqft, asking_rent, effective_rent,
+                    notes, data_source, date_type.today()
+                ])
+
+                comparable_id = cursor.fetchone()[0]
+
+                logger.info(f"Created rental comp {comparable_id} for project {project_id}: {property_name} {unit_type} = ${asking_rent}")
+
+                return {
+                    'success': True,
+                    'action': 'created',
+                    'comparable_id': comparable_id,
+                    'property_name': property_name,
+                    'unit_type': unit_type,
+                    'asking_rent': asking_rent
+                }
+
+    except Exception as e:
+        logger.error(f"Error upserting rental comparable: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'property_name': property_name,
+            'unit_type': unit_type
+        }
+
+
+def bulk_upsert_rental_comps(
+    project_id: int,
+    comps: List[Dict[str, Any]],
+    source_document: str = None
+) -> Dict[str, Any]:
+    """
+    Bulk upsert multiple rental comparables for a project.
+
+    Args:
+        project_id: Project to add comps to
+        comps: List of comp dicts with keys:
+            - property_name: Required
+            - unit_type: Required
+            - bedrooms, bathrooms: Required
+            - avg_sqft, asking_rent: Required
+            - address, lat, lng, etc.: Optional
+        source_document: Optional document name for activity logging
+
+    Returns:
+        Dict with success status, created/updated counts, and details
+    """
+    results = []
+    created_count = 0
+    updated_count = 0
+    error_count = 0
+
+    for comp in comps:
+        property_name = comp.get('property_name', '')
+        unit_type = comp.get('unit_type', '')
+        bedrooms = comp.get('bedrooms', 0)
+        bathrooms = comp.get('bathrooms', 0)
+        avg_sqft = comp.get('avg_sqft', 0)
+        asking_rent = comp.get('asking_rent', 0)
+
+        if not property_name or not unit_type or not asking_rent:
+            results.append({
+                'success': False,
+                'error': 'Missing required fields (property_name, unit_type, asking_rent)',
+                'comp': comp
+            })
+            error_count += 1
+            continue
+
+        result = upsert_rental_comparable(
+            project_id=project_id,
+            property_name=property_name,
+            unit_type=unit_type,
+            bedrooms=float(bedrooms),
+            bathrooms=float(bathrooms),
+            avg_sqft=int(avg_sqft),
+            asking_rent=float(asking_rent),
+            address=comp.get('address'),
+            latitude=comp.get('latitude'),
+            longitude=comp.get('longitude'),
+            distance_miles=comp.get('distance_miles'),
+            year_built=comp.get('year_built'),
+            total_units=comp.get('total_units'),
+            effective_rent=comp.get('effective_rent'),
+            notes=comp.get('notes'),
+            data_source=source_document or 'Landscaper AI'
+        )
+
+        results.append(result)
+
+        if result.get('success'):
+            if result.get('action') == 'created':
+                created_count += 1
+            else:
+                updated_count += 1
+        else:
+            error_count += 1
+
+    # Log activity for bulk operation
+    if created_count > 0 or updated_count > 0:
+        _log_rental_comp_activity(
+            project_id=project_id,
+            created_count=created_count,
+            updated_count=updated_count,
+            source_document=source_document,
+            comps=[r for r in results if r.get('success')]
+        )
+
+    return {
+        'success': error_count == 0,
+        'created': created_count,
+        'updated': updated_count,
+        'errors': error_count,
+        'results': results,
+        'summary': f"Created {created_count}, updated {updated_count}, errors {error_count}"
+    }
+
+
+def _log_rental_comp_activity(
+    project_id: int,
+    created_count: int,
+    updated_count: int,
+    source_document: str,
+    comps: List[Dict]
+) -> None:
+    """Log bulk rental comp update to activity feed."""
+    try:
+        from .models import ActivityItem
+
+        total = created_count + updated_count
+        comp_names = list(set([c.get('property_name', 'Unknown') for c in comps[:5]]))
+        comp_list = ', '.join(comp_names)
+        if len(set([c.get('property_name') for c in comps])) > 5:
+            comp_list += f" and {len(set([c.get('property_name') for c in comps])) - 5} more"
+
+        title = f"Added {total} rental comparables"
+        if source_document:
+            summary = f"Populated from {source_document}: {comp_list}"
+        else:
+            summary = f"Added comps: {comp_list}"
+
+        ActivityItem.objects.create(
+            project_id=project_id,
+            activity_type='update',
+            title=title,
+            summary=summary,
+            status='complete',
+            confidence='high',
+            details={
+                'created': created_count,
+                'updated': updated_count,
+                'comps': comps
+            },
+            highlight_fields=['rental_comparables'],
+            source_type='landscaper_ai',
+            source_id=f"rental_comp_bulk_{project_id}"
+        )
+        logger.info(f"Logged rental comp bulk activity for project {project_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to log rental comp activity: {e}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Operating Expense Functions
+# ─────────────────────────────────────────────────────────────────────────────
+
 def bulk_upsert_operating_expenses(
     project_id: int,
     expenses: List[Dict[str, Any]],
@@ -1040,6 +1183,15 @@ def execute_tool(
         return bulk_upsert_operating_expenses(
             project_id=project_id,
             expenses=expenses,
+            source_document=source_doc
+        )
+
+    elif tool_name == 'update_rental_comps':
+        comps = tool_input.get('comps', [])
+        source_doc = tool_input.get('source_document')
+        return bulk_upsert_rental_comps(
+            project_id=project_id,
+            comps=comps,
             source_document=source_doc
         )
 

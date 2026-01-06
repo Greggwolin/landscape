@@ -1,5 +1,5 @@
 """
-Landscaper AI service with RAG-enhanced responses.
+Landscaper AI service with RAG-enhanced responses and tool execution.
 
 Landscaper has access to:
 1. STRUCTURED DATA: Full project context from database tables
@@ -7,21 +7,39 @@ Landscaper has access to:
    - Operating expenses, budget, sales data, financial assumptions
 2. DOCUMENT CONTENT: RAG-retrieved chunks from uploaded documents
 3. QUERY RESULTS: On-demand database queries for specific questions
+4. TOOLS: Can update project fields, read documents, and manage operating expenses
 
 The system prompt includes ALL available project data so Landscaper
 can answer questions about both structured data AND documents.
 """
+import json
+import logging
 import os
 import re
 import uuid
+from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from anthropic import Anthropic
 from django.conf import settings
 from django.db import connection
 
+
+class DecimalEncoder(json.JSONEncoder):
+    """JSON encoder that handles Decimal types from PostgreSQL."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
 from .rag_retrieval import retrieve_rag_context, get_conversation_context, RAGContext
 from .query_builder import execute_project_query
 from .project_context import get_project_context
+
+# Import tool definitions and executor from landscaper app
+from apps.landscaper.ai_handler import LANDSCAPER_TOOLS
+from apps.landscaper.tool_executor import execute_tool
+
+logger = logging.getLogger(__name__)
 
 
 def _get_anthropic_client() -> Anthropic:
@@ -50,11 +68,103 @@ def _get_anthropic_client() -> Anthropic:
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 
+# Tab-specific system prompt additions
+# Covers all 7 tabs: Project Home, Property, Operations, Feasibility/Valuation, Capitalization, Reports, Documents
+TAB_CONTEXT = {
+    'home': {
+        'focus': 'project overview, status, key decisions, and cross-functional issues',
+        'doc_types': None,  # All document types
+        'prompt_addition': '''You are viewing the PROJECT HOME dashboard. Focus on:
+- Overall project status and health
+- Key decisions that need attention
+- Cross-functional issues between departments
+- Executive summary level information
+- What's blocking progress and next steps
+- High-level financial metrics and timeline'''
+    },
+    'property': {
+        'focus': 'property details, physical characteristics, location, and site information',
+        'doc_types': ['om', 'appraisal', 'site_plan', 'survey', 'environmental'],
+        'prompt_addition': '''You are viewing the PROPERTY tab. Focus on:
+- Physical property characteristics (size, age, condition)
+- Location, market, and submarket positioning
+- Site plans, surveys, and parcel information
+- Zoning and entitlements
+- Environmental and due diligence items
+- Property-level assumptions and comparables'''
+    },
+    'operations': {
+        'focus': 'rent roll, unit mix, operating expenses, NOI, and operational metrics',
+        'doc_types': ['rent_roll', 'om', 'financial_statement', 't12', 'operating_statement'],
+        'prompt_addition': '''You are viewing the OPERATIONS tab. Focus on:
+- Rent roll details: unit types, counts, current rents, market rents
+- Unit mix analysis and rent per SF
+- Vacancy rates: physical, economic, credit loss, concessions
+- Operating expenses by category (detailed and summary)
+- Net Operating Income (NOI) and trends
+- Expense ratios and per-unit metrics
+- T-12 and historical operating performance'''
+    },
+    'feasibility': {
+        'focus': 'returns analysis, IRR, NPV, equity multiple, cash flow projections, and sensitivity',
+        'doc_types': ['pro_forma', 'financial_model', 'sensitivity', 'investment_memo'],
+        'prompt_addition': '''You are viewing the FEASIBILITY / VALUATION tab. Focus on:
+- Return metrics: IRR (levered/unlevered), NPV, Equity Multiple, Cash-on-Cash
+- Cash flow projections and waterfall
+- Valuation approaches: DCF, Cap Rate, Comparable Sales
+- Exit assumptions and terminal value
+- Sensitivity analysis: what variables move returns most
+- Investment thesis, risks, and mitigants
+- Comparison to target returns and hurdle rates'''
+    },
+    'capitalization': {
+        'focus': 'capital structure, debt terms, equity requirements, and financing assumptions',
+        'doc_types': ['term_sheet', 'loan_doc', 'partnership_agreement', 'loi', 'commitment_letter'],
+        'prompt_addition': '''You are viewing the CAPITALIZATION tab. Focus on:
+- Capital stack: senior debt, mezzanine, preferred equity, common equity
+- Debt terms: LTV, DSCR, interest rate, amortization, term, prepayment
+- Equity structure: GP/LP splits, promote/waterfall, preferred returns
+- Sources and uses of funds
+- Financing fees and closing costs
+- Guaranty and recourse requirements
+- Refinancing and exit assumptions'''
+    },
+    'reports': {
+        'focus': 'analytics, reporting, exports, and data visualization',
+        'doc_types': None,  # All types - reports can reference anything
+        'prompt_addition': '''You are viewing the REPORTS tab. Focus on:
+- Available reports and their purpose
+- Key metrics and KPIs across the project
+- Data exports and formatting
+- Comparison reports (budget vs actual, scenario comparison)
+- Executive summaries and presentation materials
+- Audit trails and version history
+- Custom report generation'''
+    },
+    'documents': {
+        'focus': 'document management, extraction status, data quality, and ingestion',
+        'doc_types': None,  # All types - this is the DMS
+        'prompt_addition': '''You are viewing the DOCUMENTS tab. Focus on:
+- Document inventory and organization
+- Processing and extraction status
+- AI extraction results and confidence scores
+- Data quality issues and conflicts
+- Missing documents or information gaps
+- Source attribution and provenance
+- Document versioning and updates
+- Pending reviews and approvals'''
+    },
+}
+
+
 def get_landscaper_response(
     user_message: str,
     project_id: int,
     conversation_history: List[Dict] = None,
-    max_context_chunks: int = 5
+    max_context_chunks: int = 5,
+    db_context: Optional[Dict[str, Any]] = None,
+    rag_context: Optional[Dict[str, Any]] = None,
+    active_tab: str = 'home'
 ) -> Dict[str, Any]:
     """
     Get RAG-enhanced response from Landscaper AI.
@@ -69,13 +179,34 @@ def get_landscaper_response(
         Dict with 'content', 'metadata', 'context_used'
     """
 
-    # 1. Retrieve RAG context
-    rag_context = retrieve_rag_context(
-        query=user_message,
-        project_id=project_id,
-        max_chunks=max_context_chunks,
-        similarity_threshold=0.65
-    )
+    # 1. Retrieve or hydrate RAG context
+    if isinstance(rag_context, RAGContext):
+        rag_context_obj = rag_context
+    elif isinstance(rag_context, dict):
+        rag_context_obj = RAGContext()
+        normalized_chunks = []
+        for chunk in rag_context.get('chunks', []):
+            normalized_chunks.append({
+                **chunk,
+                'doc_name': chunk.get('doc_name') or chunk.get('filename') or 'Unknown document',
+                'content': chunk.get('content') or chunk.get('content_text') or ''
+            })
+        rag_context_obj.document_chunks = normalized_chunks
+        if normalized_chunks:
+            rag_context_obj.sources_used.append('documents')
+    else:
+        rag_context_obj = retrieve_rag_context(
+            query=user_message,
+            project_id=project_id,
+            max_chunks=max_context_chunks,
+            similarity_threshold=0.65
+        )
+
+    if db_context:
+        rag_context_obj.db_query_result = db_context.get('query_result_text')
+        rag_context_obj.db_query_type = db_context.get('query_type')
+        if db_context.get('query_type'):
+            rag_context_obj.sources_used.append('database')
 
     # 2. Get conversation history if not provided
     if conversation_history is None:
@@ -84,8 +215,12 @@ def get_landscaper_response(
     # 3. Get full project context (structured data from all tables)
     project_context = get_project_context(project_id)
 
-    # 4. Build system prompt with RAG context + project context
-    system_prompt = _build_system_prompt(rag_context, project_context)
+    # 4. Get tab-specific context
+    tab_config = TAB_CONTEXT.get(active_tab, TAB_CONTEXT['home'])
+    tab_context = tab_config['prompt_addition']
+
+    # 5. Build system prompt with RAG context + project context + tab context
+    system_prompt = _build_system_prompt(rag_context_obj, project_context, tab_context)
 
     # 4. Build messages array
     messages = []
@@ -101,17 +236,84 @@ def get_landscaper_response(
         "content": user_message
     })
 
-    # 5. Call Claude API
+    # 5. Call Claude API with tool support
     try:
         anthropic = _get_anthropic_client()
+
+        # Track tool executions for metadata
+        tool_executions = []
+
+        # Initial API call with tools
         response = anthropic.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=2000,
             system=system_prompt,
-            messages=messages
+            messages=messages,
+            tools=LANDSCAPER_TOOLS
         )
 
-        ai_content = response.content[0].text if response.content else ""
+        # Tool use loop - continue until we get a text response
+        max_tool_iterations = 10
+        iteration = 0
+
+        while response.stop_reason == "tool_use" and iteration < max_tool_iterations:
+            iteration += 1
+            logger.info(f"Tool use iteration {iteration}")
+
+            # Process all tool use blocks in the response
+            tool_results = []
+            for content_block in response.content:
+                if content_block.type == "tool_use":
+                    tool_name = content_block.name
+                    tool_input = content_block.input
+                    tool_use_id = content_block.id
+
+                    logger.info(f"Executing tool: {tool_name} with input: {json.dumps(tool_input)[:200]}")
+
+                    # Execute the tool
+                    try:
+                        tool_result = execute_tool(tool_name, tool_input, project_id)
+                        tool_executions.append({
+                            'tool': tool_name,
+                            'input': tool_input,
+                            'result': tool_result,
+                            'success': not tool_result.get('error')
+                        })
+                        result_content = json.dumps(tool_result, cls=DecimalEncoder)
+                    except Exception as tool_error:
+                        logger.error(f"Tool execution error: {tool_error}")
+                        tool_executions.append({
+                            'tool': tool_name,
+                            'input': tool_input,
+                            'error': str(tool_error),
+                            'success': False
+                        })
+                        result_content = json.dumps({'error': str(tool_error)})
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": result_content
+                    })
+
+            # Add assistant's response (with tool_use) and tool results to messages
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
+
+            # Continue the conversation
+            response = anthropic.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=2000,
+                system=system_prompt,
+                messages=messages,
+                tools=LANDSCAPER_TOOLS
+            )
+
+        # Extract final text response
+        ai_content = ""
+        for content_block in response.content:
+            if hasattr(content_block, 'text'):
+                ai_content += content_block.text
 
         # 6. Extract any suggested values from response
         metadata = _extract_suggestions(ai_content)
@@ -122,19 +324,19 @@ def get_landscaper_response(
         data_title = None
         columns = None
 
-        if rag_context.db_query_type:
-            query_result = execute_project_query(project_id, rag_context.db_query_type)
+        if rag_context_obj.db_query_type:
+            query_result = execute_project_query(project_id, rag_context_obj.db_query_type)
             if not query_result.get('error') and query_result.get('row_count', 0) > 3:
                 # Tabular data worth showing in a grid
                 structured_data = query_result['rows']
                 data_type = 'table'
-                data_title = _get_data_title(rag_context.db_query_type)
-                columns = _get_column_definitions(rag_context.db_query_type)
+                data_title = _get_data_title(rag_context_obj.db_query_type)
+                columns = _get_column_definitions(rag_context_obj.db_query_type)
 
         # Determine primary source
         has_project_data = bool(project_context and project_context.strip())
-        has_query_result = rag_context.db_query_type is not None
-        has_documents = len(rag_context.document_chunks) > 0
+        has_query_result = rag_context_obj.db_query_type is not None
+        has_documents = len(rag_context_obj.document_chunks) > 0
 
         if has_query_result:
             primary_source = 'database_query'
@@ -145,21 +347,30 @@ def get_landscaper_response(
         else:
             primary_source = 'general'
 
+        # Add tool execution info to metadata
+        if tool_executions:
+            metadata['tool_executions'] = tool_executions
+            metadata['tools_used'] = [t['tool'] for t in tool_executions]
+            metadata['all_tools_succeeded'] = all(t.get('success', False) for t in tool_executions)
+
         return {
             'content': ai_content,
             'metadata': metadata,
             'context_used': {
-                'chunks_retrieved': len(rag_context.document_chunks),
-                'token_estimate': rag_context.token_estimate,
-                'sources': [c.get('doc_name', 'Unknown') for c in rag_context.document_chunks],
+                'chunks_retrieved': len(rag_context_obj.document_chunks),
+                'token_estimate': rag_context_obj.token_estimate,
+                'sources': [c.get('doc_name', 'Unknown') for c in rag_context_obj.document_chunks],
                 # Track what context was included
                 'has_project_context': has_project_data,
                 'has_query_result': has_query_result,
                 'has_document_chunks': has_documents,
                 'db_query_matched': has_query_result,
-                'db_query_type': rag_context.db_query_type,
-                'sources_used': getattr(rag_context, 'sources_used', []),
-                'primary_source': primary_source
+                'db_query_type': rag_context_obj.db_query_type,
+                'sources_used': getattr(rag_context_obj, 'sources_used', []),
+                'primary_source': primary_source,
+                # Tool execution tracking
+                'tools_executed': len(tool_executions),
+                'tool_iterations': iteration if 'iteration' in dir() else 0
             },
             # NEW: Structured data for table rendering
             'structured_data': structured_data,
@@ -181,13 +392,14 @@ def get_landscaper_response(
         }
 
 
-def _build_system_prompt(rag_context: RAGContext, project_context: str = "") -> str:
+def _build_system_prompt(rag_context: RAGContext, project_context: str = "", tab_context: str = "") -> str:
     """
-    Build system prompt with full project context + RAG context.
+    Build system prompt with full project context + RAG context + tab context.
 
     Args:
         rag_context: RAG context with document chunks and query results
         project_context: Full structured data context from ProjectContextService
+        tab_context: Tab-specific focus instructions
     """
 
     sections = rag_context.to_prompt_sections()
@@ -201,7 +413,44 @@ def _build_system_prompt(rag_context: RAGContext, project_context: str = "") -> 
 
 Your role is to provide actionable, data-driven guidance. You have access to BOTH structured project data from the database AND content from uploaded documents. Reference specific data when answering.
 
-When suggesting specific numeric values (absorption rates, prices, costs, timelines), be explicit so these can be tracked against the user's actual choices."""
+When suggesting specific numeric values (absorption rates, prices, costs, timelines), be explicit so these can be tracked against the user's actual choices.
+
+=== TOOLS ===
+
+You have tools available to UPDATE project data, not just read it. When the user asks you to change, set, update, or populate a field, USE THE TOOLS. Don't just describe what should be done - actually do it.
+
+Available tools:
+- update_project_field: Update a single field (location, market, pricing, etc.)
+- bulk_update_fields: Update multiple related fields at once
+- get_project_fields: Read current field values before updating
+- get_field_schema: Check what fields exist and their constraints
+- get_project_documents: List uploaded documents
+- get_document_content: Read document content
+- get_document_assertions: Get extracted data from documents
+- ingest_document: Auto-populate fields from an OM or similar document
+- update_operating_expenses: Add/update OpEx line items
+- update_rental_comps: Add/update rental comparables from OMs or market research
+
+When to use tools:
+- User says "set the city to Phoenix" → use update_project_field
+- User says "populate from the OM" → use ingest_document
+- User says "add these operating expenses" → use update_operating_expenses
+- User says "populate the rental comps" → use update_rental_comps
+- User asks "what documents do we have?" → use get_project_documents
+
+IMPORTANT: When user asks to POPULATE or ADD data, ALWAYS use the appropriate tool. Don't just describe the data - actually save it!
+- "populate rental comps from the OM" → CALL update_rental_comps with the extracted data
+- "add the operating expenses" → CALL update_operating_expenses with the extracted data"""
+
+    # TAB CONTEXT: Current UI context the user is viewing
+    if tab_context and tab_context.strip():
+        base_prompt += f"""
+
+=== CURRENT CONTEXT ===
+
+{tab_context}
+
+Focus your answers on topics relevant to this context. If the user asks about something outside this context, still answer but consider what brought them here."""
 
     # PRIMARY SOURCE: Full project context (always include if available)
     if project_context and project_context.strip():

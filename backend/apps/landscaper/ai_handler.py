@@ -290,6 +290,113 @@ After using this tool, the data will appear in the Operations tab.""",
             },
             "required": ["expenses"]
         }
+    },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Rental Comparables Tools
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "update_rental_comps",
+        "description": """Add or update rental comparables for the project.
+Use this to populate the Comparable Rentals section with nearby properties from OMs or market research.
+
+Each comparable represents a competing property with its unit mix and asking rents.
+The data will appear in the Comparable Rentals map and table on the Property tab.
+
+Required fields for each comp:
+- property_name: Name of the comparable property (e.g., "Charter Oaks")
+- unit_type: Descriptive unit type (e.g., "1BR/1BA", "2BR/2BA", "Studio")
+- bedrooms, bathrooms: Numeric bed/bath count
+- avg_sqft: Average unit size in square feet
+- asking_rent: Monthly asking rent in dollars
+
+Optional fields:
+- address: Street address for mapping
+- latitude, longitude: Coordinates for map display
+- distance_miles: Distance from subject property
+- year_built: Year the property was built
+- total_units: Total unit count in the property
+- effective_rent: Effective rent after concessions
+- notes: Additional notes (renovations, amenities, etc.)
+
+Example usage:
+"Add the six rental comps from the Lynn Villa OM to the project"
+""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "comps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "property_name": {
+                                "type": "string",
+                                "description": "Name of the comparable property"
+                            },
+                            "address": {
+                                "type": "string",
+                                "description": "Street address"
+                            },
+                            "latitude": {
+                                "type": "number",
+                                "description": "Latitude coordinate"
+                            },
+                            "longitude": {
+                                "type": "number",
+                                "description": "Longitude coordinate"
+                            },
+                            "distance_miles": {
+                                "type": "number",
+                                "description": "Distance from subject property in miles"
+                            },
+                            "year_built": {
+                                "type": "integer",
+                                "description": "Year the property was built"
+                            },
+                            "total_units": {
+                                "type": "integer",
+                                "description": "Total units in the property"
+                            },
+                            "unit_type": {
+                                "type": "string",
+                                "description": "Unit type descriptor (e.g., '1BR/1BA', 'Studio')"
+                            },
+                            "bedrooms": {
+                                "type": "number",
+                                "description": "Number of bedrooms"
+                            },
+                            "bathrooms": {
+                                "type": "number",
+                                "description": "Number of bathrooms"
+                            },
+                            "avg_sqft": {
+                                "type": "integer",
+                                "description": "Average square footage"
+                            },
+                            "asking_rent": {
+                                "type": "number",
+                                "description": "Monthly asking rent in dollars"
+                            },
+                            "effective_rent": {
+                                "type": "number",
+                                "description": "Effective rent after concessions"
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": "Notes about the property (renovations, amenities, etc.)"
+                            }
+                        },
+                        "required": ["property_name", "unit_type", "bedrooms", "bathrooms", "avg_sqft", "asking_rent"]
+                    },
+                    "description": "List of rental comparable properties to add/update"
+                },
+                "source_document": {
+                    "type": "string",
+                    "description": "Optional document name where comps were extracted from (for activity logging)"
+                }
+            },
+            "required": ["comps"]
+        }
     }
 ]
 
@@ -324,6 +431,19 @@ For manual extraction (more control):
 1. Use get_document_content to read the document
 2. Use bulk_update_fields to update specific fields
 3. Report what you updated
+
+RENTAL COMPARABLES:
+When asked to populate rental comps, comparables, or comp data from a document:
+1. Use get_document_content to read the comp data from the OM
+2. Use update_rental_comps to insert the comps into the database
+3. Each comp needs: property_name, unit_type, bedrooms, bathrooms, avg_sqft, asking_rent
+4. ALWAYS call update_rental_comps tool - don't just describe the comps, actually save them!
+
+OPERATING EXPENSES:
+When asked to populate operating expenses from a document:
+1. Use get_document_content to read the T-12 or operating statement
+2. Use update_operating_expenses to insert the line items into the database
+3. ALWAYS call update_operating_expenses tool - don't just describe expenses, save them!
 
 FIELD UPDATES:
 - Use tools to update fields when user asks or when you can infer missing data

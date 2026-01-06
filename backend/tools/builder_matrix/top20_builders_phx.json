@@ -2,7 +2,7 @@
   "market": "Phoenix, AZ \u2013 Zonda Nov 2025",
   "generated_at": "2025-12-03T03:16:20.332470",
   "methodology": {
-    "source_file": "docs/archive/attachments/ZondaReports.xlsx",
+    "source_file": "docs/09_session_notes/archive/attachments/ZondaReports.xlsx",
     "rank_basis": "subdivision_count",
     "top_n": 20
   },

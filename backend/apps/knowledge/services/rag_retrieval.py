@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from django.db import connection
 
 from .embedding_storage import search_similar
+from .embedding_service import generate_embedding
 from .schema_context import get_project_schema_context
 from .query_builder import detect_query_intent, execute_project_query, format_query_results
 
@@ -185,11 +186,15 @@ def retrieve_rag_context(
     # STEP 3: Vector similarity search for document chunks (SECONDARY)
     # Always do this - documents may have additional context even if DB answered
     try:
-        similar_chunks = search_similar(
-            query_text=query,
-            limit=max_chunks,
-            similarity_threshold=similarity_threshold
-        )
+        query_embedding = generate_embedding(query)
+        similar_chunks = []
+        if query_embedding:
+            similar_chunks = search_similar(
+                query_embedding=query_embedding,
+                project_id=project_id,
+                top_k=max_chunks,
+                similarity_threshold=similarity_threshold
+            )
 
         if similar_chunks:
             context.document_chunks = _enrich_chunks_with_metadata(similar_chunks)
@@ -218,16 +223,18 @@ def _enrich_chunks_with_metadata(chunks: List[Dict]) -> List[Dict]:
     if not chunks:
         return []
 
-    # Get unique doc_ids (source_id for document_chunk type)
-    doc_ids = list(set(c['source_id'] for c in chunks if c.get('source_type') == 'document_chunk'))
+    doc_ids = list({
+        c.get('source_doc_id') or c.get('source_id')
+        for c in chunks
+        if c.get('source_doc_id') or c.get('source_id')
+    })
 
     if not doc_ids:
-        # Return chunks with content field mapped
         for chunk in chunks:
-            chunk['content'] = chunk.get('content_text', '')
+            chunk['content'] = chunk.get('content') or chunk.get('content_text', '')
+            chunk['doc_name'] = chunk.get('doc_name') or chunk.get('filename') or 'Unknown document'
         return chunks
 
-    # Fetch document metadata
     with connection.cursor() as cursor:
         placeholders = ','.join(['%s'] * len(doc_ids))
         cursor.execute(f"""
@@ -242,15 +249,48 @@ def _enrich_chunks_with_metadata(chunks: List[Dict]) -> List[Dict]:
             'project_id': row[3]
         } for row in cursor.fetchall()}
 
-    # Enrich chunks
     for chunk in chunks:
-        doc_id = chunk.get('source_id')
+        doc_id = chunk.get('source_doc_id') or chunk.get('source_id')
         if doc_id in doc_metadata:
             chunk.update(doc_metadata[doc_id])
-        # Map content_text to content for consistency
-        chunk['content'] = chunk.get('content_text', '')
+        chunk['content'] = chunk.get('content') or chunk.get('content_text', '')
+        chunk['doc_name'] = chunk.get('doc_name') or chunk.get('filename') or 'Unknown document'
 
     return chunks
+
+
+class RAGRetriever:
+    """Simple wrapper to retrieve project-scoped RAG chunks."""
+
+    def __init__(
+        self,
+        project_id: int,
+        top_k: int = 5,
+        similarity_threshold: float = 0.7,
+        source_types: Optional[List[str]] = None
+    ):
+        self.project_id = project_id
+        self.top_k = top_k
+        self.similarity_threshold = similarity_threshold
+        self.source_types = source_types
+
+    def retrieve(self, query: str) -> Dict[str, Any]:
+        query_embedding = generate_embedding(query)
+        if not query_embedding:
+            return {'chunks': []}
+
+        chunks = search_similar(
+            query_embedding=query_embedding,
+            project_id=self.project_id,
+            top_k=self.top_k,
+            similarity_threshold=self.similarity_threshold,
+            source_types=self.source_types
+        )
+
+        if chunks:
+            chunks = _enrich_chunks_with_metadata(chunks)
+
+        return {'chunks': chunks}
 
 
 def _get_project_context(project_id: int) -> Dict[str, Any]:

@@ -61,4 +61,4 @@ await fetch('/api/prototypes/notes', {
 });
 ```
 
-Notes are automatically stored in `docs/prototypes/notes.log` and displayed on each tile.
+Notes are automatically stored in `docs/09_session_notes/prototypes/notes.log` and displayed on each tile.

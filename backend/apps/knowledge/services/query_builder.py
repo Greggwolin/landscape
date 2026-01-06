@@ -625,3 +625,28 @@ def get_available_queries() -> List[Dict[str, str]]:
         {'key': key, 'description': template['description']}
         for key, template in QUERY_TEMPLATES.items()
     ]
+
+
+class QueryBuilder:
+    """Convenience wrapper for DB-first query matching and execution."""
+
+    def __init__(self, project_id: int):
+        self.project_id = project_id
+
+    def build_context(self, user_message: str) -> Optional[Dict[str, Any]]:
+        """Match intent and return query context for prompt building."""
+        query_type = detect_query_intent(user_message)
+        if not query_type:
+            return None
+
+        results = execute_project_query(self.project_id, query_type)
+        formatted = None
+        if not results.get('error') and results.get('row_count', 0) > 0:
+            formatted = format_query_results(results)
+
+        return {
+            'query_type': query_type,
+            'query_results': results,
+            'query_result_text': formatted,
+            'row_count': results.get('row_count', 0)
+        }

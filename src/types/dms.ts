@@ -6,6 +6,7 @@ export interface DMSDocument {
   workspace_id: string | null;
   phase_id: string | null;
   parcel_id: string | null;
+  parcel_id_int?: string | null;
   doc_name: string;
   doc_type: string | null;
   discipline: string | null;

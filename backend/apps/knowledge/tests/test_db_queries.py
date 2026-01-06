@@ -242,6 +242,7 @@ class TestSchemaContext:
 class TestIntegration:
     """Integration tests for the full flow."""
 
+    @patch('apps.knowledge.services.rag_retrieval.generate_embedding')
     @patch('apps.knowledge.services.rag_retrieval.search_similar')
     @patch('apps.knowledge.services.rag_retrieval.get_project_schema_context')
     @patch('apps.knowledge.services.rag_retrieval.execute_project_query')
@@ -251,7 +252,8 @@ class TestIntegration:
         mock_detect,
         mock_execute,
         mock_schema,
-        mock_search
+        mock_search,
+        mock_embedding
     ):
         """Test that DB queries are tried first."""
         mock_detect.return_value = 'parcel_count'
@@ -262,6 +264,7 @@ class TestIntegration:
         }
         mock_schema.return_value = "Schema context"
         mock_search.return_value = []
+        mock_embedding.return_value = [0.0]
 
         context = retrieve_rag_context(
             query="How many parcels?",
@@ -272,6 +275,7 @@ class TestIntegration:
         assert context.db_query_result is not None
         assert 'database' in context.sources_used
 
+    @patch('apps.knowledge.services.rag_retrieval.generate_embedding')
     @patch('apps.knowledge.services.rag_retrieval.search_similar')
     @patch('apps.knowledge.services.rag_retrieval.get_project_schema_context')
     @patch('apps.knowledge.services.rag_retrieval.detect_query_intent')
@@ -279,7 +283,8 @@ class TestIntegration:
         self,
         mock_detect,
         mock_schema,
-        mock_search
+        mock_search,
+        mock_embedding
     ):
         """Test fallback to RAG when no DB match."""
         mock_detect.return_value = None  # No DB match
@@ -287,6 +292,7 @@ class TestIntegration:
         mock_search.return_value = [
             {'content_text': 'Document content', 'source_id': 1, 'source_type': 'document_chunk'}
         ]
+        mock_embedding.return_value = [0.0]
 
         context = retrieve_rag_context(
             query="What does the market study say?",

@@ -16,6 +16,9 @@ from django.db import connection, transaction
 from datetime import datetime
 
 from .field_registry import get_registry, FieldMapping
+from apps.landscaper.opex_mapping import OPEX_ACCOUNT_MAPPING
+from apps.projects.primary_measure import sync_primary_measure_on_legacy_update
+from .opex_utils import upsert_opex_entry, resolve_opex_category
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +217,14 @@ class ExtractionWriter:
                     # Check if we used ON CONFLICT
                     if 'ON CONFLICT' not in sql:
                         return False, f"No rows updated for {table}.{column}"
+                if table in ('tbl_project', 'tbl_multifamily_property', 'tbl_cre_property'):
+                    sync_primary_measure_on_legacy_update(
+                        project_id=self.project_id,
+                        table=table,
+                        column=column,
+                        value=converted_value,
+                        cursor=cursor
+                    )
             except Exception as e:
                 logger.error(f"SQL error: {e}")
                 return False, f"Database error: {str(e)}"
@@ -281,30 +292,62 @@ class ExtractionWriter:
         value: Any,
         selector: Dict
     ) -> Tuple[bool, str]:
-        """Write to tbl_operating_expense."""
+        """
+        Write operating expenses to the canonical tbl_operating_expenses table.
 
-        category_name = selector.get('category_name', mapping.label)
+        Mapping resolver precedence:
+        1) selector-provided category/category_name
+        2) mapping.label
+        3) alias match via OPEX_ACCOUNT_MAPPING
+        """
 
-        # Convert value to decimal
-        try:
-            amount = Decimal(str(value).replace(',', '').replace('$', ''))
-        except (InvalidOperation, ValueError):
-            return False, f"Invalid amount value: {value}"
+        category_label = selector.get('category') or selector.get('category_name') or mapping.label
+        selector = dict(selector or {})
+        result = upsert_opex_entry(
+            connection,
+            self.project_id,
+            category_label,
+            value,
+            selector
+        )
+        if result.get('success'):
+            action = result.get('action', 'updated')
+            return True, f"{action.title()} OpEx: {category_label}"
+        return False, result.get('error', 'Unknown error')
 
-        # Use upsert with the unique constraint on (project_id, expense_category)
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO landscape.tbl_operating_expense
-                    (project_id, expense_category, category_name, amount, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, NOW(), NOW())
-                ON CONFLICT (project_id, expense_category)
-                DO UPDATE SET
-                    amount = EXCLUDED.amount,
-                    category_name = EXCLUDED.category_name,
-                    updated_at = NOW()
-            """, [self.project_id, category_name, category_name, amount])
 
-        return True, f"Wrote OpEx: {category_name}"
+    def write_opex_entry(
+        self,
+        category_label: str,
+        amount: Any,
+        selector: Optional[Dict] = None
+    ) -> Tuple[bool, str]:
+        """
+        Convenience entry point to write an OpEx row without a full FieldMapping.
+        Used by replay/validation scripts.
+        """
+        fake_mapping = FieldMapping(
+            property_type=self.property_type,
+            field_key='opex_manual',
+            label=category_label,
+            field_type='currency',
+            required=False,
+            default=None,
+            extractability='medium',
+            extract_policy='propose_for_validation',
+            source_priority='doc>user>benchmark',
+            scope='project',
+            evidence_types=[],
+            db_write_type='row_opex',
+            resolved=True,
+            resolved_table='tbl_operating_expenses',
+            resolved_column='annual_amount',
+            selector_json=selector or {},
+            db_target='tbl_operating_expenses.annual_amount',
+            field_role='input',
+            analytical_tier_default='supporting'
+        )
+        return self._write_opex(fake_mapping, amount, selector or {})
 
     def _write_allocation(
         self,

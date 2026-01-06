@@ -272,8 +272,8 @@ python manage.py test apps.acquisition
 ## Related Documentation
 
 - [Django Backend Implementation](../../docs/03-api-reference/DJANGO_BACKEND_IMPLEMENTATION.md)
-- [Session Notes: Acquisition Fixes](../../docs/session-notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
-- [Implementation Status](../../docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-13.md)
+- [Session Notes: Acquisition Fixes](../../docs/09_session_notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
+- [Implementation Status](../../docs/00_overview/status/IMPLEMENTATION_STATUS_25-11-13.md)
 
 ## Change Log
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UnifiedSidebar } from '@/components/layout/UnifiedSidebar';
+import { AgentSidebar as UnifiedSidebar } from './AgentSidebar';
 
 interface ProjectLayoutClientProps {
   projectId: string;

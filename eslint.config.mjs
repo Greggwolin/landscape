@@ -28,7 +28,7 @@ const eslintConfig = [
       "backend/**/*.py",
       // Ignore documentation and examples
       "Documentation/**",
-      "docs/examples/**",
+      "docs/09_session_notes/examples/**",
       "docs/**/*.tsx",
       // Ignore reference materials
       "reference/**",

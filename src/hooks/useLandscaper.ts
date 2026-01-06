@@ -1,199 +1,147 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { emitFieldUpdate } from './useFieldRefresh';
-
-export interface ColumnDef {
-  key: string;
-  label: string;
-  width?: number;
-  format?: 'currency' | 'number' | 'decimal' | 'percent';
-}
+import { useState, useCallback, useEffect } from 'react';
 
 export interface ChatMessage {
-  id: string;
+  messageId: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  createdAt: string;
   metadata?: {
-    suggestedValues?: Record<string, string>;
-    confidenceLevel?: 'low' | 'medium' | 'high';
-    context?: {
-      chunks_retrieved?: number;
-      sources?: string[];
-      db_query_matched?: boolean;
-      db_query_type?: string;
-      primary_source?: string;
-    };
+    sources?: Array<{ filename: string; similarity?: number; doc_id?: number }>;
+    fieldUpdates?: Record<string, unknown>;
+    db_query_used?: string;
+    rag_chunks_used?: number;
+    client_request_id?: string;
   };
-  // Structured data for table rendering
-  structuredData?: Record<string, unknown>[];
-  dataType?: 'table' | 'list';
-  dataTitle?: string;
-  columns?: ColumnDef[];
 }
 
-interface ChatHistoryResponse {
-  success: boolean;
-  messages: Array<{ role: string; content: string }>;
-  count: number;
-  error?: string;
+interface UseLandscaperOptions {
+  projectId: string;
+  activeTab?: string;
+  onFieldUpdate?: (updates: Record<string, unknown>) => void;
 }
 
-export interface FieldUpdate {
-  table: string;
-  field: string;
-  old_value: string | null;
-  new_value: string | null;
-  reason: string;
-  success: boolean;
-}
+export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: UseLandscaperOptions) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-interface SendMessageResponse {
-  success: boolean;
-  messageId: string;
-  content: string;
-  metadata: Record<string, unknown>;
-  context: Record<string, unknown>;
-  // Structured data for table rendering
-  structuredData?: Record<string, unknown>[];
-  dataType?: 'table' | 'list';
-  dataTitle?: string;
-  columns?: ColumnDef[];
-  // Field updates from Landscaper tool calls
-  fieldUpdates?: FieldUpdate[];
-  error?: string;
-}
-
-/**
- * Fetch chat history for a project.
- */
-export function useLandscaperChat(projectId?: string | number) {
-  const id = projectId?.toString() || '';
-
-  return useQuery<ChatHistoryResponse>({
-    queryKey: ['landscaper-chat', id],
-    queryFn: async () => {
-      const response = await fetch(`/api/projects/${id}/landscaper/chat`);
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch chat history');
-      }
-      return response.json();
-    },
-    enabled: Boolean(id),
-    staleTime: 30_000,
-  });
-}
-
-/**
- * Send a message to Landscaper AI.
- * Automatically invalidates project data queries when field updates occur.
- */
-export function useSendMessage(projectId?: string | number) {
-  const queryClient = useQueryClient();
-  const id = projectId?.toString() || '';
-
-  return useMutation<SendMessageResponse, Error, string>({
-    mutationFn: async (message: string) => {
-      if (!id) {
-        throw new Error('Project ID is required');
+  const loadHistory = useCallback(async () => {
+    try {
+      // Build URL with active_tab filter for tab-specific history
+      const url = new URL(`/api/projects/${projectId}/landscaper/chat`, window.location.origin);
+      if (activeTab) {
+        url.searchParams.set('active_tab', activeTab);
       }
 
-      const response = await fetch(`/api/projects/${id}/landscaper/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
+      console.log('[Landscaper] Loading chat history for tab:', activeTab, url.toString());
 
+      const response = await fetch(url.toString());
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send message');
+      if (data.success && data.messages) {
+        console.log('[Landscaper] Loaded', data.messages.length, 'messages for tab:', activeTab);
+        setMessages(data.messages);
       }
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+    }
+  }, [projectId, activeTab]);
 
-      return data;
-    },
-    onSuccess: (data) => {
-      // Always invalidate chat history
-      queryClient.invalidateQueries({ queryKey: ['landscaper-chat', id] });
+  // Reload history when project or tab changes - clear immediately for responsive UX
+  useEffect(() => {
+    console.log('[Landscaper] Tab changed to:', activeTab, '- clearing and reloading');
+    setMessages([]); // Clear old messages immediately
+    loadHistory();
+  }, [projectId, activeTab, loadHistory]);
 
-      // If there were field updates, invalidate project-related queries AND emit event
-      if (data.fieldUpdates && data.fieldUpdates.length > 0) {
-        // Invalidate React Query caches
-        queryClient.invalidateQueries({ queryKey: [`/api/projects/${id}/profile`] });
-        queryClient.invalidateQueries({ queryKey: ['project-details', id] });
-        queryClient.invalidateQueries({ queryKey: ['project', id] });
-        queryClient.invalidateQueries({ queryKey: ['landscaper-activities', id] });
+  const sendMessage = useCallback(
+    async (message: string) => {
+      setIsLoading(true);
+      setError(null);
 
-        // Emit event for SWR-based components (like ProjectProfileTile)
-        emitFieldUpdate({
-          projectId: id,
-          updates: data.fieldUpdates.map((u) => ({
-            table: u.table,
-            field: u.field,
-            old_value: u.old_value,
-            new_value: u.new_value,
-          })),
+      const clientRequestId = crypto.randomUUID();
+
+      const tempUserMessage: ChatMessage = {
+        messageId: `temp-${Date.now()}`,
+        role: 'user',
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, tempUserMessage]);
+
+      try {
+        const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, clientRequestId, activeTab }),
         });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to send message');
+        }
+
+        const assistantMessage: ChatMessage = {
+          messageId: data.messageId,
+          role: 'assistant',
+          content: data.content,
+          metadata: data.metadata,
+          createdAt: data.createdAt,
+        };
+
+        setMessages((prev) => [
+          ...prev.filter((m) => m.messageId !== tempUserMessage.messageId),
+          { ...tempUserMessage, messageId: `user-${data.messageId}` },
+          assistantMessage,
+        ]);
+
+        if (data.metadata?.fieldUpdates && onFieldUpdate) {
+          onFieldUpdate(data.metadata.fieldUpdates);
+        }
+
+        if (data.wasDuplicate) {
+          console.info('Response was cached (duplicate request)');
+        }
+
+        return assistantMessage;
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
     },
-  });
-}
+    [projectId, activeTab, onFieldUpdate]
+  );
 
-/**
- * Clear chat history.
- */
-export function useClearChat(projectId?: string | number) {
-  const queryClient = useQueryClient();
-  const id = projectId?.toString() || '';
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!id) {
-        throw new Error('Project ID is required');
-      }
-
-      const response = await fetch(`/api/projects/${id}/landscaper/chat`, {
+  const clearChat = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to clear chat history');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['landscaper-chat', id] });
-    },
-  });
-}
-
-/**
- * Search documents without AI response.
- */
-export function useDocumentSearch(projectId?: string | number) {
-  const id = projectId?.toString() || '';
-
-  return useMutation({
-    mutationFn: async (query: string) => {
-      if (!id) {
-        throw new Error('Project ID is required');
-      }
-
-      const response = await fetch(`/api/projects/${id}/landscaper/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-
       const data = await response.json();
 
-      if (!response.ok || data.success === false) {
-        throw new Error(data.error || 'Search failed');
+      if (data.success) {
+        setMessages([]);
       }
 
       return data;
-    },
-  });
+    } catch (err) {
+      console.error('Failed to clear chat:', err);
+      throw err;
+    }
+  }, [projectId]);
+
+  return {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    clearChat,
+    loadHistory,
+  };
 }

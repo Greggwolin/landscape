@@ -2,88 +2,64 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import {
-  useSendMessage,
-  useLandscaperChat,
-  ChatMessage,
-} from '@/hooks/useLandscaper';
+import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
 import { ChatMessageBubble } from './ChatMessageBubble';
 
 interface LandscaperChatProps {
   projectId: number;
+  activeTab?: string;
   isIngesting?: boolean;
   ingestionProgress?: number; // 0-100
   ingestionMessage?: string;
 }
 
-export function LandscaperChat({ projectId, isIngesting, ingestionProgress = 0, ingestionMessage }: LandscaperChatProps) {
+/**
+ * Get context-aware hint for the current tab.
+ */
+function getTabContextHint(tab: string): string {
+  const hints: Record<string, string> = {
+    'home': 'Project Overview',
+    'property': 'Property Details & Site',
+    'operations': 'Rent Roll & Operating Expenses',
+    'feasibility': 'Returns & Feasibility Analysis',
+    'capitalization': 'Capital Structure & Financing',
+    'reports': 'Reports & Analytics',
+    'documents': 'Document Management',
+  };
+  return hints[tab] || 'General';
+}
+
+export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage }: LandscaperChatProps) {
   const [input, setInput] = useState('');
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userHasSentMessage = useRef(false);
   const prevMessageCount = useRef(0);
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
+  const tabContextHint = getTabContextHint(activeTab);
 
-  const { data: chatHistory } = useLandscaperChat(projectId);
-  const { mutate: sendMessage, isPending } = useSendMessage(projectId);
-
-  // Sync server messages to local state
-  useEffect(() => {
-    if (chatHistory?.messages) {
-      const formatted: ChatMessage[] = chatHistory.messages.map((msg, idx) => ({
-        id: `msg_${idx}`,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date().toISOString(),
-      }));
-      setLocalMessages(formatted);
-    }
-  }, [chatHistory]);
+  const { messages, sendMessage, isLoading } = useLandscaper({
+    projectId: projectId.toString(),
+    activeTab,
+  });
 
   // Auto-scroll only after user interaction
   useEffect(() => {
-    if (userHasSentMessage.current && localMessages.length > prevMessageCount.current) {
+    if (userHasSentMessage.current && messages.length > prevMessageCount.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-    prevMessageCount.current = localMessages.length;
-  }, [localMessages]);
+    prevMessageCount.current = messages.length;
+  }, [messages]);
 
   const handleSend = () => {
-    if (!input.trim() || isPending) return;
+    if (!input.trim() || isLoading) return;
 
     userHasSentMessage.current = true;
 
-    const userMessage: ChatMessage = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    setLocalMessages((prev) => [...prev, userMessage]);
+    const currentMessage = input.trim();
     setInput('');
 
-    sendMessage(input.trim(), {
-      onSuccess: (response) => {
-        const assistantMessage: ChatMessage = {
-          id: response.messageId,
-          role: 'assistant',
-          content: response.content,
-          timestamp: new Date().toISOString(),
-          metadata: {
-            ...response.metadata,
-            context: response.context,
-          },
-          structuredData: response.structuredData || undefined,
-          dataType: response.dataType || undefined,
-          dataTitle: response.dataTitle || undefined,
-          columns: response.columns || undefined,
-        };
-        setLocalMessages((prev) => [...prev, assistantMessage]);
-      },
-      onError: () => {
-        setLocalMessages((prev) => prev.slice(0, -1));
-      },
+    sendMessage(currentMessage).catch(() => {
+      setInput(currentMessage);
     });
   };
 
@@ -102,6 +78,19 @@ export function LandscaperChat({ projectId, isIngesting, ingestionProgress = 0, 
         <span className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
           Landscaper
         </span>
+
+        {/* Context indicator - shows which tab Landscaper is focused on */}
+        {!isIngesting && (
+          <span
+            className="ml-auto text-xs px-2 py-0.5 rounded"
+            style={{
+              color: 'var(--cui-secondary-color)',
+              backgroundColor: 'var(--cui-tertiary-bg)',
+            }}
+          >
+            {tabContextHint}
+          </span>
+        )}
 
         {/* Ingestion Progress Gauge */}
         {isIngesting && (
@@ -157,18 +146,18 @@ export function LandscaperChat({ projectId, isIngesting, ingestionProgress = 0, 
         className="flex-1 overflow-y-auto p-4 space-y-3"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
-        {localMessages.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="py-8 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
             <p className="text-sm">{promptCopy}</p>
             <p className="text-xs mt-1">Budget, market analysis, assumptions, documents...</p>
           </div>
         ) : (
-          localMessages.map((msg) => (
-            <ChatMessageBubble key={msg.id} message={msg} />
+          messages.map((msg: ChatMessage) => (
+            <ChatMessageBubble key={msg.messageId} message={msg} />
           ))
         )}
 
-        {isPending && (
+        {isLoading && (
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
             <div className="h-4 w-4 animate-spin rounded-full border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
             <span>Thinking...</span>
@@ -195,11 +184,11 @@ export function LandscaperChat({ projectId, isIngesting, ingestionProgress = 0, 
               backgroundColor: 'var(--cui-body-bg)',
               color: 'var(--cui-body-color)',
             }}
-            disabled={isPending}
+            disabled={isLoading}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isPending}
+            disabled={!input.trim() || isLoading}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: 'var(--cui-primary)' }}
           >

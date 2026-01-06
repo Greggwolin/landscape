@@ -1,228 +1,216 @@
 """
-API views for Landscaper chat with RAG.
+Canonical chat endpoint for Landscaper.
+Orchestrates: Idempotency check -> DB-first queries -> RAG retrieval -> AI response -> persistence
+
+Returns unified response contract - Next.js should pass through without transformation.
 """
 import json
-from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt
-from django.db import connection
+import logging
 
-from ..services.landscaper_ai import (
-    get_landscaper_response,
-    save_chat_message,
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from ..services.rag_retrieval import RAGRetriever
+from ..services.landscaper_ai import get_landscaper_response
+from ..services.query_builder import QueryBuilder
+from ..contracts import (
+    ChatResponse,
+    ChatHistoryResponse,
+    ChatMessage,
+    ChatMetadata,
+    ChatSource,
+    error_response
 )
-from ..services.rag_retrieval import get_conversation_context
+from apps.landscaper.services.message_storage import (
+    check_idempotency,
+    save_message_pair,
+    get_history,
+    clear_history,
+    get_recent_context
+)
+
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
-@require_http_methods(["GET"])
-def get_chat_history(request, project_id):
+@require_http_methods(["GET", "POST"])
+def chat(request, project_id: int):
     """
-    GET /api/knowledge/chat/{project_id}/
+    Unified chat endpoint.
 
-    Retrieve chat history for a project.
+    GET: Retrieve chat history
+    POST: Send message, get AI response with DB-first + RAG context
+
+    Response shapes are defined in contracts.py - Next.js passes through as-is.
     """
+    if request.method == "GET":
+        return _get_chat_history(request, project_id)
+    return _send_message(request, project_id)
+
+
+def _get_chat_history(request, project_id: int) -> JsonResponse:
+    """Get chat history for project, optionally filtered by tab."""
     try:
-        limit = int(request.GET.get('limit', 50))
-        messages = get_conversation_context(project_id, limit=limit)
+        limit = int(request.GET.get('limit', 100))
+        before_id = request.GET.get('before_id')
+        active_tab = request.GET.get('active_tab')  # Optional tab filter
 
-        return JsonResponse({
-            'success': True,
-            'project_id': project_id,
-            'messages': messages,
-            'count': len(messages)
-        })
+        raw_messages = get_history(project_id, limit=limit, before_id=before_id, active_tab=active_tab)
+
+        messages = [
+            ChatMessage(
+                message_id=m['message_id'],
+                role=m['role'],
+                content=m['content'],
+                created_at=m['created_at'],
+                metadata=m.get('metadata')
+            )
+            for m in raw_messages
+        ]
+
+        response = ChatHistoryResponse(
+            success=True,
+            messages=messages,
+            project_id=project_id
+        )
+
+        return JsonResponse(response.to_dict())
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.exception("Error getting chat history for project %s", project_id)
+        return JsonResponse(error_response(str(e)), status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def send_message(request, project_id):
+def _send_message(request, project_id: int) -> JsonResponse:
     """
-    POST /api/knowledge/chat/{project_id}/send/
+    Process user message with full context stack:
 
-    Send a message and get AI response.
-
-    Request body:
-    {
-        "message": "What absorption rate should I use?",
-        "conversation_history": [...]  // optional, will fetch from DB if not provided
-    }
+    1. Parse request + check idempotency
+    2. Detect intent and run DB queries (DB-FIRST)
+    3. Retrieve relevant document chunks (RAG, project-scoped)
+    4. Build enriched prompt
+    5. Get AI response
+    6. Persist messages atomically
+    7. Return unified response (no transformation needed by Next.js)
     """
     try:
         data = json.loads(request.body)
         user_message = data.get('message', '').strip()
+        client_request_id = data.get('clientRequestId') or data.get('client_request_id')
+        active_tab = data.get('active_tab', 'home')  # Tab context for focused responses
 
         if not user_message:
-            return JsonResponse({
-                'success': False,
-                'error': 'Message is required'
-            }, status=400)
+            return JsonResponse(error_response('Message is required'), status=400)
 
-        # Optional: use provided history or fetch from DB
-        conversation_history = data.get('conversation_history')
+        if client_request_id:
+            cached = check_idempotency(project_id, client_request_id)
+            if cached:
+                logger.info("Returning cached response for request %s", client_request_id)
 
-        # Get user_id if authenticated
-        user_id = None
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            user_id = request.user.id
+                cached_metadata = cached.get('metadata') or {}
+                cached_sources = [
+                    ChatSource(
+                        filename=source.get('filename', 'Unknown'),
+                        doc_id=source.get('doc_id'),
+                        similarity=source.get('similarity')
+                    )
+                    for source in cached_metadata.get('sources', [])
+                    if isinstance(source, dict)
+                ]
 
-        # Save user message
-        save_chat_message(
-            project_id=project_id,
-            role='user',
-            content=user_message,
-            user_id=user_id
-        )
+                response = ChatResponse(
+                    success=True,
+                    message_id=cached['message_id'],
+                    content=cached['content'],
+                    metadata=ChatMetadata(
+                        sources=cached_sources,
+                        db_query_used=cached_metadata.get('db_query_used'),
+                        rag_chunks_used=cached_metadata.get('rag_chunks_used', 0),
+                        field_updates=cached_metadata.get('fieldUpdates'),
+                        client_request_id=client_request_id,
+                    ),
+                    created_at=cached['created_at'],
+                    was_duplicate=True
+                )
+                return JsonResponse(response.to_dict())
 
-        # Get AI response with RAG context
-        response = get_landscaper_response(
+        conversation_history = get_recent_context(project_id, max_messages=10)
+
+        query_builder = QueryBuilder(project_id)
+        db_context = query_builder.build_context(user_message)
+
+        rag_retriever = RAGRetriever(project_id)
+        rag_context = rag_retriever.retrieve(user_message)
+
+        ai_response = get_landscaper_response(
             user_message=user_message,
             project_id=project_id,
-            conversation_history=conversation_history
+            conversation_history=conversation_history,
+            db_context=db_context,
+            rag_context=rag_context,
+            active_tab=active_tab
         )
 
-        # Save assistant response
-        save_chat_message(
+        sources = []
+        if rag_context and rag_context.get('chunks'):
+            for chunk in rag_context['chunks'][:3]:
+                sources.append(ChatSource(
+                    filename=chunk.get('filename', 'Unknown'),
+                    doc_id=chunk.get('source_doc_id'),
+                    similarity=chunk.get('similarity')
+                ))
+
+        # Include tool execution info from AI response
+        ai_metadata = ai_response.get('metadata', {})
+
+        metadata = ChatMetadata(
+            sources=sources,
+            db_query_used=db_context.get('query_type') if db_context else None,
+            rag_chunks_used=len(rag_context.get('chunks', [])) if rag_context else 0,
+            field_updates=ai_response.get('suggestions'),
+            client_request_id=client_request_id,
+            tools_used=ai_metadata.get('tools_used'),
+            tool_executions=ai_metadata.get('tool_executions')
+        )
+
+        user_msg, assistant_msg = save_message_pair(
             project_id=project_id,
-            role='assistant',
-            content=response['content'],
-            metadata=response.get('metadata'),
-            user_id=user_id
+            user_content=user_message,
+            assistant_content=ai_response['content'],
+            client_request_id=client_request_id,
+            metadata=metadata.to_dict(),
+            active_tab=active_tab
         )
 
-        return JsonResponse({
-            'success': True,
-            'response': {
-                'content': response['content'],
-                'metadata': response.get('metadata', {}),
-                'context': response.get('context_used', {}),
-                # NEW: Structured data for table rendering
-                'structured_data': response.get('structured_data'),
-                'data_type': response.get('data_type'),
-                'data_title': response.get('data_title'),
-                'columns': response.get('columns'),
-            }
-        })
+        response = ChatResponse(
+            success=True,
+            message_id=assistant_msg['message_id'],
+            content=ai_response['content'],
+            metadata=metadata,
+            created_at=assistant_msg['created_at'],
+            was_duplicate=False
+        )
+
+        return JsonResponse(response.to_dict())
 
     except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid JSON'
-        }, status=400)
-
+        return JsonResponse(error_response('Invalid JSON'), status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.exception("Error processing message for project %s", project_id)
+        return JsonResponse(error_response(str(e)), status=500)
 
 
 @csrf_exempt
 @require_http_methods(["DELETE"])
-def clear_chat_history(request, project_id):
-    """
-    DELETE /api/knowledge/chat/{project_id}/clear/
-
-    Clear chat history for a project.
-    """
+def clear_chat(request, project_id: int):
+    """Clear chat history for project."""
     try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                DELETE FROM landscape.landscaper_chat_message
-                WHERE project_id = %s
-            """, [project_id])
-
-            deleted_count = cursor.rowcount
-
+        deleted_count = clear_history(project_id)
         return JsonResponse({
             'success': True,
-            'deleted_count': deleted_count
+            'deletedCount': deleted_count
         })
-
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def search_documents(request, project_id):
-    """
-    POST /api/knowledge/chat/{project_id}/search/
-
-    Search document embeddings without generating AI response.
-    Useful for showing relevant documents as user types.
-
-    Request body:
-    {
-        "query": "absorption rate",
-        "limit": 5,
-        "threshold": 0.7
-    }
-    """
-    try:
-        data = json.loads(request.body)
-        query = data.get('query', '').strip()
-
-        if not query:
-            return JsonResponse({
-                'success': False,
-                'error': 'Query is required'
-            }, status=400)
-
-        limit = int(data.get('limit', 5))
-        threshold = float(data.get('threshold', 0.7))
-
-        from ..services.embedding_storage import search_similar
-
-        results = search_similar(
-            query_text=query,
-            limit=limit,
-            similarity_threshold=threshold
-        )
-
-        # Enrich with document metadata
-        if results:
-            doc_ids = list(set(r['source_id'] for r in results if r.get('source_type') == 'document_chunk'))
-
-            if doc_ids:
-                with connection.cursor() as cursor:
-                    placeholders = ','.join(['%s'] * len(doc_ids))
-                    cursor.execute(f"""
-                        SELECT doc_id, doc_name, doc_type
-                        FROM landscape.core_doc
-                        WHERE doc_id IN ({placeholders})
-                    """, doc_ids)
-
-                    doc_metadata = {row[0]: {'doc_name': row[1], 'doc_type': row[2]} for row in cursor.fetchall()}
-
-                    for r in results:
-                        doc_id = r.get('source_id')
-                        if doc_id in doc_metadata:
-                            r.update(doc_metadata[doc_id])
-
-        return JsonResponse({
-            'success': True,
-            'results': results,
-            'count': len(results)
-        })
-
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid JSON'
-        }, status=400)
-
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+        logger.exception("Error clearing chat for project %s", project_id)
+        return JsonResponse(error_response(str(e)), status=500)

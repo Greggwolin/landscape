@@ -161,12 +161,12 @@ export const dmsDb = {
   async createDocument(doc: Omit<CoreDoc, 'doc_id' | 'created_at' | 'updated_at'>): Promise<CoreDoc> {
     const result = await sql<CoreDoc[]>`
       INSERT INTO landscape.core_doc (
-        project_id, workspace_id, phase_id, parcel_id, doc_name, doc_type,
+        project_id, workspace_id, phase_id, parcel_id, parcel_id_int, doc_name, doc_type,
         discipline, mime_type, file_size_bytes, sha256_hash, storage_uri,
         version_no, parent_doc_id, status, profile_json, created_by, updated_by
       )
       VALUES (
-        ${doc.project_id}, ${doc.workspace_id}, ${doc.phase_id || null}, ${doc.parcel_id || null},
+        ${doc.project_id}, ${doc.workspace_id}, ${doc.phase_id || null}, ${doc.parcel_id || null}, ${doc.parcel_id || null},
         ${doc.doc_name}, ${doc.doc_type}, ${doc.discipline || null}, ${doc.mime_type},
         ${doc.file_size_bytes}, ${doc.sha256_hash}, ${doc.storage_uri}, ${doc.version_no},
         ${doc.parent_doc_id || null}, ${doc.status}, ${JSON.stringify(doc.profile_json)},
@@ -251,12 +251,16 @@ export const dmsDb = {
   }) {
     const limit = params.limit || 50;
     const offset = params.offset || 0;
+    const normalizeParcelId = <T extends { parcel_id?: number; parcel_id_int?: number }>(row: T) => ({
+      ...row,
+      parcel_id: row.parcel_id_int ?? row.parcel_id,
+    });
 
     // For now, return a simple query with the most common filters
     // This is a fallback when Meilisearch is not available
     
     if (params.projectId && params.workspaceId) {
-      return await sql`
+      const rows = await sql`
         SELECT 
           d.*,
           p.project_name,
@@ -276,8 +280,9 @@ export const dmsDb = {
         ORDER BY d.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
+      return rows.map(normalizeParcelId);
     } else if (params.projectId) {
-      return await sql`
+      const rows = await sql`
         SELECT 
           d.*,
           p.project_name,
@@ -293,6 +298,7 @@ export const dmsDb = {
         ORDER BY d.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
+      return rows.map(normalizeParcelId);
     } else {
       // Return empty result set if no project specified
       return [];

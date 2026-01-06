@@ -16,6 +16,7 @@ interface OpexAccount {
   sort_order: number;
   opex_id: number | null;
   annual_amount: number | null;
+  amount_per_sf: number | null;
   calculation_basis: string | null;
   unit_amount: number | null;
   is_auto_calculated: boolean | null;
@@ -100,6 +101,7 @@ export async function GET(
         c.sort_order,
         oe.opex_id,
         oe.annual_amount,
+        oe.amount_per_sf,
         oe.calculation_basis,
         oe.unit_amount,
         oe.is_auto_calculated,

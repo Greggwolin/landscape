@@ -8,6 +8,7 @@ import { ExtractionReviewModal } from './ExtractionReviewModal';
 
 interface LandscaperPanelProps {
   projectId: number;
+  activeTab?: string;
 }
 
 interface UploadResult {
@@ -52,7 +53,7 @@ interface ExtractionResult {
   };
 }
 
-export function LandscaperPanel({ projectId }: LandscaperPanelProps) {
+export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
   const [isActivityExpanded, setActivityExpanded] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -513,25 +514,26 @@ export function LandscaperPanel({ projectId }: LandscaperPanelProps) {
           {dropNotice}
         </div>
       )}
-      {/* Landscaper Chat Card */}
+      {/* Landscaper Chat Card - reduced height to ensure Activity Feed is visible */}
       <div
         className={`flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden ${
-          isActivityExpanded ? 'flex-[0.4]' : 'flex-1'
+          isActivityExpanded ? 'flex-[0.35]' : 'flex-1'
         }`}
-        style={{ backgroundColor: 'var(--cui-card-bg)' }}
+        style={{ backgroundColor: 'var(--cui-card-bg)', maxHeight: isActivityExpanded ? '45vh' : undefined }}
       >
         <LandscaperChat
           projectId={projectId}
+          activeTab={activeTab}
           isIngesting={isUploading || uploadThingIsUploading}
           ingestionProgress={uploadProgress}
           ingestionMessage={uploadMessage}
         />
       </div>
 
-      {/* Activity Feed Card - Separate standalone, taller to show more content */}
+      {/* Activity Feed Card - More prominent to show content without scrolling */}
       <div
         className={`rounded-xl shadow-lg overflow-hidden ${
-          isActivityExpanded ? 'flex-[0.6] min-h-[300px]' : 'flex-none'
+          isActivityExpanded ? 'flex-[0.65] min-h-[250px]' : 'flex-none'
         }`}
         style={{ backgroundColor: 'var(--cui-card-bg)' }}
       >

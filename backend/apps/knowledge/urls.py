@@ -3,7 +3,7 @@ Knowledge API URLs
 """
 
 from django.urls import path
-from .views import session_views, extraction_views, status_views
+from .views import session_views, extraction_views, status_views, chat_views
 
 urlpatterns = [
     # Session management
@@ -53,4 +53,8 @@ urlpatterns = [
     path('documents/<int:doc_id>/reprocess/', status_views.reprocess_document, name='knowledge-doc-reprocess'),
     path('documents/<int:doc_id>/process/', status_views.process_document_now, name='knowledge-doc-process'),
     path('queue/status/', status_views.get_queue_status, name='knowledge-queue-status'),
+
+    # Canonical chat endpoints
+    path('chat/<int:project_id>/', chat_views.chat, name='knowledge_chat'),
+    path('chat/<int:project_id>/clear/', chat_views.clear_chat, name='knowledge_chat_clear'),
 ]

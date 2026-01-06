@@ -49,6 +49,32 @@
   /* Spacing */
   --app-padding: 0.75rem; /* align to nav bar horizontal padding */
   --component-gap: 0.75rem;
+
+  /* Operations Tab - Input styling */
+  --ops-input-as-is: #63b3ed;
+  --ops-input-as-is-bg: rgba(99, 179, 237, 0.12);
+  --ops-input-as-is-border: rgba(99, 179, 237, 0.35);
+  --ops-input-post-reno: #68d391;
+  --ops-input-post-reno-bg: rgba(104, 211, 145, 0.12);
+  --ops-input-post-reno-border: rgba(104, 211, 145, 0.35);
+
+  /* Operations Tab - Evidence (ghost) styling */
+  --ops-evidence-text: rgba(0, 0, 0, 0.4);
+  --ops-evidence-bg: rgba(0, 0, 0, 0.02);
+
+  /* Operations Tab - Layout */
+  --ops-card-bg: #ffffff;
+  --ops-border: #e5e7eb;
+  --ops-section-header-bg: rgba(0, 0, 0, 0.03);
+  --ops-parent-row-bg: rgba(0, 0, 0, 0.02);
+  --ops-subtotal-bg: rgba(0, 0, 0, 0.04);
+  --ops-noi-accent: #38b2ac;
+
+  /* Operations Tab - Semantic colors */
+  --ops-negative: #fc8181;
+  --ops-positive: #68d391;
+  --ops-muted: #a0aec0;
+  --ops-warn: #f6ad55;
 }
 
 /* Dark theme scope - matches CoreUI theme attribute */
@@ -80,4 +106,27 @@
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
+
+  /* Operations Tab - Dark mode (same input colors, adjusted backgrounds) */
+  --ops-input-as-is: #63b3ed;
+  --ops-input-as-is-bg: rgba(99, 179, 237, 0.12);
+  --ops-input-as-is-border: rgba(99, 179, 237, 0.35);
+  --ops-input-post-reno: #68d391;
+  --ops-input-post-reno-bg: rgba(104, 211, 145, 0.12);
+  --ops-input-post-reno-border: rgba(104, 211, 145, 0.35);
+
+  --ops-evidence-text: rgba(255, 255, 255, 0.4);
+  --ops-evidence-bg: rgba(255, 255, 255, 0.02);
+
+  --ops-card-bg: #232a33;
+  --ops-border: #2d3748;
+  --ops-section-header-bg: rgba(0, 0, 0, 0.3);
+  --ops-parent-row-bg: rgba(255, 255, 255, 0.03);
+  --ops-subtotal-bg: rgba(255, 255, 255, 0.03);
+  --ops-noi-accent: #38b2ac;
+
+  --ops-negative: #fc8181;
+  --ops-positive: #68d391;
+  --ops-muted: #a0aec0;
+  --ops-warn: #f6ad55;
 }

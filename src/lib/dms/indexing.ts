@@ -13,7 +13,7 @@ export function documentToSearchable(dbDoc: DMSDocument): SearchableDocument {
     project_id: dbDoc.project_id,
     workspace_id: dbDoc.workspace_id,
     phase_id: dbDoc.phase_id,
-    parcel_id: dbDoc.parcel_id,
+    parcel_id: dbDoc.parcel_id_int ?? dbDoc.parcel_id,
     doc_name: dbDoc.doc_name,
     doc_type: dbDoc.doc_type,
     discipline: dbDoc.discipline,

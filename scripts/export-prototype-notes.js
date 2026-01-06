@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const NOTES_FILE = path.join(__dirname, '../data/prototype-notes.json');
-const DOCS_DIR = path.join(__dirname, '../docs/prototypes');
+const DOCS_DIR = path.join(__dirname, '../docs/09_session_notes/prototypes');
 
 // Prototype metadata - maps IDs to directory paths
 const PROTOTYPE_MAP = {

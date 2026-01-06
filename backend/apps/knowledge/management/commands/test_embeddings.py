@@ -53,7 +53,16 @@ class Command(BaseCommand):
         # Test 3: Similarity search
         self.stdout.write("3. Testing similarity search...")
         query = "apartments for rent in Arizona"
-        results = search_similar(query, limit=5, similarity_threshold=0.5)
+        query_embedding = generate_embedding(query)
+        results = []
+        if query_embedding:
+            results = search_similar(
+                query_embedding=query_embedding,
+                project_id=1,
+                top_k=5,
+                similarity_threshold=0.5,
+                source_types=['document']
+            )
 
         if results:
             self.stdout.write(self.style.SUCCESS(
@@ -61,7 +70,7 @@ class Command(BaseCommand):
             ))
             for r in results:
                 similarity_pct = r['similarity'] * 100
-                content_preview = r['content_text'][:50]
+                content_preview = r['content'][:50]
                 self.stdout.write(
                     f"      - {content_preview}... (similarity: {similarity_pct:.1f}%)"
                 )

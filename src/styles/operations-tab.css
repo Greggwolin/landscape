@@ -1,0 +1,612 @@
+/* Operations Tab Styles
+ * Unified P&L view for Multifamily Operations
+ * Uses CSS variables from tokens.css (--ops-*) and CoreUI (--cui-*)
+ */
+
+/* =============================================================================
+   LAYOUT
+   ============================================================================= */
+
+.ops-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px;
+  min-height: 100%;
+  background-color: var(--cui-body-bg);
+}
+
+/* =============================================================================
+   HEADER
+   ============================================================================= */
+
+.ops-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.ops-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ops-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0;
+}
+
+.ops-header-pills {
+  display: flex;
+  gap: 10px;
+}
+
+.ops-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ops-save-button {
+  padding: 0.375rem 0.875rem;
+  background: var(--cui-primary);
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ops-save-button:hover {
+  filter: brightness(1.1);
+}
+
+.ops-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ops-pill {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  font-size: 0.75rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-pill b {
+  color: var(--cui-body-color);
+}
+
+/* =============================================================================
+   VALUE-ADD TOGGLE
+   ============================================================================= */
+
+.ops-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ops-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--cui-tertiary-bg);
+  border-radius: 0.5rem;
+  border: 1px solid var(--cui-border-color);
+}
+
+.ops-toggle-label {
+  font-size: 0.75rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-toggle {
+  position: relative;
+  width: 2.5rem;
+  height: 1.375rem;
+  background: var(--cui-border-color);
+  border-radius: 0.6875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ops-toggle.on {
+  background: var(--cui-primary);
+}
+
+.ops-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.ops-toggle.on::after {
+  transform: translateX(18px);
+}
+
+/* =============================================================================
+   SECTION CARD
+   ============================================================================= */
+
+.ops-card {
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.ops-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--surface-card-header);
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.ops-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0;
+}
+
+.ops-section-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* =============================================================================
+   DETAIL/SUMMARY TOGGLE
+   ============================================================================= */
+
+.ops-view-toggle {
+  display: flex;
+  background: var(--cui-tertiary-bg);
+  border-radius: 0.375rem;
+  padding: 0.125rem;
+  font-size: 0.75rem;
+}
+
+.ops-view-toggle button {
+  padding: 0.25rem 0.625rem;
+  border: none;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.15s;
+}
+
+.ops-view-toggle button.active {
+  background: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+}
+
+.ops-view-toggle button:hover:not(.active) {
+  color: var(--cui-body-color);
+}
+
+/* =============================================================================
+   ADD BUTTON
+   ============================================================================= */
+
+.ops-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px dashed var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-secondary-color);
+  font-size: 0.75rem;
+  border-radius: 0.3125rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ops-add-btn:hover {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.1);
+}
+
+.ops-inline-add {
+  padding: 0.125rem 0.5rem;
+  border: 1px dashed var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-secondary-color);
+  font-size: 0.625rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.ops-parent-row:hover .ops-inline-add {
+  opacity: 1;
+}
+
+.ops-inline-add:hover {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+}
+
+/* =============================================================================
+   TABLE
+   ============================================================================= */
+
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem; /* 14px - matches text-sm */
+}
+
+/* Column Headers */
+.ops-table thead th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.875rem; /* 14px - matches text-sm */
+  color: var(--cui-secondary-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--surface-card-header);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.ops-table thead th.num {
+  text-align: right;
+}
+
+/* Evidence Column Headers */
+.ops-table thead th.evidence {
+  background: var(--ops-evidence-bg);
+  color: var(--ops-evidence-text);
+  cursor: pointer;
+}
+
+.ops-table thead th.evidence:hover {
+  color: var(--ops-muted);
+}
+
+.ops-table thead th.evidence .chevron {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 8px;
+  transition: transform 0.2s;
+}
+
+.ops-table thead th.evidence.expanded .chevron {
+  transform: rotate(90deg);
+}
+
+/* Post-Reno Column Headers */
+.ops-table thead th.post-reno {
+  background: var(--ops-input-post-reno-bg);
+  color: var(--ops-input-post-reno);
+}
+
+/* Data Rows */
+.ops-table tbody td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  vertical-align: middle;
+  color: var(--cui-body-color);
+}
+
+.ops-table tbody tr:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+/* Numeric Cells */
+.ops-table .num {
+  text-align: right;
+}
+
+/* =============================================================================
+   ROW TYPES
+   ============================================================================= */
+
+/* Parent Row (CoA hierarchy) */
+.ops-parent-row {
+  background: var(--cui-tertiary-bg);
+}
+
+.ops-parent-row td {
+  font-weight: 600;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.ops-parent-row td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-expand-icon {
+  width: 1rem;
+  height: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cui-secondary-color);
+  font-size: 0.625rem;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.ops-expand-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Child Row (indented) */
+.ops-child-row td:first-child {
+  padding-left: 2.25rem;
+}
+
+.ops-child-row td:first-child::before {
+  content: '├─';
+  color: var(--cui-border-color);
+  margin-right: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+}
+
+.ops-child-row:last-of-type td:first-child::before {
+  content: '└─';
+}
+
+/* Subtotal Row */
+.ops-subtotal-row td {
+  background: var(--cui-tertiary-bg);
+  font-weight: 600;
+  border-top: 1px solid var(--cui-border-color);
+  padding: 0.6875rem 0.75rem;
+}
+
+.ops-subtotal-row td.evidence {
+  background: var(--ops-evidence-bg);
+}
+
+/* Grand Total (NOI) Row */
+.ops-grand-total td {
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.1);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  border-top: 2px solid var(--cui-primary);
+  padding: 0.875rem 0.75rem;
+}
+
+/* =============================================================================
+   INPUT CELLS
+   ============================================================================= */
+
+.ops-input {
+  display: inline-flex;
+  justify-content: center;
+  width: 6rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+.ops-input:focus {
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 2px rgba(var(--cui-primary-rgb, 56, 178, 172), 0.2);
+}
+
+/* As-Is Input - subtle blue accent */
+.ops-input-as-is {
+  border-left: 3px solid var(--ops-input-as-is);
+}
+
+/* Post-Reno Input - subtle green accent */
+.ops-input-post-reno {
+  border-left: 3px solid var(--ops-input-post-reno);
+}
+
+/* Calculated (Display Only) */
+.ops-calc {
+  color: var(--cui-secondary-color);
+}
+
+/* =============================================================================
+   EVIDENCE CELLS
+   ============================================================================= */
+
+.ops-table td.evidence {
+  background: var(--ops-evidence-bg);
+  color: var(--ops-evidence-text);
+  font-size: 0.75rem;
+}
+
+/* Evidence column group border */
+.ops-evidence-group {
+  border-left: 1px solid var(--cui-border-color);
+}
+
+/* Hidden when collapsed */
+.ops-evidence-collapsed .ops-evidence-extra {
+  display: none;
+}
+
+.ops-evidence-expanded .ops-evidence-extra {
+  display: table-cell;
+}
+
+/* =============================================================================
+   POST-RENO COLUMNS
+   ============================================================================= */
+
+.ops-table td.post-reno {
+  background: var(--ops-input-post-reno-bg);
+}
+
+/* Hidden when Value-Add mode is off */
+.ops-value-add-hidden .post-reno {
+  display: none;
+}
+
+/* =============================================================================
+   VALUE FORMATTING
+   ============================================================================= */
+
+.ops-negative {
+  color: var(--ops-negative);
+}
+
+.ops-positive {
+  color: var(--ops-positive);
+}
+
+/* =============================================================================
+   GROWTH BADGES
+   ============================================================================= */
+
+.ops-badge {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-secondary-color);
+}
+
+.ops-badge.global {
+  background: var(--cui-tertiary-bg);
+}
+
+.ops-badge.custom {
+  border-color: var(--ops-warn);
+  color: var(--ops-warn);
+  background: rgba(246, 173, 85, 0.08);
+}
+
+.ops-badge.fee {
+  border-color: var(--ops-positive);
+  color: var(--ops-positive);
+  background: rgba(104, 211, 145, 0.08);
+}
+
+/* =============================================================================
+   SUMMARY BAR (Sticky Footer)
+   ============================================================================= */
+
+.ops-summary-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.ops-summary-item {
+  text-align: right;
+}
+
+.ops-summary-label {
+  font-size: 0.75rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--cui-body-color);
+}
+
+.ops-summary-value.positive {
+  color: var(--ops-positive);
+}
+
+.ops-summary-delta {
+  font-size: 0.75rem;
+  color: var(--ops-positive);
+}
+
+/* =============================================================================
+   EGI / NOI SUBTOTAL CARDS
+   ============================================================================= */
+
+.ops-egi-card {
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.06);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.ops-noi-card {
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.08);
+  border: 1px solid var(--cui-primary);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* =============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================= */
+
+@media (max-width: 1200px) {
+  .ops-table thead th,
+  .ops-table tbody td {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .ops-input {
+    min-width: 3.5rem;
+    padding: 0.25rem 0.375rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .ops-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .ops-header-pills {
+    flex-wrap: wrap;
+  }
+}

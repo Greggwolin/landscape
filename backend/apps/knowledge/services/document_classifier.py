@@ -66,6 +66,19 @@ DOCTYPE_TO_EVIDENCE = {
 # Maps CSV evidence_types to DocumentType
 EVIDENCE_TO_DOCTYPE = {v: k for k, v in DOCTYPE_TO_EVIDENCE.items()}
 
+# Maps internal classification types to common template doc_types
+# This allows AI classification to map to user-defined template doc_types
+DOCTYPE_TO_TEMPLATE_MAPPING = {
+    'offering_memorandum': ['Property Data', 'Diligence', 'Operations'],
+    'rent_roll': ['Property Data', 'Operations', 'Leases'],
+    't12': ['Property Data', 'Operations', 'Accounting'],
+    'appraisal': ['Property Data', 'Diligence', 'Reports, Studies'],
+    'comp_report': ['Market Data', 'Property Data', 'Reports, Studies'],
+    'site_plan': ['Entitlements', 'Diligence', 'Sets'],
+    'proforma': ['Property Data', 'Diligence', 'Operations'],
+    'unknown': ['Property Data', 'Other', 'general'],
+}
+
 
 @dataclass
 class ClassificationResult:
@@ -175,11 +188,121 @@ CLASSIFICATION_PATTERNS = {
 }
 
 
+def get_valid_doc_types_for_project(project_id: int) -> List[str]:
+    """
+    Get valid doc_type options from the project's template.
+
+    Args:
+        project_id: The project ID
+
+    Returns:
+        List of valid doc_type strings from the template
+    """
+    with connection.cursor() as cursor:
+        # First try project-specific template
+        cursor.execute("""
+            SELECT doc_type_options
+            FROM landscape.dms_templates
+            WHERE project_id = %s
+            ORDER BY is_default DESC, updated_at DESC
+            LIMIT 1
+        """, [project_id])
+        row = cursor.fetchone()
+
+        if row and row[0]:
+            return row[0]
+
+        # Try to get project type and match template by name
+        cursor.execute("""
+            SELECT project_type FROM landscape.tbl_project WHERE project_id = %s
+        """, [project_id])
+        row = cursor.fetchone()
+        project_type = row[0] if row else None
+
+        if project_type:
+            # Map project_type codes to template names
+            template_name_map = {
+                'MF': 'Commercial / Multifam',
+                'OFF': 'Commercial / Multifam',
+                'RET': 'Commercial / Multifam',
+                'IND': 'Commercial / Multifam',
+                'LAND': 'Land Development',
+                'MXU': 'Land Development',
+            }
+            template_name = template_name_map.get(project_type)
+
+            if template_name:
+                cursor.execute("""
+                    SELECT doc_type_options
+                    FROM landscape.dms_templates
+                    WHERE template_name = %s
+                    ORDER BY is_default DESC, updated_at DESC
+                    LIMIT 1
+                """, [template_name])
+                row = cursor.fetchone()
+                if row and row[0]:
+                    return row[0]
+
+        # Fallback to default template
+        cursor.execute("""
+            SELECT doc_type_options
+            FROM landscape.dms_templates
+            WHERE is_default = true
+            ORDER BY updated_at DESC
+            LIMIT 1
+        """)
+        row = cursor.fetchone()
+        if row and row[0]:
+            return row[0]
+
+        # Ultimate fallback
+        return ['Property Data', 'Diligence', 'Agreements', 'Correspondence', 'Other']
+
+
+def map_to_valid_doc_type(internal_type: str, valid_types: List[str]) -> str:
+    """
+    Map an internal classification type to a valid template doc_type.
+
+    Args:
+        internal_type: The internal classification (e.g., 'offering_memorandum')
+        valid_types: List of valid doc_types from the template
+
+    Returns:
+        A valid doc_type string from the template
+    """
+    # First check if internal_type is already valid (case-insensitive)
+    valid_lower = {t.lower(): t for t in valid_types}
+    if internal_type.lower() in valid_lower:
+        return valid_lower[internal_type.lower()]
+
+    # Get preferred mappings for this internal type
+    preferred = DOCTYPE_TO_TEMPLATE_MAPPING.get(internal_type, ['Property Data', 'Other'])
+
+    # Find first preferred that's in valid_types (case-insensitive)
+    for pref in preferred:
+        if pref.lower() in valid_lower:
+            return valid_lower[pref.lower()]
+
+    # If no match, return first valid type or default
+    return valid_types[0] if valid_types else 'Property Data'
+
+
 class DocumentClassifier:
     """Classifies documents based on content analysis."""
 
     def __init__(self, project_id: Optional[int] = None):
         self.project_id = project_id
+        self._valid_doc_types: Optional[List[str]] = None
+
+    def _get_valid_doc_types(self, project_id: Optional[int] = None) -> List[str]:
+        """Get and cache valid doc_types for the project."""
+        pid = project_id or self.project_id
+        if not pid:
+            return ['Property Data', 'Diligence', 'Other']
+
+        if self._valid_doc_types is None:
+            self._valid_doc_types = get_valid_doc_types_for_project(pid)
+        return self._valid_doc_types
 
     def classify_document(self, doc_id: int) -> ClassificationResult:
         """
@@ -206,16 +329,28 @@ class DocumentClassifier:
         doc_name = doc_info['doc_name']
         content = doc_info['content']
 
+        # Set project_id from document if not already set
+        if not self.project_id and doc_info.get('project_id'):
+            self.project_id = doc_info['project_id']
+
         # First check filename for hints
         filename_type = self._classify_by_filename(doc_name)
         if filename_type and filename_type != DocumentType.UNKNOWN:
             # Boost confidence if filename matches content
             content_result = self._classify_by_content(content)
             if content_result[0] == filename_type:
+                internal_type = DOCTYPE_TO_EVIDENCE.get(filename_type, 'unknown')
+                # Map to valid template doc_type if we have project context
+                if self.project_id:
+                    valid_types = self._get_valid_doc_types()
+                    mapped_type = map_to_valid_doc_type(internal_type, valid_types)
+                else:
+                    mapped_type = internal_type
+
                 return ClassificationResult(
                     doc_type=filename_type,
                     confidence=min(0.98, content_result[1] + 0.1),
-                    evidence_type=DOCTYPE_TO_EVIDENCE.get(filename_type, 'unknown'),
+                    evidence_type=mapped_type,  # Use mapped type
                     matched_patterns=content_result[2],
                     doc_id=doc_id,
                     doc_name=doc_name
@@ -223,11 +358,19 @@ class DocumentClassifier:
 
         # Classify by content
         doc_type, confidence, patterns = self._classify_by_content(content)
+        internal_type = DOCTYPE_TO_EVIDENCE.get(doc_type, 'unknown')
+
+        # Map to valid template doc_type if we have project context
+        if self.project_id:
+            valid_types = self._get_valid_doc_types()
+            mapped_type = map_to_valid_doc_type(internal_type, valid_types)
+        else:
+            mapped_type = internal_type
 
         return ClassificationResult(
             doc_type=doc_type,
             confidence=confidence,
-            evidence_type=DOCTYPE_TO_EVIDENCE.get(doc_type, 'unknown'),
+            evidence_type=mapped_type,  # Use mapped type
             matched_patterns=patterns,
             doc_id=doc_id,
             doc_name=doc_name
@@ -366,27 +509,53 @@ class DocumentClassifier:
 
         return best_type, best_score, matched.get(best_type, [])
 
-    def update_document_classification(self, doc_id: int, doc_type: DocumentType) -> bool:
+    def update_document_classification(
+        self,
+        doc_id: int,
+        doc_type: DocumentType,
+        project_id: Optional[int] = None
+    ) -> bool:
         """
         Update the document's classification in the database.
 
+        Maps internal classification type to a valid template doc_type
+        before saving to ensure only valid doc_types are used.
+
         Args:
             doc_id: Document ID
-            doc_type: Classified document type
+            doc_type: Classified document type (internal)
+            project_id: Optional project ID to look up valid doc_types
 
         Returns:
             True if updated successfully
         """
-        evidence_type = DOCTYPE_TO_EVIDENCE.get(doc_type, 'unknown')
+        internal_type = DOCTYPE_TO_EVIDENCE.get(doc_type, 'unknown')
+
+        # Get valid doc_types for the project
+        pid = project_id or self.project_id
+        if pid:
+            valid_types = self._get_valid_doc_types(pid)
+            # Map internal type to a valid template doc_type
+            final_doc_type = map_to_valid_doc_type(internal_type, valid_types)
+            logger.info(
+                f"Mapped internal type '{internal_type}' to template doc_type "
+                f"'{final_doc_type}' for doc_id={doc_id}"
+            )
+        else:
+            # No project context - use internal type (legacy behavior)
+            final_doc_type = internal_type
+            logger.warning(
+                f"No project_id for doc_id={doc_id}, using internal type '{internal_type}' "
+                f"(may not match template)"
+            )
 
         with connection.cursor() as cursor:
-            # Check if doc_type column exists and update
             cursor.execute("""
                 UPDATE landscape.core_doc
                 SET doc_type = %s,
                     updated_at = NOW()
                 WHERE doc_id = %s
-            """, [evidence_type, doc_id])
+            """, [final_doc_type, doc_id])
 
             return cursor.rowcount > 0
 

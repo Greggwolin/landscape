@@ -10,14 +10,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CButton, CFormTextarea, CSpinner } from '@coreui/react';
 import ChatMessageBubble from './ChatMessageBubble';
-
-interface ChatMessage {
-  message_id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  user_name?: string | null;
-}
+import { ChatMessage } from '@/hooks/useLandscaper';
 
 interface ChatInterfaceProps {
   projectId: number;
@@ -48,7 +41,7 @@ export default function ChatInterface({
   const loadMessages = async () => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/landscaper/chat/`
+        `/api/projects/${projectId}/landscaper/chat`
       );
 
       if (!response.ok) {
@@ -70,16 +63,17 @@ export default function ChatInterface({
     setError(null);
 
     try {
+      const clientRequestId = crypto.randomUUID();
       const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/landscaper/chat/`,
+        `/api/projects/${projectId}/landscaper/chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            content: inputValue.trim(),
-            // user: null, // TODO: Add user ID when auth is implemented
+            message: inputValue.trim(),
+            clientRequestId,
           }),
         }
       );
@@ -90,11 +84,25 @@ export default function ChatInterface({
 
       const data = await response.json();
 
-      // Add both user and assistant messages to the list
+      const userMessage: ChatMessage = {
+        messageId: `temp-${Date.now()}`,
+        role: 'user',
+        content: inputValue.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const assistantMessage: ChatMessage = {
+        messageId: data.messageId,
+        role: 'assistant',
+        content: data.content,
+        metadata: data.metadata,
+        createdAt: data.createdAt,
+      };
+
       const newMessages = [
         ...messages,
-        data.user_message,
-        data.assistant_message,
+        userMessage,
+        assistantMessage,
       ];
       onMessagesUpdate(newMessages);
 
@@ -137,11 +145,8 @@ export default function ChatInterface({
           <>
             {messages.map((message) => (
               <ChatMessageBubble
-                key={message.message_id}
-                role={message.role}
-                content={message.content}
-                timestamp={message.timestamp}
-                userName={message.user_name}
+                key={message.messageId}
+                message={message}
               />
             ))}
             <div ref={messagesEndRef} />

@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { SalesComparable, SalesComparableForm, ValuationReconciliation } from '@/types/valuation';
 import { ComparablesGrid } from './ComparablesGrid';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
-import { LandscaperChatPanel } from './LandscaperChatPanel';
+// LandscaperChatPanel removed - redundant with main Landscaper panel which has tab-aware context
 import { ComparablesMap } from './ComparablesMap';
 import ValuationSalesCompMap from '@/components/map/ValuationSalesCompMap';
 import { LandscapeButton } from '@/components/ui/landscape';
@@ -195,17 +195,8 @@ export function SalesComparisonApproach({
             )}
           </div>
 
-          {/* Bottom Section: Landscaper (left) + Indicated Value (right) - Always 50/50 */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Landscaper AI - Left side */}
-            <LandscaperChatPanel
-              projectId={projectId}
-              comparables={comparables}
-              subjectAskingPrice={47500000}
-              subjectUnits={113}
-            />
-
-            {/* Indicated Value Summary - Right side */}
+          {/* Bottom Section: Indicated Value Summary - Full width (Landscaper panel on left handles valuation questions) */}
+          <div>
             <IndicatedValueSummary
               comparables={comparables}
               reconciliation={reconciliation}
