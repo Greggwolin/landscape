@@ -121,14 +121,5 @@ services/**/.venv/
 archive/
 backup_*/
 
-# Working data files (Excel spreadsheets with local data)
-*.xlsx
-*.xlsm
-!reference/**/*.xlsx
-!reference/**/*.xlsm
-
-# Reference PDFs (large binary files)
-reference/**/*.pdf
-
-# Temporary working files
+# Temporary working files (scratch/throwaway only)
 tmp_*
