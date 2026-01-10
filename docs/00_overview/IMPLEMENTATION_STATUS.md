@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2025-12-23
-**Version:** 2.3
+**Last Updated:** 2026-01-10
+**Version:** 2.4
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1)
 
 ---
@@ -35,7 +35,19 @@ The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL ap
 
 ---
 
-## Current State Snapshot (2025-12-23)
+## Current State Snapshot (2026-01-10)
+
+### 🆕 Latest Updates
+
+**January 10, 2026** - Document Extraction Integration for New Project Modal:
+- ✅ **NewProjectDropZone Integration** - Drop documents to auto-populate project creation form
+- ✅ **Claude API Extraction** - Real-time PDF/image analysis for property data extraction
+- ✅ **Visual Extraction Indicators** - Blue rings and "Auto-filled" badges on populated fields
+- ✅ **Clipboard Paste Support** - Paste documents directly into dropzone
+- ✅ **Form Clear Button** - Reset form without closing modal
+- 📁 **New API:** `/api/landscaper/extract-for-project` - Claude-based extraction
+
+### Previous State Snapshot (2025-12-23)
 
 ### High-Level Summary
 - Next.js 15 frontend with numerous App Router API routes querying Neon PostgreSQL via `src/lib/db.ts` (see `src/app/api/projects/[projectId]/route.ts` for direct table updates).

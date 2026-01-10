@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Document Extraction for New Project Modal (Jan 10, 2026)',
+      path: '/docs/09_session_notes/2026-01-10-document-extraction-integration.md',
+      category: 'AI',
+      description: 'NewProjectDropZone integration - Drop OMs/rent rolls to auto-populate form fields using Claude extraction, visual indicators, clipboard paste support',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-01-10'
+    },
+    {
       title: 'Documentation Reorganization (Jan 6, 2026)',
       path: '/docs/09_session_notes/2026-01-06-documentation-refresh.md',
       category: 'Status',
