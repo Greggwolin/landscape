@@ -55,21 +55,37 @@ export default function ContactsSection({ projectId }: ContactsSectionProps) {
     return <div className="text-gray-500">Loading contacts...</div>;
   }
 
-  // Always show these role sections (even if empty)
-  const standardRoles = ['property_contact', 'listing_broker', 'owner_representative', 'other'];
+  // Role configuration: standard roles to always show (even if empty)
+  const roleConfig: Record<string, string> = {
+    property_contact: 'Property Contact',
+    listing_broker: 'Listing Broker',
+    buyer_broker: 'Buyer Broker',
+    mortgage_broker: 'Mortgage Broker',
+    owner_representative: 'Owner Representative',
+    seller: 'Seller',
+    buyer: 'Buyer',
+    lender: 'Lender',
+    title: 'Title Company',
+    escrow: 'Escrow',
+    attorney: 'Attorney',
+    property_manager: 'Property Manager',
+    other: 'Other Contacts',
+  };
 
-  // Ensure all standard roles are present in display
-  const displayGroups = standardRoles.map(roleKey => {
+  // Show primary roles always, plus any roles that have contacts
+  const primaryRoles = ['property_contact', 'listing_broker', 'mortgage_broker', 'owner_representative'];
+  const rolesWithContacts = contactGroups.map(g => g.role_key);
+  const allRolesToShow = [...new Set([...primaryRoles, ...rolesWithContacts])];
+
+  // Ensure all roles to show are present in display
+  const displayGroups = allRolesToShow.map(roleKey => {
     const existingGroup = contactGroups.find(g => g.role_key === roleKey);
     if (existingGroup) return existingGroup;
 
     // Create empty group for display
     return {
       role_key: roleKey,
-      role_label: roleKey === 'property_contact' ? 'Property Contact'
-        : roleKey === 'listing_broker' ? 'Listing Broker'
-        : roleKey === 'owner_representative' ? 'Owner Representative'
-        : 'Other Contacts',
+      role_label: roleConfig[roleKey] || roleKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
       contacts: []
     };
   });

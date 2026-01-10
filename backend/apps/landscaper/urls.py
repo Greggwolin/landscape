@@ -7,6 +7,11 @@ from .views import (
     ActivityFeedViewSet,
     ExtractionMappingViewSet,
     ExtractionLogViewSet,
+    # Mutation management views
+    PendingMutationsView,
+    ConfirmMutationView,
+    RejectMutationView,
+    ConfirmBatchView,
 )
 
 # Project-scoped endpoints
@@ -127,5 +132,37 @@ urlpatterns = [
             'post': 'review',
         }),
         name='extraction-log-review'
+    ),
+
+    # ========================================================================
+    # Mutation Management Endpoints (Level 2 Autonomy)
+    # ========================================================================
+
+    # Get pending mutations for a project
+    path(
+        'landscaper/projects/<int:project_id>/mutations/pending/',
+        PendingMutationsView.as_view(),
+        name='pending-mutations'
+    ),
+
+    # Confirm a single mutation
+    path(
+        'landscaper/mutations/<str:mutation_id>/confirm/',
+        ConfirmMutationView.as_view(),
+        name='confirm-mutation'
+    ),
+
+    # Reject a single mutation
+    path(
+        'landscaper/mutations/<str:mutation_id>/reject/',
+        RejectMutationView.as_view(),
+        name='reject-mutation'
+    ),
+
+    # Confirm all mutations in a batch
+    path(
+        'landscaper/mutations/batch/<str:batch_id>/confirm/',
+        ConfirmBatchView.as_view(),
+        name='confirm-batch'
     ),
 ]

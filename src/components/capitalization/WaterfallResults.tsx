@@ -112,6 +112,11 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
   const tierDefinitions = data?.tierDefinitions ?? [];
   const periodDistributions = data?.periodDistributions ?? [];
 
+  // Detect if we're in EM mode by checking if all tiers have equity_multiple hurdle type
+  const isEmMode = tierDefinitions.length > 0 && tierDefinitions.every(
+    (t) => t.hurdleType === 'equity_multiple' || t.hurdleType === null
+  );
+
   // Aggregate periods based on selected period type
   const aggregatedDistributions = useMemo((): AggregatedPeriod[] => {
     if (!periodDistributions.length) return [];
@@ -136,6 +141,8 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
         };
       });
     }
+
+    const useDistributionsForCashFlow = true;
 
     // Group periods by quarter or year
     const groups = new Map<string, PeriodDistribution[]>();
@@ -188,12 +195,16 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
 
       if (periodType === 'quarters') {
         const [year, q] = key.split('-');
-        displayPeriod = q;
+        displayPeriod = String(periodCounter);
         displayDate = `${q} ${year}`;
       } else {
         displayPeriod = String(periodCounter);
         displayDate = key;
       }
+
+      const aggregatedCashFlow = useDistributionsForCashFlow
+        ? rows.reduce((sum, r) => sum + (r.lpDist || 0) + (r.gpDist || 0), 0)
+        : rows.reduce((sum, r) => sum + (r.cashFlow || 0), 0);
 
       result.push({
         periodId: periodCounter,
@@ -201,7 +212,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
         displayPeriod,
         displayDate,
         // SUM columns
-        cashFlow: rows.reduce((sum, r) => sum + (r.cashFlow || 0), 0),
+        cashFlow: aggregatedCashFlow,
         lpDist: rows.reduce((sum, r) => sum + (r.lpDist || 0), 0),
         gpDist: rows.reduce((sum, r) => sum + (r.gpDist || 0), 0),
         // LAST value columns
@@ -217,7 +228,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
     });
 
     return result;
-  }, [periodDistributions, periodType]);
+  }, [isEmMode, periodDistributions, periodType]);
 
   // Format with $ sign (for first row, totals row, and summary tables)
   const formatCurrency = (value: number | null | undefined): string => {
@@ -300,10 +311,16 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
     return `${display}%`;
   };
 
-  // Detect if we're in EM mode by checking if all tiers have equity_multiple hurdle type
-  const isEmMode = tierDefinitions.length > 0 && tierDefinitions.every(
-    (t) => t.hurdleType === 'equity_multiple' || t.hurdleType === null
-  );
+  const getTierColSpan = (tier: TierDefinition): number => {
+    const isPrefTier = tier.tierNumber === 1;
+    const isHurdleTier = tier.tierNumber === 2;
+    if (isPrefTier || isHurdleTier) {
+      return isEmMode ? 3 : 4;
+    }
+    return 2;
+  };
+
+  const totalPeriodColumns = 4 + tierDefinitions.reduce((sum, tier) => sum + getTierColSpan(tier), 0);
 
   // Get tier display name based on mode
   const getTierDisplayName = (tier: TierSummary): string => {
@@ -475,7 +492,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                         className="align-middle text-end"
                         style={{ backgroundColor: 'rgba(255, 193, 7, 0.15)', whiteSpace: 'nowrap' }}
                       >
-                        Project<br />Net Income
+                        Project<br />Cash Flow
                       </th>
                       <th
                         rowSpan={2}
@@ -485,19 +502,14 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                         Cume<br />Net Income
                       </th>
                       {tierDefinitions.map((tier) => {
-                        // Determine number of columns for this tier
-                        // Tier 1 (Pref): Accrued Pref + LP + GP + Residual to Hurdle = 4 cols
-                        // Tier 2 (Hurdle): Accrued Hurdle + LP + GP + Residual = 4 cols
-                        // Tier 3 (Residual): LP + GP = 2 cols
-                        const isPrefTier = tier.tierNumber === 1;
-                        const isHurdleTier = tier.tierNumber === 2;
-                        const colSpan = isPrefTier || isHurdleTier ? 4 : 2;
-                        // Rename "Promote" to "Hurdle" in display
+                        const colSpan = getTierColSpan(tier);
                         let displayName = tier.tierName;
                         if (displayName.toLowerCase().includes('promote')) {
                           displayName = displayName.replace(/promote/i, 'Hurdle');
                         }
-                        // Format hurdle rate based on type (% for IRR, x for EMx)
+                        if (isEmMode && tier.tierNumber === 1) {
+                          displayName = 'Return Capital';
+                        }
                         const hurdleSuffix = tier.hurdleType === 'equity_multiple' ? 'x' : '%';
                         return (
                           <th
@@ -519,12 +531,12 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                         const isHurdleTier = tier.tierNumber === 2;
                         return (
                           <React.Fragment key={tier.tierNumber}>
-                            {isPrefTier && (
+                            {isPrefTier && !isEmMode && (
                               <th className="text-end" style={{ fontWeight: 'normal', whiteSpace: 'nowrap' }}>
                                 Accrued<br />Pref
                               </th>
                             )}
-                            {isHurdleTier && (
+                            {isHurdleTier && !isEmMode && (
                               <th className="text-end" style={{ fontWeight: 'normal', whiteSpace: 'nowrap' }}>
                                 Accrued<br />Hurdle
                               </th>
@@ -579,12 +591,12 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                             const isHurdleTier = tier.tierNumber === 2;
                             return (
                               <React.Fragment key={tier.tierNumber}>
-                                {isPrefTier && (
+                                {isPrefTier && !isEmMode && (
                                   <td className="text-end" style={{ color: 'var(--cui-secondary-color)' }}>
                                     {fmt(row.accruedPref)}
                                   </td>
                                 )}
-                                {isHurdleTier && (
+                                {isHurdleTier && !isEmMode && (
                                   <td className="text-end" style={{ color: 'var(--cui-secondary-color)' }}>
                                     {fmt(row.accruedHurdle)}
                                   </td>
@@ -610,7 +622,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                     {aggregatedDistributions.length === 0 && (
                       <tr>
                         <td
-                          colSpan={4 + tierDefinitions.length * 4}
+                          colSpan={totalPeriodColumns}
                           className="text-muted"
                         >
                           No distributions calculated.
@@ -654,10 +666,10 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                           }, 0);
                           return (
                             <React.Fragment key={tier.tierNumber}>
-                              {isPrefTier && (
+                              {isPrefTier && !isEmMode && (
                                 <td className="text-end" style={{ color: 'var(--cui-secondary-color)' }}>—</td>
                               )}
-                              {isHurdleTier && (
+                              {isHurdleTier && !isEmMode && (
                                 <td className="text-end" style={{ color: 'var(--cui-secondary-color)' }}>—</td>
                               )}
                               <td className="text-end">{formatCurrency(lpTotal)}</td>

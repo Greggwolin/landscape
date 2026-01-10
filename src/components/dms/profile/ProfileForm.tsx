@@ -26,7 +26,15 @@ const profileSchema = z.object({
   tags: z.array(z.string()).default([]),
   doc_date: z.string().optional(),
   parties: z.string().optional(), // Comma-separated string for simplicity
-  dollar_amount: z.number().optional(),
+  dollar_amount: z.preprocess((value) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    if (typeof value === 'number' && Number.isNaN(value)) {
+      return undefined;
+    }
+    return value;
+  }, z.number().optional()),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -110,7 +118,7 @@ export default function ProfileForm({
       const profileData = {
         ...data,
         parties: data.parties || undefined,
-        dollar_amount: data.dollar_amount || undefined,
+        dollar_amount: data.dollar_amount ?? undefined,
       };
 
       await onSave(profileData);
@@ -249,7 +257,9 @@ export default function ProfileForm({
                 <span className="text-gray-500 text-sm">$</span>
               </div>
               <input
-                {...register('dollar_amount', { valueAsNumber: true })}
+                {...register('dollar_amount', {
+                  setValueAs: (value) => (value === '' ? undefined : Number(value))
+                })}
                 type="number"
                 id="dollar_amount"
                 step="0.01"

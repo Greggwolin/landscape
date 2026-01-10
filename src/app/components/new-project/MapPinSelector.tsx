@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
 
 export interface GeocodeResult {
   city?: string
@@ -131,7 +132,7 @@ const MapPinSelector = ({
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      style: getEsriHybridStyle(),
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: false

@@ -192,15 +192,6 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
     }).format(value);
   };
 
-  // Format short currency (e.g., $650k)
-  const formatShortCurrency = (value: number | undefined | null) => {
-    if (value === undefined || value === null) return '-';
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    }
-    return `$${Math.round(value / 1000)}k`;
-  };
-
   // Handle sync completion message
   React.useEffect(() => {
     if (lastSyncResult && lastSyncResult.imported_count > 0) {
@@ -293,7 +284,6 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
                     getStatusBadgeClass={getStatusBadgeClass}
                     getSourceBadgeClass={getSourceBadgeClass}
                     formatCurrency={formatCurrency}
-                    formatShortCurrency={formatShortCurrency}
                     getSubdivisionName={getSubdivisionName}
                   />
                 ));
@@ -304,27 +294,30 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
                 <div key={groupKey}>
                   {/* Master Plan Header */}
                   <div
-                    className="list-group-item p-2 d-flex justify-content-between align-items-center"
+                    className="list-group-item p-2 d-flex flex-nowrap justify-content-between align-items-center"
                     style={{
                       cursor: hasMultiple ? 'pointer' : 'default',
-                      backgroundColor: 'var(--bs-tertiary-bg)'
+                      backgroundColor: 'var(--bs-tertiary-bg)',
+                      whiteSpace: 'nowrap',
                     }}
                     onClick={() => hasMultiple && toggleMasterPlan(groupKey)}
                   >
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="d-flex align-items-center gap-2 overflow-hidden" style={{ minWidth: 0 }}>
                       {hasMultiple && (
                         <i className={`bi bi-chevron-${isExpanded ? 'down' : 'right'} text-muted`}></i>
                       )}
                       <i className="bi bi-buildings text-primary"></i>
-                      <span className="fw-semibold">{group.masterPlanName}</span>
+                      <span className="fw-semibold text-truncate" style={{ maxWidth: '260px' }}>
+                        {group.masterPlanName}
+                      </span>
                       <span className="badge bg-secondary-subtle text-secondary-emphasis">
                         {group.competitors.length} subdivisions
                       </span>
                     </div>
-                    <div className="d-flex gap-3 small text-muted">
+                    <div className="d-flex gap-3 small text-muted text-nowrap flex-shrink-0">
                       <span><strong>{group.totalUnits}</strong> units</span>
                       <span>
-                        {formatShortCurrency(group.priceMin)} - {formatShortCurrency(group.priceMax)}
+                        {formatCurrency(group.priceMin)} - {formatCurrency(group.priceMax)}
                       </span>
                       {group.avgAbsorption !== null && (
                         <span><strong>{group.avgAbsorption.toFixed(1)}</strong> /mo avg</span>
@@ -345,7 +338,6 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
                       getStatusBadgeClass={getStatusBadgeClass}
                       getSourceBadgeClass={getSourceBadgeClass}
                       formatCurrency={formatCurrency}
-                      formatShortCurrency={formatShortCurrency}
                       getSubdivisionName={getSubdivisionName}
                     />
                   ))}
@@ -387,7 +379,6 @@ interface CompetitorRowProps {
   getStatusBadgeClass: (status: string) => string;
   getSourceBadgeClass: (source: string) => string;
   formatCurrency: (value: number | undefined | null) => string;
-  formatShortCurrency: (value: number | undefined | null) => string;
   getSubdivisionName: (comp: MarketCompetitiveProject) => string;
 }
 
@@ -408,7 +399,6 @@ function CompetitorRow({
   getStatusBadgeClass,
   getSourceBadgeClass,
   formatCurrency,
-  formatShortCurrency,
   getSubdivisionName,
 }: CompetitorRowProps) {
   const hasProducts = comp.products && comp.products.length > 0;
@@ -439,16 +429,17 @@ function CompetitorRow({
     <div className="list-group-item p-0">
       {/* Main row - single line format for subdivisions */}
       <div
-        className="d-flex justify-content-between align-items-center px-2 py-1"
+        className="d-flex flex-nowrap justify-content-between align-items-center px-2 py-1"
         style={{
           cursor: hasProducts ? 'pointer' : 'default',
           paddingLeft: isIndented ? '2.5rem' : undefined,
           backgroundColor: isIndented ? 'transparent' : undefined,
           minHeight: '2.5rem',
+          whiteSpace: 'nowrap',
         }}
         onClick={() => comp.id && hasProducts && toggleProducts(comp.id)}
       >
-        <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+        <div className="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden" style={{ minWidth: 0 }}>
           {hasProducts && (
             <i className={`bi bi-chevron-${isProductsExpanded ? 'down' : 'right'} text-muted small flex-shrink-0`}></i>
           )}
@@ -481,7 +472,7 @@ function CompetitorRow({
             )}
             {(comp.price_min || comp.price_max) && (
               <span className="text-muted">
-                {formatShortCurrency(comp.price_min)} - {formatShortCurrency(comp.price_max)}
+                {formatCurrency(comp.price_min)} - {formatCurrency(comp.price_max)}
               </span>
             )}
             {comp.absorption_rate_monthly && (
@@ -542,7 +533,7 @@ function ProductsTable({
 
   return (
     <div className="table-responsive">
-      <table className="table table-sm table-borderless mb-0 small">
+      <table className="table table-sm table-borderless mb-0 small text-nowrap">
         <thead>
           <tr className="text-muted">
             <th>Lot</th>
@@ -570,7 +561,7 @@ function ProductsTable({
                 {formatCurrency(prod.price_min)} - {formatCurrency(prod.price_max)}
               </td>
               <td className="text-end">
-                {prod.price_per_sf_avg ? `$${Number(prod.price_per_sf_avg).toFixed(0)}` : '-'}
+                {prod.price_per_sf_avg ? formatCurrency(prod.price_per_sf_avg) : '-'}
               </td>
               <td className="text-end">
                 {prod.units_remaining ?? '-'}

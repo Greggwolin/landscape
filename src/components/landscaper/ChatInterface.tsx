@@ -18,6 +18,8 @@ interface ChatInterfaceProps {
   onMessagesUpdate: (messages: ChatMessage[]) => void;
 }
 
+const REQUEST_TIMEOUT_MS = 90000;
+
 export default function ChatInterface({
   projectId,
   messages,
@@ -27,6 +29,17 @@ export default function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -40,7 +53,7 @@ export default function ChatInterface({
 
   const loadMessages = async () => {
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `/api/projects/${projectId}/landscaper/chat`
       );
 
@@ -64,7 +77,7 @@ export default function ChatInterface({
 
     try {
       const clientRequestId = crypto.randomUUID();
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `/api/projects/${projectId}/landscaper/chat`,
         {
           method: 'POST',
@@ -110,7 +123,11 @@ export default function ChatInterface({
       setInputValue('');
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message. Please try again.');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      } else {
+        setError('Failed to send message. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

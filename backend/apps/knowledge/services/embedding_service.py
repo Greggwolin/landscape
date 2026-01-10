@@ -15,6 +15,7 @@ EMBEDDING_MODEL = "text-embedding-ada-002"
 EMBEDDING_DIMENSIONS = 1536
 MAX_TOKENS = 8191  # ada-002 token limit
 MAX_CHARS = 30000  # Conservative char estimate (~4 chars per token)
+OPENAI_TIMEOUT_SECONDS = 30
 
 
 def _get_client() -> OpenAI:
@@ -40,7 +41,10 @@ def _get_client() -> OpenAI:
             raise ValueError(
                 "OPENAI_API_KEY not found. Set it in backend/.env or environment."
             )
-        _client = OpenAI(api_key=api_key)
+        try:
+            _client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS)
+        except TypeError:
+            _client = OpenAI(api_key=api_key)
     return _client
 
 

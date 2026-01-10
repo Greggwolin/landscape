@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { MessageCircle, Send } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { MessageCircle, Send, Loader2 } from 'lucide-react'
 import type { NewProjectFormData } from './types'
+import NewProjectDropZone from '@/components/projects/onboarding/NewProjectDropZone'
 
 export interface LandscaperMessage {
   id: string
@@ -11,10 +12,20 @@ export interface LandscaperMessage {
   timestamp: Date
 }
 
+// Extracted fields from document processing
+export interface ExtractedFields {
+  [key: string]: {
+    value: any
+    confidence: number
+  }
+}
+
 interface LandscaperPanelProps {
   analysisType: 'Land Development' | 'Income Property' | ''
   formData: NewProjectFormData
   onSuggestionApply?: (field: string, value: string) => void
+  onDocumentExtracted?: (fields: ExtractedFields, file: File) => void
+  isDark?: boolean
 }
 
 // Rule-based response triggers for MVP
@@ -144,10 +155,76 @@ const generateLandscaperResponses = (
   return messages
 }
 
-const LandscaperPanel = ({ analysisType, formData, onSuggestionApply }: LandscaperPanelProps) => {
+const LandscaperPanel = ({
+  analysisType,
+  formData,
+  onSuggestionApply: _onSuggestionApply,
+  onDocumentExtracted,
+  isDark = false
+}: LandscaperPanelProps) => {
   const [userInput, setUserInput] = useState('')
   const [userMessages, setUserMessages] = useState<LandscaperMessage[]>([])
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [showDropZone, setShowDropZone] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Handle document drop and extraction
+  const handleDocumentDrop = useCallback(async (file: File) => {
+    setIsExtracting(true)
+    setShowDropZone(false)
+
+    // Add receipt message
+    const receiptMessage: LandscaperMessage = {
+      id: `receipt-${Date.now()}`,
+      role: 'landscaper',
+      content: `I received **${file.name}**. Analyzing the document...`,
+      timestamp: new Date()
+    }
+    setUserMessages(prev => [...prev, receiptMessage])
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/landscaper/extract-for-project', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Extraction failed')
+      }
+
+      // Notify parent to populate form fields
+      if (onDocumentExtracted && result.extracted_fields) {
+        onDocumentExtracted(result.extracted_fields, file)
+      }
+
+      // Add summary message
+      const summaryMessage: LandscaperMessage = {
+        id: `summary-${Date.now()}`,
+        role: 'landscaper',
+        content: formatExtractionSummary(result),
+        timestamp: new Date()
+      }
+      setUserMessages(prev => [...prev, summaryMessage])
+
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Document extraction error:', errMsg)
+      const errorMessage: LandscaperMessage = {
+        id: `error-${Date.now()}`,
+        role: 'landscaper',
+        content: `I had trouble reading **${file.name}**. ${errMsg}\n\nYou can enter the details manually or try a different file.`,
+        timestamp: new Date()
+      }
+      setUserMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsExtracting(false)
+    }
+  }, [onDocumentExtracted])
 
   // Generate rule-based messages from form state
   const systemMessages = useMemo(
@@ -202,15 +279,31 @@ const LandscaperPanel = ({ analysisType, formData, onSuggestionApply }: Landscap
   }
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-slate-50">
+    <div className={`flex h-full flex-col rounded-xl border ${
+      isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'
+    }`}>
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+      <div className={`flex items-center gap-2 border-b px-4 py-3 ${
+        isDark ? 'border-slate-700' : 'border-slate-200'
+      }`}>
         <MessageCircle className="h-5 w-5 text-blue-600" />
-        <span className="font-medium text-slate-900">Landscaper</span>
+        <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Landscaper</span>
         <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
           Online
         </span>
       </div>
+
+      {/* Dropzone at top */}
+      {showDropZone && (
+        <div className={`border-b p-3 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+          <NewProjectDropZone
+            onFileDrop={handleDocumentDrop}
+            isDark={isDark}
+            isProcessing={isExtracting}
+            compact
+          />
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -223,18 +316,44 @@ const LandscaperPanel = ({ analysisType, formData, onSuggestionApply }: Landscap
               className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 message.role === 'user'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-slate-200 text-slate-700'
+                  : isDark
+                    ? 'bg-slate-700 border border-slate-600 text-slate-200'
+                    : 'bg-white border border-slate-200 text-slate-700'
               }`}
             >
-              {message.content}
+              {/* Render message with basic markdown support */}
+              <div className="whitespace-pre-wrap">
+                {message.content.split('\n').map((line, idx) => {
+                  const boldLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  return (
+                    <div
+                      key={idx}
+                      dangerouslySetInnerHTML={{ __html: boldLine }}
+                    />
+                  )
+                })}
+              </div>
             </div>
           </div>
         ))}
+
+        {/* Extraction in progress indicator */}
+        {isExtracting && (
+          <div className="flex justify-start">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+              isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Extracting document data...</span>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-slate-200 p-3">
+      <div className={`border-t p-3 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -242,7 +361,11 @@ const LandscaperPanel = ({ analysisType, formData, onSuggestionApply }: Landscap
             onChange={e => setUserInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isDark
+                ? 'border-slate-600 bg-slate-700 text-slate-100'
+                : 'border-slate-300 bg-white text-slate-900'
+            }`}
           />
           <button
             onClick={handleSendMessage}
@@ -252,9 +375,62 @@ const LandscaperPanel = ({ analysisType, formData, onSuggestionApply }: Landscap
             <Send className="h-4 w-4" />
           </button>
         </div>
+        {/* Toggle to show/hide dropzone */}
+        {!showDropZone && (
+          <button
+            onClick={() => setShowDropZone(true)}
+            className={`mt-2 text-xs transition hover:text-blue-500 ${
+              isDark ? 'text-slate-400' : 'text-slate-500'
+            }`}
+          >
+            + Upload document
+          </button>
+        )}
       </div>
     </div>
   )
+}
+
+// Format extraction summary for chat display
+function formatExtractionSummary(result: {
+  extracted_fields?: Record<string, { value: any; confidence: number }>
+  document_type?: string
+}): string {
+  const { extracted_fields, document_type } = result
+
+  if (!extracted_fields || Object.keys(extracted_fields).length === 0) {
+    return "I couldn't extract any fields from this document. Please enter the details manually."
+  }
+
+  const fieldCount = Object.keys(extracted_fields).length
+  const fields = extracted_fields
+
+  let summary = `I found a **${document_type || 'document'}** and extracted **${fieldCount} fields**.\n\n`
+
+  // Key fields summary
+  if (fields.property_name?.value) {
+    summary += `**Property:** ${fields.property_name.value}\n`
+  }
+  if (fields.street_address?.value) {
+    summary += `**Address:** ${fields.street_address.value}`
+    if (fields.city?.value) summary += `, ${fields.city.value}`
+    if (fields.state?.value) summary += `, ${fields.state.value}`
+    summary += '\n'
+  }
+  if (fields.total_units?.value) {
+    summary += `**Units:** ${fields.total_units.value}\n`
+  }
+  if (fields.building_sf?.value || fields.rentable_sf?.value) {
+    const sf = fields.building_sf?.value || fields.rentable_sf?.value
+    summary += `**Size:** ${Number(sf).toLocaleString()} SF\n`
+  }
+  if (fields.site_area?.value) {
+    summary += `**Site:** ${fields.site_area.value} acres\n`
+  }
+
+  summary += `\nI've populated the form with these values. Review and adjust as needed.`
+
+  return summary
 }
 
 // Simple rule-based responses for user questions (MVP)

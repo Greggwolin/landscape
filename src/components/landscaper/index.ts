@@ -6,6 +6,7 @@ export { ActivityFeedItem, type ActivityItem } from './ActivityFeedItem';
 export { ChatMessageBubble } from './ChatMessageBubble';
 export { DataTableModal, type ColumnDef } from './DataTableModal';
 export { ExtractionReviewModal } from './ExtractionReviewModal';
+export { MutationProposalCard, type MutationProposal } from './MutationProposalCard';
 
 // Legacy exports (for backwards compatibility)
 export { default as ChatInterface } from './ChatInterface';

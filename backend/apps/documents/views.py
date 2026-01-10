@@ -7,12 +7,16 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.core.files.storage import default_storage
 from django.utils import timezone
+from django.db.models import Q
 from .models import Document, DocumentFolder, DMSExtractQueue, DMSAssertion, AICorrectionLog
 from .serializers import DocumentSerializer, DocumentFolderSerializer
 from apps.multifamily.models import MultifamilyUnitType, MultifamilyUnit, MultifamilyLease
 import uuid
 import json
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentFolderViewSet(viewsets.ModelViewSet):
@@ -491,6 +495,278 @@ def commit_staging_data(request, doc_id):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# =====================================================
+# DMS Versioning & Collision Detection Endpoints
+# =====================================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def check_upload_collision(request, project_id):
+    """
+    Check if uploaded file matches existing document by name or content hash.
+    Called BEFORE actual upload to prompt user for action.
+
+    Request body:
+    {
+        "filename": "Colliers_OM.pdf",
+        "content_hash": "sha256_hex_string",  # computed client-side
+        "file_size": 1234567
+    }
+
+    Response:
+    {
+        "collision": true/false,
+        "match_type": "filename" | "content" | "both" | null,
+        "existing_doc": { doc_id, filename, version_number, uploaded_at, extraction_summary } | null
+    }
+    """
+    try:
+        filename = request.data.get('filename')
+        content_hash = request.data.get('content_hash')
+
+        if not filename:
+            return Response(
+                {'error': 'filename is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check for matches (exclude soft-deleted)
+        query = Document.objects.filter(
+            project_id=project_id,
+            deleted_at__isnull=True
+        )
+
+        filename_match = query.filter(doc_name__iexact=filename).first()
+        hash_match = query.filter(sha256_hash=content_hash).first() if content_hash else None
+
+        if not filename_match and not hash_match:
+            return Response({
+                "collision": False,
+                "match_type": None,
+                "existing_doc": None
+            })
+
+        # Determine match type
+        if filename_match and hash_match and filename_match.doc_id == hash_match.doc_id:
+            match_type = "both"
+            matched_doc = filename_match
+        elif hash_match:
+            match_type = "content"
+            matched_doc = hash_match
+        else:
+            match_type = "filename"
+            matched_doc = filename_match
+
+        # Get extraction summary for this doc
+        from django.db import connection
+        with connection.cursor() as cursor:
+            # Count extracted facts
+            cursor.execute("""
+                SELECT COUNT(*) FROM landscape.doc_extracted_facts
+                WHERE doc_id = %s AND superseded_at IS NULL
+            """, [matched_doc.doc_id])
+            facts_row = cursor.fetchone()
+            facts_count = facts_row[0] if facts_row else 0
+
+            # Count embeddings
+            cursor.execute("""
+                SELECT COUNT(*) FROM landscape.knowledge_embeddings
+                WHERE source_type = 'document' AND source_id = %s
+                AND superseded_by_version IS NULL
+            """, [matched_doc.doc_id])
+            embeddings_row = cursor.fetchone()
+            embeddings_count = embeddings_row[0] if embeddings_row else 0
+
+        return Response({
+            "collision": True,
+            "match_type": match_type,
+            "existing_doc": {
+                "doc_id": matched_doc.doc_id,
+                "filename": matched_doc.doc_name,
+                "version_number": matched_doc.version_no,
+                "uploaded_at": matched_doc.created_at.isoformat() if matched_doc.created_at else None,
+                "extraction_summary": {
+                    "facts_extracted": facts_count,
+                    "embeddings": embeddings_count
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.exception("Error checking upload collision for project %s", project_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+@permission_classes([AllowAny])
+def upload_new_version(request, project_id, doc_id):
+    """
+    Upload a new version of an existing document.
+    - Increments version_number
+    - Keeps existing extractions (cumulative knowledge)
+    - Creates new embeddings tagged with new version
+    - Marks old embeddings as potentially superseded
+
+    Request: multipart form with file
+    """
+    try:
+        existing_doc = Document.objects.get(doc_id=doc_id, project_id=project_id)
+
+        if existing_doc.deleted_at:
+            return Response(
+                {"error": "Cannot version a deleted document"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Compute content hash
+        file_content = uploaded_file.read()
+        content_hash = hashlib.sha256(file_content).hexdigest()
+        uploaded_file.seek(0)  # Reset for upload
+
+        # Generate unique filename
+        ext = uploaded_file.name.split('.')[-1] if '.' in uploaded_file.name else ''
+        unique_filename = f"{uuid.uuid4()}.{ext}" if ext else str(uuid.uuid4())
+        file_path = f"uploads/{project_id}/{unique_filename}"
+
+        # Save to storage
+        saved_path = default_storage.save(file_path, uploaded_file)
+
+        # Update existing doc record
+        old_version = existing_doc.version_no
+        existing_doc.version_no = old_version + 1
+        existing_doc.storage_uri = saved_path
+        existing_doc.sha256_hash = content_hash
+        existing_doc.file_size_bytes = len(file_content)
+        existing_doc.mime_type = uploaded_file.content_type or 'application/octet-stream'
+        existing_doc.updated_at = timezone.now()
+        existing_doc.status = 'processing'  # Will be reprocessed
+        existing_doc.save()
+
+        # Mark old embeddings as potentially superseded
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE landscape.knowledge_embeddings
+                SET superseded_by_version = %s
+                WHERE source_type = 'document'
+                AND source_id = %s
+                AND superseded_by_version IS NULL
+            """, [existing_doc.version_no, doc_id])
+
+        # Queue for reprocessing
+        DMSExtractQueue.objects.create(
+            doc_id=doc_id,
+            extract_type='general',
+            priority=5,
+            status='pending'
+        )
+
+        return Response({
+            "doc_id": doc_id,
+            "new_version": existing_doc.version_no,
+            "old_version": old_version,
+            "message": "New version uploaded. Previous extractions preserved, new extractions will be added."
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error uploading new version for doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def soft_delete_document(request, project_id, doc_id):
+    """Soft delete a document - marks as deleted but preserves for audit."""
+    try:
+        doc = Document.objects.get(doc_id=doc_id, project_id=project_id)
+
+        if doc.deleted_at:
+            return Response(
+                {"error": "Document is already deleted"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        doc.deleted_at = timezone.now()
+        doc.deleted_by = request.data.get('deleted_by', 'anonymous')
+        doc.save()
+
+        return Response({
+            "success": True,
+            "message": "Document deleted",
+            "doc_id": doc_id
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error soft deleting doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def rename_document(request, project_id, doc_id):
+    """Rename a document."""
+    try:
+        doc = Document.objects.get(doc_id=doc_id, project_id=project_id, deleted_at__isnull=True)
+
+        new_name = request.data.get('new_name')
+        if not new_name:
+            return Response(
+                {"error": "new_name is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        old_name = doc.doc_name
+        doc.doc_name = new_name.strip()
+        doc.updated_at = timezone.now()
+        doc.save()
+
+        return Response({
+            "success": True,
+            "doc_id": doc_id,
+            "old_name": old_name,
+            "new_name": doc.doc_name
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error renaming doc %s", doc_id)
         return Response(
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -167,8 +167,21 @@ export default function Dropzone({
           });
 
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error(`Failed to create document record for ${file.name}:`, errorData);
+            const responseText = await response.text();
+            let errorData: unknown = {};
+            try {
+              errorData = JSON.parse(responseText);
+            } catch {
+              errorData = { raw: responseText };
+            }
+            console.error(
+              `Failed to create document record for ${file.name}:`,
+              {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData,
+              }
+            );
             // Continue with other files even if one fails
           } else {
             const docResult: DocCreateResult = await response.json();

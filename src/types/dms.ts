@@ -20,6 +20,12 @@ export interface DMSDocument {
   created_at: string;
   updated_at: string;
 
+  // Storage fields
+  storage_uri?: string | null;
+  sha256_hash?: string | null;
+  mime_type?: string | null;
+  file_size_bytes?: number | null;
+
   // Derived/joined fields
   project_name?: string | null;
   workspace_name?: string | null;

@@ -126,6 +126,12 @@ div.planning-tile.planning-tile-active div.planning-tile-header,
   gap: var(--component-gap);
 }
 
+.capitalization-panel {
+  background-color: #ffffff !important;
+  align-self: stretch;
+  min-height: 100%;
+}
+
 .card,
 .panel {
   margin-bottom: var(--component-gap);

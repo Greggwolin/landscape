@@ -756,3 +756,180 @@ class ExtractionLogViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'error': 'Log not found',
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+# =============================================================================
+# Mutation Management Views (Level 2 Autonomy)
+# =============================================================================
+
+class PendingMutationsView(APIView):
+    """
+    Get all pending mutations for a project.
+
+    GET /api/landscaper/projects/{project_id}/mutations/pending/
+
+    Response:
+    {
+        "success": true,
+        "mutations": [...],
+        "count": 5
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, project_id):
+        """Get all pending mutations for a project."""
+        try:
+            from .services.mutation_service import MutationService
+
+            mutations = MutationService.get_pending_for_project(project_id)
+
+            # Format for frontend
+            formatted = []
+            for m in mutations:
+                formatted.append({
+                    'mutationId': str(m['mutation_id']),
+                    'mutationType': m['mutation_type'],
+                    'table': m['table_name'],
+                    'field': m['field_name'],
+                    'recordId': m.get('record_id'),
+                    'currentValue': m['current_value'],
+                    'proposedValue': m['proposed_value'],
+                    'reason': m['reason'],
+                    'isHighRisk': m['is_high_risk'],
+                    'createdAt': m['created_at'].isoformat() if m['created_at'] else None,
+                    'expiresAt': m['expires_at'].isoformat() if m['expires_at'] else None,
+                    'batchId': str(m['batch_id']) if m['batch_id'] else None,
+                    'sourceMessageId': m.get('source_message_id'),
+                })
+
+            return Response({
+                'success': True,
+                'mutations': formatted,
+                'count': len(formatted),
+            })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ConfirmMutationView(APIView):
+    """
+    Confirm and execute a pending mutation.
+
+    POST /api/landscaper/mutations/{mutation_id}/confirm/
+
+    Response:
+    {
+        "success": true,
+        "mutationId": "...",
+        "action": "confirmed",
+        "result": {...}
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, mutation_id):
+        """Confirm and execute a pending mutation."""
+        try:
+            from .services.mutation_service import MutationService
+
+            # Get user ID from request if available
+            user_id = None
+            if hasattr(request, 'user') and request.user.is_authenticated:
+                user_id = request.user.email or str(request.user.id)
+
+            result = MutationService.confirm_mutation(mutation_id, user_id)
+
+            status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
+            return Response(result, status=status_code)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RejectMutationView(APIView):
+    """
+    Reject a pending mutation.
+
+    POST /api/landscaper/mutations/{mutation_id}/reject/
+
+    Request body (optional):
+    {
+        "reason": "User-provided rejection reason"
+    }
+
+    Response:
+    {
+        "success": true,
+        "mutationId": "...",
+        "action": "rejected"
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, mutation_id):
+        """Reject a pending mutation."""
+        try:
+            from .services.mutation_service import MutationService
+
+            user_id = None
+            if hasattr(request, 'user') and request.user.is_authenticated:
+                user_id = request.user.email or str(request.user.id)
+
+            reason = request.data.get('reason') if request.data else None
+
+            result = MutationService.reject_mutation(mutation_id, user_id, reason)
+
+            status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
+            return Response(result, status=status_code)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ConfirmBatchView(APIView):
+    """
+    Confirm all mutations in a batch.
+
+    POST /api/landscaper/mutations/batch/{batch_id}/confirm/
+
+    Response:
+    {
+        "success": true,
+        "batchId": "...",
+        "results": [...],
+        "confirmed": 3,
+        "failed": 0
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, batch_id):
+        """Confirm all mutations in a batch."""
+        try:
+            from .services.mutation_service import MutationService
+
+            user_id = None
+            if hasattr(request, 'user') and request.user.is_authenticated:
+                user_id = request.user.email or str(request.user.id)
+
+            result = MutationService.confirm_batch(batch_id, user_id)
+
+            status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
+            return Response(result, status=status_code)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

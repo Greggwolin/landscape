@@ -1,20 +1,36 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useQuery } from '@tanstack/react-query';
 import { useSfComps, SfComp } from '@/hooks/analysis/useSfComps';
 import { formatMoney } from '@/utils/formatters/number';
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
+
+interface MarketCompetitorProduct {
+  lot_width_ft?: number | null;
+  lot_dimensions?: string | null;
+  unit_size_min_sf?: number | null;
+  unit_size_max_sf?: number | null;
+  unit_size_avg_sf?: number | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  price_avg?: number | null;
+}
 
 interface MarketCompetitor {
   id?: number;
   comp_name: string;
+  builder_name?: string | null;
   comp_address?: string;
   latitude?: number;
   longitude?: number;
   total_units?: number;
+  price_min?: number | null;
+  price_max?: number | null;
   status?: string;
+  products?: MarketCompetitorProduct[];
 }
 
 interface MarketMapViewProps {
@@ -22,6 +38,9 @@ interface MarketMapViewProps {
   competitors: MarketCompetitor[];
   height?: string;
   className?: string;
+  selectedCompetitorId?: number | null;
+  onSelectCompetitor?: (id: number) => void;
+  onClearSelection?: () => void;
 }
 
 // Helper to categorize price relative to dataset
@@ -39,16 +58,92 @@ export default function MarketMapView({
   projectId,
   competitors,
   height = '600px',
-  className = ''
+  className = '',
+  selectedCompetitorId = null,
+  onSelectCompetitor,
+  onClearSelection
 }: MarketMapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const compsMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const competitorMarkerElements = useRef<Map<number, { dot: HTMLDivElement; baseColor: string }>>(new Map());
+  const [mapStyleId, setMapStyleId] = useState('hybrid');
   const [error, setError] = useState<string | null>(null);
   const [showComps, setShowComps] = useState(true);
   const [showCompetitors, setShowCompetitors] = useState(true);
   const [selectedComp, setSelectedComp] = useState<SfComp | null>(null);
+
+  const mapStyles = useMemo(() => ({
+    hybrid: {
+      label: 'Hybrid',
+      style: getEsriHybridStyle()
+    },
+    light: {
+      label: 'Light',
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    },
+    dark: {
+      label: 'Dark',
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+    },
+    voyager: {
+      label: 'Voyager',
+      style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
+    },
+    aerial: {
+      label: 'Aerial',
+      style: {
+        version: 8,
+        sources: {
+          esri: {
+            type: 'raster',
+            tiles: [
+              'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            ],
+            tileSize: 256,
+            attribution: 'Esri, Maxar, Earthstar Geographics'
+          }
+        },
+        layers: [
+          { id: 'esri', type: 'raster', source: 'esri' }
+        ]
+      }
+    }
+  }), []);
+
+  const formatShortCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+    if (value >= 1_000_000) return `$${Math.round(value / 1000).toLocaleString()}k`;
+    if (value >= 1_000) return `$${Math.round(value / 1000)}k`;
+    return `$${Math.round(value)}`;
+  };
+
+  const getLotDisplay = (comp: MarketCompetitor) => {
+    const product = comp.products?.find(p =>
+      p.lot_dimensions || p.lot_width_ft || p.unit_size_avg_sf || p.unit_size_min_sf || p.unit_size_max_sf
+    );
+    if (!product) return { label: 'Lot', value: '—' };
+    if (product.lot_dimensions) return { label: 'Lot', value: product.lot_dimensions };
+    if (Number.isFinite(Number(product.lot_width_ft))) {
+      return { label: 'Lot', value: `${Number(product.lot_width_ft)}'` };
+    }
+    if (Number.isFinite(Number(product.unit_size_avg_sf))) {
+      return { label: 'Size', value: `${Number(product.unit_size_avg_sf).toLocaleString()} SF` };
+    }
+    const min = Number(product.unit_size_min_sf);
+    const max = Number(product.unit_size_max_sf);
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      return { label: 'Size', value: `${min.toLocaleString()}-${max.toLocaleString()} SF` };
+    }
+    return { label: 'Lot', value: '—' };
+  };
+
+  const getLastSalePrice = (comp: MarketCompetitor) => {
+    const product = comp.products?.find(p => p.price_avg || p.price_max || p.price_min);
+    const value = product?.price_avg ?? product?.price_max ?? product?.price_min ?? null;
+    return value;
+  };
 
   // Fetch Redfin comps
   const { data: compsData } = useSfComps(projectId, {
@@ -77,15 +172,20 @@ export default function MarketMapView({
 
     try {
       // Initialize map centered on project
+      const selectedStyle = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+        style: selectedStyle,
         center: [projectLon, projectLat],
         zoom: 12
       });
 
       // Add navigation controls
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      map.current.on('click', () => {
+        onClearSelection?.();
+      });
 
       // Add project marker (blue)
       new maplibregl.Marker({ color: '#0d6efd', scale: 1.2 })
@@ -114,6 +214,12 @@ export default function MarketMapView({
     };
   }, [projectLat, projectLon, project?.project_name]);
 
+  useEffect(() => {
+    if (!map.current) return;
+    const style = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
+    map.current.setStyle(style as maplibregl.StyleSpecification | string);
+  }, [mapStyleId, mapStyles]);
+
   // Update competitor markers when competitors change or visibility toggles
   useEffect(() => {
     if (!map.current) return;
@@ -124,6 +230,8 @@ export default function MarketMapView({
 
     if (!showCompetitors) return;
 
+    competitorMarkerElements.current.clear();
+
     // Add competitor markers
     competitors.forEach(comp => {
       if (comp.latitude && comp.longitude && map.current) {
@@ -133,18 +241,55 @@ export default function MarketMapView({
           planned: '#0dcaf0'
         };
         const markerColor = statusColors[comp.status || ''] || '#dc3545';
+        const el = document.createElement('div');
+        el.style.cssText = `
+          width: 22px;
+          height: 22px;
+          cursor: pointer;
+        `;
+        const dot = document.createElement('div');
+        dot.style.cssText = `
+          width: 100%;
+          height: 100%;
+          background-color: ${markerColor};
+          border: 2px solid white;
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+          transform-origin: center;
+        `;
+        el.appendChild(dot);
+        if (comp.id) {
+          competitorMarkerElements.current.set(comp.id, { dot, baseColor: markerColor });
+        }
 
-        const marker = new maplibregl.Marker({ color: markerColor })
+        const lotDisplay = getLotDisplay(comp);
+        const priceRange = (comp.price_min || comp.price_max)
+          ? `${formatShortCurrency(comp.price_min ?? null)}-${formatShortCurrency(comp.price_max ?? null)}`
+          : '—';
+        const lastSalePrice = getLastSalePrice(comp);
+
+        el.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (comp.id) {
+            onSelectCompetitor?.(comp.id);
+          }
+        });
+
+        const marker = new maplibregl.Marker({ element: el })
           .setLngLat([comp.longitude, comp.latitude])
           .setPopup(
-            new maplibregl.Popup({ offset: 25 }).setHTML(
-              `<div style="padding: 8px;">
-                <strong>${comp.comp_name}</strong><br/>
-                ${comp.comp_address ? `<small>${comp.comp_address}</small><br/>` : ''}
-                ${comp.total_units ? `<small>${comp.total_units} units</small><br/>` : ''}
-                <span style="display: inline-block; padding: 2px 6px; border-radius: 3px; background-color: ${markerColor}; color: white; font-size: 10px; text-transform: uppercase;">
-                  ${comp.status?.replace('_', ' ') || 'competitor'}
-                </span>
+            new maplibregl.Popup({ offset: 25, maxWidth: '280px' }).setHTML(
+              `<div style="padding: 10px;">
+                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">${comp.comp_name}</div>
+                ${comp.builder_name ? `<div style="font-size: 12px; color: #555; margin-bottom: 4px;">${comp.builder_name}</div>` : ''}
+                ${comp.comp_address ? `<div style="font-size: 11px; color: #666; margin-bottom: 6px;">${comp.comp_address}</div>` : ''}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px;">
+                  <div><span style="color: #888;">${lotDisplay.label}:</span> <span style="font-weight: 600;">${lotDisplay.value}</span></div>
+                  <div><span style="color: #888;">Units:</span> <span style="font-weight: 600;">${comp.total_units?.toLocaleString() || '—'}</span></div>
+                  <div><span style="color: #888;">Price Range:</span> <span style="font-weight: 600;">${priceRange}</span></div>
+                  <div><span style="color: #888;">Last Sale:</span> <span style="font-weight: 600;">${lastSalePrice ? formatShortCurrency(lastSalePrice) : '—'}</span></div>
+                </div>
               </div>`
             )
           )
@@ -173,6 +318,20 @@ export default function MarketMapView({
       }
     }
   }, [competitors, projectLat, projectLon, showCompetitors]);
+
+  useEffect(() => {
+    competitorMarkerElements.current.forEach(({ dot, baseColor }, id) => {
+      if (selectedCompetitorId && id === selectedCompetitorId) {
+        dot.style.backgroundColor = '#0d6efd';
+        dot.style.borderColor = '#0b5ed7';
+        dot.style.transform = 'scale(1.2)';
+      } else {
+        dot.style.backgroundColor = baseColor;
+        dot.style.borderColor = 'white';
+        dot.style.transform = 'scale(1)';
+      }
+    });
+  }, [selectedCompetitorId]);
 
   // Update Redfin comps markers when comps change or visibility toggles
   useEffect(() => {
@@ -313,18 +472,27 @@ export default function MarketMapView({
         }}
       />
 
-      {/* Layer Toggle Controls */}
       <div
-        className="position-absolute top-0 end-0 m-3 p-2 rounded shadow-sm"
+        className="position-absolute top-0 start-0 m-3 p-2 rounded shadow-sm"
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           border: '1px solid var(--cui-border-color)',
-          zIndex: 1,
-          marginTop: '50px' // Below nav controls
+          zIndex: 1
         }}
       >
         <div className="text-muted small fw-semibold mb-2" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Map Layers
+        </div>
+        <div className="mb-2">
+          <select
+            className="form-select form-select-sm"
+            value={mapStyleId}
+            onChange={(event) => setMapStyleId(event.target.value)}
+          >
+            {Object.entries(mapStyles).map(([key, value]) => (
+              <option key={key} value={key}>{value.label}</option>
+            ))}
+          </select>
         </div>
         <div className="d-flex flex-column gap-1" style={{ fontSize: '12px' }}>
           <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: 'pointer' }}>
@@ -352,7 +520,6 @@ export default function MarketMapView({
         </div>
       </div>
 
-      {/* Legend */}
       <div
         className="position-absolute bottom-0 start-0 m-3 p-2 rounded shadow-sm"
         style={{
@@ -362,32 +529,10 @@ export default function MarketMapView({
         }}
       >
         <div className="d-flex flex-column gap-1" style={{ fontSize: '11px' }}>
-          {/* Subject Property */}
           <div className="d-flex align-items-center gap-2">
             <div style={{ width: '12px', height: '12px', backgroundColor: '#0d6efd', borderRadius: '50%' }}></div>
             <span>Subject Property</span>
           </div>
-
-          {/* Competitive Projects Legend */}
-          {showCompetitors && (
-            <>
-              <div className="text-muted mt-1" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Competitors</div>
-              <div className="d-flex align-items-center gap-2">
-                <div style={{ width: '10px', height: '10px', backgroundColor: '#198754', borderRadius: '50%' }}></div>
-                <span>Selling</span>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                <div style={{ width: '10px', height: '10px', backgroundColor: '#6c757d', borderRadius: '50%' }}></div>
-                <span>Sold Out</span>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                <div style={{ width: '10px', height: '10px', backgroundColor: '#0dcaf0', borderRadius: '50%' }}></div>
-                <span>Planned</span>
-              </div>
-            </>
-          )}
-
-          {/* Recent Sales Legend */}
           {showComps && comps.length > 0 && (
             <>
               <div className="text-muted mt-1" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recent Sales</div>

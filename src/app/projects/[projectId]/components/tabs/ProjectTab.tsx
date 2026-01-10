@@ -1188,14 +1188,7 @@ export default function ProjectTab({
         </CCardHeader>
         {contactsExpanded && (
           <CCardBody>
-            {project.listing_brokerage && (
-              <div className="mb-3">
-                <strong>Listing Brokerage:</strong>
-                <div>{project.listing_brokerage}</div>
-              </div>
-            )}
-
-            {/* Contacts Section */}
+            {/* Contacts Section - includes listing brokers */}
             <ContactsSection projectId={project.project_id} />
           </CCardBody>
         )}

@@ -15,6 +15,7 @@ import { z } from 'zod';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log('[/api/dms/docs] Received:', JSON.stringify(body, null, 2));
 
     // Validate request body
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
@@ -72,7 +73,6 @@ export async function POST(req: NextRequest) {
         workspace_id,
         phase_id,
         parcel_id,
-        parcel_id_int,
         doc_name,
         doc_type,
         discipline,
@@ -89,7 +89,6 @@ export async function POST(req: NextRequest) {
         ${system.project_id},
         ${system.workspace_id ?? null},
         ${system.phase_id ?? null},
-        ${system.parcel_id ?? null},
         ${system.parcel_id ?? null},
         ${system.doc_name},
         ${system.doc_type ?? 'general'},

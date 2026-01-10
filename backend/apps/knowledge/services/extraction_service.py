@@ -2101,14 +2101,24 @@ class BatchedExtractionService:
             response_text = response.content[0].text
             extractions = self._parse_batch_response(response_text, fields, scopes)
 
+            if extractions is None:
+                return {
+                    'batch': batch_name,
+                    'success': False,
+                    'error': 'Failed to parse JSON response',
+                    'fields': len(fields),
+                    'raw_response': response_text[:500] if response_text else None,
+                }
+
             # ISSUE 1 FIX: Deduplicate within batch before staging
             extractions = deduplicate_extractions(extractions)
 
             if not extractions:
                 return {
                     'batch': batch_name,
-                    'success': False,
-                    'error': 'No extractions parsed from response',
+                    'success': True,
+                    'staged': 0,
+                    'note': 'No extractable fields found in response',
                     'fields': len(fields),
                     'raw_response': response_text[:500] if response_text else None,
                 }
@@ -2378,7 +2388,7 @@ Extract ALL rent comps as array under "rent_comp_name":
         response_text: str,
         fields: List[Any],
         scopes: List[str]
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         """Parse Claude's JSON response."""
         # Find JSON object in response
         start = response_text.find('{')
@@ -2386,10 +2396,11 @@ Extract ALL rent comps as array under "rent_comp_name":
 
         if start == -1 or end == 0:
             logger.error("No JSON object found in response")
-            return {}
+            return None
 
         try:
-            return json.loads(response_text[start:end])
+            parsed = json.loads(response_text[start:end])
+            return parsed if isinstance(parsed, dict) else None
         except json.JSONDecodeError as e:
             logger.error(f"JSON parse error: {e}")
             # Try to extract partial JSON
@@ -2399,10 +2410,11 @@ Extract ALL rent comps as array under "rent_comp_name":
                 start = clean.find('{')
                 end = clean.rfind('}') + 1
                 if start >= 0 and end > start:
-                    return json.loads(clean[start:end])
-            except:
+                    parsed = json.loads(clean[start:end])
+                    return parsed if isinstance(parsed, dict) else None
+            except Exception:
                 pass
-            return {}
+            return None
 
     def _stage_batch_extractions(
         self,

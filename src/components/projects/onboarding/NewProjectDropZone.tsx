@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FileText, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Upload, Loader2, CheckCircle, AlertCircle, Clipboard } from 'lucide-react';
 
 interface NewProjectDropZoneProps {
   onFileDrop: (file: File) => void;
@@ -13,6 +13,17 @@ interface NewProjectDropZoneProps {
 
 type DropPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
+// Allowed MIME types for validation
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png'
+];
+
 export default function NewProjectDropZone({
   onFileDrop,
   isDark = false,
@@ -22,11 +33,10 @@ export default function NewProjectDropZone({
   const [phase, setPhase] = useState<DropPhase>('idle');
   const [fileName, setFileName] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-
-    const file = acceptedFiles[0];
+  // Shared file processing logic
+  const processFile = useCallback(async (file: File) => {
     setFileName(file.name);
     setPhase('uploading');
     setErrorMessage('');
@@ -57,6 +67,50 @@ export default function NewProjectDropZone({
       }, 3000);
     }
   }, [onFileDrop]);
+
+  // Handle pasted files from clipboard
+  const handlePaste = useCallback((event: ClipboardEvent) => {
+    if (isProcessing || phase !== 'idle') return;
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file && ALLOWED_MIME_TYPES.includes(file.type)) {
+          event.preventDefault();
+          // Process the pasted file
+          processFile(file);
+          return;
+        }
+      }
+    }
+  }, [isProcessing, phase, processFile]);
+
+  // Add paste event listener
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Listen on document for paste events when container is focused or hovered
+    const handleDocumentPaste = (event: ClipboardEvent) => {
+      // Check if the dropzone or its children are focused/active
+      if (container.contains(document.activeElement) || container.matches(':hover')) {
+        handlePaste(event);
+      }
+    };
+
+    document.addEventListener('paste', handleDocumentPaste);
+    return () => {
+      document.removeEventListener('paste', handleDocumentPaste);
+    };
+  }, [handlePaste]);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+    processFile(acceptedFiles[0]);
+  }, [processFile]);
 
   const {
     getRootProps,
@@ -97,10 +151,12 @@ export default function NewProjectDropZone({
   if (compact) {
     return (
       <div
+        ref={containerRef}
         {...getRootProps()}
+        tabIndex={0}
         className={`
           relative border-2 border-dashed rounded-lg p-4 text-center cursor-pointer
-          transition-colors duration-200
+          transition-colors duration-200 outline-none focus:ring-2 focus:ring-blue-400
           ${getBorderClass()}
           ${isActive ? 'cursor-default' : ''}
         `}
@@ -112,7 +168,7 @@ export default function NewProjectDropZone({
             <>
               <Upload className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                {isDragActive ? 'Drop document here' : 'Drag document or click to browse'}
+                {isDragActive ? 'Drop document here' : 'Drag, paste, or click to browse'}
               </span>
             </>
           )}
@@ -151,10 +207,12 @@ export default function NewProjectDropZone({
 
   return (
     <div
+      ref={containerRef}
       {...getRootProps()}
+      tabIndex={0}
       className={`
         relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
-        transition-colors duration-200
+        transition-colors duration-200 outline-none focus:ring-2 focus:ring-blue-400
         ${getBorderClass()}
         ${isActive ? 'cursor-default' : ''}
       `}
@@ -188,7 +246,7 @@ export default function NewProjectDropZone({
           ) : (
             <div>
               <p className={`text-base font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                Drop a document here
+                Drop or paste a document here
               </p>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Offering memorandum, rent roll, T-12, or appraisal
@@ -196,13 +254,20 @@ export default function NewProjectDropZone({
             </div>
           )}
 
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition"
-          >
-            <Upload className="h-4 w-4" />
-            Select File
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition"
+            >
+              <Upload className="h-4 w-4" />
+              Select File
+            </button>
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>or</span>
+            <span className={`inline-flex items-center gap-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <Clipboard className="h-3 w-3" />
+              Ctrl+V to paste
+            </span>
+          </div>
 
           <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             PDF, Word, Excel up to 32MB

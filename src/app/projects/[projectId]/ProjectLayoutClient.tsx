@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { LandscaperPanel } from '@/components/landscaper';
 
 interface ProjectLayoutClientProps {
@@ -39,9 +39,11 @@ function mapTabToLandscaperContext(tab: string): string {
 }
 
 export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClientProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryTab = searchParams.get('tab') || 'project';
   const activeTab = mapTabToLandscaperContext(queryTab);
+  const isCapitalization = pathname?.includes('/capitalization/');
 
   // Debug: log when activeTab changes
   console.log('[ProjectLayoutClient] queryTab:', queryTab, '-> activeTab:', activeTab);
@@ -64,7 +66,9 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
       </div>
 
       {/* Right Content - Tab Content (70%) */}
-      <div className="flex-1 min-w-0">
+      <div
+        className={`flex-1 min-w-0${isCapitalization ? ' capitalization-panel' : ''}`}
+      >
         {children}
       </div>
     </div>

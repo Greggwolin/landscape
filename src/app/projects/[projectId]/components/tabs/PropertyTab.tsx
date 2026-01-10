@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { CCard, CCardBody, CCardHeader, CNav, CNavItem, CNavLink } from '@coreui/react';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { formatNumber, formatCurrency, formatDecimal } from '@/utils/formatNumber';
+import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-react';
 
 interface Project {
   project_id: number;
@@ -92,6 +94,130 @@ interface RentalComparable {
   is_active?: boolean;
 }
 
+// Landscaper Insights Component - dynamically generates insights from comparables
+interface LandscaperInsightsProps {
+  floorPlans: FloorPlan[];
+  comparables: RentalComparable[];
+  comparablesByProperty: Array<{
+    propertyName: string;
+    distance?: number;
+    yearBuilt?: number;
+    totalUnits?: number;
+    unitTypes: RentalComparable[];
+    rentRange: { min: number; max: number };
+  }>;
+}
+
+function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: LandscaperInsightsProps) {
+  // Filter to only comparables with valid asking_rent (catches NaN, null, undefined, 0, Infinity)
+  // Note: DB may return numbers as strings, so convert first
+  const validComparables = comparables.filter(c => {
+    const rent = Number(c.asking_rent);
+    return Number.isFinite(rent) && rent > 0;
+  });
+
+  // If no comparable data, show a helpful message
+  if (validComparables.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+        No rental comparables available. Use Landscaper to extract comp data from your OM or add comparables manually.
+      </p>
+    );
+  }
+
+  // Calculate market stats directly from comparables (works even without floor plans)
+  // Use Number() to handle string values from DB
+  const avgCompRent = Math.round(validComparables.reduce((sum, c) => sum + Number(c.asking_rent), 0) / validComparables.length);
+  const minRent = Math.min(...validComparables.map(c => Number(c.asking_rent)));
+  const maxRent = Math.max(...validComparables.map(c => Number(c.asking_rent)));
+
+  // Group by bedroom count for insights (using validComparables)
+  const byBedroom = new Map<number, { count: number; avgRent: number; minRent: number; maxRent: number }>();
+  validComparables.forEach(c => {
+    const rent = Number(c.asking_rent);
+    const existing = byBedroom.get(c.bedrooms);
+    if (!existing) {
+      byBedroom.set(c.bedrooms, { count: 1, avgRent: rent, minRent: rent, maxRent: rent });
+    } else {
+      existing.count += 1;
+      existing.avgRent = ((existing.avgRent * (existing.count - 1)) + rent) / existing.count;
+      existing.minRent = Math.min(existing.minRent, rent);
+      existing.maxRent = Math.max(existing.maxRent, rent);
+    }
+  });
+
+  // Calculate avg $/SF if we have sqft data
+  const compsWithSqft = validComparables.filter(c => Number(c.avg_sqft) > 0);
+  const avgRentPerSqft = compsWithSqft.length > 0
+    ? compsWithSqft.reduce((sum, c) => sum + (Number(c.asking_rent) / Number(c.avg_sqft)), 0) / compsWithSqft.length
+    : 0;
+
+  // Get nearest comp
+  const nearestComp = comparablesByProperty.find(p => p.distance && p.distance > 0);
+
+  // Check if we have floor plan data to compare against
+  const plansWithComps = floorPlans.filter((p: FloorPlan & { matchType?: string; compCount?: number }) =>
+    (p.matchType && p.matchType !== 'none') || (p.aiEstimate !== p.marketRent)
+  );
+  const hasFloorPlanComparison = plansWithComps.length > 0;
+
+  // If we have floor plan comparison data, calculate gap metrics
+  let marketGapText = '';
+  if (hasFloorPlanComparison) {
+    const totalCurrentRent = plansWithComps.reduce((sum, p) => sum + (p.currentRent * p.unitCount), 0);
+    const totalAIRent = plansWithComps.reduce((sum, p) => sum + (p.aiEstimate * p.unitCount), 0);
+    const totalUnits = plansWithComps.reduce((sum, p) => sum + p.unitCount, 0);
+    const avgCurrentRent = totalUnits > 0 ? Math.round(totalCurrentRent / totalUnits) : 0;
+    const avgAIRent = totalUnits > 0 ? Math.round(totalAIRent / totalUnits) : 0;
+    const marketGap = avgCurrentRent > 0 ? ((avgAIRent - avgCurrentRent) / avgCurrentRent * 100) : 0;
+
+    if (Math.abs(marketGap) > 1) {
+      marketGapText = marketGap > 0
+        ? `Your current rents appear to be ${marketGap.toFixed(0)}% below market.`
+        : `Your current rents are ${Math.abs(marketGap).toFixed(0)}% above market.`;
+    }
+  }
+
+  return (
+    <div className="space-y-2 text-sm" style={{ color: 'var(--cui-body-color)' }}>
+      <p>
+        <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Market Summary:</span>{' '}
+        Analyzed {validComparables.length} unit types across {comparablesByProperty.length} properties.
+        Average asking rent is <span className="font-semibold">{formatCurrency(avgCompRent)}/mo</span> (range: {formatCurrency(minRent)}-{formatCurrency(maxRent)}).
+        {avgRentPerSqft > 0 && <> Average rent per SF: <span className="font-semibold">${avgRentPerSqft.toFixed(2)}/SF</span>.</>}
+      </p>
+
+      <p>
+        <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>By Unit Type:</span>{' '}
+        {Array.from(byBedroom.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([beds, data]) => (
+            <span key={beds}>
+              {beds === 0 ? 'Studio' : `${beds}BR`}: {formatCurrency(Math.round(data.avgRent))} avg ({data.count} units){beds < Math.max(...Array.from(byBedroom.keys())) ? ' · ' : ''}
+            </span>
+          ))
+        }
+      </p>
+
+      {nearestComp && (
+        <p>
+          <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Nearest Comp:</span>{' '}
+          {nearestComp.propertyName} ({nearestComp.distance} mi) — {formatCurrency(nearestComp.rentRange.min)}-{formatCurrency(nearestComp.rentRange.max)}/mo
+          {nearestComp.yearBuilt && `, built ${nearestComp.yearBuilt}`}
+          {nearestComp.totalUnits && `, ${nearestComp.totalUnits} units`}.
+        </p>
+      )}
+
+      {marketGapText && (
+        <p>
+          <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Position:</span>{' '}
+          {marketGapText}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const mockUnits: Unit[] = [
   { id: '1', unitNumber: '101', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1200, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-01-15', leaseEnd: '2025-01-14', tenantName: 'John Smith', status: 'Occupied', deposit: 1200, monthlyIncome: 1200, rentPerSF: 1.85, proformaRentPerSF: 2.12, notes: '' },
   { id: '2', unitNumber: '102', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1225, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-03-01', leaseEnd: '2025-02-28', tenantName: 'Sarah Johnson', status: 'Occupied', deposit: 1225, monthlyIncome: 1225, rentPerSF: 1.88, proformaRentPerSF: 2.12, notes: '' },
@@ -146,6 +272,184 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   const [planEditDraft, setPlanEditDraft] = useState<FloorPlan | null>(null);
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
   const [showFieldChooser, setShowFieldChooser] = useState(false);
+  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
+
+  // Calculate AI market rent estimates from comparable data
+  // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
+  const aiEstimatesByBedBath = useMemo(() => {
+    const estimates = new Map<string, { totalRent: number; totalSqft: number; count: number; avgRent: number; avgRentPerSqft: number }>();
+    // Also track by bedroom only for fuzzy matching when exact bed/bath doesn't match
+    const byBedroomOnly = new Map<number, { totalRent: number; totalSqft: number; count: number; avgRent: number; avgRentPerSqft: number }>();
+
+    // Only include comparables with valid rent values (handle string/number)
+    comparables.filter(c => {
+      const rent = Number(c.asking_rent);
+      return Number.isFinite(rent) && rent > 0;
+    }).forEach(comp => {
+      const rent = Number(comp.asking_rent);
+      const sqft = Number(comp.avg_sqft) || 0;
+
+      // Exact bed/bath key
+      const key = `${comp.bedrooms}/${comp.bathrooms}`;
+      if (!estimates.has(key)) {
+        estimates.set(key, { totalRent: 0, totalSqft: 0, count: 0, avgRent: 0, avgRentPerSqft: 0 });
+      }
+      const entry = estimates.get(key)!;
+      entry.totalRent += rent;
+      entry.totalSqft += sqft;
+      entry.count += 1;
+
+      // Also group by bedroom only
+      if (!byBedroomOnly.has(comp.bedrooms)) {
+        byBedroomOnly.set(comp.bedrooms, { totalRent: 0, totalSqft: 0, count: 0, avgRent: 0, avgRentPerSqft: 0 });
+      }
+      const bedEntry = byBedroomOnly.get(comp.bedrooms)!;
+      bedEntry.totalRent += rent;
+      bedEntry.totalSqft += sqft;
+      bedEntry.count += 1;
+    });
+
+    // Calculate averages for exact matches
+    estimates.forEach((entry) => {
+      entry.avgRent = Math.round(entry.totalRent / entry.count);
+      entry.avgRentPerSqft = entry.totalSqft > 0 ? entry.totalRent / entry.totalSqft : 0;
+    });
+
+    // Calculate averages for bedroom-only matches
+    byBedroomOnly.forEach((entry) => {
+      entry.avgRent = Math.round(entry.totalRent / entry.count);
+      entry.avgRentPerSqft = entry.totalSqft > 0 ? entry.totalRent / entry.totalSqft : 0;
+    });
+
+    // Store bedroom-only estimates with special key format "Xbd"
+    byBedroomOnly.forEach((entry, bedrooms) => {
+      estimates.set(`${bedrooms}bd`, entry);
+    });
+
+    return estimates;
+  }, [comparables]);
+
+  // Floor plans with AI estimates populated from comparable data
+  // Uses fuzzy matching: exact bed/bath -> rounded bath -> bedroom only
+  const floorPlansWithAI = useMemo(() => {
+    return floorPlans.map(plan => {
+      // Try exact bed/bath match first
+      const exactKey = `${plan.bedrooms}/${plan.bathrooms}`;
+      let estimate = aiEstimatesByBedBath.get(exactKey);
+      let matchType: 'exact' | 'rounded' | 'bedroom' | 'none' = 'none';
+
+      if (estimate && estimate.count > 0) {
+        matchType = 'exact';
+      } else {
+        // Try rounded bathroom (1.75 -> 2, 1.5 -> 2, 1.25 -> 1)
+        const roundedBath = Math.round(plan.bathrooms);
+        const roundedKey = `${plan.bedrooms}/${roundedBath}`;
+        estimate = aiEstimatesByBedBath.get(roundedKey);
+
+        if (estimate && estimate.count > 0) {
+          matchType = 'rounded';
+        } else {
+          // Fall back to bedroom-only matching
+          const bedroomKey = `${plan.bedrooms}bd`;
+          estimate = aiEstimatesByBedBath.get(bedroomKey);
+          if (estimate && estimate.count > 0) {
+            matchType = 'bedroom';
+          }
+        }
+      }
+
+      if (estimate && estimate.count > 0) {
+        // Use comparable average rent, or fall back to $/SF calculation if sqft differs significantly
+        let aiEstimate = estimate.avgRent;
+
+        // If the floor plan sqft differs from comparable average by >15%, adjust using $/SF
+        if (estimate.avgRentPerSqft > 0 && plan.sqft > 0) {
+          const avgCompSqft = estimate.totalSqft / estimate.count;
+          const sqftDiff = Math.abs(plan.sqft - avgCompSqft) / avgCompSqft;
+          if (sqftDiff > 0.15) {
+            // Adjust rent based on floor plan's actual sqft
+            aiEstimate = Math.round(estimate.avgRentPerSqft * plan.sqft);
+          }
+        }
+
+        return { ...plan, aiEstimate, matchType, compCount: estimate.count };
+      }
+
+      // No matching comparables - fall back to current market rent
+      return { ...plan, aiEstimate: plan.marketRent, matchType: 'none' as const, compCount: 0 };
+    });
+  }, [floorPlans, aiEstimatesByBedBath]);
+
+  // Group comparables by property name for collapsible display
+  const comparablesByProperty = useMemo(() => {
+    const grouped = new Map<string, RentalComparable[]>();
+    comparables.forEach(comp => {
+      const key = comp.property_name;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(comp);
+    });
+    // Sort each group by bedrooms
+    grouped.forEach(comps => {
+      comps.sort((a, b) => a.bedrooms - b.bedrooms);
+    });
+    // Convert to array sorted by distance
+    return Array.from(grouped.entries())
+      .map(([name, comps]) => {
+        // Filter for valid rents when calculating stats (handle string/number)
+        const validRentComps = comps.filter(c => {
+          const rent = Number(c.asking_rent);
+          return Number.isFinite(rent) && rent > 0;
+        });
+        const avgRent = validRentComps.length > 0
+          ? Math.round(validRentComps.reduce((sum, c) => sum + Number(c.asking_rent), 0) / validRentComps.length)
+          : 0;
+        const rentRange = validRentComps.length > 0
+          ? {
+              min: Math.min(...validRentComps.map(c => Number(c.asking_rent))),
+              max: Math.max(...validRentComps.map(c => Number(c.asking_rent)))
+            }
+          : { min: 0, max: 0 };
+
+        return {
+          propertyName: name,
+          address: comps[0]?.address,
+          distance: comps[0]?.distance_miles,
+          yearBuilt: comps[0]?.year_built,
+          totalUnits: comps[0]?.total_units,
+          latitude: comps[0]?.latitude,
+          longitude: comps[0]?.longitude,
+          unitTypes: comps,
+          avgRent,
+          rentRange
+        };
+      })
+      .sort((a, b) => (a.distance || 999) - (b.distance || 999));
+  }, [comparables]);
+
+  // Toggle property expansion
+  const toggleProperty = (propertyName: string) => {
+    setExpandedProperties(prev => {
+      const next = new Set(prev);
+      if (next.has(propertyName)) {
+        next.delete(propertyName);
+      } else {
+        next.add(propertyName);
+      }
+      return next;
+    });
+  };
+
+  // Expand all properties
+  const expandAll = () => {
+    setExpandedProperties(new Set(comparablesByProperty.map(p => p.propertyName)));
+  };
+
+  // Collapse all properties
+  const collapseAll = () => {
+    setExpandedProperties(new Set());
+  };
 
   // Load real data from database
   useEffect(() => {
@@ -170,7 +474,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           unitCount: ut.total_units,
           currentRent: Math.round(ut.current_market_rent || 0),
           marketRent: Math.round(ut.current_market_rent || 0),
-          aiEstimate: Math.round((ut.current_market_rent || 0) * 1.05) // 5% above current as estimate
+          aiEstimate: 0 // Will be populated from comparables
         }));
 
         // Fetch units
@@ -426,22 +730,30 @@ export default function PropertyTab({ project }: PropertyTabProps) {
     return `px-2 py-0.5 rounded text-xs font-medium border ${styles[status]}`;
   };
 
-  // AI estimate indicator - shows if market rent differs from AI estimate
-  const getAIIndicator = (marketRent: number, aiEstimate: number) => {
+  // AI estimate indicator - shows if market rent differs from AI estimate based on comparables
+  const getAIIndicator = (marketRent: number, aiEstimate: number, compCount: number, matchType: string) => {
+    // If no comparable data or no difference, don't show any indicator
+    if (compCount === 0 || matchType === 'none' || aiEstimate === 0 || aiEstimate === marketRent) {
+      return null;
+    }
+
     const diff = marketRent - aiEstimate;
     const percentDiff = Math.abs((diff / aiEstimate) * 100);
 
     if (percentDiff < 2) return null; // Within 2% - no indicator
 
+    const matchLabel = matchType === 'exact' ? '' : matchType === 'rounded' ? ' (rounded bath)' : ' (by bedroom)';
+    const tooltip = `Landscaper suggests ${formatCurrency(aiEstimate)} based on ${compCount} comparable unit${compCount > 1 ? 's' : ''}${matchLabel} (${percentDiff.toFixed(1)}% ${diff > 0 ? 'above' : 'below'} market)`;
+
     if (diff > 0) {
       return (
-        <span className="ml-1 text-xs text-green-400" title={`AI suggests $${aiEstimate} (${percentDiff.toFixed(1)}% lower)`}>
+        <span className="ml-1 text-xs text-green-400 cursor-help" title={tooltip}>
           ↑
         </span>
       );
     } else {
       return (
-        <span className="ml-1 text-xs text-amber-400" title={`AI suggests $${aiEstimate} (${percentDiff.toFixed(1)}% higher)`}>
+        <span className="ml-1 text-xs text-amber-400 cursor-help" title={tooltip}>
           ↓
         </span>
       );
@@ -579,9 +891,33 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Upper Row: Floor Plans (left) + Comparables Map (right) */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
+    <CCard>
+      <CCardHeader>
+        <span>Project Design and Market Analysis</span>
+      </CCardHeader>
+      <div
+        style={{
+          background: 'var(--cui-tertiary-bg)',
+          borderBottom: '1px solid var(--cui-border-color)',
+          padding: '0 1.5rem',
+        }}
+      >
+        <CNav variant="underline-border">
+          <CNavItem>
+            <CNavLink href="#property-design">Design</CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink href="#property-market">Market</CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink href="#property-rent-roll">Rent Roll</CNavLink>
+          </CNavItem>
+        </CNav>
+      </div>
+      <CCardBody>
+        <div className="space-y-4">
+          {/* Upper Row: Floor Plans (left) + Comparables Map (right) */}
+          <div id="property-design" className="grid gap-4 grid-cols-1 lg:grid-cols-[1.3fr_1fr]">
         {/* Floor Plan Matrix - Upper Left (WIDER) */}
         <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
           <div className="border-b" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
@@ -625,7 +961,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {floorPlans.map((plan, index) => {
+                  {floorPlansWithAI.map((plan, index) => {
                     const editing = isPlanEditing(plan.id);
                     const draft = editing ? planEditDraft! : plan;
                     const variance = draft.marketRent - draft.currentRent;
@@ -717,7 +1053,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                           ) : (
                             <span className="text-white font-medium">
                               {formatCurrency(plan.marketRent)}
-                              {getAIIndicator(plan.marketRent, plan.aiEstimate)}
+                              {getAIIndicator(plan.marketRent, plan.aiEstimate, plan.compCount || 0, plan.matchType || 'none')}
                             </span>
                           )}
                         </td>
@@ -761,38 +1097,26 @@ export default function PropertyTab({ project }: PropertyTabProps) {
             </div>
 
             {/* Landscaper Analysis Box */}
-            <div className="border-t border-gray-700 pt-4">
-              <div className="bg-purple-900/20 border border-purple-700/40 rounded-lg p-4">
+            <div className="border-t pt-4" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
-                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h4 className="text-sm font-semibold text-purple-300">Landscaper Analysis</h4>
-                      <span className="text-xs text-purple-400/60">AI-Powered Insights</span>
+                      <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
+                      <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {comparables.length > 0 ? `Based on ${comparables.length} comp units from ${comparablesByProperty.length} properties` : ''}
+                      </span>
                     </div>
-                    <div className="space-y-2 text-xs text-gray-300">
-                      <p>
-                        <span className="font-medium text-purple-300">Market Position:</span> Your current rents are averaging
-                        <span className="text-white font-semibold"> 7.2% below market</span> based on comparable properties.
-                        This represents approximately <span className="text-green-400 font-semibold">$12,400/month</span> in
-                        potential additional revenue.
-                      </p>
-                      <p>
-                        <span className="font-medium text-purple-300">Key Insight:</span> Floor plans B1 and B2 (2bd/2ba) show
-                        the largest gap to market rates. Consider prioritizing rent increases on these units during lease renewals.
-                        Comparable properties within 1.5 miles are achieving <span className="text-white font-semibold">$1,825-$1,950</span> for
-                        similar configurations.
-                      </p>
-                      <p>
-                        <span className="font-medium text-purple-300">Recommendation:</span> Phase rent adjustments over the next
-                        6 months to capture market value while maintaining occupancy. Target 95%+ occupancy with optimized rents
-                        versus current 92% at below-market rates.
-                      </p>
-                    </div>
+                    <LandscaperInsights
+                      floorPlans={floorPlansWithAI}
+                      comparables={comparables}
+                      comparablesByProperty={comparablesByProperty}
+                    />
                   </div>
                 </div>
               </div>
@@ -801,10 +1125,28 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         </div>
 
         {/* Comparable Rentals - Upper Right */}
-        <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+        <div id="property-market" className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
           <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-            <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
-            <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>AI-analyzed nearby properties</p>
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-700/40">
+                {comparablesByProperty.length} properties • {comparables.length} unit types
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={expandAll}
+                className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                Expand All
+              </button>
+              <button
+                onClick={collapseAll}
+                className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                Collapse All
+              </button>
+            </div>
           </div>
           <div className="p-4 space-y-3" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
             {/* Project Map with Rental Comparables */}
@@ -817,37 +1159,114 @@ export default function PropertyTab({ project }: PropertyTabProps) {
               />
             </div>
 
-            {/* Comparables Table - COMPACT */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
-                  <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                    <th className="text-left px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Property</th>
-                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bed/Ba</th>
-                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
-                    <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Dist</th>
-                    <th className="text-right px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Rent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparables.map((comp, index) => (
-                    <tr key={comp.comparable_id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
-                      <td className="px-2 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{comp.property_name}</td>
-                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatNumber(comp.bedrooms)}/{formatNumber(comp.bathrooms)}</td>
-                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatNumber(comp.avg_sqft)}</td>
-                      <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{comp.distance_miles ? `${comp.distance_miles} mi` : '—'}</td>
-                      <td className="px-2 py-1.5 text-right font-medium" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(comp.asking_rent)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Collapsible Property Groups */}
+            <div className={`space-y-1 pr-1 ${expandedProperties.size > 0 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
+              {comparablesByProperty.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  <p>No rental comparables available.</p>
+                  <p className="text-xs mt-1">Ask Landscaper to extract comps from your OM.</p>
+                </div>
+              ) : (
+                comparablesByProperty.map((property, propIdx) => {
+                  const isExpanded = expandedProperties.has(property.propertyName);
+                  return (
+                    <div key={property.propertyName} className="border border-gray-700 rounded-lg overflow-hidden">
+                      {/* Property Header - Clickable */}
+                      <button
+                        onClick={() => toggleProperty(property.propertyName)}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-700/30 transition-colors text-left"
+                        style={{ backgroundColor: propIdx % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white truncate">{property.propertyName}</span>
+                              <span className="text-xs text-gray-500">({property.unitTypes.length} types)</span>
+                            </div>
+                            {property.address && (
+                              <div className="flex items-center gap-1 text-xs text-gray-400 truncate">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{property.address}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                          {property.distance && (
+                            <span className="text-blue-400 font-medium">{property.distance} mi</span>
+                          )}
+                          {property.yearBuilt && (
+                            <span className="text-gray-400 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {property.yearBuilt}
+                            </span>
+                          )}
+                          {property.totalUnits && (
+                            <span className="text-gray-400 flex items-center gap-1">
+                              <Building2 className="w-3 h-3" />
+                              {property.totalUnits}
+                            </span>
+                          )}
+                          <span className="text-green-400 font-medium">
+                            {property.rentRange.min === property.rentRange.max
+                              ? formatCurrency(property.rentRange.min)
+                              : `${formatCurrency(property.rentRange.min)} - ${formatCurrency(property.rentRange.max)}`
+                            }
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Expanded Unit Types */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-600" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-600">
+                                <th className="text-left px-3 py-1.5 font-medium text-gray-400 w-24">Unit Type</th>
+                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">Bed</th>
+                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">Bath</th>
+                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">SF</th>
+                                <th className="text-right px-3 py-1.5 font-medium text-gray-400">Rent</th>
+                                <th className="text-right px-3 py-1.5 font-medium text-gray-400">$/SF</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {property.unitTypes.map((unit, idx) => (
+                                <tr
+                                  key={unit.comparable_id}
+                                  className="border-b border-gray-700/50 last:border-b-0"
+                                  style={{ backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}
+                                >
+                                  <td className="px-3 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{unit.unit_type || `${unit.bedrooms}BR/${unit.bathrooms}BA`}</td>
+                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</td>
+                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</td>
+                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.avg_sqft)}</td>
+                                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--cui-success)' }}>{formatCurrency(unit.asking_rent)}</td>
+                                  <td className="px-3 py-1.5 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+                                    {unit.avg_sqft > 0 ? `$${(unit.asking_rent / unit.avg_sqft).toFixed(2)}` : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {/* Detailed Rent Roll Table - Bottom (FULL WIDTH) */}
-      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <div id="property-rent-roll" className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
@@ -1009,14 +1428,21 @@ export default function PropertyTab({ project }: PropertyTabProps) {
 
       {/* Field Chooser Modal */}
       {showFieldChooser && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div
+            className="rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+          >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Configure Columns</h3>
+            <div
+              className="px-6 py-4 flex items-center justify-between"
+              style={{ borderBottom: '1px solid var(--cui-border-color)' }}
+            >
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Configure Columns</h3>
               <button
                 onClick={() => setShowFieldChooser(false)}
-                className="text-gray-400 hover:text-white"
+                className="transition-colors"
+                style={{ color: 'var(--cui-secondary-color)' }}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1026,15 +1452,25 @@ export default function PropertyTab({ project }: PropertyTabProps) {
 
             {/* Modal Body */}
             <div className="px-6 py-2 overflow-y-auto flex-1">
-              <div className="mb-2 pb-1.5 border-b border-gray-700">
+              <div className="mb-2 pb-1.5" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 bg-blue-900/30 border border-blue-700/50 text-blue-300 rounded font-medium text-[10px]">Input</span>
-                    <span className="text-gray-400">User-editable</span>
+                    <span
+                      className="px-1.5 py-0.5 rounded font-medium text-[10px]"
+                      style={{ backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }}
+                    >
+                      Input
+                    </span>
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>User-editable</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 bg-purple-900/30 border border-purple-700/50 text-purple-300 rounded font-medium text-[10px]">Calc</span>
-                    <span className="text-gray-400">Auto-calculated</span>
+                    <span
+                      className="px-1.5 py-0.5 rounded font-medium text-[10px]"
+                      style={{ backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }}
+                    >
+                      Calc
+                    </span>
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>Auto-calculated</span>
                   </div>
                 </div>
               </div>
@@ -1042,10 +1478,15 @@ export default function PropertyTab({ project }: PropertyTabProps) {
               {/* Column categories */}
               {['unit', 'floorplan', 'tenant', 'lease', 'financial'].map(category => (
                 <div key={category} className="mb-3">
-                  <h4 className="text-xs font-semibold text-blue-400 mb-1 capitalize">{category} Info</h4>
+                  <h4 className="text-xs font-semibold mb-1 capitalize" style={{ color: 'var(--cui-info, #3b82f6)' }}>{category} Info</h4>
                   <div className="space-y-0.5 ml-5">
                     {columns.filter(col => col.category === category).map(col => (
-                      <label key={col.id} htmlFor={`field-${col.id}`} className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-700/30 px-2 py-1 rounded text-xs group">
+                      <label
+                        key={col.id}
+                        htmlFor={`field-${col.id}`}
+                        className="flex items-center gap-2.5 cursor-pointer px-2 py-1 rounded text-xs group"
+                        style={{ backgroundColor: col.visible ? 'var(--cui-tertiary-bg)' : 'transparent' }}
+                      >
                         <input
                           type="checkbox"
                           id={`field-${col.id}`}
@@ -1055,17 +1496,20 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                               c.id === col.id ? { ...c, visible: e.target.checked } : c
                             ));
                           }}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800 flex-shrink-0"
+                          className="rounded flex-shrink-0"
+                          style={{ accentColor: 'var(--cui-primary)' }}
                         />
-                        <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0 ${
-                          col.type === 'input'
-                            ? 'bg-blue-900/30 border border-blue-700/50 text-blue-300'
-                            : 'bg-purple-900/30 border border-purple-700/50 text-purple-300'
-                        }`}>
+                        <span
+                          className="px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0"
+                          style={col.type === 'input'
+                            ? { backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }
+                            : { backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }
+                          }
+                        >
                           {col.type === 'input' ? 'Input' : 'Calc'}
                         </span>
-                        <span className="text-gray-200 font-medium w-28 flex-shrink-0">{col.label}</span>
-                        <span className="text-gray-400 flex-1">{col.description}</span>
+                        <span className="font-medium w-28 flex-shrink-0" style={{ color: 'var(--cui-body-color)' }}>{col.label}</span>
+                        <span className="flex-1" style={{ color: 'var(--cui-secondary-color)' }}>{col.description}</span>
                       </label>
                     ))}
                   </div>
@@ -1074,18 +1518,23 @@ export default function PropertyTab({ project }: PropertyTabProps) {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 border-t border-gray-700 flex items-center justify-between">
+            <div
+              className="px-6 py-3 flex items-center justify-between"
+              style={{ borderTop: '1px solid var(--cui-border-color)' }}
+            >
               <button
                 onClick={() => {
                   setColumns(defaultColumns);
                 }}
-                className="px-3 py-1.5 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
+                className="px-3 py-1.5 text-xs rounded transition-colors"
+                style={{ backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-body-color)' }}
               >
                 Reset to Defaults
               </button>
               <button
                 onClick={() => setShowFieldChooser(false)}
-                className="px-4 py-1.5 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
+                className="px-4 py-1.5 text-xs rounded transition-colors text-white"
+                style={{ backgroundColor: 'var(--cui-primary)' }}
               >
                 Done
               </button>
@@ -1093,6 +1542,8 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </CCardBody>
+    </CCard>
   );
 }

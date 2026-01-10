@@ -641,33 +641,21 @@ export default function NapkinWaterfallForm({
                         style={{ ...inputFieldStyle, width: '72px' }}
                       />
                     </td>
-                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                      {waterfallType === 'IRR_EM' ? (
-                        <span>{typeof promotePct === 'number' ? promotePct : 20}%</span>
-                      ) : (
-                        <>
-                          <input
-                            type="text"
-                            value={formatWithSuffix(promotePct, '%')}
-                            onChange={(e) => setPromotePct(parseNumber(e.target.value))}
-                            style={{ ...inputFieldStyle, width: '64px' }}
-                          />
-                        </>
-                      )}
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(promotePct, '%')}
+                        onChange={(e) => setPromotePct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
                     </td>
-                    <td style={waterfallType === 'IRR_EM' ? calcCellStyle : inputCellStyle}>
-                      {waterfallType === 'IRR_EM' ? (
-                        <span>{typeof promoteLpPct === 'number' ? promoteLpPct : 72}%</span>
-                      ) : (
-                        <>
-                          <input
-                            type="text"
-                            value={formatWithSuffix(promoteLpPct, '%')}
-                            onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
-                            style={{ ...inputFieldStyle, width: '64px' }}
-                          />
-                        </>
-                      )}
+                    <td style={inputCellStyle}>
+                      <input
+                        type="text"
+                        value={formatWithSuffix(promoteLpPct, '%')}
+                        onChange={(e) => setPromoteLpPct(parseNumber(e.target.value))}
+                        style={{ ...inputFieldStyle, width: '64px' }}
+                      />
                     </td>
                     <td style={calcCellStyle}>{promoteGpPct}%</td>
                   </tr>

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilFilterSquare } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
-import FilterDetailView from '@/components/dms/views/FilterDetailView';
+import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
 import Dropzone from '@/components/dms/upload/Dropzone';
 import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
@@ -31,7 +31,7 @@ export default function DMSView({
   const defaultWorkspaceId = 1;
 
   // Documents tab state
-  const [selectedFilterType, setSelectedFilterType] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
   const [allFilters, setAllFilters] = useState<FilterAccordion[]>([]);
   const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
   const [isLoadingFilters, setIsLoadingFilters] = useState(true);
@@ -209,19 +209,20 @@ export default function DMSView({
     }
   };
 
-  // Handle clicking folder icon - navigate to filter detail view
-  const handleFilterClick = (docType: string) => {
-    setSelectedFilterType(docType);
-  };
-
-  const handleCloseDetail = () => {
-    setSelectedFilterType(null);
-  };
-
-  // Handle document selection from accordion
+  // Handle document selection from accordion - opens preview panel for single doc
   const handleDocumentSelect = (doc: DMSDocument) => {
-    console.log('Document selected:', doc);
-    // TODO: Open document preview or navigate to document page
+    setSelectedDocument(doc);
+  };
+
+  // Handle closing document preview
+  const handleCloseDocumentPreview = () => {
+    setSelectedDocument(null);
+  };
+
+  // Handle document changes (refresh filters)
+  const handleDocumentChange = () => {
+    void loadFilters();
+    setSelectedDocument(null);
   };
 
   // Upload handlers
@@ -266,7 +267,7 @@ export default function DMSView({
   };
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: '#E6E7EB' }}>
+    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       {/* Header */}
       {!hideHeader && (
         <div
@@ -317,21 +318,21 @@ export default function DMSView({
       )}
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden" style={{ backgroundColor: '#E6E7EB' }}>
+      <div className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
         {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div className="h-full flex flex-col" style={{ backgroundColor: '#E6E7EB' }}>
+          <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
             <div className="px-3 lg:px-4 py-4 lg:py-6">
               <div
                 className="rounded-lg border shadow-sm overflow-hidden"
                 style={{
                   borderColor: 'var(--cui-border-color)',
-                  backgroundColor: '#F0F1F2'
+                  backgroundColor: 'var(--cui-card-bg)'
                 }}
               >
                 <button
                   className="w-full px-4 py-3 text-left"
-                  style={{ color: 'var(--cui-body-color)', backgroundColor: '#F0F1F2' }}
+                  style={{ color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-card-bg)' }}
                   onClick={() => setPanelExpanded((prev) => !prev)}
                   aria-expanded={panelExpanded}
                 >
@@ -379,15 +380,15 @@ export default function DMSView({
                     className="border-t"
                     style={{
                       borderColor: 'var(--cui-border-color)',
-                      backgroundColor: '#ffffff'
+                      backgroundColor: 'var(--cui-body-bg)'
                     }}
                   >
                     {/* Breadcrumb */}
-                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: '#ffffff' }}>
+                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
                       <div className="flex items-center gap-2 text-sm">
-                        <button className="text-blue-600 hover:underline">Home</button>
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
                         <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                        <button className="text-blue-600 hover:underline">Projects</button>
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
                         <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
                         <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
                           {projectName}
@@ -396,31 +397,25 @@ export default function DMSView({
                     </div>
 
                     {/* Toolbar */}
-                    <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: '#ffffff' }}>
+                    <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
                       <div className="flex items-center gap-4">
-                        <button className="text-blue-600">🔻</button>
+                        <button style={{ color: 'var(--cui-primary)' }}>🔻</button>
                         <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                           {totalItemCount} items | 0 selected
                         </span>
                         <div className="ml-auto flex items-center gap-3 text-sm">
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                            🤖 Ask AI
-                          </button>
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
                             ✏️ Rename
                           </button>
-                          <button className="hover:opacity-70 flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                          <button className="hover:opacity-70 flex items-center gap-1 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
                             <CIcon icon={cilFilterSquare} className="w-4 h-4" />
                             Move/Copy
                           </button>
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
                             📧 Email copy
                           </button>
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
                             ✏️ Edit profile
-                          </button>
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                            ✅ Check in
                           </button>
                           <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
                             ⋯ More
@@ -429,12 +424,12 @@ export default function DMSView({
                       </div>
                     </div>
 
-                    <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
-                      <div className={`flex-1 overflow-y-auto ${selectedFilterType ? 'lg:w-7/12 xl:w-3/5' : 'w-full'}`}>
-                        <div className="p-4 lg:p-6" style={{ backgroundColor: '#ffffff' }}>
+                    <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                      <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>
+                        <div className="p-4 lg:p-6" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                           {isLoadingFilters ? (
                             <div className="flex items-center justify-center h-64">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
                               <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
                             </div>
                           ) : allFilters.length === 0 ? (
@@ -443,17 +438,17 @@ export default function DMSView({
                               <p className="text-sm">No documents found in this project</p>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 bg-white">
+                            <div className="grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                               {/* Left Column */}
                               <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
                                 <AccordionFilters
                                   projectId={projectId}
+                                  workspaceId={defaultWorkspaceId}
                                   filters={leftColumnFilters}
                                   onExpand={handleAccordionExpand}
-                                  onFilterClick={handleFilterClick}
                                   onDocumentSelect={handleDocumentSelect}
                                   expandedFilter={expandedFilter}
-                                  activeFilter={selectedFilterType}
+                                  onUploadComplete={handleDocumentChange}
                                 />
                               </div>
 
@@ -461,12 +456,12 @@ export default function DMSView({
                               <div>
                                 <AccordionFilters
                                   projectId={projectId}
+                                  workspaceId={defaultWorkspaceId}
                                   filters={rightColumnFilters}
                                   onExpand={handleAccordionExpand}
-                                  onFilterClick={handleFilterClick}
                                   onDocumentSelect={handleDocumentSelect}
                                   expandedFilter={expandedFilter}
-                                  activeFilter={selectedFilterType}
+                                  onUploadComplete={handleDocumentChange}
                                 />
                               </div>
                             </div>
@@ -474,21 +469,23 @@ export default function DMSView({
                         </div>
                       </div>
 
-                      {selectedFilterType && (
+                      {/* Single document preview panel */}
+                      {selectedDocument && (
                         <>
                           <div
                             className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-                            onClick={handleCloseDetail}
+                            onClick={handleCloseDocumentPreview}
                             role="presentation"
                           />
                           <div
-                            className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-5/12 xl:w-2/5"
+                            className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[480px]"
                             style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
                           >
-                            <FilterDetailView
+                            <DocumentPreviewPanel
                               projectId={projectId}
-                              docType={selectedFilterType}
-                              onBack={handleCloseDetail}
+                              document={selectedDocument}
+                              onClose={handleCloseDocumentPreview}
+                              onDocumentChange={handleDocumentChange}
                             />
                           </div>
                         </>

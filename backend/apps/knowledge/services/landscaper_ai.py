@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
@@ -41,6 +42,9 @@ from apps.landscaper.tool_executor import execute_tool
 
 logger = logging.getLogger(__name__)
 
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
+ANTHROPIC_TIMEOUT_SECONDS = 60
+
 
 def _get_anthropic_client() -> Anthropic:
     """Get Anthropic client with API key from .env or settings."""
@@ -62,10 +66,10 @@ def _get_anthropic_client() -> Anthropic:
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not found. Set it in backend/.env or environment.")
 
-    return Anthropic(api_key=api_key)
-
-
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+    try:
+        return Anthropic(api_key=api_key, timeout=ANTHROPIC_TIMEOUT_SECONDS)
+    except TypeError:
+        return Anthropic(api_key=api_key)
 
 
 # Tab-specific system prompt additions
@@ -213,14 +217,18 @@ def get_landscaper_response(
         conversation_history = get_conversation_context(project_id, limit=10)
 
     # 3. Get full project context (structured data from all tables)
+    t0 = time.time()
     project_context = get_project_context(project_id)
+    print(f"[AI_TIMING] get_project_context: {time.time() - t0:.2f}s")
 
     # 4. Get tab-specific context
     tab_config = TAB_CONTEXT.get(active_tab, TAB_CONTEXT['home'])
     tab_context = tab_config['prompt_addition']
 
     # 5. Build system prompt with RAG context + project context + tab context
+    t0 = time.time()
     system_prompt = _build_system_prompt(rag_context_obj, project_context, tab_context)
+    print(f"[AI_TIMING] _build_system_prompt: {time.time() - t0:.2f}s (prompt len: {len(system_prompt)} chars)")
 
     # 4. Build messages array
     messages = []
@@ -243,22 +251,50 @@ def get_landscaper_response(
         # Track tool executions for metadata
         tool_executions = []
 
+        # Track mutation proposals (Level 2 autonomy)
+        mutation_proposals = []
+
+        # Generate a source message ID for linking proposals to this chat message
+        source_message_id = f"msg_{uuid.uuid4().hex[:12]}"
+
         # Initial API call with tools
+        t0 = time.time()
+        print("[AI_TIMING] Starting initial Claude API call...")
         response = anthropic.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=2000,
+            max_tokens=4000,
             system=system_prompt,
             messages=messages,
             tools=LANDSCAPER_TOOLS
         )
+        print(f"[AI_TIMING] Initial Claude API call: {time.time() - t0:.2f}s (stop_reason: {response.stop_reason}, tokens: {response.usage.input_tokens} in / {response.usage.output_tokens} out)")
+
+        # Log initial response info
+        logger.info(f"Initial response - stop_reason: {response.stop_reason}, content blocks: {len(response.content)}")
+        for i, block in enumerate(response.content):
+            logger.info(f"  Block {i}: type={block.type}, {'name=' + block.name if hasattr(block, 'name') else ''}")
 
         # Tool use loop - continue until we get a text response
-        max_tool_iterations = 10
+        # IMPORTANT: Limit iterations to avoid timeout. Each iteration with large
+        # document content takes 30-60s, so 4 iterations = ~2-3 min max.
+        max_tool_iterations = 4
         iteration = 0
+        total_tool_loop_start = time.time()
+
+        # Overall timeout guard - abort if approaching 90s frontend timeout
+        overall_timeout_seconds = 80
 
         while response.stop_reason == "tool_use" and iteration < max_tool_iterations:
+            # Check overall timeout before starting another iteration
+            elapsed = time.time() - total_tool_loop_start
+            if elapsed > overall_timeout_seconds:
+                print(f"[AI_TIMING] Aborting tool loop - elapsed {elapsed:.1f}s exceeds {overall_timeout_seconds}s timeout")
+                logger.warning(f"Tool loop aborted after {elapsed:.1f}s to avoid timeout")
+                break
+
             iteration += 1
-            logger.info(f"Tool use iteration {iteration}")
+            iteration_start = time.time()
+            print(f"[AI_TIMING] Tool use iteration {iteration} starting...")
 
             # Process all tool use blocks in the response
             tool_results = []
@@ -270,14 +306,30 @@ def get_landscaper_response(
 
                     logger.info(f"Executing tool: {tool_name} with input: {json.dumps(tool_input)[:200]}")
 
-                    # Execute the tool
+                    # Execute the tool (with proposal mode for mutations)
+                    tool_exec_start = time.time()
                     try:
-                        tool_result = execute_tool(tool_name, tool_input, project_id)
+                        tool_result = execute_tool(
+                            tool_name,
+                            tool_input,
+                            project_id,
+                            source_message_id=source_message_id,
+                            propose_only=True  # Level 2 autonomy: propose, don't execute
+                        )
+                        print(f"[AI_TIMING] Tool {tool_name} execution: {time.time() - tool_exec_start:.2f}s")
+
+                        # Check if this was a mutation proposal
+                        if tool_result.get('mutation_id') or tool_result.get('batch_id'):
+                            # This is a proposal, not an immediate execution
+                            mutation_proposals.append(tool_result)
+                            logger.info(f"Created mutation proposal: {tool_result.get('mutation_id') or tool_result.get('batch_id')}")
+
                         tool_executions.append({
                             'tool': tool_name,
                             'input': tool_input,
                             'result': tool_result,
-                            'success': not tool_result.get('error')
+                            'success': tool_result.get('success', not tool_result.get('error')),
+                            'is_proposal': bool(tool_result.get('mutation_id') or tool_result.get('batch_id'))
                         })
                         result_content = json.dumps(tool_result, cls=DecimalEncoder)
                     except Exception as tool_error:
@@ -298,16 +350,156 @@ def get_landscaper_response(
 
             # Add assistant's response (with tool_use) and tool results to messages
             messages.append({"role": "assistant", "content": response.content})
-            messages.append({"role": "user", "content": tool_results})
+
+            # Check if we just read document content and should prompt for completion
+            tools_just_used = [t['tool'] for t in tool_executions[-len(tool_results):]]
+            read_doc = 'get_document_content' in tools_just_used
+
+            # If we read a document, check if the user wanted to save data
+            user_wants_save = any(kw in user_message.lower() for kw in [
+                'extract', 'add', 'save', 'populate', 'update', 'import', 'insert'
+            ])
+            data_type_requested = None
+            if 'rental' in user_message.lower() or 'comp' in user_message.lower():
+                data_type_requested = 'rental_comps'
+            elif 'expense' in user_message.lower() or 'opex' in user_message.lower() or 't-12' in user_message.lower():
+                data_type_requested = 'operating_expenses'
+
+            # If we read a document and user wants to save, add a nudge
+            if read_doc and user_wants_save and data_type_requested:
+                tool_name = 'update_rental_comps' if data_type_requested == 'rental_comps' else 'update_operating_expenses'
+                nudge = f"Now extract the data from the content and call {tool_name} to save it to the database."
+                messages.append({"role": "user", "content": tool_results + [{"type": "text", "text": nudge}]})
+            else:
+                messages.append({"role": "user", "content": tool_results})
 
             # Continue the conversation
+            api_call_start = time.time()
+            print(f"[AI_TIMING] Starting Claude API call for iteration {iteration}...")
             response = anthropic.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=2000,
+                max_tokens=4000,  # Increased for tool calls with lots of data
                 system=system_prompt,
                 messages=messages,
                 tools=LANDSCAPER_TOOLS
             )
+            print(f"[AI_TIMING] Claude API call iteration {iteration}: {time.time() - api_call_start:.2f}s (stop_reason: {response.stop_reason}, tokens: {response.usage.input_tokens} in / {response.usage.output_tokens} out)")
+            print(f"[AI_TIMING] Total iteration {iteration} time: {time.time() - iteration_start:.2f}s")
+
+        if iteration > 0:
+            print(f"[AI_TIMING] Total tool loop time ({iteration} iterations): {time.time() - total_tool_loop_start:.2f}s")
+
+        # Check if we need to force another iteration to complete the task
+        # This handles the case where the model reads a document but ends without saving
+        tools_used_names = [t['tool'] for t in tool_executions]
+        read_doc = 'get_document_content' in tools_used_names
+        saved_data = 'update_rental_comps' in tools_used_names or 'update_operating_expenses' in tools_used_names
+
+        # Detect if user wanted to save data
+        user_wants_save = any(kw in user_message.lower() for kw in [
+            'extract', 'add', 'save', 'populate', 'update', 'import', 'insert'
+        ])
+        data_type_requested = None
+        if 'rental' in user_message.lower() or 'comp' in user_message.lower():
+            data_type_requested = 'rental_comps'
+        elif 'expense' in user_message.lower() or 'opex' in user_message.lower() or 't-12' in user_message.lower():
+            data_type_requested = 'operating_expenses'
+
+        # If we read a document, user wanted to save, but we didn't save - force continuation
+        if read_doc and user_wants_save and data_type_requested and not saved_data and iteration < max_tool_iterations:
+            logger.info("Forcing continuation to complete save operation")
+            target_tool = 'update_rental_comps' if data_type_requested == 'rental_comps' else 'update_operating_expenses'
+
+            # Get the last document content from tool executions
+            doc_content = ""
+            for t in reversed(tool_executions):
+                if t['tool'] == 'get_document_content' and t.get('result', {}).get('success'):
+                    doc_content = t['result'].get('content', '')[:15000]  # Limit size
+                    break
+
+            # Build a new request with just the content and direct instruction
+            # This avoids the tool_result message format issues
+            continuation_messages = [
+                {
+                    "role": "user",
+                    "content": f"""Here is the document content with rental comparable data:
+
+{doc_content}
+
+Extract ALL the rental comparable properties and their unit types from this content.
+For each property and unit type combination, create an entry with:
+- property_name: The property name
+- address: Full street address if shown
+- unit_type: e.g., "1BR/1BA", "2BR/2BA", "Studio"
+- bedrooms: Number (0 for studio)
+- bathrooms: Number
+- avg_sqft: Square footage
+- asking_rent: Monthly rent in dollars
+
+Call {target_tool} with all the extracted comps now."""
+                }
+            ]
+
+            # Make a fresh API call with just the content
+            response = anthropic.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=8000,
+                system="You are a data extraction assistant. Extract structured rental comparable data from the provided document content and call the update_rental_comps tool to save it.",
+                messages=continuation_messages,
+                tools=LANDSCAPER_TOOLS
+            )
+
+            # Process any additional tool calls from the continuation
+            while response.stop_reason == "tool_use" and iteration < max_tool_iterations:
+                iteration += 1
+                tool_results = []
+                for content_block in response.content:
+                    if content_block.type == "tool_use":
+                        tool_name_exec = content_block.name
+                        tool_input = content_block.input
+                        tool_use_id = content_block.id
+                        logger.info(f"Executing forced tool: {tool_name_exec}")
+
+                        try:
+                            tool_result = execute_tool(
+                                tool_name_exec,
+                                tool_input,
+                                project_id,
+                                source_message_id=source_message_id,
+                                propose_only=True  # Level 2 autonomy
+                            )
+
+                            # Track proposals from forced continuation
+                            if tool_result.get('mutation_id') or tool_result.get('batch_id'):
+                                mutation_proposals.append(tool_result)
+
+                            tool_executions.append({
+                                'tool': tool_name_exec,
+                                'input': tool_input,
+                                'result': tool_result,
+                                'success': tool_result.get('success', not tool_result.get('error')),
+                                'is_proposal': bool(tool_result.get('mutation_id') or tool_result.get('batch_id'))
+                            })
+                            result_content = json.dumps(tool_result, cls=DecimalEncoder)
+                        except Exception as tool_error:
+                            logger.error(f"Tool execution error: {tool_error}")
+                            result_content = json.dumps({'error': str(tool_error)})
+
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": result_content
+                        })
+
+                continuation_messages.append({"role": "assistant", "content": response.content})
+                continuation_messages.append({"role": "user", "content": tool_results})
+                response = anthropic.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=2000,
+                    system="You are a data extraction assistant.",
+                    messages=continuation_messages,
+                    tools=LANDSCAPER_TOOLS
+                )
 
         # Extract final text response
         ai_content = ""
@@ -352,6 +544,14 @@ def get_landscaper_response(
             metadata['tool_executions'] = tool_executions
             metadata['tools_used'] = [t['tool'] for t in tool_executions]
             metadata['all_tools_succeeded'] = all(t.get('success', False) for t in tool_executions)
+
+        # Add mutation proposals to metadata (Level 2 autonomy)
+        if mutation_proposals:
+            metadata['mutation_proposals'] = mutation_proposals
+            metadata['has_pending_mutations'] = True
+            metadata['source_message_id'] = source_message_id
+        else:
+            metadata['has_pending_mutations'] = False
 
         return {
             'content': ai_content,

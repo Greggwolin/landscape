@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import CIcon from '@coreui/icons-react';
+import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
 import { ChatMessageBubble } from './ChatMessageBubble';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 interface LandscaperChatProps {
   projectId: number;
@@ -11,6 +15,8 @@ interface LandscaperChatProps {
   isIngesting?: boolean;
   ingestionProgress?: number; // 0-100
   ingestionMessage?: string;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 /**
@@ -29,7 +35,7 @@ function getTabContextHint(tab: string): string {
   return hints[tab] || 'General';
 }
 
-export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage }: LandscaperChatProps) {
+export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand }: LandscaperChatProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userHasSentMessage = useRef(false);
@@ -37,10 +43,61 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
   const tabContextHint = getTabContextHint(activeTab);
 
-  const { messages, sendMessage, isLoading } = useLandscaper({
+  const { messages, sendMessage, isLoading, loadHistory, error } = useLandscaper({
     projectId: projectId.toString(),
     activeTab,
   });
+
+  // Mutation handlers for Level 2 autonomy
+  const handleConfirmMutation = useCallback(async (mutationId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Refresh chat history to reflect updated state
+        loadHistory?.();
+      } else {
+        console.error('Failed to confirm mutation:', data.error);
+      }
+    } catch (error) {
+      console.error('Error confirming mutation:', error);
+    }
+  }, [loadHistory]);
+
+  const handleRejectMutation = useCallback(async (mutationId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/reject/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadHistory?.();
+      }
+    } catch (error) {
+      console.error('Error rejecting mutation:', error);
+    }
+  }, [loadHistory]);
+
+  const handleConfirmBatch = useCallback(async (batchId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/batch/${batchId}/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadHistory?.();
+      } else {
+        console.error('Failed to confirm batch:', data.error);
+      }
+    } catch (error) {
+      console.error('Error confirming batch:', error);
+    }
+  }, [loadHistory]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {
@@ -139,6 +196,21 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
             </span>
           </div>
         )}
+
+        {/* Collapse/Expand toggle */}
+        {onToggleExpand && (
+          <button
+            onClick={onToggleExpand}
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title={isExpanded ? 'Collapse chat' : 'Expand chat'}
+          >
+            <CIcon
+              icon={isExpanded ? cilChevronTop : cilChevronBottom}
+              size="sm"
+              style={{ color: 'var(--cui-secondary-color)' }}
+            />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -153,7 +225,13 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
           </div>
         ) : (
           messages.map((msg: ChatMessage) => (
-            <ChatMessageBubble key={msg.messageId} message={msg} />
+            <ChatMessageBubble
+              key={msg.messageId}
+              message={msg}
+              onConfirmMutation={handleConfirmMutation}
+              onRejectMutation={handleRejectMutation}
+              onConfirmBatch={handleConfirmBatch}
+            />
           ))
         )}
 
@@ -161,6 +239,15 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
             <div className="h-4 w-4 animate-spin rounded-full border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
             <span>Thinking...</span>
+          </div>
+        )}
+        {error && !isLoading && (
+          <div className="rounded-md border px-3 py-2 text-sm" style={{
+            borderColor: 'var(--cui-danger-border-subtle)',
+            color: 'var(--cui-danger)',
+            backgroundColor: 'var(--cui-danger-bg-subtle)',
+          }}>
+            {error}
           </div>
         )}
         <div ref={messagesEndRef} />

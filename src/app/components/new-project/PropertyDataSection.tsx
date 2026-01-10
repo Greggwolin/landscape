@@ -9,6 +9,7 @@ type PropertyDataSectionProps = {
   form: UseFormReturn<NewProjectFormData>
   isDark?: boolean
   hasError?: boolean
+  extractedFieldKeys?: Set<string>
 }
 
 // Compact Floating Label Input Component (Light mode, single line)
@@ -17,10 +18,11 @@ interface FloatingInputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string
   suffix?: React.ReactNode
   isDark?: boolean
+  isExtracted?: boolean
 }
 
 const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
-  ({ label, error, suffix, isDark = false, className, id, value, ...props }, ref) => {
+  ({ label, error, suffix, isDark = false, isExtracted = false, className, id, value, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false)
     const hasValue = value !== undefined && value !== ''
 
@@ -47,6 +49,8 @@ const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
             'peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition',
             'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
             error ? 'border-rose-400' : (isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'),
+            isExtracted && !isDark && 'ring-2 ring-blue-300 bg-blue-50/50',
+            isExtracted && isDark && 'ring-2 ring-blue-500/50 bg-blue-900/20',
             suffix ? 'pr-14' : '',
             className
           )}
@@ -62,10 +66,23 @@ const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
           >
             {label}
           </label>
+          {isExtracted && !suffix && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-600">
+              Auto
+            </span>
+          )}
           {suffix && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+            <div className={cn(
+              'absolute top-1/2 -translate-y-1/2 text-xs text-slate-400',
+              isExtracted ? 'right-10' : 'right-2'
+            )}>
               {suffix}
             </div>
+          )}
+          {isExtracted && suffix && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-600">
+              Auto
+            </span>
           )}
         </div>
         {error && (
@@ -77,7 +94,7 @@ const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
 )
 FloatingInput.displayName = 'FloatingInput'
 
-const PropertyDataSection = ({ form, isDark = false, hasError = false }: PropertyDataSectionProps) => {
+const PropertyDataSection = ({ form, isDark = false, hasError = false, extractedFieldKeys = new Set() }: PropertyDataSectionProps) => {
   const {
     register,
     watch,
@@ -96,6 +113,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
         value={watch('total_units')}
         error={errors.total_units?.message as string}
         isDark={isDark}
+        isExtracted={extractedFieldKeys.has('total_units')}
       />
       <FloatingInput
         label="Building SF"
@@ -105,6 +123,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
         value={watch('building_sf')}
         error={errors.building_sf?.message as string}
         isDark={isDark}
+        isExtracted={extractedFieldKeys.has('building_sf')}
       />
       <div className="flex gap-2 items-end">
         <FloatingInput
@@ -116,6 +135,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
           value={watch('site_area')}
           error={errors.site_area?.message as string}
           isDark={isDark}
+          isExtracted={extractedFieldKeys.has('site_area')}
         />
         <select
           {...register('site_area_unit')}
@@ -145,6 +165,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
           value={watch('site_area')}
           error={errors.site_area?.message as string}
           isDark={isDark}
+          isExtracted={extractedFieldKeys.has('site_area')}
         />
         <select
           {...register('site_area_unit')}
@@ -168,6 +189,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
         value={watch('total_lots_units')}
         error={errors.total_lots_units?.message as string}
         isDark={isDark}
+        isExtracted={extractedFieldKeys.has('total_lots_units')}
       />
 
       <FloatingInput
@@ -180,6 +202,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false }: Propert
         value={watch('density')}
         error={errors.density?.message as string}
         isDark={isDark}
+        isExtracted={extractedFieldKeys.has('density')}
       />
     </div>
   )

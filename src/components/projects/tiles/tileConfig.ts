@@ -87,11 +87,17 @@ export interface SubtabConfig {
 
 /**
  * Get contextual label for tile position 3 based on project type.
- * Land Development → "Development"
+ * Land Development → "Development / Sales" (two-line)
  * Income Properties → "Operations"
  */
-export function getTile3Label(projectType: string | undefined): string {
-  return isIncomeProperty(projectType) ? 'Operations' : 'Development';
+export function getTile3Label(projectType: string | undefined): string | TileLabel {
+  if (isIncomeProperty(projectType)) {
+    return 'Operations';
+  }
+  return {
+    primary: 'Development',
+    secondary: 'Sales',
+  };
 }
 
 /**
@@ -150,6 +156,7 @@ export function createTileConfig(projectType: string | undefined): TileConfig[] 
         : [
             { id: 'budget', label: 'Budget', route: '/budget' },
             { id: 'schedule', label: 'Schedule', route: '/budget/schedule' },
+            { id: 'sales', label: 'Sales', route: '/project/sales' },
             { id: 'draws', label: 'Draws', route: '/budget/draws' },
           ],
     },
@@ -181,13 +188,10 @@ export function createTileConfig(projectType: string | undefined): TileConfig[] 
       id: 'capital',
       label: 'Capitalization',
       background: TILE_COLORS.capital,
-      route: isIncome ? '' : '/capitalization/equity',
-      tabKey: isIncome ? 'capitalization' : undefined,
-      proOnly: true,
+      route: '/capitalization/equity',
       subtabs: [
         { id: 'equity', label: 'Equity', route: '/capitalization/equity' },
         { id: 'debt', label: 'Debt', route: '/capitalization/debt' },
-        { id: 'waterfall', label: 'Waterfall', route: '/capitalization/waterfall' },
       ],
     },
 

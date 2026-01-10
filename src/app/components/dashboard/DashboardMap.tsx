@@ -246,7 +246,7 @@ export default function DashboardMap({ projects, selectedProjectId, onProjectSel
               onProjectSelect?.(projectId);
             }
           }}
-          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
+          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
         />
       )}
     </div>

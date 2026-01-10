@@ -514,12 +514,13 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
           {dropNotice}
         </div>
       )}
-      {/* Landscaper Chat Card - reduced height to ensure Activity Feed is visible */}
+      {/* Landscaper Chat Card - 75% when expanded, 25% when collapsed */}
       <div
-        className={`flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden ${
-          isActivityExpanded ? 'flex-[0.35]' : 'flex-1'
-        }`}
-        style={{ backgroundColor: 'var(--cui-card-bg)', maxHeight: isActivityExpanded ? '45vh' : undefined }}
+        className="flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden"
+        style={{
+          backgroundColor: 'var(--cui-card-bg)',
+          flex: isActivityExpanded ? '0 0 calc(25% - 12px)' : '0 0 75%',
+        }}
       >
         <LandscaperChat
           projectId={projectId}
@@ -527,15 +528,18 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
           isIngesting={isUploading || uploadThingIsUploading}
           ingestionProgress={uploadProgress}
           ingestionMessage={uploadMessage}
+          isExpanded={!isActivityExpanded}
+          onToggleExpand={handleActivityToggle}
         />
       </div>
 
-      {/* Activity Feed Card - More prominent to show content without scrolling */}
+      {/* Activity Feed Card - 75% when expanded, 25% when collapsed */}
       <div
-        className={`rounded-xl shadow-lg overflow-hidden ${
-          isActivityExpanded ? 'flex-[0.65] min-h-[250px]' : 'flex-none'
-        }`}
-        style={{ backgroundColor: 'var(--cui-card-bg)' }}
+        className="rounded-xl shadow-lg overflow-hidden"
+        style={{
+          backgroundColor: 'var(--cui-card-bg)',
+          flex: isActivityExpanded ? '0 0 75%' : '0 0 calc(25% - 12px)',
+        }}
       >
         <ActivityFeed
           projectId={projectId}

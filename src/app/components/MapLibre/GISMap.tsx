@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { parcelLoader } from '../../utils/parcelLoader'
 import { geocodeLocation, getZoomLevel, type GeocodingResult } from '../../../lib/geocoding'
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
 
 interface GISMapProps {
   projectId: number
@@ -172,41 +173,7 @@ const GISMap: React.FC<GISMapProps> = ({
       try {
         map.current = new maplibregl.Map({
           container: mapContainer.current!,
-          style: {
-            version: 8,
-            sources: {
-              'osm': {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256
-              },
-              'esri-world-imagery': {
-                type: 'raster',
-                tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-                tileSize: 256
-              }
-            },
-            layers: [
-              {
-                id: 'background',
-                type: 'background',
-                paint: { 'background-color': '#1a202c' }
-              },
-              {
-                id: 'satellite',
-                type: 'raster',
-                source: 'esri-world-imagery'
-              },
-              {
-                id: 'osm',
-                type: 'raster',
-                source: 'osm',
-                paint: {
-                  'raster-opacity': 0.3
-                }
-              }
-            ]
-          },
+          style: getEsriHybridStyle(),
           center: geocodingResult
             ? [geocodingResult.longitude, geocodingResult.latitude]
             : [-111.927912, 33.028911], // Default: Anderson Road & Farrell Road intersection

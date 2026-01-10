@@ -1,0 +1,477 @@
+/**
+ * Landscape Grid Standard - BudgetDataGrid Implementation
+ * Version: 1.0
+ * Reference: docs/standards/LANDSCAPE_GRID_STANDARD.md
+ */
+
+/* ==========================================================================
+   CSS Custom Properties
+   ========================================================================== */
+
+.ls-budget-grid {
+  /* Dimensions */
+  --ls-grid-row-height: 28px;
+  --ls-grid-header-height: 32px;
+  --ls-grid-cell-padding-x: 8px;
+  --ls-grid-cell-padding-y: 4px;
+
+  /* Typography */
+  --ls-grid-font-size: 12px;
+  --ls-grid-header-font-size: 11px;
+  --ls-grid-font-family: system-ui, -apple-system, 'Inter', sans-serif;
+
+  /* Colors - Light Mode */
+  --ls-grid-bg: #ffffff;
+  --ls-grid-bg-alt: #fafafa;
+  --ls-grid-bg-hover: #f0f4f8;
+  --ls-grid-bg-selected: #e3f2fd;
+  --ls-grid-bg-group: #eceff1;
+  --ls-grid-bg-totals: #e8eaf6;
+
+  --ls-grid-border: #e0e0e0;
+  --ls-grid-border-focus: #1976d2;
+
+  --ls-grid-text: #212121;
+  --ls-grid-text-input: #1a5fb4;
+  --ls-grid-text-calculated: #2e7d32;
+  --ls-grid-text-dropdown: #7b1fa2;
+  --ls-grid-text-disabled: #757575;
+  --ls-grid-text-error: #d32f2f;
+
+  /* Transitions */
+  --ls-grid-transition: 150ms ease;
+}
+
+/* Dark mode overrides - CoreUI theme detection */
+[data-coreui-theme="dark"] .ls-budget-grid,
+.dark .ls-budget-grid {
+  --ls-grid-bg: #1e1e1e;
+  --ls-grid-bg-alt: #262626;
+  --ls-grid-bg-hover: #2d2d2d;
+  --ls-grid-bg-selected: #1e3a5f;
+  --ls-grid-bg-group: #2d2d2d;
+  --ls-grid-bg-totals: #2d2d2d;
+
+  --ls-grid-border: #424242;
+  --ls-grid-border-focus: #64b5f6;
+
+  --ls-grid-text: #e0e0e0;
+  --ls-grid-text-input: #64b5f6;
+  --ls-grid-text-calculated: #81c784;
+  --ls-grid-text-dropdown: #ba68c8;
+  --ls-grid-text-disabled: #9e9e9e;
+  --ls-grid-text-error: #ef5350;
+}
+
+/* ==========================================================================
+   Base Table Styles
+   ========================================================================== */
+
+.ls-budget-grid {
+  font-family: var(--ls-grid-font-family);
+  font-size: var(--ls-grid-font-size);
+  border-collapse: collapse;
+  width: 100%;
+  background-color: var(--ls-grid-bg);
+  color: var(--ls-grid-text);
+}
+
+.ls-budget-grid-container {
+  border: 1px solid var(--ls-grid-border);
+  border-radius: 4px;
+  overflow: auto;
+  position: relative;
+}
+
+.ls-budget-grid-container:focus {
+  outline: none;
+}
+
+.ls-budget-grid-container:focus-visible {
+  box-shadow: 0 0 0 2px var(--ls-grid-border-focus);
+}
+
+/* ==========================================================================
+   Header Styles
+   ========================================================================== */
+
+.ls-budget-grid thead th {
+  height: var(--ls-grid-header-height);
+  padding: var(--ls-grid-cell-padding-y) var(--ls-grid-cell-padding-x);
+  font-size: var(--ls-grid-header-font-size);
+  font-weight: 600;
+  text-align: left;
+  background-color: var(--ls-grid-bg-group);
+  border-bottom: 2px solid var(--ls-grid-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.ls-budget-grid thead th[data-sortable="true"] {
+  cursor: pointer;
+}
+
+.ls-budget-grid thead th[data-sortable="true"]:hover {
+  background-color: var(--ls-grid-bg-hover);
+}
+
+/* Sort indicators */
+.ls-budget-grid thead th .sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* Column resize handle */
+.ls-budget-grid .resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color var(--ls-grid-transition);
+}
+
+.ls-budget-grid .resize-handle:hover,
+.ls-budget-grid .resize-handle.resizing {
+  background-color: var(--ls-grid-border-focus);
+}
+
+/* ==========================================================================
+   Body & Row Styles
+   ========================================================================== */
+
+.ls-budget-grid tbody tr {
+  height: var(--ls-grid-row-height);
+  transition: background-color var(--ls-grid-transition);
+}
+
+/* Zebra striping */
+.ls-budget-grid tbody tr:nth-child(odd) {
+  background-color: var(--ls-grid-bg);
+}
+
+.ls-budget-grid tbody tr:nth-child(even) {
+  background-color: var(--ls-grid-bg-alt);
+}
+
+/* Hover state */
+.ls-budget-grid tbody tr:hover {
+  background-color: var(--ls-grid-bg-hover);
+}
+
+/* Selected row */
+.ls-budget-grid tbody tr.ls-row-selected,
+.ls-budget-grid tbody tr[data-selected="true"] {
+  background-color: var(--ls-grid-bg-selected);
+}
+
+/* ==========================================================================
+   Cell Styles
+   ========================================================================== */
+
+.ls-budget-grid td,
+.ls-budget-grid th {
+  padding: var(--ls-grid-cell-padding-y) var(--ls-grid-cell-padding-x);
+  border-right: 1px solid var(--ls-grid-border);
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ls-budget-grid td:last-child,
+.ls-budget-grid th:last-child {
+  border-right: none;
+}
+
+/* Focused cell */
+.ls-budget-grid td.ls-cell-focused {
+  outline: 2px solid var(--ls-grid-border-focus);
+  outline-offset: -2px;
+  background-color: var(--ls-grid-bg-selected) !important;
+}
+
+/* Editing cell */
+.ls-budget-grid td.ls-cell-editing,
+.ls-budget-grid td:focus-within {
+  outline: 2px solid var(--ls-grid-border-focus);
+  outline-offset: -2px;
+  background-color: var(--ls-grid-bg-selected) !important;
+  padding: 0;
+}
+
+.ls-budget-grid td.ls-cell-editing input,
+.ls-budget-grid td.ls-cell-editing select {
+  width: 100%;
+  height: 100%;
+  padding: var(--ls-grid-cell-padding-y) var(--ls-grid-cell-padding-x);
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+}
+
+.ls-budget-grid td.ls-cell-editing input:focus,
+.ls-budget-grid td.ls-cell-editing select:focus {
+  outline: none;
+}
+
+/* ==========================================================================
+   Cell Type Colors
+   ========================================================================== */
+
+/* Input cells (editable) - Blue */
+.ls-cell-input {
+  color: var(--ls-grid-text-input);
+}
+
+/* Calculated cells - Green with background */
+.ls-cell-calculated {
+  color: var(--ls-grid-text-calculated);
+  background-color: var(--ls-grid-bg-alt);
+  font-weight: 500;
+}
+
+/* Dropdown cells - Purple */
+.ls-cell-dropdown {
+  color: var(--ls-grid-text-dropdown);
+}
+
+/* Disabled/locked cells - Gray */
+.ls-cell-disabled {
+  color: var(--ls-grid-text-disabled);
+  background-color: var(--ls-grid-bg-alt);
+}
+
+/* Error cells */
+.ls-cell-error {
+  color: var(--ls-grid-text-error);
+  background-color: #ffebee;
+}
+
+[data-coreui-theme="dark"] .ls-cell-error {
+  background-color: rgba(239, 83, 80, 0.15);
+}
+
+/* ==========================================================================
+   Numeric Alignment
+   ========================================================================== */
+
+.ls-cell-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Group Row Styles
+   ========================================================================== */
+
+.ls-budget-grid .ls-group-row {
+  background-color: var(--ls-grid-bg-group) !important;
+  font-weight: 600;
+  border-top: 1px solid var(--ls-grid-border);
+  border-bottom: 1px solid var(--ls-grid-border);
+  height: calc(var(--ls-grid-row-height) + 4px);
+}
+
+.ls-budget-grid .ls-group-row td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.ls-budget-grid .ls-group-row .expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  cursor: pointer;
+  font-size: 10px;
+  transition: transform var(--ls-grid-transition);
+}
+
+.ls-budget-grid .ls-group-row .expand-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.ls-budget-grid .ls-group-row .group-name {
+  flex: 1;
+}
+
+.ls-budget-grid .ls-group-row .group-subtotal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ls-grid-text-calculated);
+}
+
+/* Indentation for nested groups */
+.ls-budget-grid .ls-group-row[data-level="1"] td:first-child {
+  padding-left: 8px;
+}
+
+.ls-budget-grid .ls-group-row[data-level="2"] td:first-child {
+  padding-left: 24px;
+}
+
+.ls-budget-grid .ls-group-row[data-level="3"] td:first-child {
+  padding-left: 40px;
+}
+
+.ls-budget-grid .ls-group-row[data-level="4"] td:first-child {
+  padding-left: 56px;
+}
+
+/* ==========================================================================
+   Totals Row Styles
+   ========================================================================== */
+
+.ls-budget-grid .ls-totals-row {
+  background-color: var(--ls-grid-bg-totals) !important;
+  font-weight: 700;
+  border-top: 2px solid var(--ls-grid-border);
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+
+.ls-budget-grid .ls-totals-row td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* ==========================================================================
+   Expandable Details Row
+   ========================================================================== */
+
+.ls-budget-grid .ls-details-row {
+  background-color: var(--ls-grid-bg-alt);
+  border-bottom: 1px solid var(--ls-grid-border);
+}
+
+.ls-budget-grid .ls-details-row td {
+  padding: 12px 16px;
+}
+
+/* ==========================================================================
+   Variance Indicators
+   ========================================================================== */
+
+.ls-variance-positive {
+  color: var(--ls-grid-text-calculated);
+}
+
+.ls-variance-negative {
+  color: var(--ls-grid-text-error);
+}
+
+.ls-variance-neutral {
+  color: var(--ls-grid-text-disabled);
+}
+
+/* ==========================================================================
+   Action Buttons
+   ========================================================================== */
+
+.ls-budget-grid .ls-cell-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ls-budget-grid .ls-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ls-grid-text-disabled);
+  cursor: pointer;
+  transition: all var(--ls-grid-transition);
+}
+
+.ls-budget-grid .ls-action-btn:hover {
+  background-color: var(--ls-grid-bg-hover);
+  color: var(--ls-grid-text);
+}
+
+.ls-budget-grid .ls-action-btn.ls-action-delete:hover {
+  background-color: #ffebee;
+  color: var(--ls-grid-text-error);
+}
+
+[data-coreui-theme="dark"] .ls-budget-grid .ls-action-btn.ls-action-delete:hover {
+  background-color: rgba(239, 83, 80, 0.15);
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.ls-budget-grid-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--ls-grid-text-disabled);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Keyboard Navigation Indicators
+   ========================================================================== */
+
+.ls-budget-grid[data-keyboard-mode="true"] tbody tr:focus {
+  outline: none;
+}
+
+.ls-budget-grid[data-keyboard-mode="true"] td[tabindex="0"]:focus {
+  outline: 2px solid var(--ls-grid-border-focus);
+  outline-offset: -2px;
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .ls-budget-grid {
+    --ls-grid-font-size: 11px;
+    --ls-grid-header-font-size: 10px;
+    --ls-grid-cell-padding-x: 6px;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .ls-budget-grid {
+    font-size: 10px;
+  }
+
+  .ls-budget-grid thead th {
+    background-color: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ls-budget-grid .ls-group-row {
+    background-color: #eceff1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

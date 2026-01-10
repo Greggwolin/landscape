@@ -19,6 +19,7 @@ type LocationSectionProps = {
   analysisType: 'Land Development' | 'Income Property' | ''
   isDark?: boolean
   hasError?: boolean
+  extractedFieldKeys?: Set<string>
 }
 
 // Floating Label Input Component (Light mode)
@@ -26,10 +27,11 @@ interface FloatingInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
   error?: string
   isDark?: boolean
+  isExtracted?: boolean
 }
 
 const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
-  ({ label, error, isDark = false, className, id, value, ...props }, ref) => {
+  ({ label, error, isDark = false, isExtracted = false, className, id, value, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false)
     const hasValue = value !== undefined && value !== ''
 
@@ -55,6 +57,8 @@ const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
             'peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition',
             'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
             error ? 'border-rose-400' : (isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'),
+            isExtracted && !isDark && 'ring-2 ring-blue-300 bg-blue-50/50',
+            isExtracted && isDark && 'ring-2 ring-blue-500/50 bg-blue-900/20',
             className
           )}
         />
@@ -69,6 +73,11 @@ const FloatingInput = forwardRef<HTMLInputElement, FloatingInputProps>(
         >
           {label}
         </label>
+        {isExtracted && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-blue-600">
+            Auto
+          </span>
+        )}
         {error && (
           <p className="mt-1 text-xs text-rose-500">{error}</p>
         )}
@@ -89,10 +98,11 @@ interface FloatingSelectProps {
   error?: string
   className?: string
   isDark?: boolean
+  isExtracted?: boolean
 }
 
 const FloatingSelect = forwardRef<HTMLSelectElement, FloatingSelectProps>(
-  ({ label, value, onChange, onBlur, name, options, error, className, isDark = false }, ref) => {
+  ({ label, value, onChange, onBlur, name, options, error, className, isDark = false, isExtracted = false }, ref) => {
     const hasValue = value !== ''
 
     return (
@@ -107,6 +117,8 @@ const FloatingSelect = forwardRef<HTMLSelectElement, FloatingSelectProps>(
             'peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none',
             'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
             error ? 'border-rose-400' : (isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'),
+            isExtracted && !isDark && 'ring-2 ring-blue-300 bg-blue-50/50',
+            isExtracted && isDark && 'ring-2 ring-blue-500/50 bg-blue-900/20',
             className
           )}
         >
@@ -123,11 +135,19 @@ const FloatingSelect = forwardRef<HTMLSelectElement, FloatingSelectProps>(
         >
           {label}
         </label>
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+        <div className={cn(
+          'absolute top-1/2 -translate-y-1/2 pointer-events-none',
+          isExtracted ? 'right-10' : 'right-3'
+        )}>
           <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
+        {isExtracted && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-blue-600">
+            Auto
+          </span>
+        )}
         {error && (
           <p className="mt-1 text-xs text-rose-500">{error}</p>
         )}
@@ -137,7 +157,7 @@ const FloatingSelect = forwardRef<HTMLSelectElement, FloatingSelectProps>(
 )
 FloatingSelect.displayName = 'FloatingSelect'
 
-const LocationSection = ({ form, analysisType, isDark = false, hasError = false }: LocationSectionProps) => {
+const LocationSection = ({ form, analysisType, isDark = false, hasError = false, extractedFieldKeys = new Set() }: LocationSectionProps) => {
   const {
     register,
     setValue,
@@ -255,6 +275,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
               {...register('street_address')}
               value={watch('street_address')}
               isDark={isDark}
+              isExtracted={extractedFieldKeys.has('street_address')}
             />
             <div className="grid gap-3 sm:grid-cols-3">
               <FloatingInput
@@ -262,6 +283,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
                 {...register('city')}
                 value={watch('city')}
                 isDark={isDark}
+                isExtracted={extractedFieldKeys.has('city')}
               />
               <FloatingSelect
                 label="State"
@@ -269,6 +291,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
                 onChange={(e) => setValue('state', e.target.value)}
                 options={US_STATES}
                 isDark={isDark}
+                isExtracted={extractedFieldKeys.has('state')}
               />
               <FloatingInput
                 label="ZIP"
@@ -277,6 +300,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
                 {...register('zip')}
                 value={watch('zip')}
                 isDark={isDark}
+                isExtracted={extractedFieldKeys.has('zip')}
               />
             </div>
           </>
@@ -289,6 +313,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
               {...register('cross_streets')}
               value={watch('cross_streets')}
               isDark={isDark}
+              isExtracted={extractedFieldKeys.has('cross_streets')}
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <FloatingInput
@@ -296,6 +321,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
                 {...register('city')}
                 value={watch('city')}
                 isDark={isDark}
+                isExtracted={extractedFieldKeys.has('city')}
               />
               <FloatingSelect
                 label="State"
@@ -303,6 +329,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
                 onChange={(e) => setValue('state', e.target.value)}
                 options={US_STATES}
                 isDark={isDark}
+                isExtracted={extractedFieldKeys.has('state')}
               />
             </div>
           </>
@@ -317,6 +344,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
               {...register('latitude')}
               value={watch('latitude')}
               isDark={isDark}
+              isExtracted={extractedFieldKeys.has('latitude')}
             />
             <FloatingInput
               label="Longitude"
@@ -325,6 +353,7 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false 
               {...register('longitude')}
               value={watch('longitude')}
               isDark={isDark}
+              isExtracted={extractedFieldKeys.has('longitude')}
             />
           </div>
         )}

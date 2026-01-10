@@ -9,9 +9,18 @@ Key features:
 """
 import json
 import uuid
+from decimal import Decimal
 from typing import List, Dict, Any, Optional, Tuple
 
 from django.db import connection, transaction
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """JSON encoder that handles Decimal types from PostgreSQL."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 
 class MessageStorageService:
@@ -116,7 +125,7 @@ class MessageStorageService:
                 project_id,
                 assistant_message_id,
                 assistant_content,
-                json.dumps(assistant_metadata),
+                json.dumps(assistant_metadata, cls=DecimalEncoder),
                 active_tab
             ])
             assistant_row = cursor.fetchone()

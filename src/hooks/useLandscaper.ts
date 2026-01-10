@@ -1,5 +1,33 @@
 import { useState, useCallback, useEffect } from 'react';
 
+/**
+ * Represents a mutation proposal from Landscaper (Level 2 autonomy).
+ * The AI proposes changes that users must confirm before execution.
+ */
+export interface MutationProposal {
+  mutation_id?: string;
+  mutationId?: string;
+  mutation_type?: string;
+  mutationType?: string;
+  table?: string;
+  table_name?: string;
+  field?: string | null;
+  field_name?: string | null;
+  record_id?: string | null;
+  recordId?: string | null;
+  current_value?: unknown;
+  currentValue?: unknown;
+  proposed_value?: unknown;
+  proposedValue?: unknown;
+  reason?: string;
+  is_high_risk?: boolean;
+  isHighRisk?: boolean;
+  expires_at?: string;
+  expiresAt?: string;
+  batch_id?: string;
+  batchId?: string;
+}
+
 export interface ChatMessage {
   messageId: string;
   role: 'user' | 'assistant';
@@ -11,6 +39,11 @@ export interface ChatMessage {
     db_query_used?: string;
     rag_chunks_used?: number;
     client_request_id?: string;
+    // Level 2 autonomy: mutation proposals
+    mutation_proposals?: MutationProposal[];
+    mutationProposals?: MutationProposal[];
+    has_pending_mutations?: boolean;
+    hasPendingMutations?: boolean;
   };
 }
 
@@ -20,10 +53,23 @@ interface UseLandscaperOptions {
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
 }
 
+const REQUEST_TIMEOUT_MS = 90000;
+
 export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: UseLandscaperOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchWithTimeout = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }, []);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -35,7 +81,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
 
       console.log('[Landscaper] Loading chat history for tab:', activeTab, url.toString());
 
-      const response = await fetch(url.toString());
+      const response = await fetchWithTimeout(url.toString());
       const data = await response.json();
 
       if (data.success && data.messages) {
@@ -45,7 +91,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
-  }, [projectId, activeTab]);
+  }, [projectId, activeTab, fetchWithTimeout]);
 
   // Reload history when project or tab changes - clear immediately for responsive UX
   useEffect(() => {
@@ -70,7 +116,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       setMessages((prev) => [...prev, tempUserMessage]);
 
       try {
-        const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
+        const response = await fetchWithTimeout(`/api/projects/${projectId}/landscaper/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, clientRequestId, activeTab }),
@@ -108,18 +154,22 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       } catch (err) {
         setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setError(errorMessage);
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setError('Request timed out. Please try again.');
+        } else {
+          setError(errorMessage);
+        }
         throw err;
       } finally {
         setIsLoading(false);
       }
     },
-    [projectId, activeTab, onFieldUpdate]
+    [projectId, activeTab, onFieldUpdate, fetchWithTimeout]
   );
 
   const clearChat = useCallback(async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
+      const response = await fetchWithTimeout(`/api/projects/${projectId}/landscaper/chat`, {
         method: 'DELETE',
       });
 
@@ -134,7 +184,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       console.error('Failed to clear chat:', err);
       throw err;
     }
-  }, [projectId]);
+  }, [projectId, fetchWithTimeout]);
 
   return {
     messages,

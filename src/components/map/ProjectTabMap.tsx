@@ -41,6 +41,9 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   // Create storage key with tabId to keep tab views independent
   const storageKey = `map-saved-view-${projectId}-${tabId}`;
 
+  // Track if we've fit bounds for comparables
+  const hasFitBoundsRef = useRef(false);
+
   // Load initial values from localStorage
   const getInitialSavedView = () => {
     if (typeof window !== 'undefined') {
@@ -144,6 +147,54 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
       localStorage.setItem(storageKey, JSON.stringify(savedView));
     }
   }, [savedView, storageKey]);
+
+  // Fit bounds to include subject and all rental comparables when they load
+  useEffect(() => {
+    // Only fit bounds once when data is available and we have comparables
+    if (!data?.center || rentalComparables.length === 0 || hasFitBoundsRef.current) return;
+
+    // Give map time to initialize
+    const timer = setTimeout(() => {
+      if (!mapRef.current) return;
+
+      // Calculate bounds including subject and all comparables
+      const allCoords: [number, number][] = [data.center];
+
+      rentalComparables.forEach(comp => {
+        if (comp.latitude && comp.longitude) {
+          allCoords.push([comp.longitude, comp.latitude]);
+        }
+      });
+
+      if (allCoords.length <= 1) return; // Only subject, no need to fit bounds
+
+      // Calculate bounding box
+      let minLng = allCoords[0][0];
+      let maxLng = allCoords[0][0];
+      let minLat = allCoords[0][1];
+      let maxLat = allCoords[0][1];
+
+      allCoords.forEach(([lng, lat]) => {
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      });
+
+      // Add some padding to the bounds
+      const lngPadding = (maxLng - minLng) * 0.15;
+      const latPadding = (maxLat - minLat) * 0.15;
+
+      mapRef.current.fitBounds(
+        [[minLng - lngPadding, minLat - latPadding], [maxLng + lngPadding, maxLat + latPadding]],
+        { padding: 40, pitch: 0, bearing: 0 }
+      );
+
+      hasFitBoundsRef.current = true;
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [data?.center, rentalComparables]);
 
   if (isLoading) {
     return (

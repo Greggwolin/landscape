@@ -7,6 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useQuery } from '@tanstack/react-query';
 import { formatMoney } from '@/utils/formatters/number';
 import type { SfComp } from '@/hooks/analysis/useSfComps';
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
 
 interface NapkinCompsMapProps {
   projectId: number;
@@ -16,9 +17,13 @@ interface NapkinCompsMapProps {
 }
 
 // Available map styles
-type MapStyleKey = 'voyager' | 'satellite';
+type MapStyleKey = 'hybrid' | 'voyager' | 'satellite';
 
 const MAP_STYLES: Record<MapStyleKey, { name: string; url: string }> = {
+  hybrid: {
+    name: 'Hybrid',
+    url: '' // Built dynamically for ESRI hybrid
+  },
   voyager: {
     name: 'Street',
     url: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
@@ -29,33 +34,28 @@ const MAP_STYLES: Record<MapStyleKey, { name: string; url: string }> = {
   }
 };
 
-// ESRI World Imagery raster style (built dynamically)
-function getEsriSatelliteStyle(center: [number, number]): maplibregl.StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      'esri-satellite': {
-        type: 'raster',
-        tiles: [
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        ],
-        tileSize: 256,
-        attribution: 'Imagery © Esri'
-      }
-    },
-    layers: [
-      {
-        id: 'esri-satellite-layer',
-        type: 'raster',
-        source: 'esri-satellite',
-        minzoom: 0,
-        maxzoom: 22
-      }
-    ],
-    center: center,
-    zoom: 12
-  };
-}
+const getEsriSatelliteStyle = (): maplibregl.StyleSpecification => ({
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      attribution: 'Imagery © Esri'
+    }
+  },
+  layers: [
+    {
+      id: 'esri-satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite',
+      minzoom: 0,
+      maxzoom: 22
+    }
+  ]
+});
 
 // 8-color progressive ramp for lot SF bands (one per product)
 // Colors progress from cool (small lots) to warm (large lots)
@@ -93,7 +93,7 @@ export function NapkinCompsMap({
   const map = useRef<maplibregl.Map | null>(null);
   const compsMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [mapStyle, setMapStyle] = useState<MapStyleKey>('voyager');
+  const [mapStyle, setMapStyle] = useState<MapStyleKey>('hybrid');
 
   // Fetch project data to get location
   const { data: project, isLoading: isLoadingProject } = useQuery({
@@ -114,8 +114,11 @@ export function NapkinCompsMap({
 
   // Get current style
   const getMapStyle = (): string | maplibregl.StyleSpecification => {
-    if (mapStyle === 'satellite' && projectLon && projectLat) {
-      return getEsriSatelliteStyle([projectLon, projectLat]);
+    if (mapStyle === 'hybrid') {
+      return getEsriHybridStyle();
+    }
+    if (mapStyle === 'satellite') {
+      return getEsriSatelliteStyle();
     }
     return MAP_STYLES.voyager.url;
   };

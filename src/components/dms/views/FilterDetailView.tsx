@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CIcon from '@coreui/icons-react';
-import { cilFilterSquare } from '@coreui/icons';
+import {
+  cilFilterSquare,
+  cilCommentSquare,
+  cilPencil,
+  cilCloudDownload,
+  cilTrash,
+  cilOptions,
+} from '@coreui/icons';
+import { CDropdown, CDropdownToggle, CDropdownMenu, CDropdownItem, CDropdownDivider } from '@coreui/react';
 import type { DMSDocument } from '@/types/dms';
+import { DocumentChatModal, RenameModal, DeleteConfirmModal } from '../modals';
+import DocumentPreviewPanel from './DocumentPreviewPanel';
 
 interface FilterDetailViewProps {
   projectId: number;
@@ -20,6 +30,12 @@ export default function FilterDetailView({
   const [selectedDoc, setSelectedDoc] = useState<DMSDocument | null>(null);
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+
+  // Modal states
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatDoc, setChatDoc] = useState<DMSDocument | null>(null);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     fetchDocuments();
@@ -76,6 +92,103 @@ export default function FilterDetailView({
     }
   };
 
+  // Get first selected document for single-doc operations
+  const getFirstSelectedDoc = useCallback((): DMSDocument | null => {
+    if (selectedDocs.size === 0) return null;
+    const firstId = Array.from(selectedDocs)[0];
+    return documents.find(d => d.doc_id === firstId) || null;
+  }, [selectedDocs, documents]);
+
+  // Get all selected documents
+  const getSelectedDocuments = useCallback((): DMSDocument[] => {
+    return documents.filter(d => selectedDocs.has(d.doc_id));
+  }, [selectedDocs, documents]);
+
+  // Handle opening chat for a document
+  const handleOpenChat = (doc: DMSDocument) => {
+    setChatDoc(doc);
+    setShowChatModal(true);
+  };
+
+  // Handle rename
+  const handleRename = async (newName: string) => {
+    const doc = getFirstSelectedDoc();
+    if (!doc) return;
+
+    const response = await fetch(
+      `/api/projects/${projectId}/dms/docs/${doc.doc_id}/rename`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_name: newName }),
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to rename');
+    }
+
+    // Refresh document list
+    await fetchDocuments();
+    setSelectedDocs(new Set());
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    const docsToDelete = getSelectedDocuments();
+
+    // Delete each document
+    for (const doc of docsToDelete) {
+      const response = await fetch(
+        `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || `Failed to delete ${doc.doc_name}`);
+      }
+    }
+
+    // Refresh document list
+    await fetchDocuments();
+    setSelectedDocs(new Set());
+    setSelectedDoc(null);
+  };
+
+  // Handle download
+  const handleDownload = async (doc: DMSDocument) => {
+    try {
+      // Use storage_uri if available (direct file URL)
+      if (doc.storage_uri) {
+        const response = await fetch(doc.storage_uri);
+        if (!response.ok) throw new Error('Failed to download');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.doc_name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('Download not available for this document');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download document');
+    }
+  };
+
+  const selectedCount = selectedDocs.size;
+  const firstSelected = getFirstSelectedDoc();
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Breadcrumb */}
@@ -127,31 +240,90 @@ export default function FilterDetailView({
         <div className="flex items-center gap-4">
           <button className="text-blue-600 dark:text-blue-400">🔻</button>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {documents.length} items | {selectedDocs.size} selected
+            {documents.length} items | {selectedCount} selected
           </span>
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <button className="text-blue-600 dark:text-blue-400 hover:underline">
-              🤖 Ask AI
+            {/* Rename - single selection only */}
+            <button
+              className={`flex items-center gap-1 ${
+                selectedCount === 1
+                  ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
+              onClick={() => selectedCount === 1 && setShowRenameModal(true)}
+              disabled={selectedCount !== 1}
+            >
+              <CIcon icon={cilPencil} className="w-4 h-4" />
+              Rename
             </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-              ✏️ Rename
+
+            {/* Download - single selection only */}
+            <button
+              className={`flex items-center gap-1 ${
+                selectedCount === 1
+                  ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
+              onClick={() => firstSelected && handleDownload(firstSelected)}
+              disabled={selectedCount !== 1}
+            >
+              <CIcon icon={cilCloudDownload} className="w-4 h-4" />
+              Download
             </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-1">
-              <CIcon icon={cilFilterSquare} className="w-4 h-4" />
-              Move/Copy
+
+            {/* Delete - works with multiple */}
+            <button
+              className={`flex items-center gap-1 ${
+                selectedCount > 0
+                  ? 'text-red-600 dark:text-red-400 hover:text-red-700'
+                  : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
+              onClick={() => selectedCount > 0 && setShowDeleteModal(true)}
+              disabled={selectedCount === 0}
+            >
+              <CIcon icon={cilTrash} className="w-4 h-4" />
+              Delete
             </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-              📧 Email copy
-            </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-              ✏️ Edit profile
-            </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-              ✅ Check in
-            </button>
-            <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-              ⋯ More
-            </button>
+
+            {/* More dropdown */}
+            <CDropdown variant="btn-group">
+              <CDropdownToggle
+                color="secondary"
+                variant="ghost"
+                size="sm"
+                className="text-gray-600 dark:text-gray-400"
+              >
+                <CIcon icon={cilOptions} className="w-4 h-4" />
+              </CDropdownToggle>
+              <CDropdownMenu>
+                <CDropdownItem
+                  onClick={() => {
+                    // Move/Copy - TODO: implement
+                    alert('Move/Copy coming soon');
+                  }}
+                >
+                  Move/Copy
+                </CDropdownItem>
+                <CDropdownItem
+                  onClick={() => {
+                    // Email copy - TODO: implement
+                    alert('Email copy coming soon');
+                  }}
+                >
+                  Email copy
+                </CDropdownItem>
+                <CDropdownDivider />
+                <CDropdownItem
+                  onClick={() => {
+                    // Edit profile - TODO: implement
+                    alert('Edit profile coming soon');
+                  }}
+                  disabled={selectedCount === 0}
+                >
+                  Edit profile
+                </CDropdownItem>
+              </CDropdownMenu>
+            </CDropdown>
           </div>
         </div>
       </div>
@@ -179,17 +351,15 @@ export default function FilterDetailView({
                   </th>
                   <th className="w-8"></th>
                   <th className="w-8"></th>
+                  <th className="w-8"></th>
                   <th className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-400">
                     Name
                   </th>
                   <th className="px-3 py-2 text-center text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Total Versions
+                    Version
                   </th>
                   <th className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Last modified date ↓
-                  </th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Notes
+                    Last modified date
                   </th>
                 </tr>
               </thead>
@@ -227,6 +397,18 @@ export default function FilterDetailView({
                       </button>
                     </td>
                     <td className="px-3 py-3">
+                      <button
+                        className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenChat(doc);
+                        }}
+                        title="Chat with Landscaper about this document"
+                      >
+                        <CIcon icon={cilCommentSquare} className="w-4 h-4" />
+                      </button>
+                    </td>
+                    <td className="px-3 py-3">
                       <span className="text-red-600 dark:text-red-400 text-lg">📄</span>
                     </td>
                     <td className="px-3 py-3">
@@ -242,7 +424,6 @@ export default function FilterDetailView({
                     <td className="px-3 py-3 text-gray-600 dark:text-gray-400 text-sm">
                       {doc.updated_at ? formatDateTime(doc.updated_at) : 'No date'}
                     </td>
-                    <td className="px-3 py-3"></td>
                   </tr>
                 ))}
               </tbody>
@@ -259,110 +440,55 @@ export default function FilterDetailView({
 
         {/* Preview Panel (slides in from right when document selected) */}
         {selectedDoc && (
-          <div className="w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col">
-            {/* Preview Header */}
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-red-600 dark:text-red-400 text-lg flex-shrink-0">📄</span>
-                <span className="font-medium truncate text-gray-900 dark:text-gray-100">
-                  {selectedDoc.doc_name}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
-                  Full View
-                </button>
-                <button
-                  onClick={() => setSelectedDoc(null)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Preview Content */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* PDF Thumbnail Placeholder */}
-              <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
-                <div className="aspect-[8.5/11] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <span className="text-gray-400 dark:text-gray-600 text-4xl">📄</span>
-                </div>
-              </div>
-
-              {/* Document Metadata */}
-              <div className="space-y-3 text-sm">
-                <div>
-                  <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Type</div>
-                  <div className="text-gray-900 dark:text-gray-100">{selectedDoc.doc_type}</div>
-                </div>
-
-                {selectedDoc.discipline && (
-                  <div>
-                    <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Discipline</div>
-                    <div className="text-gray-900 dark:text-gray-100">{selectedDoc.discipline}</div>
-                  </div>
-                )}
-
-                {selectedDoc.doc_date && (
-                  <div>
-                    <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Document Date</div>
-                    <div className="text-gray-900 dark:text-gray-100">
-                      {new Date(selectedDoc.doc_date).toLocaleDateString()}
-                    </div>
-                  </div>
-                )}
-
-                {selectedDoc.tags && selectedDoc.tags.length > 0 && (
-                  <div>
-                    <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Tags</div>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedDoc.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded text-xs"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Created</div>
-                  <div className="text-gray-900 dark:text-gray-100">
-                    {new Date(selectedDoc.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-gray-500 dark:text-gray-400 font-medium mb-1">Last Modified</div>
-                  <div className="text-gray-900 dark:text-gray-100">
-                    {formatDateTime(selectedDoc.updated_at)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-              <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-colors">
-                <span>📋</span>
-                <span>Copy</span>
-              </button>
-              <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-colors">
-                <span>📄</span>
-                <span>Duplicate</span>
-              </button>
-              <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-red-600 dark:text-red-400 transition-colors">
-                <span>🗑️</span>
-                <span>Delete</span>
-              </button>
-            </div>
+          <div className="w-[480px] border-l border-gray-200 dark:border-gray-700">
+            <DocumentPreviewPanel
+              projectId={projectId}
+              document={selectedDoc}
+              onClose={() => setSelectedDoc(null)}
+              onDocumentChange={fetchDocuments}
+            />
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      {chatDoc && (
+        <DocumentChatModal
+          visible={showChatModal}
+          onClose={() => {
+            setShowChatModal(false);
+            setChatDoc(null);
+          }}
+          projectId={projectId}
+          document={{
+            doc_id: parseInt(chatDoc.doc_id),
+            filename: chatDoc.doc_name,
+            version_number: chatDoc.version_no || 1,
+          }}
+        />
+      )}
+
+      {firstSelected && (
+        <RenameModal
+          visible={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          docId={parseInt(firstSelected.doc_id)}
+          projectId={projectId}
+          currentName={firstSelected.doc_name}
+          onRename={handleRename}
+        />
+      )}
+
+      <DeleteConfirmModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        documents={getSelectedDocuments().map(d => ({
+          doc_id: parseInt(d.doc_id),
+          doc_name: d.doc_name,
+        }))}
+        projectId={projectId}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }

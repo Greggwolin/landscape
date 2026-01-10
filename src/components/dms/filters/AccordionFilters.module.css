@@ -35,3 +35,15 @@
   color: var(--cui-primary);
   font-weight: 600;
 }
+
+.filterRow {
+  position: relative;
+}
+
+.filterRowActive {
+  box-shadow: inset 0 0 0 2px rgba(var(--cui-success-rgb), 0.4);
+}
+
+.filterRowReject {
+  box-shadow: inset 0 0 0 2px rgba(var(--cui-danger-rgb), 0.45);
+}

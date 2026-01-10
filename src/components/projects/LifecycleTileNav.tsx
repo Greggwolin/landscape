@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useUserTier } from '@/hooks/useUserTier';
 import {
   createTileConfig,
   isTwoLineLabel,
@@ -18,7 +17,6 @@ export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavPr
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { data: tierLevel, isLoading } = useUserTier();
   const standardHomePath = `/projects/${projectId}`;
 
   // Detect if we're in dark mode
@@ -28,19 +26,7 @@ export function LifecycleTileNav({ projectId, propertyType }: LifecycleTileNavPr
   // Get tiles based on project type (7 static tiles)
   const tiles = createTileConfig(propertyType);
 
-  const visibleTiles = tiles.filter((tile: TileConfig) => {
-    if (tile.proOnly && tierLevel !== 'pro') return false;
-    return true;
-  });
-
-  // Show loading state while fetching tier
-  if (isLoading) {
-    return (
-      <div className="d-flex gap-3 overflow-x-auto align-items-center">
-        <div className="text-muted small">Loading navigation...</div>
-      </div>
-    );
-  }
+  const visibleTiles = tiles;
 
   // Check if a tile is active based on current path or query param
   const isActive = (tile: TileConfig) => {

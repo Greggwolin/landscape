@@ -1,7 +1,7 @@
-// v1.2 · 2025-11-03 · Added reconciliation support
+// v1.3 · 2026-01-09 · ARGUS-style density upgrade with keyboard navigation
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { CButton } from '@coreui/react';
 import { LandscapeButton } from '@/components/ui/landscape';
@@ -12,6 +12,8 @@ import GroupRow from './custom/GroupRow';
 import ExpandableDetailsRow from './custom/ExpandableDetailsRow';
 import { useBudgetGrouping } from '@/hooks/useBudgetGrouping';
 import { useBudgetVariance, getCategoryVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
+import { useGridKeyboard, type GridCell } from './hooks/useGridKeyboard';
+import './BudgetDataGrid.css';
 
 interface Props {
   data: BudgetItem[];
@@ -54,6 +56,8 @@ export default function BudgetDataGrid({
 }: Props) {
   const [expandedFactId, setExpandedFactId] = useState<number | null>(null); // For category editor
   const [expandedDetailsFactId, setExpandedDetailsFactId] = useState<number | null>(null); // For details row
+  const [editingCell, setEditingCell] = useState<GridCell | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   // Grouping functionality
   const {
@@ -144,6 +148,40 @@ export default function BudgetDataGrid({
     columnResizeMode: 'onChange',
   });
 
+  // Keyboard navigation
+  const rowCount = isGrouped ? tableData.length : data.length;
+  const columnCount = table.getVisibleLeafColumns().length;
+
+  const handleCellFocus = useCallback((cell: GridCell) => {
+    // Scroll the focused cell into view if needed
+    const tbody = gridContainerRef.current?.querySelector('tbody');
+    if (tbody) {
+      const rows = tbody.querySelectorAll('tr[data-row-index]');
+      const targetRow = rows[cell.row] as HTMLElement;
+      if (targetRow) {
+        targetRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, []);
+
+  const handleEnterEdit = useCallback((cell: GridCell) => {
+    setEditingCell(cell);
+  }, []);
+
+  const handleExitEdit = useCallback((committed: boolean) => {
+    setEditingCell(null);
+  }, []);
+
+  const { focusedCell, handleKeyDown, handleCellClick, isKeyboardMode } = useGridKeyboard({
+    rowCount,
+    columnCount,
+    onCellFocus: handleCellFocus,
+    onEnterEdit: handleEnterEdit,
+    onExitEdit: handleExitEdit,
+    isEditing: editingCell !== null,
+    disabled: data.length === 0,
+  });
+
   const handleCategorySave = async (
     item: BudgetItem,
     categoryIds: {
@@ -163,9 +201,17 @@ export default function BudgetDataGrid({
   };
 
   return (
-    <div className="table-responsive border rounded">
-      <table className="table table-hover align-middle mb-0" style={{ tableLayout: 'fixed' }}>
-        <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>
+    <div
+      ref={gridContainerRef}
+      className="ls-budget-grid-container"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="grid"
+      aria-label="Budget Line Items"
+      data-keyboard-mode={isKeyboardMode}
+    >
+      <table className="ls-budget-grid" style={{ tableLayout: 'fixed' }}>
+        <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
@@ -350,26 +396,53 @@ export default function BudgetDataGrid({
             })
           ) : (
             // Render normal flat rows
-            table.getRowModel().rows.map((row) => {
+            table.getRowModel().rows.map((row, rowIndex) => {
               const isSelected = selectedItem?.fact_id === row.original.fact_id;
               const isExpanded = expandedFactId === row.original.fact_id;
               const isDetailsExpanded = expandedDetailsFactId === row.original.fact_id;
+              const isRowFocused = isKeyboardMode && focusedCell.row === rowIndex;
 
               return (
                 <React.Fragment key={row.id}>
                   <tr
                     onClick={() => onRowSelect?.(row.original)}
-                    className={isSelected ? 'table-active' : undefined}
+                    className={`${isSelected ? 'ls-row-selected' : ''}`}
                     style={{ cursor: 'pointer' }}
+                    data-row-index={rowIndex}
+                    role="row"
+                    aria-selected={isSelected}
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => {
                       const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
                       const columnMeta = cell.column.columnDef.meta as any;
                       const columnDef = cell.column.columnDef as BudgetColumnDef<BudgetItem>;
                       const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
+                      const isCellFocused = isRowFocused && focusedCell.col === cellIndex;
+                      const isEditable = columnMeta?.editable ?? false;
+
+                      // Determine cell type class based on column metadata
+                      const cellTypeClass = columnMeta?.cellType === 'calculated'
+                        ? 'ls-cell-calculated'
+                        : columnMeta?.cellType === 'dropdown'
+                          ? 'ls-cell-dropdown'
+                          : isEditable
+                            ? 'ls-cell-input'
+                            : '';
+
+                      const numberClass = (columnMeta?.inputType === 'number' || columnMeta?.inputType === 'currency')
+                        ? 'ls-cell-number'
+                        : '';
 
                       return (
-                        <td key={cell.id} className={columnDef.cellClassName} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
+                        <td
+                          key={cell.id}
+                          className={`${columnDef.cellClassName || ''} ${cellTypeClass} ${numberClass} ${isCellFocused ? 'ls-cell-focused' : ''}`}
+                          style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}
+                          role="gridcell"
+                          tabIndex={isCellFocused ? 0 : -1}
+                          onClick={() => handleCellClick(rowIndex, cellIndex)}
+                          aria-readonly={!isEditable}
+                        >
                           {hasExpandButton ? (
                             <div className="d-flex align-items-center gap-2">
                               <LandscapeButton
@@ -425,7 +498,11 @@ export default function BudgetDataGrid({
           )}
         </tbody>
       </table>
-      {data.length === 0 && <div className="text-center py-4 text-secondary">No budget items yet.</div>}
+      {data.length === 0 && (
+        <div className="ls-budget-grid-empty">
+          No budget items yet. Click "+ Add Item" to create one.
+        </div>
+      )}
     </div>
   );
 }

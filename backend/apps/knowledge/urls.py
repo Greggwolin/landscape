@@ -57,4 +57,6 @@ urlpatterns = [
     # Canonical chat endpoints
     path('chat/<int:project_id>/', chat_views.chat, name='knowledge_chat'),
     path('chat/<int:project_id>/clear/', chat_views.clear_chat, name='knowledge_chat_clear'),
+    # Document-scoped chat endpoint
+    path('projects/<int:project_id>/docs/<int:doc_id>/chat/', chat_views.document_chat, name='knowledge_doc_chat'),
 ]
