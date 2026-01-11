@@ -79,9 +79,9 @@ Added dual navigation system to `LifecycleTileNav` component that automatically 
 
 All documentation has been updated:
 
-✅ **Session Notes:** [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](docs/session-notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md)
+✅ **Session Notes:** [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](docs/09_session_notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md)
 ✅ **Implementation Guide:** [MULTIFAMILY_TILE_NAV_IMPLEMENTATION.md](MULTIFAMILY_TILE_NAV_IMPLEMENTATION.md)
-✅ **Implementation Status:** [IMPLEMENTATION_STATUS_25-11-13.md](docs/11-implementation-status/IMPLEMENTATION_STATUS_25-11-13.md)
+✅ **Implementation Status:** [IMPLEMENTATION_STATUS_25-11-13.md](docs/00_overview/status/IMPLEMENTATION_STATUS_25-11-13.md)
 ✅ **Integration Analysis:** [MULTIFAMILY_INTEGRATION_ANALYSIS.md](MULTIFAMILY_INTEGRATION_ANALYSIS.md)
 ✅ **Tab Structure:** [MULTIFAMILY_TAB_STRUCTURE.md](MULTIFAMILY_TAB_STRUCTURE.md)
 

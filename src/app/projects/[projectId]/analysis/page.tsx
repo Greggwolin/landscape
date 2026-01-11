@@ -46,7 +46,7 @@ export default function FeasibilityPage({ params }: PageProps) {
   }
 
   return (
-    <div style={{ paddingLeft: '1rem', paddingRight: '1rem' }}>
+    <div className="app-content">
       <FeasibilityTab project={project} />
     </div>
   );

@@ -15,7 +15,10 @@ export interface ProjectProfile {
   project_name: string;
   analysis_type?: AnalysisType;
   property_subtype?: PropertySubtype;
-  target_units?: number;
+  project_type?: string; // LAND, MF, OFF, etc.
+  target_units?: number; // For development projects (planned units at build-out)
+  total_units?: number; // For operating projects (actual units)
+  calculated_units?: number; // Calculated from tbl_multifamily_unit (rent roll)
   gross_acres?: number;
   address?: string;
   city?: string;
@@ -25,6 +28,8 @@ export interface ProjectProfile {
   msa_id?: number;
   msa_name?: string; // Joined from tbl_msa
   state_abbreviation?: string; // Joined from tbl_msa
+  market?: string; // Free text market field (fallback when no MSA)
+  submarket?: string; // Free text submarket field
   apn?: string;
   ownership_type?: OwnershipType;
   property_class?: PropertyClass;
@@ -123,20 +128,57 @@ export function formatGrossAcres(acres?: number | null): string {
 }
 
 /**
- * Format target units with commas
+ * Format units with commas
  */
-export function formatTargetUnits(units?: number | null): string {
+export function formatUnits(units?: number | null): string {
   if (units === null || units === undefined) return 'Not specified';
   return new Intl.NumberFormat('en-US').format(units);
 }
 
 /**
- * Format MSA display name
+ * Format target units with commas (alias for backwards compatibility)
  */
-export function formatMSADisplay(msaName?: string, stateAbbr?: string): string {
-  if (!msaName) return 'Not specified';
-  // MSA name already includes state, no need to append
-  return msaName;
+export function formatTargetUnits(units?: number | null): string {
+  return formatUnits(units);
+}
+
+/**
+ * Get the appropriate unit count based on project type
+ * - Development projects: use target_units (planned)
+ * - Operating projects: use calculated_units > total_units > target_units (fallback chain)
+ */
+export function getUnitCount(profile: ProjectProfile): number | undefined {
+  const isDevelopment = profile.analysis_type === 'Land Development' ||
+                        profile.project_type === 'LAND';
+
+  if (isDevelopment) {
+    return profile.target_units;
+  }
+
+  // For operating properties, prefer calculated (from rent roll), then total_units, then target_units
+  return profile.calculated_units && profile.calculated_units > 0
+    ? profile.calculated_units
+    : profile.total_units ?? profile.target_units;
+}
+
+/**
+ * Get the appropriate label for the units field based on project type
+ */
+export function getUnitsLabel(profile: ProjectProfile): string {
+  const isDevelopment = profile.analysis_type === 'Land Development' ||
+                        profile.project_type === 'LAND';
+
+  return isDevelopment ? 'Target Units' : 'Units';
+}
+
+/**
+ * Format MSA display name with fallback to market field
+ */
+export function formatMSADisplay(msaName?: string, stateAbbr?: string, market?: string): string {
+  // Prefer MSA name, fall back to free-text market field
+  if (msaName) return msaName;
+  if (market) return market;
+  return 'Not specified';
 }
 
 /**

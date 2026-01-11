@@ -6,6 +6,7 @@ import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
 import useSWR from 'swr'
 import { fetchUnitTypes, unitTypesAPI } from '@/lib/api/multifamily'
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -57,6 +58,16 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
   )
 
   const unitTypes = response?.data ?? []
+
+  // Auto-refresh when Landscaper completes mutations affecting unit types
+  useLandscaperRefresh(
+    projectId,
+    ['unit_types', 'units'],  // Also refresh when units change (they aggregate to unit types)
+    useCallback(() => {
+      console.log('[FloorplansGrid] Refreshing data after Landscaper mutation')
+      mutate()
+    }, [mutate])
+  )
 
   // Format currency
   const formatCurrency = useCallback((value: number | string) => {

@@ -200,7 +200,7 @@ src/styles/
 
 #### Documentation (7 new docs)
 ```
-docs/session-notes/
+docs/09_session_notes/
 ├── PHASE_2_PROJECT_TAB_COMPLETE.md
 ├── PHASE_3_SALES_TRANSACTION_DETAILS_COMPLETE.md
 ├── PHASE_4_FEASIBILITY_VALUATION_COMPLETE.md

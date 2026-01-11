@@ -94,7 +94,8 @@ export {
   keepMonthly,
   groupByGranularity,
   groupCostsBySummary,
-  groupCostsByScope,
+  groupCostsByStage,
+  groupCostsByCategory,
   groupCostsByPhase,
   transformCashFlow,
 } from './aggregation';

@@ -91,39 +91,68 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
     ${offsetClause};
   `;
 
-  console.log('Unit cost query:', query);
-  console.log('Unit cost query values:', values);
+  console.log('Unit cost query params - categoryId:', categoryId, 'projectTypeCode:', projectTypeCode);
 
-  // Use tagged template to build query since Neon doesn't support .query() well
-  const categoryIdVal = values[0] as number;
-  const projectTypeVal = values[1] as string;
+  // Build dynamic query based on provided filters
+  let result: TemplateRow[];
 
-  const result = await sql<TemplateRow>`
-    SELECT
-      t.item_id as template_id,
-      t.category_id,
-      c.category_name,
-      t.item_name,
-      t.default_uom_code,
-      t.typical_mid_value,
-      t.quantity,
-      t.market_geography,
-      t.source,
-      t.as_of_date,
-      t.project_type_code,
-      t.usage_count,
-      t.last_used_date,
-      t.is_active,
-      t.created_from_ai,
-      t.created_from_project_id,
-      false AS has_benchmarks
-    FROM landscape.core_unit_cost_item t
-    JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
-    WHERE t.is_active = true
-      AND t.category_id = ${categoryIdVal}
-      AND LOWER(t.project_type_code) = LOWER(${projectTypeVal})
-    ORDER BY t.item_name
-  `;
+  if (categoryId && projectTypeCode) {
+    // Both filters
+    result = await sql<TemplateRow>`
+      SELECT
+        t.item_id as template_id, t.category_id, c.category_name, t.item_name,
+        t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
+        t.source, t.as_of_date, t.project_type_code, t.usage_count, t.last_used_date,
+        t.is_active, t.created_from_ai, t.created_from_project_id, false AS has_benchmarks
+      FROM landscape.core_unit_cost_item t
+      JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
+      WHERE t.is_active = true
+        AND t.category_id = ${Number(categoryId)}
+        AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})
+      ORDER BY t.item_name
+    `;
+  } else if (categoryId) {
+    // Only category filter
+    result = await sql<TemplateRow>`
+      SELECT
+        t.item_id as template_id, t.category_id, c.category_name, t.item_name,
+        t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
+        t.source, t.as_of_date, t.project_type_code, t.usage_count, t.last_used_date,
+        t.is_active, t.created_from_ai, t.created_from_project_id, false AS has_benchmarks
+      FROM landscape.core_unit_cost_item t
+      JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
+      WHERE t.is_active = true
+        AND t.category_id = ${Number(categoryId)}
+      ORDER BY t.item_name
+    `;
+  } else if (projectTypeCode) {
+    // Only project type filter
+    result = await sql<TemplateRow>`
+      SELECT
+        t.item_id as template_id, t.category_id, c.category_name, t.item_name,
+        t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
+        t.source, t.as_of_date, t.project_type_code, t.usage_count, t.last_used_date,
+        t.is_active, t.created_from_ai, t.created_from_project_id, false AS has_benchmarks
+      FROM landscape.core_unit_cost_item t
+      JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
+      WHERE t.is_active = true
+        AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})
+      ORDER BY t.item_name
+    `;
+  } else {
+    // No filters - return all active items
+    result = await sql<TemplateRow>`
+      SELECT
+        t.item_id as template_id, t.category_id, c.category_name, t.item_name,
+        t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
+        t.source, t.as_of_date, t.project_type_code, t.usage_count, t.last_used_date,
+        t.is_active, t.created_from_ai, t.created_from_project_id, false AS has_benchmarks
+      FROM landscape.core_unit_cost_item t
+      JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
+      WHERE t.is_active = true
+      ORDER BY t.item_name
+    `;
+  }
 
   console.log(`Query returned ${result.length} rows`);
   return result;

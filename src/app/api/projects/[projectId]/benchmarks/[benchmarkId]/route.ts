@@ -8,12 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
 
+type Params = { params: Promise<{ projectId: string; benchmarkId: string }> };
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string; benchmarkId: string } }
+  context: Params
 ) {
   try {
-    const { benchmarkId } = params;
+    const { benchmarkId } = await context.params;
     const body = await request.json();
 
     const response = await fetch(

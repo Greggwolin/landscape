@@ -46,7 +46,7 @@ export default function ProjectSummaryPage() {
   return (
     <>
       <ProjectSubNav projectId={projectId} />
-      <div className="container-fluid py-4">
+      <div className="app-content">
         {/* Key Metrics Row */}
         <div className="row mb-4">
           <div className="col-12">

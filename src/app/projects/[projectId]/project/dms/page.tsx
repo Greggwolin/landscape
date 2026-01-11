@@ -21,7 +21,7 @@ export default function ProjectDMSPage() {
 
   if (!project) {
     return (
-      <div className="container-fluid py-4">
+      <div className="app-content">
         <div className="alert alert-warning">Project not found</div>
       </div>
     );
@@ -30,7 +30,7 @@ export default function ProjectDMSPage() {
   return (
     <>
       <ProjectSubNav projectId={projectId} />
-      <div className="h-full">
+      <div className="app-content h-full">
         <DMSView
           projectId={project.project_id}
           projectName={project.project_name}

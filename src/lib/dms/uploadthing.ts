@@ -33,22 +33,43 @@ export const dmsUploader = {
       const phaseId = req.headers.get("x-phase-id");
       const parcelId = req.headers.get("x-parcel-id");
 
+      console.log("📤 UploadThing middleware - headers:", {
+        projectId,
+        workspaceId,
+        docType,
+        discipline,
+        phaseId,
+        parcelId
+      });
+
       if (!projectId || !workspaceId) {
+        console.error("❌ Missing project or workspace ID");
         throw new UploadThingError("Project ID and Workspace ID are required");
       }
 
-      // Validate workspace exists
-      const workspace = await dmsDb.getDefaultWorkspace();
-      if (!workspace) {
-        throw new UploadThingError("Default workspace not found");
-      }
+      // Validate workspace exists (but don't block upload if not found)
+      let workspace = null;
+      let template = null;
 
-      // Get default template for validation
-      const template = await dmsDb.getDefaultTemplate(
-        parseInt(workspaceId), 
-        parseInt(projectId), 
-        docType
-      );
+      try {
+        workspace = await dmsDb.getDefaultWorkspace();
+        if (!workspace) {
+          console.warn("⚠️ Default workspace not found, continuing without validation");
+        }
+
+        // Get default template for validation (optional)
+        template = await dmsDb.getDefaultTemplate(
+          parseInt(workspaceId),
+          parseInt(projectId),
+          docType
+        );
+
+        if (!template) {
+          console.warn("⚠️ No matching template found, continuing with upload");
+        }
+      } catch (dbError) {
+        console.error("⚠️ Database validation error (continuing):", dbError);
+      }
 
       return {
         projectId: parseInt(projectId),

@@ -86,7 +86,10 @@ async function databaseSearch(params: any) {
         folder_name,
         extracted_text,
         word_count,
-        searchable_text
+        searchable_text,
+        storage_uri,
+        mime_type,
+        file_size_bytes
       FROM landscape.mv_doc_search
       ${whereClause}
       ORDER BY updated_at DESC

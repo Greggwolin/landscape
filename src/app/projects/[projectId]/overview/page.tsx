@@ -258,7 +258,7 @@ function OverviewTab({ projectId, project }: { projectId: string; project: Recor
         </h2>
         <ProjectTabMap
           projectId={projectId}
-          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
+          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
         />
       </div>
 

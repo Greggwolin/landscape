@@ -3,6 +3,7 @@ import { sql } from '@/lib/db'
 
 interface ParcelBoundary {
   parcelId: string
+  parcelApn?: string
   geometry: GeoJSON.Geometry
   grossAcres: number
   ownerName?: string
@@ -55,10 +56,11 @@ export async function POST(
 
       // Insert individual parcel records
       for (const parcel of parcels) {
+        const parcelApn = parcel.parcelApn || parcel.parcelId
         await sql`
           INSERT INTO landscape.project_parcel_boundaries
-           (boundary_id, project_id, parcel_id, geometry, gross_acres, owner_name, site_address, created_at)
-           VALUES (${boundaryId}, ${projectId}, ${parcel.parcelId}, ST_GeomFromGeoJSON(${JSON.stringify(parcel.geometry)}), ${parcel.grossAcres}, ${parcel.ownerName}, ${parcel.siteAddress}, NOW())`
+           (boundary_id, project_id, parcel_id, parcel_apn, geometry, gross_acres, owner_name, site_address, created_at)
+           VALUES (${boundaryId}, ${projectId}, ${parcel.parcelId}, ${parcelApn}, ST_GeomFromGeoJSON(${JSON.stringify(parcel.geometry)}), ${parcel.grossAcres}, ${parcel.ownerName}, ${parcel.siteAddress}, NOW())`
       }
 
       // Update project total acres
@@ -131,6 +133,7 @@ export async function GET(
 
     const parcels = parcelsResult.map(row => ({
       parcelId: row.parcel_id,
+      parcelApn: row.parcel_apn || row.parcel_id,
       geometry: JSON.parse(row.geojson),
       grossAcres: parseFloat(row.gross_acres),
       ownerName: row.owner_name,

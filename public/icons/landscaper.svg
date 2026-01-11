@@ -1,0 +1,29 @@
+<svg viewBox="0 0 155 138" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <ellipse cx="60" cy="18" rx="14" ry="16"/>
+
+  <!-- Body/Torso - bent forward -->
+  <path d="M46 32 C40 40, 35 55, 42 70 L58 65 C55 50, 58 40, 60 34 Z"/>
+
+  <!-- Back arm (reaching to ground) -->
+  <path d="M44 45 C35 55, 25 70, 20 85 L28 88 C32 75, 40 62, 48 52 Z"/>
+
+  <!-- Front arm (holding tool/tending) -->
+  <path d="M55 50 C65 60, 75 72, 82 82 L76 88 C70 78, 62 66, 52 56 Z"/>
+
+  <!-- Back leg (kneeling) -->
+  <path d="M50 68 C45 80, 40 95, 38 110 L48 112 C48 97, 50 82, 54 72 Z"/>
+
+  <!-- Front leg (bent, knee on ground) -->
+  <path d="M56 70 C70 78, 85 90, 95 100 L90 108 C80 100, 68 88, 58 78 Z"/>
+
+  <!-- Knee pad/ground contact -->
+  <ellipse cx="95" cy="105" rx="8" ry="5"/>
+
+  <!-- Ground/Grass - decorative tufts -->
+  <path d="M0 125 Q10 115, 15 125 Q20 118, 25 125 Q30 116, 35 125 Q40 119, 45 125 Q50 117, 55 125 Q60 120, 65 125 Q70 116, 75 125 Q80 119, 85 125 Q90 115, 95 125 Q100 118, 105 125 Q110 116, 115 125 Q120 119, 125 125 Q130 115, 135 125 Q140 118, 145 125 Q150 120, 155 125 L155 138 L0 138 Z"/>
+
+  <!-- Small plant being tended -->
+  <path d="M22 95 L22 85 M18 88 Q22 82, 26 88"/>
+  <ellipse cx="22" cy="82" rx="4" ry="3"/>
+</svg>

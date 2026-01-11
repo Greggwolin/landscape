@@ -244,7 +244,7 @@ python apps/documents/demo_extraction.py
 
 ### Project Documentation
 - [Project-level DMS README](../../../docs/02-features/dms/README.md)
-- [Session Notes](../../../docs/session-notes/2025-10-30-dms-ai-extraction-implementation.md)
+- [Session Notes](../../../docs/09_session_notes/2025-10-30-dms-ai-extraction-implementation.md)
 
 ### Django Models
 - [models.py](./models.py) - Document, DMSExtractQueue, DMSAssertion, AICorrectionLog

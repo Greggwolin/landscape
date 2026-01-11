@@ -1,22 +1,24 @@
 # DMS Implementation Status & Handoff Guide
 
-**Last Updated:** 2025-10-07 23:45 PST
+**Last Updated:** 2025-12-11
 **Current Branch:** `work`
-**Last Commit:** `aadd1c6` - fix: add dark background to DMS document results area
+**Last Commit:** `0d0a1d1` - chore: sync workspace changes
 
 ---
 
 ## Executive Summary
 
-The Landscape Document Management System (DMS) has completed **Steps 1-7**, delivering a production-ready document management platform with:
+The Landscape Document Management System (DMS) has completed **Steps 1-7 + Tag-Based Refactor**, delivering a production-ready document management platform with:
 
 - ✅ Document upload and storage via UploadThing
 - ✅ AI-powered metadata extraction
-- ✅ Flexible profile system with custom attributes
+- ✅ **Simplified tag-based profile system** (replaces complex attribute registry)
 - ✅ Full-text search with Meilisearch + PostgreSQL fallback
-- ✅ Hierarchical folder organization with profile inheritance
+- ✅ **Filter-based document browsing** (replaces hierarchical folders)
 - ✅ Smart filters for dynamic document collections
 - ✅ PDF text extraction pipeline
+- ✅ **Tag autocomplete with usage tracking**
+- ✅ **Project-scoped DMS integration** (embedded in project pages)
 
 **Next Phase:** Step 8 - Folder Security & Setup Page (planning complete, ready for implementation)
 
@@ -278,6 +280,134 @@ $ curl http://localhost:3000/api/dms/folders | jq
 
 ---
 
+### Tag-Based DMS Refactor (October 25-29, 2025)
+**Commit:** `100d599` - feat: implement tag-based DMS with autocomplete and simplified profile schema (DMS-TAG-001)
+**Documentation:** `/docs/02-features/dms/DMS-Tag-Based-Refactor-Implementation-Summary.md`
+
+**Major Architectural Changes:**
+
+1. **Simplified Profile System**
+   - **Before:** Complex attribute registry with 8+ attribute types, dynamic schema generation, template bindings
+   - **After:** Fixed 6-field profile schema with freeform tags
+   - ProfileForm reduced from 458 to 292 lines (36% code reduction)
+
+2. **New Profile Schema:**
+   ```typescript
+   {
+     doc_type: string,      // Required - from template options
+     description: string,   // Optional
+     tags: string[],        // Freeform with autocomplete
+     doc_date: string,      // Document date
+     parties: string,       // Organizations/individuals
+     dollar_amount: number  // Financial amounts
+   }
+   ```
+
+3. **Tag System Features:**
+   - Autocomplete suggestions based on usage
+   - Usage tracking for popular tags
+   - Keyboard navigation (arrows, enter, escape)
+   - Duplicate prevention (case-insensitive)
+   - Gmail/Notion-style tag input UX
+
+**New API Endpoints:**
+- `GET /api/dms/tags/suggest` - Tag autocomplete with usage counts
+- `POST /api/dms/tags/increment` - Track tag usage
+- `GET /api/dms/templates/doc-types` - Get valid doc types for project
+
+**New Components:**
+- `TagInput.tsx` - Autocomplete tag input with suggestions
+- Refactored `ProfileForm.tsx` - Simplified fixed-schema form
+
+**Database Functions Added:**
+- `landscape.get_tag_suggestions()` - Tag autocomplete
+- `landscape.increment_tag_usage()` - Usage tracking
+
+**Status:** ✅ Implementation complete, ready for testing
+
+---
+
+### Filter-Based UI Refactor (October-November 2025)
+**Commits:** `a812d88`, `b740310`, `d489a53`
+
+**Changes:**
+1. **DMSView Component** - New reusable DMS view component
+   - Filter-based document browsing (replaces folder tree navigation)
+   - AccordionFilters for expandable filter categories
+   - FilterDetailView for viewing documents within a filter
+   - Two-column responsive layout
+
+2. **Project-Scoped DMS** - `/projects/[projectId]/documents/`
+   - Embedded DMS view within project context
+   - Project-filtered document display
+   - Upload and Documents tabs
+
+3. **UI Components Added:**
+   - `AccordionFilters.tsx` - Expandable filter panels
+   - `FilterDetailView.tsx` - Document list for selected filter
+   - `DMSView.tsx` - Unified DMS interface component
+
+**Status:** ✅ Production ready
+
+---
+
+### UI Polish & Cleanup (December 2025)
+**Commit:** `0d0a1d1`
+
+**Changes:**
+1. **Breadcrumb Removal**
+   - Removed "Home > Projects > {projectName}" breadcrumb from DMSView
+   - Removed "Home > Documents > {docType}" breadcrumb from FilterDetailView
+   - Cleaner, less cluttered document browsing interface
+
+2. **Navigation Consolidation**
+   - DMS now accessible via project context
+   - Global DMS link available from project documents page
+
+**Status:** ✅ Complete
+
+---
+
+### DMS UX Improvements (December 11, 2025)
+
+**Session:** XK-83
+
+**Changes:**
+1. **Multi-Select Document Management**
+   - Added `checkedDocIds` state (Set<number>) for tracking selected documents
+   - Checkbox selection now enables delete button
+   - Support for deleting multiple documents at once
+   - Delete count shown in confirmation dialog
+
+2. **Toast Notifications**
+   - Replaced blocking `alert()` with non-blocking toast notifications
+   - Green toast for "Profile Updated!" on save
+   - Toast auto-dismisses after 2.5 seconds
+
+3. **Multi-Filter Expansion**
+   - Changed from single `expandedFilter` to `expandedFilters` Set
+   - Multiple filter accordions can now be open simultaneously
+   - Better document browsing workflow
+
+4. **Document Row Highlighting**
+   - Selected or checked documents now highlighted with blue background
+   - Visual feedback for active selections
+
+5. **Profile Form Simplification**
+   - Removed versioning label from document rows
+   - Moved date to same line as document name
+   - Added description display below document name
+
+**Files Modified:**
+- `src/components/dms/DMSView.tsx`
+- `src/components/dms/filters/AccordionFilters.tsx`
+- `src/components/dms/profile/ProfileForm.tsx`
+- `src/app/api/dms/docs/[id]/route.ts` (DELETE endpoint)
+
+**Status:** ✅ Complete
+
+---
+
 ## Current Architecture
 
 ### Technology Stack
@@ -378,7 +508,7 @@ Meilisearch (Primary)
 ```
 /src/app/api/dms/
   docs/
-    route.ts                 # POST - Create document
+    route.ts                 # POST - Create document (with tag tracking)
     [id]/
       route.ts               # GET - Retrieve, PATCH - Update
       move/route.ts          # POST - Move to folder
@@ -388,6 +518,14 @@ Meilisearch (Primary)
 
   folders/route.ts           # CRUD for folders
   filters/route.ts           # CRUD for smart filters
+    counts/route.ts          # GET - Filter counts (NEW)
+
+  tags/                      # Tag management (NEW)
+    suggest/route.ts         # GET - Tag autocomplete suggestions
+    increment/route.ts       # POST - Track tag usage
+
+  templates/                 # Template management (NEW)
+    doc-types/route.ts       # GET - Valid doc types for project
 
   cron/
     dms-sync/route.ts        # Background Meili sync
@@ -415,8 +553,9 @@ Meilisearch (Primary)
     Queue.tsx                # Upload queue
 
   profile/
-    ProfileForm.tsx          # Metadata editor
+    ProfileForm.tsx          # Simplified 6-field metadata editor
     DocCard.tsx              # Document preview
+    TagInput.tsx             # Autocomplete tag input (NEW)
 
   search/
     SearchBox.tsx            # Query input
@@ -430,14 +569,22 @@ Meilisearch (Primary)
 
   filters/
     SmartFilterBuilder.tsx   # Visual query builder
+    AccordionFilters.tsx     # Expandable filter panels (NEW)
+
+  views/
+    FilterDetailView.tsx     # Document list for selected filter (NEW)
+
+  DMSView.tsx                # Unified DMS interface component (NEW)
 ```
 
 ### Pages
 ```
 /src/app/dms/
+  page.tsx                   # Unified DMS page with tabs
   layout.tsx                 # ProjectProvider wrapper
-  upload/page.tsx            # Upload interface
-  documents/page.tsx         # Browse and search
+
+/src/app/projects/[projectId]/documents/
+  page.tsx                   # Project-scoped DMS view
 ```
 
 ### Documentation
@@ -723,30 +870,40 @@ For a new developer or Claude instance taking over:
 
 ## Summary
 
-The Landscape DMS has reached **70% completion** with a solid foundation:
+The Landscape DMS has reached **80% completion** with a solid foundation and major UX improvements:
 
 **Completed:**
 - ✅ Document upload and storage
-- ✅ Flexible profile system
+- ✅ **Simplified tag-based profile system** (replaced complex attribute registry)
 - ✅ Full-text search (Meilisearch + PostgreSQL)
-- ✅ Hierarchical folders with inheritance
+- ✅ **Filter-based document browsing** (cleaner than folder navigation)
 - ✅ Smart filters
 - ✅ PDF text extraction
 - ✅ Comprehensive UI components
+- ✅ **Tag autocomplete with usage tracking**
+- ✅ **Project-scoped DMS integration**
+- ✅ **Clean UI (breadcrumbs removed)**
+
+**Recent Changes (Oct-Dec 2025):**
+- Tag-based refactor (50% code reduction in ProfileForm)
+- Filter-based UI (AccordionFilters, FilterDetailView)
+- DMSView reusable component
+- Breadcrumb removal for cleaner interface
+- Project-scoped document browsing
 
 **Next Phase:**
 - 📋 Step 8: Folder Security & Setup Page (4 weeks)
-- 📋 Steps 5-6: Attribute Admin & AI Review (optional, 6-8 weeks)
+- 📋 Steps 5-6: ~~Attribute Admin~~ & AI Review (optional, simplified now)
 
 **Production Status:**
 - Current features are production-ready
 - Step 8 recommended for multi-tenant security
-- Steps 5-6 add advanced customization
+- Tag-based system is simpler and more maintainable
 
 The codebase is well-documented, tested, and ready for the next phase of development. All changes are committed to the `work` branch and pushed to GitHub.
 
-**Total Implementation Time:** ~8-10 weeks so far
+**Total Implementation Time:** ~12-14 weeks so far
 **Remaining for Step 8:** ~4 weeks
-**Complete System (through Step 8):** ~12-14 weeks total
+**Complete System (through Step 8):** ~16-18 weeks total
 
 🎉 **Landscape DMS is ready for production deployment or continued development!**

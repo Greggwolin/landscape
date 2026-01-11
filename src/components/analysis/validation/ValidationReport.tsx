@@ -482,6 +482,7 @@ export default function ValidationReport({ projectId }: Props) {
       profitMargin: 0,
       otherLandAcres: 0,
       otherLandUnits: 0,
+      otherLandParcels: [],
       otherLandGrossRevenue: 0,
       otherLandNetRevenue: 0,
       otherLandByType: [],
@@ -490,6 +491,9 @@ export default function ValidationReport({ projectId }: Props) {
       grossSaleProceeds: 0,
       totalNetRevenue: 0,
     };
+
+    // Track other land by type for aggregation
+    const otherLandByTypeMap = new Map<string, { typeCode: string; units: number; acres: number; pricePerUnit: number; grossRevenue: number; netRevenue: number }>();
 
     phases.forEach(p => {
       newTotals.acres += p.acres;
@@ -516,7 +520,29 @@ export default function ValidationReport({ projectId }: Props) {
       newTotals.subdivisionCost += p.subdivisionCost;
       newTotals.grossSaleProceeds += p.grossSaleProceeds;
       newTotals.totalNetRevenue += p.totalNetRevenue;
+
+      // Aggregate other land parcels
+      if (p.otherLandParcels) {
+        newTotals.otherLandParcels = newTotals.otherLandParcels.concat(p.otherLandParcels);
+      }
+
+      // Aggregate other land by type
+      p.otherLandByType?.forEach(typeData => {
+        const existing = otherLandByTypeMap.get(typeData.typeCode);
+        if (existing) {
+          existing.units += typeData.units;
+          existing.acres += typeData.acres;
+          existing.grossRevenue += typeData.grossRevenue;
+          existing.netRevenue += typeData.netRevenue;
+          if (typeData.pricePerUnit > 0) existing.pricePerUnit = typeData.pricePerUnit;
+        } else {
+          otherLandByTypeMap.set(typeData.typeCode, { ...typeData });
+        }
+      });
     });
+
+    // Set aggregated other land by type
+    newTotals.otherLandByType = Array.from(otherLandByTypeMap.values()).sort((a, b) => a.typeCode.localeCompare(b.typeCode));
 
     // Calculate derived values
     newTotals.pricePerFrontFoot = newTotals.frontFeet > 0 ? newTotals.grossRevenue / newTotals.frontFeet : 0;

@@ -48,6 +48,8 @@ interface ParcelRow {
   gross_parcel_price: number | null;
   net_sale_proceeds: number | null;
   total_transaction_costs: number | null;
+  improvement_offset_total: number | null;
+  price_uom: string | null;
 }
 
 interface PricingRow {
@@ -80,6 +82,9 @@ export async function fetchProjectParcels(
   let query;
 
   if (containerIds && containerIds.length > 0) {
+    console.log(`Filtering parcels by containerIds (division_ids):`, containerIds);
+    // containerIds are division_ids from tbl_division (tier 2 = phases)
+    // We need to join through tbl_phase to match parcel.phase_id
     query = sql<ParcelRow>`
       SELECT
         p.parcel_id,
@@ -100,12 +105,29 @@ export async function fetchProjectParcels(
         p.custom_sale_date,
         psa.gross_parcel_price,
         psa.net_sale_proceeds,
-        psa.total_transaction_costs
+        psa.total_transaction_costs,
+        psa.improvement_offset_total,
+        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom
       FROM landscape.tbl_parcel p
       LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
+      LEFT JOIN LATERAL (
+        SELECT unit_of_measure
+        FROM landscape.land_use_pricing lup
+        WHERE lup.project_id = p.project_id
+          AND lup.lu_type_code = p.type_code
+          AND (lup.product_code = p.product_code OR lup.product_code IS NULL)
+        ORDER BY lup.product_code NULLS LAST
+        LIMIT 1
+      ) lup ON TRUE
+      -- Join to tbl_phase to map phase_id to division_id (tier 2)
+      LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+      LEFT JOIN landscape.tbl_division d_phase
+        ON ph.phase_name = d_phase.display_name
+        AND ph.project_id = d_phase.project_id
+        AND d_phase.tier = 2
       WHERE p.project_id = ${projectId}
-        AND (p.area_id = ANY(${containerIds}) OR p.phase_id = ANY(${containerIds}))
-        AND p.units_total > 0
+        AND d_phase.division_id = ANY(${containerIds})
+        AND (p.units_total > 0 OR p.acres_gross > 0)
       ORDER BY p.sale_period ASC NULLS LAST, p.parcel_code ASC
     `;
   } else {
@@ -129,11 +151,22 @@ export async function fetchProjectParcels(
         p.custom_sale_date,
         psa.gross_parcel_price,
         psa.net_sale_proceeds,
-        psa.total_transaction_costs
+        psa.total_transaction_costs,
+        psa.improvement_offset_total,
+        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom
       FROM landscape.tbl_parcel p
       LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
+      LEFT JOIN LATERAL (
+        SELECT unit_of_measure
+        FROM landscape.land_use_pricing lup
+        WHERE lup.project_id = p.project_id
+          AND lup.lu_type_code = p.type_code
+          AND (lup.product_code = p.product_code OR lup.product_code IS NULL)
+        ORDER BY lup.product_code NULLS LAST
+        LIMIT 1
+      ) lup ON TRUE
       WHERE p.project_id = ${projectId}
-        AND p.units_total > 0
+        AND (p.units_total > 0 OR p.acres_gross > 0)
       ORDER BY p.sale_period ASC NULLS LAST, p.parcel_code ASC
     `;
   }
@@ -297,8 +330,12 @@ export async function calculateParcelSale(
   projectStartDate: Date,
   projectId: number
 ): Promise<ParcelSale | null> {
-  // Skip parcels without sale period or units
-  if (!parcel.sale_period || !parcel.units_total) {
+  // Skip parcels without sale period or without any quantifiable dimension
+  if (!parcel.sale_period) {
+    return null;
+  }
+  // Must have either units or acres to have value
+  if (!parcel.units_total && !parcel.acres_gross) {
     return null;
   }
 
@@ -340,19 +377,31 @@ export async function calculateParcelSale(
     pricing.acres = parcel.acres_gross || undefined;
     pricing.units = parcel.units_total || undefined;
 
-    // Estimate deductions proportionally (rough approximation)
+    // Use actual subdivision costs from database (improvement_offset_total)
+    // Only include for $/FF parcels - other UOMs track improvement offsets separately
+    const normalizeUom = (uom: string | null): string => {
+      if (!uom) return 'EA';
+      return uom.replace('$/', '').toUpperCase();
+    };
+    const uom = normalizeUom(parcel.price_uom);
+    const subdivisionCosts = uom === 'FF' && parcel.improvement_offset_total
+      ? Number(parcel.improvement_offset_total)
+      : 0;
+
+    // Estimate commissions and closing costs (these are already in totalDeductions)
+    // We estimate them for display purposes only
     const commissionRate = 0.03;
-    const closingCostRate = 0.02;
+    const closingCostRate = 0.0057;
     const commissions = grossRevenue * commissionRate;
-    const closingCosts = totalDeductions - commissions;
+    const closingCosts = grossRevenue * closingCostRate;
 
     return {
       parcelId: parcel.parcel_id,
       parcelCode: parcel.parcel_code,
-      containerId: parcel.area_id || parcel.phase_id || undefined,
+      containerId: parcel.phase_id || undefined,  // Use phase_id for phase grouping
       salePeriod: parcel.sale_period,
       pricing,
-      baseRevenue: grossRevenue, // Using gross as base since we don't have the breakdown
+      baseRevenue: grossRevenue,
       escalationFactor: 1.0,
       grossRevenue,
       commissionRate,
@@ -362,6 +411,7 @@ export async function calculateParcelSale(
       closingCosts,
       onsiteCostPct: 0,
       onsiteCosts: 0,
+      subdivisionCosts,
       totalDeductions,
       netRevenue,
       units: parcel.units_total || 0,
@@ -436,7 +486,7 @@ export async function calculateParcelSale(
   return {
     parcelId: parcel.parcel_id,
     parcelCode: parcel.parcel_code,
-    containerId: parcel.area_id || parcel.phase_id || undefined,
+    containerId: parcel.phase_id || undefined,  // Use phase_id for phase grouping
     salePeriod: parcel.sale_period,
     pricing,
     baseRevenue,
@@ -449,6 +499,7 @@ export async function calculateParcelSale(
     closingCosts,
     onsiteCostPct: benchmarks.onsiteCostPct,
     onsiteCosts,
+    subdivisionCosts: 0, // Not available in fallback calculation
     totalDeductions,
     netRevenue,
     units: parcel.units_total || 0,
@@ -515,7 +566,9 @@ export async function generateAbsorptionSchedule(
   containerIds?: number[]
 ): Promise<AbsorptionSchedule> {
   // Fetch all parcels with sales
+  console.log(`Fetching parcels for project ${projectId} with containerIds:`, containerIds);
   const parcels = await fetchProjectParcels(projectId, containerIds);
+  console.log(`Found ${parcels.length} parcels`);
 
   if (parcels.length === 0) {
     return {
@@ -586,6 +639,10 @@ export async function generateAbsorptionSchedule(
     (sum, sale) => sum + sale.closingCosts,
     0
   );
+  const totalSubdivisionCosts = parcelSales.reduce(
+    (sum, sale) => sum + sale.subdivisionCosts,
+    0
+  );
 
   // Calculate absorption rate (units per year)
   const firstSalePeriod = Math.min(...parcelSales.map((s) => s.salePeriod));
@@ -607,6 +664,7 @@ export async function generateAbsorptionSchedule(
     totalNetRevenue,
     totalCommissions,
     totalClosingCosts,
+    totalSubdivisionCosts,
   };
 }
 

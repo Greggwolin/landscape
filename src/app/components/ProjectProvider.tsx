@@ -25,6 +25,7 @@ interface ProjectSummary {
   analysis_type?: string | null
   property_subtype?: string | null
   property_class?: string | null
+  analysis_mode?: 'napkin' | 'developer' | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
   updated_at?: string | null

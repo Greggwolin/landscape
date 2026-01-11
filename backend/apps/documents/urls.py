@@ -7,7 +7,11 @@ from .views import (
     DocumentFolderViewSet,
     upload_document,
     get_staging_data,
-    commit_staging_data
+    commit_staging_data,
+    check_upload_collision,
+    upload_new_version,
+    soft_delete_document,
+    rename_document,
 )
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
@@ -24,4 +28,9 @@ urlpatterns = [
     path('upload/', upload_document, name='upload_document'),
     path('staging/<int:doc_id>/', get_staging_data, name='get_staging'),
     path('staging/<int:doc_id>/commit/', commit_staging_data, name='commit_staging'),
+    # Versioning and collision detection endpoints
+    path('projects/<int:project_id>/check-collision/', check_upload_collision, name='check_upload_collision'),
+    path('projects/<int:project_id>/docs/<int:doc_id>/version/', upload_new_version, name='upload_new_version'),
+    path('projects/<int:project_id>/docs/<int:doc_id>/delete/', soft_delete_document, name='soft_delete_document'),
+    path('projects/<int:project_id>/docs/<int:doc_id>/rename/', rename_document, name='rename_document'),
 ]

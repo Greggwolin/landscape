@@ -1,0 +1,73 @@
+/* Channel Pills Styles */
+
+.channel-pill {
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--cui-body-color);
+  transition: all 0.15s ease;
+}
+
+.channel-pill:hover {
+  background: var(--cui-secondary-bg);
+  border-color: var(--pill-color, var(--cui-border-color));
+}
+
+.channel-pill.active {
+  background: var(--pill-color, var(--cui-primary));
+  border-color: var(--pill-color, var(--cui-primary));
+  color: white;
+}
+
+.channel-pill:focus-visible {
+  outline: 2px solid var(--pill-color, var(--cui-primary));
+  outline-offset: 2px;
+}
+
+[data-coreui-theme="dark"] .channel-pills button {
+  background: var(--cui-tertiary-bg) !important;
+  color: var(--cui-body-color) !important;
+  border-color: var(--cui-border-color) !important;
+}
+
+[data-coreui-theme="dark"] .channel-pills button:hover {
+  background: var(--cui-secondary-bg) !important;
+}
+
+/* Activity feed styles */
+.activity-feed {
+  min-height: 200px;
+}
+
+.activity-card {
+  transition: all 0.15s ease;
+}
+
+.activity-card:hover {
+  background: var(--cui-secondary-bg) !important;
+}
+
+/* Project card styles */
+.project-card .metric {
+  min-width: 80px;
+}
+
+/* Workspace layout */
+.project-workspace {
+  min-height: 0;
+}
+
+.workspace-main {
+  min-width: 0;
+}
+
+.workspace-greenhouse {
+  min-height: 0;
+}
+
+/* Completeness ring animation */
+.completeness-ring circle:last-child {
+  transition: stroke-dashoffset 0.5s ease-out;
+}

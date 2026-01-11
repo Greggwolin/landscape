@@ -1,0 +1,903 @@
+schema_name,table_name,index_name,index_oid,indexdef,is_constraint_owned,constraint_name,constraint_type
+landscape,_migrations,_migrations_migration_file_key,516106,CREATE UNIQUE INDEX _migrations_migration_file_key ON landscape._migrations USING btree (migration_file),True,_migrations_migration_file_key,u
+landscape,_migrations,_migrations_pkey,516104,CREATE UNIQUE INDEX _migrations_pkey ON landscape._migrations USING btree (migration_id),True,_migrations_pkey,p
+landscape,ai_correction_log,ai_correction_log_pkey,794653,CREATE UNIQUE INDEX ai_correction_log_pkey ON landscape.ai_correction_log USING btree (id),True,ai_correction_log_pkey,p
+landscape,ai_correction_log,idx_correction_log_correction_type,794663,CREATE INDEX idx_correction_log_correction_type ON landscape.ai_correction_log USING btree (correction_type),False,,
+landscape,ai_correction_log,idx_correction_log_created_at,794662,CREATE INDEX idx_correction_log_created_at ON landscape.ai_correction_log USING btree (created_at),False,,
+landscape,ai_correction_log,idx_correction_log_field_path,794661,CREATE INDEX idx_correction_log_field_path ON landscape.ai_correction_log USING btree (field_path),False,,
+landscape,ai_correction_log,idx_correction_log_queue_id,794660,CREATE INDEX idx_correction_log_queue_id ON landscape.ai_correction_log USING btree (queue_id),False,,
+landscape,ai_extraction_staging,ai_extraction_staging_pkey,1335306,CREATE UNIQUE INDEX ai_extraction_staging_pkey ON landscape.ai_extraction_staging USING btree (extraction_id),True,ai_extraction_staging_pkey,p
+landscape,ai_extraction_staging,idx_extraction_staging_doc,1335319,CREATE INDEX idx_extraction_staging_doc ON landscape.ai_extraction_staging USING btree (doc_id),False,,
+landscape,ai_extraction_staging,idx_extraction_staging_project,1335318,"CREATE INDEX idx_extraction_staging_project ON landscape.ai_extraction_staging USING btree (project_id, status)",False,,
+landscape,ai_extraction_staging,idx_staging_field_key,1343657,CREATE INDEX idx_staging_field_key ON landscape.ai_extraction_staging USING btree (field_key),False,,
+landscape,ai_extraction_staging,idx_staging_property_type,1343658,CREATE INDEX idx_staging_property_type ON landscape.ai_extraction_staging USING btree (property_type),False,,
+landscape,ai_extraction_staging,idx_staging_scope,1343659,CREATE INDEX idx_staging_scope ON landscape.ai_extraction_staging USING btree (scope),False,,
+landscape,ai_extraction_staging,idx_staging_unique_pending,1540100,"CREATE UNIQUE INDEX idx_staging_unique_pending ON landscape.ai_extraction_staging USING btree (project_id, field_key, COALESCE(scope_label, ''::character varying), COALESCE(array_index, 0)) WHERE ((status)::text = 'pending'::text)",False,,
+landscape,ai_extraction_warnings,ai_extraction_warnings_pkey,794673,CREATE UNIQUE INDEX ai_extraction_warnings_pkey ON landscape.ai_extraction_warnings USING btree (id),True,ai_extraction_warnings_pkey,p
+landscape,ai_extraction_warnings,idx_extraction_warnings_created_at,794682,CREATE INDEX idx_extraction_warnings_created_at ON landscape.ai_extraction_warnings USING btree (created_at),False,,
+landscape,ai_extraction_warnings,idx_extraction_warnings_queue_id,794680,CREATE INDEX idx_extraction_warnings_queue_id ON landscape.ai_extraction_warnings USING btree (queue_id),False,,
+landscape,ai_extraction_warnings,idx_extraction_warnings_severity,794681,CREATE INDEX idx_extraction_warnings_severity ON landscape.ai_extraction_warnings USING btree (severity),False,,
+landscape,ai_ingestion_history,ai_ingestion_history_pkey,409631,CREATE UNIQUE INDEX ai_ingestion_history_pkey ON landscape.ai_ingestion_history USING btree (ingestion_id),True,ai_ingestion_history_pkey,p
+landscape,ai_review_history,ai_review_history_pkey,409608,CREATE UNIQUE INDEX ai_review_history_pkey ON landscape.ai_review_history USING btree (review_id),True,ai_review_history_pkey,p
+landscape,ai_review_history,idx_ai_review_history_action_type,409616,CREATE INDEX idx_ai_review_history_action_type ON landscape.ai_review_history USING btree (action_type),False,,
+landscape,ai_review_history,idx_ai_review_history_created_at,409617,CREATE INDEX idx_ai_review_history_created_at ON landscape.ai_review_history USING btree (created_at),False,,
+landscape,ai_review_history,idx_ai_review_history_project_id,409615,CREATE INDEX idx_ai_review_history_project_id ON landscape.ai_review_history USING btree (project_id),False,,
+landscape,auth_group,auth_group_name_a6ea08ec_like,655496,CREATE INDEX auth_group_name_a6ea08ec_like ON landscape.auth_group USING btree (name varchar_pattern_ops),False,,
+landscape,auth_group,auth_group_name_key,655494,CREATE UNIQUE INDEX auth_group_name_key ON landscape.auth_group USING btree (name),True,auth_group_name_key,u
+landscape,auth_group,auth_group_pkey,655386,CREATE UNIQUE INDEX auth_group_pkey ON landscape.auth_group USING btree (id),True,auth_group_pkey,p
+landscape,auth_group_permissions,auth_group_permissions_group_id_b120cbf9,655437,CREATE INDEX auth_group_permissions_group_id_b120cbf9 ON landscape.auth_group_permissions USING btree (group_id),False,,
+landscape,auth_group_permissions,auth_group_permissions_group_id_permission_id_0cd325b0_uniq,655425,"CREATE UNIQUE INDEX auth_group_permissions_group_id_permission_id_0cd325b0_uniq ON landscape.auth_group_permissions USING btree (group_id, permission_id)",True,auth_group_permissions_group_id_permission_id_0cd325b0_uniq,u
+landscape,auth_group_permissions,auth_group_permissions_permission_id_84c5c92e,655438,CREATE INDEX auth_group_permissions_permission_id_84c5c92e ON landscape.auth_group_permissions USING btree (permission_id),False,,
+landscape,auth_group_permissions,auth_group_permissions_pkey,655394,CREATE UNIQUE INDEX auth_group_permissions_pkey ON landscape.auth_group_permissions USING btree (id),True,auth_group_permissions_pkey,p
+landscape,auth_permission,auth_permission_content_type_id_2f476e4b,655423,CREATE INDEX auth_permission_content_type_id_2f476e4b ON landscape.auth_permission USING btree (content_type_id),False,,
+landscape,auth_permission,auth_permission_content_type_id_codename_01ab375a_uniq,655416,"CREATE UNIQUE INDEX auth_permission_content_type_id_codename_01ab375a_uniq ON landscape.auth_permission USING btree (content_type_id, codename)",True,auth_permission_content_type_id_codename_01ab375a_uniq,u
+landscape,auth_permission,auth_permission_pkey,655380,CREATE UNIQUE INDEX auth_permission_pkey ON landscape.auth_permission USING btree (id),True,auth_permission_pkey,p
+landscape,auth_user,auth_user_pkey,655400,CREATE UNIQUE INDEX auth_user_pkey ON landscape.auth_user USING btree (id),True,auth_user_pkey,p
+landscape,auth_user,auth_user_username_6821ab7c_like,655491,CREATE INDEX auth_user_username_6821ab7c_like ON landscape.auth_user USING btree (username varchar_pattern_ops),False,,
+landscape,auth_user,auth_user_username_key,655489,CREATE UNIQUE INDEX auth_user_username_key ON landscape.auth_user USING btree (username),True,auth_user_username_key,u
+landscape,auth_user_groups,auth_user_groups_group_id_97559544,655453,CREATE INDEX auth_user_groups_group_id_97559544 ON landscape.auth_user_groups USING btree (group_id),False,,
+landscape,auth_user_groups,auth_user_groups_pkey,655408,CREATE UNIQUE INDEX auth_user_groups_pkey ON landscape.auth_user_groups USING btree (id),True,auth_user_groups_pkey,p
+landscape,auth_user_groups,auth_user_groups_user_id_6a12ed8b,655452,CREATE INDEX auth_user_groups_user_id_6a12ed8b ON landscape.auth_user_groups USING btree (user_id),False,,
+landscape,auth_user_groups,auth_user_groups_user_id_group_id_94350c0c_uniq,655440,"CREATE UNIQUE INDEX auth_user_groups_user_id_group_id_94350c0c_uniq ON landscape.auth_user_groups USING btree (user_id, group_id)",True,auth_user_groups_user_id_group_id_94350c0c_uniq,u
+landscape,auth_user_user_permissions,auth_user_user_permissions_permission_id_1fbb5f2c,655467,CREATE INDEX auth_user_user_permissions_permission_id_1fbb5f2c ON landscape.auth_user_user_permissions USING btree (permission_id),False,,
+landscape,auth_user_user_permissions,auth_user_user_permissions_pkey,655414,CREATE UNIQUE INDEX auth_user_user_permissions_pkey ON landscape.auth_user_user_permissions USING btree (id),True,auth_user_user_permissions_pkey,p
+landscape,auth_user_user_permissions,auth_user_user_permissions_user_id_a95ead1b,655466,CREATE INDEX auth_user_user_permissions_user_id_a95ead1b ON landscape.auth_user_user_permissions USING btree (user_id),False,,
+landscape,auth_user_user_permissions,auth_user_user_permissions_user_id_permission_id_14a6b632_uniq,655454,"CREATE UNIQUE INDEX auth_user_user_permissions_user_id_permission_id_14a6b632_uniq ON landscape.auth_user_user_permissions USING btree (user_id, permission_id)",True,auth_user_user_permissions_user_id_permission_id_14a6b632_uniq,u
+landscape,bmk_absorption_velocity,bmk_absorption_velocity_pkey,892959,CREATE UNIQUE INDEX bmk_absorption_velocity_pkey ON landscape.bmk_absorption_velocity USING btree (absorption_velocity_id),True,bmk_absorption_velocity_pkey,p
+landscape,bmk_absorption_velocity,idx_bmk_absorption_benchmark,892966,CREATE INDEX idx_bmk_absorption_benchmark ON landscape.bmk_absorption_velocity USING btree (benchmark_id),False,,
+landscape,bmk_absorption_velocity,idx_bmk_absorption_geography,892967,CREATE INDEX idx_bmk_absorption_geography ON landscape.bmk_absorption_velocity USING btree (market_geography),False,,
+landscape,bmk_builder_communities,bmk_builder_communities_pkey,1204234,CREATE UNIQUE INDEX bmk_builder_communities_pkey ON landscape.bmk_builder_communities USING btree (id),True,bmk_builder_communities_pkey,p
+landscape,bmk_builder_communities,bmk_builder_communities_source_source_id_key,1204236,"CREATE UNIQUE INDEX bmk_builder_communities_source_source_id_key ON landscape.bmk_builder_communities USING btree (source, source_id)",True,bmk_builder_communities_source_source_id_key,u
+landscape,bmk_builder_communities,idx_bmk_communities_builder,1204238,CREATE INDEX idx_bmk_communities_builder ON landscape.bmk_builder_communities USING btree (builder_name),False,,
+landscape,bmk_builder_communities,idx_bmk_communities_city_state,1204240,"CREATE INDEX idx_bmk_communities_city_state ON landscape.bmk_builder_communities USING btree (city, state)",False,,
+landscape,bmk_builder_communities,idx_bmk_communities_geo,1204241,"CREATE INDEX idx_bmk_communities_geo ON landscape.bmk_builder_communities USING btree (lat, lng) WHERE (lat IS NOT NULL)",False,,
+landscape,bmk_builder_communities,idx_bmk_communities_last_seen,1204242,CREATE INDEX idx_bmk_communities_last_seen ON landscape.bmk_builder_communities USING btree (last_seen_at),False,,
+landscape,bmk_builder_communities,idx_bmk_communities_market,1204239,CREATE INDEX idx_bmk_communities_market ON landscape.bmk_builder_communities USING btree (market_label),False,,
+landscape,bmk_builder_communities,idx_bmk_communities_price_range,1204243,"CREATE INDEX idx_bmk_communities_price_range ON landscape.bmk_builder_communities USING btree (price_min, price_max) WHERE (price_min IS NOT NULL)",False,,
+landscape,bmk_builder_inventory,bmk_builder_inventory_pkey,1204273,CREATE UNIQUE INDEX bmk_builder_inventory_pkey ON landscape.bmk_builder_inventory USING btree (id),True,bmk_builder_inventory_pkey,p
+landscape,bmk_builder_inventory,bmk_builder_inventory_source_source_id_key,1204275,"CREATE UNIQUE INDEX bmk_builder_inventory_source_source_id_key ON landscape.bmk_builder_inventory USING btree (source, source_id)",True,bmk_builder_inventory_source_source_id_key,u
+landscape,bmk_builder_inventory,idx_bmk_inventory_city_state,1204281,"CREATE INDEX idx_bmk_inventory_city_state ON landscape.bmk_builder_inventory USING btree (city, state)",False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_community,1204277,"CREATE INDEX idx_bmk_inventory_community ON landscape.bmk_builder_inventory USING btree (source, community_source_id)",False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_geo,1204280,"CREATE INDEX idx_bmk_inventory_geo ON landscape.bmk_builder_inventory USING btree (lat, lng) WHERE (lat IS NOT NULL)",False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_last_seen,1204282,CREATE INDEX idx_bmk_inventory_last_seen ON landscape.bmk_builder_inventory USING btree (last_seen_at),False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_move_in,1204283,CREATE INDEX idx_bmk_inventory_move_in ON landscape.bmk_builder_inventory USING btree (move_in_date) WHERE (move_in_date IS NOT NULL),False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_price,1204279,CREATE INDEX idx_bmk_inventory_price ON landscape.bmk_builder_inventory USING btree (price_current) WHERE (price_current IS NOT NULL),False,,
+landscape,bmk_builder_inventory,idx_bmk_inventory_status,1204278,CREATE INDEX idx_bmk_inventory_status ON landscape.bmk_builder_inventory USING btree (status),False,,
+landscape,bmk_builder_plans,bmk_builder_plans_pkey,1204254,CREATE UNIQUE INDEX bmk_builder_plans_pkey ON landscape.bmk_builder_plans USING btree (id),True,bmk_builder_plans_pkey,p
+landscape,bmk_builder_plans,bmk_builder_plans_source_source_id_key,1204256,"CREATE UNIQUE INDEX bmk_builder_plans_source_source_id_key ON landscape.bmk_builder_plans USING btree (source, source_id)",True,bmk_builder_plans_source_source_id_key,u
+landscape,bmk_builder_plans,idx_bmk_plans_base_price,1204260,CREATE INDEX idx_bmk_plans_base_price ON landscape.bmk_builder_plans USING btree (base_price) WHERE (base_price IS NOT NULL),False,,
+landscape,bmk_builder_plans,idx_bmk_plans_community,1204258,"CREATE INDEX idx_bmk_plans_community ON landscape.bmk_builder_plans USING btree (source, community_source_id)",False,,
+landscape,bmk_builder_plans,idx_bmk_plans_last_seen,1204262,CREATE INDEX idx_bmk_plans_last_seen ON landscape.bmk_builder_plans USING btree (last_seen_at),False,,
+landscape,bmk_builder_plans,idx_bmk_plans_product_type,1204259,CREATE INDEX idx_bmk_plans_product_type ON landscape.bmk_builder_plans USING btree (product_type),False,,
+landscape,bmk_builder_plans,idx_bmk_plans_sqft,1204261,"CREATE INDEX idx_bmk_plans_sqft ON landscape.bmk_builder_plans USING btree (sqft_min, sqft_max) WHERE (sqft_min IS NOT NULL)",False,,
+landscape,bmk_resale_closings,bmk_resale_closings_pkey,1212426,CREATE UNIQUE INDEX bmk_resale_closings_pkey ON landscape.bmk_resale_closings USING btree (id),True,bmk_resale_closings_pkey,p
+landscape,bmk_resale_closings,bmk_resale_closings_source_source_id_key,1212428,"CREATE UNIQUE INDEX bmk_resale_closings_source_source_id_key ON landscape.bmk_resale_closings USING btree (source, source_id)",True,bmk_resale_closings_source_source_id_key,u
+landscape,bmk_resale_closings,idx_bmk_resale_closings_geo,1212433,"CREATE INDEX idx_bmk_resale_closings_geo ON landscape.bmk_resale_closings USING btree (lat, lng)",False,,
+landscape,bmk_resale_closings,idx_bmk_resale_closings_location,1212432,"CREATE INDEX idx_bmk_resale_closings_location ON landscape.bmk_resale_closings USING btree (city, state)",False,,
+landscape,bmk_resale_closings,idx_bmk_resale_closings_sale_date,1212431,CREATE INDEX idx_bmk_resale_closings_sale_date ON landscape.bmk_resale_closings USING btree (sale_date DESC),False,,
+landscape,bmk_resale_closings,idx_bmk_resale_closings_source,1212430,CREATE INDEX idx_bmk_resale_closings_source ON landscape.bmk_resale_closings USING btree (source),False,,
+landscape,bmk_resale_closings,idx_bmk_resale_closings_year_built,1212434,CREATE INDEX idx_bmk_resale_closings_year_built ON landscape.bmk_resale_closings USING btree (year_built),False,,
+landscape,core_category_lifecycle_stages,core_category_lifecycle_stages_pkey,917511,"CREATE UNIQUE INDEX core_category_lifecycle_stages_pkey ON landscape.core_category_lifecycle_stages USING btree (category_id, activity)",True,core_category_lifecycle_stages_pkey,p
+landscape,core_category_lifecycle_stages,idx_category_lifecycle_category,917519,CREATE INDEX idx_category_lifecycle_category ON landscape.core_category_lifecycle_stages USING btree (category_id),False,,
+landscape,core_category_lifecycle_stages,idx_category_lifecycle_sort,917518,"CREATE INDEX idx_category_lifecycle_sort ON landscape.core_category_lifecycle_stages USING btree (activity, sort_order)",False,,
+landscape,core_category_tag_library,core_category_tag_library_pkey,909413,CREATE UNIQUE INDEX core_category_tag_library_pkey ON landscape.core_category_tag_library USING btree (tag_id),True,core_category_tag_library_pkey,p
+landscape,core_category_tag_library,core_category_tag_library_tag_name_key,909415,CREATE UNIQUE INDEX core_category_tag_library_tag_name_key ON landscape.core_category_tag_library USING btree (tag_name),True,core_category_tag_library_tag_name_key,u
+landscape,core_category_tag_library,idx_tag_library_active,909418,CREATE INDEX idx_tag_library_active ON landscape.core_category_tag_library USING btree (is_active) WHERE (is_active = true),False,,
+landscape,core_category_tag_library,idx_tag_library_context,909417,CREATE INDEX idx_tag_library_context ON landscape.core_category_tag_library USING btree (tag_context),False,,
+landscape,core_doc,core_doc_pkey,262243,CREATE UNIQUE INDEX core_doc_pkey ON landscape.core_doc USING btree (doc_id),True,core_doc_pkey,p
+landscape,core_doc,idx_core_doc_doc_type,262314,CREATE INDEX idx_core_doc_doc_type ON landscape.core_doc USING btree (doc_type),False,,
+landscape,core_doc,idx_core_doc_processing_status,1302531,CREATE INDEX idx_core_doc_processing_status ON landscape.core_doc USING btree (processing_status),False,,
+landscape,core_doc,idx_core_doc_profile_json,262315,CREATE INDEX idx_core_doc_profile_json ON landscape.core_doc USING gin (profile_json),False,,
+landscape,core_doc,idx_core_doc_project_id,262311,CREATE INDEX idx_core_doc_project_id ON landscape.core_doc USING btree (project_id),False,,
+landscape,core_doc,idx_core_doc_status,262313,CREATE INDEX idx_core_doc_status ON landscape.core_doc USING btree (status),False,,
+landscape,core_doc,idx_core_doc_workspace_id,262312,CREATE INDEX idx_core_doc_workspace_id ON landscape.core_doc USING btree (workspace_id),False,,
+landscape,core_doc_attr_enum,core_doc_attr_enum_pkey,450567,"CREATE UNIQUE INDEX core_doc_attr_enum_pkey ON landscape.core_doc_attr_enum USING btree (attr_id, option_code)",True,core_doc_attr_enum_pkey,p
+landscape,core_doc_attr_lookup,core_doc_attr_lookup_pkey,450580,CREATE UNIQUE INDEX core_doc_attr_lookup_pkey ON landscape.core_doc_attr_lookup USING btree (attr_id),True,core_doc_attr_lookup_pkey,p
+landscape,core_doc_folder,core_doc_folder_pkey,458765,CREATE UNIQUE INDEX core_doc_folder_pkey ON landscape.core_doc_folder USING btree (folder_id),True,core_doc_folder_pkey,p
+landscape,core_doc_folder,idx_folder_parent,458774,CREATE INDEX idx_folder_parent ON landscape.core_doc_folder USING btree (parent_id) WHERE (is_active = true),False,,
+landscape,core_doc_folder,idx_folder_path,458775,CREATE INDEX idx_folder_path ON landscape.core_doc_folder USING btree (path),False,,
+landscape,core_doc_folder,unique_folder_path,458767,CREATE UNIQUE INDEX unique_folder_path ON landscape.core_doc_folder USING btree (path),True,unique_folder_path,u
+landscape,core_doc_folder_link,core_doc_folder_link_pkey,458781,CREATE UNIQUE INDEX core_doc_folder_link_pkey ON landscape.core_doc_folder_link USING btree (doc_id),True,core_doc_folder_link_pkey,p
+landscape,core_doc_folder_link,idx_folder_link_folder,458793,CREATE INDEX idx_folder_link_folder ON landscape.core_doc_folder_link USING btree (folder_id),False,,
+landscape,core_doc_smartfilter,core_doc_smartfilter_pkey,458804,CREATE UNIQUE INDEX core_doc_smartfilter_pkey ON landscape.core_doc_smartfilter USING btree (filter_id),True,core_doc_smartfilter_pkey,p
+landscape,core_doc_smartfilter,idx_smartfilter_active,458806,CREATE INDEX idx_smartfilter_active ON landscape.core_doc_smartfilter USING btree (is_active) WHERE (is_active = true),False,,
+landscape,core_doc_text,core_doc_text_pkey,458814,CREATE UNIQUE INDEX core_doc_text_pkey ON landscape.core_doc_text USING btree (doc_id),True,core_doc_text_pkey,p
+landscape,core_doc_text,idx_doc_text_fts,458821,"CREATE INDEX idx_doc_text_fts ON landscape.core_doc_text USING gin (to_tsvector('english'::regconfig, extracted_text))",False,,
+landscape,core_fin_budget_version,core_fin_budget_version_pkey,196772,CREATE UNIQUE INDEX core_fin_budget_version_pkey ON landscape.core_fin_budget_version USING btree (budget_id),True,core_fin_budget_version_pkey,p
+landscape,core_fin_category_uom,core_fin_category_uom_pkey,196716,"CREATE UNIQUE INDEX core_fin_category_uom_pkey ON landscape.core_fin_category_uom USING btree (category_id, uom_code)",True,core_fin_category_uom_pkey,p
+landscape,core_fin_confidence_policy,core_fin_confidence_policy_pkey,638984,CREATE UNIQUE INDEX core_fin_confidence_policy_pkey ON landscape.core_fin_confidence_policy USING btree (confidence_code),True,core_fin_confidence_policy_pkey,p
+landscape,core_fin_crosswalk_ad,core_fin_crosswalk_ad_pkey,196840,"CREATE UNIQUE INDEX core_fin_crosswalk_ad_pkey ON landscape.core_fin_crosswalk_ad USING btree (ad_code, category_id)",True,core_fin_crosswalk_ad_pkey,p
+landscape,core_fin_crosswalk_ae,core_fin_crosswalk_ae_pkey,196852,"CREATE UNIQUE INDEX core_fin_crosswalk_ae_pkey ON landscape.core_fin_crosswalk_ae USING btree (ae_coa, category_id)",True,core_fin_crosswalk_ae_pkey,p
+landscape,core_fin_curve,core_fin_curve_name_key,196760,CREATE UNIQUE INDEX core_fin_curve_name_key ON landscape.core_fin_curve USING btree (name),True,core_fin_curve_name_key,u
+landscape,core_fin_curve,core_fin_curve_pkey,196758,CREATE UNIQUE INDEX core_fin_curve_pkey ON landscape.core_fin_curve USING btree (curve_id),True,core_fin_curve_pkey,p
+landscape,core_fin_division_applicability,core_fin_container_applicability_pkey,557104,"CREATE UNIQUE INDEX core_fin_container_applicability_pkey ON landscape.core_fin_division_applicability USING btree (category_id, tier)",True,core_fin_container_applicability_pkey,p
+landscape,core_fin_fact_actual,core_fin_fact_actual_pkey,196821,CREATE UNIQUE INDEX core_fin_fact_actual_pkey ON landscape.core_fin_fact_actual USING btree (fact_id),True,core_fin_fact_actual_pkey,p
+landscape,core_fin_fact_actual,idx_core_fin_fact_actual_container,311363,CREATE INDEX idx_core_fin_fact_actual_container ON landscape.core_fin_fact_actual USING btree (container_id),False,,
+landscape,core_fin_fact_actual,idx_fact_actual_category,196834,CREATE INDEX idx_fact_actual_category ON landscape.core_fin_fact_actual USING btree (category_id),False,,
+landscape,core_fin_fact_actual,idx_fact_actual_container,557099,"CREATE INDEX idx_fact_actual_container ON landscape.core_fin_fact_actual USING btree (container_id, txn_date)",False,,
+landscape,core_fin_fact_actual,idx_fact_actual_scenario,696389,CREATE INDEX idx_fact_actual_scenario ON landscape.core_fin_fact_actual USING btree (scenario_id),False,,
+landscape,core_fin_fact_budget,core_fin_fact_budget_pkey,196783,CREATE UNIQUE INDEX core_fin_fact_budget_pkey ON landscape.core_fin_fact_budget USING btree (fact_id),True,core_fin_fact_budget_pkey,p
+landscape,core_fin_fact_budget,idx_budget_approval_status,991254,CREATE INDEX idx_budget_approval_status ON landscape.core_fin_fact_budget USING btree (approval_status),False,,
+landscape,core_fin_fact_budget,idx_budget_fact_category_l1,835637,CREATE INDEX idx_budget_fact_category_l1 ON landscape.core_fin_fact_budget USING btree (category_l1_id) WHERE (category_l1_id IS NOT NULL),False,,
+landscape,core_fin_fact_budget,idx_budget_fact_category_l2,835638,CREATE INDEX idx_budget_fact_category_l2 ON landscape.core_fin_fact_budget USING btree (category_l2_id) WHERE (category_l2_id IS NOT NULL),False,,
+landscape,core_fin_fact_budget,idx_budget_fact_category_l3,835639,CREATE INDEX idx_budget_fact_category_l3 ON landscape.core_fin_fact_budget USING btree (category_l3_id) WHERE (category_l3_id IS NOT NULL),False,,
+landscape,core_fin_fact_budget,idx_budget_fact_category_l4,835640,CREATE INDEX idx_budget_fact_category_l4 ON landscape.core_fin_fact_budget USING btree (category_l4_id) WHERE (category_l4_id IS NOT NULL),False,,
+landscape,core_fin_fact_budget,idx_budget_finance_structure,663671,CREATE INDEX idx_budget_finance_structure ON landscape.core_fin_fact_budget USING btree (finance_structure_id),False,,
+landscape,core_fin_fact_budget,idx_budget_funding_id,991256,CREATE INDEX idx_budget_funding_id ON landscape.core_fin_fact_budget USING btree (funding_id),False,,
+landscape,core_fin_fact_budget,idx_budget_is_critical,991255,CREATE INDEX idx_budget_is_critical ON landscape.core_fin_fact_budget USING btree (is_critical) WHERE (is_critical = true),False,,
+landscape,core_fin_fact_budget,idx_budget_lifecycle_stage,1024003,CREATE INDEX idx_budget_lifecycle_stage ON landscape.core_fin_fact_budget USING btree (activity),False,,
+landscape,core_fin_fact_budget,idx_budget_milestone_id,991257,CREATE INDEX idx_budget_milestone_id ON landscape.core_fin_fact_budget USING btree (milestone_id),False,,
+landscape,core_fin_fact_budget,idx_budget_status,991253,CREATE INDEX idx_budget_status ON landscape.core_fin_fact_budget USING btree (status),False,,
+landscape,core_fin_fact_budget,idx_core_fin_fact_budget_confidence,311364,CREATE INDEX idx_core_fin_fact_budget_confidence ON landscape.core_fin_fact_budget USING btree (confidence_level),False,,
+landscape,core_fin_fact_budget,idx_core_fin_fact_budget_container,311362,CREATE INDEX idx_core_fin_fact_budget_container ON landscape.core_fin_fact_budget USING btree (division_id),False,,
+landscape,core_fin_fact_budget,idx_core_fin_fact_budget_periods,884738,"CREATE INDEX idx_core_fin_fact_budget_periods ON landscape.core_fin_fact_budget USING btree (start_period, end_period) WHERE (start_period IS NOT NULL)",False,,
+landscape,core_fin_fact_budget,idx_core_fin_fact_budget_vendor,311365,CREATE INDEX idx_core_fin_fact_budget_vendor ON landscape.core_fin_fact_budget USING btree (vendor_contact_id),False,,
+landscape,core_fin_fact_budget,idx_fact_budget_budget_container,557097,"CREATE INDEX idx_fact_budget_budget_container ON landscape.core_fin_fact_budget USING btree (budget_id, division_id)",False,,
+landscape,core_fin_fact_budget,idx_fact_budget_category,196811,CREATE INDEX idx_fact_budget_category ON landscape.core_fin_fact_budget USING btree (category_id),False,,
+landscape,core_fin_fact_budget,idx_fact_budget_dates,442382,"CREATE INDEX idx_fact_budget_dates ON landscape.core_fin_fact_budget USING btree (start_date, end_date)",False,,
+landscape,core_fin_fact_budget,idx_fact_budget_division,557096,"CREATE INDEX idx_fact_budget_division ON landscape.core_fin_fact_budget USING btree (division_id, category_id)",False,,
+landscape,core_fin_fact_budget,idx_fact_budget_project_level,557098,"CREATE INDEX idx_fact_budget_project_level ON landscape.core_fin_fact_budget USING btree (project_id, category_id) WHERE (division_id IS NULL)",False,,
+landscape,core_fin_fact_budget,idx_fact_budget_project_scenario,696383,"CREATE INDEX idx_fact_budget_project_scenario ON landscape.core_fin_fact_budget USING btree (project_id, scenario_id)",False,,
+landscape,core_fin_fact_budget,idx_fact_budget_scenario,696382,CREATE INDEX idx_fact_budget_scenario ON landscape.core_fin_fact_budget USING btree (scenario_id),False,,
+landscape,core_fin_fact_tags,core_fin_fact_tags_fact_id_fact_type_tag_name_key,311375,"CREATE UNIQUE INDEX core_fin_fact_tags_fact_id_fact_type_tag_name_key ON landscape.core_fin_fact_tags USING btree (fact_id, fact_type, tag_name)",True,core_fin_fact_tags_fact_id_fact_type_tag_name_key,u
+landscape,core_fin_fact_tags,core_fin_fact_tags_pkey,311373,CREATE UNIQUE INDEX core_fin_fact_tags_pkey ON landscape.core_fin_fact_tags USING btree (tag_id),True,core_fin_fact_tags_pkey,p
+landscape,core_fin_fact_tags,idx_fact_tags_category,311379,CREATE INDEX idx_fact_tags_category ON landscape.core_fin_fact_tags USING btree (tag_category),False,,
+landscape,core_fin_fact_tags,idx_fact_tags_fact,311377,"CREATE INDEX idx_fact_tags_fact ON landscape.core_fin_fact_tags USING btree (fact_id, fact_type)",False,,
+landscape,core_fin_fact_tags,idx_fact_tags_name,311378,CREATE INDEX idx_fact_tags_name ON landscape.core_fin_fact_tags USING btree (tag_name),False,,
+landscape,core_fin_funding_source,core_fin_funding_source_pkey,196748,CREATE UNIQUE INDEX core_fin_funding_source_pkey ON landscape.core_fin_funding_source USING btree (funding_id),True,core_fin_funding_source_pkey,p
+landscape,core_fin_growth_rate_sets,core_fin_growth_rate_sets_pkey,319497,CREATE UNIQUE INDEX core_fin_growth_rate_sets_pkey ON landscape.core_fin_growth_rate_sets USING btree (set_id),True,core_fin_growth_rate_sets_pkey,p
+landscape,core_fin_growth_rate_sets,core_fin_growth_rate_sets_project_id_card_type_set_name_key,319499,"CREATE UNIQUE INDEX core_fin_growth_rate_sets_project_id_card_type_set_name_key ON landscape.core_fin_growth_rate_sets USING btree (project_id, card_type, set_name)",True,core_fin_growth_rate_sets_project_id_card_type_set_name_key,u
+landscape,core_fin_growth_rate_sets,idx_growth_rate_benchmark,843890,CREATE INDEX idx_growth_rate_benchmark ON landscape.core_fin_growth_rate_sets USING btree (benchmark_id),False,,
+landscape,core_fin_growth_rate_sets,idx_growth_rate_geography,843891,CREATE INDEX idx_growth_rate_geography ON landscape.core_fin_growth_rate_sets USING btree (market_geography),False,,
+landscape,core_fin_growth_rate_sets,idx_growth_rate_sets_project_card,319521,"CREATE INDEX idx_growth_rate_sets_project_card ON landscape.core_fin_growth_rate_sets USING btree (project_id, card_type)",False,,
+landscape,core_fin_growth_rate_steps,core_fin_growth_rate_steps_pkey,319507,CREATE UNIQUE INDEX core_fin_growth_rate_steps_pkey ON landscape.core_fin_growth_rate_steps USING btree (step_id),True,core_fin_growth_rate_steps_pkey,p
+landscape,core_fin_growth_rate_steps,core_fin_growth_rate_steps_set_id_step_number_key,319509,"CREATE UNIQUE INDEX core_fin_growth_rate_steps_set_id_step_number_key ON landscape.core_fin_growth_rate_steps USING btree (set_id, step_number)",True,core_fin_growth_rate_steps_set_id_step_number_key,u
+landscape,core_fin_growth_rate_steps,idx_growth_rate_steps_set,319522,"CREATE INDEX idx_growth_rate_steps_set ON landscape.core_fin_growth_rate_steps USING btree (set_id, step_number)",False,,
+landscape,core_fin_uom,core_fin_uom_pkey,196690,CREATE UNIQUE INDEX core_fin_uom_pkey ON landscape.core_fin_uom USING btree (uom_code),True,core_fin_uom_pkey,p
+landscape,core_item_benchmark_link,core_item_benchmark_link_pkey,852103,CREATE UNIQUE INDEX core_item_benchmark_link_pkey ON landscape.core_item_benchmark_link USING btree (link_id),True,core_item_benchmark_link_pkey,p
+landscape,core_item_benchmark_link,idx_template_benchmark_benchmark,852116,CREATE INDEX idx_template_benchmark_benchmark ON landscape.core_item_benchmark_link USING btree (benchmark_id),False,,
+landscape,core_item_benchmark_link,idx_template_benchmark_template,852115,CREATE INDEX idx_template_benchmark_template ON landscape.core_item_benchmark_link USING btree (item_id),False,,
+landscape,core_lookup_item,core_lookup_item_pkey,196659,CREATE UNIQUE INDEX core_lookup_item_pkey ON landscape.core_lookup_item USING btree (item_id),True,core_lookup_item_pkey,p
+landscape,core_lookup_item,uq_core_lookup_item,196661,"CREATE UNIQUE INDEX uq_core_lookup_item ON landscape.core_lookup_item USING btree (list_key, code)",True,uq_core_lookup_item,u
+landscape,core_lookup_list,core_lookup_list_pkey,196647,CREATE UNIQUE INDEX core_lookup_list_pkey ON landscape.core_lookup_list USING btree (list_key),True,core_lookup_list_pkey,p
+landscape,core_planning_standards,core_planning_standards_pkey,852136,CREATE UNIQUE INDEX core_planning_standards_pkey ON landscape.core_planning_standards USING btree (standard_id),True,core_planning_standards_pkey,p
+landscape,core_planning_standards,core_planning_standards_unique,852138,CREATE UNIQUE INDEX core_planning_standards_unique ON landscape.core_planning_standards USING btree (standard_name),True,core_planning_standards_unique,u
+landscape,core_unit_cost_category,core_unit_cost_category_pkey,852050,CREATE UNIQUE INDEX core_unit_cost_category_pkey ON landscape.core_unit_cost_category USING btree (category_id),True,core_unit_cost_category_pkey,p
+landscape,core_unit_cost_category,idx_category_account_number,1515548,CREATE INDEX idx_category_account_number ON landscape.core_unit_cost_category USING btree (account_number) WHERE (account_number IS NOT NULL),False,,
+landscape,core_unit_cost_category,idx_category_is_calculated,1515550,CREATE INDEX idx_category_is_calculated ON landscape.core_unit_cost_category USING btree (is_calculated) WHERE (is_calculated = true),False,,
+landscape,core_unit_cost_category,idx_category_property_types,1515549,CREATE INDEX idx_category_property_types ON landscape.core_unit_cost_category USING gin (property_types),False,,
+landscape,core_unit_cost_category,idx_category_tags,909425,CREATE INDEX idx_category_tags ON landscape.core_unit_cost_category USING gin (tags),False,,
+landscape,core_unit_cost_category,idx_unit_cost_category_parent,852059,CREATE INDEX idx_unit_cost_category_parent ON landscape.core_unit_cost_category USING btree (parent_id),False,,
+landscape,core_unit_cost_item,core_unit_cost_item_pkey,852073,CREATE UNIQUE INDEX core_unit_cost_item_pkey ON landscape.core_unit_cost_item USING btree (item_id),True,core_unit_cost_item_pkey,p
+landscape,core_unit_cost_item,core_unit_cost_template_unique,852075,"CREATE UNIQUE INDEX core_unit_cost_template_unique ON landscape.core_unit_cost_item USING btree (category_id, item_name, default_uom_code, project_type_code, market_geography)",True,core_unit_cost_template_unique,u
+landscape,core_unit_cost_item,idx_unit_cost_item_active,852141,CREATE INDEX idx_unit_cost_item_active ON landscape.core_unit_cost_item USING btree (is_active),False,,
+landscape,core_unit_cost_item,idx_unit_cost_item_category,852092,CREATE INDEX idx_unit_cost_item_category ON landscape.core_unit_cost_item USING btree (category_id),False,,
+landscape,core_unit_cost_item,idx_unit_cost_item_project_type,852095,CREATE INDEX idx_unit_cost_item_project_type ON landscape.core_unit_cost_item USING btree (project_type_code),False,,
+landscape,core_unit_cost_item,idx_unit_cost_template_category_active,852142,"CREATE INDEX idx_unit_cost_template_category_active ON landscape.core_unit_cost_item USING btree (category_id, is_active)",False,,
+landscape,core_unit_cost_item,idx_unit_cost_template_geography,852094,CREATE INDEX idx_unit_cost_template_geography ON landscape.core_unit_cost_item USING btree (market_geography),False,,
+landscape,core_unit_cost_item,idx_unit_cost_template_name,852093,CREATE INDEX idx_unit_cost_template_name ON landscape.core_unit_cost_item USING btree (item_name),False,,
+landscape,core_unit_cost_item,idx_unit_cost_template_search,852143,"CREATE INDEX idx_unit_cost_template_search ON landscape.core_unit_cost_item USING gin (to_tsvector('simple'::regconfig, (item_name)::text))",False,,
+landscape,core_workspace_member,core_workspace_member_pkey,450592,"CREATE UNIQUE INDEX core_workspace_member_pkey ON landscape.core_workspace_member USING btree (workspace_id, user_id)",True,core_workspace_member_pkey,p
+landscape,core_workspace_member,idx_workspace_member_user,450599,CREATE INDEX idx_workspace_member_user ON landscape.core_workspace_member USING btree (user_id),False,,
+landscape,density_classification,density_classification_code_key,327690,CREATE UNIQUE INDEX density_classification_code_key ON landscape.density_classification USING btree (code),True,density_classification_code_key,u
+landscape,density_classification,density_classification_pkey,327688,CREATE UNIQUE INDEX density_classification_pkey ON landscape.density_classification USING btree (density_id),True,density_classification_pkey,p
+landscape,developer_fees,developer_fees_pkey,1245194,CREATE UNIQUE INDEX developer_fees_pkey ON landscape.developer_fees USING btree (id),True,developer_fees_pkey,p
+landscape,developer_fees,idx_developer_fees_project,1245201,CREATE INDEX idx_developer_fees_project ON landscape.developer_fees USING btree (project_id),False,,
+landscape,django_admin_log,django_admin_log_content_type_id_c4bce8eb,655487,CREATE INDEX django_admin_log_content_type_id_c4bce8eb ON landscape.django_admin_log USING btree (content_type_id),False,,
+landscape,django_admin_log,django_admin_log_pkey,655475,CREATE UNIQUE INDEX django_admin_log_pkey ON landscape.django_admin_log USING btree (id),True,django_admin_log_pkey,p
+landscape,django_admin_log,django_admin_log_user_id_c564eba6,655488,CREATE INDEX django_admin_log_user_id_c564eba6 ON landscape.django_admin_log USING btree (user_id),False,,
+landscape,django_content_type,django_content_type_app_label_model_76bd3d3b_uniq,655374,"CREATE UNIQUE INDEX django_content_type_app_label_model_76bd3d3b_uniq ON landscape.django_content_type USING btree (app_label, model)",True,django_content_type_app_label_model_76bd3d3b_uniq,u
+landscape,django_content_type,django_content_type_pkey,655372,CREATE UNIQUE INDEX django_content_type_pkey ON landscape.django_content_type USING btree (id),True,django_content_type_pkey,p
+landscape,django_migrations,django_migrations_pkey,655366,CREATE UNIQUE INDEX django_migrations_pkey ON landscape.django_migrations USING btree (id),True,django_migrations_pkey,p
+landscape,django_session,django_session_expire_date_a5c62663,655505,CREATE INDEX django_session_expire_date_a5c62663 ON landscape.django_session USING btree (expire_date),False,,
+landscape,django_session,django_session_pkey,655502,CREATE UNIQUE INDEX django_session_pkey ON landscape.django_session USING btree (session_key),True,django_session_pkey,p
+landscape,django_session,django_session_session_key_c0390e0f_like,655504,CREATE INDEX django_session_session_key_c0390e0f_like ON landscape.django_session USING btree (session_key varchar_pattern_ops),False,,
+landscape,dms_assertion,dms_assertion_pkey,426011,CREATE UNIQUE INDEX dms_assertion_pkey ON landscape.dms_assertion USING btree (assertion_id),True,dms_assertion_pkey,p
+landscape,dms_assertion,idx_assertion_as_of_date,426029,CREATE INDEX idx_assertion_as_of_date ON landscape.dms_assertion USING btree (as_of_date),False,,
+landscape,dms_assertion,idx_assertion_doc_id,426026,CREATE INDEX idx_assertion_doc_id ON landscape.dms_assertion USING btree (doc_id),False,,
+landscape,dms_assertion,idx_assertion_metric_key,426028,CREATE INDEX idx_assertion_metric_key ON landscape.dms_assertion USING btree (metric_key),False,,
+landscape,dms_assertion,idx_assertion_project_id,426025,CREATE INDEX idx_assertion_project_id ON landscape.dms_assertion USING btree (project_id),False,,
+landscape,dms_assertion,idx_assertion_subject_type,426027,CREATE INDEX idx_assertion_subject_type ON landscape.dms_assertion USING btree (subject_type),False,,
+landscape,dms_attributes,dms_attributes_attr_key_key,262175,CREATE UNIQUE INDEX dms_attributes_attr_key_key ON landscape.dms_attributes USING btree (attr_key),True,dms_attributes_attr_key_key,u
+landscape,dms_attributes,dms_attributes_pkey,262173,CREATE UNIQUE INDEX dms_attributes_pkey ON landscape.dms_attributes USING btree (attr_id),True,dms_attributes_pkey,p
+landscape,dms_extract_queue,dms_extract_queue_pkey,262304,CREATE UNIQUE INDEX dms_extract_queue_pkey ON landscape.dms_extract_queue USING btree (queue_id),True,dms_extract_queue_pkey,p
+landscape,dms_extract_queue,idx_extract_queue_created_at,426020,CREATE INDEX idx_extract_queue_created_at ON landscape.dms_extract_queue USING btree (created_at),False,,
+landscape,dms_extract_queue,idx_extract_queue_doc_id,426018,CREATE INDEX idx_extract_queue_doc_id ON landscape.dms_extract_queue USING btree (doc_id),False,,
+landscape,dms_extract_queue,idx_extract_queue_status,426019,CREATE INDEX idx_extract_queue_status ON landscape.dms_extract_queue USING btree (status),False,,
+landscape,dms_profile_audit,dms_profile_audit_pkey,262282,CREATE UNIQUE INDEX dms_profile_audit_pkey ON landscape.dms_profile_audit USING btree (audit_id),True,dms_profile_audit_pkey,p
+landscape,dms_template_attributes,dms_template_attributes_pkey,262204,"CREATE UNIQUE INDEX dms_template_attributes_pkey ON landscape.dms_template_attributes USING btree (template_id, attr_id)",True,dms_template_attributes_pkey,p
+landscape,dms_templates,dms_templates_pkey,262185,CREATE UNIQUE INDEX dms_templates_pkey ON landscape.dms_templates USING btree (template_id),True,dms_templates_pkey,p
+landscape,dms_unmapped,dms_unmapped_pkey,425993,CREATE UNIQUE INDEX dms_unmapped_pkey ON landscape.dms_unmapped USING btree (unmapped_id),True,dms_unmapped_pkey,p
+landscape,dms_unmapped,idx_unmapped_doc_id,426021,CREATE INDEX idx_unmapped_doc_id ON landscape.dms_unmapped USING btree (doc_id),False,,
+landscape,dms_unmapped,idx_unmapped_project_id,426022,CREATE INDEX idx_unmapped_project_id ON landscape.dms_unmapped USING btree (project_id),False,,
+landscape,dms_unmapped,idx_unmapped_source_key,426024,CREATE INDEX idx_unmapped_source_key ON landscape.dms_unmapped USING btree (source_key),False,,
+landscape,dms_unmapped,idx_unmapped_status,426023,CREATE INDEX idx_unmapped_status ON landscape.dms_unmapped USING btree (status),False,,
+landscape,dms_workspaces,dms_workspaces_pkey,262154,CREATE UNIQUE INDEX dms_workspaces_pkey ON landscape.dms_workspaces USING btree (workspace_id),True,dms_workspaces_pkey,p
+landscape,dms_workspaces,dms_workspaces_workspace_code_key,262156,CREATE UNIQUE INDEX dms_workspaces_workspace_code_key ON landscape.dms_workspaces USING btree (workspace_code),True,dms_workspaces_workspace_code_key,u
+landscape,doc_processing_queue,doc_processing_queue_doc_id_key,1302547,CREATE UNIQUE INDEX doc_processing_queue_doc_id_key ON landscape.doc_processing_queue USING btree (doc_id),True,doc_processing_queue_doc_id_key,u
+landscape,doc_processing_queue,doc_processing_queue_pkey,1302545,CREATE UNIQUE INDEX doc_processing_queue_pkey ON landscape.doc_processing_queue USING btree (queue_id),True,doc_processing_queue_pkey,p
+landscape,doc_processing_queue,doc_processing_queue_priority_idx,1564673,"CREATE INDEX doc_processing_queue_priority_idx ON landscape.doc_processing_queue USING btree (priority DESC, created_at)",False,,
+landscape,doc_processing_queue,doc_processing_queue_status_idx,1564672,CREATE INDEX doc_processing_queue_status_idx ON landscape.doc_processing_queue USING btree (status),False,,
+landscape,doc_processing_queue,idx_doc_queue_status,1302554,"CREATE INDEX idx_doc_queue_status ON landscape.doc_processing_queue USING btree (status, priority DESC, created_at)",False,,
+landscape,gis_boundary_history,gis_boundary_history_pkey,417809,CREATE UNIQUE INDEX gis_boundary_history_pkey ON landscape.gis_boundary_history USING btree (boundary_id),True,gis_boundary_history_pkey,p
+landscape,gis_boundary_history,idx_boundary_history_created_at,417835,CREATE INDEX idx_boundary_history_created_at ON landscape.gis_boundary_history USING btree (created_at),False,,
+landscape,gis_boundary_history,idx_boundary_history_project_id,417834,CREATE INDEX idx_boundary_history_project_id ON landscape.gis_boundary_history USING btree (project_id),False,,
+landscape,gis_document_ingestion,gis_document_ingestion_pkey,376897,CREATE UNIQUE INDEX gis_document_ingestion_pkey ON landscape.gis_document_ingestion USING btree (id),True,gis_document_ingestion_pkey,p
+landscape,gis_document_ingestion,idx_gdi_project_package,376904,"CREATE INDEX idx_gdi_project_package ON landscape.gis_document_ingestion USING btree (project_id, package_name)",False,,
+landscape,gis_mapping_history,gis_mapping_history_pkey,417826,CREATE UNIQUE INDEX gis_mapping_history_pkey ON landscape.gis_mapping_history USING btree (mapping_id),True,gis_mapping_history_pkey,p
+landscape,gis_mapping_history,idx_mapping_history_created_at,417837,CREATE INDEX idx_mapping_history_created_at ON landscape.gis_mapping_history USING btree (created_at),False,,
+landscape,gis_mapping_history,idx_mapping_history_project_id,417836,CREATE INDEX idx_mapping_history_project_id ON landscape.gis_mapping_history USING btree (project_id),False,,
+landscape,gis_plan_parcel,gis_plan_parcel_pkey,376871,CREATE UNIQUE INDEX gis_plan_parcel_pkey ON landscape.gis_plan_parcel USING btree (id),True,gis_plan_parcel_pkey,p
+landscape,gis_plan_parcel,idx_gpp_confidence,376885,CREATE INDEX idx_gpp_confidence ON landscape.gis_plan_parcel USING btree (confidence DESC),False,,
+landscape,gis_plan_parcel,idx_gpp_geom,376884,CREATE INDEX idx_gpp_geom ON landscape.gis_plan_parcel USING gist (geom),False,,
+landscape,gis_plan_parcel,ux_gpp_active,376883,"CREATE UNIQUE INDEX ux_gpp_active ON landscape.gis_plan_parcel USING btree (project_id, parcel_id) WHERE is_active",False,,
+landscape,gis_project_boundary,gis_project_boundary_pkey,376850,CREATE UNIQUE INDEX gis_project_boundary_pkey ON landscape.gis_project_boundary USING btree (id),True,gis_project_boundary_pkey,p
+landscape,gis_project_boundary,gis_project_boundary_project_id_key,376852,CREATE UNIQUE INDEX gis_project_boundary_project_id_key ON landscape.gis_project_boundary USING btree (project_id),True,gis_project_boundary_project_id_key,u
+landscape,gis_project_boundary,idx_gpb_geom,376859,CREATE INDEX idx_gpb_geom ON landscape.gis_project_boundary USING gist (geom),False,,
+landscape,gis_tax_parcel_ref,gis_tax_parcel_ref_pkey,376839,CREATE UNIQUE INDEX gis_tax_parcel_ref_pkey ON landscape.gis_tax_parcel_ref USING btree (tax_parcel_id),True,gis_tax_parcel_ref_pkey,p
+landscape,gis_tax_parcel_ref,idx_gtpr_geom,376841,CREATE INDEX idx_gtpr_geom ON landscape.gis_tax_parcel_ref USING gist (geom),False,,
+landscape,glossary_zoning,glossary_zoning_pkey,221319,CREATE UNIQUE INDEX glossary_zoning_pkey ON landscape.glossary_zoning USING btree (glossary_id),True,glossary_zoning_pkey,p
+landscape,glossary_zoning,idx_gz_allowance,221325,CREATE INDEX idx_gz_allowance ON landscape.glossary_zoning USING btree (allowance),False,,
+landscape,glossary_zoning,idx_gz_district,221322,CREATE INDEX idx_gz_district ON landscape.glossary_zoning USING btree (district_code),False,,
+landscape,glossary_zoning,idx_gz_fulltext_conditions,221326,"CREATE INDEX idx_gz_fulltext_conditions ON landscape.glossary_zoning USING gin (to_tsvector('english'::regconfig, COALESCE(conditions_text, ''::text)))",False,,
+landscape,glossary_zoning,idx_gz_fulltext_purpose,221327,"CREATE INDEX idx_gz_fulltext_purpose ON landscape.glossary_zoning USING gin (to_tsvector('english'::regconfig, COALESCE(purpose_text, ''::text)))",False,,
+landscape,glossary_zoning,idx_gz_juris,221321,"CREATE INDEX idx_gz_juris ON landscape.glossary_zoning USING btree (jurisdiction_state, jurisdiction_city)",False,,
+landscape,glossary_zoning,idx_gz_mapped_use,221323,CREATE INDEX idx_gz_mapped_use ON landscape.glossary_zoning USING btree (mapped_use),False,,
+landscape,glossary_zoning,idx_gz_token_kind,221324,CREATE INDEX idx_gz_token_kind ON landscape.glossary_zoning USING btree (code_token_kind),False,,
+landscape,knowledge_embeddings,idx_embedding_vector,1294889,CREATE INDEX idx_embedding_vector ON landscape.knowledge_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists='10'),False,,
+landscape,knowledge_embeddings,knowledge_e_source__f8627b_idx,1286541,"CREATE INDEX knowledge_e_source__f8627b_idx ON landscape.knowledge_embeddings USING btree (source_type, source_id)",False,,
+landscape,knowledge_embeddings,knowledge_embeddings_created_at_b0e6da24,1286540,CREATE INDEX knowledge_embeddings_created_at_b0e6da24 ON landscape.knowledge_embeddings USING btree (created_at),False,,
+landscape,knowledge_embeddings,knowledge_embeddings_pkey,1286478,CREATE UNIQUE INDEX knowledge_embeddings_pkey ON landscape.knowledge_embeddings USING btree (embedding_id),True,knowledge_embeddings_pkey,p
+landscape,knowledge_embeddings,knowledge_embeddings_source_id_0d388137,1286539,CREATE INDEX knowledge_embeddings_source_id_0d388137 ON landscape.knowledge_embeddings USING btree (source_id),False,,
+landscape,knowledge_embeddings,knowledge_embeddings_source_type_acd3fae1,1286537,CREATE INDEX knowledge_embeddings_source_type_acd3fae1 ON landscape.knowledge_embeddings USING btree (source_type),False,,
+landscape,knowledge_embeddings,knowledge_embeddings_source_type_acd3fae1_like,1286538,CREATE INDEX knowledge_embeddings_source_type_acd3fae1_like ON landscape.knowledge_embeddings USING btree (source_type varchar_pattern_ops),False,,
+landscape,knowledge_entities,knowledge_e_canonic_a1a8d9_idx,1286522,CREATE INDEX knowledge_e_canonic_a1a8d9_idx ON landscape.knowledge_entities USING btree (canonical_name),False,,
+landscape,knowledge_entities,knowledge_e_entity__ca2a63_idx,1286521,"CREATE INDEX knowledge_e_entity__ca2a63_idx ON landscape.knowledge_entities USING btree (entity_type, entity_subtype)",False,,
+landscape,knowledge_entities,knowledge_entities_canonical_name_b5e564cc_like,1286549,CREATE INDEX knowledge_entities_canonical_name_b5e564cc_like ON landscape.knowledge_entities USING btree (canonical_name varchar_pattern_ops),False,,
+landscape,knowledge_entities,knowledge_entities_canonical_name_key,1286488,CREATE UNIQUE INDEX knowledge_entities_canonical_name_key ON landscape.knowledge_entities USING btree (canonical_name),True,knowledge_entities_canonical_name_key,u
+landscape,knowledge_entities,knowledge_entities_created_at_4594632c,1286550,CREATE INDEX knowledge_entities_created_at_4594632c ON landscape.knowledge_entities USING btree (created_at),False,,
+landscape,knowledge_entities,knowledge_entities_created_by_id_49f837e1,1286551,CREATE INDEX knowledge_entities_created_by_id_49f837e1 ON landscape.knowledge_entities USING btree (created_by_id),False,,
+landscape,knowledge_entities,knowledge_entities_entity_type_59f385fa,1286547,CREATE INDEX knowledge_entities_entity_type_59f385fa ON landscape.knowledge_entities USING btree (entity_type),False,,
+landscape,knowledge_entities,knowledge_entities_entity_type_59f385fa_like,1286548,CREATE INDEX knowledge_entities_entity_type_59f385fa_like ON landscape.knowledge_entities USING btree (entity_type varchar_pattern_ops),False,,
+landscape,knowledge_entities,knowledge_entities_pkey,1286486,CREATE UNIQUE INDEX knowledge_entities_pkey ON landscape.knowledge_entities USING btree (entity_id),True,knowledge_insights_subject_entity_id_c3b729c9_fk_knowledge,f
+landscape,knowledge_facts,knowledge_f_is_curr_84f472_idx,1286525,"CREATE INDEX knowledge_f_is_curr_84f472_idx ON landscape.knowledge_facts USING btree (is_current, predicate)",False,,
+landscape,knowledge_facts,knowledge_f_object__4cb694_idx,1286524,CREATE INDEX knowledge_f_object__4cb694_idx ON landscape.knowledge_facts USING btree (object_entity_id),False,,
+landscape,knowledge_facts,knowledge_f_source__dd8340_idx,1286526,"CREATE INDEX knowledge_f_source__dd8340_idx ON landscape.knowledge_facts USING btree (source_type, source_id)",False,,
+landscape,knowledge_facts,knowledge_f_subject_0aa246_idx,1286523,"CREATE INDEX knowledge_f_subject_0aa246_idx ON landscape.knowledge_facts USING btree (subject_entity_id, predicate)",False,,
+landscape,knowledge_facts,knowledge_f_valid_f_f71d25_idx,1286527,"CREATE INDEX knowledge_f_valid_f_f71d25_idx ON landscape.knowledge_facts USING btree (valid_from, valid_to)",False,,
+landscape,knowledge_facts,knowledge_facts_created_at_9f31ebb7,1286577,CREATE INDEX knowledge_facts_created_at_9f31ebb7 ON landscape.knowledge_facts USING btree (created_at),False,,
+landscape,knowledge_facts,knowledge_facts_created_by_id_a1fa9f24,1286578,CREATE INDEX knowledge_facts_created_by_id_a1fa9f24 ON landscape.knowledge_facts USING btree (created_by_id),False,,
+landscape,knowledge_facts,knowledge_facts_is_current_3cf05c45,1286576,CREATE INDEX knowledge_facts_is_current_3cf05c45 ON landscape.knowledge_facts USING btree (is_current),False,,
+landscape,knowledge_facts,knowledge_facts_object_entity_id_ca9e8ef5,1286579,CREATE INDEX knowledge_facts_object_entity_id_ca9e8ef5 ON landscape.knowledge_facts USING btree (object_entity_id),False,,
+landscape,knowledge_facts,knowledge_facts_pkey,1286496,CREATE UNIQUE INDEX knowledge_facts_pkey ON landscape.knowledge_facts USING btree (fact_id),True,knowledge_facts_superseded_by_id_eee8e8cb_fk_knowledge,f
+landscape,knowledge_facts,knowledge_facts_predicate_b00107dd,1286572,CREATE INDEX knowledge_facts_predicate_b00107dd ON landscape.knowledge_facts USING btree (predicate),False,,
+landscape,knowledge_facts,knowledge_facts_predicate_b00107dd_like,1286573,CREATE INDEX knowledge_facts_predicate_b00107dd_like ON landscape.knowledge_facts USING btree (predicate varchar_pattern_ops),False,,
+landscape,knowledge_facts,knowledge_facts_source_type_7df43544,1286574,CREATE INDEX knowledge_facts_source_type_7df43544 ON landscape.knowledge_facts USING btree (source_type),False,,
+landscape,knowledge_facts,knowledge_facts_source_type_7df43544_like,1286575,CREATE INDEX knowledge_facts_source_type_7df43544_like ON landscape.knowledge_facts USING btree (source_type varchar_pattern_ops),False,,
+landscape,knowledge_facts,knowledge_facts_subject_entity_id_0c130194,1286580,CREATE INDEX knowledge_facts_subject_entity_id_0c130194 ON landscape.knowledge_facts USING btree (subject_entity_id),False,,
+landscape,knowledge_facts,knowledge_facts_superseded_by_id_eee8e8cb,1286581,CREATE INDEX knowledge_facts_superseded_by_id_eee8e8cb ON landscape.knowledge_facts USING btree (superseded_by_id),False,,
+landscape,knowledge_insights,knowledge_i_acknowl_7d6024_idx,1286529,"CREATE INDEX knowledge_i_acknowl_7d6024_idx ON landscape.knowledge_insights USING btree (acknowledged, severity)",False,,
+landscape,knowledge_insights,knowledge_i_insight_965cc4_idx,1286530,"CREATE INDEX knowledge_i_insight_965cc4_idx ON landscape.knowledge_insights USING btree (insight_type, created_at)",False,,
+landscape,knowledge_insights,knowledge_i_subject_c1bcf7_idx,1286528,"CREATE INDEX knowledge_i_subject_c1bcf7_idx ON landscape.knowledge_insights USING btree (subject_entity_id, insight_type)",False,,
+landscape,knowledge_insights,knowledge_insights_acknowledged_7eb9491e,1286594,CREATE INDEX knowledge_insights_acknowledged_7eb9491e ON landscape.knowledge_insights USING btree (acknowledged),False,,
+landscape,knowledge_insights,knowledge_insights_acknowledged_by_id_68ba1117,1286596,CREATE INDEX knowledge_insights_acknowledged_by_id_68ba1117 ON landscape.knowledge_insights USING btree (acknowledged_by_id),False,,
+landscape,knowledge_insights,knowledge_insights_created_at_9aeca26f,1286595,CREATE INDEX knowledge_insights_created_at_9aeca26f ON landscape.knowledge_insights USING btree (created_at),False,,
+landscape,knowledge_insights,knowledge_insights_insight_type_4d527f2b,1286592,CREATE INDEX knowledge_insights_insight_type_4d527f2b ON landscape.knowledge_insights USING btree (insight_type),False,,
+landscape,knowledge_insights,knowledge_insights_insight_type_4d527f2b_like,1286593,CREATE INDEX knowledge_insights_insight_type_4d527f2b_like ON landscape.knowledge_insights USING btree (insight_type varchar_pattern_ops),False,,
+landscape,knowledge_insights,knowledge_insights_pkey,1286504,CREATE UNIQUE INDEX knowledge_insights_pkey ON landscape.knowledge_insights USING btree (insight_id),True,knowledge_insights_pkey,p
+landscape,knowledge_insights,knowledge_insights_subject_entity_id_c3b729c9,1286597,CREATE INDEX knowledge_insights_subject_entity_id_c3b729c9 ON landscape.knowledge_insights USING btree (subject_entity_id),False,,
+landscape,knowledge_interactions,knowledge_i_query_i_cc952f_idx,1286535,CREATE INDEX knowledge_i_query_i_cc952f_idx ON landscape.knowledge_interactions USING btree (query_intent),False,,
+landscape,knowledge_interactions,knowledge_i_session_7869de_idx,1286534,"CREATE INDEX knowledge_i_session_7869de_idx ON landscape.knowledge_interactions USING btree (session_id, created_at)",False,,
+landscape,knowledge_interactions,knowledge_i_user_fe_5c8b7f_idx,1286536,CREATE INDEX knowledge_i_user_fe_5c8b7f_idx ON landscape.knowledge_interactions USING btree (user_feedback),False,,
+landscape,knowledge_interactions,knowledge_interactions_created_at_7a47ab34,1286611,CREATE INDEX knowledge_interactions_created_at_7a47ab34 ON landscape.knowledge_interactions USING btree (created_at),False,,
+landscape,knowledge_interactions,knowledge_interactions_pkey,1286519,CREATE UNIQUE INDEX knowledge_interactions_pkey ON landscape.knowledge_interactions USING btree (interaction_id),True,knowledge_interactions_pkey,p
+landscape,knowledge_interactions,knowledge_interactions_session_id_7f4000a5,1286612,CREATE INDEX knowledge_interactions_session_id_7f4000a5 ON landscape.knowledge_interactions USING btree (session_id),False,,
+landscape,knowledge_sessions,idx_active_sessions,1286533,CREATE INDEX idx_active_sessions ON landscape.knowledge_sessions USING btree (session_end) WHERE (session_end IS NULL),False,,
+landscape,knowledge_sessions,knowledge_s_session_5b8f09_idx,1286532,CREATE INDEX knowledge_s_session_5b8f09_idx ON landscape.knowledge_sessions USING btree (session_start),False,,
+landscape,knowledge_sessions,knowledge_s_user_id_c64165_idx,1286531,"CREATE INDEX knowledge_s_user_id_c64165_idx ON landscape.knowledge_sessions USING btree (user_id, project_id)",False,,
+landscape,knowledge_sessions,knowledge_sessions_pkey,1286511,CREATE UNIQUE INDEX knowledge_sessions_pkey ON landscape.knowledge_sessions USING btree (session_id),True,knowledge_interactio_session_id_7f4000a5_fk_knowledge,f
+landscape,knowledge_sessions,knowledge_sessions_project_id_5f44cc1b,1286603,CREATE INDEX knowledge_sessions_project_id_5f44cc1b ON landscape.knowledge_sessions USING btree (project_id),False,,
+landscape,knowledge_sessions,knowledge_sessions_session_start_740f4f0a,1286604,CREATE INDEX knowledge_sessions_session_start_740f4f0a ON landscape.knowledge_sessions USING btree (session_start),False,,
+landscape,knowledge_sessions,knowledge_sessions_user_id_fa891383,1286605,CREATE INDEX knowledge_sessions_user_id_fa891383 ON landscape.knowledge_sessions USING btree (user_id),False,,
+landscape,land_use_pricing,idx_land_use_pricing_benchmark,843897,CREATE INDEX idx_land_use_pricing_benchmark ON landscape.land_use_pricing USING btree (benchmark_id),False,,
+landscape,land_use_pricing,idx_land_use_pricing_geography,843898,CREATE INDEX idx_land_use_pricing_geography ON landscape.land_use_pricing USING btree (market_geography),False,,
+landscape,land_use_pricing,idx_land_use_pricing_project,352268,CREATE INDEX idx_land_use_pricing_project ON landscape.land_use_pricing USING btree (project_id),False,,
+landscape,land_use_pricing,idx_land_use_pricing_project_product,958489,"CREATE INDEX idx_land_use_pricing_project_product ON landscape.land_use_pricing USING btree (project_id, lu_type_code, product_code)",False,,
+landscape,land_use_pricing,land_use_pricing_pkey,352264,CREATE UNIQUE INDEX land_use_pricing_pkey ON landscape.land_use_pricing USING btree (id),True,land_use_pricing_pkey,p
+landscape,land_use_pricing,land_use_pricing_project_lu_product_key,958487,"CREATE UNIQUE INDEX land_use_pricing_project_lu_product_key ON landscape.land_use_pricing USING btree (project_id, lu_type_code, product_code)",True,land_use_pricing_project_lu_product_key,u
+landscape,land_use_pricing,land_use_pricing_project_type_product_key,876544,"CREATE UNIQUE INDEX land_use_pricing_project_type_product_key ON landscape.land_use_pricing USING btree (project_id, lu_type_code, product_code)",True,land_use_pricing_project_type_product_key,u
+landscape,landscaper_absorption_detail,idx_landscaper_absorption_benchmark,892985,CREATE INDEX idx_landscaper_absorption_benchmark ON landscape.landscaper_absorption_detail USING btree (benchmark_id),False,,
+landscape,landscaper_absorption_detail,idx_landscaper_absorption_geography,892987,CREATE INDEX idx_landscaper_absorption_geography ON landscape.landscaper_absorption_detail USING btree (market_geography),False,,
+landscape,landscaper_absorption_detail,idx_landscaper_absorption_lot_size,892988,CREATE INDEX idx_landscaper_absorption_lot_size ON landscape.landscaper_absorption_detail USING btree (lot_size_sf),False,,
+landscape,landscaper_absorption_detail,idx_landscaper_absorption_period,892989,CREATE INDEX idx_landscaper_absorption_period ON landscape.landscaper_absorption_detail USING btree (as_of_period),False,,
+landscape,landscaper_absorption_detail,idx_landscaper_absorption_source,892986,CREATE INDEX idx_landscaper_absorption_source ON landscape.landscaper_absorption_detail USING btree (data_source_type),False,,
+landscape,landscaper_absorption_detail,landscaper_absorption_detail_pkey,892978,CREATE UNIQUE INDEX landscaper_absorption_detail_pkey ON landscape.landscaper_absorption_detail USING btree (detail_id),True,landscaper_absorption_detail_pkey,p
+landscape,landscaper_activity,idx_landscaper_activity_created,1622017,"CREATE INDEX idx_landscaper_activity_created ON landscape.landscaper_activity USING btree (project_id, created_at DESC)",False,,
+landscape,landscaper_activity,idx_landscaper_activity_project,1622016,CREATE INDEX idx_landscaper_activity_project ON landscape.landscaper_activity USING btree (project_id),False,,
+landscape,landscaper_activity,idx_landscaper_activity_project_created,1450005,"CREATE INDEX idx_landscaper_activity_project_created ON landscape.landscaper_activity USING btree (project_id, created_at DESC)",False,,
+landscape,landscaper_activity,idx_landscaper_activity_project_read,1450006,"CREATE INDEX idx_landscaper_activity_project_read ON landscape.landscaper_activity USING btree (project_id, is_read)",False,,
+landscape,landscaper_activity,idx_landscaper_activity_read,1622018,"CREATE INDEX idx_landscaper_activity_read ON landscape.landscaper_activity USING btree (project_id, is_read)",False,,
+landscape,landscaper_activity,idx_landscaper_activity_source,1450007,"CREATE INDEX idx_landscaper_activity_source ON landscape.landscaper_activity USING btree (source_type, source_id)",False,,
+landscape,landscaper_activity,landscaper_activity_pkey,1449998,CREATE UNIQUE INDEX landscaper_activity_pkey ON landscape.landscaper_activity USING btree (activity_id),True,landscaper_activity_pkey,p
+landscape,landscaper_advice,landscaper__created_57ae5a_idx,1081387,CREATE INDEX landscaper__created_57ae5a_idx ON landscape.landscaper_advice USING btree (created_at),False,,
+landscape,landscaper_advice,landscaper__project_948878_idx,1081385,"CREATE INDEX landscaper__project_948878_idx ON landscape.landscaper_advice USING btree (project_id, assumption_key)",False,,
+landscape,landscaper_advice,landscaper__project_e8f509_idx,1081386,"CREATE INDEX landscaper__project_e8f509_idx ON landscape.landscaper_advice USING btree (project_id, lifecycle_stage)",False,,
+landscape,landscaper_advice,landscaper_advice_message_id_5653931d,1081411,CREATE INDEX landscaper_advice_message_id_5653931d ON landscape.landscaper_advice USING btree (message_id),False,,
+landscape,landscaper_advice,landscaper_advice_message_id_5653931d_like,1081412,CREATE INDEX landscaper_advice_message_id_5653931d_like ON landscape.landscaper_advice USING btree (message_id varchar_pattern_ops),False,,
+landscape,landscaper_advice,landscaper_advice_pkey,1081381,CREATE UNIQUE INDEX landscaper_advice_pkey ON landscape.landscaper_advice USING btree (advice_id),True,landscaper_advice_pkey,p
+landscape,landscaper_advice,landscaper_advice_project_id_6fb9f5af,1081413,CREATE INDEX landscaper_advice_project_id_6fb9f5af ON landscape.landscaper_advice USING btree (project_id),False,,
+landscape,landscaper_chat_message,idx_chat_message_project_tab,1613825,"CREATE INDEX idx_chat_message_project_tab ON landscape.landscaper_chat_message USING btree (project_id, active_tab)",False,,
+landscape,landscaper_chat_message,landscaper__project_0fbb3d_idx,1081383,"CREATE INDEX landscaper__project_0fbb3d_idx ON landscape.landscaper_chat_message USING btree (project_id, ""timestamp"")",False,,
+landscape,landscaper_chat_message,landscaper__timesta_8945c8_idx,1081384,"CREATE INDEX landscaper__timesta_8945c8_idx ON landscape.landscaper_chat_message USING btree (""timestamp"")",False,,
+landscape,landscaper_chat_message,landscaper_chat_message_message_id_27da4cf7_like,1081398,CREATE INDEX landscaper_chat_message_message_id_27da4cf7_like ON landscape.landscaper_chat_message USING btree (message_id varchar_pattern_ops),False,,
+landscape,landscaper_chat_message,landscaper_chat_message_pkey,1081373,CREATE UNIQUE INDEX landscaper_chat_message_pkey ON landscape.landscaper_chat_message USING btree (message_id),True,landscaper_chat_message_pkey,p
+landscape,landscaper_chat_message,landscaper_chat_message_project_id_fc77d355,1081399,CREATE INDEX landscaper_chat_message_project_id_fc77d355 ON landscape.landscaper_chat_message USING btree (project_id),False,,
+landscape,landscaper_chat_message,landscaper_chat_message_user_id_263e4adb,1081400,CREATE INDEX landscaper_chat_message_user_id_263e4adb ON landscape.landscaper_chat_message USING btree (user_id),False,,
+landscape,lu_acreage_allocation_type,lu_acreage_allocation_type_allocation_type_code_key,1343603,CREATE UNIQUE INDEX lu_acreage_allocation_type_allocation_type_code_key ON landscape.lu_acreage_allocation_type USING btree (allocation_type_code),True,lu_acreage_allocation_type_allocation_type_code_key,u
+landscape,lu_acreage_allocation_type,lu_acreage_allocation_type_pkey,1343601,CREATE UNIQUE INDEX lu_acreage_allocation_type_pkey ON landscape.lu_acreage_allocation_type USING btree (allocation_type_id),True,tbl_acreage_allocation_allocation_type_id_fkey,f
+landscape,lu_com_spec,lu_com_spec_pkey,114779,CREATE UNIQUE INDEX lu_com_spec_pkey ON landscape.lu_com_spec USING btree (com_spec_id),True,lu_com_spec_pkey,p
+landscape,lu_family,idx_lu_family_active,213000,CREATE INDEX idx_lu_family_active ON landscape.lu_family USING btree (active),False,,
+landscape,lu_family,lu_family_code_key,114698,CREATE UNIQUE INDEX lu_family_code_key ON landscape.lu_family USING btree (code),True,lu_family_code_key,u
+landscape,lu_family,lu_family_pkey,114696,CREATE UNIQUE INDEX lu_family_pkey ON landscape.lu_family USING btree (family_id),True,lu_family_pkey,p
+landscape,lu_lease_status,lu_lease_status_pkey,500085,CREATE UNIQUE INDEX lu_lease_status_pkey ON landscape.lu_lease_status USING btree (status_code),True,lu_lease_status_pkey,p
+landscape,lu_lease_type,lu_lease_type_pkey,500092,CREATE UNIQUE INDEX lu_lease_type_pkey ON landscape.lu_lease_type USING btree (type_code),True,lu_lease_type_pkey,p
+landscape,lu_market,lu_market_market_code_key,1466397,CREATE UNIQUE INDEX lu_market_market_code_key ON landscape.lu_market USING btree (market_code),True,lu_market_market_code_key,u
+landscape,lu_market,lu_market_pkey,1466395,CREATE UNIQUE INDEX lu_market_pkey ON landscape.lu_market USING btree (market_id),True,lu_market_pkey,p
+landscape,lu_picklist_display_config,lu_picklist_display_config_list_code_context_key,1490953,"CREATE UNIQUE INDEX lu_picklist_display_config_list_code_context_key ON landscape.lu_picklist_display_config USING btree (list_code, context)",True,lu_picklist_display_config_list_code_context_key,u
+landscape,lu_picklist_display_config,lu_picklist_display_config_pkey,1490951,CREATE UNIQUE INDEX lu_picklist_display_config_pkey ON landscape.lu_picklist_display_config USING btree (config_id),True,lu_picklist_display_config_pkey,p
+landscape,lu_property_subtype,lu_property_subtype_pkey,1490963,CREATE UNIQUE INDEX lu_property_subtype_pkey ON landscape.lu_property_subtype USING btree (subtype_id),True,lu_property_subtype_pkey,p
+landscape,lu_property_subtype,lu_property_subtype_property_type_code_subtype_code_key,1490965,"CREATE UNIQUE INDEX lu_property_subtype_property_type_code_subtype_code_key ON landscape.lu_property_subtype USING btree (property_type_code, subtype_code)",True,lu_property_subtype_property_type_code_subtype_code_key,u
+landscape,lu_recovery_structure,lu_recovery_structure_pkey,500099,CREATE UNIQUE INDEX lu_recovery_structure_pkey ON landscape.lu_recovery_structure USING btree (structure_code),True,lu_recovery_structure_pkey,p
+landscape,lu_res_spec,lu_res_spec_pkey,114759,CREATE UNIQUE INDEX lu_res_spec_pkey ON landscape.lu_res_spec USING btree (res_spec_id),True,lu_res_spec_pkey,p
+landscape,lu_subtype,lu_subtype_family_id_code_key,344077,"CREATE UNIQUE INDEX lu_subtype_family_id_code_key ON landscape.lu_subtype USING btree (family_id, code)",True,lu_subtype_family_id_code_key,u
+landscape,lu_subtype,lu_subtype_pkey1,344075,CREATE UNIQUE INDEX lu_subtype_pkey1 ON landscape.lu_subtype USING btree (subtype_id),True,lu_subtype_pkey1,p
+landscape,lu_type,idx_lu_subtype_active,213001,CREATE INDEX idx_lu_subtype_active ON landscape.lu_type USING btree (active),False,,
+landscape,lu_type,idx_lu_subtype_family,212992,CREATE INDEX idx_lu_subtype_family ON landscape.lu_type USING btree (family_id),False,,
+landscape,lu_type,lu_subtype_code_key,114709,CREATE UNIQUE INDEX lu_subtype_code_key ON landscape.lu_type USING btree (code),True,lu_subtype_code_key,u
+landscape,lu_type,lu_subtype_pkey,114707,CREATE UNIQUE INDEX lu_subtype_pkey ON landscape.lu_type USING btree (type_id),True,lu_subtype_pkey,p
+landscape,management_overhead,idx_management_overhead_project,1245221,CREATE INDEX idx_management_overhead_project ON landscape.management_overhead USING btree (project_id),False,,
+landscape,management_overhead,management_overhead_pkey,1245214,CREATE UNIQUE INDEX management_overhead_pkey ON landscape.management_overhead USING btree (id),True,management_overhead_pkey,p
+landscape,market_activity,idx_market_activity_geo_type,1220623,"CREATE INDEX idx_market_activity_geo_type ON landscape.market_activity USING btree (msa_code, geography_type)",False,,
+landscape,market_activity,idx_market_activity_lookup,1220620,"CREATE INDEX idx_market_activity_lookup ON landscape.market_activity USING btree (msa_code, geography_name, period_end_date DESC)",False,,
+landscape,market_activity,idx_market_activity_period,1220622,CREATE INDEX idx_market_activity_period ON landscape.market_activity USING btree (period_end_date DESC),False,,
+landscape,market_activity,idx_market_activity_source,1220621,"CREATE INDEX idx_market_activity_source ON landscape.market_activity USING btree (source, metric_type)",False,,
+landscape,market_activity,market_activity_msa_code_source_metric_type_geography_type__key,1220618,"CREATE UNIQUE INDEX market_activity_msa_code_source_metric_type_geography_type__key ON landscape.market_activity USING btree (msa_code, source, metric_type, geography_type, geography_name, period_end_date)",True,market_activity_msa_code_source_metric_type_geography_type__key,u
+landscape,market_activity,market_activity_pkey,1220616,CREATE UNIQUE INDEX market_activity_pkey ON landscape.market_activity USING btree (id),True,market_activity_pkey,p
+landscape,market_assumptions,idx_market_assumptions_dvl_timeseries,368640,"CREATE INDEX idx_market_assumptions_dvl_timeseries ON landscape.market_assumptions USING btree (project_id, dvl_per_year, dvl_per_quarter, dvl_per_month)",False,,
+landscape,market_assumptions,idx_market_assumptions_project_lutype,352256,"CREATE INDEX idx_market_assumptions_project_lutype ON landscape.market_assumptions USING btree (project_id, lu_type_code)",False,,
+landscape,market_assumptions,market_assumptions_pkey,204806,CREATE UNIQUE INDEX market_assumptions_pkey ON landscape.market_assumptions USING btree (project_id),True,market_assumptions_pkey,p
+landscape,market_competitive_project_exclusions,idx_comp_exclusions_project,1278034,CREATE INDEX idx_comp_exclusions_project ON landscape.market_competitive_project_exclusions USING btree (project_id),False,,
+landscape,market_competitive_project_exclusions,market_competitive_project_exc_project_id_source_project_id_key,1278027,"CREATE UNIQUE INDEX market_competitive_project_exc_project_id_source_project_id_key ON landscape.market_competitive_project_exclusions USING btree (project_id, source_project_id)",True,market_competitive_project_exc_project_id_source_project_id_key,u
+landscape,market_competitive_project_exclusions,market_competitive_project_exclusions_pkey,1278025,CREATE UNIQUE INDEX market_competitive_project_exclusions_pkey ON landscape.market_competitive_project_exclusions USING btree (id),True,market_competitive_project_exclusions_pkey,p
+landscape,market_competitive_project_products,idx_comp_products_competitive_project,1278017,CREATE INDEX idx_comp_products_competitive_project ON landscape.market_competitive_project_products USING btree (competitive_project_id),False,,
+landscape,market_competitive_project_products,idx_comp_products_lot_width,1278016,CREATE INDEX idx_comp_products_lot_width ON landscape.market_competitive_project_products USING btree (lot_width_ft),False,,
+landscape,market_competitive_project_products,idx_comp_products_project_product,1278014,"CREATE UNIQUE INDEX idx_comp_products_project_product ON landscape.market_competitive_project_products USING btree (competitive_project_id, product_id) WHERE (product_id IS NOT NULL)",False,,
+landscape,market_competitive_project_products,idx_comp_products_project_width,1278015,"CREATE UNIQUE INDEX idx_comp_products_project_width ON landscape.market_competitive_project_products USING btree (competitive_project_id, lot_width_ft) WHERE ((product_id IS NULL) AND (lot_width_ft IS NOT NULL))",False,,
+landscape,market_competitive_project_products,market_competitive_project_products_pkey,1278002,CREATE UNIQUE INDEX market_competitive_project_products_pkey ON landscape.market_competitive_project_products USING btree (id),True,market_competitive_project_products_pkey,p
+landscape,market_competitive_projects,idx_market_comps_project,1277990,CREATE INDEX idx_market_comps_project ON landscape.market_competitive_projects USING btree (project_id),False,,
+landscape,market_competitive_projects,idx_market_comps_project_source_unique,1277992,"CREATE UNIQUE INDEX idx_market_comps_project_source_unique ON landscape.market_competitive_projects USING btree (project_id, source_project_id) WHERE (source_project_id IS NOT NULL)",False,,
+landscape,market_competitive_projects,idx_market_comps_source_project,1277991,CREATE INDEX idx_market_comps_source_project ON landscape.market_competitive_projects USING btree (source_project_id),False,,
+landscape,market_competitive_projects,market_competitive_projects_pkey,1277983,CREATE UNIQUE INDEX market_competitive_projects_pkey ON landscape.market_competitive_projects USING btree (id),True,market_competitive_projects_pkey,p
+landscape,mkt_data_source_registry,mkt_data_source_registry_pkey,1236998,CREATE UNIQUE INDEX mkt_data_source_registry_pkey ON landscape.mkt_data_source_registry USING btree (source_id),True,mkt_data_source_registry_pkey,p
+landscape,mkt_data_source_registry,mkt_data_source_registry_source_code_609b59ab_like,1237023,CREATE INDEX mkt_data_source_registry_source_code_609b59ab_like ON landscape.mkt_data_source_registry USING btree (source_code varchar_pattern_ops),False,,
+landscape,mkt_data_source_registry,mkt_data_source_registry_source_code_key,1237000,CREATE UNIQUE INDEX mkt_data_source_registry_source_code_key ON landscape.mkt_data_source_registry USING btree (source_code),True,mkt_data_source_registry_source_code_key,u
+landscape,mkt_new_home_project,idx_mkt_nhp_builder,1237038,CREATE INDEX idx_mkt_nhp_builder ON landscape.mkt_new_home_project USING btree (builder_name),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_cbsa,1237044,CREATE INDEX idx_mkt_nhp_cbsa ON landscape.mkt_new_home_project USING btree (cbsa_code),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_city,1237040,CREATE INDEX idx_mkt_nhp_city ON landscape.mkt_new_home_project USING btree (city),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_effective_date,1237041,CREATE INDEX idx_mkt_nhp_effective_date ON landscape.mkt_new_home_project USING btree (effective_date),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_location,1237045,"CREATE INDEX idx_mkt_nhp_location ON landscape.mkt_new_home_project USING btree (latitude, longitude)",False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_lot_width,1237039,CREATE INDEX idx_mkt_nhp_lot_width ON landscape.mkt_new_home_project USING btree (lot_width_ft),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_lu_product,1237046,CREATE INDEX idx_mkt_nhp_lu_product ON landscape.mkt_new_home_project USING btree (lu_product_id),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_lu_type,1237047,CREATE INDEX idx_mkt_nhp_lu_type ON landscape.mkt_new_home_project USING btree (lu_type_id),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_master_plan,1237037,CREATE INDEX idx_mkt_nhp_master_plan ON landscape.mkt_new_home_project USING btree (master_plan_name),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_project_name,1237036,CREATE INDEX idx_mkt_nhp_project_name ON landscape.mkt_new_home_project USING btree (project_name),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_source,1237042,CREATE INDEX idx_mkt_nhp_source ON landscape.mkt_new_home_project USING btree (source_id),False,,
+landscape,mkt_new_home_project,idx_mkt_nhp_status,1237043,CREATE INDEX idx_mkt_nhp_status ON landscape.mkt_new_home_project USING btree (status),False,,
+landscape,mkt_new_home_project,mkt_new_home_project_pkey,1237014,CREATE UNIQUE INDEX mkt_new_home_project_pkey ON landscape.mkt_new_home_project USING btree (record_id),True,mkt_new_home_project_pkey,p
+landscape,mkt_new_home_project,mkt_new_home_project_source_id_cbf21c81,1237035,CREATE INDEX mkt_new_home_project_source_id_cbf21c81 ON landscape.mkt_new_home_project USING btree (source_id),False,,
+landscape,mkt_new_home_project,uq_mkt_project_source_date,1237016,"CREATE UNIQUE INDEX uq_mkt_project_source_date ON landscape.mkt_new_home_project USING btree (source_id, source_project_id, effective_date)",True,uq_mkt_project_source_date,u
+landscape,mkt_permit_history,idx_mkt_permit_jurisdiction,1237019,CREATE INDEX idx_mkt_permit_jurisdiction ON landscape.mkt_permit_history USING btree (jurisdiction_name),False,,
+landscape,mkt_permit_history,idx_mkt_permit_month,1237018,CREATE INDEX idx_mkt_permit_month ON landscape.mkt_permit_history USING btree (permit_month),False,,
+landscape,mkt_permit_history,idx_mkt_permit_source,1237020,CREATE INDEX idx_mkt_permit_source ON landscape.mkt_permit_history USING btree (source_id),False,,
+landscape,mkt_permit_history,mkt_permit_history_pkey,1237006,CREATE UNIQUE INDEX mkt_permit_history_pkey ON landscape.mkt_permit_history USING btree (record_id),True,mkt_permit_history_pkey,p
+landscape,mkt_permit_history,mkt_permit_history_source_id_4d1eb402,1237029,CREATE INDEX mkt_permit_history_source_id_4d1eb402 ON landscape.mkt_permit_history USING btree (source_id),False,,
+landscape,mkt_permit_history,uq_mkt_permit_month_jurisdiction,1237021,"CREATE UNIQUE INDEX uq_mkt_permit_month_jurisdiction ON landscape.mkt_permit_history USING btree (source_id, permit_month, jurisdiction_name)",True,uq_mkt_permit_month_jurisdiction,u
+landscape,opex_account_migration_map,opex_account_migration_map_pkey,1515555,CREATE UNIQUE INDEX opex_account_migration_map_pkey ON landscape.opex_account_migration_map USING btree (old_account_id),True,opex_account_migration_map_pkey,p
+landscape,planning_doc,planning_doc_pkey,114749,CREATE UNIQUE INDEX planning_doc_pkey ON landscape.planning_doc USING btree (doc_id),True,planning_doc_pkey,p
+landscape,project_boundaries,idx_project_boundaries_geometry,393256,CREATE INDEX idx_project_boundaries_geometry ON landscape.project_boundaries USING gist (dissolved_geometry),False,,
+landscape,project_boundaries,idx_project_boundaries_project_id,393252,CREATE INDEX idx_project_boundaries_project_id ON landscape.project_boundaries USING btree (project_id),False,,
+landscape,project_boundaries,project_boundaries_pkey,393225,CREATE UNIQUE INDEX project_boundaries_pkey ON landscape.project_boundaries USING btree (boundary_id),True,project_boundaries_pkey,p
+landscape,project_jurisdiction_mapping,project_jurisdiction_mapping_pkey,327708,CREATE UNIQUE INDEX project_jurisdiction_mapping_pkey ON landscape.project_jurisdiction_mapping USING btree (mapping_id),True,project_jurisdiction_mapping_pkey,p
+landscape,project_parcel_boundaries,idx_project_parcel_boundaries_boundary_id,393253,CREATE INDEX idx_project_parcel_boundaries_boundary_id ON landscape.project_parcel_boundaries USING btree (boundary_id),False,,
+landscape,project_parcel_boundaries,idx_project_parcel_boundaries_geometry,393257,CREATE INDEX idx_project_parcel_boundaries_geometry ON landscape.project_parcel_boundaries USING gist (geometry),False,,
+landscape,project_parcel_boundaries,idx_project_parcel_boundaries_parcel_id,393255,CREATE INDEX idx_project_parcel_boundaries_parcel_id ON landscape.project_parcel_boundaries USING btree (parcel_id),False,,
+landscape,project_parcel_boundaries,idx_project_parcel_boundaries_project_id,393254,CREATE INDEX idx_project_parcel_boundaries_project_id ON landscape.project_parcel_boundaries USING btree (project_id),False,,
+landscape,project_parcel_boundaries,project_parcel_boundaries_pkey,393240,CREATE UNIQUE INDEX project_parcel_boundaries_pkey ON landscape.project_parcel_boundaries USING btree (parcel_boundary_id),True,project_parcel_boundaries_pkey,p
+landscape,report_templates,idx_report_active,1097736,CREATE INDEX idx_report_active ON landscape.report_templates USING btree (is_active),False,,
+landscape,report_templates,report_templates_pkey,1097734,CREATE UNIQUE INDEX report_templates_pkey ON landscape.report_templates USING btree (id),True,report_templates_pkey,p
+landscape,res_lot_product,idx_res_lot_product_active,852126,CREATE INDEX idx_res_lot_product_active ON landscape.res_lot_product USING btree (is_active),False,,
+landscape,res_lot_product,idx_res_lot_product_type,852125,CREATE INDEX idx_res_lot_product_type ON landscape.res_lot_product USING btree (type_id),False,,
+landscape,res_lot_product,res_lot_product_code_key,114725,CREATE UNIQUE INDEX res_lot_product_code_key ON landscape.res_lot_product USING btree (code),True,res_lot_product_code_key,u
+landscape,res_lot_product,res_lot_product_pkey,114723,CREATE UNIQUE INDEX res_lot_product_pkey ON landscape.res_lot_product USING btree (product_id),True,res_lot_product_pkey,p
+landscape,sale_names,idx_sale_names_project,1122320,CREATE INDEX idx_sale_names_project ON landscape.sale_names USING btree (project_id),False,,
+landscape,sale_names,sale_names_pkey,1122311,CREATE UNIQUE INDEX sale_names_pkey ON landscape.sale_names USING btree (id),True,sale_names_pkey,p
+landscape,sale_names,sale_names_project_id_sale_date_key,1122313,"CREATE UNIQUE INDEX sale_names_project_id_sale_date_key ON landscape.sale_names USING btree (project_id, sale_date)",True,sale_names_project_id_sale_date_key,u
+landscape,spatial_ref_sys,spatial_ref_sys_pkey,270664,CREATE UNIQUE INDEX spatial_ref_sys_pkey ON landscape.spatial_ref_sys USING btree (srid),True,spatial_ref_sys_pkey,p
+landscape,tbl_absorption_schedule,idx_absorption_parcel,507961,CREATE INDEX idx_absorption_parcel ON landscape.tbl_absorption_schedule USING btree (parcel_id),False,,
+landscape,tbl_absorption_schedule,idx_absorption_phase,507960,CREATE INDEX idx_absorption_phase ON landscape.tbl_absorption_schedule USING btree (phase_id),False,,
+landscape,tbl_absorption_schedule,idx_absorption_product,507962,CREATE INDEX idx_absorption_product ON landscape.tbl_absorption_schedule USING btree (product_code),False,,
+landscape,tbl_absorption_schedule,idx_absorption_project_period,507959,"CREATE INDEX idx_absorption_project_period ON landscape.tbl_absorption_schedule USING btree (project_id, start_period)",False,,
+landscape,tbl_absorption_schedule,idx_absorption_scenario,696395,CREATE INDEX idx_absorption_scenario ON landscape.tbl_absorption_schedule USING btree (scenario_id),False,,
+landscape,tbl_absorption_schedule,tbl_absorption_schedule_pkey,507937,CREATE UNIQUE INDEX tbl_absorption_schedule_pkey ON landscape.tbl_absorption_schedule USING btree (absorption_id),True,tbl_absorption_schedule_pkey,p
+landscape,tbl_acquisition,idx_acquisition_contact_id,163899,CREATE INDEX idx_acquisition_contact_id ON landscape.tbl_acquisition USING btree (contact_id),False,,
+landscape,tbl_acquisition,idx_acquisition_project_id,163898,CREATE INDEX idx_acquisition_project_id ON landscape.tbl_acquisition USING btree (project_id),False,,
+landscape,tbl_acquisition,tbl_acquisition_pkey,163876,CREATE UNIQUE INDEX tbl_acquisition_pkey ON landscape.tbl_acquisition USING btree (acquisition_id),True,tbl_acquisition_pkey,p
+landscape,tbl_acreage_allocation,idx_acreage_project,1343642,CREATE INDEX idx_acreage_project ON landscape.tbl_acreage_allocation USING btree (project_id),False,,
+landscape,tbl_acreage_allocation,idx_acreage_project_phase,1343643,"CREATE INDEX idx_acreage_project_phase ON landscape.tbl_acreage_allocation USING btree (project_id, phase_id)",False,,
+landscape,tbl_acreage_allocation,idx_acreage_project_type,1343645,"CREATE INDEX idx_acreage_project_type ON landscape.tbl_acreage_allocation USING btree (project_id, allocation_type_code)",False,,
+landscape,tbl_acreage_allocation,idx_acreage_type,1343644,CREATE INDEX idx_acreage_type ON landscape.tbl_acreage_allocation USING btree (allocation_type_code),False,,
+landscape,tbl_acreage_allocation,tbl_acreage_allocation_pkey,1343615,CREATE UNIQUE INDEX tbl_acreage_allocation_pkey ON landscape.tbl_acreage_allocation USING btree (allocation_id),True,tbl_acreage_allocation_pkey,p
+landscape,tbl_additional_income,idx_additional_income_lease,499871,CREATE INDEX idx_additional_income_lease ON landscape.tbl_additional_income USING btree (lease_id),False,,
+landscape,tbl_additional_income,tbl_additional_income_pkey,499862,CREATE UNIQUE INDEX tbl_additional_income_pkey ON landscape.tbl_additional_income USING btree (additional_income_id),True,tbl_additional_income_pkey,p
+landscape,tbl_additional_income,uq_additional_income_lease,499864,CREATE UNIQUE INDEX uq_additional_income_lease ON landscape.tbl_additional_income USING btree (lease_id),True,uq_additional_income_lease,u
+landscape,tbl_ai_adjustment_suggestions,idx_ai_suggestions_comparable,778260,CREATE INDEX idx_ai_suggestions_comparable ON landscape.tbl_ai_adjustment_suggestions USING btree (comparable_id),False,,
+landscape,tbl_ai_adjustment_suggestions,idx_ai_suggestions_type,778261,CREATE INDEX idx_ai_suggestions_type ON landscape.tbl_ai_adjustment_suggestions USING btree (adjustment_type),False,,
+landscape,tbl_ai_adjustment_suggestions,tbl_ai_adjustment_suggestions_comparable_id_adjustment_type_key,778252,"CREATE UNIQUE INDEX tbl_ai_adjustment_suggestions_comparable_id_adjustment_type_key ON landscape.tbl_ai_adjustment_suggestions USING btree (comparable_id, adjustment_type)",True,tbl_ai_adjustment_suggestions_comparable_id_adjustment_type_key,u
+landscape,tbl_ai_adjustment_suggestions,tbl_ai_adjustment_suggestions_pkey,778250,CREATE UNIQUE INDEX tbl_ai_adjustment_suggestions_pkey ON landscape.tbl_ai_adjustment_suggestions USING btree (ai_suggestion_id),True,tbl_ai_adjustment_suggestions_pkey,p
+landscape,tbl_approval,tbl_approval_pkey,41020,CREATE UNIQUE INDEX tbl_approval_pkey ON landscape.tbl_approval USING btree (approval_id),True,tbl_approval_pkey,p
+landscape,tbl_area,tbl_planarea_pkey,40972,CREATE UNIQUE INDEX tbl_planarea_pkey ON landscape.tbl_area USING btree (area_id),True,tbl_devphase_planarea_id_fkey,f
+landscape,tbl_area,ux_planarea_project_area,147456,"CREATE UNIQUE INDEX ux_planarea_project_area ON landscape.tbl_area USING btree (project_id, area_no) WHERE (area_no IS NOT NULL)",False,,
+landscape,tbl_assumptionrule,tbl_assumptionrule_pkey,41012,CREATE UNIQUE INDEX tbl_assumptionrule_pkey ON landscape.tbl_assumptionrule USING btree (rule_id),True,tbl_assumptionrule_pkey,p
+landscape,tbl_base_rent,idx_base_rent_dates,499811,"CREATE INDEX idx_base_rent_dates ON landscape.tbl_base_rent USING btree (period_start_date, period_end_date)",False,,
+landscape,tbl_base_rent,idx_base_rent_lease,499810,CREATE INDEX idx_base_rent_lease ON landscape.tbl_base_rent USING btree (lease_id),False,,
+landscape,tbl_base_rent,tbl_base_rent_pkey,499801,CREATE UNIQUE INDEX tbl_base_rent_pkey ON landscape.tbl_base_rent USING btree (base_rent_id),True,tbl_base_rent_pkey,p
+landscape,tbl_base_rent,uq_base_rent_lease_period,499803,"CREATE UNIQUE INDEX uq_base_rent_lease_period ON landscape.tbl_base_rent USING btree (lease_id, period_number)",True,uq_base_rent_lease_period,u
+landscape,tbl_benchmark_ai_suggestions,idx_ai_suggestion_category,843882,CREATE INDEX idx_ai_suggestion_category ON landscape.tbl_benchmark_ai_suggestions USING btree (category),False,,
+landscape,tbl_benchmark_ai_suggestions,idx_ai_suggestion_document,843881,CREATE INDEX idx_ai_suggestion_document ON landscape.tbl_benchmark_ai_suggestions USING btree (document_id),False,,
+landscape,tbl_benchmark_ai_suggestions,idx_ai_suggestion_extraction_date,843883,CREATE INDEX idx_ai_suggestion_extraction_date ON landscape.tbl_benchmark_ai_suggestions USING btree (extraction_date),False,,
+landscape,tbl_benchmark_ai_suggestions,idx_ai_suggestion_status,843880,CREATE INDEX idx_ai_suggestion_status ON landscape.tbl_benchmark_ai_suggestions USING btree (status),False,,
+landscape,tbl_benchmark_ai_suggestions,idx_ai_suggestion_user,843879,CREATE INDEX idx_ai_suggestion_user ON landscape.tbl_benchmark_ai_suggestions USING btree (user_id),False,,
+landscape,tbl_benchmark_ai_suggestions,tbl_benchmark_ai_suggestions_pkey,843857,CREATE UNIQUE INDEX tbl_benchmark_ai_suggestions_pkey ON landscape.tbl_benchmark_ai_suggestions USING btree (suggestion_id),True,tbl_benchmark_ai_suggestions_pkey,p
+landscape,tbl_benchmark_contingency,idx_benchmark_contingency_benchmark_id,950285,CREATE INDEX idx_benchmark_contingency_benchmark_id ON landscape.tbl_benchmark_contingency USING btree (benchmark_id),False,,
+landscape,tbl_benchmark_contingency,tbl_benchmark_contingency_pkey,950278,CREATE UNIQUE INDEX tbl_benchmark_contingency_pkey ON landscape.tbl_benchmark_contingency USING btree (benchmark_id),True,tbl_benchmark_contingency_pkey,p
+landscape,tbl_benchmark_transaction_cost,idx_transaction_cost_benchmark,843843,CREATE INDEX idx_transaction_cost_benchmark ON landscape.tbl_benchmark_transaction_cost USING btree (benchmark_id),False,,
+landscape,tbl_benchmark_transaction_cost,idx_transaction_cost_type,843844,CREATE INDEX idx_transaction_cost_type ON landscape.tbl_benchmark_transaction_cost USING btree (cost_type),False,,
+landscape,tbl_benchmark_transaction_cost,tbl_benchmark_transaction_cost_pkey,843836,CREATE UNIQUE INDEX tbl_benchmark_transaction_cost_pkey ON landscape.tbl_benchmark_transaction_cost USING btree (transaction_cost_id),True,tbl_benchmark_transaction_cost_pkey,p
+landscape,tbl_benchmark_unit_cost,idx_unit_cost_benchmark,843825,CREATE INDEX idx_unit_cost_benchmark ON landscape.tbl_benchmark_unit_cost USING btree (benchmark_id),False,,
+landscape,tbl_benchmark_unit_cost,idx_unit_cost_phase,843826,CREATE INDEX idx_unit_cost_phase ON landscape.tbl_benchmark_unit_cost USING btree (cost_phase),False,,
+landscape,tbl_benchmark_unit_cost,idx_unit_cost_work_type,843827,CREATE INDEX idx_unit_cost_work_type ON landscape.tbl_benchmark_unit_cost USING btree (work_type),False,,
+landscape,tbl_benchmark_unit_cost,tbl_benchmark_unit_cost_pkey,843818,CREATE UNIQUE INDEX tbl_benchmark_unit_cost_pkey ON landscape.tbl_benchmark_unit_cost USING btree (unit_cost_id),True,tbl_benchmark_unit_cost_pkey,p
+landscape,tbl_budget,tbl_budget_pkey,49158,CREATE UNIQUE INDEX tbl_budget_pkey ON landscape.tbl_budget USING btree (budget_id),True,tbl_budget_pkey,p
+landscape,tbl_budget_fact,idx_budget_fact_category,1343549,CREATE INDEX idx_budget_fact_category ON landscape.tbl_budget_fact USING btree (category_id),False,,
+landscape,tbl_budget_fact,idx_budget_fact_project,1343548,CREATE INDEX idx_budget_fact_project ON landscape.tbl_budget_fact USING btree (project_id),False,,
+landscape,tbl_budget_fact,idx_budget_fact_project_category,1343550,"CREATE INDEX idx_budget_fact_project_category ON landscape.tbl_budget_fact USING btree (project_id, category_name)",False,,
+landscape,tbl_budget_fact,tbl_budget_fact_pkey,1343526,CREATE UNIQUE INDEX tbl_budget_fact_pkey ON landscape.tbl_budget_fact USING btree (budget_fact_id),True,tbl_budget_fact_pkey,p
+landscape,tbl_budget_fact,uq_budget_project_category,1343662,"CREATE UNIQUE INDEX uq_budget_project_category ON landscape.tbl_budget_fact USING btree (project_id, category_name)",True,uq_budget_project_category,u
+landscape,tbl_budget_items,idx_budget_items_project,172073,CREATE INDEX idx_budget_items_project ON landscape.tbl_budget_items USING btree (project_id),False,,
+landscape,tbl_budget_items,idx_budget_items_structure,172074,CREATE INDEX idx_budget_items_structure ON landscape.tbl_budget_items USING btree (structure_id),False,,
+landscape,tbl_budget_items,idx_budget_items_timing,516349,"CREATE INDEX idx_budget_items_timing ON landscape.tbl_budget_items USING btree (project_id, start_period, timing_method)",False,,
+landscape,tbl_budget_items,tbl_budget_items_pkey,172060,CREATE UNIQUE INDEX tbl_budget_items_pkey ON landscape.tbl_budget_items USING btree (budget_item_id),True,tbl_budget_items_pkey,p
+landscape,tbl_budget_structure,idx_budget_structure_scope,172072,CREATE INDEX idx_budget_structure_scope ON landscape.tbl_budget_structure USING btree (scope),False,,
+landscape,tbl_budget_structure,tbl_budget_structure_pkey,172042,CREATE UNIQUE INDEX tbl_budget_structure_pkey ON landscape.tbl_budget_structure USING btree (structure_id),True,tbl_budget_structure_pkey,p
+landscape,tbl_budget_structure,tbl_budget_structure_scope_category_detail_key,172044,"CREATE UNIQUE INDEX tbl_budget_structure_scope_category_detail_key ON landscape.tbl_budget_structure USING btree (scope, category, detail)",True,tbl_budget_structure_scope_category_detail_key,u
+landscape,tbl_budget_timing,idx_budget_timing_fact,311418,CREATE INDEX idx_budget_timing_fact ON landscape.tbl_budget_timing USING btree (fact_id),False,,
+landscape,tbl_budget_timing,idx_budget_timing_period,311419,CREATE INDEX idx_budget_timing_period ON landscape.tbl_budget_timing USING btree (period_id),False,,
+landscape,tbl_budget_timing,tbl_budget_timing_pkey,311404,CREATE UNIQUE INDEX tbl_budget_timing_pkey ON landscape.tbl_budget_timing USING btree (timing_id),True,tbl_budget_timing_pkey,p
+landscape,tbl_budget_timing,uq_budget_timing,311406,"CREATE UNIQUE INDEX uq_budget_timing ON landscape.tbl_budget_timing USING btree (fact_id, period_id)",True,uq_budget_timing,u
+landscape,tbl_calculation_period,idx_calculation_period_project,311395,"CREATE INDEX idx_calculation_period_project ON landscape.tbl_calculation_period USING btree (project_id, period_sequence)",False,,
+landscape,tbl_calculation_period,tbl_calculation_period_pkey,311386,CREATE UNIQUE INDEX tbl_calculation_period_pkey ON landscape.tbl_calculation_period USING btree (period_id),True,tbl_calculation_period_pkey,p
+landscape,tbl_calculation_period,uq_calculation_period_sequence,311388,"CREATE UNIQUE INDEX uq_calculation_period_sequence ON landscape.tbl_calculation_period USING btree (project_id, period_sequence)",True,uq_calculation_period_sequence,u
+landscape,tbl_cap_rate_comps,idx_cap_rate_comps_income_approach,770139,CREATE INDEX idx_cap_rate_comps_income_approach ON landscape.tbl_cap_rate_comps USING btree (income_approach_id),False,,
+landscape,tbl_cap_rate_comps,tbl_cap_rate_comps_pkey,770132,CREATE UNIQUE INDEX tbl_cap_rate_comps_pkey ON landscape.tbl_cap_rate_comps USING btree (cap_rate_comp_id),True,tbl_cap_rate_comps_pkey,p
+landscape,tbl_capex_reserve,idx_capex_project,647373,CREATE INDEX idx_capex_project ON landscape.tbl_capex_reserve USING btree (project_id),False,,
+landscape,tbl_capex_reserve,tbl_capex_reserve_pkey,647308,CREATE UNIQUE INDEX tbl_capex_reserve_pkey ON landscape.tbl_capex_reserve USING btree (capex_id),True,tbl_capex_reserve_pkey,p
+landscape,tbl_capital_call,idx_capital_call_project,647376,CREATE INDEX idx_capital_call_project ON landscape.tbl_capital_call USING btree (project_id),False,,
+landscape,tbl_capital_call,tbl_capital_call_pkey,647354,CREATE UNIQUE INDEX tbl_capital_call_pkey ON landscape.tbl_capital_call USING btree (capital_call_id),True,tbl_capital_call_pkey,p
+landscape,tbl_capital_reserves,idx_capital_reserves_lease,516278,CREATE INDEX idx_capital_reserves_lease ON landscape.tbl_capital_reserves USING btree (trigger_lease_id),False,,
+landscape,tbl_capital_reserves,idx_capital_reserves_project,516275,CREATE INDEX idx_capital_reserves_project ON landscape.tbl_capital_reserves USING btree (project_id),False,,
+landscape,tbl_capital_reserves,idx_capital_reserves_trigger,516277,CREATE INDEX idx_capital_reserves_trigger ON landscape.tbl_capital_reserves USING btree (trigger_type),False,,
+landscape,tbl_capital_reserves,idx_capital_reserves_type,516276,CREATE INDEX idx_capital_reserves_type ON landscape.tbl_capital_reserves USING btree (reserve_type),False,,
+landscape,tbl_capital_reserves,tbl_capital_reserves_pkey,516263,CREATE UNIQUE INDEX tbl_capital_reserves_pkey ON landscape.tbl_capital_reserves USING btree (reserve_id),True,tbl_capital_reserves_pkey,p
+landscape,tbl_capitalization,tbl_capitalization_pkey,49171,CREATE UNIQUE INDEX tbl_capitalization_pkey ON landscape.tbl_capitalization USING btree (capitalization_id),True,tbl_capitalization_pkey,p
+landscape,tbl_cashflow,idx_cashflow_category,500026,CREATE INDEX idx_cashflow_category ON landscape.tbl_cashflow USING btree (cashflow_category),False,,
+landscape,tbl_cashflow,idx_cashflow_lease,500029,"CREATE INDEX idx_cashflow_lease ON landscape.tbl_cashflow USING btree (lease_id, period_id)",False,,
+landscape,tbl_cashflow,idx_cashflow_parcel,500027,"CREATE INDEX idx_cashflow_parcel ON landscape.tbl_cashflow USING btree (parcel_id, period_id)",False,,
+landscape,tbl_cashflow,idx_cashflow_phase,500028,"CREATE INDEX idx_cashflow_phase ON landscape.tbl_cashflow USING btree (phase_id, period_id)",False,,
+landscape,tbl_cashflow,idx_cashflow_project_period,500025,"CREATE INDEX idx_cashflow_project_period ON landscape.tbl_cashflow USING btree (project_id, period_id)",False,,
+landscape,tbl_cashflow,tbl_cashflow_pkey,499998,CREATE UNIQUE INDEX tbl_cashflow_pkey ON landscape.tbl_cashflow USING btree (cashflow_id),True,tbl_cashflow_pkey,p
+landscape,tbl_cashflow_summary,idx_summary_project_period,500061,"CREATE INDEX idx_summary_project_period ON landscape.tbl_cashflow_summary USING btree (project_id, period_id)",False,,
+landscape,tbl_cashflow_summary,tbl_cashflow_summary_pkey,500052,CREATE UNIQUE INDEX tbl_cashflow_summary_pkey ON landscape.tbl_cashflow_summary USING btree (summary_id),True,tbl_cashflow_summary_pkey,p
+landscape,tbl_cashflow_summary,uq_summary_project_period,500054,"CREATE UNIQUE INDEX uq_summary_project_period ON landscape.tbl_cashflow_summary USING btree (project_id, period_id)",True,uq_summary_project_period,u
+landscape,tbl_closing_event,idx_closing_date,966704,CREATE INDEX idx_closing_date ON landscape.tbl_closing_event USING btree (closing_date),False,,
+landscape,tbl_closing_event,idx_closing_sale_event,966703,CREATE INDEX idx_closing_sale_event ON landscape.tbl_closing_event USING btree (sale_event_id),False,,
+landscape,tbl_closing_event,idx_closing_sequence,966705,"CREATE INDEX idx_closing_sequence ON landscape.tbl_closing_event USING btree (sale_event_id, closing_sequence)",False,,
+landscape,tbl_closing_event,tbl_closing_event_pkey,966694,CREATE UNIQUE INDEX tbl_closing_event_pkey ON landscape.tbl_closing_event USING btree (closing_id),True,tbl_closing_event_pkey,p
+landscape,tbl_closing_event,tbl_closing_event_sale_event_id_closing_sequence_key,966696,"CREATE UNIQUE INDEX tbl_closing_event_sale_event_id_closing_sequence_key ON landscape.tbl_closing_event USING btree (sale_event_id, closing_sequence)",True,tbl_closing_event_sale_event_id_closing_sequence_key,u
+landscape,tbl_contacts,idx_contacts_company_name,163900,CREATE INDEX idx_contacts_company_name ON landscape.tbl_contacts USING btree (company_name),False,,
+landscape,tbl_contacts,idx_contacts_project_role,753676,"CREATE INDEX idx_contacts_project_role ON landscape.tbl_contacts USING btree (project_id, contact_role)",False,,
+landscape,tbl_contacts,tbl_contacts_pkey,163864,CREATE UNIQUE INDEX tbl_contacts_pkey ON landscape.tbl_contacts USING btree (contact_id),True,tbl_contacts_pkey,p
+landscape,tbl_cost_allocation,idx_cost_alloc_container,663602,CREATE INDEX idx_cost_alloc_container ON landscape.tbl_cost_allocation USING btree (container_id),False,,
+landscape,tbl_cost_allocation,idx_cost_alloc_structure,663601,CREATE INDEX idx_cost_alloc_structure ON landscape.tbl_cost_allocation USING btree (finance_structure_id),False,,
+landscape,tbl_cost_allocation,idx_cost_allocation_scenario,696407,CREATE INDEX idx_cost_allocation_scenario ON landscape.tbl_cost_allocation USING btree (scenario_id),False,,
+landscape,tbl_cost_allocation,tbl_cost_allocation_pkey,663587,CREATE UNIQUE INDEX tbl_cost_allocation_pkey ON landscape.tbl_cost_allocation USING btree (allocation_id),True,tbl_cost_allocation_pkey,p
+landscape,tbl_cost_allocation,unique_allocation,663589,"CREATE UNIQUE INDEX unique_allocation ON landscape.tbl_cost_allocation USING btree (finance_structure_id, container_id)",True,unique_allocation,u
+landscape,tbl_cost_approach,idx_cost_approach_project,770103,CREATE UNIQUE INDEX idx_cost_approach_project ON landscape.tbl_cost_approach USING btree (project_id),False,,
+landscape,tbl_cost_approach,tbl_cost_approach_pkey,770096,CREATE UNIQUE INDEX tbl_cost_approach_pkey ON landscape.tbl_cost_approach USING btree (cost_approach_id),True,tbl_cost_approach_pkey,p
+landscape,tbl_cre_absorption,tbl_cre_absorption_pkey,622877,CREATE UNIQUE INDEX tbl_cre_absorption_pkey ON landscape.tbl_cre_absorption USING btree (absorption_id),True,tbl_cre_absorption_pkey,p
+landscape,tbl_cre_base_rent,idx_cre_base_rent_lease_id,761859,CREATE INDEX idx_cre_base_rent_lease_id ON landscape.tbl_cre_base_rent USING btree (lease_id),False,,
+landscape,tbl_cre_base_rent,tbl_cre_base_rent_pkey,622674,CREATE UNIQUE INDEX tbl_cre_base_rent_pkey ON landscape.tbl_cre_base_rent USING btree (base_rent_id),True,tbl_cre_base_rent_pkey,p
+landscape,tbl_cre_cam_charge,tbl_cre_cam_charge_pkey,622775,CREATE UNIQUE INDEX tbl_cre_cam_charge_pkey ON landscape.tbl_cre_cam_charge USING btree (cam_charge_id),True,tbl_cre_cam_charge_pkey,p
+landscape,tbl_cre_cap_rate,tbl_cre_cap_rate_pkey,622917,CREATE UNIQUE INDEX tbl_cre_cap_rate_pkey ON landscape.tbl_cre_cap_rate USING btree (cap_rate_id),True,tbl_cre_cap_rate_pkey,p
+landscape,tbl_cre_capital_reserve,tbl_cre_capital_reserve_pkey,630807,CREATE UNIQUE INDEX tbl_cre_capital_reserve_pkey ON landscape.tbl_cre_capital_reserve USING btree (capital_reserve_id),True,tbl_cre_capital_reserve_pkey,p
+landscape,tbl_cre_cash_flow,idx_cre_cash_flow_property_period,622994,"CREATE INDEX idx_cre_cash_flow_property_period ON landscape.tbl_cre_cash_flow USING btree (cre_property_id, period_id)",False,,
+landscape,tbl_cre_cash_flow,tbl_cre_cash_flow_pkey,622931,CREATE UNIQUE INDEX tbl_cre_cash_flow_pkey ON landscape.tbl_cre_cash_flow USING btree (cash_flow_id),True,tbl_cre_cash_flow_pkey,p
+landscape,tbl_cre_dcf_analysis,tbl_cre_dcf_analysis_pkey,622950,CREATE UNIQUE INDEX tbl_cre_dcf_analysis_pkey ON landscape.tbl_cre_dcf_analysis USING btree (dcf_analysis_id),True,tbl_cre_dcf_analysis_pkey,p
+landscape,tbl_cre_expense_recovery,tbl_cre_expense_recovery_pkey,630794,CREATE UNIQUE INDEX tbl_cre_expense_recovery_pkey ON landscape.tbl_cre_expense_recovery USING btree (expense_recovery_id),True,tbl_cre_expense_recovery_pkey,p
+landscape,tbl_cre_expense_reimbursement,tbl_cre_expense_reimbursement_pkey,622794,CREATE UNIQUE INDEX tbl_cre_expense_reimbursement_pkey ON landscape.tbl_cre_expense_reimbursement USING btree (reimbursement_id),True,tbl_cre_expense_reimbursement_pkey,p
+landscape,tbl_cre_expense_stop,tbl_cre_expense_stop_pkey,622761,CREATE UNIQUE INDEX tbl_cre_expense_stop_pkey ON landscape.tbl_cre_expense_stop USING btree (expense_stop_id),True,tbl_cre_expense_stop_pkey,p
+landscape,tbl_cre_lease,idx_cre_lease_expiration,622990,CREATE INDEX idx_cre_lease_expiration ON landscape.tbl_cre_lease USING btree (lease_expiration_date),False,,
+landscape,tbl_cre_lease,idx_cre_lease_property,622987,CREATE INDEX idx_cre_lease_property ON landscape.tbl_cre_lease USING btree (cre_property_id),False,,
+landscape,tbl_cre_lease,idx_cre_lease_space_id,761856,CREATE INDEX idx_cre_lease_space_id ON landscape.tbl_cre_lease USING btree (space_id),False,,
+landscape,tbl_cre_lease,idx_cre_lease_status,622989,CREATE INDEX idx_cre_lease_status ON landscape.tbl_cre_lease USING btree (lease_status),False,,
+landscape,tbl_cre_lease,idx_cre_lease_tenant,622988,CREATE INDEX idx_cre_lease_tenant ON landscape.tbl_cre_lease USING btree (tenant_id),False,,
+landscape,tbl_cre_lease,idx_cre_lease_tenant_id,761857,CREATE INDEX idx_cre_lease_tenant_id ON landscape.tbl_cre_lease USING btree (tenant_id),False,,
+landscape,tbl_cre_lease,tbl_cre_lease_pkey,622650,CREATE UNIQUE INDEX tbl_cre_lease_pkey ON landscape.tbl_cre_lease USING btree (lease_id),True,tbl_cre_lease_pkey,p
+landscape,tbl_cre_leasing_commission,tbl_cre_leasing_commission_pkey,622830,CREATE UNIQUE INDEX tbl_cre_leasing_commission_pkey ON landscape.tbl_cre_leasing_commission USING btree (commission_id),True,tbl_cre_leasing_commission_pkey,p
+landscape,tbl_cre_leasing_legal,tbl_cre_leasing_legal_pkey,622844,CREATE UNIQUE INDEX tbl_cre_leasing_legal_pkey ON landscape.tbl_cre_leasing_legal USING btree (legal_fee_id),True,tbl_cre_leasing_legal_pkey,p
+landscape,tbl_cre_major_maintenance,tbl_cre_major_maintenance_pkey,630820,CREATE UNIQUE INDEX tbl_cre_major_maintenance_pkey ON landscape.tbl_cre_major_maintenance USING btree (major_maintenance_id),True,tbl_cre_major_maintenance_pkey,p
+landscape,tbl_cre_noi,idx_cre_noi_property_period,622993,"CREATE INDEX idx_cre_noi_property_period ON landscape.tbl_cre_noi USING btree (cre_property_id, period_id)",False,,
+landscape,tbl_cre_noi,tbl_cre_noi_pkey,622896,CREATE UNIQUE INDEX tbl_cre_noi_pkey ON landscape.tbl_cre_noi USING btree (noi_id),True,tbl_cre_noi_pkey,p
+landscape,tbl_cre_operating_expense,tbl_cre_operating_expense_pkey,622738,CREATE UNIQUE INDEX tbl_cre_operating_expense_pkey ON landscape.tbl_cre_operating_expense USING btree (operating_expense_id),True,tbl_cre_operating_expense_pkey,p
+landscape,tbl_cre_percentage_rent,tbl_cre_percentage_rent_pkey,622705,CREATE UNIQUE INDEX tbl_cre_percentage_rent_pkey ON landscape.tbl_cre_percentage_rent USING btree (percentage_rent_id),True,tbl_cre_percentage_rent_pkey,p
+landscape,tbl_cre_property,idx_cre_property_project,622982,CREATE INDEX idx_cre_property_project ON landscape.tbl_cre_property USING btree (project_id),False,,
+landscape,tbl_cre_property,idx_cre_property_status,622983,CREATE INDEX idx_cre_property_status ON landscape.tbl_cre_property USING btree (property_status),False,,
+landscape,tbl_cre_property,idx_cre_property_type,622984,CREATE INDEX idx_cre_property_type ON landscape.tbl_cre_property USING btree (property_type),False,,
+landscape,tbl_cre_property,tbl_cre_property_pkey,622599,CREATE UNIQUE INDEX tbl_cre_property_pkey ON landscape.tbl_cre_property USING btree (cre_property_id),True,tbl_cre_cam_charge_cre_property_id_fkey,f
+landscape,tbl_cre_rent_concession,tbl_cre_rent_concession_pkey,622721,CREATE UNIQUE INDEX tbl_cre_rent_concession_pkey ON landscape.tbl_cre_rent_concession USING btree (concession_id),True,tbl_cre_rent_concession_pkey,p
+landscape,tbl_cre_rent_escalation,tbl_cre_rent_escalation_pkey,622691,CREATE UNIQUE INDEX tbl_cre_rent_escalation_pkey ON landscape.tbl_cre_rent_escalation USING btree (escalation_id),True,tbl_cre_rent_escalation_pkey,p
+landscape,tbl_cre_space,idx_cre_space_property,622985,CREATE INDEX idx_cre_space_property ON landscape.tbl_cre_space USING btree (cre_property_id),False,,
+landscape,tbl_cre_space,idx_cre_space_property_id,761858,CREATE INDEX idx_cre_space_property_id ON landscape.tbl_cre_space USING btree (cre_property_id),False,,
+landscape,tbl_cre_space,idx_cre_space_status,622986,CREATE INDEX idx_cre_space_status ON landscape.tbl_cre_space USING btree (space_status),False,,
+landscape,tbl_cre_space,tbl_cre_space_pkey,622620,CREATE UNIQUE INDEX tbl_cre_space_pkey ON landscape.tbl_cre_space USING btree (space_id),True,tbl_cre_lease_space_id_fkey,f
+landscape,tbl_cre_stabilization,tbl_cre_stabilization_pkey,622965,CREATE UNIQUE INDEX tbl_cre_stabilization_pkey ON landscape.tbl_cre_stabilization USING btree (stabilization_id),True,tbl_cre_stabilization_pkey,p
+landscape,tbl_cre_tenant,idx_cre_tenant_credit,622992,CREATE INDEX idx_cre_tenant_credit ON landscape.tbl_cre_tenant USING btree (creditworthiness),False,,
+landscape,tbl_cre_tenant,idx_cre_tenant_name,622991,CREATE INDEX idx_cre_tenant_name ON landscape.tbl_cre_tenant USING btree (tenant_name),False,,
+landscape,tbl_cre_tenant,tbl_cre_tenant_pkey,622636,CREATE UNIQUE INDEX tbl_cre_tenant_pkey ON landscape.tbl_cre_tenant USING btree (tenant_id),True,tbl_cre_tenant_pkey,p
+landscape,tbl_cre_tenant_improvement,tbl_cre_tenant_improvement_pkey,622816,CREATE UNIQUE INDEX tbl_cre_tenant_improvement_pkey ON landscape.tbl_cre_tenant_improvement USING btree (ti_id),True,tbl_cre_tenant_improvement_pkey,p
+landscape,tbl_cre_vacancy,tbl_cre_vacancy_pkey,622858,CREATE UNIQUE INDEX tbl_cre_vacancy_pkey ON landscape.tbl_cre_vacancy USING btree (vacancy_id),True,tbl_cre_vacancy_pkey,p
+landscape,tbl_debt_draw_schedule,idx_debt_draw_facility,508050,"CREATE INDEX idx_debt_draw_facility ON landscape.tbl_debt_draw_schedule USING btree (facility_id, period_id)",False,,
+landscape,tbl_debt_draw_schedule,idx_debt_draw_period,508051,CREATE INDEX idx_debt_draw_period ON landscape.tbl_debt_draw_schedule USING btree (period_id),False,,
+landscape,tbl_debt_draw_schedule,tbl_debt_draw_schedule_pkey,508036,CREATE UNIQUE INDEX tbl_debt_draw_schedule_pkey ON landscape.tbl_debt_draw_schedule USING btree (draw_id),True,tbl_debt_draw_schedule_pkey,p
+landscape,tbl_debt_draw_schedule,uq_debt_draw_facility_period,508038,"CREATE UNIQUE INDEX uq_debt_draw_facility_period ON landscape.tbl_debt_draw_schedule USING btree (facility_id, period_id)",True,uq_debt_draw_facility_period,u
+landscape,tbl_debt_facility,idx_debt_facility_project,508019,CREATE INDEX idx_debt_facility_project ON landscape.tbl_debt_facility USING btree (project_id),False,,
+landscape,tbl_debt_facility,idx_debt_facility_type,508020,CREATE INDEX idx_debt_facility_type ON landscape.tbl_debt_facility USING btree (facility_type),False,,
+landscape,tbl_debt_facility,idx_debt_project,647374,CREATE INDEX idx_debt_project ON landscape.tbl_debt_facility USING btree (project_id),False,,
+landscape,tbl_debt_facility,tbl_debt_facility_pkey,508007,CREATE UNIQUE INDEX tbl_debt_facility_pkey ON landscape.tbl_debt_facility USING btree (facility_id),True,tbl_debt_facility_pkey,p
+landscape,tbl_division,idx_container_project_level,311327,"CREATE INDEX idx_container_project_level ON landscape.tbl_division USING btree (project_id, tier, sort_order, division_id)",False,,
+landscape,tbl_division,idx_container_sale_phase,958493,"CREATE INDEX idx_container_sale_phase ON landscape.tbl_division USING btree (project_id, sale_phase_code) WHERE (sale_phase_code IS NOT NULL)",False,,
+landscape,tbl_division,idx_division_parent,311328,CREATE INDEX idx_division_parent ON landscape.tbl_division USING btree (parent_division_id),False,,
+landscape,tbl_division,tbl_container_pkey,311313,CREATE UNIQUE INDEX tbl_container_pkey ON landscape.tbl_division USING btree (division_id),True,tbl_container_pkey,p
+landscape,tbl_division,uq_container_code,311315,"CREATE UNIQUE INDEX uq_container_code ON landscape.tbl_division USING btree (project_id, division_code)",True,uq_container_code,u
+landscape,tbl_equity,idx_equity_project,499973,CREATE INDEX idx_equity_project ON landscape.tbl_equity USING btree (project_id),False,,
+landscape,tbl_equity,idx_equity_tier,499974,"CREATE INDEX idx_equity_tier ON landscape.tbl_equity USING btree (project_id, equity_tier)",False,,
+landscape,tbl_equity,tbl_equity_pkey,499966,CREATE UNIQUE INDEX tbl_equity_pkey ON landscape.tbl_equity USING btree (equity_id),True,tbl_equity_pkey,p
+landscape,tbl_equity_distribution,idx_equity_distribution_partner,508095,"CREATE INDEX idx_equity_distribution_partner ON landscape.tbl_equity_distribution USING btree (partner_id, period_id)",False,,
+landscape,tbl_equity_distribution,idx_equity_distribution_period,508096,CREATE INDEX idx_equity_distribution_period ON landscape.tbl_equity_distribution USING btree (period_id),False,,
+landscape,tbl_equity_distribution,idx_equity_distribution_type,508097,CREATE INDEX idx_equity_distribution_type ON landscape.tbl_equity_distribution USING btree (distribution_type),False,,
+landscape,tbl_equity_distribution,tbl_equity_distribution_pkey,508083,CREATE UNIQUE INDEX tbl_equity_distribution_pkey ON landscape.tbl_equity_distribution USING btree (distribution_id),True,tbl_equity_distribution_pkey,p
+landscape,tbl_equity_partner,idx_equity_partner_class,508070,CREATE INDEX idx_equity_partner_class ON landscape.tbl_equity_partner USING btree (partner_class),False,,
+landscape,tbl_equity_partner,idx_equity_partner_project,508069,CREATE INDEX idx_equity_partner_project ON landscape.tbl_equity_partner USING btree (project_id),False,,
+landscape,tbl_equity_partner,tbl_equity_partner_pkey,508062,CREATE UNIQUE INDEX tbl_equity_partner_pkey ON landscape.tbl_equity_partner USING btree (partner_id),True,tbl_equity_partner_pkey,p
+landscape,tbl_equity_structure,tbl_equity_structure_pkey,647325,CREATE UNIQUE INDEX tbl_equity_structure_pkey ON landscape.tbl_equity_structure USING btree (equity_structure_id),True,tbl_equity_structure_pkey,p
+landscape,tbl_escalation,idx_escalation_lease,499830,CREATE INDEX idx_escalation_lease ON landscape.tbl_escalation USING btree (lease_id),False,,
+landscape,tbl_escalation,idx_escalation_type,499831,CREATE INDEX idx_escalation_type ON landscape.tbl_escalation USING btree (escalation_type),False,,
+landscape,tbl_escalation,tbl_escalation_pkey,499823,CREATE UNIQUE INDEX tbl_escalation_pkey ON landscape.tbl_escalation USING btree (escalation_id),True,tbl_escalation_pkey,p
+landscape,tbl_expense_detail,idx_expense_detail_category,647372,CREATE INDEX idx_expense_detail_category ON landscape.tbl_expense_detail USING btree (expense_category),False,,
+landscape,tbl_expense_detail,idx_expense_detail_project,647371,CREATE INDEX idx_expense_detail_project ON landscape.tbl_expense_detail USING btree (project_id),False,,
+landscape,tbl_expense_detail,tbl_expense_detail_pkey,647281,CREATE UNIQUE INDEX tbl_expense_detail_pkey ON landscape.tbl_expense_detail USING btree (expense_detail_id),True,tbl_expense_detail_pkey,p
+landscape,tbl_extraction_log,idx_extraction_log_doc,1507373,CREATE INDEX idx_extraction_log_doc ON landscape.tbl_extraction_log USING btree (doc_id),False,,
+landscape,tbl_extraction_log,idx_extraction_log_mapping,1507371,CREATE INDEX idx_extraction_log_mapping ON landscape.tbl_extraction_log USING btree (mapping_id),False,,
+landscape,tbl_extraction_log,idx_extraction_log_project,1507372,CREATE INDEX idx_extraction_log_project ON landscape.tbl_extraction_log USING btree (project_id),False,,
+landscape,tbl_extraction_log,tbl_extraction_log_pkey,1507361,CREATE UNIQUE INDEX tbl_extraction_log_pkey ON landscape.tbl_extraction_log USING btree (log_id),True,tbl_extraction_log_pkey,p
+landscape,tbl_extraction_mapping,idx_extraction_mapping_active,1507370,CREATE INDEX idx_extraction_mapping_active ON landscape.tbl_extraction_mapping USING btree (is_active) WHERE (is_active = true),False,,
+landscape,tbl_extraction_mapping,idx_extraction_mapping_doctype,1507368,CREATE INDEX idx_extraction_mapping_doctype ON landscape.tbl_extraction_mapping USING btree (document_type),False,,
+landscape,tbl_extraction_mapping,idx_extraction_mapping_target,1507369,"CREATE INDEX idx_extraction_mapping_target ON landscape.tbl_extraction_mapping USING btree (target_table, target_field)",False,,
+landscape,tbl_extraction_mapping,tbl_extraction_mapping_pkey,1507348,CREATE UNIQUE INDEX tbl_extraction_mapping_pkey ON landscape.tbl_extraction_mapping USING btree (mapping_id),True,tbl_extraction_mapping_pkey,p
+landscape,tbl_extraction_mapping,uq_mapping_pattern_field,1507350,"CREATE UNIQUE INDEX uq_mapping_pattern_field ON landscape.tbl_extraction_mapping USING btree (document_type, source_pattern, target_table, target_field)",True,uq_mapping_pattern_field,u
+landscape,tbl_field_catalog,idx_field_catalog_editable,1466388,CREATE INDEX idx_field_catalog_editable ON landscape.tbl_field_catalog USING btree (is_editable) WHERE (is_editable = true),False,,
+landscape,tbl_field_catalog,idx_field_catalog_group,1466387,CREATE INDEX idx_field_catalog_group ON landscape.tbl_field_catalog USING btree (field_group),False,,
+landscape,tbl_field_catalog,idx_field_catalog_table,1466386,CREATE INDEX idx_field_catalog_table ON landscape.tbl_field_catalog USING btree (table_name),False,,
+landscape,tbl_field_catalog,tbl_field_catalog_pkey,1466382,CREATE UNIQUE INDEX tbl_field_catalog_pkey ON landscape.tbl_field_catalog USING btree (field_id),True,tbl_field_catalog_pkey,p
+landscape,tbl_field_catalog,tbl_field_catalog_table_name_field_name_key,1466384,"CREATE UNIQUE INDEX tbl_field_catalog_table_name_field_name_key ON landscape.tbl_field_catalog USING btree (table_name, field_name)",True,tbl_field_catalog_table_name_field_name_key,u
+landscape,tbl_finance_structure,idx_finance_structure_active,663577,CREATE INDEX idx_finance_structure_active ON landscape.tbl_finance_structure USING btree (is_active) WHERE (is_active = true),False,,
+landscape,tbl_finance_structure,idx_finance_structure_project,663575,CREATE INDEX idx_finance_structure_project ON landscape.tbl_finance_structure USING btree (project_id),False,,
+landscape,tbl_finance_structure,idx_finance_structure_scenario,696401,CREATE INDEX idx_finance_structure_scenario ON landscape.tbl_finance_structure USING btree (scenario_id),False,,
+landscape,tbl_finance_structure,idx_finance_structure_type,663576,CREATE INDEX idx_finance_structure_type ON landscape.tbl_finance_structure USING btree (structure_type),False,,
+landscape,tbl_finance_structure,tbl_finance_structure_pkey,663566,CREATE UNIQUE INDEX tbl_finance_structure_pkey ON landscape.tbl_finance_structure USING btree (finance_structure_id),True,tbl_finance_structure_pkey,p
+landscape,tbl_finance_structure,unique_structure_code,663568,"CREATE UNIQUE INDEX unique_structure_code ON landscape.tbl_finance_structure USING btree (project_id, structure_code)",True,unique_structure_code,u
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_active,843809,CREATE INDEX idx_benchmark_registry_active ON landscape.tbl_global_benchmark_registry USING btree (is_active),False,,
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_as_of_date,843810,CREATE INDEX idx_benchmark_registry_as_of_date ON landscape.tbl_global_benchmark_registry USING btree (as_of_date),False,,
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_category,843806,"CREATE INDEX idx_benchmark_registry_category ON landscape.tbl_global_benchmark_registry USING btree (category, subcategory)",False,,
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_geography,843807,CREATE INDEX idx_benchmark_registry_geography ON landscape.tbl_global_benchmark_registry USING btree (market_geography),False,,
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_property_type,843808,CREATE INDEX idx_benchmark_registry_property_type ON landscape.tbl_global_benchmark_registry USING btree (property_type),False,,
+landscape,tbl_global_benchmark_registry,idx_benchmark_registry_user,843805,CREATE INDEX idx_benchmark_registry_user ON landscape.tbl_global_benchmark_registry USING btree (user_id),False,,
+landscape,tbl_global_benchmark_registry,tbl_global_benchmark_registry_pkey,843793,CREATE UNIQUE INDEX tbl_global_benchmark_registry_pkey ON landscape.tbl_global_benchmark_registry USING btree (benchmark_id),True,tbl_global_benchmark_registry_pkey,p
+landscape,tbl_income_approach,idx_income_approach_project,770123,CREATE UNIQUE INDEX idx_income_approach_project ON landscape.tbl_income_approach USING btree (project_id),False,,
+landscape,tbl_income_approach,tbl_income_approach_pkey,770116,CREATE UNIQUE INDEX tbl_income_approach_pkey ON landscape.tbl_income_approach USING btree (income_approach_id),True,tbl_income_approach_pkey,p
+landscape,tbl_inventory_item,idx_inventory_active,573486,CREATE INDEX idx_inventory_active ON landscape.tbl_inventory_item USING btree (is_active) WHERE (is_active = true),False,,
+landscape,tbl_inventory_item,idx_inventory_code,573485,CREATE INDEX idx_inventory_code ON landscape.tbl_inventory_item USING btree (item_code),False,,
+landscape,tbl_inventory_item,idx_inventory_container,573482,CREATE INDEX idx_inventory_container ON landscape.tbl_inventory_item USING btree (container_id),False,,
+landscape,tbl_inventory_item,idx_inventory_data_gin,573488,CREATE INDEX idx_inventory_data_gin ON landscape.tbl_inventory_item USING gin (data_values),False,,
+landscape,tbl_inventory_item,idx_inventory_family,589839,CREATE INDEX idx_inventory_family ON landscape.tbl_inventory_item USING btree (family_id),False,,
+landscape,tbl_inventory_item,idx_inventory_hierarchy_gin,573487,CREATE INDEX idx_inventory_hierarchy_gin ON landscape.tbl_inventory_item USING gin (hierarchy_values),False,,
+landscape,tbl_inventory_item,idx_inventory_product,589840,CREATE INDEX idx_inventory_product ON landscape.tbl_inventory_item USING btree (product_id),False,,
+landscape,tbl_inventory_item,idx_inventory_project,573481,CREATE INDEX idx_inventory_project ON landscape.tbl_inventory_item USING btree (project_id),False,,
+landscape,tbl_inventory_item,idx_inventory_status,573484,CREATE INDEX idx_inventory_status ON landscape.tbl_inventory_item USING btree (status),False,,
+landscape,tbl_inventory_item,idx_inventory_type,573483,CREATE INDEX idx_inventory_type ON landscape.tbl_inventory_item USING btree (property_type),False,,
+landscape,tbl_inventory_item,tbl_inventory_item_pkey,573467,CREATE UNIQUE INDEX tbl_inventory_item_pkey ON landscape.tbl_inventory_item USING btree (item_id),True,tbl_inventory_item_pkey,p
+landscape,tbl_inventory_item,uq_inventory_item_code,573469,"CREATE UNIQUE INDEX uq_inventory_item_code ON landscape.tbl_inventory_item USING btree (project_id, item_code)",True,uq_inventory_item_code,u
+landscape,tbl_item_dependency,idx_item_dependency_dependent,507920,"CREATE INDEX idx_item_dependency_dependent ON landscape.tbl_item_dependency USING btree (dependent_item_type, dependent_item_id)",False,,
+landscape,tbl_item_dependency,idx_item_dependency_trigger,507921,"CREATE INDEX idx_item_dependency_trigger ON landscape.tbl_item_dependency USING btree (trigger_item_type, trigger_item_id)",False,,
+landscape,tbl_item_dependency,tbl_item_dependency_pkey,507918,CREATE UNIQUE INDEX tbl_item_dependency_pkey ON landscape.tbl_item_dependency USING btree (dependency_id),True,tbl_item_dependency_pkey,p
+landscape,tbl_landuse,idx_tbl_landuse_active,213007,CREATE INDEX idx_tbl_landuse_active ON landscape.tbl_landuse USING btree (active),False,,
+landscape,tbl_landuse,idx_tbl_landuse_code,212999,CREATE INDEX idx_tbl_landuse_code ON landscape.tbl_landuse USING btree (landuse_code),False,,
+landscape,tbl_landuse,idx_tbl_landuse_subtype,212998,CREATE INDEX idx_tbl_landuse_subtype ON landscape.tbl_landuse USING btree (type_id),False,,
+landscape,tbl_landuse,tbl_landuse_landuse_code_key,40996,CREATE UNIQUE INDEX tbl_landuse_landuse_code_key ON landscape.tbl_landuse USING btree (landuse_code),True,tbl_parcels_landuse_code_fkey,f
+landscape,tbl_landuse,tbl_landuse_pkey,40994,CREATE UNIQUE INDEX tbl_landuse_pkey ON landscape.tbl_landuse USING btree (landuse_id),True,tbl_landuse_pkey,p
+landscape,tbl_landuse_program,tbl_landuse_program_pkey,90118,CREATE UNIQUE INDEX tbl_landuse_program_pkey ON landscape.tbl_landuse_program USING btree (landuse_code),True,tbl_landuse_program_pkey,p
+landscape,tbl_lease,idx_lease_expiration,499790,CREATE INDEX idx_lease_expiration ON landscape.tbl_lease USING btree (lease_expiration_date),False,,
+landscape,tbl_lease,idx_lease_lot,499788,CREATE INDEX idx_lease_lot ON landscape.tbl_lease USING btree (lot_id),False,,
+landscape,tbl_lease,idx_lease_parcel,499787,CREATE INDEX idx_lease_parcel ON landscape.tbl_lease USING btree (parcel_id),False,,
+landscape,tbl_lease,idx_lease_project,499786,CREATE INDEX idx_lease_project ON landscape.tbl_lease USING btree (project_id),False,,
+landscape,tbl_lease,idx_lease_status,499789,"CREATE INDEX idx_lease_status ON landscape.tbl_lease USING btree (lease_status, affects_occupancy)",False,,
+landscape,tbl_lease,idx_lease_tenant,499791,CREATE INDEX idx_lease_tenant ON landscape.tbl_lease USING btree (tenant_name),False,,
+landscape,tbl_lease,tbl_lease_pkey,499769,CREATE UNIQUE INDEX tbl_lease_pkey ON landscape.tbl_lease USING btree (lease_id),True,tbl_lease_pkey,p
+landscape,tbl_lease_assumptions,idx_lease_assumptions_project,516223,CREATE INDEX idx_lease_assumptions_project ON landscape.tbl_lease_assumptions USING btree (project_id),False,,
+landscape,tbl_lease_assumptions,idx_lease_assumptions_space_type,516224,CREATE INDEX idx_lease_assumptions_space_type ON landscape.tbl_lease_assumptions USING btree (space_type),False,,
+landscape,tbl_lease_assumptions,tbl_lease_assumptions_pkey,516214,CREATE UNIQUE INDEX tbl_lease_assumptions_pkey ON landscape.tbl_lease_assumptions USING btree (assumption_id),True,tbl_lease_assumptions_pkey,p
+landscape,tbl_lease_assumptions,tbl_lease_assumptions_project_id_space_type_effective_date_key,516216,"CREATE UNIQUE INDEX tbl_lease_assumptions_project_id_space_type_effective_date_key ON landscape.tbl_lease_assumptions USING btree (project_id, space_type, effective_date)",True,tbl_lease_assumptions_project_id_space_type_effective_date_key,u
+landscape,tbl_lease_revenue_timing,idx_lease_revenue_timing_lease,516309,CREATE INDEX idx_lease_revenue_timing_lease ON landscape.tbl_lease_revenue_timing USING btree (lease_id),False,,
+landscape,tbl_lease_revenue_timing,idx_lease_revenue_timing_period,516310,CREATE INDEX idx_lease_revenue_timing_period ON landscape.tbl_lease_revenue_timing USING btree (period_id),False,,
+landscape,tbl_lease_revenue_timing,idx_lease_revenue_timing_project,516308,CREATE INDEX idx_lease_revenue_timing_project ON landscape.tbl_lease_revenue_timing USING btree (project_id),False,,
+landscape,tbl_lease_revenue_timing,idx_lease_revenue_timing_project_period,516311,"CREATE INDEX idx_lease_revenue_timing_project_period ON landscape.tbl_lease_revenue_timing USING btree (project_id, period_id)",False,,
+landscape,tbl_lease_revenue_timing,tbl_lease_revenue_timing_lease_id_period_id_key,516296,"CREATE UNIQUE INDEX tbl_lease_revenue_timing_lease_id_period_id_key ON landscape.tbl_lease_revenue_timing USING btree (lease_id, period_id)",True,tbl_lease_revenue_timing_lease_id_period_id_key,u
+landscape,tbl_lease_revenue_timing,tbl_lease_revenue_timing_pkey,516294,CREATE UNIQUE INDEX tbl_lease_revenue_timing_pkey ON landscape.tbl_lease_revenue_timing USING btree (timing_id),True,tbl_lease_revenue_timing_pkey,p
+landscape,tbl_leasing_commission,idx_commission_lease,499907,CREATE INDEX idx_commission_lease ON landscape.tbl_leasing_commission USING btree (lease_id),False,,
+landscape,tbl_leasing_commission,tbl_leasing_commission_pkey,499898,CREATE UNIQUE INDEX tbl_leasing_commission_pkey ON landscape.tbl_leasing_commission USING btree (commission_id),True,tbl_leasing_commission_pkey,p
+landscape,tbl_leasing_commission,uq_commission_lease,499900,CREATE UNIQUE INDEX uq_commission_lease ON landscape.tbl_leasing_commission USING btree (lease_id),True,uq_commission_lease,u
+landscape,tbl_loan,idx_loan_project,499953,CREATE INDEX idx_loan_project ON landscape.tbl_loan USING btree (project_id),False,,
+landscape,tbl_loan,idx_loan_type,499954,CREATE INDEX idx_loan_type ON landscape.tbl_loan USING btree (loan_type),False,,
+landscape,tbl_loan,tbl_loan_pkey,499946,CREATE UNIQUE INDEX tbl_loan_pkey ON landscape.tbl_loan USING btree (loan_id),True,tbl_loan_pkey,p
+landscape,tbl_lot,idx_lot_parcel,499748,CREATE INDEX idx_lot_parcel ON landscape.tbl_lot USING btree (parcel_id),False,,
+landscape,tbl_lot,idx_lot_phase,499749,CREATE INDEX idx_lot_phase ON landscape.tbl_lot USING btree (phase_id),False,,
+landscape,tbl_lot,idx_lot_sale_date,499751,CREATE INDEX idx_lot_sale_date ON landscape.tbl_lot USING btree (sale_date) WHERE (sale_date IS NOT NULL),False,,
+landscape,tbl_lot,idx_lot_status,499750,"CREATE INDEX idx_lot_status ON landscape.tbl_lot USING btree (project_id, lot_status)",False,,
+landscape,tbl_lot,tbl_lot_pkey,499729,CREATE UNIQUE INDEX tbl_lot_pkey ON landscape.tbl_lot USING btree (lot_id),True,tbl_lot_pkey,p
+landscape,tbl_lot,uq_lot_project_number,499731,"CREATE UNIQUE INDEX uq_lot_project_number ON landscape.tbl_lot USING btree (project_id, lot_number)",True,uq_lot_project_number,u
+landscape,tbl_lot_type,tbl_producttype_pkey,41002,CREATE UNIQUE INDEX tbl_producttype_pkey ON landscape.tbl_lot_type USING btree (producttype_id),True,tbl_parcels_producttype_id_fkey,f
+landscape,tbl_lot_type,tbl_producttype_producttype_name_key,41004,CREATE UNIQUE INDEX tbl_producttype_producttype_name_key ON landscape.tbl_lot_type USING btree (producttype_name),True,tbl_producttype_producttype_name_key,u
+landscape,tbl_market_rate_analysis,idx_market_rate_analysis_project,680006,CREATE INDEX idx_market_rate_analysis_project ON landscape.tbl_market_rate_analysis USING btree (project_id),False,,
+landscape,tbl_market_rate_analysis,idx_market_rate_analysis_unit_type,680007,CREATE INDEX idx_market_rate_analysis_unit_type ON landscape.tbl_market_rate_analysis USING btree (unit_type),False,,
+landscape,tbl_market_rate_analysis,tbl_market_rate_analysis_pkey,679997,CREATE UNIQUE INDEX tbl_market_rate_analysis_pkey ON landscape.tbl_market_rate_analysis USING btree (analysis_id),True,tbl_market_rate_analysis_pkey,p
+landscape,tbl_measures,idx_measures_code,163901,CREATE INDEX idx_measures_code ON landscape.tbl_measures USING btree (measure_code),False,,
+landscape,tbl_measures,idx_tbl_measures_sort_order,1163265,CREATE INDEX idx_tbl_measures_sort_order ON landscape.tbl_measures USING btree (sort_order),False,,
+landscape,tbl_measures,tbl_measures_measure_code_key,163852,CREATE UNIQUE INDEX tbl_measures_measure_code_key ON landscape.tbl_measures USING btree (measure_code),True,tbl_measures_measure_code_key,u
+landscape,tbl_measures,tbl_measures_pkey,163850,CREATE UNIQUE INDEX tbl_measures_pkey ON landscape.tbl_measures USING btree (measure_id),True,tbl_measures_pkey,p
+landscape,tbl_milestone,idx_milestone_project,1343585,CREATE INDEX idx_milestone_project ON landscape.tbl_milestone USING btree (project_id),False,,
+landscape,tbl_milestone,idx_milestone_target_date,1343587,CREATE INDEX idx_milestone_target_date ON landscape.tbl_milestone USING btree (target_date),False,,
+landscape,tbl_milestone,idx_milestone_type,1343586,CREATE INDEX idx_milestone_type ON landscape.tbl_milestone USING btree (milestone_type),False,,
+landscape,tbl_milestone,tbl_milestone_pkey,1343563,CREATE UNIQUE INDEX tbl_milestone_pkey ON landscape.tbl_milestone USING btree (milestone_id),True,tbl_milestone_pkey,p
+landscape,tbl_msa,idx_msa_active_display_order,811023,"CREATE INDEX idx_msa_active_display_order ON landscape.tbl_msa USING btree (is_active, display_order) WHERE (is_active = true)",False,,
+landscape,tbl_msa,tbl_msa_pkey,811016,CREATE UNIQUE INDEX tbl_msa_pkey ON landscape.tbl_msa USING btree (msa_id),True,tbl_msa_pkey,p
+landscape,tbl_multifamily_lease,idx_multifamily_lease_end_date,524338,CREATE INDEX idx_multifamily_lease_end_date ON landscape.tbl_multifamily_lease USING btree (lease_end_date),False,,
+landscape,tbl_multifamily_lease,idx_multifamily_lease_is_renewal,524340,CREATE INDEX idx_multifamily_lease_is_renewal ON landscape.tbl_multifamily_lease USING btree (is_renewal),False,,
+landscape,tbl_multifamily_lease,idx_multifamily_lease_notice_date,524339,CREATE INDEX idx_multifamily_lease_notice_date ON landscape.tbl_multifamily_lease USING btree (notice_date) WHERE (notice_date IS NOT NULL),False,,
+landscape,tbl_multifamily_lease,idx_multifamily_lease_start_date,524337,CREATE INDEX idx_multifamily_lease_start_date ON landscape.tbl_multifamily_lease USING btree (lease_start_date),False,,
+landscape,tbl_multifamily_lease,idx_multifamily_lease_status,524336,CREATE INDEX idx_multifamily_lease_status ON landscape.tbl_multifamily_lease USING btree (lease_status),False,,
+landscape,tbl_multifamily_lease,idx_multifamily_lease_unit,524335,CREATE INDEX idx_multifamily_lease_unit ON landscape.tbl_multifamily_lease USING btree (unit_id),False,,
+landscape,tbl_multifamily_lease,tbl_multifamily_lease_pkey,524328,CREATE UNIQUE INDEX tbl_multifamily_lease_pkey ON landscape.tbl_multifamily_lease USING btree (lease_id),True,tbl_multifamily_lease_pkey,p
+landscape,tbl_multifamily_property,idx_multifamily_property_class,712766,CREATE INDEX idx_multifamily_property_class ON landscape.tbl_multifamily_property USING btree (property_class),False,,
+landscape,tbl_multifamily_property,idx_multifamily_property_project,712764,CREATE INDEX idx_multifamily_property_project ON landscape.tbl_multifamily_property USING btree (project_id),False,,
+landscape,tbl_multifamily_property,idx_multifamily_property_status,712765,CREATE INDEX idx_multifamily_property_status ON landscape.tbl_multifamily_property USING btree (property_status),False,,
+landscape,tbl_multifamily_property,tbl_multifamily_property_pkey,712757,CREATE UNIQUE INDEX tbl_multifamily_property_pkey ON landscape.tbl_multifamily_property USING btree (multifamily_property_id),True,tbl_multifamily_property_pkey,p
+landscape,tbl_multifamily_property,tbl_multifamily_property_project_id_key,1351680,CREATE UNIQUE INDEX tbl_multifamily_property_project_id_key ON landscape.tbl_multifamily_property USING btree (project_id),True,tbl_multifamily_property_project_id_key,u
+landscape,tbl_multifamily_turn,idx_multifamily_turn_make_ready_complete,524370,CREATE INDEX idx_multifamily_turn_make_ready_complete ON landscape.tbl_multifamily_turn USING btree (make_ready_complete_date),False,,
+landscape,tbl_multifamily_turn,idx_multifamily_turn_move_out,524369,CREATE INDEX idx_multifamily_turn_move_out ON landscape.tbl_multifamily_turn USING btree (move_out_date),False,,
+landscape,tbl_multifamily_turn,idx_multifamily_turn_status,524368,CREATE INDEX idx_multifamily_turn_status ON landscape.tbl_multifamily_turn USING btree (turn_status),False,,
+landscape,tbl_multifamily_turn,idx_multifamily_turn_unit,524367,CREATE INDEX idx_multifamily_turn_unit ON landscape.tbl_multifamily_turn USING btree (unit_id),False,,
+landscape,tbl_multifamily_turn,tbl_multifamily_turn_pkey,524360,CREATE UNIQUE INDEX tbl_multifamily_turn_pkey ON landscape.tbl_multifamily_turn USING btree (turn_id),True,tbl_multifamily_turn_pkey,p
+landscape,tbl_multifamily_unit,idx_multifamily_unit_building,524309,CREATE INDEX idx_multifamily_unit_building ON landscape.tbl_multifamily_unit USING btree (building_name),False,,
+landscape,tbl_multifamily_unit,idx_multifamily_unit_project,524307,CREATE INDEX idx_multifamily_unit_project ON landscape.tbl_multifamily_unit USING btree (project_id),False,,
+landscape,tbl_multifamily_unit,idx_multifamily_unit_renovation_status,524310,CREATE INDEX idx_multifamily_unit_renovation_status ON landscape.tbl_multifamily_unit USING btree (renovation_status),False,,
+landscape,tbl_multifamily_unit,idx_multifamily_unit_type,524308,CREATE INDEX idx_multifamily_unit_type ON landscape.tbl_multifamily_unit USING btree (unit_type),False,,
+landscape,tbl_multifamily_unit,tbl_multifamily_unit_pkey,524298,CREATE UNIQUE INDEX tbl_multifamily_unit_pkey ON landscape.tbl_multifamily_unit USING btree (unit_id),True,tbl_multifamily_unit_pkey,p
+landscape,tbl_multifamily_unit,uq_unit_project_number,524300,"CREATE UNIQUE INDEX uq_unit_project_number ON landscape.tbl_multifamily_unit USING btree (project_id, unit_number)",True,uq_unit_project_number,u
+landscape,tbl_multifamily_unit_type,idx_multifamily_unit_type_code,524390,CREATE INDEX idx_multifamily_unit_type_code ON landscape.tbl_multifamily_unit_type USING btree (unit_type_code),False,,
+landscape,tbl_multifamily_unit_type,idx_multifamily_unit_type_project,524389,CREATE INDEX idx_multifamily_unit_type_project ON landscape.tbl_multifamily_unit_type USING btree (project_id),False,,
+landscape,tbl_multifamily_unit_type,tbl_multifamily_unit_type_pkey,524380,CREATE UNIQUE INDEX tbl_multifamily_unit_type_pkey ON landscape.tbl_multifamily_unit_type USING btree (unit_type_id),True,tbl_multifamily_unit_type_pkey,p
+landscape,tbl_multifamily_unit_type,uq_unit_type_project_code,524382,"CREATE UNIQUE INDEX uq_unit_type_project_code ON landscape.tbl_multifamily_unit_type USING btree (project_id, unit_type_code)",True,uq_unit_type_project_code,u
+landscape,tbl_multifamily_unit_type,uq_unit_type_project_name,1343664,"CREATE UNIQUE INDEX uq_unit_type_project_name ON landscape.tbl_multifamily_unit_type USING btree (project_id, unit_type_name)",True,uq_unit_type_project_name,u
+landscape,tbl_operating_expense,idx_opex_category,499933,CREATE INDEX idx_opex_category ON landscape.tbl_operating_expense USING btree (expense_category),False,,
+landscape,tbl_operating_expense,idx_opex_parcel,499932,CREATE INDEX idx_opex_parcel ON landscape.tbl_operating_expense USING btree (parcel_id),False,,
+landscape,tbl_operating_expense,idx_opex_project,499931,CREATE INDEX idx_opex_project ON landscape.tbl_operating_expense USING btree (project_id),False,,
+landscape,tbl_operating_expense,tbl_operating_expense_pkey,499919,CREATE UNIQUE INDEX tbl_operating_expense_pkey ON landscape.tbl_operating_expense USING btree (expense_id),True,tbl_operating_expense_pkey,p
+landscape,tbl_operating_expense,uq_opex_project_category,1343660,"CREATE UNIQUE INDEX uq_opex_project_category ON landscape.tbl_operating_expense USING btree (project_id, expense_category)",True,uq_opex_project_category,u
+landscape,tbl_operating_expenses,idx_operating_expenses_account,720923,CREATE INDEX idx_operating_expenses_account ON landscape.tbl_operating_expenses USING btree (account_id),False,,
+landscape,tbl_operating_expenses,idx_operating_expenses_category_id,1515564,CREATE INDEX idx_operating_expenses_category_id ON landscape.tbl_operating_expenses USING btree (category_id),False,,
+landscape,tbl_operating_expenses,idx_opex_project_account,999427,"CREATE INDEX idx_opex_project_account ON landscape.tbl_operating_expenses USING btree (project_id, account_id)",False,,
+landscape,tbl_operating_expenses,idx_opex_project_statement,1581059,"CREATE INDEX idx_opex_project_statement ON landscape.tbl_operating_expenses USING btree (project_id, statement_discriminator)",False,,
+landscape,tbl_operating_expenses,idx_opex_recoverable,516251,CREATE INDEX idx_opex_recoverable ON landscape.tbl_operating_expenses USING btree (is_recoverable),False,,
+landscape,tbl_operating_expenses,idx_opex_type,516250,CREATE INDEX idx_opex_type ON landscape.tbl_operating_expenses USING btree (expense_type),False,,
+landscape,tbl_operating_expenses,tbl_operating_expenses_pkey,516243,CREATE UNIQUE INDEX tbl_operating_expenses_pkey ON landscape.tbl_operating_expenses USING btree (opex_id),True,tbl_operating_expenses_pkey,p
+landscape,tbl_operating_expenses,ux_opex_proj_acct_stmt,1581058,"CREATE UNIQUE INDEX ux_opex_proj_acct_stmt ON landscape.tbl_operating_expenses USING btree (project_id, account_id, statement_discriminator) WHERE (account_id IS NOT NULL)",False,,
+landscape,tbl_operating_expenses,ux_opex_proj_cat_stmt,1581057,"CREATE UNIQUE INDEX ux_opex_proj_cat_stmt ON landscape.tbl_operating_expenses USING btree (project_id, category_id, statement_discriminator) WHERE (category_id IS NOT NULL)",False,,
+landscape,tbl_operations_user_inputs,idx_ops_inputs_category,1597470,CREATE INDEX idx_ops_inputs_category ON landscape.tbl_operations_user_inputs USING btree (category_id) WHERE (category_id IS NOT NULL),False,,
+landscape,tbl_operations_user_inputs,idx_ops_inputs_parent,1597471,"CREATE INDEX idx_ops_inputs_parent ON landscape.tbl_operations_user_inputs USING btree (project_id, section, parent_key) WHERE (parent_key IS NOT NULL)",False,,
+landscape,tbl_operations_user_inputs,idx_ops_inputs_project,1597468,CREATE INDEX idx_ops_inputs_project ON landscape.tbl_operations_user_inputs USING btree (project_id),False,,
+landscape,tbl_operations_user_inputs,idx_ops_inputs_section,1597469,"CREATE INDEX idx_ops_inputs_section ON landscape.tbl_operations_user_inputs USING btree (project_id, section)",False,,
+landscape,tbl_operations_user_inputs,tbl_operations_user_inputs_pkey,1597454,CREATE UNIQUE INDEX tbl_operations_user_inputs_pkey ON landscape.tbl_operations_user_inputs USING btree (input_id),True,tbl_operations_user_inputs_pkey,p
+landscape,tbl_operations_user_inputs,tbl_operations_user_inputs_project_id_section_line_item_key_key,1597456,"CREATE UNIQUE INDEX tbl_operations_user_inputs_project_id_section_line_item_key_key ON landscape.tbl_operations_user_inputs USING btree (project_id, section, line_item_key)",True,tbl_operations_user_inputs_project_id_section_line_item_key_key,u
+landscape,tbl_opex_accounts_deprecated,idx_opex_accounts_level,720916,CREATE INDEX idx_opex_accounts_level ON landscape.tbl_opex_accounts_deprecated USING btree (account_level),False,,
+landscape,tbl_opex_accounts_deprecated,idx_opex_accounts_number,720917,CREATE INDEX idx_opex_accounts_number ON landscape.tbl_opex_accounts_deprecated USING btree (account_number),False,,
+landscape,tbl_opex_accounts_deprecated,idx_opex_accounts_parent,720915,CREATE INDEX idx_opex_accounts_parent ON landscape.tbl_opex_accounts_deprecated USING btree (parent_account_id),False,,
+landscape,tbl_opex_accounts_deprecated,tbl_opex_accounts_account_number_key,720908,CREATE UNIQUE INDEX tbl_opex_accounts_account_number_key ON landscape.tbl_opex_accounts_deprecated USING btree (account_number),True,tbl_opex_accounts_account_number_key,u
+landscape,tbl_opex_accounts_deprecated,tbl_opex_accounts_pkey,720906,CREATE UNIQUE INDEX tbl_opex_accounts_pkey ON landscape.tbl_opex_accounts_deprecated USING btree (account_id),True,tbl_opex_accounts_pkey,p
+landscape,tbl_opex_timing,idx_opex_timing_opex,516337,CREATE INDEX idx_opex_timing_opex ON landscape.tbl_opex_timing USING btree (opex_id),False,,
+landscape,tbl_opex_timing,idx_opex_timing_period,516338,CREATE INDEX idx_opex_timing_period ON landscape.tbl_opex_timing USING btree (period_id),False,,
+landscape,tbl_opex_timing,idx_opex_timing_project,516336,CREATE INDEX idx_opex_timing_project ON landscape.tbl_opex_timing USING btree (project_id),False,,
+landscape,tbl_opex_timing,idx_opex_timing_project_period,516339,"CREATE INDEX idx_opex_timing_project_period ON landscape.tbl_opex_timing USING btree (project_id, period_id)",False,,
+landscape,tbl_opex_timing,tbl_opex_timing_opex_id_period_id_key,516324,"CREATE UNIQUE INDEX tbl_opex_timing_opex_id_period_id_key ON landscape.tbl_opex_timing USING btree (opex_id, period_id)",True,tbl_opex_timing_opex_id_period_id_key,u
+landscape,tbl_opex_timing,tbl_opex_timing_pkey,516322,CREATE UNIQUE INDEX tbl_opex_timing_pkey ON landscape.tbl_opex_timing USING btree (timing_id),True,tbl_opex_timing_pkey,p
+landscape,tbl_parcel,idx_parcel_sale_phase,958491,"CREATE INDEX idx_parcel_sale_phase ON landscape.tbl_parcel USING btree (project_id, sale_phase_code) WHERE (sale_phase_code IS NOT NULL)",False,,
+landscape,tbl_parcel,idx_tbl_parcel_code,376832,"CREATE INDEX idx_tbl_parcel_code ON landscape.tbl_parcel USING btree (project_id, parcel_code)",False,,
+landscape,tbl_parcel,tbl_parcels_pkey,41031,CREATE UNIQUE INDEX tbl_parcels_pkey ON landscape.tbl_parcel USING btree (parcel_id),True,tbl_parcels_pkey,p
+landscape,tbl_parcel_sale_assumptions,idx_parcel_sale_assumptions_parcel,983085,CREATE INDEX idx_parcel_sale_assumptions_parcel ON landscape.tbl_parcel_sale_assumptions USING btree (parcel_id),False,,
+landscape,tbl_parcel_sale_assumptions,tbl_parcel_sale_assumptions_parcel_id_key,983078,CREATE UNIQUE INDEX tbl_parcel_sale_assumptions_parcel_id_key ON landscape.tbl_parcel_sale_assumptions USING btree (parcel_id),True,tbl_parcel_sale_assumptions_parcel_id_key,u
+landscape,tbl_parcel_sale_assumptions,tbl_parcel_sale_assumptions_pkey,983076,CREATE UNIQUE INDEX tbl_parcel_sale_assumptions_pkey ON landscape.tbl_parcel_sale_assumptions USING btree (assumption_id),True,tbl_parcel_sale_assumptions_pkey,p
+landscape,tbl_parcel_sale_event,idx_sale_event_parcel,966680,CREATE INDEX idx_sale_event_parcel ON landscape.tbl_parcel_sale_event USING btree (parcel_id),False,,
+landscape,tbl_parcel_sale_event,idx_sale_event_project,966679,CREATE INDEX idx_sale_event_project ON landscape.tbl_parcel_sale_event USING btree (project_id),False,,
+landscape,tbl_parcel_sale_event,idx_sale_event_status,966682,CREATE INDEX idx_sale_event_status ON landscape.tbl_parcel_sale_event USING btree (sale_status),False,,
+landscape,tbl_parcel_sale_event,idx_sale_event_type,966681,CREATE INDEX idx_sale_event_type ON landscape.tbl_parcel_sale_event USING btree (sale_type),False,,
+landscape,tbl_parcel_sale_event,tbl_parcel_sale_event_pkey,966672,CREATE UNIQUE INDEX tbl_parcel_sale_event_pkey ON landscape.tbl_parcel_sale_event USING btree (sale_event_id),True,tbl_parcel_sale_event_pkey,p
+landscape,tbl_participation_payment,idx_participation_date,663663,CREATE INDEX idx_participation_date ON landscape.tbl_participation_payment USING btree (payment_date),False,,
+landscape,tbl_participation_payment,idx_participation_period,663664,CREATE INDEX idx_participation_period ON landscape.tbl_participation_payment USING btree (payment_period),False,,
+landscape,tbl_participation_payment,idx_participation_project,663662,CREATE INDEX idx_participation_project ON landscape.tbl_participation_payment USING btree (project_id),False,,
+landscape,tbl_participation_payment,idx_participation_settlement,663661,CREATE INDEX idx_participation_settlement ON landscape.tbl_participation_payment USING btree (settlement_id),False,,
+landscape,tbl_participation_payment,idx_participation_status,663665,CREATE INDEX idx_participation_status ON landscape.tbl_participation_payment USING btree (payment_status),False,,
+landscape,tbl_participation_payment,tbl_participation_payment_pkey,663649,CREATE UNIQUE INDEX tbl_participation_payment_pkey ON landscape.tbl_participation_payment USING btree (payment_id),True,tbl_participation_payment_pkey,p
+landscape,tbl_phase,tbl_devphase_pkey,40983,CREATE UNIQUE INDEX tbl_devphase_pkey ON landscape.tbl_phase USING btree (phase_id),True,tbl_devphase_pkey,p
+landscape,tbl_project,idx_project_active_opex_discriminator,1589249,CREATE INDEX idx_project_active_opex_discriminator ON landscape.tbl_project USING btree (active_opex_discriminator),False,,
+landscape,tbl_project,idx_project_analysis_type,802820,CREATE INDEX idx_project_analysis_type ON landscape.tbl_project USING btree (analysis_type),False,,
+landscape,tbl_project,idx_project_flood_zone,1343655,CREATE INDEX idx_project_flood_zone ON landscape.tbl_project USING btree (flood_zone) WHERE (flood_zone IS NOT NULL),False,,
+landscape,tbl_project,idx_project_msa_id,811024,CREATE INDEX idx_project_msa_id ON landscape.tbl_project USING btree (msa_id),False,,
+landscape,tbl_project,idx_project_property_subtype,802821,CREATE INDEX idx_project_property_subtype ON landscape.tbl_project USING btree (property_subtype),False,,
+landscape,tbl_project,idx_project_template,614405,CREATE INDEX idx_project_template ON landscape.tbl_project USING btree (template_id),False,,
+landscape,tbl_project,idx_project_topography,1343656,CREATE INDEX idx_project_topography ON landscape.tbl_project USING btree (topography) WHERE (topography IS NOT NULL),False,,
+landscape,tbl_project,tbl_project_pkey,40964,CREATE UNIQUE INDEX tbl_project_pkey ON landscape.tbl_project USING btree (project_id),True,tbl_project_pkey,p
+landscape,tbl_project,tbl_project_project_name_key,40966,CREATE UNIQUE INDEX tbl_project_project_name_key ON landscape.tbl_project USING btree (project_name),True,tbl_project_project_name_key,u
+landscape,tbl_project_assumption,idx_assumption_key,1343514,CREATE INDEX idx_assumption_key ON landscape.tbl_project_assumption USING btree (assumption_key),False,,
+landscape,tbl_project_assumption,idx_assumption_project,1343513,CREATE INDEX idx_assumption_project ON landscape.tbl_project_assumption USING btree (project_id),False,,
+landscape,tbl_project_assumption,tbl_project_assumption_pkey,1343499,CREATE UNIQUE INDEX tbl_project_assumption_pkey ON landscape.tbl_project_assumption USING btree (assumption_id),True,tbl_project_assumption_pkey,p
+landscape,tbl_project_assumption,uq_project_assumption,1343501,"CREATE UNIQUE INDEX uq_project_assumption ON landscape.tbl_project_assumption USING btree (project_id, assumption_key)",True,uq_project_assumption,u
+landscape,tbl_project_assumption,uq_project_assumption_key,1368064,"CREATE UNIQUE INDEX uq_project_assumption_key ON landscape.tbl_project_assumption USING btree (project_id, assumption_key)",True,uq_project_assumption_key,u
+landscape,tbl_project_config,idx_project_config_asset_type,311344,CREATE INDEX idx_project_config_asset_type ON landscape.tbl_project_config USING btree (asset_type),False,,
+landscape,tbl_project_config,idx_project_config_land_use_labels,786440,"CREATE INDEX idx_project_config_land_use_labels ON landscape.tbl_project_config USING btree (land_use_level1_label, land_use_level2_label, land_use_level3_label)",False,,
+landscape,tbl_project_config,tbl_project_config_pkey,311337,CREATE UNIQUE INDEX tbl_project_config_pkey ON landscape.tbl_project_config USING btree (project_id),True,tbl_project_config_pkey,p
+landscape,tbl_project_inventory_columns,idx_project_columns_order,573512,"CREATE INDEX idx_project_columns_order ON landscape.tbl_project_inventory_columns USING btree (project_id, display_order)",False,,
+landscape,tbl_project_inventory_columns,idx_project_columns_project,573511,CREATE INDEX idx_project_columns_project ON landscape.tbl_project_inventory_columns USING btree (project_id),False,,
+landscape,tbl_project_inventory_columns,tbl_project_inventory_columns_pkey,573502,CREATE UNIQUE INDEX tbl_project_inventory_columns_pkey ON landscape.tbl_project_inventory_columns USING btree (column_config_id),True,tbl_project_inventory_columns_pkey,p
+landscape,tbl_project_inventory_columns,uq_project_column,573504,"CREATE UNIQUE INDEX uq_project_column ON landscape.tbl_project_inventory_columns USING btree (project_id, column_name)",True,uq_project_column,u
+landscape,tbl_project_metrics,idx_metrics_latest,500078,"CREATE INDEX idx_metrics_latest ON landscape.tbl_project_metrics USING btree (project_id, calculation_version DESC)",False,,
+landscape,tbl_project_metrics,idx_metrics_project,500077,CREATE INDEX idx_metrics_project ON landscape.tbl_project_metrics USING btree (project_id),False,,
+landscape,tbl_project_metrics,tbl_project_metrics_pkey,500068,CREATE UNIQUE INDEX tbl_project_metrics_pkey ON landscape.tbl_project_metrics USING btree (metrics_id),True,tbl_project_metrics_pkey,p
+landscape,tbl_project_metrics,uq_metrics_project_version,500070,"CREATE UNIQUE INDEX uq_metrics_project_version ON landscape.tbl_project_metrics USING btree (project_id, calculation_version)",True,uq_metrics_project_version,u
+landscape,tbl_project_settings,idx_project_settings_currency,311439,CREATE INDEX idx_project_settings_currency ON landscape.tbl_project_settings USING btree (default_currency),False,,
+landscape,tbl_project_settings,tbl_project_settings_pkey,311432,CREATE UNIQUE INDEX tbl_project_settings_pkey ON landscape.tbl_project_settings USING btree (project_id),True,tbl_project_settings_pkey,p
+landscape,tbl_property_acquisition,idx_acquisition_project,647366,CREATE INDEX idx_acquisition_project ON landscape.tbl_property_acquisition USING btree (project_id),False,,
+landscape,tbl_property_acquisition,tbl_property_acquisition_pkey,647182,CREATE UNIQUE INDEX tbl_property_acquisition_pkey ON landscape.tbl_property_acquisition USING btree (acquisition_id),True,tbl_property_acquisition_pkey,p
+landscape,tbl_property_apn,idx_property_apn_apn,712722,CREATE INDEX idx_property_apn_apn ON landscape.tbl_property_apn USING btree (apn),False,,
+landscape,tbl_property_apn,idx_property_apn_project,712721,CREATE INDEX idx_property_apn_project ON landscape.tbl_property_apn USING btree (project_id),False,,
+landscape,tbl_property_apn,tbl_property_apn_pkey,712714,CREATE UNIQUE INDEX tbl_property_apn_pkey ON landscape.tbl_property_apn USING btree (property_apn_id),True,tbl_property_apn_pkey,p
+landscape,tbl_property_type_config,tbl_property_type_config_pkey,573449,CREATE UNIQUE INDEX tbl_property_type_config_pkey ON landscape.tbl_property_type_config USING btree (config_id),True,tbl_property_type_config_pkey,p
+landscape,tbl_property_type_config,tbl_property_type_config_property_type_key,573451,CREATE UNIQUE INDEX tbl_property_type_config_property_type_key ON landscape.tbl_property_type_config USING btree (property_type),True,tbl_property_type_config_property_type_key,u
+landscape,tbl_property_use_template,idx_template_property_type,598049,"CREATE INDEX idx_template_property_type ON landscape.tbl_property_use_template USING btree (property_type, is_active)",False,,
+landscape,tbl_property_use_template,tbl_property_use_template_pkey,598029,CREATE UNIQUE INDEX tbl_property_use_template_pkey ON landscape.tbl_property_use_template USING btree (template_id),True,tbl_property_use_template_pkey,p
+landscape,tbl_recovery,idx_recovery_lease,499851,CREATE INDEX idx_recovery_lease ON landscape.tbl_recovery USING btree (lease_id),False,,
+landscape,tbl_recovery,tbl_recovery_pkey,499842,CREATE UNIQUE INDEX tbl_recovery_pkey ON landscape.tbl_recovery USING btree (recovery_id),True,tbl_recovery_pkey,p
+landscape,tbl_recovery,uq_recovery_lease,499844,CREATE UNIQUE INDEX uq_recovery_lease ON landscape.tbl_recovery USING btree (lease_id),True,uq_recovery_lease,u
+landscape,tbl_rent_comparable,idx_rent_comparable_project,680004,CREATE INDEX idx_rent_comparable_project ON landscape.tbl_rent_comparable USING btree (project_id),False,,
+landscape,tbl_rent_comparable,idx_rent_comparable_unit_type,680005,CREATE INDEX idx_rent_comparable_unit_type ON landscape.tbl_rent_comparable USING btree (unit_type),False,,
+landscape,tbl_rent_comparable,tbl_rent_comparable_pkey,679975,CREATE UNIQUE INDEX tbl_rent_comparable_pkey ON landscape.tbl_rent_comparable USING btree (comparable_id),True,tbl_rent_comparable_pkey,p
+landscape,tbl_rent_roll,idx_rent_roll_end_date,516190,CREATE INDEX idx_rent_roll_end_date ON landscape.tbl_rent_roll USING btree (lease_end_date),False,,
+landscape,tbl_rent_roll,idx_rent_roll_project,516189,CREATE INDEX idx_rent_roll_project ON landscape.tbl_rent_roll USING btree (project_id),False,,
+landscape,tbl_rent_roll,idx_rent_roll_space_type,516192,CREATE INDEX idx_rent_roll_space_type ON landscape.tbl_rent_roll USING btree (space_type),False,,
+landscape,tbl_rent_roll,idx_rent_roll_status,516191,CREATE INDEX idx_rent_roll_status ON landscape.tbl_rent_roll USING btree (lease_status),False,,
+landscape,tbl_rent_roll,tbl_rent_roll_pkey,516182,CREATE UNIQUE INDEX tbl_rent_roll_pkey ON landscape.tbl_rent_roll USING btree (rent_roll_id),True,tbl_rent_roll_pkey,p
+landscape,tbl_rent_roll_unit,idx_rent_roll_unit,647368,CREATE INDEX idx_rent_roll_unit ON landscape.tbl_rent_roll_unit USING btree (unit_id),False,,
+landscape,tbl_rent_roll_unit,tbl_rent_roll_unit_pkey,647219,CREATE UNIQUE INDEX tbl_rent_roll_unit_pkey ON landscape.tbl_rent_roll_unit USING btree (rent_roll_id),True,tbl_rent_roll_unit_pkey,p
+landscape,tbl_rental_comparable,idx_rental_comp_location,1261586,"CREATE INDEX idx_rental_comp_location ON landscape.tbl_rental_comparable USING btree (latitude, longitude)",False,,
+landscape,tbl_rental_comparable,idx_rental_comp_project,1261585,CREATE INDEX idx_rental_comp_project ON landscape.tbl_rental_comparable USING btree (project_id),False,,
+landscape,tbl_rental_comparable,tbl_rental_comparable_pkey,1261578,CREATE UNIQUE INDEX tbl_rental_comparable_pkey ON landscape.tbl_rental_comparable USING btree (comparable_id),True,tbl_rental_comparable_pkey,p
+landscape,tbl_revenue_other,idx_other_income_project,647369,CREATE INDEX idx_other_income_project ON landscape.tbl_revenue_other USING btree (project_id),False,,
+landscape,tbl_revenue_other,tbl_revenue_other_pkey,647240,CREATE UNIQUE INDEX tbl_revenue_other_pkey ON landscape.tbl_revenue_other USING btree (other_income_id),True,tbl_revenue_other_pkey,p
+landscape,tbl_revenue_other,uq_revenue_other_project,1368066,CREATE UNIQUE INDEX uq_revenue_other_project ON landscape.tbl_revenue_other USING btree (project_id),True,uq_revenue_other_project,u
+landscape,tbl_revenue_rent,idx_rent_project,647367,CREATE INDEX idx_rent_project ON landscape.tbl_revenue_rent USING btree (project_id),False,,
+landscape,tbl_revenue_rent,tbl_revenue_rent_pkey,647205,CREATE UNIQUE INDEX tbl_revenue_rent_pkey ON landscape.tbl_revenue_rent USING btree (rent_id),True,tbl_revenue_rent_pkey,p
+landscape,tbl_revenue_timing,idx_revenue_timing_absorption,507988,"CREATE INDEX idx_revenue_timing_absorption ON landscape.tbl_revenue_timing USING btree (absorption_id, period_id)",False,,
+landscape,tbl_revenue_timing,idx_revenue_timing_period,507989,CREATE INDEX idx_revenue_timing_period ON landscape.tbl_revenue_timing USING btree (period_id),False,,
+landscape,tbl_revenue_timing,tbl_revenue_timing_pkey,507974,CREATE UNIQUE INDEX tbl_revenue_timing_pkey ON landscape.tbl_revenue_timing USING btree (revenue_timing_id),True,tbl_revenue_timing_pkey,p
+landscape,tbl_revenue_timing,uq_revenue_timing_period,507976,"CREATE UNIQUE INDEX uq_revenue_timing_period ON landscape.tbl_revenue_timing USING btree (absorption_id, period_id)",True,uq_revenue_timing_period,u
+landscape,tbl_sale_benchmarks,idx_sale_benchmarks_product,983060,"CREATE INDEX idx_sale_benchmarks_product ON landscape.tbl_sale_benchmarks USING btree (project_id, lu_type_code, product_code)",False,,
+landscape,tbl_sale_benchmarks,idx_sale_benchmarks_scope,983058,"CREATE INDEX idx_sale_benchmarks_scope ON landscape.tbl_sale_benchmarks USING btree (scope_level, project_id)",False,,
+landscape,tbl_sale_benchmarks,idx_sale_benchmarks_type,983059,CREATE INDEX idx_sale_benchmarks_type ON landscape.tbl_sale_benchmarks USING btree (benchmark_type),False,,
+landscape,tbl_sale_benchmarks,tbl_sale_benchmarks_pkey,983051,CREATE UNIQUE INDEX tbl_sale_benchmarks_pkey ON landscape.tbl_sale_benchmarks USING btree (benchmark_id),True,tbl_sale_benchmarks_pkey,p
+landscape,tbl_sale_phases,idx_sale_phases_project,958509,CREATE INDEX idx_sale_phases_project ON landscape.tbl_sale_phases USING btree (project_id),False,,
+landscape,tbl_sale_phases,tbl_sale_phases_pkey,958502,CREATE UNIQUE INDEX tbl_sale_phases_pkey ON landscape.tbl_sale_phases USING btree (phase_code),True,tbl_sale_phases_pkey,p
+landscape,tbl_sale_settlement,idx_sale_settlement_container,958511,CREATE INDEX idx_sale_settlement_container ON landscape.tbl_sale_settlement USING btree (container_id),False,,
+landscape,tbl_sale_settlement,idx_sale_settlement_parcel,958512,CREATE INDEX idx_sale_settlement_parcel ON landscape.tbl_sale_settlement USING btree (parcel_id),False,,
+landscape,tbl_sale_settlement,idx_sale_settlement_phase,958510,CREATE INDEX idx_sale_settlement_phase ON landscape.tbl_sale_settlement USING btree (sale_phase_code),False,,
+landscape,tbl_sale_settlement,idx_settlement_container,663632,CREATE INDEX idx_settlement_container ON landscape.tbl_sale_settlement USING btree (container_id),False,,
+landscape,tbl_sale_settlement,idx_settlement_date,663633,CREATE INDEX idx_settlement_date ON landscape.tbl_sale_settlement USING btree (sale_date),False,,
+landscape,tbl_sale_settlement,idx_settlement_project,663631,CREATE INDEX idx_settlement_project ON landscape.tbl_sale_settlement USING btree (project_id),False,,
+landscape,tbl_sale_settlement,idx_settlement_status,663634,CREATE INDEX idx_settlement_status ON landscape.tbl_sale_settlement USING btree (settlement_status),False,,
+landscape,tbl_sale_settlement,tbl_sale_settlement_pkey,663619,CREATE UNIQUE INDEX tbl_sale_settlement_pkey ON landscape.tbl_sale_settlement USING btree (settlement_id),True,tbl_sale_settlement_pkey,p
+landscape,tbl_sales_comp_adjustments,idx_sales_comp_adjustments_comparable,770084,CREATE INDEX idx_sales_comp_adjustments_comparable ON landscape.tbl_sales_comp_adjustments USING btree (comparable_id),False,,
+landscape,tbl_sales_comp_adjustments,tbl_sales_comp_adjustments_pkey,770077,CREATE UNIQUE INDEX tbl_sales_comp_adjustments_pkey ON landscape.tbl_sales_comp_adjustments USING btree (adjustment_id),True,tbl_sales_comp_adjustments_pkey,p
+landscape,tbl_sales_comparables,idx_sales_comparables_project,770066,CREATE INDEX idx_sales_comparables_project ON landscape.tbl_sales_comparables USING btree (project_id),False,,
+landscape,tbl_sales_comparables,idx_sales_comparables_sale_date,770067,CREATE INDEX idx_sales_comparables_sale_date ON landscape.tbl_sales_comparables USING btree (sale_date DESC),False,,
+landscape,tbl_sales_comparables,tbl_sales_comparables_pkey,770059,CREATE UNIQUE INDEX tbl_sales_comparables_pkey ON landscape.tbl_sales_comparables USING btree (comparable_id),True,tbl_sales_comparables_pkey,p
+landscape,tbl_scenario,idx_scenario_active,696356,"CREATE INDEX idx_scenario_active ON landscape.tbl_scenario USING btree (project_id, is_active) WHERE (is_active = true)",False,,
+landscape,tbl_scenario,idx_scenario_display_order,696357,"CREATE INDEX idx_scenario_display_order ON landscape.tbl_scenario USING btree (project_id, display_order)",False,,
+landscape,tbl_scenario,idx_scenario_project,696355,CREATE INDEX idx_scenario_project ON landscape.tbl_scenario USING btree (project_id),False,,
+landscape,tbl_scenario,tbl_scenario_pkey,696336,CREATE UNIQUE INDEX tbl_scenario_pkey ON landscape.tbl_scenario USING btree (scenario_id),True,core_fin_fact_budget_scenario_id_fkey,f
+landscape,tbl_scenario,tbl_scenario_scenario_code_key,696338,CREATE UNIQUE INDEX tbl_scenario_scenario_code_key ON landscape.tbl_scenario USING btree (scenario_code),True,tbl_scenario_scenario_code_key,u
+landscape,tbl_scenario_comparison,idx_scenario_comparison_project,696376,CREATE INDEX idx_scenario_comparison_project ON landscape.tbl_scenario_comparison USING btree (project_id),False,,
+landscape,tbl_scenario_comparison,tbl_scenario_comparison_pkey,696369,CREATE UNIQUE INDEX tbl_scenario_comparison_pkey ON landscape.tbl_scenario_comparison USING btree (comparison_id),True,tbl_scenario_comparison_pkey,p
+landscape,tbl_system_picklist,idx_picklist_active,1155093,CREATE INDEX idx_picklist_active ON landscape.tbl_system_picklist USING btree (is_active),False,,
+landscape,tbl_system_picklist,idx_picklist_parent,1155094,CREATE INDEX idx_picklist_parent ON landscape.tbl_system_picklist USING btree (parent_id),False,,
+landscape,tbl_system_picklist,idx_picklist_type,1155092,CREATE INDEX idx_picklist_type ON landscape.tbl_system_picklist USING btree (picklist_type),False,,
+landscape,tbl_system_picklist,tbl_system_picklist_picklist_type_code_key,1155085,"CREATE UNIQUE INDEX tbl_system_picklist_picklist_type_code_key ON landscape.tbl_system_picklist USING btree (picklist_type, code)",True,tbl_system_picklist_picklist_type_code_key,u
+landscape,tbl_system_picklist,tbl_system_picklist_pkey,1155083,CREATE UNIQUE INDEX tbl_system_picklist_pkey ON landscape.tbl_system_picklist USING btree (picklist_id),True,tbl_system_picklist_pkey,p
+landscape,tbl_template_column_config,idx_template_column_template,598050,"CREATE INDEX idx_template_column_template ON landscape.tbl_template_column_config USING btree (template_id, display_order)",False,,
+landscape,tbl_template_column_config,tbl_template_column_config_pkey,598042,CREATE UNIQUE INDEX tbl_template_column_config_pkey ON landscape.tbl_template_column_config USING btree (template_column_id),True,tbl_template_column_config_pkey,p
+landscape,tbl_tenant_improvement,idx_ti_lease,499888,CREATE INDEX idx_ti_lease ON landscape.tbl_tenant_improvement USING btree (lease_id),False,,
+landscape,tbl_tenant_improvement,tbl_tenant_improvement_pkey,499879,CREATE UNIQUE INDEX tbl_tenant_improvement_pkey ON landscape.tbl_tenant_improvement USING btree (tenant_improvement_id),True,tbl_tenant_improvement_pkey,p
+landscape,tbl_tenant_improvement,uq_ti_lease,499881,CREATE UNIQUE INDEX uq_ti_lease ON landscape.tbl_tenant_improvement USING btree (lease_id),True,uq_ti_lease,u
+landscape,tbl_uom_calculation_formulas,idx_uom_formulas_code,974875,CREATE INDEX idx_uom_formulas_code ON landscape.tbl_uom_calculation_formulas USING btree (uom_code),False,,
+landscape,tbl_uom_calculation_formulas,tbl_uom_calculation_formulas_pkey,974871,CREATE UNIQUE INDEX tbl_uom_calculation_formulas_pkey ON landscape.tbl_uom_calculation_formulas USING btree (formula_id),True,tbl_uom_calculation_formulas_pkey,p
+landscape,tbl_uom_calculation_formulas,tbl_uom_calculation_formulas_uom_code_key,974873,CREATE UNIQUE INDEX tbl_uom_calculation_formulas_uom_code_key ON landscape.tbl_uom_calculation_formulas USING btree (uom_code),True,tbl_uom_calculation_formulas_uom_code_key,u
+landscape,tbl_user_preference,tbl_user_pr_prefere_c180c6_idx,1081366,CREATE INDEX tbl_user_pr_prefere_c180c6_idx ON landscape.tbl_user_preference USING btree (preference_key),False,,
+landscape,tbl_user_preference,tbl_user_pr_updated_4533b0_idx,1081367,CREATE INDEX tbl_user_pr_updated_4533b0_idx ON landscape.tbl_user_preference USING btree (updated_at DESC),False,,
+landscape,tbl_user_preference,tbl_user_pr_user_id_c4e8f5_idx,1081365,"CREATE INDEX tbl_user_pr_user_id_c4e8f5_idx ON landscape.tbl_user_preference USING btree (user_id, scope_type, scope_id)",False,,
+landscape,tbl_user_preference,tbl_user_preference_pkey,1081350,CREATE UNIQUE INDEX tbl_user_preference_pkey ON landscape.tbl_user_preference USING btree (id),True,tbl_user_preference_pkey,p
+landscape,tbl_user_preference,tbl_user_preference_preference_key_328aa664,1081359,CREATE INDEX tbl_user_preference_preference_key_328aa664 ON landscape.tbl_user_preference USING btree (preference_key),False,,
+landscape,tbl_user_preference,tbl_user_preference_preference_key_328aa664_like,1081360,CREATE INDEX tbl_user_preference_preference_key_328aa664_like ON landscape.tbl_user_preference USING btree (preference_key varchar_pattern_ops),False,,
+landscape,tbl_user_preference,tbl_user_preference_scope_id_f3ff4922,1081363,CREATE INDEX tbl_user_preference_scope_id_f3ff4922 ON landscape.tbl_user_preference USING btree (scope_id),False,,
+landscape,tbl_user_preference,tbl_user_preference_scope_type_8cde7862,1081361,CREATE INDEX tbl_user_preference_scope_type_8cde7862 ON landscape.tbl_user_preference USING btree (scope_type),False,,
+landscape,tbl_user_preference,tbl_user_preference_scope_type_8cde7862_like,1081362,CREATE INDEX tbl_user_preference_scope_type_8cde7862_like ON landscape.tbl_user_preference USING btree (scope_type varchar_pattern_ops),False,,
+landscape,tbl_user_preference,tbl_user_preference_user_id_f8847056,1081364,CREATE INDEX tbl_user_preference_user_id_f8847056 ON landscape.tbl_user_preference USING btree (user_id),False,,
+landscape,tbl_user_preference,tbl_user_preference_user_id_preference_key_s_0f07b87a_uniq,1081352,"CREATE UNIQUE INDEX tbl_user_preference_user_id_preference_key_s_0f07b87a_uniq ON landscape.tbl_user_preference USING btree (user_id, preference_key, scope_type, scope_id)",True,tbl_user_preference_user_id_preference_key_s_0f07b87a_uniq,u
+landscape,tbl_vacancy_assumption,idx_vacancy_project,647370,CREATE INDEX idx_vacancy_project ON landscape.tbl_vacancy_assumption USING btree (project_id),False,,
+landscape,tbl_vacancy_assumption,tbl_vacancy_assumption_pkey,647263,CREATE UNIQUE INDEX tbl_vacancy_assumption_pkey ON landscape.tbl_vacancy_assumption USING btree (vacancy_id),True,tbl_vacancy_assumption_pkey,p
+landscape,tbl_valuation_reconciliation,idx_valuation_reconciliation_project,770157,CREATE UNIQUE INDEX idx_valuation_reconciliation_project ON landscape.tbl_valuation_reconciliation USING btree (project_id),False,,
+landscape,tbl_valuation_reconciliation,tbl_valuation_reconciliation_pkey,770150,CREATE UNIQUE INDEX tbl_valuation_reconciliation_pkey ON landscape.tbl_valuation_reconciliation USING btree (reconciliation_id),True,tbl_valuation_reconciliation_pkey,p
+landscape,tbl_waterfall,idx_waterfall_active,499992,"CREATE INDEX idx_waterfall_active ON landscape.tbl_waterfall USING btree (project_id, is_active)",False,,
+landscape,tbl_waterfall,idx_waterfall_project,499991,CREATE INDEX idx_waterfall_project ON landscape.tbl_waterfall USING btree (project_id),False,,
+landscape,tbl_waterfall,tbl_waterfall_pkey,499984,CREATE UNIQUE INDEX tbl_waterfall_pkey ON landscape.tbl_waterfall USING btree (waterfall_id),True,tbl_waterfall_pkey,p
+landscape,tbl_waterfall_tier,idx_waterfall_structure,647375,CREATE INDEX idx_waterfall_structure ON landscape.tbl_waterfall_tier USING btree (equity_structure_id),False,,
+landscape,tbl_waterfall_tier,tbl_waterfall_tier_pkey,647340,CREATE UNIQUE INDEX tbl_waterfall_tier_pkey ON landscape.tbl_waterfall_tier USING btree (tier_id),True,tbl_waterfall_tier_pkey,p
+landscape,tbl_zoning_control,idx_zc_lookup,90138,"CREATE INDEX idx_zc_lookup ON landscape.tbl_zoning_control USING btree (jurisdiction_id, zoning_code, landuse_code, scenario_id)",False,,
+landscape,tbl_zoning_control,idx_zc_validity,90139,"CREATE INDEX idx_zc_validity ON landscape.tbl_zoning_control USING btree (valid_from, COALESCE(valid_to, '9999-12-31'::date))",False,,
+landscape,tbl_zoning_control,tbl_zoning_control_pkey,90132,CREATE UNIQUE INDEX tbl_zoning_control_pkey ON landscape.tbl_zoning_control USING btree (zoning_control_id),True,tbl_zoning_control_pkey,p
+landscape,tbl_zoning_control,uq_zoning_nk,90134,"CREATE UNIQUE INDEX uq_zoning_nk ON landscape.tbl_zoning_control USING btree (jurisdiction_id, zoning_code, landuse_code, scenario_id, valid_from)",True,uq_zoning_nk,u
+landscape,type_lot_product,subtype_lot_product_pkey,114730,"CREATE UNIQUE INDEX subtype_lot_product_pkey ON landscape.type_lot_product USING btree (type_id, product_id)",True,subtype_lot_product_pkey,p
+landscape,user_profile,user_profile_pkey,1187849,CREATE UNIQUE INDEX user_profile_pkey ON landscape.user_profile USING btree (id),True,user_profile_pkey,p
+landscape,user_profile,user_profile_user_id_key,1187851,CREATE UNIQUE INDEX user_profile_user_id_key ON landscape.user_profile USING btree (user_id),True,user_profile_user_id_key,u
+landscape,user_settings,user_settings_pkey,1105923,CREATE UNIQUE INDEX user_settings_pkey ON landscape.user_settings USING btree (user_id),True,user_settings_pkey,p
+landscape,zonda_subdivisions,idx_zonda_builder,1228816,CREATE INDEX idx_zonda_builder ON landscape.zonda_subdivisions USING btree (builder),False,,
+landscape,zonda_subdivisions,idx_zonda_location,1228815,"CREATE INDEX idx_zonda_location ON landscape.zonda_subdivisions USING btree (latitude, longitude)",False,,
+landscape,zonda_subdivisions,idx_zonda_mpc,1228817,CREATE INDEX idx_zonda_mpc ON landscape.zonda_subdivisions USING btree (mpc),False,,
+landscape,zonda_subdivisions,idx_zonda_msa_lotwidth,1228814,"CREATE INDEX idx_zonda_msa_lotwidth ON landscape.zonda_subdivisions USING btree (msa_code, lot_width)",False,,
+landscape,zonda_subdivisions,idx_zonda_price,1228818,"CREATE INDEX idx_zonda_price ON landscape.zonda_subdivisions USING btree (msa_code, price_avg)",False,,
+landscape,zonda_subdivisions,zonda_subdivisions_msa_code_project_name_product_code_key,1228812,"CREATE UNIQUE INDEX zonda_subdivisions_msa_code_project_name_product_code_key ON landscape.zonda_subdivisions USING btree (msa_code, project_name, product_code)",True,zonda_subdivisions_msa_code_project_name_product_code_key,u
+landscape,zonda_subdivisions,zonda_subdivisions_pkey,1228810,CREATE UNIQUE INDEX zonda_subdivisions_pkey ON landscape.zonda_subdivisions USING btree (id),True,zonda_subdivisions_pkey,p

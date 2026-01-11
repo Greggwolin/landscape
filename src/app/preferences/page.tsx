@@ -1,18 +1,21 @@
 'use client';
 
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import dynamic from 'next/dynamic';
+import { useEffect, Suspense } from 'react';
+import nextDynamic from 'next/dynamic';
 
 /**
  * Import existing page components dynamically
  * This avoids refactoring existing pages - we just import and render them
  * Note: Cost Library and Benchmarks have moved to /admin routes
  */
-const ProductLibraryPage = dynamic(() => import('@/app/benchmarks/products/page'), {
+const ProductLibraryPage = nextDynamic(() => import('@/app/benchmarks/products/page'), {
   ssr: false,
 });
-const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
+const TaxonomyPage = nextDynamic(() => import('@/app/settings/taxonomy/page'), {
   ssr: false,
 });
 
@@ -26,7 +29,7 @@ const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
  * Note: Cost Library moved to /admin/benchmarks/cost-library
  * Note: Benchmarks moved to /admin/benchmarks
  */
-export default function PreferencesPage() {
+function PreferencesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get('tab');
@@ -57,5 +60,13 @@ export default function PreferencesPage() {
       {activeTab === 'products' && <ProductLibraryPage />}
       {activeTab === 'taxonomy' && <TaxonomyPage />}
     </>
+  );
+}
+
+export default function PreferencesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen" style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>}>
+      <PreferencesPageContent />
+    </Suspense>
   );
 }

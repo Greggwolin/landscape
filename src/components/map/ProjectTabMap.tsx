@@ -11,13 +11,27 @@ import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
 import useSWRMutation from 'swr/mutation';
 
+export interface RentalComparable {
+  comparable_id: number;
+  property_name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  distance_miles?: number;
+  bedrooms: number;
+  bathrooms: number;
+  avg_sqft: number;
+  asking_rent: number;
+}
+
 export interface ProjectTabMapProps {
   projectId: string;
   styleUrl: string;
   tabId?: string; // Optional identifier for which tab this map is on (e.g., 'project', 'property')
+  rentalComparables?: RentalComparable[]; // Optional rental comparables to display as markers
 }
 
-export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }: ProjectTabMapProps) {
+export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [] }: ProjectTabMapProps) {
   const { data, error, isLoading, mutate } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
   const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
@@ -26,6 +40,9 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
 
   // Create storage key with tabId to keep tab views independent
   const storageKey = `map-saved-view-${projectId}-${tabId}`;
+
+  // Track if we've fit bounds for comparables
+  const hasFitBoundsRef = useRef(false);
 
   // Load initial values from localStorage
   const getInitialSavedView = () => {
@@ -53,7 +70,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(() => {
-    const base = data?.center
+    const base: Array<{ id: string; coordinates: [number, number]; color: string; label: string; popup?: string }> = data?.center
       ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }]
       : [];
 
@@ -61,9 +78,28 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
       base.push({ id: 'pending', coordinates: pendingLocation, color: '#f97316', label: 'New Location' });
     }
 
+    // Add rental comparable markers
+    rentalComparables.forEach((comp, index) => {
+      if (comp.latitude && comp.longitude) {
+        base.push({
+          id: `comp-${comp.comparable_id}`,
+          coordinates: [comp.longitude, comp.latitude] as [number, number],
+          color: '#10b981', // Green for comparables
+          label: `${index + 1}`,
+          popup: `<div style="padding: 12px; min-width: 180px;">
+            <div style="font-weight: 600; color: #10b981; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
+            ${comp.address ? `<div style="font-size: 0.85em; color: #9ca3af; margin-bottom: 2px;">${comp.address}</div>` : ''}
+            <div style="font-size: 0.85em; color: #d1d5db;">${comp.bedrooms}BR/${comp.bathrooms}BA · ${comp.avg_sqft?.toLocaleString()} SF</div>
+            <div style="font-size: 0.95em; font-weight: 600; color: #f9fafb; margin-top: 6px;">$${Math.round(comp.asking_rent || 0).toLocaleString()}/mo</div>
+            ${comp.distance_miles ? `<div style="font-size: 0.8em; color: #6b7280; margin-top: 4px;">${comp.distance_miles} mi away</div>` : ''}
+          </div>`
+        });
+      }
+    });
+
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation]);
+  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables]);
 
   const lines = useMemo(
     () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
@@ -111,6 +147,54 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project' }
       localStorage.setItem(storageKey, JSON.stringify(savedView));
     }
   }, [savedView, storageKey]);
+
+  // Fit bounds to include subject and all rental comparables when they load
+  useEffect(() => {
+    // Only fit bounds once when data is available and we have comparables
+    if (!data?.center || rentalComparables.length === 0 || hasFitBoundsRef.current) return;
+
+    // Give map time to initialize
+    const timer = setTimeout(() => {
+      if (!mapRef.current) return;
+
+      // Calculate bounds including subject and all comparables
+      const allCoords: [number, number][] = [data.center];
+
+      rentalComparables.forEach(comp => {
+        if (comp.latitude && comp.longitude) {
+          allCoords.push([comp.longitude, comp.latitude]);
+        }
+      });
+
+      if (allCoords.length <= 1) return; // Only subject, no need to fit bounds
+
+      // Calculate bounding box
+      let minLng = allCoords[0][0];
+      let maxLng = allCoords[0][0];
+      let minLat = allCoords[0][1];
+      let maxLat = allCoords[0][1];
+
+      allCoords.forEach(([lng, lat]) => {
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      });
+
+      // Add some padding to the bounds
+      const lngPadding = (maxLng - minLng) * 0.15;
+      const latPadding = (maxLat - minLat) * 0.15;
+
+      mapRef.current.fitBounds(
+        [[minLng - lngPadding, minLat - latPadding], [maxLng + lngPadding, maxLat + latPadding]],
+        { padding: 40, pitch: 0, bearing: 0 }
+      );
+
+      hasFitBoundsRef.current = true;
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [data?.center, rentalComparables]);
 
   if (isLoading) {
     return (

@@ -1,0 +1,13 @@
+{
+  "target_market": "Phoenix, AZ",
+  "center_lat": 33.437,
+  "center_lng": -112.074,
+  "radius_miles": 5,
+  "sold_within_days": 180,
+  "min_year_built": 2023,
+  "property_type": "house",
+  "max_results": 350,
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "request_delay_seconds": 1.5,
+  "timeout_seconds": 15.0
+}

@@ -1,15 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getTimelineItemSummary, TimelineItemType } from '@/lib/timeline-engine/item-service';
 
 const ITEM_TYPES: TimelineItemType[] = ['budget', 'milestone'];
 
+type Params = { params: Promise<{ type: string; id: string }> };
+
 export async function GET(
-  request: Request,
-  { params }: { params: { type: TimelineItemType; id: string } }
+  request: NextRequest,
+  context: Params
 ) {
   try {
-    const { type, id } = params;
+    const { type: typeParam, id } = await context.params;
+    const type = typeParam as TimelineItemType;
     if (!ITEM_TYPES.includes(type)) {
       return NextResponse.json(
         { success: false, error: 'Invalid item type' },

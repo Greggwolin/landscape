@@ -8,6 +8,7 @@ import CostLibraryPanel from './CostLibraryPanel';
 import DMSAdminPanel from './DMSAdminPanel';
 import ReportConfiguratorPanel from './ReportConfiguratorPanel';
 import UserManagementPanel from './UserManagementPanel';
+import LandscaperAdminPanel from './LandscaperAdminPanel';
 
 /**
  * AdminModal Component
@@ -20,6 +21,7 @@ import UserManagementPanel from './UserManagementPanel';
  * - DMS Admin (Document Templates)
  * - Report Configurator (Coming in Phase 2)
  * - Users (User Management - CRUD operations)
+ * - Landscaper (AI Configuration - Extraction Mappings, Model Config)
  */
 
 interface AdminModalProps {
@@ -27,7 +29,7 @@ interface AdminModalProps {
   onClose: () => void;
 }
 
-type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users';
+type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users' | 'landscaper';
 
 export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
@@ -140,6 +142,27 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
               Users
             </CNavLink>
           </CNavItem>
+
+          {/* Landscaper tab - visually separated with spacing before icon */}
+          <CNavItem>
+            <CNavLink
+              href="#"
+              active={activeTab === 'landscaper'}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('landscaper');
+              }}
+              className="d-flex align-items-center gap-2"
+              style={{ marginLeft: 80 }}
+            >
+              <img
+                src="/landscaper-icon.svg"
+                alt=""
+                style={{ width: 24, height: 24 }}
+              />
+              Landscaper
+            </CNavLink>
+          </CNavItem>
         </CNav>
 
         {/* Tab Content Panels */}
@@ -150,6 +173,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           {activeTab === 'dms-admin' && <DMSAdminPanel />}
           {activeTab === 'report-configurator' && <ReportConfiguratorPanel />}
           {activeTab === 'users' && <UserManagementPanel />}
+          {activeTab === 'landscaper' && <LandscaperAdminPanel />}
         </div>
       </CModalBody>
     </CModal>

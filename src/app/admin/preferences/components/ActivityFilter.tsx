@@ -17,7 +17,7 @@ interface ActivityFilterProps {
 const STAGE_DESCRIPTIONS: Record<Activity, string> = {
   Acquisition: 'Purchase, closing costs, due diligence',
   'Planning & Engineering': 'Studies, planning, design, permits, engineering',
-  Development: 'Construction, site work, infrastructure',
+  Improvements: 'Construction, site work, infrastructure',
   Operations: 'OpEx, CapEx, revenue, property management',
   Disposition: 'Sale costs, marketing, broker fees',
   Financing: 'Debt, equity, refinancing costs',

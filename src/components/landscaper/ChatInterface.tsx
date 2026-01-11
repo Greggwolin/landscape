@@ -10,20 +10,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CButton, CFormTextarea, CSpinner } from '@coreui/react';
 import ChatMessageBubble from './ChatMessageBubble';
-
-interface ChatMessage {
-  message_id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  user_name?: string | null;
-}
+import { ChatMessage } from '@/hooks/useLandscaper';
 
 interface ChatInterfaceProps {
   projectId: number;
   messages: ChatMessage[];
   onMessagesUpdate: (messages: ChatMessage[]) => void;
 }
+
+const REQUEST_TIMEOUT_MS = 90000;
 
 export default function ChatInterface({
   projectId,
@@ -34,6 +29,17 @@ export default function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -47,8 +53,8 @@ export default function ChatInterface({
 
   const loadMessages = async () => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/landscaper/chat/`
+      const response = await fetchWithTimeout(
+        `/api/projects/${projectId}/landscaper/chat`
       );
 
       if (!response.ok) {
@@ -70,16 +76,17 @@ export default function ChatInterface({
     setError(null);
 
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/projects/${projectId}/landscaper/chat/`,
+      const clientRequestId = crypto.randomUUID();
+      const response = await fetchWithTimeout(
+        `/api/projects/${projectId}/landscaper/chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            content: inputValue.trim(),
-            // user: null, // TODO: Add user ID when auth is implemented
+            message: inputValue.trim(),
+            clientRequestId,
           }),
         }
       );
@@ -90,11 +97,25 @@ export default function ChatInterface({
 
       const data = await response.json();
 
-      // Add both user and assistant messages to the list
+      const userMessage: ChatMessage = {
+        messageId: `temp-${Date.now()}`,
+        role: 'user',
+        content: inputValue.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const assistantMessage: ChatMessage = {
+        messageId: data.messageId,
+        role: 'assistant',
+        content: data.content,
+        metadata: data.metadata,
+        createdAt: data.createdAt,
+      };
+
       const newMessages = [
         ...messages,
-        data.user_message,
-        data.assistant_message,
+        userMessage,
+        assistantMessage,
       ];
       onMessagesUpdate(newMessages);
 
@@ -102,7 +123,11 @@ export default function ChatInterface({
       setInputValue('');
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message. Please try again.');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      } else {
+        setError('Failed to send message. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -137,11 +162,8 @@ export default function ChatInterface({
           <>
             {messages.map((message) => (
               <ChatMessageBubble
-                key={message.message_id}
-                role={message.role}
-                content={message.content}
-                timestamp={message.timestamp}
-                userName={message.user_name}
+                key={message.messageId}
+                message={message}
               />
             ))}
             <div ref={messagesEndRef} />

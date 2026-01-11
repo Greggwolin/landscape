@@ -1,15 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
+import React, { memo } from 'react';
 import { CCard, CCardBody } from '@coreui/react';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
-import { NestedExpenseTable } from '@/app/prototypes/multifam/rent-roll-inputs/components/NestedExpenseTable';
-import { BenchmarkPanel } from '@/app/prototypes/multifam/rent-roll-inputs/components/BenchmarkPanel';
-import { ConfigureColumnsModal } from './ConfigureColumnsModal';
-import { buildHierarchicalExpenses, ExpenseRow } from '@/config/opex/hierarchical-structure';
-import { multifamilyOpExFields } from '@/config/opex/multifamily-fields';
-import { unitsAPI } from '@/lib/api/multifamily';
 import OpExHierarchy from '@/app/components/OpExHierarchy';
+
+// New Operations components
+import {
+  RentalIncomeSection,
+  VacancyDeductionsSection,
+  OtherIncomeSection,
+  OperatingExpensesSection,
+  EGISubtotalBar,
+  NOITotalBar,
+  SummaryBar,
+  OperationsHeader,
+  LineItemRow
+} from '@/components/operations';
+import '@/styles/operations-tab.css';
+import { useOperationsData } from '@/hooks/useOperationsData';
 
 interface Project {
   project_id: number;
@@ -23,350 +32,46 @@ interface OperationsTabProps {
   onModeChange?: (mode: ComplexityTier) => void;
 }
 
-interface ExpenseData {
-  expense_type: string;
-  expense_category: string;
-  label: string;
-  annual_amount: number;
-  per_unit: number;
-  per_sf: number;
-  escalation_rate: number;
-  is_recoverable?: boolean;
-  recovery_rate?: number;
-}
-
-interface ColumnConfig {
-  id: string;
-  label: string;
-  visible: boolean;
-  minTier: ComplexityTier;
-  description?: string;
-}
-
-const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { id: 'per_unit', label: 'Per Unit', visible: true, minTier: 'basic', description: 'Annual amount divided by unit count' },
-  { id: 'per_sf', label: 'Per SF', visible: true, minTier: 'standard', description: 'Annual amount divided by total square footage' },
-  { id: 'escalation_rate', label: 'Escalation', visible: true, minTier: 'standard', description: 'Annual inflation adjustment percentage' },
-  { id: 'is_recoverable', label: 'Recoverable', visible: true, minTier: 'advanced', description: 'Whether expense can be recovered from tenants' },
-  { id: 'recovery_rate', label: 'Recovery %', visible: true, minTier: 'advanced', description: 'Percentage of expense recovered from tenants' }
-];
-
 function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
-  // Check if this is a supported project type (Multifamily only for now)
+  // Check project type
   const isMultifamily = project.project_type_code === 'MF';
   const isLand = project.project_type_code === 'LAND';
 
-  // Use prop mode if provided, otherwise use local state
-  const [localMode, setLocalMode] = useState<ComplexityTier>('standard');
-  const mode = propMode || localMode;
-  const setMode = onModeChange || setLocalMode;
+  // Use the operations data hook
+  const {
+    data,
+    propertySummary,
+    rentalIncome,
+    vacancyDeductions,
+    otherIncome,
+    operatingExpenses,
+    totals,
+    availableScenarios,
+    preferredScenario,
+    valueAddEnabled,
+    isLoading,
+    isSaving,
+    error,
+    isDirty,
+    updateInput,
+    toggleValueAdd,
+    toggleExpand,
+    saveAll
+  } = useOperationsData(project.project_id);
 
-  const [expenses, setExpenses] = useState<ExpenseData[]>([]);
-  const [hierarchicalRows, setHierarchicalRows] = useState<ExpenseRow[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
-  const [showColumnConfig, setShowColumnConfig] = useState(false);
-  const [propertyData, setPropertyData] = useState<{ unitCount: number; totalSF: number } | null>(null);
-  const [savedValuesHistory, setSavedValuesHistory] = useState<{
-    basic: Record<string, ExpenseData> | null;
-    standard: Record<string, ExpenseData> | null;
-    advanced: Record<string, ExpenseData> | null;
-  }>({ basic: null, standard: null, advanced: null });
-  const [showRestoreNotice, setShowRestoreNotice] = useState<string | null>(null);
-
-  // Load property data on mount
-  useEffect(() => {
-    // Skip data loading for non-multifamily projects
-    if (!isMultifamily) {
-      setIsLoading(false);
-      return;
-    }
-    loadPropertyData();
-  }, [project.project_id, isMultifamily]);
-
-  // Load expenses when property data is available
-  useEffect(() => {
-    if (propertyData && isMultifamily) {
-      loadExpenses();
-    }
-  }, [project.project_id, propertyData, isMultifamily]);
-
-  const loadPropertyData = async () => {
-    try {
-      const units = await unitsAPI.list(project.project_id);
-      const unitCount = units.length;
-      const totalSF = units.reduce((sum, unit) => sum + (parseFloat(unit.square_feet?.toString() || '0') || 0), 0);
-
-      console.log('[OperationsTab] Property data:', { unitCount, totalSF });
-      setPropertyData({ unitCount, totalSF });
-    } catch (error) {
-      console.error('Error loading property data:', error);
-      // Set defaults if no units found
-      setPropertyData({ unitCount: 0, totalSF: 0 });
-    }
-  };
-
-  // Handle mode changes with value preservation
-  const previousMode = useRef<ComplexityTier>(mode);
-  useEffect(() => {
-    if (previousMode.current !== mode && expenses.length > 0) {
-      const oldMode = previousMode.current;
-      const newMode = mode;
-
-      // Check if we're going backward (higher granularity to lower)
-      const modeOrder: Record<ComplexityTier, number> = { basic: 1, standard: 2, advanced: 3 };
-      const isGoingBackward = modeOrder[newMode] < modeOrder[oldMode];
-
-      if (isGoingBackward) {
-        // Restore from history if available
-        const savedValues = savedValuesHistory[newMode];
-        if (savedValues) {
-          setExpenses(Object.values(savedValues));
-          setShowRestoreNotice(newMode);
-          setTimeout(() => setShowRestoreNotice(null), 5000);
-        }
-      } else {
-        // Going forward - save current values
-        const expensesMap = expenses.reduce((acc, exp) => {
-          acc[exp.expense_type] = exp;
-          return acc;
-        }, {} as Record<string, ExpenseData>);
-
-        setSavedValuesHistory(prev => ({
-          ...prev,
-          [oldMode]: expensesMap
-        }));
-      }
-
-      previousMode.current = mode;
-    }
-  }, [mode, expenses.length]);
-
-  // Rebuild hierarchical structure when expenses or mode changes
-  useEffect(() => {
-    console.log('[OperationsTab] Building hierarchy, expenses count:', expenses.length, 'mode:', mode);
-    if (expenses.length > 0) {
-      const rows = buildHierarchicalExpenses(expenses, mode);
-      console.log('[OperationsTab] Built hierarchical rows:', rows.length, rows);
-      setHierarchicalRows(rows);
-    } else {
-      console.log('[OperationsTab] No expenses to build hierarchy from');
-      setHierarchicalRows([]);
-    }
-  }, [expenses, mode]);
-
-  const loadExpenses = async () => {
-    try {
-      setIsLoading(true);
-
-      // Load from Chart of Accounts hierarchy API
-      const response = await fetch(`/api/projects/${project.project_id}/operating-expenses/hierarchy`);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[OperationsTab] Chart of Accounts API response:', data);
-
-        if (data.accounts && data.accounts.length > 0) {
-          console.log('[OperationsTab] Using Chart of Accounts data, accounts count:', data.accounts.length);
-
-          // Map Chart of Accounts to expected expense type keys and categories
-          const accountToExpenseTypeMap: Record<string, { expenseType: string; category: string }> = {
-            // Taxes & Insurance
-            '5100': { expenseType: 'property_taxes', category: 'taxes' },
-            '5110': { expenseType: 'property_taxes', category: 'taxes' },
-            '5111': { expenseType: 'property_taxes', category: 'taxes' },
-            '5112': { expenseType: 'property_taxes', category: 'taxes' },
-            '5120': { expenseType: 'insurance', category: 'insurance' },
-
-            // Utilities
-            '5200': { expenseType: 'utilities_combined', category: 'utilities' },
-            '5210': { expenseType: 'water_sewer', category: 'utilities' },
-            '5220': { expenseType: 'gas_electric', category: 'utilities' },
-
-            // Payroll
-            '5300': { expenseType: 'property_management', category: 'management' },
-            '5310': { expenseType: 'payroll_onsite', category: 'management' },
-            '5320': { expenseType: 'payroll_offsite', category: 'management' },
-
-            // Repairs & Maintenance
-            '5400': { expenseType: 'repairs_maintenance', category: 'maintenance' },
-            '5410': { expenseType: 'unit_turnover', category: 'maintenance' },
-            '5420': { expenseType: 'general_repairs', category: 'maintenance' },
-
-            // General & Administrative
-            '5500': { expenseType: 'other_operating', category: 'other' },
-            '5510': { expenseType: 'landscaping', category: 'other' },
-            '5520': { expenseType: 'trash_removal', category: 'other' },
-            '5530': { expenseType: 'pest_control', category: 'other' },
-            '5540': { expenseType: 'pool_amenity', category: 'other' },
-            '5550': { expenseType: 'administrative', category: 'other' }
-          };
-
-          // Flatten the hierarchical accounts into expense format
-          const flattenAccounts = (accounts: any[]): ExpenseData[] => {
-            const result: ExpenseData[] = [];
-
-            accounts.forEach((account) => {
-              const mapping = accountToExpenseTypeMap[account.account_number];
-
-              // Add this account if we have a mapping for it
-              if (mapping) {
-                const annualAmount = parseFloat(account.calculated_total) || 0;
-                result.push({
-                  expense_type: mapping.expenseType,
-                  expense_category: mapping.category,
-                  label: account.account_name,
-                  annual_amount: annualAmount,
-                  per_unit: propertyData?.unitCount ? annualAmount / propertyData.unitCount : 0,
-                  per_sf: propertyData?.totalSF ? annualAmount / propertyData.totalSF : 0,
-                  escalation_rate: 0.03, // Default 3%
-                  is_recoverable: false,
-                  recovery_rate: 0
-                });
-              }
-
-              // Recursively process children
-              if (account.children && account.children.length > 0) {
-                result.push(...flattenAccounts(account.children));
-              }
-            });
-
-            return result;
-          };
-
-          const mappedExpenses = flattenAccounts(data.accounts);
-          console.log('[OperationsTab] Mapped expenses from Chart of Accounts:', mappedExpenses);
-          setExpenses(mappedExpenses);
-        } else {
-          console.log('[OperationsTab] API returned empty, no expenses for this project');
-          setExpenses([]);
-        }
-      } else {
-        console.log('[OperationsTab] API failed, setting empty expenses');
-        setExpenses([]);
-      }
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      setExpenses([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const generateMockExpenses = (): ExpenseData[] => {
-    return [
-      { expense_type: 'property_taxes', expense_category: 'taxes', label: 'Property Taxes', annual_amount: 195000, per_unit: 1625, per_sf: 2.79, escalation_rate: 0.02, is_recoverable: false, recovery_rate: 0 },
-      { expense_type: 'insurance', expense_category: 'insurance', label: 'Insurance', annual_amount: 16800, per_unit: 140, per_sf: 0.24, escalation_rate: 0.035, is_recoverable: false, recovery_rate: 0 },
-      { expense_type: 'utilities_combined', expense_category: 'utilities', label: 'Utilities', annual_amount: 41720, per_unit: 348, per_sf: 0.60, escalation_rate: 0.04, is_recoverable: true, recovery_rate: 0.6 },
-      { expense_type: 'repairs_maintenance', expense_category: 'maintenance', label: 'Repairs & Maintenance', annual_amount: 51560, per_unit: 430, per_sf: 0.74, escalation_rate: 0.03, is_recoverable: false, recovery_rate: 0 },
-      { expense_type: 'property_management', expense_category: 'management', label: 'Property Management', annual_amount: 31200, per_unit: 260, per_sf: 0.45, escalation_rate: 0, is_recoverable: false, recovery_rate: 0 },
-      { expense_type: 'other_operating', expense_category: 'other', label: 'Other Operating', annual_amount: 58120, per_unit: 484, per_sf: 0.83, escalation_rate: 0.03, is_recoverable: false, recovery_rate: 0 }
-    ];
-  };
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    return expenses.reduce(
-      (acc, exp) => ({
-        annual: acc.annual + exp.annual_amount,
-        perUnit: acc.perUnit + exp.per_unit,
-        perSF: acc.perSF + exp.per_sf
-      }),
-      { annual: 0, perUnit: 0, perSF: 0 }
-    );
-  }, [expenses]);
-
-  // Benchmark alerts
-  const benchmarkAlerts = useMemo(() => {
-    const totalPerUnit = Math.round(totals.perUnit);
-    const marketMedian = 8200;
-
-    return [
-      {
-        category: 'Total Operating Expenses',
-        variance: ((totalPerUnit - marketMedian) / marketMedian) * 100,
-        userValue: totalPerUnit,
-        marketMedian: marketMedian,
-        message: `${totalPerUnit > marketMedian ? 'above' : 'below'} market median`,
-        severity: totalPerUnit > marketMedian * 1.1 ? 'warning' as const : 'success' as const,
-        recommendation: totalPerUnit > marketMedian * 1.1 ? 'Review expenses for optimization opportunities' : undefined
-      }
-    ];
-  }, [totals]);
-
-  const handleToggleExpand = (rowId: string) => {
-    const updateExpanded = (rows: ExpenseRow[]): ExpenseRow[] => {
-      return rows.map(row => {
-        if (row.id === rowId) {
-          return { ...row, isExpanded: !row.isExpanded };
-        }
-        if (row.children && row.children.length > 0) {
-          return { ...row, children: updateExpanded(row.children) };
-        }
-        return row;
-      });
+  // Handle input updates - route to correct section
+  const handleUpdateRow = (section: 'rental_income' | 'vacancy_deductions' | 'other_income' | 'operating_expenses') =>
+    (lineItemKey: string, field: string, value: number | null) => {
+      updateInput(section, lineItemKey, field, value);
     };
 
-    setHierarchicalRows(updateExpanded(hierarchicalRows));
-  };
+  // Handle expand/collapse
+  const handleToggleExpand = (section: 'other_income' | 'operating_expenses') =>
+    (lineItemKey: string) => {
+      toggleExpand(section, lineItemKey);
+    };
 
-  const handleUpdateExpense = (expenseType: string, field: string, value: number | boolean) => {
-    setExpenses(prev => prev.map(exp => {
-      if (exp.expense_type === expenseType) {
-        return { ...exp, [field]: value };
-      }
-      return exp;
-    }));
-    setHasUnsavedChanges(true);
-  };
-
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-
-      const expensesArray = expenses.map(exp => ({
-        expense_category: exp.expense_category,
-        expense_type: exp.expense_type,
-        annual_amount: exp.annual_amount,
-        amount_per_sf: exp.per_sf,
-        escalation_rate: exp.escalation_rate,
-        is_recoverable: exp.is_recoverable,
-        recovery_rate: exp.recovery_rate,
-        escalation_type: 'FIXED_PERCENT',
-        start_period: 1,
-        payment_frequency: 'MONTHLY'
-      }));
-
-      const response = await fetch(`/api/projects/${project.project_id}/opex`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expenses: expensesArray })
-      });
-
-      if (response.ok) {
-        setHasUnsavedChanges(false);
-        await loadExpenses();
-      }
-    } catch (error) {
-      console.error('Error saving expenses:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleToggleColumn = (columnId: string) => {
-    setColumns(prev => prev.map(col =>
-      col.id === columnId ? { ...col, visible: !col.visible } : col
-    ));
-  };
-
-  const visibleColumnIds = useMemo(() => {
-    return columns.filter(col => col.visible).map(col => col.id);
-  }, [columns]);
-
+  // Land projects use OpExHierarchy
   if (isLand) {
     return (
       <div className="py-6">
@@ -375,15 +80,19 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     );
   }
 
+  // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
+      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4" style={{ borderColor: 'var(--cui-primary)' }}></div>
+          <p style={{ color: 'var(--cui-secondary-color)' }}>Loading operations data...</p>
+        </div>
       </div>
     );
   }
 
-  // Show "Coming Soon" for unsupported project types
+  // Unsupported project types
   if (!isMultifamily) {
     const projectTypeLabels: Record<string, string> = {
       'OFF': 'Office',
@@ -431,17 +140,21 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     );
   }
 
-  // Show empty state for multifamily projects with no operating expense data
-  if (expenses.length === 0 && hierarchicalRows.length === 0) {
+  // Empty state for multifamily with no data
+  if (!data || (!rentalIncome?.rows?.length && !operatingExpenses?.rows?.length)) {
     return (
-      <div className="p-4 space-y-4 bg-gray-950 min-h-screen flex items-center justify-center">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-2xl">
-          <div className="text-6xl mb-6">📊</div>
-          <h2 className="text-2xl font-semibold text-white mb-3">
-            No Operating Expenses Data Yet
+      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
+            No Operating Data Yet
           </h2>
-          <p className="text-gray-400 mb-6">
-            This multifamily project doesn't have any operating expenses configured yet.
+          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
+            This multifamily project doesn't have any operating data configured yet.
           </p>
           <div
             className="p-4 rounded text-left"
@@ -451,7 +164,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
             }}
           >
             <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
-              <strong>To add operating expenses:</strong>
+              <strong>To add operating data:</strong>
             </p>
             <ul
               className="text-sm ml-4"
@@ -460,9 +173,9 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
                 listStyleType: 'disc'
               }}
             >
-              <li>Use the Budget tab to configure development and operating costs</li>
-              <li>Add expense categories like management fees, utilities, insurance, etc.</li>
-              <li>Operating expenses will be calculated on a per-unit and per-SF basis</li>
+              <li>Upload rent rolls and operating statements via the Documents tab</li>
+              <li>Use Landscaper to extract income and expense data</li>
+              <li>Manually input values in the Budget tab</li>
             </ul>
           </div>
         </div>
@@ -470,201 +183,121 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     );
   }
 
+  // Extract row data for sections
+  const rentalRows: LineItemRow[] = rentalIncome?.rows || [];
+  const vacancyRows: LineItemRow[] = vacancyDeductions?.rows || [];
+  const otherRows: LineItemRow[] = otherIncome?.rows || [];
+  const opexRows: LineItemRow[] = operatingExpenses?.rows || [];
+
+  // Calculate GPR for vacancy calculations
+  const grossPotentialRent = totals?.gross_potential_rent || 0;
+  const unitCount = propertySummary?.unit_count || 0;
+  const totalSF = propertySummary?.total_sf || 0;
+
   return (
-    <div className="p-4 space-y-4">
-      {/* Restore Notice Banner */}
-      {showRestoreNotice && (
+    <div className="ops-container">
+      {/* Header with Value-Add toggle */}
+      <OperationsHeader
+        projectName={project.project_name}
+        unitCount={unitCount}
+        totalSF={totalSF}
+        valueAddEnabled={valueAddEnabled}
+        onToggleValueAdd={toggleValueAdd}
+        isSaving={isSaving}
+        isDirty={isDirty}
+        onSave={saveAll}
+      />
+
+      {/* Error Banner */}
+      {error && (
         <div
-          className="rounded-lg px-6 py-4 border flex items-center justify-between"
+          className="rounded-lg px-6 py-4 border flex items-center gap-3"
           style={{
-            backgroundColor: 'var(--cui-info-bg)',
-            borderColor: 'var(--cui-info)'
+            backgroundColor: 'var(--cui-danger-bg)',
+            borderColor: 'var(--cui-danger)'
           }}
         >
-          <div className="flex items-center gap-3">
-            <svg className="w-5 h-5" style={{ color: 'var(--cui-info)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <div className="font-semibold" style={{ color: 'var(--cui-info)' }}>
-                Values Restored
-              </div>
-              <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
-                Previous {showRestoreNotice} mode values have been restored
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowRestoreNotice(null)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <svg className="w-5 h-5" style={{ color: 'var(--cui-danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span style={{ color: 'var(--cui-danger)' }}>{error}</span>
         </div>
       )}
 
-      {/* Summary Metrics Bar */}
-      <div className="grid grid-cols-4 gap-4">
-        <div
-          className="rounded-lg px-6 py-4 text-center"
-          style={{
-            backgroundColor: 'var(--cui-primary-bg)',
-            borderRadius: '8px'
-          }}
-        >
-          <div
-            className="text-xs uppercase font-medium mb-1"
-            style={{ color: 'var(--cui-primary)' }}
-          >
-            Total Operating Expenses
-          </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--cui-primary)' }}>
-            ${totals.annual.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </div>
-          <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-            per year
-          </div>
-        </div>
-
-        <div
-          className="rounded-lg px-6 py-4 text-center"
-          style={{
-            backgroundColor: 'var(--cui-success-bg)',
-            borderRadius: '8px'
-          }}
-        >
-          <div
-            className="text-xs uppercase font-medium mb-1"
-            style={{ color: 'var(--cui-success)' }}
-          >
-            Per Unit
-          </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--cui-success)' }}>
-            ${Math.round(totals.perUnit).toLocaleString('en-US')}
-          </div>
-          <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-            annual
-          </div>
-        </div>
-
-        <div
-          className="rounded-lg px-6 py-4 text-center"
-          style={{
-            backgroundColor: 'var(--cui-info-bg)',
-            borderRadius: '8px'
-          }}
-        >
-          <div
-            className="text-xs uppercase font-medium mb-1"
-            style={{ color: 'var(--cui-info)' }}
-          >
-            Per SF
-          </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--cui-info)' }}>
-            ${totals.perSF.toFixed(2)}
-          </div>
-          <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-            annual
-          </div>
-        </div>
-
-        <div
-          className="rounded-lg px-6 py-4 text-center"
-          style={{
-            backgroundColor: 'var(--cui-warning-bg)',
-            borderRadius: '8px'
-          }}
-        >
-          <div
-            className="text-xs uppercase font-medium mb-1"
-            style={{ color: 'var(--cui-warning)' }}
-          >
-            Expense Ratio
-          </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--cui-warning)' }}>
-            --
-          </div>
-          <div className="text-xs" style={{ color: 'var(--cui-body-color)' }}>
-            of EGI (TBD)
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Grid: Expense Table + Benchmark Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Nested Expense Table */}
-        <div className="lg:col-span-2">
-          {hierarchicalRows.length > 0 ? (
-            <NestedExpenseTable
-              mode={mode}
-              rows={hierarchicalRows}
-              onToggleExpand={handleToggleExpand}
-              onUpdateExpense={handleUpdateExpense}
-              selectedCategories={selectedCategories}
-              onCategoryFilterChange={setSelectedCategories}
-              onConfigureColumns={() => setShowColumnConfig(true)}
-              visibleColumns={visibleColumnIds}
-            />
-          ) : (
-            <CCard>
-              <CCardBody className="p-8 text-center">
-                <div style={{ color: 'var(--cui-secondary-color)' }}>
-                  No expense data available
-                </div>
-              </CCardBody>
-            </CCard>
-          )}
-        </div>
-
-        {/* Benchmark Panel */}
-        <div className="lg:col-span-1">
-          <BenchmarkPanel
-            mode={mode}
-            totalPerUnit={Math.round(totals.perUnit)}
-            marketMedian={8200}
-            alerts={benchmarkAlerts}
-          />
-        </div>
-      </div>
-
-      {/* Save Button */}
-      {hasUnsavedChanges && (
-        <div
-          className="fixed bottom-4 right-4 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 border"
-          style={{
-            backgroundColor: 'var(--cui-warning-bg)',
-            borderColor: 'var(--cui-warning)'
-          }}
-        >
-          <span
-            className="text-sm font-medium"
-            style={{ color: 'var(--cui-warning-text)' }}
-          >
-            You have unsaved changes
-          </span>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="px-4 py-2 rounded transition-colors disabled:opacity-50 text-sm font-medium"
-            style={{
-              backgroundColor: 'var(--cui-warning)',
-              color: 'white'
-            }}
-          >
-            {isSaving ? 'Saving...' : 'Save Now'}
-          </button>
-        </div>
+      {/* Section 1: Rental Income */}
+      {rentalRows.length > 0 && (
+        <RentalIncomeSection
+          rows={rentalRows}
+          unitCount={unitCount}
+          availableScenarios={availableScenarios}
+          preferredScenario={preferredScenario}
+          valueAddEnabled={valueAddEnabled}
+          onUpdateRow={handleUpdateRow('rental_income')}
+        />
       )}
 
-      {/* Configure Columns Modal */}
-      <ConfigureColumnsModal
-        isOpen={showColumnConfig}
-        onClose={() => setShowColumnConfig(false)}
-        columns={columns}
-        onToggleColumn={handleToggleColumn}
-        currentMode={mode}
+      {/* Section 2: Vacancy & Deductions */}
+      {vacancyRows.length > 0 && (
+        <VacancyDeductionsSection
+          rows={vacancyRows}
+          grossPotentialRent={grossPotentialRent}
+          availableScenarios={availableScenarios}
+          preferredScenario={preferredScenario}
+          valueAddEnabled={valueAddEnabled}
+          onUpdateRow={handleUpdateRow('vacancy_deductions')}
+        />
+      )}
+
+      {/* Section 3: Other Income */}
+      {otherRows.length > 0 && (
+        <OtherIncomeSection
+          rows={otherRows}
+          unitCount={unitCount}
+          availableScenarios={availableScenarios}
+          preferredScenario={preferredScenario}
+          valueAddEnabled={valueAddEnabled}
+          onUpdateRow={handleUpdateRow('other_income')}
+          onToggleExpand={handleToggleExpand('other_income')}
+        />
+      )}
+
+      {/* EGI Subtotal */}
+      <EGISubtotalBar
+        asIsEGI={totals?.effective_gross_income || 0}
+        postRenoEGI={totals?.effective_gross_income || 0} // TODO: Calculate post-reno EGI
+        valueAddEnabled={valueAddEnabled}
+        availableScenarios={availableScenarios}
+      />
+
+      {/* Section 4: Operating Expenses */}
+      {opexRows.length > 0 && (
+        <OperatingExpensesSection
+          rows={opexRows}
+          unitCount={unitCount}
+          totalSF={totalSF}
+          availableScenarios={availableScenarios}
+          preferredScenario={preferredScenario}
+          valueAddEnabled={valueAddEnabled}
+          onUpdateRow={handleUpdateRow('operating_expenses')}
+          onToggleExpand={handleToggleExpand('operating_expenses')}
+        />
+      )}
+
+      {/* NOI Total */}
+      <NOITotalBar
+        asIsNOI={totals?.as_is_noi || 0}
+        postRenoNOI={totals?.post_reno_noi || 0}
+        valueAddEnabled={valueAddEnabled}
+        availableScenarios={availableScenarios}
+      />
+
+      {/* Sticky Summary Bar */}
+      <SummaryBar
+        asIsNOI={totals?.as_is_noi || 0}
+        postRenoNOI={totals?.post_reno_noi || 0}
+        noiUplift={totals?.noi_uplift || 0}
+        noiUpliftPercent={totals?.noi_uplift_percent || 0}
+        valueAddEnabled={valueAddEnabled}
       />
     </div>
   );

@@ -6,7 +6,6 @@ import { CButton, CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/reac
 import CIcon from '@coreui/icons-react';
 import { cilPlus } from '@coreui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubNav';
 import MetricCard from '@/components/capitalization/MetricCard';
 import DebtFacilitiesTable, { type DebtFacility } from '@/components/capitalization/DebtFacilitiesTable';
 import DebtFacilityModal from '@/components/capitalization/DebtFacilityModal';
@@ -151,20 +150,11 @@ export default function DebtPage() {
   };
 
   return (
-    <>
-      <CapitalizationSubNav projectId={projectId} />
-
-      <div
-        className="p-4 space-y-4 min-h-screen"
-        style={{ backgroundColor: 'var(--cui-body-bg)' }}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="mb-0">Capitalization</h5>
+    <div className="space-y-4">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h5 className="mb-0">Debt Facilities</h5>
+        <div className="d-flex gap-2">
           <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
-        </div>
-
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2>Debt Facilities</h2>
           <CButton
             color="primary"
             onClick={handleAddFacility}
@@ -174,85 +164,85 @@ export default function DebtPage() {
             Add Facility
           </CButton>
         </div>
-
-        <CRow className="g-3 mb-4">
-          <CCol xs={12} md={3}>
-            <MetricCard
-              label="Total Debt Capacity"
-              value={formatCurrency(calculateTotalDebtCapacity())}
-              status="info"
-            />
-          </CCol>
-          <CCol xs={12} md={3}>
-            <MetricCard
-              label="Outstanding Balance"
-              value={formatCurrency(calculateOutstandingBalance())}
-              status="primary"
-            />
-          </CCol>
-          <CCol xs={12} md={3}>
-            <MetricCard
-              label="Available to Draw"
-              value={formatCurrency(calculateAvailableToDraw())}
-              status="success"
-            />
-          </CCol>
-          <CCol xs={12} md={3}>
-            <MetricCard
-              label="Weighted Avg Rate"
-              value={formatPercent(calculateWeightedAvgRate())}
-              status="info"
-            />
-          </CCol>
-        </CRow>
-
-        <CCard className="mb-4">
-          <CCardHeader>
-            <h5 className="mb-0">Active Debt Facilities</h5>
-          </CCardHeader>
-          <CCardBody>
-            <DebtFacilitiesTable
-              facilities={facilities}
-              onSelect={setSelectedFacilityId}
-              selectedId={selectedFacilityId}
-              onEdit={handleEditFacility}
-              onDelete={handleDeleteFacility}
-            />
-          </CCardBody>
-        </CCard>
-
-        <CCard>
-          <CCardHeader className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Draw Schedule</h5>
-            <CButton
-              color="outline-secondary"
-              size="sm"
-              aria-label="Add draw event"
-            >
-              <CIcon icon={cilPlus} className="me-1" />
-              Add Draw Event
-            </CButton>
-          </CCardHeader>
-          <CCardBody>
-            <p className="text-muted small mb-3">
-              Manually track draw events and timing. Auto-generation from budget timing
-              and milestone triggers will be added in the Debt Enhancement phase.
-            </p>
-            <DrawScheduleTable
-              drawEvents={drawEvents}
-              onEdit={() => {}}
-              onDelete={() => {}}
-            />
-          </CCardBody>
-        </CCard>
-
-        <DebtFacilityModal
-          visible={facilityModalVisible}
-          facility={editingFacility}
-          onClose={() => setFacilityModalVisible(false)}
-          onSave={handleSaveFacility}
-        />
       </div>
-    </>
+
+      <CRow className="g-3 mb-4">
+        <CCol xs={12} md={3}>
+          <MetricCard
+            label="Total Debt Capacity"
+            value={formatCurrency(calculateTotalDebtCapacity())}
+            status="info"
+          />
+        </CCol>
+        <CCol xs={12} md={3}>
+          <MetricCard
+            label="Outstanding Balance"
+            value={formatCurrency(calculateOutstandingBalance())}
+            status="primary"
+          />
+        </CCol>
+        <CCol xs={12} md={3}>
+          <MetricCard
+            label="Available to Draw"
+            value={formatCurrency(calculateAvailableToDraw())}
+            status="success"
+          />
+        </CCol>
+        <CCol xs={12} md={3}>
+          <MetricCard
+            label="Weighted Avg Rate"
+            value={formatPercent(calculateWeightedAvgRate())}
+            status="info"
+          />
+        </CCol>
+      </CRow>
+
+      <CCard className="mb-4">
+        <CCardHeader>
+          <h5 className="mb-0">Active Debt Facilities</h5>
+        </CCardHeader>
+        <CCardBody>
+          <DebtFacilitiesTable
+            facilities={facilities}
+            onSelect={setSelectedFacilityId}
+            selectedId={selectedFacilityId}
+            onEdit={handleEditFacility}
+            onDelete={handleDeleteFacility}
+          />
+        </CCardBody>
+      </CCard>
+
+      <CCard>
+        <CCardHeader className="d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Draw Schedule</h5>
+          <CButton
+            color="outline-secondary"
+            size="sm"
+            aria-label="Add draw event"
+          >
+            <CIcon icon={cilPlus} className="me-1" />
+            Add Draw Event
+          </CButton>
+        </CCardHeader>
+        <CCardBody>
+          <p className="text-muted small mb-3">
+            Manually track draw events and timing. Auto-generation from budget timing
+            and milestone triggers will be added in the Debt Enhancement phase.
+          </p>
+          <DrawScheduleTable
+            drawEvents={drawEvents}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
+        </CCardBody>
+      </CCard>
+
+      <DebtFacilityModal
+        visible={facilityModalVisible}
+        facility={editingFacility}
+        onClose={() => setFacilityModalVisible(false)}
+        onSave={handleSaveFacility}
+      />
+    </div>
   );
 }

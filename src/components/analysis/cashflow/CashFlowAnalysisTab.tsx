@@ -1,17 +1,23 @@
 /**
  * Cash Flow Analysis Tab
- * Main container for DCF analysis with time scale and granularity controls
+ * Main container for time-period based cash flow analysis
+ * Columns: Time periods (years/quarters/months)
+ * Rows: Revenue and Cost categories
+ * Filter: Affects which phases' data is aggregated into totals
  */
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { CCard, CCardBody, CCardHeader, CSpinner, CAlert, CFormSwitch } from '@coreui/react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { CCard, CCardBody, CCardHeader, CSpinner, CAlert, CBadge } from '@coreui/react';
 import useSWR from 'swr';
 import TimeScaleSelector from './TimeScaleSelector';
 import CostGranularityToggle from './CostGranularityToggle';
 import CashFlowTable from './CashFlowTable';
 import CashFlowSummaryMetrics from './CashFlowSummaryMetrics';
+import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
+import { useContainers } from '@/hooks/useContainers';
+import { useProjectConfig } from '@/hooks/useProjectConfig';
 import {
   transformCashFlow,
   type TimeScale,
@@ -35,13 +41,18 @@ interface CashFlowResponse {
   error?: string;
 }
 
-async function fetchCashFlow(url: string): Promise<CashFlowResponse> {
+interface FetchOptions {
+  containerIds?: number[];
+}
+
+async function fetchCashFlow(url: string, options: FetchOptions = {}): Promise<CashFlowResponse> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       periodType: 'month',
       includeFinancing: false,
+      containerIds: options.containerIds,
     }),
   });
 
@@ -54,22 +65,83 @@ async function fetchCashFlow(url: string): Promise<CashFlowResponse> {
 }
 
 export default function CashFlowAnalysisTab({ projectId }: Props) {
-  // Controls state - defaults: Overall time, By Phase grouping, details hidden
-  const [timeScale, setTimeScale] = useState<TimeScale>('overall');
-  const [costGranularity, setCostGranularity] = useState<CostGranularity>('by_phase');
-  const [showLineItems, setShowLineItems] = useState(false);
+  // Controls state - defaults: Annual time, Summary grouping
+  const [timeScale, setTimeScale] = useState<TimeScale>('annual');
+  const [costGranularity, setCostGranularity] = useState<CostGranularity>('summary');
 
-  // Fetch cash flow data
+  // Filter state
+  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
+  const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
+
+  // Fetch containers (areas/phases) for filter
+  const { areas, phases: containerPhases, isLoading: containersLoading } = useContainers({ projectId });
+  const { labels } = useProjectConfig(projectId);
+
+  // Filter handlers
+  const handleAreaSelect = useCallback((areaId: number) => {
+    setSelectedAreaIds(prev => {
+      if (prev.includes(areaId)) {
+        return prev.filter(id => id !== areaId);
+      }
+      return [...prev, areaId];
+    });
+    // Clear phase selections when area changes
+    setSelectedPhaseIds([]);
+  }, []);
+
+  const handlePhaseSelect = useCallback((phaseId: number) => {
+    setSelectedPhaseIds(prev => {
+      if (prev.includes(phaseId)) {
+        return prev.filter(id => id !== phaseId);
+      }
+      return [...prev, phaseId];
+    });
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedAreaIds([]);
+    setSelectedPhaseIds([]);
+  }, []);
+
+  // Filter phases shown in tiles by selected areas
+  const filteredContainerPhases = useMemo(() => {
+    if (selectedAreaIds.length === 0) return containerPhases;
+    return containerPhases.filter(phase => selectedAreaIds.includes(phase.parent_id!));
+  }, [containerPhases, selectedAreaIds]);
+
+  const hasFilters = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
+
+  // Determine which container IDs to pass to the API
+  // This controls which phases' data is aggregated into the totals
+  const containerIdsForApi = useMemo(() => {
+    // If specific phases are selected, use those
+    if (selectedPhaseIds.length > 0) {
+      return selectedPhaseIds;
+    }
+    // If areas are selected but no phases, get all phases in those areas
+    if (selectedAreaIds.length > 0) {
+      return containerPhases
+        .filter(p => selectedAreaIds.includes(p.parent_id!))
+        .map(p => p.division_id);
+    }
+    // No filter - return undefined to fetch all
+    return undefined;
+  }, [selectedPhaseIds, selectedAreaIds, containerPhases]);
+
+  // Fetch cash flow data with container filter
   const { data, error, isLoading } = useSWR<CashFlowResponse>(
-    `/api/projects/${projectId}/cash-flow/generate`,
-    fetchCashFlow,
+    // Include containerIds in the cache key so data refetches when filter changes
+    containerIdsForApi
+      ? [`/api/projects/${projectId}/cash-flow/generate`, containerIdsForApi]
+      : `/api/projects/${projectId}/cash-flow/generate`,
+    () => fetchCashFlow(`/api/projects/${projectId}/cash-flow/generate`, { containerIds: containerIdsForApi }),
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
     }
   );
 
-  // Transform data based on selected options
+  // Transform data based on selected time scale and cost granularity
   const transformedSchedule: AggregatedSchedule | null = useMemo(() => {
     if (!data?.data) return null;
     return transformCashFlow(data.data, timeScale, costGranularity);
@@ -114,12 +186,112 @@ export default function CashFlowAnalysisTab({ projectId }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ paddingBottom: '2rem' }}>
+      {/* Filter Header - Villages/Phases */}
+      <CollapsibleSection
+        title={`${labels.level1LabelPlural} / ${labels.level2LabelPlural}`}
+        itemCount={1}
+        defaultExpanded={false}
+        headerActions={
+          hasFilters && (
+            <CBadge
+              color="secondary"
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClearFilters();
+              }}
+            >
+              Clear Filters
+            </CBadge>
+          )
+        }
+      >
+        <div className="p-3">
+          {/* Areas (Level 1) */}
+          <div className="mb-3">
+            <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+              {labels.level1LabelPlural}
+            </h6>
+            <div className="d-flex flex-wrap gap-2">
+              {containersLoading ? (
+                <div className="text-muted text-sm">Loading...</div>
+              ) : areas.length === 0 ? (
+                <div className="text-muted text-sm">No {labels.level1LabelPlural.toLowerCase()} defined</div>
+              ) : (
+                areas.map(area => {
+                  const isSelected = selectedAreaIds.includes(area.division_id);
+                  const cleanName = area.name.replace(/\bArea\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+                  return (
+                    <button
+                      key={area.division_id}
+                      onClick={() => handleAreaSelect(area.division_id)}
+                      className="px-3 py-2 rounded text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
+                        color: isSelected ? '#fff' : 'var(--cui-body-color)',
+                        border: `1px solid ${isSelected ? 'var(--cui-primary)' : 'var(--cui-border-color)'}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {labels.level1Label} {cleanName}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Phases (Level 2) */}
+          <div>
+            <h6 className="text-sm font-semibold mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+              {labels.level2LabelPlural}
+            </h6>
+            <div className="d-flex flex-wrap gap-2">
+              {containersLoading ? (
+                <div className="text-muted text-sm">Loading...</div>
+              ) : filteredContainerPhases.length === 0 ? (
+                <div className="text-muted text-sm">
+                  No {labels.level2LabelPlural.toLowerCase()} {selectedAreaIds.length > 0 ? `in selected ${labels.level1LabelPlural.toLowerCase()}` : 'defined'}
+                </div>
+              ) : (
+                filteredContainerPhases.map(phase => {
+                  const isSelected = selectedPhaseIds.includes(phase.division_id);
+                  const isHighlighted = !isSelected && selectedAreaIds.includes(phase.parent_id!);
+                  return (
+                    <button
+                      key={phase.division_id}
+                      onClick={() => handlePhaseSelect(phase.division_id)}
+                      className="px-3 py-2 rounded text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: isSelected
+                          ? 'var(--cui-primary)'
+                          : isHighlighted
+                          ? 'var(--cui-info-bg)'
+                          : 'var(--cui-tertiary-bg)',
+                        color: isSelected ? '#fff' : 'var(--cui-body-color)',
+                        border: `1px solid ${isSelected ? 'var(--cui-primary)' : isHighlighted ? 'var(--cui-info)' : 'var(--cui-border-color)'}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {labels.level2Label} {phase.name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </CollapsibleSection>
+
       {/* Summary Metrics */}
-      <CashFlowSummaryMetrics summary={data.data.summary} />
+      <div className="mt-3">
+        <CashFlowSummaryMetrics summary={data.data.summary} />
+      </div>
 
       {/* Controls */}
       <CCard
+        className="mt-3"
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           borderColor: 'var(--cui-border-color)',
@@ -145,25 +317,16 @@ export default function CashFlowAnalysisTab({ projectId }: Props) {
             </span>
             <CostGranularityToggle value={costGranularity} onChange={setCostGranularity} />
           </div>
-
-          <div className="ms-auto">
-            <CFormSwitch
-              id="showLineItems"
-              label="Show details"
-              checked={showLineItems}
-              onChange={(e) => setShowLineItems(e.target.checked)}
-            />
-          </div>
         </CCardHeader>
         <CCardBody className="p-0">
-          <CashFlowTable schedule={transformedSchedule} showLineItems={showLineItems} />
+          <CashFlowTable schedule={transformedSchedule} />
         </CCardBody>
       </CCard>
 
       {/* Generation metadata */}
       {data.meta && (
         <div
-          className="text-xs text-right"
+          className="text-xs text-right mt-3"
           style={{ color: 'var(--cui-secondary-color)' }}
         >
           Generated in {data.meta.generationTime}ms • {data.meta.periodCount} periods •{' '}

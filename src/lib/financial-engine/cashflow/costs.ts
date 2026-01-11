@@ -87,9 +87,9 @@ const ACTIVITY_CATEGORY_MAP: Record<string, CategoryMapping> = {
     category: 'Planning & Engineering',
     sortOrder: 2,
   },
-  'Development': {
-    activity: 'Development',
-    category: 'Development Costs',
+  'Improvements': {
+    activity: 'Improvements',
+    category: 'Improvement Costs',  // Renamed from Development Costs
     sortOrder: 3,
   },
   'Operations': {
@@ -485,6 +485,46 @@ function interpolateCurve(curve: number[], progress: number): number {
 }
 
 // ============================================================================
+// ACQUISITION COST FETCHING
+// ============================================================================
+
+interface AcquisitionRow {
+  acquisition_id: number;
+  project_id: number;
+  event_date: string | null;
+  event_type: string | null;
+  description: string | null;
+  amount: number;
+  is_applied_to_purchase: boolean;
+  notes: string | null;
+}
+
+/**
+ * Fetch acquisition costs from tbl_acquisition
+ * These are separate from budget items and represent land purchase costs
+ */
+export async function fetchAcquisitionCosts(projectId: number): Promise<AcquisitionRow[]> {
+  const query = sql<AcquisitionRow>`
+    SELECT
+      acquisition_id,
+      project_id,
+      event_date,
+      event_type,
+      description,
+      COALESCE(amount, 0)::numeric as amount,
+      COALESCE(is_applied_to_purchase, true) as is_applied_to_purchase,
+      notes
+    FROM landscape.tbl_acquisition
+    WHERE project_id = ${projectId}
+      AND is_applied_to_purchase = true
+      AND amount > 0
+    ORDER BY event_date, acquisition_id
+  `;
+
+  return await query;
+}
+
+// ============================================================================
 // COST SCHEDULE GENERATION
 // ============================================================================
 
@@ -504,7 +544,11 @@ export async function generateCostSchedule(
   // Fetch budget items
   const budgetItems = await fetchBudgetItems(projectId, containerIds);
 
-  if (budgetItems.length === 0) {
+  // Fetch acquisition costs (separate from budget)
+  // Note: Acquisition costs are project-level and not filtered by container
+  const acquisitionCosts = await fetchAcquisitionCosts(projectId);
+
+  if (budgetItems.length === 0 && acquisitionCosts.length === 0) {
     return {
       projectId,
       totalCosts: 0,
@@ -588,6 +632,88 @@ export async function generateCostSchedule(
       curveSteepness: item.curve_steepness || undefined,
       periods: escalatedPeriods,
     });
+  }
+
+  // Add acquisition costs as allocations (from tbl_acquisition)
+  // These are land purchase costs, typically incurred at period 1
+  // When filtered by container, allocate proportionally by acres (like validation report)
+  if (acquisitionCosts.length > 0) {
+    // Calculate total acquisition amount
+    const totalAcquisition = acquisitionCosts.reduce((sum, acq) => {
+      const amt = typeof acq.amount === 'number' ? acq.amount : parseFloat(String(acq.amount));
+      return sum + (amt > 0 ? amt : 0);
+    }, 0);
+
+    if (totalAcquisition > 0) {
+      // Determine allocation proportion based on acres
+      let allocationProportion = 1.0; // Default to 100% if no filter
+
+      if (containerIds && containerIds.length > 0) {
+        // Fetch acres for proportion calculation
+        // containerIds are division_ids (tier 2 = phases)
+        const acresQuery = await sql<{ total_acres: number; filtered_acres: number }>`
+          WITH project_acres AS (
+            SELECT COALESCE(SUM(acres_gross), 0)::numeric as total_acres
+            FROM landscape.tbl_parcel
+            WHERE project_id = ${projectId}
+          ),
+          filtered_acres AS (
+            SELECT COALESCE(SUM(p.acres_gross), 0)::numeric as filtered_acres
+            FROM landscape.tbl_parcel p
+            LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+            LEFT JOIN landscape.tbl_division d_phase
+              ON ph.phase_name = d_phase.display_name
+              AND ph.project_id = d_phase.project_id
+              AND d_phase.tier = 2
+            WHERE p.project_id = ${projectId}
+              AND d_phase.division_id = ANY(${containerIds})
+          )
+          SELECT
+            (SELECT total_acres FROM project_acres) as total_acres,
+            (SELECT filtered_acres FROM filtered_acres) as filtered_acres
+        `;
+
+        const acresResult = acresQuery[0];
+        const totalAcres = Number(acresResult?.total_acres) || 0;
+        const filteredAcres = Number(acresResult?.filtered_acres) || 0;
+
+        if (totalAcres > 0) {
+          allocationProportion = filteredAcres / totalAcres;
+        }
+      }
+
+      // Calculate allocated acquisition amount
+      const allocatedAmount = totalAcquisition * allocationProportion;
+
+      if (allocatedAmount > 0) {
+        // Acquisition costs are placed at period 1 (project start)
+        const periods: PeriodValue[] = [{
+          periodIndex: 0,
+          periodSequence: 1,
+          amount: allocatedAmount,
+          source: 'budget',
+        }];
+
+        allocations.push({
+          factId: -1, // Synthetic ID for aggregated acquisition
+          budgetItemId: -1,
+          projectId,
+          containerId: undefined,
+          containerLabel: undefined,
+          category: 'Land Acquisition',
+          subcategory: 'Land Purchase',
+          description: allocationProportion < 1
+            ? `Land Acquisition (${Math.round(allocationProportion * 100)}% allocation)`
+            : 'Land Acquisition',
+          totalAmount: allocatedAmount,
+          startPeriod: 1,
+          periodsToComplete: 1,
+          endPeriod: 1,
+          timingMethod: 'milestone',
+          periods,
+        });
+      }
+    }
   }
 
   // Group by category

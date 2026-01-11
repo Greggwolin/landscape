@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
 
 export default function ParcelTestPage() {
   const mapContainer = useRef<HTMLDivElement>(null)
@@ -19,29 +20,7 @@ export default function ParcelTestPage() {
 
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: {
-          version: 8,
-          sources: {
-            'osm': {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256
-            }
-          },
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: { 'background-color': '#1a202c' }
-            },
-            {
-              id: 'osm',
-              type: 'raster',
-              source: 'osm',
-              paint: { 'raster-opacity': 0.7 }
-            }
-          ]
-        },
+        style: getEsriHybridStyle(),
         center: [-111.927912, 33.028911], // Anderson Road & Farrell Road intersection, Maricopa
         zoom: 12
       })

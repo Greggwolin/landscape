@@ -26,8 +26,7 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
-  const horizontalMargin = '1rem';
-  const stickyTop = 'calc(58px + 1rem)'; // top nav height + desired gap
+  const stickyTop = 'calc(58px + var(--app-padding) + 16px)'; // top nav height + extra breathing room
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -52,10 +51,8 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
         borderRadius: '12px',
         top: stickyTop,
         zIndex: 40,
-        marginTop: horizontalMargin,
-        marginLeft: horizontalMargin,
-        marginRight: horizontalMargin,
-        marginBottom: '0.5rem',
+        marginTop: '0',
+        marginBottom: 'calc(var(--app-padding) / 2)',
         overflow: 'hidden'
       }}
     >
@@ -63,45 +60,47 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
       <div
         style={{
           backgroundColor: 'var(--surface-card-header)',
-          padding: '12px 16px'
+          padding: '0.75rem var(--app-padding)'
         }}
       >
-        <div className="d-flex align-items-center gap-3">
-          <span
-            className="fw-semibold"
-            style={{
-              color: 'var(--cui-body-color)',
-              fontSize: '1.1rem',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Active Project:
-          </span>
-          <select
-            value={project.project_id}
-            onChange={(e) => handleProjectChange(Number(e.target.value))}
-            className="px-3 py-2 fw-medium rounded"
-            style={{
-              backgroundColor: 'var(--cui-body-bg)',
-              borderColor: 'var(--cui-border-color)',
-              color: 'var(--cui-body-color)',
-              border: '1px solid var(--cui-border-color)',
-              cursor: 'pointer',
-              minWidth: '380px',
-              fontSize: '1.05rem',
-            }}
-          >
-            {projects.map((proj) => (
-              <option key={proj.project_id} value={proj.project_id}>
-                {proj.project_name} - {proj.project_type_code || 'Unknown'}
-              </option>
-            ))}
-          </select>
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+          <div className="d-flex align-items-center gap-3 flex-wrap">
+            <span
+              className="fw-semibold"
+              style={{
+                color: 'var(--cui-body-color)',
+                fontSize: '1.1rem',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Active Project:
+            </span>
+            <select
+              value={project.project_id}
+              onChange={(e) => handleProjectChange(Number(e.target.value))}
+              className="px-3 py-2 fw-medium rounded"
+              style={{
+                backgroundColor: 'var(--cui-body-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)',
+                border: '1px solid var(--cui-border-color)',
+                cursor: 'pointer',
+                minWidth: '380px',
+                fontSize: '1.05rem',
+              }}
+            >
+              {projects.map((proj) => (
+                <option key={proj.project_id} value={proj.project_id}>
+                  {proj.project_name} - {proj.project_type_code || 'Unknown'}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Lifecycle Tiles + Inflation selectors */}
-      <div style={{ padding: '12px 16px' }}>
+      <div style={{ padding: '0.75rem var(--app-padding)' }}>
         <div className="d-flex flex-wrap gap-3 justify-content-between align-items-start">
           <div className="flex-grow-1">
             <LifecycleTileNav

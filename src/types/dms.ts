@@ -6,6 +6,7 @@ export interface DMSDocument {
   workspace_id: string | null;
   phase_id: string | null;
   parcel_id: string | null;
+  parcel_id_int?: string | null;
   doc_name: string;
   doc_type: string | null;
   discipline: string | null;
@@ -18,6 +19,12 @@ export interface DMSDocument {
   profile_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+
+  // Storage fields
+  storage_uri?: string | null;
+  sha256_hash?: string | null;
+  mime_type?: string | null;
+  file_size_bytes?: number | null;
 
   // Derived/joined fields
   project_name?: string | null;

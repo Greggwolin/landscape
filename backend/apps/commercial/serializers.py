@@ -4,6 +4,7 @@ Serializers for Commercial Real Estate application.
 
 from rest_framework import serializers
 from .models import CREProperty, CRETenant, CRESpace, CRELease
+from apps.projects.primary_measure import sync_primary_measure_on_legacy_update
 
 
 class CREPropertySerializer(serializers.ModelSerializer):
@@ -43,6 +44,32 @@ class CREPropertySerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['cre_property_id', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        project_id = instance.project_id
+        for column in ('rentable_sf', 'number_of_units'):
+            if column in validated_data:
+                sync_primary_measure_on_legacy_update(
+                    project_id=project_id,
+                    table='tbl_cre_property',
+                    column=column,
+                    value=validated_data.get(column)
+                )
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        project_id = instance.project_id
+        for column in ('rentable_sf', 'number_of_units'):
+            if column in validated_data:
+                sync_primary_measure_on_legacy_update(
+                    project_id=project_id,
+                    table='tbl_cre_property',
+                    column=column,
+                    value=validated_data.get(column)
+                )
+        return instance
 
 
 class CRETenantSerializer(serializers.ModelSerializer):

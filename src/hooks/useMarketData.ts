@@ -7,6 +7,8 @@ export interface MarketCompetitiveProject {
   id?: number;
   project: number;
   comp_name: string;
+  master_plan_name?: string | null;
+  builder_name?: string | null;
   comp_address?: string;
   latitude?: number;
   longitude?: number;
@@ -20,6 +22,29 @@ export interface MarketCompetitiveProject {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  products?: MarketCompetitiveProjectProduct[];
+}
+
+export interface MarketCompetitiveProjectProduct {
+  id?: number;
+  lot_width_ft?: number | null;
+  lot_dimensions?: string | null;
+  unit_size_min_sf?: number | null;
+  unit_size_max_sf?: number | null;
+  unit_size_avg_sf?: number | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  price_avg?: number | null;
+  price_per_sf_avg?: number | null;
+  units_planned?: number | null;
+  units_sold?: number | null;
+  units_remaining?: number | null;
+  sales_rate_monthly?: number | null;
+  sales_rate_3m_avg?: number | null;
+  sales_rate_6m_avg?: number | null;
+  qmi_count?: number | null;
+  mos_vdl?: number | null;
+  mos_inventory?: number | null;
 }
 
 export interface MarketMacroData {

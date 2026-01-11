@@ -1,0 +1,10 @@
+{
+    "target_market": "Phoenix-Mesa-Chandler, AZ",
+    "metro_entry_url": "https://www.newhomesource.com/phoenix-az/new-homes",
+    "max_communities": 10,
+    "max_plans_per_community": 5,
+    "max_listings_per_community": 10,
+    "user_agent": "LandscapeReconBot/0.1 (contact: gregg@wolinfamily.com)",
+    "respect_robots_txt": true,
+    "request_delay_seconds": 1.5
+}

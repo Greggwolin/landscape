@@ -38,8 +38,8 @@ src/
 - Add context (owner, notes, target branch) in the registry metadata so the `/prototypes` index stays useful.
 - Use dedicated data mocks inside each prototype; keep them self-contained so they work even without backend
   services.
-- Capture learnings in Markdown next to the prototype (`docs/prototypes/<experiment>.md`) if you want a written
+- Capture learnings in Markdown next to the prototype (`docs/09_session_notes/prototypes/<experiment>.md`) if you want a written
   record before merging into the main product.
 - To embed static HTML mockups, copy them into `public/prototypes` and load them through a small React wrapper (see `coreui-lease-input`). This keeps CDN links intact while integrating with the hub.
 - Dynamic app flows can be embedded via iframe so reviewers can click through without leaving the hub (see `coreui-lease-react`).
-- Use the per-tile note box on `/prototypes` to jot feedback; entries are timestamped and stored in `docs/prototypes/notes.log` so the history travels with Git.
+- Use the per-tile note box on `/prototypes` to jot feedback; entries are timestamped and stored in `docs/09_session_notes/prototypes/notes.log` so the history travels with Git.

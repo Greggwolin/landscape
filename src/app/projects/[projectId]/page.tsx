@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering for pages using useSearchParams
+export const dynamic = 'force-dynamic';
+
 import { useParams, useSearchParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { CContainer } from '@coreui/react';
@@ -57,7 +60,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div style={{ paddingLeft: '1rem', paddingRight: '1rem', paddingTop: '1rem', paddingBottom: '1rem' }}>
+    <div className="app-content">
       {/* Universal tabs */}
       {activeTab === 'project' && <ProjectTab project={project} />}
       {activeTab === 'capitalization' && <CapitalizationTab project={project} />}

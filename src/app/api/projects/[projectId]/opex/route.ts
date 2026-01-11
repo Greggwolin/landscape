@@ -11,6 +11,24 @@ export async function GET(
   try {
     const { projectId } = await context.params;
     const projectIdNum = parseInt(projectId);
+    const searchParams = request.nextUrl.searchParams;
+    const overrideDiscriminator = searchParams.get('statement_discriminator');
+
+    const activeResult = await sql`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectIdNum}
+      LIMIT 1
+    `;
+    const availableResult = await sql`
+      SELECT DISTINCT statement_discriminator
+      FROM landscape.tbl_operating_expenses
+      WHERE project_id = ${projectIdNum}
+    `;
+    const available = availableResult.rows.map(r => r.statement_discriminator).filter(Boolean);
+    const activeDiscriminator = (overrideDiscriminator && available.includes(overrideDiscriminator))
+      ? overrideDiscriminator
+      : (activeResult.rows[0]?.active_opex_discriminator || 'default');
 
     const expenses = await sql`
       SELECT
@@ -31,10 +49,15 @@ export async function GET(
         updated_at
       FROM landscape.tbl_operating_expenses
       WHERE project_id = ${projectIdNum}
+        AND statement_discriminator = ${activeDiscriminator}
       ORDER BY expense_category, expense_type
     `;
 
-    return NextResponse.json({ expenses });
+    return NextResponse.json({
+      expenses,
+      active_statement_discriminator: activeDiscriminator,
+      available_statement_discriminators: available
+    });
 
   } catch (error) {
     console.error('Error fetching operating expenses:', error);
@@ -55,7 +78,7 @@ export async function POST(
     const projectIdNum = parseInt(projectId);
     const body = await request.json();
 
-    const { expenses } = body;
+    const { expenses, statement_discriminator: statementDiscriminator } = body;
 
     if (!expenses || !Array.isArray(expenses)) {
       return NextResponse.json(
@@ -63,6 +86,14 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    const activeResult = await sql`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectIdNum}
+      LIMIT 1
+    `;
+    const discriminator = statementDiscriminator || activeResult.rows[0]?.active_opex_discriminator || 'default';
 
     // Upsert operating expenses
     for (const expense of expenses) {
@@ -82,6 +113,7 @@ export async function POST(
             start_period = ${expense.start_period},
             payment_frequency = ${expense.payment_frequency || 'MONTHLY'},
             notes = ${expense.notes || null},
+            statement_discriminator = ${discriminator},
             updated_at = NOW()
           WHERE opex_id = ${expense.opex_id}
             AND project_id = ${projectIdNum}
@@ -101,7 +133,8 @@ export async function POST(
             escalation_rate,
             start_period,
             payment_frequency,
-            notes
+            notes,
+            statement_discriminator
           ) VALUES (
             ${projectIdNum},
             ${expense.expense_category},
@@ -114,7 +147,8 @@ export async function POST(
             ${expense.escalation_rate || 0.03},
             ${expense.start_period},
             ${expense.payment_frequency || 'MONTHLY'},
-            ${expense.notes || null}
+            ${expense.notes || null},
+            ${discriminator}
           )
         `;
       }

@@ -1,72 +1,76 @@
-/**
- * ChatMessageBubble Component
- *
- * Displays an individual chat message with role-based styling.
- * User messages appear on the right, assistant messages on the left.
- */
+'use client';
 
 import React from 'react';
+import { ChatMessage } from '@/hooks/useLandscaper';
+import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
 
 interface ChatMessageBubbleProps {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  userName?: string | null;
+  message: ChatMessage;
+  onConfirmMutation?: (mutationId: string) => Promise<void>;
+  onRejectMutation?: (mutationId: string) => Promise<void>;
+  onConfirmBatch?: (batchId: string) => Promise<void>;
 }
 
-export default function ChatMessageBubble({
-  role,
-  content,
-  timestamp,
-  userName,
+export function ChatMessageBubble({
+  message,
+  onConfirmMutation,
+  onRejectMutation,
+  onConfirmBatch,
 }: ChatMessageBubbleProps) {
-  const isUser = role === 'user';
+  const isUser = message.role === 'user';
 
-  // Format timestamp
-  const formattedTime = new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  // Check for mutation proposals in metadata
+  const proposals: MutationProposal[] = message.metadata?.mutation_proposals ||
+    message.metadata?.mutationProposals ||
+    [];
+  const hasProposals = proposals.length > 0;
 
   return (
-    <div
-      className={`d-flex mb-3 ${isUser ? 'justify-content-end' : 'justify-content-start'}`}
-    >
+    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      {/* Main message bubble */}
       <div
-        className={`d-flex flex-column ${isUser ? 'align-items-end' : 'align-items-start'}`}
-        style={{ maxWidth: '75%' }}
+        className="max-w-[80%] rounded-2xl px-4 py-3"
+        style={{
+          backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
+          color: isUser ? 'white' : 'var(--cui-body-color)',
+        }}
       >
-        {/* Message bubble */}
-        <div
-          className={`px-3 py-2 rounded ${
-            isUser
-              ? 'bg-primary text-white'
-              : 'border'
-          }`}
-          style={{
-            backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--cui-body-bg)',
-            borderColor: !isUser ? 'var(--cui-border-color)' : undefined,
-            color: isUser ? 'white' : 'var(--cui-body-color)',
-          }}
-        >
-          {/* Format content with line breaks */}
-          {content.split('\n').map((line, idx) => (
-            <React.Fragment key={idx}>
-              {line}
-              {idx < content.split('\n').length - 1 && <br />}
-            </React.Fragment>
-          ))}
-        </div>
+        <div className="whitespace-pre-wrap">{message.content}</div>
 
-        {/* Metadata */}
-        <div
-          className="text-muted small mt-1"
-          style={{ fontSize: '0.75rem' }}
-        >
-          {isUser && userName && <span className="me-2">{userName}</span>}
-          <span>{formattedTime}</span>
-        </div>
+        {!isUser && message.metadata?.sources && message.metadata.sources.length > 0 && (
+          <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>
+            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              Sources:{' '}
+              {message.metadata.sources
+                .slice(0, 3)
+                .map((source) => source.filename)
+                .join(', ')}
+              {message.metadata.sources.length > 3 &&
+                ` +${message.metadata.sources.length - 3} more`}
+            </div>
+          </div>
+        )}
+
+        {!isUser && message.metadata?.fieldUpdates && !hasProposals && (
+          <div className="mt-2 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            Contains recommendations
+          </div>
+        )}
       </div>
+
+      {/* Mutation proposals card (below assistant message) */}
+      {!isUser && hasProposals && onConfirmMutation && onRejectMutation && (
+        <div className="mt-2 w-full max-w-[90%]">
+          <MutationProposalCard
+            proposals={proposals}
+            onConfirm={onConfirmMutation}
+            onReject={onRejectMutation}
+            onConfirmAll={onConfirmBatch}
+          />
+        </div>
+      )}
     </div>
   );
 }
+
+export default ChatMessageBubble;

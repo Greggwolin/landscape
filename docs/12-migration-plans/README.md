@@ -39,7 +39,7 @@ Each migration plan typically includes:
 
 ## Related Documentation
 
-- See [11-implementation-status/](../11-implementation-status/) for migration completion status
+- See [00_overview/status/](../00_overview/status/) for migration completion status
 - See [08-migration-history/](../08-migration-history/) for historical migrations
 - See [07-testing/](../07-testing/) for migration testing procedures
 

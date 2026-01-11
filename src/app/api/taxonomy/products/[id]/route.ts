@@ -89,6 +89,39 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const productId = parseInt(id);
+    const { searchParams } = new URL(request.url);
+    const typeIdParam = searchParams.get('type_id');
+
+    // If a type_id is provided, only unlink the product from that type (do not delete the product record)
+    if (typeIdParam) {
+      const typeId = parseInt(typeIdParam);
+      if (Number.isNaN(typeId)) {
+        return NextResponse.json(
+          { error: 'Invalid type_id' },
+          { status: 400 }
+        );
+      }
+
+      const unlinkResult = await sql`
+        DELETE FROM type_lot_product
+        WHERE product_id = ${productId} AND type_id = ${typeId}
+        RETURNING type_id
+      `;
+
+      if (unlinkResult.length === 0) {
+        return NextResponse.json(
+          { error: 'Product is not linked to the specified type' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        product_id: productId,
+        type_id: typeId,
+        unlinked: true
+      });
+    }
 
     // Check if any inventory items reference this product
     const inventoryCheck = await sql`
@@ -107,11 +140,19 @@ export async function DELETE(
       );
     }
 
-    // Delete junction table entries first (CASCADE should handle this, but being explicit)
-    await sql`
-      DELETE FROM type_lot_product
+    // Prevent deleting a product that is still linked to any types
+    const typeLinks = await sql`
+      SELECT COUNT(*) as count
+      FROM type_lot_product
       WHERE product_id = ${productId}
     `;
+
+    if (parseInt(typeLinks[0].count) > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete product while it is linked to property types. Remove links first.' },
+        { status: 422 }
+      );
+    }
 
     // Delete the product
     const result = await sql`

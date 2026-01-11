@@ -314,7 +314,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   │   ├── Budget-Finance-Schema-Overlap-Analysis.md
 │   │   ├── Schema-Coverage-Analysis.md
 │   │   └── Schema-Naming-Convention-Analysis.md
-│   ├── 09-technical-dd
+│   ├── 09_session_notes/technical-dd
 │   │   ├── .DS_Store
 │   │   ├── 01-executive-summary
 │   │   ├── 02-architecture
@@ -327,13 +327,13 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   │   ├── 07-technical-debt
 │   │   ├── 08-appendices
 │   │   └── README.md
-│   ├── 10-correspondence
+│   ├── 09_session_notes/correspondence
 │   │   ├── ASU-2-pager.docx
 │   │   ├── ASU-3-pager.docx
 │   │   ├── ASU-memo_re-landscape.pdf
 │   │   ├── README.md
 │   │   └── ~$U-2-pager.docx
-│   ├── 11-implementation-status
+│   ├── 00_overview/status
 │   │   ├── BUDGET_CONTAINER_INTEGRATION_COMPLETE.md
 │   │   ├── CONTAINER_CRUD_FRONTEND_COMPLETE.md
 │   │   ├── CONTAINER_CRUD_IMPLEMENTATION_STATUS.md
@@ -365,7 +365,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   │   └── README.md
 │   ├── 1451-Red Valley Phase 1 Email.pdf
 │   ├── 3.1 Preliminary Plat Narrative & Approval.pdf
-│   ├── 99-prompts
+│   ├── 09_session_notes/prompts
 │   │   ├── CLAUDE_CODE_RENT_ROLL_INGESTION_PROMPT.md
 │   │   ├── IMPLEMENTATION_PROMPT_UPDATE_SUMMARY.md
 │   │   └── chadron_rent_roll_ingestion_spec.md
@@ -396,7 +396,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   │   ├── patches
 │   │   └── ui_consistency_audit_pass_a_2025-11-05.md
 │   ├── ZondaReports.xlsx
-│   ├── ai-chats
+│   ├── 09_session_notes/ai-chats
 │   │   ├── .archive
 │   │   ├── 2025-09-17-ai-chat-logs.md
 │   │   └── 2025-09-17-ai-chat.md
@@ -444,7 +444,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   ├── rent-roll-ingestion-quick-start.md
 │   ├── rent-roll-ingestion-session-GR09-complete.md
 │   ├── rent-roll-ingestion-testing-guide.md
-│   ├── session-notes
+│   ├── 09_session_notes
 │   │   ├── 2025-10-10-market-intelligence-fixes.md
 │   │   ├── 2025-10-22-documentation-system.md
 │   │   ├── 2025-10-23-multifam-rent-roll-prototype.md
@@ -601,7 +601,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   ├── migrate-pricing-columns.mjs
 │   ├── neon-branch-create.sh
 │   ├── neon-branch-delete.sh
-│   ├── normalize-ai-chats.mjs
+│   ├── normalize-09_session_notes/ai-chats.mjs
 │   ├── rollback-production.sh
 │   ├── run-extraction-migration.js
 │   ├── run-extraction-migration.sh
@@ -617,7 +617,7 @@ FULL DIRECTORY TREE (3 LEVELS DEEP)
 │   ├── setup-auto-start.sh
 │   ├── setup-database-roles.sql
 │   ├── setup-monitoring.sql
-│   ├── stage-ai-chats.sh
+│   ├── stage-09_session_notes/ai-chats.sh
 │   ├── start-auto-commit.sh
 │   ├── test-dms-api-manual.md
 │   ├── test-dms-docs-api.sh

@@ -1,16 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CButton, CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilPlus } from '@coreui/icons';
+import { CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/react';
 import { useQuery } from '@tanstack/react-query';
-import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubNav';
 import MetricCard from '@/components/capitalization/MetricCard';
 import EquityPartnersTable, { type EquityPartner } from '@/components/capitalization/EquityPartnersTable';
-import WaterfallStructureTable, { type WaterfallTier } from '@/components/capitalization/WaterfallStructureTable';
-import { ExportButton } from '@/components/admin';
+import NapkinWaterfallForm from '@/components/capitalization/NapkinWaterfallForm';
+import WaterfallResults, { WaterfallApiResponse } from '@/components/capitalization/WaterfallResults';
+
+type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
 
 export default function EquityPage() {
   const params = useParams();
@@ -26,15 +25,51 @@ export default function EquityPage() {
     },
   });
 
-  const { data: waterfall = [] } = useQuery<WaterfallTier[]>({
-    queryKey: ['waterfall', projectId],
-    queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/equity/waterfall`);
-      if (!response.ok) throw new Error('Failed to fetch waterfall');
-      const data = await response.json();
-      return data.tiers || [];
-    },
-  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<WaterfallApiResponse | null>(null);
+  const [waterfallType, setWaterfallType] = useState<WaterfallType>('IRR');
+  const hasRunOnce = useRef(false);
+
+  const handleRun = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const hurdleMethodMap: Record<WaterfallType, string> = {
+        IRR: 'IRR',
+        EM: 'EMx',
+        IRR_EM: 'IRR_EMx',
+      };
+      const hurdleMethod = hurdleMethodMap[waterfallType];
+
+      const res = await fetch(`/api/projects/${projectId}/waterfall/calculate?hurdle_method=${hurdleMethod}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Request failed with status ${res.status}`);
+      }
+
+      const json = (await res.json()) as WaterfallApiResponse;
+      setData(json);
+      hasRunOnce.current = true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to calculate waterfall.';
+      setError(message);
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, waterfallType]);
+
+  const handleSaved = useCallback(() => {
+    if (hasRunOnce.current && !loading) {
+      handleRun();
+    }
+  }, [handleRun, loading]);
 
   const calculateTotalEquity = (): number => {
     return partners.reduce((sum, p) => sum + p.capitalCommitted, 0);
@@ -54,85 +89,76 @@ export default function EquityPage() {
   };
 
   return (
-    <>
-      <CapitalizationSubNav projectId={projectId} />
-
-      <div
-        className="p-4 space-y-4 min-h-screen"
-        style={{ backgroundColor: 'var(--cui-body-bg)' }}
-      >
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="mb-0">Capitalization</h5>
-          <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
+    <div className="space-y-4">
+      <div className="d-flex flex-column flex-lg-row gap-3 gap-lg-4 mb-3">
+        <div className="flex-fill" style={{ minWidth: 0 }}>
+          <NapkinWaterfallForm
+            projectId={projectId}
+            waterfallType={waterfallType}
+            onWaterfallTypeChange={setWaterfallType}
+            onSaved={handleSaved}
+          />
         </div>
-
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2>Equity Structure</h2>
-          <CButton
-            color="primary"
-            aria-label="Add equity partner"
-          >
-            <CIcon icon={cilPlus} className="me-1" />
-            Add Partner
-          </CButton>
+        <div className="flex-fill" style={{ minWidth: 0 }}>
+          <WaterfallResults
+            data={data}
+            error={error}
+            loading={loading}
+            onRun={handleRun}
+            showPeriodTable={false}
+          />
         </div>
-
-        <CRow className="g-3 mb-4">
-          <CCol xs={12} md={4}>
-            <MetricCard
-              label="Total Equity Committed"
-              value={formatCurrency(calculateTotalEquity())}
-              status="success"
-            />
-          </CCol>
-          <CCol xs={12} md={4}>
-            <MetricCard
-              label="Equity Deployed"
-              value={formatCurrency(calculateTotalDeployed())}
-              status="info"
-            />
-          </CCol>
-          <CCol xs={12} md={4}>
-            <MetricCard
-              label="Remaining to Deploy"
-              value={formatCurrency(calculateTotalEquity() - calculateTotalDeployed())}
-              status="primary"
-            />
-          </CCol>
-        </CRow>
-
-        <CCard className="mb-4">
-          <CCardHeader>
-            <h5 className="mb-0">Equity Partners</h5>
-          </CCardHeader>
-          <CCardBody>
-            <EquityPartnersTable
-              partners={partners}
-              onEdit={() => {}}
-              onDelete={() => {}}
-            />
-          </CCardBody>
-        </CCard>
-
-        <CCard>
-          <CCardHeader className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Waterfall Structure</h5>
-            <CButton
-              color="outline-secondary"
-              size="sm"
-              aria-label="Configure waterfall"
-            >
-              ⚙️ Configure
-            </CButton>
-          </CCardHeader>
-          <CCardBody>
-            <p className="text-muted small mb-3">
-              Display structure only. Distribution calculations will be added in future phase.
-            </p>
-            <WaterfallStructureTable tiers={waterfall} />
-          </CCardBody>
-        </CCard>
       </div>
-    </>
+      {data && (
+        <div className="row">
+          <div className="col-12">
+            <WaterfallResults
+              data={data}
+              error={null}
+              loading={false}
+              onRun={handleRun}
+              showPeriodTableOnly
+            />
+          </div>
+        </div>
+      )}
+
+      <CRow className="g-3 mt-4">
+        <CCol xs={12} md={4}>
+          <MetricCard
+            label="Total Equity Committed"
+            value={formatCurrency(calculateTotalEquity())}
+            status="success"
+          />
+        </CCol>
+        <CCol xs={12} md={4}>
+          <MetricCard
+            label="Equity Deployed"
+            value={formatCurrency(calculateTotalDeployed())}
+            status="info"
+          />
+        </CCol>
+        <CCol xs={12} md={4}>
+          <MetricCard
+            label="Remaining to Deploy"
+            value={formatCurrency(calculateTotalEquity() - calculateTotalDeployed())}
+            status="primary"
+          />
+        </CCol>
+      </CRow>
+
+      <CCard className="mt-4">
+        <CCardHeader>
+          <h5 className="mb-0">Equity Partners</h5>
+        </CCardHeader>
+        <CCardBody>
+          <EquityPartnersTable
+            partners={partners}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
+        </CCardBody>
+      </CCard>
+    </div>
   );
 }

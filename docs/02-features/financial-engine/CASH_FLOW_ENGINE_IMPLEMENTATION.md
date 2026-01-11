@@ -553,9 +553,9 @@ WHERE parcel_id = X;
 ## References
 
 - [Prompt: CASH_FLOW_ENGINE_PROMPT.md](../../../prompts/CASH_FLOW_ENGINE_PROMPT.md)
-- [Implementation Status: IMPLEMENTATION_STATUS_25-11-24.md](../../11-implementation-status/IMPLEMENTATION_STATUS_25-11-24.md)
+- [Implementation Status: IMPLEMENTATION_STATUS_25-11-24.md](../../00_overview/status/IMPLEMENTATION_STATUS_25-11-24.md)
 - [S-Curve Engine: SCURVE_CALCULATION_ENGINE.md](./SCURVE_CALCULATION_ENGINE.md)
-- [Project 9 Data Inventory](../../11-implementation-status/PROJECT_9_DATA_INVENTORY.md)
+- [Project 9 Data Inventory](../../00_overview/status/PROJECT_9_DATA_INVENTORY.md)
 - [Excel Reference Model](../../../reference/excel-models/PeoriaLakes MPC_2023.xlsm)
 
 ---

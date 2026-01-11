@@ -23,10 +23,20 @@ interface CategoryDetailPanelProps {
 const LIFECYCLE_STAGES: Activity[] = [
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',
+];
+
+// Tag chip colors matching Operations page filter buttons
+const TAG_COLORS = [
+  '#dc2626', // red-600
+  '#2563eb', // blue-600
+  '#16a34a', // green-600
+  '#ca8a04', // yellow-600
+  '#9333ea', // purple-600
+  '#4b5563', // gray-600
 ];
 
 /**
@@ -97,7 +107,7 @@ export default function CategoryDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     category_name: '',
-    activitys: ['Development'] as Activity[],
+    activitys: ['Improvements'] as Activity[],  // Default to Improvements
     tags: [] as string[],
     sort_order: 0,
   });
@@ -502,14 +512,34 @@ export default function CategoryDetailPanel({
         </div>
         <div className="detail-actions">
           {isSubcategory ? (
-            <button
-              className="btn btn-sm btn-ghost-danger"
-              onClick={handleDelete}
-              aria-label="Delete subcategory"
-              title="Delete"
-            >
-              <Trash2 size={16} />
-            </button>
+            // Subcategory: show Save/Cancel when editing, otherwise Edit/Delete
+            formData.category_name !== category.category_name ? (
+              <>
+                <button
+                  className="btn btn-sm btn-outline-secondary me-2"
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn btn-sm btn-ghost-danger"
+                onClick={handleDelete}
+                aria-label="Delete subcategory"
+                title="Delete"
+              >
+                <Trash2 size={16} />
+              </button>
+            )
           ) : !isEditing ? (
             <>
               <button
@@ -729,17 +759,23 @@ export default function CategoryDetailPanel({
             {sortedTags.length === 0 ? (
               <p className="text-muted mb-0">No tags have been created yet.</p>
             ) : (
-              sortedTags.map((tag) => {
+              sortedTags.map((tag, index) => {
                 const isAssigned = assignedTagSet.has(tag.tag_name.toLowerCase());
+                const color = TAG_COLORS[index % TAG_COLORS.length];
 
                 return (
                   <button
                     key={tag.tag_id}
                     type="button"
-                    className={`tag-chip ${isAssigned ? 'filled' : 'outline'}`}
+                    className="tag-chip"
                     onClick={() => handleTagChipToggle(tag.tag_name)}
                     disabled={isTagUpdating}
                     aria-pressed={isAssigned}
+                    style={{
+                      backgroundColor: isAssigned ? color : 'transparent',
+                      borderColor: color,
+                      color: isAssigned ? '#fff' : color,
+                    }}
                   >
                     <span className="tag-chip-label">{tag.tag_name}</span>
                     <span

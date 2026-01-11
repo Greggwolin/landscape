@@ -1,6 +1,6 @@
 /**
  * GET /api/dms/filters/counts
- * Fetch document type counts for accordion filters
+ * Fetch document type counts and smart filters for doc type panel
  * Query params: ?project_id=123
  */
 
@@ -19,16 +19,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const project = parseInt(projectId);
+
     // Query doc_type counts
     const docTypeCounts = await sql`
       SELECT
-        doc_type,
+        COALESCE(doc_type, 'general') AS doc_type,
         COUNT(*) as count
       FROM landscape.core_doc
-      WHERE project_id = ${parseInt(projectId)}
+      WHERE project_id = ${project}
         AND status NOT IN ('deleted', 'archived')
-      GROUP BY doc_type
-      ORDER BY doc_type ASC
+      GROUP BY COALESCE(doc_type, 'general')
+      ORDER BY COALESCE(doc_type, 'general') ASC
+    `;
+
+    // Query smart filters (active only)
+    const smartFilters = await sql`
+      SELECT
+        f.filter_id,
+        f.name AS filter_name,
+        f.query
+      FROM landscape.core_doc_smartfilter f
+      WHERE f.is_active = true
+      ORDER BY f.name ASC
     `;
 
     return NextResponse.json({
@@ -36,6 +49,11 @@ export async function GET(request: NextRequest) {
       doc_type_counts: docTypeCounts.map(row => ({
         doc_type: row.doc_type || 'general',
         count: parseInt(row.count as string)
+      })),
+      smart_filters: smartFilters.map(row => ({
+        filter_id: row.filter_id,
+        filter_name: row.filter_name,
+        query: row.query
       }))
     });
   } catch (error) {

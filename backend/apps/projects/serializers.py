@@ -6,6 +6,7 @@ Converts Django ORM models to/from JSON for the REST API.
 
 from rest_framework import serializers
 from .models import Project
+from .primary_measure import sync_primary_measure_on_legacy_update
 from .models_user import UserPreference
 
 
@@ -27,6 +28,30 @@ class ProjectSerializer(serializers.ModelSerializer):
             'last_calculated_at',
             'ai_last_reviewed',
         ]
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        for column in ('total_units', 'acres_gross'):
+            if column in validated_data:
+                sync_primary_measure_on_legacy_update(
+                    project_id=instance.project_id,
+                    table='tbl_project',
+                    column=column,
+                    value=validated_data.get(column)
+                )
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        for column in ('total_units', 'acres_gross'):
+            if column in validated_data:
+                sync_primary_measure_on_legacy_update(
+                    project_id=instance.project_id,
+                    table='tbl_project',
+                    column=column,
+                    value=validated_data.get(column)
+                )
+        return instance
 
 
 class ProjectListSerializer(serializers.ModelSerializer):
@@ -50,9 +75,14 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'jurisdiction_county',
             'jurisdiction_state',
             'acres_gross',
+            'primary_count',
+            'primary_count_type',
+            'primary_area',
+            'primary_area_type',
             'location_lat',
             'location_lon',
             'is_active',
+            'analysis_mode',
             'created_at',
             'updated_at',
         ]

@@ -17,7 +17,7 @@ export default function ProjectResultsPage() {
   const [activeSection, setActiveSection] = useState<'sales-comp' | 'feasibility' | 'valuation'>('sales-comp');
 
   return (
-    <div className="container-fluid px-4">
+    <div className="app-content">
       {/* Page Header */}
       <div className="mb-4">
         <h4 className="mb-1">Project Results</h4>
@@ -28,7 +28,7 @@ export default function ProjectResultsPage() {
 
       {/* Section Tabs */}
       <ul
-        className="nav nav-tabs mb-4 sticky border-bottom"
+        className="nav nav-tabs sticky border-bottom"
         style={{
           top: '163px',
           zIndex: 30,

@@ -52,6 +52,12 @@ class Project(models.Model):
     price_range_high = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
 
+    # Cross-asset primary measure (count + area)
+    primary_count = models.IntegerField(blank=True, null=True)
+    primary_count_type = models.CharField(max_length=50, blank=True, null=True)
+    primary_area = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    primary_area_type = models.CharField(max_length=50, blank=True, null=True)
+
     # Ownership
     legal_owner = models.TextField(blank=True, null=True)
     developer_owner = models.TextField(blank=True, null=True)
@@ -82,6 +88,9 @@ class Project(models.Model):
 
     # Template
     template_id = models.BigIntegerField(blank=True, null=True)
+
+    # Analysis Mode (napkin = simplified, developer = full tabs)
+    analysis_mode = models.CharField(max_length=20, blank=True, null=True, default='napkin')
 
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
 
 interface MapViewProps {
   latitude?: number;
@@ -32,7 +33,7 @@ export default function MapView({
       // Initialize map
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+        style: getEsriHybridStyle(),
         center: [longitude, latitude],
         zoom: zoom
       });

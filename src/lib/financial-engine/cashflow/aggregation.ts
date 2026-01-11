@@ -459,23 +459,89 @@ export function groupCostsByCategory(schedule: AggregatedSchedule): AggregatedSc
 }
 
 /**
- * Group costs by phase/container
- * Returns sections organized by Area/Phase hierarchy with stage subtotals as line items
+ * Group costs AND revenue by phase/container
+ * Returns flat sections (REVENUE, PROJECT COSTS) with phase labels appended to line items
+ * e.g., "Gross Revenue: Phase 1.2"
  */
 export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSchedule {
-  // Structure: phase -> stage -> items
-  const phaseStageMap = new Map<
+  const periodCount = schedule.periods.length;
+
+  // ========== COLLECT REVENUE BY PHASE ==========
+  const grossRevenueItems: AggregatedLineItem[] = [];
+  const deductionItems: AggregatedLineItem[] = [];
+  const netRevenueItems: AggregatedLineItem[] = [];
+
+  // Totals for section subtotals
+  let grossRevenueTotal = 0;
+  const grossRevenueSubtotals = new Array(periodCount).fill(0);
+  let deductionsTotal = 0;
+  const deductionsSubtotals = new Array(periodCount).fill(0);
+  let netRevenueTotal = 0;
+  const netRevenueSubtotals = new Array(periodCount).fill(0);
+
+  const revenueSections = schedule.sections.filter((s) =>
+    s.sectionName.toLowerCase().includes('revenue')
+  );
+
+  revenueSections.forEach((section) => {
+    const isGross = section.sectionId === 'revenue-gross';
+    const isDeductions = section.sectionId === 'revenue-deductions';
+    const isNet = section.sectionId === 'revenue-net';
+
+    section.lineItems.forEach((item) => {
+      const phaseName = item.containerLabel || 'Project Level';
+      const labelSuffix = item.containerId ? `: ${phaseName}` : '';
+
+      if (isGross) {
+        grossRevenueItems.push({
+          ...item,
+          lineId: `by-phase-gross-${item.containerId ?? 'project'}`,
+          description: `Gross Revenue${labelSuffix}`,
+        });
+        grossRevenueTotal += item.total;
+        item.values.forEach((val, idx) => {
+          grossRevenueSubtotals[idx] += val;
+        });
+      } else if (isDeductions) {
+        deductionItems.push({
+          ...item,
+          lineId: `by-phase-deduction-${item.containerId ?? 'project'}`,
+          description: `Subdivision Costs${labelSuffix}`,
+        });
+        deductionsTotal += item.total;
+        item.values.forEach((val, idx) => {
+          deductionsSubtotals[idx] += val;
+        });
+      } else if (isNet) {
+        netRevenueItems.push({
+          ...item,
+          lineId: `by-phase-net-${item.containerId ?? 'project'}`,
+          description: `Net Revenue${labelSuffix}`,
+        });
+        netRevenueTotal += item.total;
+        item.values.forEach((val, idx) => {
+          netRevenueSubtotals[idx] += val;
+        });
+      }
+    });
+  });
+
+  // Sort revenue items by phase name
+  const sortByPhase = (a: AggregatedLineItem, b: AggregatedLineItem) =>
+    (a.containerLabel || '').localeCompare(b.containerLabel || '');
+  grossRevenueItems.sort(sortByPhase);
+  deductionItems.sort(sortByPhase);
+  netRevenueItems.sort(sortByPhase);
+
+  // ========== COLLECT COSTS BY PHASE ==========
+  // Structure: stage -> phase -> items (so we group by stage first, then show phases within)
+  const costsByStagePhase = new Map<
     string,
     {
-      phaseName: string;
-      stages: Map<string, { items: AggregatedLineItem[]; total: number; subtotals: number[] }>;
+      stageName: string;
+      phaseItems: Map<string, { phaseName: string; items: AggregatedLineItem[]; total: number; subtotals: number[] }>;
+      projectItems: { items: AggregatedLineItem[]; total: number; subtotals: number[] };
     }
-  >();
-
-  // Project-level stages
-  const projectLevelStages = new Map<
-    string,
-    { items: AggregatedLineItem[]; total: number; subtotals: number[] }
   >();
 
   const costSections = schedule.sections.filter(
@@ -484,142 +550,151 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
 
   costSections.forEach((section) => {
     section.lineItems.forEach((item) => {
-      // Get stage from subcategory (e.g., "DEVELOPMENT COSTS")
       const stageKey = item.subcategory || 'OTHER COSTS';
 
+      if (!costsByStagePhase.has(stageKey)) {
+        costsByStagePhase.set(stageKey, {
+          stageName: stageKey,
+          phaseItems: new Map(),
+          projectItems: { items: [], total: 0, subtotals: new Array(periodCount).fill(0) },
+        });
+      }
+
+      const stageData = costsByStagePhase.get(stageKey)!;
+
       if (!item.containerId) {
-        // Project-level item - group by stage
-        if (!projectLevelStages.has(stageKey)) {
-          projectLevelStages.set(stageKey, {
-            items: [],
-            total: 0,
-            subtotals: new Array(schedule.periods.length).fill(0),
-          });
-        }
-        const stage = projectLevelStages.get(stageKey)!;
-        stage.items.push(item);
-        stage.total += item.total;
+        // Project-level cost
+        stageData.projectItems.items.push(item);
+        stageData.projectItems.total += item.total;
         item.values.forEach((val, idx) => {
-          stage.subtotals[idx] += val;
+          stageData.projectItems.subtotals[idx] += val;
         });
       } else {
-        // Phase-level item
+        // Phase-level cost
         const phaseKey = String(item.containerId);
         const phaseName = item.containerLabel || `Phase ${item.containerId}`;
 
-        if (!phaseStageMap.has(phaseKey)) {
-          phaseStageMap.set(phaseKey, {
+        if (!stageData.phaseItems.has(phaseKey)) {
+          stageData.phaseItems.set(phaseKey, {
             phaseName,
-            stages: new Map(),
-          });
-        }
-
-        const phase = phaseStageMap.get(phaseKey)!;
-        if (!phase.stages.has(stageKey)) {
-          phase.stages.set(stageKey, {
             items: [],
             total: 0,
-            subtotals: new Array(schedule.periods.length).fill(0),
+            subtotals: new Array(periodCount).fill(0),
           });
         }
 
-        const stage = phase.stages.get(stageKey)!;
-        stage.items.push(item);
-        stage.total += item.total;
+        const phaseData = stageData.phaseItems.get(phaseKey)!;
+        phaseData.items.push(item);
+        phaseData.total += item.total;
         item.values.forEach((val, idx) => {
-          stage.subtotals[idx] += val;
+          phaseData.subtotals[idx] += val;
         });
       }
     });
   });
 
-  // Build sections - each phase becomes a section, line items are stage subtotals
-  const sections: AggregatedSection[] = [];
+  // Build cost line items grouped by stage, with phase suffix
+  const costLineItems: AggregatedLineItem[] = [];
+  let totalCosts = 0;
+  const totalCostsSubtotals = new Array(periodCount).fill(0);
 
-  // Project-level section (if any)
-  if (projectLevelStages.size > 0) {
-    const projectLineItems: AggregatedLineItem[] = [];
-    let projectTotal = 0;
-    const projectSubtotals = new Array(schedule.periods.length).fill(0);
-
-    projectLevelStages.forEach((stageData, stageName) => {
-      projectLineItems.push({
-        lineId: `project-${stageName}`,
-        category: 'cost',
-        subcategory: stageName,
-        description: stageName, // Show stage name as the line item
-        values: stageData.subtotals,
-        total: stageData.total,
-        childItems: stageData.items, // Include original category items for detail view
-      });
-      projectTotal += stageData.total;
-      stageData.subtotals.forEach((val, idx) => {
-        projectSubtotals[idx] += val;
-      });
-    });
-
-    // Sort by stage order
-    projectLineItems.sort((a, b) => getStageOrder(a.description) - getStageOrder(b.description));
-
-    sections.push({
-      sectionId: 'phase-project',
-      sectionName: 'Project Level',
-      lineItems: projectLineItems,
-      subtotals: projectSubtotals,
-      sectionTotal: projectTotal,
-      sortOrder: 0,
-    });
-  }
-
-  // Phase sections
-  const sortedPhases = Array.from(phaseStageMap.entries()).sort((a, b) =>
-    a[1].phaseName.localeCompare(b[1].phaseName)
+  // Sort stages by order
+  const sortedStages = Array.from(costsByStagePhase.entries()).sort(
+    (a, b) => getStageOrder(a[0]) - getStageOrder(b[0])
   );
 
-  sortedPhases.forEach(([phaseKey, phaseData], idx) => {
-    const phaseLineItems: AggregatedLineItem[] = [];
-    let phaseTotal = 0;
-    const phaseSubtotals = new Array(schedule.periods.length).fill(0);
-
-    phaseData.stages.forEach((stageData, stageName) => {
-      phaseLineItems.push({
-        lineId: `phase-${phaseKey}-${stageName}`,
+  sortedStages.forEach(([stageKey, stageData]) => {
+    // Project-level items first (no suffix)
+    if (stageData.projectItems.total !== 0) {
+      costLineItems.push({
+        lineId: `by-phase-cost-${stageKey}-project`,
         category: 'cost',
-        subcategory: stageName,
-        description: stageName, // Show stage name as the line item
-        containerId: Number(phaseKey),
-        containerLabel: phaseData.phaseName,
-        values: stageData.subtotals,
-        total: stageData.total,
-        childItems: stageData.items, // Include original category items for detail view
+        subcategory: stageKey,
+        description: stageData.stageName,
+        values: stageData.projectItems.subtotals,
+        total: stageData.projectItems.total,
+        childItems: stageData.projectItems.items,
       });
-      phaseTotal += stageData.total;
-      stageData.subtotals.forEach((val, idx) => {
-        phaseSubtotals[idx] += val;
+      totalCosts += stageData.projectItems.total;
+      stageData.projectItems.subtotals.forEach((val, idx) => {
+        totalCostsSubtotals[idx] += val;
       });
-    });
+    }
 
-    // Sort by stage order
-    phaseLineItems.sort((a, b) => getStageOrder(a.description) - getStageOrder(b.description));
+    // Phase items sorted by phase name
+    const sortedPhases = Array.from(stageData.phaseItems.entries()).sort(
+      (a, b) => a[1].phaseName.localeCompare(b[1].phaseName)
+    );
 
-    sections.push({
-      sectionId: `phase-${phaseKey}`,
-      sectionName: phaseData.phaseName,
-      lineItems: phaseLineItems,
-      subtotals: phaseSubtotals,
-      sectionTotal: phaseTotal,
-      sortOrder: idx + 1,
+    sortedPhases.forEach(([phaseKey, phaseData]) => {
+      if (phaseData.total !== 0) {
+        costLineItems.push({
+          lineId: `by-phase-cost-${stageKey}-${phaseKey}`,
+          category: 'cost',
+          subcategory: stageKey,
+          description: `${stageData.stageName}: ${phaseData.phaseName}`,
+          containerId: Number(phaseKey),
+          containerLabel: phaseData.phaseName,
+          values: phaseData.subtotals,
+          total: phaseData.total,
+          childItems: phaseData.items,
+        });
+        totalCosts += phaseData.total;
+        phaseData.subtotals.forEach((val, idx) => {
+          totalCostsSubtotals[idx] += val;
+        });
+      }
     });
   });
 
-  // Keep revenue sections unchanged - put them FIRST (before costs)
-  const revenueSections = schedule.sections.filter((s) =>
-    s.sectionName.toLowerCase().includes('revenue')
-  );
+  // ========== BUILD SECTIONS ==========
+  const sections: AggregatedSection[] = [];
+
+  // GROSS REVENUE section
+  sections.push({
+    sectionId: 'phase-revenue-gross',
+    sectionName: 'GROSS REVENUE',
+    lineItems: grossRevenueItems,
+    subtotals: grossRevenueSubtotals,
+    sectionTotal: grossRevenueTotal,
+    sortOrder: 1,
+  });
+
+  // REVENUE DEDUCTIONS section (only if there are deductions)
+  if (deductionsTotal !== 0) {
+    sections.push({
+      sectionId: 'phase-revenue-deductions',
+      sectionName: 'REVENUE DEDUCTIONS',
+      lineItems: deductionItems,
+      subtotals: deductionsSubtotals,
+      sectionTotal: deductionsTotal,
+      sortOrder: 2,
+    });
+  }
+
+  // NET REVENUE section
+  sections.push({
+    sectionId: 'phase-revenue-net',
+    sectionName: 'NET REVENUE',
+    lineItems: netRevenueItems,
+    subtotals: netRevenueSubtotals,
+    sectionTotal: netRevenueTotal,
+    sortOrder: 3,
+  });
+
+  // PROJECT COSTS section
+  sections.push({
+    sectionId: 'phase-costs',
+    sectionName: 'PROJECT COSTS',
+    lineItems: costLineItems,
+    subtotals: totalCostsSubtotals,
+    sectionTotal: totalCosts,
+    sortOrder: 4,
+  });
 
   return {
     ...schedule,
-    sections: [...revenueSections, ...sections],
+    sections,
   };
 }
 

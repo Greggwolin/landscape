@@ -27,7 +27,7 @@ export interface RedfinSearchParams {
   latitude: number;
   longitude: number;
   radiusMiles: number;
-  propertyType?: 'house' | 'condo' | 'townhouse' | 'all';
+  propertyType?: 'house' | 'condo' | 'townhouse' | 'attached' | 'all';
   minYearBuilt?: number;
   maxYearBuilt?: number;
   soldWithinDays?: number;
@@ -92,7 +92,7 @@ function generateBoundingBoxPoly(
 /**
  * Map Redfin property type to uipt parameter
  */
-function getPropertyTypeParam(type?: 'house' | 'condo' | 'townhouse' | 'all'): string {
+function getPropertyTypeParam(type?: 'house' | 'condo' | 'townhouse' | 'attached' | 'all'): string {
   switch (type) {
     case 'house':
       return '1';
@@ -100,6 +100,8 @@ function getPropertyTypeParam(type?: 'house' | 'condo' | 'townhouse' | 'all'): s
       return '2';
     case 'townhouse':
       return '3';
+    case 'attached':
+      return '2,3'; // Condo + Townhouse combined
     case 'all':
     default:
       return '1,2,3,4,5,6,7,8';

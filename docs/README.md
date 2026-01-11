@@ -15,19 +15,19 @@ Welcome to the comprehensive documentation for the Landscape Pro-Forma financial
 - ✅ Added budget scope labels for filtered views
 - ✅ Improved admin modal UX (ESC key, visible close button)
 - ✅ Added sticky subtab navigation for Planning and Development pages
-- 📄 [SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md](session-notes/SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md)
+- 📄 [SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md](09_session_notes/SESSION_NOTES_2025_11_23_BUDGET_NAVIGATION_FIXES.md)
 
 **Acquisition Interface Fixes** (Nov 23, 2025)
 - ✅ Fixed goes-hard date persistence with database schema update
 - ✅ Resolved field mapping mismatch between frontend/backend
 - ✅ Simplified amount display (removed colored badges)
-- 📄 [SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md](session-notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
+- 📄 [SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md](09_session_notes/SESSION_NOTES_2025_11_23_ACQUISITION_FIXES.md)
 
 **Multifamily Tile Navigation** (Nov 21, 2025)
 - ✅ Dual navigation system supporting Land Development and Multifamily workflows
 - ✅ Property type-aware tile configuration (8 lifecycle vs 7 functional tiles)
 - ✅ Consistent CoreUI brand colors with theme-aware active states
-- 📄 [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](session-notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md)
+- 📄 [SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md](09_session_notes/SESSION_NOTES_2025_11_21_MULTIFAMILY_TILE_NAVIGATION.md)
 
 **Migration 013 - Project Type Code Standardization** (Nov 2, 2025)
 - ✅ Standardized 7 project type codes (LAND, MF, OFF, RET, IND, HTL, MXU)
@@ -46,9 +46,9 @@ Welcome to the comprehensive documentation for the Landscape Pro-Forma financial
 3. [System Architecture](01-architecture/DATABASE_SCHEMA.md) - Understand the system design
 
 **Looking for specific features?**
-- [PDF Report Generation](session-notes/2025-10-25-pdf-reports-navigation.md) - ⭐ **NEW: ARGUS-Quality Reports**
-- [Progressive Assumptions System](session-notes/2025-10-25-pdf-reports-navigation.md#part-2-legacy-navigation-organization) - ⭐ **NEW: Napkin→Mid→Pro**
-- [Financial Engine](02-features/financial-engine/IMPLEMENTATION_STATUS.md) - Complete status
+- [PDF Report Generation](09_session_notes/2025-10-25-pdf-reports-navigation.md) - ⭐ **NEW: ARGUS-Quality Reports**
+- [Progressive Assumptions System](09_session_notes/2025-10-25-pdf-reports-navigation.md#part-2-legacy-navigation-organization) - ⭐ **NEW: Napkin→Mid→Pro**
+- [Financial Engine](00_overview/IMPLEMENTATION_STATUS.md) - Complete status
 - [Python Financial Engine](../services/financial_engine_py/README.md) - 5-10x faster calculations
 - [Rent Roll Interface](02-features/rent-roll/UNIVERSAL_RENT_ROLL_INTERFACE.md) - DVL auto-fill system
 - [Document Management](02-features/dms/DMS-Implementation-Status.md) - DMS implementation
@@ -73,7 +73,7 @@ Feature-specific documentation organized by domain
 
 #### [financial-engine/](02-features/financial-engine/)
 ARGUS-level financial modeling engine
-- **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STATUS.md)** ⭐ **MASTER DOCUMENT** - Complete feature inventory
+- **[IMPLEMENTATION_STATUS.md](00_overview/IMPLEMENTATION_STATUS.md)** ⭐ **MASTER DOCUMENT** - Complete feature inventory
 - PHASE_1.5_SUMMARY.md - Dependencies & revenue modeling
 - SCURVE_CALCULATION_ENGINE.md - S-curve timing distribution
 - ARGUS_PARITY_CHECKLIST.md - ARGUS feature comparison
@@ -109,7 +109,7 @@ API endpoint documentation
 ### [04-ui-components/](04-ui-components/)
 UI component documentation and prototypes
 - UI_COMPONENTS_PHASE4.md - Phase 4 components
-- prototypes/ - Component prototypes
+- 09_session_notes/prototypes/ - Component prototypes
 
 ### [05-database/](05-database/)
 Database schema, migrations, and test fixtures
@@ -137,7 +137,7 @@ Historical migration and consolidation records
 - Schema-Coverage-Analysis.md
 - Schema-Naming-Convention-Analysis.md
 
-### [09-technical-dd/](09-technical-dd/)
+### [09_session_notes/technical-dd/](09_session_notes/technical-dd/)
 Technical due diligence documentation
 - 01-executive-summary/ - Executive summary
 - 02-architecture/ - Architecture analysis
@@ -145,13 +145,13 @@ Technical due diligence documentation
 - 04-feature-functionality/ - Feature matrix
 - 05-security-assessment/ - Security assessment
 
-### [10-correspondence/](10-correspondence/)
+### [09_session_notes/correspondence/](09_session_notes/correspondence/)
 Project correspondence and business documents
 - ASU-2-pager.docx - ASU 2-page project summary
 - ASU-3-pager.docx - ASU 3-page project summary
 - ASU-memo_re-landscape.pdf - ASU landscape memo
 
-### [11-implementation-status/](11-implementation-status/)
+### [00_overview/status/](00_overview/status/)
 Implementation status reports and completion documentation
 - IMPLEMENTATION_STATUS.md - Current implementation status
 - IMPLEMENTATION_STATUS_OLD.md - Historical status
@@ -181,14 +181,14 @@ Feature specifications and integration documentation
 - BUDGET_API_CONTAINER_INTEGRATION.md - Budget API integration
 - PROJECT_SETUP_WIZARD.md - Project setup wizard spec
 
-### [session-notes/](session-notes/)
+### [09_session_notes/](09_session_notes/)
 Development session notes and implementation logs
-- **[2025-10-25-pdf-reports-navigation.md](session-notes/2025-10-25-pdf-reports-navigation.md)** - ⭐ PDF Report Generation + Progressive Assumptions
-- [2025-10-25-multifamily-overview-integration.md](session-notes/2025-10-25-multifamily-overview-integration.md) - Property-type-aware Overview + Tab Fixes
-- [2025-10-24-multifam-django-consolidation.md](session-notes/2025-10-24-multifam-django-consolidation.md) - Django Backend Consolidation
-- [2025-10-23-multifam-rent-roll-prototype.md](session-notes/2025-10-23-multifam-rent-roll-prototype.md) - Rent Roll Prototype Development
+- **[2025-10-25-pdf-reports-navigation.md](09_session_notes/2025-10-25-pdf-reports-navigation.md)** - ⭐ PDF Report Generation + Progressive Assumptions
+- [2025-10-25-multifamily-overview-integration.md](09_session_notes/2025-10-25-multifamily-overview-integration.md) - Property-type-aware Overview + Tab Fixes
+- [2025-10-24-multifam-django-consolidation.md](09_session_notes/2025-10-24-multifam-django-consolidation.md) - Django Backend Consolidation
+- [2025-10-23-multifam-rent-roll-prototype.md](09_session_notes/2025-10-23-multifam-rent-roll-prototype.md) - Rent Roll Prototype Development
 
-### [archive/](archive/)
+### [09_session_notes/archive/](09_session_notes/archive/)
 Legacy and superseded documentation
 
 ---
@@ -196,7 +196,7 @@ Legacy and superseded documentation
 ## 🎯 Most Important Documents
 
 ### For New AI Chat Sessions
-Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STATUS.md)** - This single document provides complete context:
+Use **[IMPLEMENTATION_STATUS.md](00_overview/IMPLEMENTATION_STATUS.md)** - This single document provides complete context:
 - All 32 tables + 12 views
 - All implemented features
 - Code metrics and progress
@@ -204,7 +204,7 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 - File references
 
 ### For Feature Development
-- **Financial Engine:** [IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STATUS.md)
+- **Financial Engine:** [IMPLEMENTATION_STATUS.md](00_overview/IMPLEMENTATION_STATUS.md)
 - **Rent Roll:** [UNIVERSAL_RENT_ROLL_INTERFACE.md](02-features/rent-roll/UNIVERSAL_RENT_ROLL_INTERFACE.md)
 - **Database:** [DATABASE_SCHEMA.md](05-database/DATABASE_SCHEMA.md)
 - **APIs:** [API_REFERENCE_PHASE2.md](03-api-reference/API_REFERENCE_PHASE2.md)
@@ -226,7 +226,7 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 ### By Task
 - **Setting up dev environment** → [Developer Guide](00-getting-started/DEVELOPER_GUIDE.md)
 - **Understanding database** → [Database Schema](05-database/DATABASE_SCHEMA.md)
-- **Working on financial engine** → [Financial Engine Status](02-features/financial-engine/IMPLEMENTATION_STATUS.md)
+- **Working on financial engine** → [Financial Engine Status](00_overview/IMPLEMENTATION_STATUS.md)
 - **Working on rent roll** → [Rent Roll Interface](02-features/rent-roll/UNIVERSAL_RENT_ROLL_INTERFACE.md)
 - **Deploying to production** → [DevOps Guide](06-devops/DEVOPS_GUIDE.md)
 - **Running tests** → [Validation Complete](07-testing/VALIDATION_COMPLETE.md)
@@ -234,7 +234,7 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 ### By Role
 - **Developer** → Start with [Developer Guide](00-getting-started/DEVELOPER_GUIDE.md)
 - **Architect** → See [Database Schema](05-database/DATABASE_SCHEMA.md) + [DEVOPS_GUIDE](06-devops/DEVOPS_GUIDE.md)
-- **Product Manager** → See [IMPLEMENTATION_STATUS](02-features/financial-engine/IMPLEMENTATION_STATUS.md) + [Feature Matrix](09-technical-dd/04-feature-functionality/feature-functionality-matrix.md)
+- **Product Manager** → See [IMPLEMENTATION_STATUS](00_overview/IMPLEMENTATION_STATUS.md) + [Feature Matrix](09_session_notes/technical-dd/04-feature-functionality/feature-functionality-matrix.md)
 - **QA/Testing** → See [Testing](07-testing/)
 
 ---
@@ -278,7 +278,7 @@ Use **[IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STA
 ### Updating Documentation
 When adding new features or making changes:
 1. Update relevant feature documentation in `02-features/`
-2. Update [IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STATUS.md) if core feature
+2. Update [IMPLEMENTATION_STATUS.md](00_overview/IMPLEMENTATION_STATUS.md) if core feature
 3. Update this README if adding new categories
 4. Keep documentation in sync with code
 
@@ -300,7 +300,7 @@ When adding new features or making changes:
 
 ### Getting Help
 - Check relevant feature documentation first
-- Review [IMPLEMENTATION_STATUS.md](02-features/financial-engine/IMPLEMENTATION_STATUS.md) for current state
+- Review [IMPLEMENTATION_STATUS.md](00_overview/IMPLEMENTATION_STATUS.md) for current state
 - Consult [DevOps Guide](06-devops/DEVOPS_GUIDE.md) for operations issues
 
 ---

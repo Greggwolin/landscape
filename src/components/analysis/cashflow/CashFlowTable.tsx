@@ -1,341 +1,251 @@
 /**
  * Cash Flow Table
- * Displays cash flow schedule in a scrollable table with sticky columns
+ * Simple project cash flow statement
+ * - Time periods as columns
+ * - Categories as rows
+ * - Full number formatting ($39,372,000)
+ * - No collapsible sections, no colored fonts
  */
 
 'use client';
 
 import React, { useMemo } from 'react';
-import type { AggregatedSchedule, AggregatedSection, AggregatedLineItem } from '@/lib/financial-engine/cashflow/aggregation';
+import { CTable } from '@coreui/react';
+import type { AggregatedSchedule } from '@/lib/financial-engine/cashflow/aggregation';
 
 interface Props {
   schedule: AggregatedSchedule;
-  showLineItems?: boolean;
+}
+
+// Indentation levels (in pixels)
+const INDENT = {
+  SECTION_HEADER: 12,
+  LINE_ITEM: 24,
+};
+
+// Column widths
+const DEFAULT_LABEL_WIDTH = 200;
+const DEFAULT_DATA_WIDTH = 120;
+
+// Check if we're in "overall" mode (single period that is the total)
+function isOverallMode(schedule: AggregatedSchedule): boolean {
+  return schedule.periods.length === 1 && schedule.periods[0].label === 'Total';
 }
 
 /**
- * Format currency for display
+ * Format currency - full numbers ($39,372,000)
+ * Negative values shown in parentheses: ($39,372,000)
  */
-function formatCurrency(value: number, compact: boolean = false): string {
-  if (value === 0) return '$0';
-
+function formatCurrency(value: number): string {
   const absValue = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
+  const rounded = Math.round(absValue);
 
-  if (compact) {
-    if (absValue >= 1000000) {
-      return `${sign}$${(absValue / 1000000).toFixed(1)}M`;
-    }
-    if (absValue >= 1000) {
-      return `${sign}$${(absValue / 1000).toFixed(0)}K`;
-    }
-  }
+  if (rounded === 0) return '-';
 
-  return `${sign}$${Math.round(absValue).toLocaleString()}`;
-}
-
-/**
- * Get cell style based on value (positive/negative)
- */
-function getCellStyle(value: number, isTotal: boolean = false): React.CSSProperties {
-  const base: React.CSSProperties = {
-    textAlign: 'right',
-    padding: '6px 12px',
-    fontVariantNumeric: 'tabular-nums',
-    fontSize: '0.875rem',
-  };
-
-  if (isTotal) {
-    base.fontWeight = 600;
-    base.backgroundColor = 'var(--cui-tertiary-bg)';
-  }
+  const formatted = `$${rounded.toLocaleString()}`;
 
   if (value < 0) {
-    base.color = 'var(--cui-danger)';
-  } else if (value > 0) {
-    base.color = 'var(--cui-success)';
+    return `(${formatted})`;
   }
 
-  return base;
+  return formatted;
 }
 
-/**
- * Section header row with inline subtotals
- * Shows phase name in first column with period totals across
- */
-function SectionHeader({
-  section,
-  showTotals = false,
-  useCompact = false,
-}: {
-  section: AggregatedSection;
-  showTotals?: boolean;
-  useCompact?: boolean;
-}) {
-  const isRevenue = section.sectionName.toLowerCase().includes('revenue');
-  const bgColor = isRevenue ? 'var(--cui-success-bg-subtle)' : 'var(--cui-primary-bg-subtle)';
-  const textColor = isRevenue ? 'var(--cui-success)' : 'var(--cui-primary)';
+// ============================================================================
+// TABLE ROW COMPONENTS
+// ============================================================================
 
-  // If not showing totals, use colspan for simple header
-  if (!showTotals) {
-    return (
-      <tr style={{ backgroundColor: bgColor }}>
-        <td
-          colSpan={100}
-          style={{
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            padding: '10px 12px',
-            color: textColor,
-            position: 'sticky',
-            left: 0,
-            backgroundColor: bgColor,
-            zIndex: 1,
-          }}
-        >
-          {section.sectionName}
-        </td>
-      </tr>
-    );
-  }
+interface DataRowProps {
+  label: string;
+  values: number[];
+  total: number;
+  hideTotal?: boolean;
+  indent?: boolean;
+  bold?: boolean;
+  bottomBorder?: boolean; // Line below this row (accounting-style underline before totals)
+}
 
-  // Show totals inline with header
+function DataRow({
+  label,
+  values,
+  total,
+  hideTotal = false,
+  indent = false,
+  bold = false,
+  bottomBorder = false,
+}: DataRowProps) {
+  const textDecoration = bottomBorder ? 'underline' : undefined;
+
   return (
-    <tr style={{ backgroundColor: bgColor }}>
+    <tr>
       <td
         style={{
-          fontWeight: 700,
-          fontSize: '0.875rem',
-          padding: '10px 12px',
-          color: textColor,
-          position: 'sticky',
-          left: 0,
-          backgroundColor: bgColor,
-          zIndex: 1,
-          borderRight: '1px solid var(--cui-border-color)',
+          paddingLeft: indent ? `${INDENT.LINE_ITEM}px` : `${INDENT.SECTION_HEADER}px`,
+          fontWeight: bold ? 600 : 400,
+          whiteSpace: 'nowrap',
+          borderRight: '2px solid var(--cui-border-color)',
         }}
       >
-        {section.sectionName}
+        {label}
       </td>
-      {section.subtotals.map((value, idx) => (
+      {values.map((value, idx) => (
         <td
           key={idx}
           style={{
-            ...getCellStyle(value, true),
-            backgroundColor: bgColor,
-            color: textColor,
+            textAlign: 'right',
+            fontVariantNumeric: 'tabular-nums',
+            fontWeight: bold ? 600 : 400,
+            color: value < 0 ? 'var(--cui-danger)' : undefined,
+            textDecoration,
           }}
         >
-          {formatCurrency(value, useCompact)}
+          {formatCurrency(value)}
         </td>
       ))}
+      {!hideTotal && (
+        <td
+          style={{
+            textAlign: 'right',
+            fontVariantNumeric: 'tabular-nums',
+            fontWeight: 600,
+            backgroundColor: 'var(--cui-light-bg-subtle)',
+            borderLeft: '2px solid var(--cui-border-color)',
+            color: total < 0 ? 'var(--cui-danger)' : undefined,
+            textDecoration,
+          }}
+        >
+          {formatCurrency(total)}
+        </td>
+      )}
+    </tr>
+  );
+}
+
+interface SectionLabelProps {
+  label: string;
+  colSpan: number;
+}
+
+function SectionLabel({ label, colSpan }: SectionLabelProps) {
+  return (
+    <tr>
       <td
+        colSpan={colSpan}
         style={{
-          ...getCellStyle(section.sectionTotal, true),
-          backgroundColor: bgColor,
-          color: textColor,
           fontWeight: 700,
+          fontSize: '0.8125rem',
+          paddingLeft: `${INDENT.SECTION_HEADER}px`,
+          paddingTop: '12px',
+          paddingBottom: '4px',
+          borderBottom: 'none',
         }}
       >
-        {formatCurrency(section.sectionTotal, useCompact)}
+        {label}
       </td>
     </tr>
   );
 }
 
-/**
- * Stage row - shows stage subtotals (always visible in standard mode)
- */
-function StageRow({
-  item,
-  useCompact,
-}: {
-  item: AggregatedLineItem;
-  useCompact: boolean;
-}) {
-  return (
-    <tr style={{ backgroundColor: 'var(--cui-light-bg-subtle)' }}>
-      <td
-        style={{
-          padding: '8px 12px',
-          paddingLeft: '24px',
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'var(--cui-light-bg-subtle)',
-          zIndex: 1,
-          borderRight: '1px solid var(--cui-border-color)',
-        }}
-      >
-        {item.description}
-      </td>
-      {item.values.map((value, idx) => (
-        <td key={idx} style={{ ...getCellStyle(value), backgroundColor: 'var(--cui-light-bg-subtle)', fontWeight: 500 }}>
-          {formatCurrency(value, useCompact)}
-        </td>
-      ))}
-      <td style={{ ...getCellStyle(item.total, true), backgroundColor: 'var(--cui-light-bg-subtle)' }}>
-        {formatCurrency(item.total, useCompact)}
-      </td>
-    </tr>
-  );
-}
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
-/**
- * Category row - shows individual cost categories (detail view only)
- */
-function CategoryRow({
-  item,
-  useCompact,
-}: {
-  item: AggregatedLineItem;
-  useCompact: boolean;
-}) {
-  return (
-    <tr>
-      <td
-        style={{
-          padding: '6px 12px',
-          paddingLeft: '48px',
-          fontSize: '0.875rem',
-          whiteSpace: 'nowrap',
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'var(--cui-body-bg)',
-          zIndex: 1,
-          borderRight: '1px solid var(--cui-border-color)',
-          color: 'var(--cui-secondary-color)',
-        }}
-      >
-        {item.description}
-      </td>
-      {item.values.map((value, idx) => (
-        <td key={idx} style={{ ...getCellStyle(value), fontSize: '0.8125rem' }}>
-          {formatCurrency(value, useCompact)}
-        </td>
-      ))}
-      <td style={{ ...getCellStyle(item.total, true), fontSize: '0.8125rem' }}>
-        {formatCurrency(item.total, useCompact)}
-      </td>
-    </tr>
-  );
-}
+export default function CashFlowTable({ schedule }: Props) {
+  const { periods, sections } = schedule;
 
-/**
- * Line item row (legacy - for non-phase groupings)
- */
-function LineItemRow({
-  item,
-  periodCount,
-  useCompact,
-}: {
-  item: AggregatedLineItem;
-  periodCount: number;
-  useCompact: boolean;
-}) {
-  return (
-    <tr>
-      <td
-        style={{
-          padding: '6px 12px',
-          paddingLeft: '24px',
-          fontSize: '0.875rem',
-          whiteSpace: 'nowrap',
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'var(--cui-body-bg)',
-          zIndex: 1,
-          borderRight: '1px solid var(--cui-border-color)',
-        }}
-      >
-        {item.description}
-      </td>
-      {item.values.map((value, idx) => (
-        <td key={idx} style={getCellStyle(value)}>
-          {formatCurrency(value, useCompact)}
-        </td>
-      ))}
-      <td style={getCellStyle(item.total, true)}>{formatCurrency(item.total, useCompact)}</td>
-    </tr>
-  );
-}
+  // Check if we're in overall mode (single "Total" period - no need for extra Total column)
+  const overallMode = isOverallMode(schedule);
 
-/**
- * Section subtotal row
- */
-function SubtotalRow({
-  section,
-  useCompact,
-}: {
-  section: AggregatedSection;
-  useCompact: boolean;
-}) {
-  const isRevenue = section.sectionName.toLowerCase().includes('revenue');
-
-  return (
-    <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-      <td
-        style={{
-          padding: '8px 12px',
-          fontWeight: 600,
-          fontSize: '0.875rem',
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          zIndex: 1,
-          borderRight: '1px solid var(--cui-border-color)',
-        }}
-      >
-        Total {section.sectionName}
-      </td>
-      {section.subtotals.map((value, idx) => (
-        <td key={idx} style={getCellStyle(value, true)}>
-          {formatCurrency(value, useCompact)}
-        </td>
-      ))}
-      <td
-        style={{
-          ...getCellStyle(section.sectionTotal, true),
-          color: isRevenue ? 'var(--cui-success)' : 'var(--cui-primary)',
-        }}
-      >
-        {formatCurrency(section.sectionTotal, useCompact)}
-      </td>
-    </tr>
-  );
-}
-
-export default function CashFlowTable({ schedule, showLineItems = true }: Props) {
-  const { periods, sections, summary } = schedule;
-
-  // Use compact format when there are many periods
-  const useCompact = periods.length > 6;
-
-  // Check if we're in by_phase mode (any section has hierarchical items)
-  // If so, ALL sections should show totals inline (including revenue)
-  const isPhaseMode = useMemo(() => {
-    return sections.some(section =>
-      section.lineItems.some(item => item.childItems && item.childItems.length > 0)
-    );
+  // Detect "By Phase" mode: sections have phase-revenue-* or phase-costs IDs
+  const isByPhaseMode = useMemo(() => {
+    return sections.some(s => s.sectionId.startsWith('phase-revenue-') || s.sectionId === 'phase-costs');
   }, [sections]);
 
-  // Calculate net cash flow per period
+  // Group sections by type (for standard mode)
+  // Revenue sections: GROSS REVENUE, REVENUE DEDUCTIONS (but NOT NET REVENUE since it's the result)
+  const grossRevenueSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'revenue-gross'),
+    [sections]
+  );
+
+  const revenueDeductionsSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'revenue-deductions'),
+    [sections]
+  );
+
+  const netRevenueSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'revenue-net'),
+    [sections]
+  );
+
+  const costSections = useMemo(() =>
+    sections.filter(s => !s.sectionName.toLowerCase().includes('revenue') && !s.sectionId.startsWith('phase-')),
+    [sections]
+  );
+
+  // For By Phase mode, get the phase-specific sections
+  const phaseGrossRevenueSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'phase-revenue-gross'),
+    [sections]
+  );
+  const phaseDeductionsSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'phase-revenue-deductions'),
+    [sections]
+  );
+  const phaseNetRevenueSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'phase-revenue-net'),
+    [sections]
+  );
+  const phaseCostsSection = useMemo(() =>
+    sections.find(s => s.sectionId === 'phase-costs'),
+    [sections]
+  );
+
+  // Calculate totals across all sections (works for both modes)
+  const { totalRevenuePerPeriod, totalRevenue, totalCostsPerPeriod, totalCosts } = useMemo(() => {
+    if (isByPhaseMode) {
+      // By Phase mode: use the phase section totals
+      const revenuePerPeriod = phaseNetRevenueSection?.subtotals || periods.map(() => 0);
+      const revenue = phaseNetRevenueSection?.sectionTotal || 0;
+      const costsPerPeriod = phaseCostsSection?.subtotals || periods.map(() => 0);
+      const costs = phaseCostsSection?.sectionTotal || 0;
+
+      return {
+        totalRevenuePerPeriod: revenuePerPeriod,
+        totalRevenue: revenue,
+        totalCostsPerPeriod: costsPerPeriod,
+        totalCosts: costs,
+      };
+    } else {
+      // Standard mode
+      const revenuePerPeriod = netRevenueSection ? netRevenueSection.subtotals : periods.map(() => 0);
+      const revenue = netRevenueSection?.sectionTotal || 0;
+
+      const costsPerPeriod = periods.map((_, idx) => {
+        return costSections.reduce((sum, section) => sum + (section.subtotals[idx] || 0), 0);
+      });
+      const costs = costsPerPeriod.reduce((sum, val) => sum + val, 0);
+
+      return {
+        totalRevenuePerPeriod: revenuePerPeriod,
+        totalRevenue: revenue,
+        totalCostsPerPeriod: costsPerPeriod,
+        totalCosts: costs,
+      };
+    }
+  }, [isByPhaseMode, phaseNetRevenueSection, phaseCostsSection, netRevenueSection, costSections, periods]);
+
+  // Calculate net cash flow per period (revenue + costs, since costs are already negative)
   const netCashFlowPerPeriod = useMemo(() => {
     return periods.map((_, idx) => {
-      let net = 0;
-      sections.forEach((section) => {
-        const isRevenue = section.sectionName.toLowerCase().includes('revenue');
-        const value = section.subtotals[idx] || 0;
-        net += isRevenue ? value : -value;
-      });
-      return net;
+      const revenue = totalRevenuePerPeriod[idx] || 0;
+      const costs = totalCostsPerPeriod[idx] || 0; // Already negative
+      return revenue + costs;
     });
-  }, [sections, periods]);
+  }, [totalRevenuePerPeriod, totalCostsPerPeriod, periods]);
 
-  // Total net cash flow
-  const totalNetCashFlow = netCashFlowPerPeriod.reduce((sum, val) => sum + val, 0);
+  // Total net cash flow (costs are already negative)
+  const totalNetCashFlow = totalRevenue + totalCosts;
 
   // Calculate cumulative cash flow
   const cumulativeCashFlow = useMemo(() => {
@@ -345,6 +255,9 @@ export default function CashFlowTable({ schedule, showLineItems = true }: Props)
       return cumulative;
     });
   }, [netCashFlowPerPeriod]);
+
+  // Column count: label + periods + total (unless overall mode)
+  const colCount = 1 + periods.length + (overallMode ? 0 : 1);
 
   if (!sections || sections.length === 0) {
     return (
@@ -360,195 +273,250 @@ export default function CashFlowTable({ schedule, showLineItems = true }: Props)
     );
   }
 
+  const tableStyle: React.CSSProperties = {
+    fontSize: '0.8125rem',
+    marginBottom: 0,
+    tableLayout: 'fixed',
+    width: 'auto',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    backgroundColor: 'var(--cui-dark-bg-subtle)',
+    fontWeight: 600,
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    borderBottom: '3px solid var(--cui-border-color)',
+  };
+
   return (
-    <div
-      className="overflow-auto border rounded-lg"
-      style={{
-        maxHeight: '600px',
-        borderColor: 'var(--cui-border-color)',
-      }}
-    >
-      <table
-        className="w-full"
-        style={{
-          borderCollapse: 'collapse',
-          fontSize: '0.875rem',
-        }}
-      >
+    <div style={{ maxHeight: '80vh', overflowX: 'auto', overflowY: 'auto' }}>
+      <CTable small bordered hover style={tableStyle}>
+        <colgroup>
+          <col style={{ width: `${DEFAULT_LABEL_WIDTH}px` }} />
+          {periods.map((_, idx) => (
+            <col key={idx} style={{ width: `${DEFAULT_DATA_WIDTH}px` }} />
+          ))}
+          {!overallMode && <col style={{ width: `${DEFAULT_DATA_WIDTH}px` }} />}
+        </colgroup>
         <thead>
-          <tr style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+          <tr>
             <th
               style={{
-                padding: '10px 12px',
-                fontWeight: 600,
+                ...headerStyle,
                 textAlign: 'left',
-                position: 'sticky',
-                top: 0,
-                left: 0,
-                zIndex: 3,
-                backgroundColor: 'var(--cui-body-bg)',
-                borderBottom: '2px solid var(--cui-border-color)',
-                borderRight: '1px solid var(--cui-border-color)',
-                minWidth: '200px',
+                paddingLeft: `${INDENT.SECTION_HEADER}px`,
+                borderRight: '2px solid var(--cui-border-color)',
               }}
             >
               Category
             </th>
             {periods.map((period, idx) => (
-              <th
-                key={idx}
-                style={{
-                  padding: '10px 12px',
-                  fontWeight: 600,
-                  textAlign: 'right',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 2,
-                  backgroundColor: 'var(--cui-body-bg)',
-                  borderBottom: '2px solid var(--cui-border-color)',
-                  whiteSpace: 'nowrap',
-                  minWidth: useCompact ? '80px' : '100px',
-                }}
-              >
+              <th key={idx} style={headerStyle}>
                 {period.label}
               </th>
             ))}
-            <th
-              style={{
-                padding: '10px 12px',
-                fontWeight: 700,
-                textAlign: 'right',
-                position: 'sticky',
-                top: 0,
-                zIndex: 2,
-                backgroundColor: 'var(--cui-tertiary-bg)',
-                borderBottom: '2px solid var(--cui-border-color)',
-                minWidth: '100px',
-              }}
-            >
-              Total
-            </th>
+            {!overallMode && (
+              <th
+                style={{
+                  ...headerStyle,
+                  borderLeft: '2px solid var(--cui-border-color)',
+                }}
+              >
+                TOTAL
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
-          {sections.map((section) => {
-            // Check if this section has hierarchical line items
-            const hasHierarchy = section.lineItems.some(item => item.childItems && item.childItems.length > 0);
-            // In phase mode, all sections (including revenue) show totals inline
-            const showTotalsInHeader = isPhaseMode;
-
-            return (
-              <React.Fragment key={section.sectionId}>
-                {/* Section header - show totals inline in phase mode */}
-                <SectionHeader
-                  section={section}
-                  showTotals={showTotalsInHeader}
-                  useCompact={useCompact}
-                />
-                {/* Show line items based on hierarchy */}
-                {section.lineItems.map((item) => (
-                  <React.Fragment key={item.lineId}>
-                    {/* Stage subtotal row - always visible for hierarchical items */}
-                    {item.childItems && item.childItems.length > 0 ? (
-                      <>
-                        <StageRow item={item} useCompact={useCompact} />
-                        {/* Category rows - only show when details enabled */}
-                        {showLineItems &&
-                          item.childItems.map((childItem) => (
-                            <CategoryRow
-                              key={childItem.lineId}
-                              item={childItem}
-                              useCompact={useCompact}
-                            />
-                          ))}
-                      </>
-                    ) : (
-                      /* Non-hierarchical line item - show when details enabled OR not in phase mode */
-                      (!isPhaseMode || showLineItems) && (
-                        <LineItemRow
-                          item={item}
-                          periodCount={periods.length}
-                          useCompact={useCompact}
-                        />
-                      )
+          {isByPhaseMode ? (
+            /* BY PHASE MODE - Flat sections with phase suffixes on labels */
+            <>
+              {/* GROSS REVENUE */}
+              {phaseGrossRevenueSection && phaseGrossRevenueSection.lineItems.length > 0 && (
+                <>
+                  <SectionLabel label="GROSS REVENUE" colSpan={colCount} />
+                  {phaseGrossRevenueSection.lineItems.map((item, idx) => (
+                    <DataRow
+                      key={item.lineId}
+                      label={item.description}
+                      values={item.values}
+                      total={item.total}
+                      hideTotal={overallMode}
+                      indent
+                      bottomBorder={idx === phaseGrossRevenueSection.lineItems.length - 1 && !phaseDeductionsSection}
+                    />
+                  ))}
+                </>
+              )}
+              {/* REVENUE DEDUCTIONS (Subdivision Costs) */}
+              {phaseDeductionsSection && phaseDeductionsSection.lineItems.length > 0 && (
+                <>
+                  <SectionLabel label="REVENUE DEDUCTIONS" colSpan={colCount} />
+                  {phaseDeductionsSection.lineItems.map((item, idx) => (
+                    <DataRow
+                      key={item.lineId}
+                      label={item.description}
+                      values={item.values}
+                      total={item.total}
+                      hideTotal={overallMode}
+                      indent
+                      bottomBorder={idx === phaseDeductionsSection.lineItems.length - 1}
+                    />
+                  ))}
+                </>
+              )}
+              {/* NET REVENUE */}
+              {phaseNetRevenueSection && phaseNetRevenueSection.lineItems.length > 0 && (
+                <>
+                  <SectionLabel label="NET REVENUE" colSpan={colCount} />
+                  {phaseNetRevenueSection.lineItems.map((item) => (
+                    <DataRow
+                      key={item.lineId}
+                      label={item.description}
+                      values={item.values}
+                      total={item.total}
+                      hideTotal={overallMode}
+                      indent
+                    />
+                  ))}
+                  <DataRow
+                    label="Total Net Revenue"
+                    values={phaseNetRevenueSection.subtotals}
+                    total={phaseNetRevenueSection.sectionTotal}
+                    hideTotal={overallMode}
+                    bold
+                  />
+                </>
+              )}
+              {/* PROJECT COSTS */}
+              {phaseCostsSection && phaseCostsSection.lineItems.length > 0 && (
+                <>
+                  <SectionLabel label="PROJECT COSTS" colSpan={colCount} />
+                  {phaseCostsSection.lineItems.map((item, idx) => (
+                    <DataRow
+                      key={item.lineId}
+                      label={item.description}
+                      values={item.values}
+                      total={item.total}
+                      hideTotal={overallMode}
+                      indent
+                      bottomBorder={idx === phaseCostsSection.lineItems.length - 1}
+                    />
+                  ))}
+                  <DataRow
+                    label="Total Project Costs"
+                    values={phaseCostsSection.subtotals}
+                    total={phaseCostsSection.sectionTotal}
+                    hideTotal={overallMode}
+                    bold
+                  />
+                </>
+              )}
+            </>
+          ) : (
+            /* STANDARD MODE */
+            <>
+              {/* REVENUE */}
+              <SectionLabel label="REVENUE" colSpan={colCount} />
+              {(() => {
+                // Determine if Subdivision Costs will be shown (non-zero deductions)
+                const hasDeductions = revenueDeductionsSection && revenueDeductionsSection.sectionTotal !== 0;
+                return (
+                  <>
+                    {grossRevenueSection && (
+                      <DataRow
+                        label="Gross Revenue"
+                        values={grossRevenueSection.subtotals}
+                        total={grossRevenueSection.sectionTotal}
+                        hideTotal={overallMode}
+                        indent
+                        bottomBorder={!hasDeductions}
+                      />
                     )}
-                  </React.Fragment>
-                ))}
-                {/* Only show subtotal row when NOT in phase mode */}
-                {!isPhaseMode && <SubtotalRow section={section} useCompact={useCompact} />}
-              </React.Fragment>
-            );
-          })}
+                    {hasDeductions && (
+                      <DataRow
+                        label="Subdivision Costs"
+                        values={revenueDeductionsSection!.subtotals}
+                        total={revenueDeductionsSection!.sectionTotal}
+                        hideTotal={overallMode}
+                        indent
+                        bottomBorder={true}
+                      />
+                    )}
+                  </>
+                );
+              })()}
+              <DataRow
+                label="Net Revenue"
+                values={totalRevenuePerPeriod}
+                total={totalRevenue}
+                hideTotal={overallMode}
+                bold
+              />
 
-          {/* Net Cash Flow row */}
-          <tr style={{ backgroundColor: 'var(--cui-dark-bg-subtle)' }}>
-            <td
-              style={{
-                padding: '10px 12px',
-                fontWeight: 700,
-                fontSize: '0.875rem',
-                position: 'sticky',
-                left: 0,
-                backgroundColor: 'var(--cui-dark-bg-subtle)',
-                zIndex: 1,
-                borderRight: '1px solid var(--cui-border-color)',
-                borderTop: '2px solid var(--cui-border-color)',
-              }}
-            >
-              NET CASH FLOW
-            </td>
-            {netCashFlowPerPeriod.map((value, idx) => (
-              <td
-                key={idx}
-                style={{
-                  ...getCellStyle(value, true),
-                  backgroundColor: 'var(--cui-dark-bg-subtle)',
-                  borderTop: '2px solid var(--cui-border-color)',
-                }}
-              >
-                {formatCurrency(value, useCompact)}
-              </td>
-            ))}
-            <td
-              style={{
-                ...getCellStyle(totalNetCashFlow, true),
-                backgroundColor: 'var(--cui-dark-bg-subtle)',
-                borderTop: '2px solid var(--cui-border-color)',
-                fontWeight: 700,
-              }}
-            >
-              {formatCurrency(totalNetCashFlow, useCompact)}
-            </td>
-          </tr>
+              {/* PROJECT COSTS */}
+              <SectionLabel label="PROJECT COSTS" colSpan={colCount} />
+              {costSections.length > 0 ? (
+                costSections.map((section, idx) => (
+                  <DataRow
+                    key={section.sectionId}
+                    label={section.sectionName}
+                    values={section.subtotals}
+                    total={section.sectionTotal}
+                    hideTotal={overallMode}
+                    indent
+                    bottomBorder={idx === costSections.length - 1}
+                  />
+                ))
+              ) : (
+                <DataRow
+                  label="No costs"
+                  values={periods.map(() => 0)}
+                  total={0}
+                  hideTotal={overallMode}
+                  indent
+                  bottomBorder={true}
+                />
+              )}
+            </>
+          )}
 
-          {/* Cumulative Cash Flow row */}
-          <tr style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-            <td
-              style={{
-                padding: '10px 12px',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                fontStyle: 'italic',
-                position: 'sticky',
-                left: 0,
-                backgroundColor: 'var(--cui-body-bg)',
-                zIndex: 1,
-                borderRight: '1px solid var(--cui-border-color)',
-              }}
-            >
-              Cumulative
-            </td>
-            {cumulativeCashFlow.map((value, idx) => (
-              <td key={idx} style={{ ...getCellStyle(value), fontStyle: 'italic' }}>
-                {formatCurrency(value, useCompact)}
-              </td>
-            ))}
-            <td style={{ ...getCellStyle(totalNetCashFlow), fontStyle: 'italic', fontWeight: 600 }}>
-              {formatCurrency(totalNetCashFlow, useCompact)}
-            </td>
-          </tr>
+          {/* PROJECT TOTALS - shown in both modes */}
+          <SectionLabel label="PROJECT TOTALS" colSpan={colCount} />
+          <DataRow
+            label="Total Net Revenue"
+            values={totalRevenuePerPeriod}
+            total={totalRevenue}
+            hideTotal={overallMode}
+            indent
+          />
+          <DataRow
+            label="Total Project Costs"
+            values={totalCostsPerPeriod}
+            total={totalCosts}
+            hideTotal={overallMode}
+            indent
+            bottomBorder
+          />
+          <DataRow
+            label="Net Cash Flow"
+            values={netCashFlowPerPeriod}
+            total={totalNetCashFlow}
+            hideTotal={overallMode}
+            bold
+          />
+          <DataRow
+            label="Cumulative"
+            values={cumulativeCashFlow}
+            total={totalNetCashFlow}
+            hideTotal={overallMode}
+            indent
+          />
         </tbody>
-      </table>
+      </CTable>
     </div>
   );
 }

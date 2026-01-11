@@ -23,9 +23,7 @@ import { useBudgetData } from './hooks/useBudgetData';
 import type { BudgetItem } from './ColumnDefinitions';
 import BudgetItemModalV2, { type BudgetItemFormValues } from './BudgetItemModalV2';
 import TimelineTab from './TimelineTab';
-import AssumptionsTab from './AssumptionsTab';
-import AnalysisTab from './AnalysisTab';
-import CostCategoriesTab from './CostCategoriesTab';
+import SalesContent from '@/components/sales/SalesContent';
 import QuickAddCategoryModal from './QuickAddCategoryModal';
 import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
@@ -39,7 +37,7 @@ interface Props {
   scopeFilter?: string; // Optional scope filter (e.g., "Planning & Engineering", "Development")
 }
 
-type SubTab = 'grid' | 'timeline' | 'assumptions' | 'analysis' | 'categories';
+type SubTab = 'grid' | 'timeline' | 'sales';
 
 // Helper to check if project is Land Development type
 function isLandDevelopmentProject(projectTypeCode?: string): boolean {
@@ -508,29 +506,11 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
           </CNavItem>
           <CNavItem>
             <CNavLink
-              active={activeSubTab === 'assumptions'}
-              onClick={() => setActiveSubTab('assumptions')}
+              active={activeSubTab === 'sales'}
+              onClick={() => setActiveSubTab('sales')}
               style={{ cursor: 'pointer' }}
             >
-              Assumptions
-            </CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'analysis'}
-              onClick={() => setActiveSubTab('analysis')}
-              style={{ cursor: 'pointer' }}
-            >
-              Analysis
-            </CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'categories'}
-              onClick={() => setActiveSubTab('categories')}
-              style={{ cursor: 'pointer' }}
-            >
-              Cost Categories
+              Sales
             </CNavLink>
           </CNavItem>
         </CNav>
@@ -626,9 +606,7 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
         )}
 
         {activeSubTab === 'timeline' && <TimelineTab projectId={projectId} />}
-        {activeSubTab === 'assumptions' && <AssumptionsTab projectId={projectId} />}
-        {activeSubTab === 'analysis' && <AnalysisTab projectId={projectId} />}
-        {activeSubTab === 'categories' && <CostCategoriesTab projectId={projectId} />}
+        {activeSubTab === 'sales' && <SalesContent projectId={projectId} />}
       </CCardBody>
 
       <BudgetItemModalV2

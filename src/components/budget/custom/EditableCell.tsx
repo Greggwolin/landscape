@@ -1,4 +1,4 @@
-// v1.0 · 2025-11-02 · UI-only editing; no saves
+// v1.1 · 2026-01-09 · Added ARGUS-style cell type color coding
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -6,6 +6,9 @@ import ColoredDotIndicator from './ColoredDotIndicator';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 
 type SelectOption = { value: string; label: string };
+
+// Cell type for color coding per Landscape Grid Standard
+type CellType = 'input' | 'calculated' | 'dropdown' | 'disabled';
 
 interface LegacyProps {
   value: string | number | null;
@@ -15,6 +18,7 @@ interface LegacyProps {
   onSave: (newValue: any) => void | Promise<void>;
   className?: string;
   decimals?: number;
+  cellType?: CellType;
 }
 
 interface TanStackProps {
@@ -35,6 +39,7 @@ type ColumnMeta = {
   projectTypeCode?: string;
   onAutocompleteSelect?: (template: UnitCostTemplateSummary, row: any) => Promise<void> | void;
   align?: 'left' | 'center' | 'right';
+  cellType?: CellType;
 };
 
 const isTanStackProps = (props: EditableCellProps): props is TanStackProps =>
@@ -42,11 +47,36 @@ const isTanStackProps = (props: EditableCellProps): props is TanStackProps =>
   typeof (props as TanStackProps).row === 'object' &&
   typeof (props as TanStackProps).column === 'object';
 
+// Get CSS class for cell type color coding
+function getCellTypeClass(cellType?: CellType, editable?: boolean, inputType?: string): string {
+  if (cellType) {
+    switch (cellType) {
+      case 'calculated':
+        return 'ls-cell-calculated';
+      case 'dropdown':
+        return 'ls-cell-dropdown';
+      case 'disabled':
+        return 'ls-cell-disabled';
+      case 'input':
+      default:
+        return editable ? 'ls-cell-input' : '';
+    }
+  }
+
+  // Auto-detect from inputType if cellType not specified
+  if (inputType === 'select' || inputType === 'category-select') {
+    return 'ls-cell-dropdown';
+  }
+
+  return editable ? 'ls-cell-input' : '';
+}
+
 function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
   const meta = (column.columnDef.meta || {}) as ColumnMeta;
   const editable = meta.editable ?? false;
   const inputType = meta.inputType ?? 'text';
   const selectOptions = meta.options ?? [];
+  const cellTypeClass = getCellTypeClass(meta.cellType, editable, inputType);
 
   const [value, setValue] = useState(() => getValue());
   const [editing, setEditing] = useState(false);
@@ -413,14 +443,14 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
       ) : (
         <div
           onClick={() => editable && !saving && setEditing(true)}
-          className={
+          className={`${cellTypeClass} ${
             meta.align ?
               (meta.align === 'center' ? 'text-center' : meta.align === 'right' ? 'text-end' : '') :
-              (inputType === 'currency' || inputType === 'number' ? 'text-end' : '')
-          }
+              (inputType === 'currency' || inputType === 'number' ? 'text-end ls-cell-number' : '')
+          }`}
           style={{
             cursor: editable ? 'pointer' : 'default',
-            minHeight: '1.5rem',
+            minHeight: '1.25rem',
             textAlign: meta.align === 'center' ? 'center' : meta.align === 'right' ? 'right' : (inputType === 'currency' || inputType === 'number' ? 'right' : undefined)
           }}
         >

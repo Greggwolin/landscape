@@ -17,7 +17,7 @@
 TODAY=$(date +%Y-%m-%d)
 
 # Check if session note exists for today
-ls -la /Users/5150east/landscape/docs/session-notes/$TODAY-*.md
+ls -la /Users/5150east/landscape/docs/09_session_notes/$TODAY-*.md
 ```
 
 **If session note for today EXISTS:**
@@ -27,7 +27,7 @@ ls -la /Users/5150east/landscape/docs/session-notes/$TODAY-*.md
 - Update git activity section
 
 **If session note for today DOES NOT EXIST:**
-- Create new file: `/docs/session-notes/YYYY-MM-DD-[topic].md`
+- Create new file: `/docs/09_session_notes/YYYY-MM-DD-[topic].md`
 - Use descriptive topic based on main focus (e.g., "django-backend", "documentation-system", "finance-structure")
 - Follow session notes template (see existing session notes for format)
 
@@ -88,7 +88,7 @@ Analyze the output to identify:
 Update these key files with current information:
 
 #### A. Main Implementation Status
-**File:** `/docs/11-implementation-status/IMPLEMENTATION_STATUS.md`
+**File:** `/docs/00_overview/status/IMPLEMENTATION_STATUS.md`
 
 Actions:
 - Update date at top of document
@@ -101,7 +101,7 @@ Actions:
 #### B. Create Feature Completion Documents
 If major features were completed in last 7 days, create completion documents:
 
-**Template:** `/docs/11-implementation-status/[FEATURE_NAME]_COMPLETE.md`
+**Template:** `/docs/00_overview/status/[FEATURE_NAME]_COMPLETE.md`
 
 Include:
 - Completion date
@@ -113,7 +113,7 @@ Include:
 - Next steps
 
 #### C. Update Financial Engine Status (if relevant)
-**File:** `/docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md`
+**File:** `/docs/00_overview/IMPLEMENTATION_STATUS.md`
 
 Update if financial calculations or Python engine changes were made.
 
@@ -147,7 +147,7 @@ Actions:
 3. **Verify All Paths:**
    ```bash
    # Example verification
-   ls -la /Users/5150east/landscape/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md
+   ls -la /Users/5150east/landscape/docs/00_overview/status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md
    ```
 
 4. **Update Descriptions:**
@@ -159,7 +159,7 @@ Actions:
 
 If a significant migration or feature was completed, create detailed documentation:
 
-**Location:** `/docs/11-implementation-status/` or appropriate category folder
+**Location:** `/docs/00_overview/status/` or appropriate category folder
 
 **Contents:**
 - Date and status
@@ -180,7 +180,7 @@ Run verification checks:
 ```bash
 # Verify key documentation files exist
 for path in \
-  "/Users/5150east/landscape/docs/11-implementation-status/IMPLEMENTATION_STATUS.md" \
+  "/Users/5150east/landscape/docs/00_overview/status/IMPLEMENTATION_STATUS.md" \
   "/Users/5150east/landscape/docs/DJANGO_BACKEND_IMPLEMENTATION.md" \
   "/Users/5150east/landscape/backend/TESTING_GUIDE.md" \
   "/Users/5150east/landscape/backend/README.md"; do
@@ -221,7 +221,7 @@ git add backend/apps/**/README.md
 git add src/app/documentation/page.tsx
 
 # Stage session note for today
-git add docs/session-notes/$(date +%Y-%m-%d)-*.md
+git add docs/09_session_notes/$(date +%Y-%m-%d)-*.md
 
 # Verify staging
 git status
@@ -283,7 +283,7 @@ Provide a summary to the user:
 - Update all lastModified fields to current date for changed files
 
 ### Key Files to Monitor
-1. `/docs/11-implementation-status/IMPLEMENTATION_STATUS.md` - Master status
+1. `/docs/00_overview/status/IMPLEMENTATION_STATUS.md` - Master status
 2. `/src/app/documentation/page.tsx` - Documentation center
 3. `/backend/README.md` - Backend main guide
 4. Feature-specific READMEs in backend/apps/
@@ -328,8 +328,8 @@ Before completing, verify:
 **Claude should:**
 1. Scan for changes in last 7 days
 2. Find: Finance Structure migration completed yesterday
-3. Create `/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md`
-4. Update `/docs/11-implementation-status/IMPLEMENTATION_STATUS.md`
+3. Create `/docs/00_overview/status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md`
+4. Update `/docs/00_overview/status/IMPLEMENTATION_STATUS.md`
 5. Add new tile to `/src/app/documentation/page.tsx`:
    - Title: "Finance Structure Migration Complete"
    - Path: correct file path

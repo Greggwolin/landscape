@@ -27,10 +27,10 @@ export default function DevelopmentLayout({
   ];
 
   return (
-    <div className="container-fluid px-4">
+    <div className="app-content">
       {/* Subtab Navigation */}
       <ul
-        className="nav nav-tabs mb-4 sticky border-bottom"
+        className="nav nav-tabs sticky border-bottom"
         style={{
           top: '163px',
           zIndex: 30,

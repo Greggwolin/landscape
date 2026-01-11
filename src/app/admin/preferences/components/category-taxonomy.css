@@ -29,6 +29,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 500px;
   background: var(--cui-card-bg, #fff);
 }
 
@@ -746,19 +747,27 @@
 
 .tag-chip {
   flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 0.24rem 0.62rem;
-  font-size: 0.62rem;
-  font-weight: 600;
-  background: transparent;
-  color: var(--cui-body-color, #4f5d73);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, border 0.2s ease;
+  border: 1px solid;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Colors set via inline styles in component */
+}
+
+.tag-chip:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.tag-chip[aria-pressed="true"] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .tag-chip-label {
@@ -782,18 +791,7 @@
   background: rgba(0, 0, 0, 0.15);
 }
 
-.tag-chip.filled {
-  color: #fff;
-  background: var(--cui-primary, #321fdb);
-  border: 1px solid var(--cui-primary, #321fdb);
-  box-shadow: 0 2px 6px rgba(var(--cui-primary-rgb, 50, 31, 219), 0.2);
-}
-
-.tag-chip.outline {
-  background: transparent;
-  color: var(--cui-primary, #321fdb);
-  border: 1px solid var(--cui-border-color, #d8dbe0);
-}
+/* Tag chip base styles - colors applied via inline styles in component */
 
 .tag-chip:disabled {
   opacity: 0.55;

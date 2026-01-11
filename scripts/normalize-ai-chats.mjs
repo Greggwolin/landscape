@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync, renameSync } from 'fs'
 import { join } from 'path'
 
-const dir = 'docs/ai-chats'
+const dir = 'docs/09_session_notes/ai-chats'
 for (const f of readdirSync(dir)) {
   if (!f.endsWith('.md')) continue
   const p = join(dir, f)

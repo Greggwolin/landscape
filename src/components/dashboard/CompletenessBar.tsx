@@ -1,0 +1,98 @@
+'use client';
+
+import React from 'react';
+
+export interface CompletenessBarProps {
+  percentage: number;
+  onClick?: () => void;
+  showLabel?: boolean;
+  size?: 'sm' | 'md';
+}
+
+/**
+ * Gradient progress bar showing project completeness.
+ * Clickable to open detailed breakdown modal.
+ *
+ * Colors:
+ * - 0-30%: Red gradient
+ * - 30-70%: Yellow/orange gradient
+ * - 70-100%: Green gradient
+ */
+export function CompletenessBar({
+  percentage,
+  onClick,
+  showLabel = true,
+  size = 'md',
+}: CompletenessBarProps) {
+  // Clamp percentage between 0 and 100
+  const pct = Math.max(0, Math.min(100, percentage));
+
+  // Determine gradient colors based on percentage
+  const getGradient = () => {
+    if (pct < 30) {
+      return 'from-red-500 to-red-400';
+    } else if (pct < 70) {
+      return 'from-yellow-500 to-orange-400';
+    } else {
+      return 'from-green-500 to-emerald-400';
+    }
+  };
+
+  // Get background track color
+  const getTrackColor = () => {
+    if (pct < 30) {
+      return 'bg-red-100';
+    } else if (pct < 70) {
+      return 'bg-yellow-100';
+    } else {
+      return 'bg-green-100';
+    }
+  };
+
+  const heightClass = size === 'sm' ? 'h-2' : 'h-3';
+
+  return (
+    <div
+      className={`flex items-center gap-2 ${onClick ? 'cursor-pointer group' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
+      {/* Progress bar container */}
+      <div
+        className={`flex-1 ${heightClass} rounded-full overflow-hidden ${getTrackColor()} ${
+          onClick ? 'group-hover:ring-2 group-hover:ring-primary/30 transition-all' : ''
+        }`}
+      >
+        {/* Progress fill */}
+        <div
+          className={`${heightClass} rounded-full bg-gradient-to-r ${getGradient()} transition-all duration-300`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {/* Percentage label */}
+      {showLabel && (
+        <span
+          className={`text-xs font-medium tabular-nums min-w-[2.5rem] text-right ${
+            pct < 30 ? 'text-red-600' : pct < 70 ? 'text-yellow-600' : 'text-green-600'
+          }`}
+        >
+          {pct}%
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default CompletenessBar;

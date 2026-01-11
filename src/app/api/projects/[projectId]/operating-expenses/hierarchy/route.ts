@@ -16,6 +16,7 @@ interface OpexAccount {
   sort_order: number;
   opex_id: number | null;
   annual_amount: number | null;
+  amount_per_sf: number | null;
   calculation_basis: string | null;
   unit_amount: number | null;
   is_auto_calculated: boolean | null;
@@ -35,6 +36,8 @@ export async function GET(
 ) {
   try {
     const projectId = parseInt((await context.params).projectId);
+    const searchParams = request.nextUrl.searchParams;
+    const overrideDiscriminator = searchParams.get('statement_discriminator');
 
     if (isNaN(projectId)) {
       return NextResponse.json(
@@ -58,19 +61,47 @@ export async function GET(
     }
 
     const projectType = projectResult[0].project_type_code;
+    const activeDiscriminatorResult = await sql<{ active_opex_discriminator: string }[]>`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectId}
+      LIMIT 1
+    `;
+    const availableDiscriminators = await sql<{ statement_discriminator: string | null }[]>`
+      SELECT DISTINCT statement_discriminator
+      FROM landscape.tbl_operating_expenses
+      WHERE project_id = ${projectId}
+    `;
+    const available = availableDiscriminators
+      .map((row) => row.statement_discriminator)
+      .filter((v): v is string => !!v);
 
+    let effectiveDiscriminator =
+      overrideDiscriminator && available.includes(overrideDiscriminator)
+        ? overrideDiscriminator
+        : activeDiscriminatorResult[0]?.active_opex_discriminator || null;
+
+    if (!effectiveDiscriminator || !available.includes(effectiveDiscriminator)) {
+      effectiveDiscriminator = available.includes('CURRENT_PRO_FORMA')
+        ? 'CURRENT_PRO_FORMA'
+        : (available[0] || 'default');
+    }
+
+    // Query core_unit_cost_category for Operations activity categories
+    // This replaces the old tbl_opex_accounts query after migration 042
     const accounts = await sql<OpexAccount[]>`
-      SELECT 
-        a.account_id,
-        a.account_number,
-        a.account_name,
-        a.account_level,
-        a.parent_account_id,
-        a.is_calculated,
-        landscape.calculate_opex_account_total(${projectId}, a.account_id) as calculated_total,
-        a.sort_order,
+      SELECT
+        c.category_id as account_id,
+        c.account_number,
+        c.category_name as account_name,
+        COALESCE(c.account_level, 1) as account_level,
+        c.parent_id as parent_account_id,
+        COALESCE(c.is_calculated, false) as is_calculated,
+        landscape.calculate_opex_account_total(${projectId}, c.category_id) as calculated_total,
+        c.sort_order,
         oe.opex_id,
         oe.annual_amount,
+        oe.amount_per_sf,
         oe.calculation_basis,
         oe.unit_amount,
         oe.is_auto_calculated,
@@ -78,13 +109,20 @@ export async function GET(
         oe.start_period,
         oe.payment_frequency,
         oe.notes
-      FROM landscape.tbl_opex_accounts a
+      FROM landscape.core_unit_cost_category c
+      JOIN landscape.core_category_lifecycle_stages cls
+        ON c.category_id = cls.category_id
       LEFT JOIN landscape.tbl_operating_expenses oe
-        ON oe.account_id = a.account_id
+        ON oe.category_id = c.category_id
+       AND oe.statement_discriminator = ${effectiveDiscriminator}
        AND oe.project_id = ${projectId}
-      WHERE is_active = TRUE
-        AND ${projectType} = ANY(a.applicable_property_types)
-      ORDER BY a.sort_order
+      WHERE cls.activity = 'Operations'
+        AND c.is_active = TRUE
+        AND (
+          c.property_types IS NULL
+          OR ${projectType} = ANY(c.property_types)
+        )
+      ORDER BY c.sort_order
     `;
 
     // Transform flat list into nested hierarchy
@@ -111,11 +149,24 @@ export async function GET(
       }
     });
 
-    const totalOpex = rootAccounts.reduce((sum, acct) => sum + Number(acct.calculated_total), 0);
+    const computeTotal = (node: NestedAccount): number => {
+      if (!node.children.length) {
+        node.calculated_total = Number(node.annual_amount || 0);
+        return node.calculated_total;
+      }
+      const childTotal = node.children.reduce((sum, child) => sum + computeTotal(child), 0);
+      node.calculated_total = childTotal;
+      return childTotal;
+    };
+
+    rootAccounts.forEach((root) => computeTotal(root));
+    const totalOpex = rootAccounts.reduce((sum, acct) => sum + Number(acct.calculated_total || 0), 0);
     const leafAccounts = accounts.filter(a => !a.is_calculated);
 
     return NextResponse.json({
       project_type_code: projectType,
+      active_statement_discriminator: effectiveDiscriminator,
+      available_statement_discriminators: available,
       accounts: rootAccounts,
       summary: {
         total_operating_expenses: totalOpex,

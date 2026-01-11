@@ -1,0 +1,55 @@
+'use client';
+
+import React, { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+
+interface ProjectSelectorProps {
+  projectId: number;
+}
+
+export function ProjectSelector({ projectId }: ProjectSelectorProps) {
+  const { projects, activeProject, selectProject } = useProjectContext();
+  const router = useRouter();
+
+  const project = useMemo(() => {
+    return projects.find((p) => p.project_id === projectId) || activeProject;
+  }, [projects, projectId, activeProject]);
+
+  const handleProjectChange = (newProjectId: number) => {
+    selectProject(newProjectId);
+    router.push(`/projects/${newProjectId}`);
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="font-semibold whitespace-nowrap"
+        style={{ color: 'var(--nav-text)' }}
+      >
+        Active Project:
+      </span>
+      <select
+        value={project?.project_id ?? projectId}
+        onChange={(e) => handleProjectChange(Number(e.target.value))}
+        className="px-3 py-2 rounded cursor-pointer min-w-[300px]"
+        style={{
+          backgroundColor: 'var(--nav-hover-bg)',
+          border: '1px solid var(--nav-border)',
+          color: 'var(--nav-text)',
+        }}
+        disabled={!project}
+      >
+        {projects.length > 0 ? (
+          projects.map((proj) => (
+            <option key={proj.project_id} value={proj.project_id}>
+              {proj.project_name} - {proj.project_type_code || 'LAND'}
+            </option>
+          ))
+        ) : (
+          <option value={projectId}>Loading...</option>
+        )}
+      </select>
+    </div>
+  );
+}

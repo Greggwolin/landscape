@@ -270,7 +270,7 @@ export const budgetFieldGroups: FieldGroup[] = [
         options: [
           { value: 'Acquisition', label: 'Acquisition' },
           { value: 'Planning & Engineering', label: 'Planning & Engineering' },
-          { value: 'Development', label: 'Development' },
+          { value: 'Improvements', label: 'Improvements' },  // Renamed from Development
           { value: 'Operations', label: 'Operations' },
           { value: 'Disposition', label: 'Disposition' },
           { value: 'Financing', label: 'Financing' },

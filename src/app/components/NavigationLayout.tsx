@@ -40,7 +40,7 @@ export default function NavigationLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <TopNavigationBar onSettingsClick={() => setAdminModalOpen(true)} />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 app-shell">{children}</main>
 
       {/* Admin Modal - Global Overlay */}
       <AdminModal

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useProjectContext } from './ProjectProvider'
 import LocationSection from './new-project/LocationSection'
 import PropertyDataSection from './new-project/PropertyDataSection'
-import LandscaperPanel from './new-project/LandscaperPanel'
+import LandscaperPanel, { type ExtractedFields } from './new-project/LandscaperPanel'
 import type { NewProjectFormData } from './new-project/types'
 import { emptyFormDefaults, newProjectSchema } from './new-project/validation'
 import { usePersistentForm, clearPersistedForm } from './new-project/usePersistentForm'
@@ -140,6 +140,8 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [invalidSections, setInvalidSections] = useState<SectionKey[]>([])
+  const [extractedFieldKeys, setExtractedFieldKeys] = useState<Set<string>>(new Set())
+  const [pendingDocument, setPendingDocument] = useState<File | null>(null)
 
   const assetSectionRef = useRef<HTMLDivElement>(null)
   const locationSectionRef = useRef<HTMLDivElement>(null)
@@ -210,6 +212,56 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
     })
   }, [errors, globalError])
 
+  // Handle document extraction - populate form fields and store pending document
+  const handleDocumentExtracted = (fields: ExtractedFields, file: File) => {
+    // Store the file for DMS ingestion after project creation
+    setPendingDocument(file)
+    const fieldMapping: Record<string, keyof NewProjectFormData> = {
+      // Extraction field -> Form field
+      property_name: 'project_name',
+      project_name: 'project_name',
+      street_address: 'street_address',
+      city: 'city',
+      state: 'state',
+      zip_code: 'zip',
+      zip: 'zip',
+      total_units: 'total_units',
+      building_sf: 'building_sf',
+      rentable_sf: 'building_sf',
+      gross_sf: 'building_sf',
+      site_area: 'site_area',
+      site_size_acres: 'site_area',
+      latitude: 'latitude',
+      longitude: 'longitude',
+      property_subtype: 'property_subtype',
+      property_class: 'property_class',
+      cross_streets: 'cross_streets'
+    }
+
+    const updatedKeys = new Set<string>()
+
+    Object.entries(fields).forEach(([extractKey, fieldData]) => {
+      const formKey = fieldMapping[extractKey]
+      if (formKey && fieldData?.value !== undefined && fieldData?.value !== null) {
+        const value = String(fieldData.value)
+        setValue(formKey, value, { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add(formKey)
+      }
+    })
+
+    // Auto-detect analysis type from property_subtype if present
+    if (fields.property_subtype?.value) {
+      const subtype = String(fields.property_subtype.value).toUpperCase()
+      const incomeTypes = ['MULTIFAMILY', 'OFFICE', 'RETAIL', 'INDUSTRIAL', 'MIXED_USE', 'HOTEL', 'SELF_STORAGE']
+      if (incomeTypes.includes(subtype)) {
+        setValue('analysis_type', 'Income Property', { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('analysis_type')
+      }
+    }
+
+    setExtractedFieldKeys(updatedKeys)
+  }
+
   const closeModal = () => {
     if (isSubmitting) return
 
@@ -228,9 +280,31 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }
 
   const handleCreationSuccess = async (projectId: number) => {
+    // If we have a pending document, ingest it to DMS
+    if (pendingDocument) {
+      try {
+        const dmsFormData = new FormData()
+        dmsFormData.append('file', pendingDocument)
+        dmsFormData.append('project_id', projectId.toString())
+        dmsFormData.append('doc_type', 'offering_memorandum') // Default type
+        dmsFormData.append('run_full_extraction', 'true')
+
+        // Fire and forget - don't block navigation
+        fetch('/api/dms/upload', {
+          method: 'POST',
+          body: dmsFormData
+        }).catch(err => {
+          console.error('Document ingestion failed:', err)
+        })
+      } catch (err) {
+        console.error('Document ingestion setup failed:', err)
+      }
+    }
+
     await refreshProjects()
     selectProject(projectId)
     resetFormState()
+    setPendingDocument(null)
     onClose()
     router.push(`/projects/${projectId}`)
   }
@@ -245,13 +319,32 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
 
     try {
       const projectName = generateProjectName(data)
+      // For Land Development, always use 'LAND' as the project_type_code
+      // For Income Property, map property_subtype to valid codes
+      const getProjectTypeCode = () => {
+        if (data.analysis_type === 'Land Development') {
+          return 'LAND'
+        }
+        // Map Income Property subtypes to valid project_type_codes
+        const subtypeMap: Record<string, string> = {
+          'MULTIFAMILY': 'MF',
+          'OFFICE': 'OFF',
+          'RETAIL': 'RET',
+          'INDUSTRIAL': 'IND',
+          'HOTEL': 'HTL',
+          'MIXED_USE': 'MXU',
+          'SELF_STORAGE': 'IND' // Map to Industrial
+        }
+        return subtypeMap[data.property_subtype || ''] || 'MF'
+      }
+      const projectTypeCode = getProjectTypeCode()
       const payload = {
         project_name: projectName,
         analysis_type: data.analysis_type,
         property_subtype: data.property_subtype || undefined,
         property_class: data.property_class || undefined,
         development_type: data.analysis_type,
-        project_type_code: data.property_subtype || '',
+        project_type_code: projectTypeCode,
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,
         city: data.city || undefined,
@@ -501,7 +594,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                   placeholder=" "
                   className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
-                  }`}
+                  } ${extractedFieldKeys.has('project_name') ? 'ring-2 ring-blue-300 bg-blue-50/50' : ''}`}
                 />
                 <label
                   htmlFor="project-name"
@@ -513,6 +606,11 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                 >
                   Project Name (optional)
                 </label>
+                {extractedFieldKeys.has('project_name') && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-600">
+                    Auto-filled
+                  </span>
+                )}
               </div>
 
               {/* Location Section */}
@@ -526,6 +624,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                   analysisType={analysisType}
                   isDark={isDark}
                   hasError={invalidSectionSet.has('location')}
+                  extractedFieldKeys={extractedFieldKeys}
                 />
               </div>
 
@@ -536,6 +635,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                   form={form}
                   isDark={isDark}
                   hasError={invalidSectionSet.has('propertyData')}
+                  extractedFieldKeys={extractedFieldKeys}
                 />
               </div>
 
@@ -563,15 +663,26 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
             <LandscaperPanel
               analysisType={analysisType}
               formData={formData}
+              onDocumentExtracted={handleDocumentExtracted}
+              isDark={isDark}
             />
           </div>
         </div>
 
         {/* Footer */}
         <footer className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-          <p className="text-xs text-slate-400">
-            Progress autosaves locally.
-          </p>
+          <button
+            type="button"
+            onClick={() => {
+              resetFormState()
+              setExtractedFieldKeys(new Set())
+              setPendingDocument(null)
+            }}
+            disabled={isSubmitting}
+            className="text-xs text-slate-400 hover:text-slate-600 transition disabled:opacity-50"
+          >
+            Clear form
+          </button>
           <div className="flex items-center gap-3">
             <Button
               type="button"

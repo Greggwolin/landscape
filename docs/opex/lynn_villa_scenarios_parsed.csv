@@ -1,0 +1,190 @@
+source_row_label,normalized_label,scenario_discriminator,amount,raw_amount,page,column_header
+Operating,operating,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Operating,operating,CURRENT_PRO_FORMA,,Statement,26,CURRENT_PRO_FORMA
+Operating,operating,POST_RENO_PRO_FORMA,,,26,POST_RENO_PRO_FORMA
+Operating,operating,T3_ANNUALIZED,2024.0,Dec 2024 - T3 Annualized,26,T3_ANNUALIZED
+Operating,operating,CURRENT_PRO_FORMA,,Current Rent Roll Pro forma,26,CURRENT_PRO_FORMA
+Operating,operating,POST_RENO_PRO_FORMA,,Post-Reno Market Rent Pro Forma,26,POST_RENO_PRO_FORMA
+Operating,operating,T3_ANNUALIZED,,% /$/Unit,26,T3_ANNUALIZED
+Operating,operating,CURRENT_PRO_FORMA,,% /$/Unit,26,CURRENT_PRO_FORMA
+Operating,operating,POST_RENO_PRO_FORMA,,% /$/Unit,26,POST_RENO_PRO_FORMA
+Scheduled Market Rent,scheduled market rent,T3_ANNUALIZED,1875128.0,"$1,875,128 $21,069",26,T3_ANNUALIZED
+Scheduled Market Rent,scheduled market rent,CURRENT_PRO_FORMA,2045450.0,"$2,045,450 $22,983",26,CURRENT_PRO_FORMA
+Scheduled Market Rent,scheduled market rent,POST_RENO_PRO_FORMA,2045450.0,"$2,045,450 $22,983",26,POST_RENO_PRO_FORMA
+Scheduled Market Rent,scheduled market rent,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Scheduled Market Rent,scheduled market rent,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Scheduled Market Rent,scheduled market rent,POST_RENO_PRO_FORMA,12.0,Based on 12/31/24 RR with vacant units rolled to market rents and 90% of rents increased by 5% prior to COE,26,POST_RENO_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,T3_ANNUALIZED,0.0,$0 0.00%,26,T3_ANNUALIZED
+Plus: Rehab Value Add Income,plus: rehab value add income,CURRENT_PRO_FORMA,0.0,$0 0.00%,26,CURRENT_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,POST_RENO_PRO_FORMA,1024150.0,"$1,024,150 50.07%Post-Reno",26,POST_RENO_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Plus: Rehab Value Add Income,plus: rehab value add income,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,POST_RENO_PRO_FORMA,,Market Rents: Based on premium from renovations,26,POST_RENO_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Plus: Rehab Value Add Income,plus: rehab value add income,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Plus: Rehab Value Add Income,plus: rehab value add income,POST_RENO_PRO_FORMA,-1.5,-1.50%Current RR Pro Forma: No LTL,26,POST_RENO_PRO_FORMA
+Less: Loss to Lease,less: loss to lease,T3_ANNUALIZED,0.0,$0 0.00%,26,T3_ANNUALIZED
+Less: Loss to Lease,less: loss to lease,CURRENT_PRO_FORMA,0.0,$0 0.00%,26,CURRENT_PRO_FORMA
+Less: Loss to Lease,less: loss to lease,POST_RENO_PRO_FORMA,-46044.0,"($46,044)",26,POST_RENO_PRO_FORMA
+Less: Loss to Lease,less: loss to lease,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Less: Loss to Lease,less: loss to lease,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Less: Loss to Lease,less: loss to lease,POST_RENO_PRO_FORMA,,Post-Reno Market Rent: 1.50% LTL,26,POST_RENO_PRO_FORMA
+Subtotal Gross Potential Rent (GPR),subtotal gross potential rent (gpr),T3_ANNUALIZED,1875128.0,"$1,875,128 100.00%",26,T3_ANNUALIZED
+Subtotal Gross Potential Rent (GPR),subtotal gross potential rent (gpr),CURRENT_PRO_FORMA,2045450.0,"$2,045,450 100.00%",26,CURRENT_PRO_FORMA
+Subtotal Gross Potential Rent (GPR),subtotal gross potential rent (gpr),POST_RENO_PRO_FORMA,3023556.0,"$3,023,556 147.82%",26,POST_RENO_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,T3_ANNUALIZED,0.0,$0 0.00%,26,T3_ANNUALIZED
+Less: Physical Vacancy,less: physical vacancy,CURRENT_PRO_FORMA,-61363.0,"($61,363) -3.00%",26,CURRENT_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,POST_RENO_PRO_FORMA,-90707.0,"($90,707) -3.00%Marked",26,POST_RENO_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Less: Physical Vacancy,less: physical vacancy,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,POST_RENO_PRO_FORMA,1.12,to market; Current RR vacancy is 1.12%,26,POST_RENO_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Less: Physical Vacancy,less: physical vacancy,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Less: Physical Vacancy,less: physical vacancy,POST_RENO_PRO_FORMA,-1.15,"-1.15%Current RR Pro Forma: One employee unit recurring moving forward ($2,200/month)",26,POST_RENO_PRO_FORMA
+Less: Employee Unit,less: employee unit,T3_ANNUALIZED,-26400.0,"($26,400) -1.41%",26,T3_ANNUALIZED
+Less: Employee Unit,less: employee unit,CURRENT_PRO_FORMA,-25200.0,"($25,200) -1.23%",26,CURRENT_PRO_FORMA
+Less: Employee Unit,less: employee unit,POST_RENO_PRO_FORMA,-34800.0,"($34,800)",26,POST_RENO_PRO_FORMA
+Less: Employee Unit,less: employee unit,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Less: Employee Unit,less: employee unit,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Less: Employee Unit,less: employee unit,POST_RENO_PRO_FORMA,,"Post-Reno Market Rents: One employee unit recurring moving forward ($2,900/month)",26,POST_RENO_PRO_FORMA
+Less: Bad Debt,less: bad debt,T3_ANNUALIZED,0.0,$0 0.00%,26,T3_ANNUALIZED
+Less: Bad Debt,less: bad debt,CURRENT_PRO_FORMA,0.0,$0 0.00%,26,CURRENT_PRO_FORMA
+Less: Bad Debt,less: bad debt,POST_RENO_PRO_FORMA,-7559.0,"($7,559) -0.25%",26,POST_RENO_PRO_FORMA
+Net Rental Income,net rental income,T3_ANNUALIZED,1848728.0,"$1,848,728 $20,772",26,T3_ANNUALIZED
+Net Rental Income,net rental income,CURRENT_PRO_FORMA,1958886.0,"$1,958,886 $22,010",26,CURRENT_PRO_FORMA
+Net Rental Income,net rental income,POST_RENO_PRO_FORMA,2890490.0,"$2,890,490 $32,477",26,POST_RENO_PRO_FORMA
+Economic Occupancy,economic occupancy,T3_ANNUALIZED,98.59,98.59%,26,T3_ANNUALIZED
+Economic Occupancy,economic occupancy,CURRENT_PRO_FORMA,95.77,95.77%,26,CURRENT_PRO_FORMA
+Economic Occupancy,economic occupancy,POST_RENO_PRO_FORMA,95.6,95.60%,26,POST_RENO_PRO_FORMA
+Effective Rent,effective rent,T3_ANNUALIZED,1.86,"$1.86 $1,756",26,T3_ANNUALIZED
+Effective Rent,effective rent,CURRENT_PRO_FORMA,2.03,"$2.03 $1,915",26,CURRENT_PRO_FORMA
+Effective Rent,effective rent,POST_RENO_PRO_FORMA,3.0,"$3.00 $2,831",26,POST_RENO_PRO_FORMA
+Plus: Late Charges Income,plus: late charges income,T3_ANNUALIZED,340.0,$340 $4,26,T3_ANNUALIZED
+Plus: Late Charges Income,plus: late charges income,CURRENT_PRO_FORMA,809.0,$809,26,CURRENT_PRO_FORMA
+Plus: Late Charges Income,plus: late charges income,POST_RENO_PRO_FORMA,9.0,$9 $833 $9,26,POST_RENO_PRO_FORMA
+Plus: Late Charges Income,plus: late charges income,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Plus: Late Charges Income,plus: late charges income,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Plus: Late Charges Income,plus: late charges income,POST_RENO_PRO_FORMA,12.0,Current Rent Roll Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%,26,POST_RENO_PRO_FORMA
+Plus: Laundry Vending,plus: laundry vending,T3_ANNUALIZED,16608.0,"$16,608 $187",26,T3_ANNUALIZED
+Plus: Laundry Vending,plus: laundry vending,CURRENT_PRO_FORMA,23158.0,"$23,158 $260",26,CURRENT_PRO_FORMA
+Plus: Laundry Vending,plus: laundry vending,POST_RENO_PRO_FORMA,23853.0,"$23,853 $268",26,POST_RENO_PRO_FORMA
+Plus: Laundry Vending,plus: laundry vending,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Plus: Laundry Vending,plus: laundry vending,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Plus: Laundry Vending,plus: laundry vending,POST_RENO_PRO_FORMA,12.0,Current Rent Roll Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%,26,POST_RENO_PRO_FORMA
+Plus: RUBs Income,plus: rubs income,T3_ANNUALIZED,0.0,$0 $0,26,T3_ANNUALIZED
+Plus: RUBs Income,plus: rubs income,CURRENT_PRO_FORMA,144539.0,"$144,539 $1,624",26,CURRENT_PRO_FORMA
+Plus: RUBs Income,plus: rubs income,POST_RENO_PRO_FORMA,148875.0,"$148,875 $1,673",26,POST_RENO_PRO_FORMA
+Plus: RUBs Income,plus: rubs income,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Plus: RUBs Income,plus: rubs income,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Plus: RUBs Income,plus: rubs income,POST_RENO_PRO_FORMA,,Current Rent Roll Pro Forma & Post-Reno Market Rent assume 70% of utilities being recovered through RUBs program,26,POST_RENO_PRO_FORMA
+Subtotal Other Income,subtotal other income,T3_ANNUALIZED,16948.0,"$16,948 $190",26,T3_ANNUALIZED
+Subtotal Other Income,subtotal other income,CURRENT_PRO_FORMA,168506.0,"$168,506 $1,893",26,CURRENT_PRO_FORMA
+Subtotal Other Income,subtotal other income,POST_RENO_PRO_FORMA,173561.0,"$173,561 $1,950",26,POST_RENO_PRO_FORMA
+Effective Gross Income (EGI),effective gross income (egi),T3_ANNUALIZED,1865676.0,"$1,865,676 $20,963",26,T3_ANNUALIZED
+Effective Gross Income (EGI),effective gross income (egi),CURRENT_PRO_FORMA,2127392.0,"$2,127,392 $23,903",26,CURRENT_PRO_FORMA
+Effective Gross Income (EGI),effective gross income (egi),POST_RENO_PRO_FORMA,3064051.0,"$3,064,051 $34,428",26,POST_RENO_PRO_FORMA
+Operating Expenses,operating expenses,T3_ANNUALIZED,12.0,T12,26,T3_ANNUALIZED
+Operating Expenses,operating expenses,CURRENT_PRO_FORMA,,Berkadia Pro Forma,26,CURRENT_PRO_FORMA
+Operating Expenses,operating expenses,POST_RENO_PRO_FORMA,,Berkadia Pro Forma,26,POST_RENO_PRO_FORMA
+Apartment Prep/Turnover,apartment prep/turnover,T3_ANNUALIZED,51328.0,"$51,328 $577",26,T3_ANNUALIZED
+Apartment Prep/Turnover,apartment prep/turnover,CURRENT_PRO_FORMA,32246.0,"$32,246 $362",26,CURRENT_PRO_FORMA
+Apartment Prep/Turnover,apartment prep/turnover,POST_RENO_PRO_FORMA,32246.0,"$32,246 $362",26,POST_RENO_PRO_FORMA
+Apartment Prep/Turnover,apartment prep/turnover,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Apartment Prep/Turnover,apartment prep/turnover,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Apartment Prep/Turnover,apartment prep/turnover,POST_RENO_PRO_FORMA,12.0,T12 includes Cap Ex: $8.5k in appliance replacement; $10.5k in flooring replacement (Mar '24),26,POST_RENO_PRO_FORMA
+Administrative,administrative,T3_ANNUALIZED,15830.0,"$15,830 $178",26,T3_ANNUALIZED
+Administrative,administrative,CURRENT_PRO_FORMA,15830.0,"$15,830 $178",26,CURRENT_PRO_FORMA
+Administrative,administrative,POST_RENO_PRO_FORMA,15830.0,"$15,830 $178",26,POST_RENO_PRO_FORMA
+Administrative,administrative,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Administrative,administrative,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Administrative,administrative,POST_RENO_PRO_FORMA,12.0,"Based on T12; Includes Telephone, Cable, Supplies, Fire, Business License, & Professional Fees",26,POST_RENO_PRO_FORMA
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",T3_ANNUALIZED,39432.0,"$39,432 $443",26,T3_ANNUALIZED
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",CURRENT_PRO_FORMA,39432.0,"$39,432 $443",26,CURRENT_PRO_FORMA
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",POST_RENO_PRO_FORMA,39432.0,"$39,432 $443",26,POST_RENO_PRO_FORMA
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",T3_ANNUALIZED,,,26,T3_ANNUALIZED
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+"Contracted Services (Pool Service, Pest Control, Landscaping)","contracted services (pool service, pest control, landscaping)",POST_RENO_PRO_FORMA,12.0,Based on T12,26,POST_RENO_PRO_FORMA
+Repairs & Maintenance,repairs & maintenance,T3_ANNUALIZED,185453.0,"$185,453 $2,084",26,T3_ANNUALIZED
+Repairs & Maintenance,repairs & maintenance,CURRENT_PRO_FORMA,53400.0,"$53,400 $600",26,CURRENT_PRO_FORMA
+Repairs & Maintenance,repairs & maintenance,POST_RENO_PRO_FORMA,53400.0,"$53,400 $600",26,POST_RENO_PRO_FORMA
+Repairs & Maintenance,repairs & maintenance,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Repairs & Maintenance,repairs & maintenance,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Repairs & Maintenance,repairs & maintenance,POST_RENO_PRO_FORMA,135809.0,"Marked to Market; Historical Excludes CapEx of $135,809 A/C and Heating & $304,356 Plumbing",26,POST_RENO_PRO_FORMA
+Payroll,payroll,T3_ANNUALIZED,124481.0,"$124,481 $1,399",26,T3_ANNUALIZED
+Payroll,payroll,CURRENT_PRO_FORMA,125001.0,"$125,001 $1,405",26,CURRENT_PRO_FORMA
+Payroll,payroll,POST_RENO_PRO_FORMA,125001.0,"$125,001 $1,405",26,POST_RENO_PRO_FORMA
+Payroll,payroll,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Payroll,payroll,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Payroll,payroll,POST_RENO_PRO_FORMA,1.0,Assumes 1 FT Mgr ($50K+Benefits/Taxes) & 1 FT Maint Supervisor ($50K+Benefits/Taxes) & Mgr receiving free unit,26,POST_RENO_PRO_FORMA
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",T3_ANNUALIZED,62299.0,"$62,299 $700",26,T3_ANNUALIZED
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",CURRENT_PRO_FORMA,62299.0,"$62,299 $700",26,CURRENT_PRO_FORMA
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",POST_RENO_PRO_FORMA,64168.0,"$64,168 $721",26,POST_RENO_PRO_FORMA
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",T3_ANNUALIZED,,,26,T3_ANNUALIZED
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+"Utilities (fuel, gas, electric)","utilities (fuel, gas, electric)",POST_RENO_PRO_FORMA,12.0,Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%,26,POST_RENO_PRO_FORMA
+Water & Sewer,water & sewer,T3_ANNUALIZED,122406.0,"$122,406 $1,375",26,T3_ANNUALIZED
+Water & Sewer,water & sewer,CURRENT_PRO_FORMA,122406.0,"$122,406 $1,375",26,CURRENT_PRO_FORMA
+Water & Sewer,water & sewer,POST_RENO_PRO_FORMA,126078.0,"$126,078 $1,417",26,POST_RENO_PRO_FORMA
+Water & Sewer,water & sewer,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Water & Sewer,water & sewer,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Water & Sewer,water & sewer,POST_RENO_PRO_FORMA,12.0,Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%,26,POST_RENO_PRO_FORMA
+Rubbish Removal,rubbish removal,T3_ANNUALIZED,21779.0,"$21,779 $245",26,T3_ANNUALIZED
+Rubbish Removal,rubbish removal,CURRENT_PRO_FORMA,21779.0,"$21,779 $245",26,CURRENT_PRO_FORMA
+Rubbish Removal,rubbish removal,POST_RENO_PRO_FORMA,22432.0,"$22,432 $252",26,POST_RENO_PRO_FORMA
+Rubbish Removal,rubbish removal,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Rubbish Removal,rubbish removal,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Rubbish Removal,rubbish removal,POST_RENO_PRO_FORMA,12.0,Current RR Pro forma is based on T12; Post-Reno Market Rent Pro Forma is based on T12 grown by 3%,26,POST_RENO_PRO_FORMA
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,T3_ANNUALIZED,15405.0,"$15,405 $173",26,T3_ANNUALIZED
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,CURRENT_PRO_FORMA,0.0,$0,26,CURRENT_PRO_FORMA
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,POST_RENO_PRO_FORMA,0.0,$0 $0 $0,26,POST_RENO_PRO_FORMA
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Owner Specific - CPA Fees & Legal Expense,owner specific - cpa fees & legal expense,POST_RENO_PRO_FORMA,,Zeroed out as this is owner specific expenses,26,POST_RENO_PRO_FORMA
+Total Controllable Expenses,total controllable expenses,T3_ANNUALIZED,638413.0,"$638,413 $7,173",26,T3_ANNUALIZED
+Total Controllable Expenses,total controllable expenses,CURRENT_PRO_FORMA,472393.0,"$472,393 $5,308",26,CURRENT_PRO_FORMA
+Total Controllable Expenses,total controllable expenses,POST_RENO_PRO_FORMA,478588.0,"$478,588 $5,377",26,POST_RENO_PRO_FORMA
+Management Fee,management fee,T3_ANNUALIZED,80119.0,"$80,119 4.29%",26,T3_ANNUALIZED
+Management Fee,management fee,CURRENT_PRO_FORMA,79777.0,"$79,777 3.75%",26,CURRENT_PRO_FORMA
+Management Fee,management fee,POST_RENO_PRO_FORMA,107242.0,"$107,242 3.75%Marked",26,POST_RENO_PRO_FORMA
+Management Fee,management fee,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Management Fee,management fee,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Management Fee,management fee,POST_RENO_PRO_FORMA,,to Market,26,POST_RENO_PRO_FORMA
+Insurance,insurance,T3_ANNUALIZED,115379.0,"$115,379 $1,296",26,T3_ANNUALIZED
+Insurance,insurance,CURRENT_PRO_FORMA,89000.0,"$89,000 $1,000",26,CURRENT_PRO_FORMA
+Insurance,insurance,POST_RENO_PRO_FORMA,89000.0,"$89,000 $1,000",26,POST_RENO_PRO_FORMA
+Insurance,insurance,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Insurance,insurance,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Insurance,insurance,POST_RENO_PRO_FORMA,12.0,Marked to Market; T12 of $115k includes earthquake insurance,26,POST_RENO_PRO_FORMA
+Real Estate Taxes,real estate taxes,T3_ANNUALIZED,264373.0,"$264,373 $2,970",26,T3_ANNUALIZED
+Real Estate Taxes,real estate taxes,CURRENT_PRO_FORMA,264373.0,"$264,373 $2,970",26,CURRENT_PRO_FORMA
+Real Estate Taxes,real estate taxes,POST_RENO_PRO_FORMA,264373.0,"$264,373 $2,970",26,POST_RENO_PRO_FORMA
+Real Estate Taxes,real estate taxes,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Real Estate Taxes,real estate taxes,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Real Estate Taxes,real estate taxes,POST_RENO_PRO_FORMA,1.0491,Based on 1.0491 millage rate at 100% of asking price; historicals adjusted to reflect pro forma taxes,26,POST_RENO_PRO_FORMA
+Other Taxes & Assessments,other taxes & assessments,T3_ANNUALIZED,2573.0,"$2,573 $29",26,T3_ANNUALIZED
+Other Taxes & Assessments,other taxes & assessments,CURRENT_PRO_FORMA,2573.0,"$2,573 $29",26,CURRENT_PRO_FORMA
+Other Taxes & Assessments,other taxes & assessments,POST_RENO_PRO_FORMA,2573.0,"$2,573 $29",26,POST_RENO_PRO_FORMA
+Other Taxes & Assessments,other taxes & assessments,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Other Taxes & Assessments,other taxes & assessments,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+Other Taxes & Assessments,other taxes & assessments,POST_RENO_PRO_FORMA,,Based on direct assessment provided by assessor's office; historicals adjusted to show pro forma taxes,26,POST_RENO_PRO_FORMA
+Total Non-Controllable Expenses,total non-controllable expenses,T3_ANNUALIZED,462445.0,"$462,445 $5,196",26,T3_ANNUALIZED
+Total Non-Controllable Expenses,total non-controllable expenses,CURRENT_PRO_FORMA,435724.0,"$435,724 $4,896",26,CURRENT_PRO_FORMA
+Total Non-Controllable Expenses,total non-controllable expenses,POST_RENO_PRO_FORMA,463188.0,"$463,188 $5,204",26,POST_RENO_PRO_FORMA
+Total Operating Expenses,total operating expenses,T3_ANNUALIZED,1100858.0,"$1,100,858 $12,369",26,T3_ANNUALIZED
+Total Operating Expenses,total operating expenses,CURRENT_PRO_FORMA,908117.0,"$908,117 $10,204",26,CURRENT_PRO_FORMA
+Total Operating Expenses,total operating expenses,POST_RENO_PRO_FORMA,941776.0,"$941,776 $10,582",26,POST_RENO_PRO_FORMA
+Expense Ratio (% of EGI),expense ratio (% of egi),T3_ANNUALIZED,59.0,59%,26,T3_ANNUALIZED
+Expense Ratio (% of EGI),expense ratio (% of egi),CURRENT_PRO_FORMA,43.0,43%,26,CURRENT_PRO_FORMA
+Expense Ratio (% of EGI),expense ratio (% of egi),POST_RENO_PRO_FORMA,,,26,POST_RENO_PRO_FORMA
+Net Cash Flow,net cash flow,T3_ANNUALIZED,764818.0,"$764,818 $8,593",26,T3_ANNUALIZED
+Net Cash Flow,net cash flow,CURRENT_PRO_FORMA,1219275.0,"$1,219,275 $13,700",26,CURRENT_PRO_FORMA
+Net Cash Flow,net cash flow,POST_RENO_PRO_FORMA,2122275.0,"$2,122,275 $23,846",26,POST_RENO_PRO_FORMA
+Replacement Reserves,replacement reserves,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+Replacement Reserves,replacement reserves,CURRENT_PRO_FORMA,22250.0,"$22,250 $250",26,CURRENT_PRO_FORMA
+Replacement Reserves,replacement reserves,POST_RENO_PRO_FORMA,22250.0,"$22,250 $250",26,POST_RENO_PRO_FORMA
+Net Cash Flow after Reserves,net cash flow after reserves,T3_ANNUALIZED,764818.0,"$764,818 $8,593",26,T3_ANNUALIZED
+Net Cash Flow after Reserves,net cash flow after reserves,CURRENT_PRO_FORMA,1197025.0,"$1,197,025 $13,450",26,CURRENT_PRO_FORMA
+Net Cash Flow after Reserves,net cash flow after reserves,POST_RENO_PRO_FORMA,2100025.0,"$2,100,025 $23,596",26,POST_RENO_PRO_FORMA
+62,62,T3_ANNUALIZED,,,26,T3_ANNUALIZED
+62,62,CURRENT_PRO_FORMA,,,26,CURRENT_PRO_FORMA
+62,62,POST_RENO_PRO_FORMA,63.0,63,26,POST_RENO_PRO_FORMA

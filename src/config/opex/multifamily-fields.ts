@@ -196,11 +196,32 @@ export const multifamilyOpExFields: OpExField[] = [
   },
 
   {
+    key: 'contracted_services',
+    label: 'Contracted Services',
+    tier: 'standard',
+    category: 'maintenance',
+    parentField: 'repairs_maintenance',
+    inputType: 'currency',
+    defaultEscalation: 0.030,
+    calculationType: 'per_unit',
+    benchmarks: {
+      perUnit: { min: 150, median: 250, max: 400 },
+      perSF: { min: 0.20, median: 0.35, max: 0.55 }
+    },
+    helpText: {
+      basic: "Combined contracted services (pool, pest control, landscaping).",
+      standard: "Single line item for pool service, pest control, and landscaping when grouped in the OM.",
+      advanced: "Split into separate line items only when the OM provides detail or underwriting requires it."
+    },
+    required: false
+  },
+
+  {
     key: 'landscaping',
     label: 'Landscaping & Grounds',
-    tier: 'standard',
-    category: 'other',
-    parentField: 'other_operating',
+    tier: 'advanced',
+    category: 'maintenance',
+    parentField: 'repairs_maintenance',
     inputType: 'currency',
     defaultEscalation: 0.025,
     calculationType: 'per_sf',
@@ -219,9 +240,9 @@ export const multifamilyOpExFields: OpExField[] = [
   {
     key: 'trash_removal',
     label: 'Trash Removal',
-    tier: 'standard',
-    category: 'other',
-    parentField: 'other_operating',
+    tier: 'advanced',
+    category: 'maintenance',
+    parentField: 'repairs_maintenance',
     inputType: 'currency',
     defaultEscalation: 0.030,
     calculationType: 'per_unit',
@@ -240,9 +261,9 @@ export const multifamilyOpExFields: OpExField[] = [
   {
     key: 'pest_control',
     label: 'Pest Control',
-    tier: 'standard',
-    category: 'other',
-    parentField: 'other_operating',
+    tier: 'advanced',
+    category: 'maintenance',
+    parentField: 'repairs_maintenance',
     inputType: 'currency',
     defaultEscalation: 0.020,
     calculationType: 'per_unit',
@@ -261,9 +282,9 @@ export const multifamilyOpExFields: OpExField[] = [
   {
     key: 'pool_amenity_service',
     label: 'Pool & Amenity Service',
-    tier: 'standard',
-    category: 'other',
-    parentField: 'other_operating',
+    tier: 'advanced',
+    category: 'maintenance',
+    parentField: 'repairs_maintenance',
     inputType: 'currency',
     defaultEscalation: 0.025,
     calculationType: 'per_unit',

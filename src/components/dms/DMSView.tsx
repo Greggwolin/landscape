@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilFilterSquare } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
-import FilterDetailView from '@/components/dms/views/FilterDetailView';
+import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
 import Dropzone from '@/components/dms/upload/Dropzone';
 import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
@@ -31,7 +31,7 @@ export default function DMSView({
   const defaultWorkspaceId = 1;
 
   // Documents tab state
-  const [selectedFilterType, setSelectedFilterType] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
   const [allFilters, setAllFilters] = useState<FilterAccordion[]>([]);
   const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
   const [isLoadingFilters, setIsLoadingFilters] = useState(true);
@@ -49,12 +49,12 @@ export default function DMSView({
     profile_json?: Record<string, unknown>;
   }>>([]);
   const [selectedUploadFile, setSelectedUploadFile] = useState<typeof uploadedFiles[number] | null>(null);
+  const [panelExpanded, setPanelExpanded] = useState(true);
 
   const secondaryColorStyle: React.CSSProperties = { color: 'var(--cui-secondary-color)' };
   const primaryColorStyle: React.CSSProperties = { color: 'var(--cui-primary)' };
   const borderColor = 'var(--cui-border-color)';
   const cardBg = 'var(--cui-card-bg)';
-  const tertiaryBg = 'var(--cui-tertiary-bg)';
 
   // Fetch filter data when Documents tab is active
   useEffect(() => {
@@ -94,6 +94,26 @@ export default function DMSView({
       const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(doc_type_counts)
         ? doc_type_counts
         : [];
+
+      const totalDocCount = countEntries.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+
+      // If no documents are profiled yet, fall back to the "valuation" template filters when available
+      if (totalDocCount === 0) {
+        try {
+          const valuationParams = new URLSearchParams(docTypeParams);
+          valuationParams.set('project_type', 'valuation');
+          const valuationResponse = await fetch(`/api/dms/templates/doc-types?${valuationParams.toString()}`);
+          if (valuationResponse.ok) {
+            const valuationData = await valuationResponse.json();
+            const valuationOptions = Array.isArray(valuationData.doc_type_options) ? valuationData.doc_type_options : [];
+            if (valuationOptions.length > 0) {
+              docTypeOptions = valuationOptions;
+            }
+          }
+        } catch (valuationError) {
+          console.error('Fallback valuation template fetch failed:', valuationError);
+        }
+      }
 
       const countMap = new Map<string, number>();
       countEntries.forEach(({ doc_type, count }) => {
@@ -189,19 +209,20 @@ export default function DMSView({
     }
   };
 
-  // Handle clicking folder icon - navigate to filter detail view
-  const handleFilterClick = (docType: string) => {
-    setSelectedFilterType(docType);
-  };
-
-  const handleCloseDetail = () => {
-    setSelectedFilterType(null);
-  };
-
-  // Handle document selection from accordion
+  // Handle document selection from accordion - opens preview panel for single doc
   const handleDocumentSelect = (doc: DMSDocument) => {
-    console.log('Document selected:', doc);
-    // TODO: Open document preview or navigate to document page
+    setSelectedDocument(doc);
+  };
+
+  // Handle closing document preview
+  const handleCloseDocumentPreview = () => {
+    setSelectedDocument(null);
+  };
+
+  // Handle document changes (refresh filters)
+  const handleDocumentChange = () => {
+    void loadFilters();
+    setSelectedDocument(null);
   };
 
   // Upload handlers
@@ -246,7 +267,7 @@ export default function DMSView({
   };
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: tertiaryBg }}>
+    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       {/* Header */}
       {!hideHeader && (
         <div
@@ -297,119 +318,182 @@ export default function DMSView({
       )}
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
         {/* Documents Tab */}
         {activeTab === 'documents' && (
           <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-            {/* Breadcrumb */}
-            <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-              <div className="flex items-center gap-2 text-sm">
-                <button className="text-blue-600 hover:underline">Home</button>
-                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                <button className="text-blue-600 hover:underline">Projects</button>
-                <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
-                  {projectName}
-                </span>
-              </div>
-            </div>
-
-            {/* Toolbar */}
-            <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-              <div className="flex items-center gap-4">
-                <button className="text-blue-600">🔻</button>
-                <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                  {totalItemCount} items | 0 selected
-                </span>
-                <div className="ml-auto flex items-center gap-3 text-sm">
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    🤖 Ask AI
-                  </button>
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    ✏️ Rename
-                  </button>
-                  <button className="hover:opacity-70 flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                    <CIcon icon={cilFilterSquare} className="w-4 h-4" />
-                    Move/Copy
-                  </button>
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    📧 Email copy
-                  </button>
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    ✏️ Edit profile
-                  </button>
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    ✅ Check in
-                  </button>
-                  <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                    ⋯ More
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-              <div className={`flex-1 overflow-y-auto ${selectedFilterType ? 'lg:w-2/3' : 'w-full'}`}>
-                {isLoadingFilters ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
+            <div className="px-3 lg:px-4 py-4 lg:py-6">
+              <div
+                className="rounded-lg border shadow-sm overflow-hidden"
+                style={{
+                  borderColor: 'var(--cui-border-color)',
+                  backgroundColor: 'var(--cui-card-bg)'
+                }}
+              >
+                <button
+                  className="w-full px-4 py-3 text-left"
+                  style={{ color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-card-bg)' }}
+                  onClick={() => setPanelExpanded((prev) => !prev)}
+                  aria-expanded={panelExpanded}
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {panelExpanded ? '▾' : '▸'}
+                      </span>
+                      <div>
+                        <div className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+                          Project Documents
+                        </div>
+                        <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                          {projectName}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                          Filtered to project #{projectId} • {totalItemCount} items
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <a
+                        href="/dms"
+                        className="px-3 py-2 rounded border transition-colors"
+                        style={{
+                          borderColor: 'var(--cui-border-color)',
+                          color: 'var(--cui-primary)'
+                        }}
+                      >
+                        Open Global DMS
+                      </a>
+                      <a
+                        href={`/projects/${projectId}/documents?tab=upload`}
+                        className="px-3 py-2 rounded text-white"
+                        style={{ backgroundColor: 'var(--cui-primary)' }}
+                      >
+                        Upload Documents
+                      </a>
+                    </div>
                   </div>
-                ) : allFilters.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--cui-secondary-color)' }}>
-                    <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3" />
-                    <p className="text-sm">No documents found in this project</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2">
-                    {/* Left Column */}
-                    <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
-                      <AccordionFilters
-                        projectId={projectId}
-                        filters={leftColumnFilters}
-                        onExpand={handleAccordionExpand}
-                        onFilterClick={handleFilterClick}
-                        onDocumentSelect={handleDocumentSelect}
-                        expandedFilter={expandedFilter}
-                        activeFilter={selectedFilterType}
-                      />
+                </button>
+
+                {panelExpanded && (
+                  <div
+                    className="border-t"
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      backgroundColor: 'var(--cui-body-bg)'
+                    }}
+                  >
+                    {/* Breadcrumb */}
+                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                      <div className="flex items-center gap-2 text-sm">
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                        <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
+                          {projectName}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Right Column */}
-                    <div>
-                      <AccordionFilters
-                        projectId={projectId}
-                        filters={rightColumnFilters}
-                        onExpand={handleAccordionExpand}
-                        onFilterClick={handleFilterClick}
-                        onDocumentSelect={handleDocumentSelect}
-                        expandedFilter={expandedFilter}
-                        activeFilter={selectedFilterType}
-                      />
+                    {/* Toolbar */}
+                    <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                      <div className="flex items-center gap-4">
+                        <button style={{ color: 'var(--cui-primary)' }}>🔻</button>
+                        <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                          {totalItemCount} items | 0 selected
+                        </span>
+                        <div className="ml-auto flex items-center gap-3 text-sm">
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
+                            ✏️ Rename
+                          </button>
+                          <button className="hover:opacity-70 flex items-center gap-1 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
+                            <CIcon icon={cilFilterSquare} className="w-4 h-4" />
+                            Move/Copy
+                          </button>
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
+                            📧 Email copy
+                          </button>
+                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
+                            ✏️ Edit profile
+                          </button>
+                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
+                            ⋯ More
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                      <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>
+                        <div className="p-4 lg:p-6" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                          {isLoadingFilters ? (
+                            <div className="flex items-center justify-center h-64">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
+                              <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
+                            </div>
+                          ) : allFilters.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--cui-secondary-color)' }}>
+                              <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3" />
+                              <p className="text-sm">No documents found in this project</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                              {/* Left Column */}
+                              <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
+                                <AccordionFilters
+                                  projectId={projectId}
+                                  workspaceId={defaultWorkspaceId}
+                                  filters={leftColumnFilters}
+                                  onExpand={handleAccordionExpand}
+                                  onDocumentSelect={handleDocumentSelect}
+                                  expandedFilter={expandedFilter}
+                                  onUploadComplete={handleDocumentChange}
+                                />
+                              </div>
+
+                              {/* Right Column */}
+                              <div>
+                                <AccordionFilters
+                                  projectId={projectId}
+                                  workspaceId={defaultWorkspaceId}
+                                  filters={rightColumnFilters}
+                                  onExpand={handleAccordionExpand}
+                                  onDocumentSelect={handleDocumentSelect}
+                                  expandedFilter={expandedFilter}
+                                  onUploadComplete={handleDocumentChange}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Single document preview panel */}
+                      {selectedDocument && (
+                        <>
+                          <div
+                            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+                            onClick={handleCloseDocumentPreview}
+                            role="presentation"
+                          />
+                          <div
+                            className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[480px]"
+                            style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
+                          >
+                            <DocumentPreviewPanel
+                              projectId={projectId}
+                              document={selectedDocument}
+                              onClose={handleCloseDocumentPreview}
+                              onDocumentChange={handleDocumentChange}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-
-              {selectedFilterType && (
-                <>
-                  <div
-                    className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-                    onClick={handleCloseDetail}
-                    role="presentation"
-                  />
-                  <div
-                    className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-1/3"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
-                  >
-                    <FilterDetailView
-                      projectId={projectId}
-                      docType={selectedFilterType}
-                      onBack={handleCloseDetail}
-                    />
-                  </div>
-                </>
-              )}
             </div>
           </div>
         )}

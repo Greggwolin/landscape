@@ -81,14 +81,22 @@ class Document(models.Model):
     updated_by = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+    # Soft delete fields
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.CharField(max_length=255, null=True, blank=True)
+
     class Meta:
         managed = False
         db_table = 'core_doc'
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return self.doc_name
+
+    @property
+    def is_deleted(self):
+        """Check if document is soft deleted."""
+        return self.deleted_at is not None
 
 
 class DMSAssertion(models.Model):
@@ -152,6 +160,7 @@ class DMSExtractQueue(models.Model):
     max_attempts = models.IntegerField(default=3)
     error_message = models.TextField(null=True, blank=True)
     extracted_data = models.JSONField(null=True, blank=True)
+    extracted_text = models.TextField(null=True, blank=True)  # Raw document text
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
 

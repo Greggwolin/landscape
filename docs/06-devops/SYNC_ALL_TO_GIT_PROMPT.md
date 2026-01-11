@@ -115,7 +115,7 @@ When Claude Code receives this prompt, it should execute the comprehensive git s
 - ❌ Large GIS files (`.geojson`, `.shp`, `.dbf`)
 - ❌ `/LocalFiles/` - Local development files
 - ❌ `/.vscode/` - Editor settings
-- ❌ `/docs/ai-chats/*.png`, `/docs/ai-chats/*.zip`
+- ❌ `/docs/09_session_notes/ai-chats/*.png`, `/docs/09_session_notes/ai-chats/*.zip`
 
 ### Phase 3: Commit Message Generation
 
@@ -354,7 +354,7 @@ pip install -r requirements.txt
 
 **Update Tracking:**
 - Update `/docs/08-migration-history/` if database migrations added
-- Update `/docs/11-implementation-status/` if features completed
+- Update `/docs/00_overview/status/` if features completed
 - Update session notes if significant work completed
 
 ### Phase 6: Verification Checklist

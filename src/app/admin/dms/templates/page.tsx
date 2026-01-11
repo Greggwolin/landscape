@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { CButton, CForm, CFormInput, CFormLabel, CFormTextarea, CCard, CCardBody, CCardHeader } from '@coreui/react';
+import { useState, useEffect } from 'react';
+import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface Template {
   template_id: number;
@@ -9,465 +9,331 @@ interface Template {
   description: string | null;
   doc_type_options: string[];
   is_default: boolean;
-  workspace_id: number | null;
-  project_id: number | null;
   created_at: string;
   updated_at: string;
 }
 
-interface TemplateFormData {
+interface FormData {
   template_name: string;
   description: string;
-  doc_type_options: string;
+  doc_type_options: string[];
   is_default: boolean;
 }
 
 export default function TemplatesAdminPage() {
+  const { activeProject } = useProjectContext();
+  // Fallback to default workspace id 1 if no active project context is available
+  const workspaceId = (activeProject as any)?.workspace_id ?? 1;
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState<TemplateFormData>({
+  const [showModal, setShowModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [formData, setFormData] = useState<FormData>({
     template_name: '',
     description: '',
-    doc_type_options: '',
+    doc_type_options: [],
     is_default: false
   });
-
-  const workspaceId = 1; // TODO: Get from context
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (workspaceId) {
+      void fetchTemplates();
+    }
+  }, [workspaceId]);
 
   const fetchTemplates = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(`/api/dms/templates?workspace_id=${workspaceId}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch templates');
-      }
-
-      const data = await response.json();
-      setTemplates(data.templates || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const response = await fetch(
+        `/api/dms/templates?workspace_id=${workspaceId}`
+      );
+      const { templates } = await response.json();
+      setTemplates(templates);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreate = () => {
-    setEditingId(null);
+    setEditingTemplate(null);
     setFormData({
       template_name: '',
       description: '',
-      doc_type_options: '',
+      doc_type_options: [],
       is_default: false
     });
-    setShowCreateForm(true);
+    setShowModal(true);
   };
 
   const handleEdit = (template: Template) => {
-    setEditingId(template.template_id);
+    setEditingTemplate(template);
     setFormData({
       template_name: template.template_name,
       description: template.description || '',
-      doc_type_options: template.doc_type_options.join('\n'),
+      doc_type_options: template.doc_type_options,
       is_default: template.is_default
     });
+    setShowModal(true);
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setShowCreateForm(false);
-    setFormData({
-      template_name: '',
-      description: '',
-      doc_type_options: '',
-      is_default: false
-    });
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workspaceId) return;
+    setLoading(true);
 
-  const handleSave = async () => {
     try {
-      const docTypeArray = formData.doc_type_options
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
+      if (editingTemplate) {
+        const response = await fetch(
+          `/api/dms/templates/${editingTemplate.template_id}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          }
+        );
 
-      if (docTypeArray.length === 0) {
-        alert('Please enter at least one document type');
-        return;
-      }
-
-      const payload = {
-        template_name: formData.template_name,
-        description: formData.description || null,
-        doc_type_options: docTypeArray,
-        is_default: formData.is_default,
-        workspace_id: workspaceId
-      };
-
-      let response;
-      if (editingId) {
-        // Update existing template
-        response = await fetch(`/api/dms/templates/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        if (!response.ok) throw new Error('Failed to update template');
       } else {
-        // Create new template
-        response = await fetch('/api/dms/templates', {
+        const response = await fetch('/api/dms/templates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            ...formData,
+            workspace_id: workspaceId
+          })
         });
+
+        if (!response.ok) throw new Error('Failed to create template');
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save template');
-      }
-
-      handleCancel();
-      fetchTemplates();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save template');
+      await fetchTemplates();
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Failed to save template');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (template: Template) => {
-    if (template.is_default) {
-      alert('Cannot delete the default template. Please set another template as default first.');
-      return;
-    }
+  const handleDelete = async (templateId: number) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
 
-    if (!confirm(`Are you sure you want to delete "${template.template_name}"?`)) {
-      return;
-    }
-
+    setLoading(true);
     try {
-      const response = await fetch(`/api/dms/templates/${template.template_id}`, {
+      const response = await fetch(`/api/dms/templates/${templateId}`, {
         method: 'DELETE'
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete template');
-      }
+      if (!response.ok) throw new Error('Failed to delete template');
 
-      fetchTemplates();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete template');
+      await fetchTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      alert('Failed to delete template');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <div className="text-gray-500 dark:text-gray-400">Loading templates...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <div className="text-red-600 dark:text-red-400">Error: {error}</div>
-          <CButton color="primary" onClick={fetchTemplates} className="mt-4">
-            Retry
-          </CButton>
-        </div>
-      </div>
-    );
-  }
-
-  // Color palette for document type chips
-  const chipColors = [
-    { bg: 'rgba(13, 110, 253, 0.1)', text: 'rgb(13, 110, 253)', border: 'rgba(13, 110, 253, 0.3)' }, // blue
-    { bg: 'rgba(25, 135, 84, 0.1)', text: 'rgb(25, 135, 84)', border: 'rgba(25, 135, 84, 0.3)' }, // green
-    { bg: 'rgba(220, 53, 69, 0.1)', text: 'rgb(220, 53, 69)', border: 'rgba(220, 53, 69, 0.3)' }, // red
-    { bg: 'rgba(255, 193, 7, 0.1)', text: 'rgb(193, 115, 0)', border: 'rgba(255, 193, 7, 0.3)' }, // yellow
-    { bg: 'rgba(111, 66, 193, 0.1)', text: 'rgb(111, 66, 193)', border: 'rgba(111, 66, 193, 0.3)' }, // purple
-    { bg: 'rgba(13, 202, 240, 0.1)', text: 'rgb(13, 162, 200)', border: 'rgba(13, 202, 240, 0.3)' }, // cyan
-    { bg: 'rgba(253, 126, 20, 0.1)', text: 'rgb(253, 126, 20)', border: 'rgba(253, 126, 20, 0.3)' }, // orange
-    { bg: 'rgba(214, 51, 132, 0.1)', text: 'rgb(214, 51, 132)', border: 'rgba(214, 51, 132, 0.3)' }, // pink
-  ];
-
-  const getChipColor = (index: number) => chipColors[index % chipColors.length];
-
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-            Document Templates
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-            Manage document type options for your workspace
-          </p>
-        </div>
-        <CButton color="primary" onClick={handleCreate}>
-          + Create Template
-        </CButton>
-      </div>
-
-      {/* Create Form */}
-      {showCreateForm && (
-        <CCard className="mb-4">
-          <CCardHeader>
-            <h3 className="text-lg font-medium">Create New Template</h3>
-          </CCardHeader>
-          <CCardBody>
-            <CForm>
-              <div className="mb-3">
-                <CFormLabel htmlFor="template_name">Template Name *</CFormLabel>
-                <CFormInput
-                  type="text"
-                  id="template_name"
-                  value={formData.template_name}
-                  onChange={(e) => setFormData({ ...formData, template_name: e.target.value })}
-                  placeholder="e.g., Standard Document Types"
-                />
-              </div>
-
-              <div className="mb-3">
-                <CFormLabel htmlFor="description">Description</CFormLabel>
-                <CFormInput
-                  type="text"
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description"
-                />
-              </div>
-
-              <div className="mb-3">
-                <CFormLabel htmlFor="doc_type_options">Document Types * (one per line)</CFormLabel>
-                <CFormTextarea
-                  id="doc_type_options"
-                  rows={10}
-                  value={formData.doc_type_options}
-                  onChange={(e) => setFormData({ ...formData, doc_type_options: e.target.value })}
-                  placeholder={'Contract\nInvoice\nReport\nPlan\nProposal'}
-                />
-                <small className="text-gray-500 dark:text-gray-400">
-                  Enter each document type on a new line
-                </small>
-              </div>
-
-              <div className="mb-3 form-check">
-                <input
-                  type="checkbox"
-                  className="form-check-input"
-                  id="is_default"
-                  checked={formData.is_default}
-                  onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                />
-                <label className="form-check-label" htmlFor="is_default">
-                  Set as default template
-                </label>
-              </div>
-
-              <div className="d-flex gap-2">
-                <CButton color="primary" onClick={handleSave}>
-                  Create Template
-                </CButton>
-                <CButton color="secondary" onClick={handleCancel}>
-                  Cancel
-                </CButton>
-              </div>
-            </CForm>
-          </CCardBody>
-        </CCard>
-      )}
-
-      {/* Templates List */}
-      {templates.length === 0 && !showCreateForm ? (
-        <div
-          className="text-center py-12 rounded-lg border"
-          style={{
-            backgroundColor: 'var(--cui-card-bg)',
-            borderColor: 'var(--cui-border-color)'
-          }}
-        >
-          <div className="mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
-            No templates found
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Document Templates
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Manage document type categories for your projects (workspace #{workspaceId})
+            </p>
           </div>
-          <CButton color="primary" onClick={handleCreate}>
-            Create Your First Template
-          </CButton>
+          <button
+            onClick={handleCreate}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            + Create Template
+          </button>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {templates.map((template) => {
-            const isEditing = editingId === template.template_id;
 
-            if (isEditing) {
-              return (
-                <CCard key={template.template_id}>
-                  <CCardHeader>
-                    <h3 className="text-lg font-medium">Edit Template</h3>
-                  </CCardHeader>
-                  <CCardBody>
-                    <CForm>
-                      <div className="mb-3">
-                        <CFormLabel htmlFor={`edit_name_${template.template_id}`}>Template Name *</CFormLabel>
-                        <CFormInput
-                          type="text"
-                          id={`edit_name_${template.template_id}`}
-                          value={formData.template_name}
-                          onChange={(e) => setFormData({ ...formData, template_name: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="mb-3">
-                        <CFormLabel htmlFor={`edit_desc_${template.template_id}`}>Description</CFormLabel>
-                        <CFormInput
-                          type="text"
-                          id={`edit_desc_${template.template_id}`}
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="mb-3">
-                        <CFormLabel htmlFor={`edit_types_${template.template_id}`}>Document Types * (one per line)</CFormLabel>
-                        <CFormTextarea
-                          id={`edit_types_${template.template_id}`}
-                          rows={10}
-                          value={formData.doc_type_options}
-                          onChange={(e) => setFormData({ ...formData, doc_type_options: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="mb-3 form-check">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={`edit_default_${template.template_id}`}
-                          checked={formData.is_default}
-                          onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                        />
-                        <label className="form-check-label" htmlFor={`edit_default_${template.template_id}`}>
-                          Set as default template
-                        </label>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <CButton color="primary" onClick={handleSave}>
-                          Save Changes
-                        </CButton>
-                        <CButton color="secondary" onClick={handleCancel}>
-                          Cancel
-                        </CButton>
-                      </div>
-                    </CForm>
-                  </CCardBody>
-                </CCard>
-              );
-            }
-
-            return (
+        {loading && templates.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            Loading templates...
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            No templates found. Create your first template to get started.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {templates.map((template) => (
               <div
                 key={template.template_id}
-                className="rounded-lg border p-5"
-                style={{
-                  backgroundColor: 'var(--cui-card-bg)',
-                  borderColor: 'var(--cui-border-color)'
-                }}
+                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-medium" style={{ color: 'var(--cui-body-color)' }}>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {template.template_name}
                       </h3>
                       {template.is_default && (
-                        <span
-                          className="px-2 py-1 text-xs font-medium rounded"
-                          style={{
-                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                            color: 'rgb(13, 110, 253)',
-                            border: '1px solid rgba(13, 110, 253, 0.3)'
-                          }}
-                        >
+                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
                           Default
                         </span>
                       )}
                     </div>
                     {template.description && (
-                      <p className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         {template.description}
                       </p>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <CButton
-                      color="warning"
-                      size="sm"
+                    <button
                       onClick={() => handleEdit(template)}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Edit
-                    </CButton>
-                    <CButton
-                      color="danger"
-                      size="sm"
-                      onClick={() => handleDelete(template)}
-                      disabled={template.is_default}
+                    </button>
+                    {!template.is_default && (
+                      <button
+                        onClick={() => handleDelete(template.template_id)}
+                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {template.doc_type_options.map((docType) => (
+                    <span
+                      key={docType}
+                      className="px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
                     >
-                      Delete
-                    </CButton>
-                  </div>
+                      {docType}
+                    </span>
+                  ))}
                 </div>
 
-                {/* Document Types */}
-                <div className="mt-3">
-                  <div className="text-xs font-medium mb-2" style={{ color: 'var(--cui-body-color)' }}>
-                    Document Types ({template.doc_type_options.length})
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {template.doc_type_options.map((docType, idx) => {
-                      const color = getChipColor(idx);
-                      return (
-                        <span
-                          key={idx}
-                          className="px-3 py-1 text-sm rounded-full"
-                          style={{
-                            backgroundColor: color.bg,
-                            color: color.text,
-                            border: `1px solid ${color.border}`
-                          }}
-                        >
-                          {docType}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Metadata */}
-                <div className="mt-3 pt-3 text-xs" style={{
-                  borderTop: '1px solid var(--cui-border-color)',
-                  color: 'var(--cui-secondary-color)'
-                }}>
-                  Created: {new Date(template.created_at).toLocaleDateString()} •
-                  Updated: {new Date(template.updated_at).toLocaleDateString()}
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                  {template.doc_type_options.length} document types
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+
+        {showModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                {editingTemplate ? 'Edit Template' : 'Create Template'}
+              </h2>
+
+              <form onSubmit={handleSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Template Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.template_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, template_name: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    placeholder="e.g., Land Development"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    rows={3}
+                    placeholder="Brief description of this template..."
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Document Types (one per line) *
+                  </label>
+                  <textarea
+                    value={formData.doc_type_options.join('\n')}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        doc_type_options: e.target.value
+                          .split('\n')
+                          .map((s) => s.trim())
+                          .filter((s) => s)
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
+                    rows={12}
+                    placeholder="Agreement&#10;Title&#10;Closing&#10;Reports&#10;Environmental&#10;Engineering&#10;..."
+                    required
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Enter one document type per line. These will appear as filter categories.
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_default}
+                      onChange={(e) =>
+                        setFormData({ ...formData, is_default: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Set as default template for this workspace
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {loading
+                      ? 'Saving...'
+                      : editingTemplate
+                      ? 'Save Changes'
+                      : 'Create Template'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

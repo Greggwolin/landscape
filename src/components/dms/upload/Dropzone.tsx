@@ -5,6 +5,38 @@ import { useDropzone } from 'react-dropzone';
 import { useUploadThing } from '@/lib/uploadthing';
 import type { DMSFileRouter } from '@/lib/dms/uploadthing';
 
+interface UploadThingResult {
+  url: string;
+  key: string;
+  name: string;
+  size: number;
+  serverData?: {
+    storage_uri: string;
+    sha256: string;
+    doc_name: string;
+    mime_type: string;
+    file_size_bytes: number;
+    project_id: number;
+    workspace_id: number;
+    doc_type: string;
+    discipline?: string;
+    phase_id?: number;
+    parcel_id?: number;
+  };
+}
+
+interface DocCreateResult {
+  success: boolean;
+  duplicate: boolean;
+  doc: {
+    doc_id: number;
+    version_no: number;
+    doc_name: string;
+    status: string;
+    created_at: string;
+  };
+}
+
 interface DropzoneProps {
   projectId: number;
   workspaceId: number;
@@ -61,6 +93,15 @@ export default function Dropzone({
     }
   });
 
+  // Generate a SHA256 hash for a file (client-side fallback)
+  const generateSha256 = async (file: File, url: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(url + file.name + file.size + Date.now());
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
@@ -74,18 +115,105 @@ export default function Dropzone({
     setUploadProgress(progressMap);
 
     try {
-      const results = await startUpload(acceptedFiles);
+      const results = await startUpload(acceptedFiles) as UploadThingResult[] | undefined;
 
-      // Enhance results with original File objects for immediate processing
-      const enhancedResults = results?.map((result: any, index: number) => ({
-        ...result,
-        file: acceptedFiles[index],
-        name: acceptedFiles[index].name,
-        size: acceptedFiles[index].size,
-        type: acceptedFiles[index].type
-      })) || [];
+      if (!results || results.length === 0) {
+        throw new Error('No upload results returned');
+      }
 
-      // Call onUploadComplete manually with enhanced results
+      console.log('UploadThing results:', results);
+
+      // Create document records in the database for each uploaded file
+      const enhancedResults: any[] = [];
+
+      for (let index = 0; index < results.length; index++) {
+        const result = results[index];
+        const file = acceptedFiles[index];
+
+        // Get serverData from UploadThing onUploadComplete callback
+        const serverData = result.serverData;
+
+        // Generate fallback SHA256 if serverData doesn't have one
+        const sha256 = serverData?.sha256 || await generateSha256(file, result.url);
+
+        // Build the payload for POST /api/dms/docs
+        const payload = {
+          system: {
+            project_id: serverData?.project_id ?? projectId,
+            workspace_id: serverData?.workspace_id ?? workspaceId,
+            phase_id: serverData?.phase_id ?? phaseId,
+            parcel_id: serverData?.parcel_id ?? parcelId,
+            doc_name: serverData?.doc_name ?? file.name,
+            doc_type: serverData?.doc_type ?? docType,
+            discipline: serverData?.discipline ?? discipline,
+            status: 'draft',
+            storage_uri: serverData?.storage_uri ?? result.url,
+            sha256: sha256,
+            file_size_bytes: serverData?.file_size_bytes ?? file.size,
+            mime_type: serverData?.mime_type ?? file.type,
+            version_no: 1,
+          },
+          profile: {},
+          ai: { source: 'upload' },
+        };
+
+        console.log(`Creating document record for: ${file.name}`, payload);
+
+        try {
+          const response = await fetch('/api/dms/docs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const responseText = await response.text();
+            let errorData: unknown = {};
+            try {
+              errorData = JSON.parse(responseText);
+            } catch {
+              errorData = { raw: responseText };
+            }
+            console.error(
+              `Failed to create document record for ${file.name}:`,
+              {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData,
+              }
+            );
+            // Continue with other files even if one fails
+          } else {
+            const docResult: DocCreateResult = await response.json();
+            console.log(`Document record created: doc_id=${docResult.doc?.doc_id}, duplicate=${docResult.duplicate}`);
+
+            // Add doc_id to the enhanced result
+            enhancedResults.push({
+              ...result,
+              file,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              doc_id: docResult.doc?.doc_id,
+              duplicate: docResult.duplicate,
+              profile_json: {},
+            });
+          }
+        } catch (docError) {
+          console.error(`Error creating document record for ${file.name}:`, docError);
+          // Still add to results without doc_id
+          enhancedResults.push({
+            ...result,
+            file,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            error: docError instanceof Error ? docError.message : 'Failed to create document record',
+          });
+        }
+      }
+
+      // Call onUploadComplete with enhanced results including doc_ids
       if (enhancedResults.length > 0) {
         onUploadComplete?.(enhancedResults);
       }
@@ -95,7 +223,7 @@ export default function Dropzone({
       setUploadProgress({});
       onUploadError?.(error instanceof Error ? error : new Error('Upload failed'));
     }
-  }, [startUpload, onUploadComplete, onUploadError]);
+  }, [startUpload, onUploadComplete, onUploadError, projectId, workspaceId, docType, discipline, phaseId, parcelId]);
 
   const {
     getRootProps,

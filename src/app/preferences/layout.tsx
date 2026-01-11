@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import PreferencesContextBar from '@/app/components/PreferencesContextBar';
 
 /**
@@ -16,7 +16,9 @@ export default function PreferencesLayout({
 }) {
   return (
     <>
-      <PreferencesContextBar />
+      <Suspense fallback={<div className="h-14 border-b" style={{ backgroundColor: 'var(--cui-body-bg)' }} />}>
+        <PreferencesContextBar />
+      </Suspense>
       <main style={{ overflow: 'visible' }}>
         {children}
       </main>

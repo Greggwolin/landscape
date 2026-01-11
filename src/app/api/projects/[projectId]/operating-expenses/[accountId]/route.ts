@@ -29,6 +29,16 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const searchParams = request.nextUrl.searchParams;
+    const overrideDiscriminator = searchParams.get('statement_discriminator') || body.statement_discriminator;
+
+    const activeResult = await sql<{ active_opex_discriminator: string }[]>`
+      SELECT active_opex_discriminator
+      FROM landscape.tbl_project
+      WHERE project_id = ${projectId}
+      LIMIT 1
+    `;
+    const discriminator = overrideDiscriminator || activeResult[0]?.active_opex_discriminator || 'default';
     const hasRecognizedField = [
       'annual_amount',
       'calculation_basis',
@@ -96,10 +106,11 @@ export async function PUT(
     }
 
     // Validate that this account is editable (not calculated)
+    // After migration 042, categories are in core_unit_cost_category
     const accountCheck = await sql<{ is_calculated: boolean }[]>`
-      SELECT is_calculated
-      FROM landscape.tbl_opex_accounts
-      WHERE account_id = ${accountId}
+      SELECT COALESCE(is_calculated, false) as is_calculated
+      FROM landscape.core_unit_cost_category
+      WHERE category_id = ${accountId}
     `;
 
     if (accountCheck.length === 0) {
@@ -127,7 +138,7 @@ export async function PUT(
       payment_frequency: string | null;
       notes: string | null;
     }[]>`
-      SELECT 
+      SELECT
         opex_id,
         annual_amount,
         calculation_basis,
@@ -139,7 +150,8 @@ export async function PUT(
         notes
       FROM landscape.tbl_operating_expenses
       WHERE project_id = ${projectId}
-        AND account_id = ${accountId}
+        AND category_id = ${accountId}
+        AND statement_discriminator = ${discriminator}
       LIMIT 1
     `;
 
@@ -151,7 +163,7 @@ export async function PUT(
     }
 
     const expense = expenseResult[0];
-    let nextCalculationBasis = (body.calculation_basis ?? expense.calculation_basis ?? 'FIXED_AMOUNT') as string;
+    const nextCalculationBasis = (body.calculation_basis ?? expense.calculation_basis ?? 'FIXED_AMOUNT') as string;
     let nextUnitAmount = body.unit_amount ?? expense.unit_amount ?? null;
     let nextAnnualAmount = expense.annual_amount ?? 0;
     let nextIsAutoCalculated = nextCalculationBasis !== 'FIXED_AMOUNT';
@@ -209,10 +221,12 @@ export async function PUT(
           start_period = ${finalStartPeriod},
           payment_frequency = ${finalPaymentFrequency},
           notes = ${finalNotes},
+          statement_discriminator = ${discriminator},
           updated_at = NOW()
       WHERE project_id = ${projectId}
-        AND account_id = ${accountId}
-      RETURNING 
+        AND category_id = ${accountId}
+        AND statement_discriminator = ${discriminator}
+      RETURNING
         opex_id,
         annual_amount,
         calculation_basis,
@@ -234,20 +248,27 @@ export async function PUT(
     let updatedTotals: unknown = null;
     if (projectResult.length > 0) {
       const projectType = projectResult[0].project_type_code;
+      // Query unified category table for updated totals
       updatedTotals = await sql`
-        SELECT 
-          account_id,
-          account_number,
-          account_name,
-          account_level,
-          parent_account_id,
-          is_calculated,
-          landscape.calculate_opex_account_total(${projectId}, account_id) AS calculated_total,
-          sort_order
-        FROM landscape.tbl_opex_accounts
-        WHERE is_active = TRUE
-          AND ${projectType} = ANY(applicable_property_types)
-        ORDER BY sort_order
+        SELECT
+          c.category_id as account_id,
+          c.account_number,
+          c.category_name as account_name,
+          COALESCE(c.account_level, 1) as account_level,
+          c.parent_id as parent_account_id,
+          COALESCE(c.is_calculated, false) as is_calculated,
+          landscape.calculate_opex_account_total(${projectId}, c.category_id) AS calculated_total,
+          c.sort_order
+        FROM landscape.core_unit_cost_category c
+        JOIN landscape.core_category_lifecycle_stages cls
+          ON c.category_id = cls.category_id
+        WHERE cls.activity = 'Operations'
+          AND c.is_active = TRUE
+          AND (
+            c.property_types IS NULL
+            OR ${projectType} = ANY(c.property_types)
+          )
+        ORDER BY c.sort_order
       `;
     }
 

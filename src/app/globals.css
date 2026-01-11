@@ -3,6 +3,39 @@
 @import '../styles/tokens.css';
 @import '../styles/component-patterns.css';
 
+/* MapLibre popup styles */
+.maplibregl-popup {
+  z-index: 9999 !important;
+}
+
+.maplibregl-popup-content {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  padding: 0 !important;
+  border: 1px solid #374151 !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: #1f2937 !important;
+}
+
+.maplibregl-popup-close-button {
+  color: #9ca3af !important;
+  font-size: 18px !important;
+  padding: 4px 8px !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  color: #f9fafb !important;
+  background: transparent !important;
+}
+
+.map-marker-popup .maplibregl-popup-content {
+  background: #1f2937 !important;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -75,6 +108,37 @@ div.planning-tile.planning-tile-active div.planning-tile-header,
 .dark {
   --background: var(--surface-bg);
   --foreground: var(--text-primary);
+}
+
+/* Universal spacing + layout helpers */
+.app-shell {
+  padding: var(--app-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--component-gap);
+}
+
+.app-page,
+.app-content,
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--component-gap);
+}
+
+.capitalization-panel {
+  background-color: #ffffff !important;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.card,
+.panel {
+  margin-bottom: var(--component-gap);
+}
+
+.section-spacing {
+  margin-bottom: var(--component-gap);
 }
 
 @theme inline {

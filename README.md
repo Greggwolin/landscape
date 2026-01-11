@@ -39,7 +39,7 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 - **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** - Django setup & admin panel
 - **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
 - **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
-- **[Financial Engine Status](docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md)** - Financial modeling status
+- **[Financial Engine Status](docs/00_overview/IMPLEMENTATION_STATUS.md)** - Financial modeling status
 - **[Database Schema](docs/05-database/DATABASE_SCHEMA.md)** - Complete schema reference
 - **[API Reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** - API documentation
 - **[DevOps Guide](docs/06-devops/DEVOPS_GUIDE.md)** - Deployment and operations

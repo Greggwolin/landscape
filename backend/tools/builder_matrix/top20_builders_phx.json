@@ -1,0 +1,331 @@
+{
+  "market": "Phoenix, AZ \u2013 Zonda Nov 2025",
+  "generated_at": "2025-12-03T03:16:20.332470",
+  "methodology": {
+    "source_file": "docs/09_session_notes/archive/attachments/ZondaReports.xlsx",
+    "rank_basis": "subdivision_count",
+    "top_n": 20
+  },
+  "builders": [
+    {
+      "rank": 1,
+      "builder_name": "Lennar",
+      "subdivision_count": 71,
+      "units_remaining_total": 3519.0,
+      "canonical_domain": "https://www.lennar.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": true,
+        "js_heavy_main_search": true,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 2,
+      "builder_name": "Taylor Morrison",
+      "subdivision_count": 56,
+      "units_remaining_total": 5151.0,
+      "canonical_domain": "https://www.taylormorrison.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": true,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 3,
+      "builder_name": "Richmond American Homes",
+      "subdivision_count": 53,
+      "units_remaining_total": 2474.0,
+      "canonical_domain": "https://www.richmondamerican.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 4,
+      "builder_name": "Meritage Homes",
+      "subdivision_count": 45,
+      "units_remaining_total": 2980.0,
+      "canonical_domain": "https://www.meritagehomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 5,
+      "builder_name": "D.R. Horton",
+      "subdivision_count": 32,
+      "units_remaining_total": 3719.0,
+      "canonical_domain": "https://www.drhorton.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 6,
+      "builder_name": "Pulte Homes",
+      "subdivision_count": 30,
+      "units_remaining_total": 2651.0,
+      "canonical_domain": "https://www.pulte.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 7,
+      "builder_name": "Toll Brothers",
+      "subdivision_count": 30,
+      "units_remaining_total": 2590.0,
+      "canonical_domain": "https://www.tollbrothers.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": true,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 8,
+      "builder_name": "KB Home",
+      "subdivision_count": 28,
+      "units_remaining_total": 1802.0,
+      "canonical_domain": "https://www.kbhome.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": true,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 9,
+      "builder_name": "Landsea Homes",
+      "subdivision_count": 23,
+      "units_remaining_total": 1605.0,
+      "canonical_domain": "https://www.landseahomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 10,
+      "builder_name": "Ashton Woods Homes",
+      "subdivision_count": 17,
+      "units_remaining_total": 1011.0,
+      "canonical_domain": "https://www.ashtonwoods.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 11,
+      "builder_name": "Mattamy Homes",
+      "subdivision_count": 16,
+      "units_remaining_total": 1460.0,
+      "canonical_domain": "https://www.mattamyhomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 12,
+      "builder_name": "Shea Homes",
+      "subdivision_count": 16,
+      "units_remaining_total": 1184.0,
+      "canonical_domain": "https://www.sheahomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 13,
+      "builder_name": "Woodside Homes",
+      "subdivision_count": 16,
+      "units_remaining_total": 932.0,
+      "canonical_domain": "https://www.woodsidehomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 14,
+      "builder_name": "TRI Pointe Homes",
+      "subdivision_count": 16,
+      "units_remaining_total": 472.0,
+      "canonical_domain": "https://www.tripointehomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 15,
+      "builder_name": "Fulton Homes",
+      "subdivision_count": 15,
+      "units_remaining_total": 2493.0,
+      "canonical_domain": "https://www.fultonhomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 16,
+      "builder_name": "David Weekley Homes",
+      "subdivision_count": 13,
+      "units_remaining_total": 514.0,
+      "canonical_domain": "https://www.davidweekleyhomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 17,
+      "builder_name": "Brightland Homes",
+      "subdivision_count": 12,
+      "units_remaining_total": 578.0,
+      "canonical_domain": "https://www.brightlandhomes.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 18,
+      "builder_name": "Century Communities",
+      "subdivision_count": 11,
+      "units_remaining_total": 842.0,
+      "canonical_domain": "https://www.centurycommunities.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 19,
+      "builder_name": "K. Hovnanian Homes",
+      "subdivision_count": 11,
+      "units_remaining_total": 449.0,
+      "canonical_domain": "https://www.khov.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    },
+    {
+      "rank": 20,
+      "builder_name": "Centex Homes",
+      "subdivision_count": 10,
+      "units_remaining_total": 539.0,
+      "canonical_domain": "https://www.centex.com",
+      "notes": "",
+      "site_profile": {
+        "likely_microsites": false,
+        "js_heavy_main_search": false,
+        "static_community_tiles": true,
+        "static_plan_detail": "unknown",
+        "static_inventory_detail": "unknown"
+      },
+      "scraper_status": "NOT_EVALUATED"
+    }
+  ]
+}

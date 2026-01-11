@@ -26,16 +26,16 @@ This will automatically:
 ### 1. Core Status Documents
 
 **Main Status File:**
-- `/docs/11-implementation-status/IMPLEMENTATION_STATUS.md`
+- `/docs/00_overview/IMPLEMENTATION_STATUS.md`
 - Master document tracking all implementation progress
 
 **Feature Completion Documents:**
-- Located in `/docs/11-implementation-status/`
+- Located in `/docs/02-features/financial-engine/`
 - Created when major features/migrations complete
 - Example: `FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md`
 
 **Feature-Specific Status:**
-- `/docs/02-features/financial-engine/IMPLEMENTATION_STATUS.md`
+- `/docs/00_overview/IMPLEMENTATION_STATUS.md`
 - `/docs/02-features/dms/DMS-Implementation-Status.md`
 - Domain-specific progress tracking
 
@@ -76,7 +76,7 @@ docs/
 │   └── land-use/
 ├── 05-database/                 # Database schemas
 ├── 08-migration-history/        # Past migrations
-├── 11-implementation-status/    # Current status (KEY!)
+├── 00_overview/status/    # Current status (KEY!)
 │   ├── IMPLEMENTATION_STATUS.md          # Master status
 │   ├── FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md
 │   └── [OTHER_FEATURE]_COMPLETE.md
@@ -371,7 +371,7 @@ stat -f "%Sm" -t "%Y-%m-%d" [filepath]
 date +%Y-%m-%d
 
 # Verify documentation paths
-ls -la docs/11-implementation-status/
+ls -la docs/00_overview/status/
 
 # See what changed in git
 git status
@@ -393,13 +393,13 @@ git log --oneline -10
 **User:** "update documentation"
 
 **Claude actions:**
-1. Creates `/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md`
-2. Updates `/docs/11-implementation-status/IMPLEMENTATION_STATUS.md`
+1. Creates `/docs/00_overview/status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md`
+2. Updates `/docs/00_overview/IMPLEMENTATION_STATUS.md`
 3. Adds tile to documentation center:
    ```typescript
    {
      title: 'Finance Structure Migration Complete',
-     path: '/docs/11-implementation-status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md',
+     path: '/docs/00_overview/status/FINANCE_STRUCTURE_MIGRATION_004_COMPLETE.md',
      category: 'Status',
      description: 'Finance Structure system migration to Django backend - Complete with auto-allocations, cost-to-complete, sale settlements, and participation tracking',
      icon: <DollarSign className="w-5 h-5" />,

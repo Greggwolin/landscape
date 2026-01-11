@@ -1,0 +1,862 @@
+{
+  "market": "Phoenix, AZ \u2013 Zonda Nov 2025",
+  "generated_at": "2025-12-03T04:29:15.482490+00:00",
+  "source_matrix": "backend/tools/builder_matrix/top20_builders_phx.json",
+  "recon_config": {
+    "target_market": "Phoenix, AZ \u2013 Zonda Nov 2025",
+    "top_n": 20,
+    "builders_filter": [],
+    "respect_robots_txt": true,
+    "request_delay_seconds": 1.5,
+    "max_communities_per_builder": 20,
+    "max_plans_per_builder": 10,
+    "max_listings_per_builder": 20
+  },
+  "builders": [
+    {
+      "rank": 1,
+      "builder_name": "Lennar",
+      "canonical_domain": "https://www.lennar.com",
+      "scraper_status": "HAS_MINER",
+      "legal_assessment": {
+        "robots_url": "",
+        "robots_summary": "",
+        "risk_level": "UNKNOWN",
+        "notes": ""
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 0,
+        "errors": 0
+      },
+      "notes": ""
+    },
+    {
+      "rank": 2,
+      "builder_name": "Taylor Morrison",
+      "canonical_domain": "https://www.taylormorrison.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.taylormorrison.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /Assets; Disallow: /assets; Disallow: /sitecore; Disallow: /authentication-redirects/; Disallow: /solr/",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 3,
+        "errors": 1
+      },
+      "notes": "Probed starting URL: https://www.taylormorrison.com/new-homes/arizona/phoenix"
+    },
+    {
+      "rank": 3,
+      "builder_name": "Richmond American Homes",
+      "canonical_domain": "https://www.richmondamerican.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.richmondamerican.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /bin/; Disallow: /Service%20References/; Disallow: /Views/; Disallow: /Community/LoadAll/; Disallow: /Home/Clear/; Disallow: /Home/GenerateSiteMapXml/; Disallow: /service%20references/; Disallow: /views/; Disallow: /community/loadall/; Disallow: /home/clear/; Disallow: /home/generatesitemapxml/; Disallow: *.config; Disallow: *.dll; Disallow: *.xsc; Disallow: *.xss; Disallow: *.asax; Disallow: /communityInfoDir/*; Disallow: /communityInfo/*; Disallow: /WarrantyAttachments/*; Disallow: /communityinfodir/*; Disallow: /warrantyattachments/*; Disallow: /my-account/*; Disallow: /account/*",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": true,
+          "has_sqft_range": true,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.richmondamerican.com/new-homes"
+    },
+    {
+      "rank": 4,
+      "builder_name": "Meritage Homes",
+      "canonical_domain": "https://www.meritagehomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.meritagehomes.com/robots.txt",
+        "robots_summary": "User-agent: *; Allow: /",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed Meritage metro page: https://www.meritagehomes.com/state/az/phoenix"
+    },
+    {
+      "rank": 5,
+      "builder_name": "D.R. Horton",
+      "canonical_domain": "https://www.drhorton.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.drhorton.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /All-Promotions; Disallow: /All-Promotions/; Disallow: /all-promotions; Disallow: /all-promotions/; Disallow: /approvals; Disallow: /approvals/; Disallow: /Approvals; Disallow: /Approvals/; Disallow: /control-panel-page; Disallow: /community-finder; Disallow: /scanner; Disallow: /scanner/; Disallow: /brand; Disallow: /browse; Disallow: /committed-to-you; Disallow: /committed-to-you-ty; Disallow: /Community Finder; Disallow: /Comparison Landing; Disallow: /control-panel-rte; Disallow: /control-panel-RTE; Disallow: /control-panel-brands; Disallow: /control-panel-page; Disallow: /EditAccount; Disallow: /Favorites; Disallow: /giving-you-more; Disallow: /giving-you-more-ty; Disallow: /GlobalMap; Disallow: /globalmap; Disallow: /Global-Shared-Content; Disallow: /Global-Shared-Content/; Disallow: /global-shared-content; Disallow: /global-shared-content/; Disallow: /global shared content; Disallow: /global shared content/; Disallow: /Global Shared Content; Disallow: /Global Shared Content/; Disallow: /Homes-Ready-TY; Disallow: indiana/indianapolis/IndyFuel; Disallow: indiana/indianapolis/indyfuel; Disallow: /Inventory; Disallow: /landing-page; Disallow: /loading; Disallow: /Messages; Disallow: /My Points of Interests; Disallow: /My Saved Searches; Disallow: /New Custom Content Page; Disallow: /New-Home-Inquiry-TY; Disallow: /new-mexico/albuquerque/rio-rancho/discover-ty; Disallow: /pages/; Disallow: /Pages/; Disallow: /Profile Notes; Disallow: /Project; Disallow: /real-estate-agents; Disallow: /real-estate-agents-TY; Disallow: /red-tag-event-c; Disallow: /red-tag-event-C; Disallow: /red-tag-event-C-go; Disallow: /red-tag-event-n; Disallow: /red-tag-event-N; Disallow: /red-tag-event-n-go; Disallow: /red-tag-event-N-go; Disallow: /red-tag-event-n-reg; Disallow: /red-tag-event-N-reg; Disallow: /red-tag-event-n-thank-you; Disallow: /red-tag-event-N-thank-you; Disallow: /red-tag-event-r; Disallow: /red-tag-event-R; Disallow: /red-tag-event-r-n; Disallow: /red-tag-event-R-N; Disallow: /red-tag-event-r-n-go; Disallow: /red-tag-event-R-N-go; Disallow: /red-tag-event-r-n-reg; Disallow: /red-tag-event-R-N-reg; Disallow: /red-tag-event-r-go; Disallow: /red-tag-event-R-go; Disallow: /red-tag-event-r-thank-you; Disallow: /red-tag-event-R-thank-you; Disallow: /red-tag-event-over; Disallow: /RFI-success; Disallow: /SAT-success; Disallow: /Smart-Home-TY; Disallow: /still-building-N; Disallow: /still-building-N-thank-you; Disallow: /still-building-R; Disallow: /still-building-R-thank-you; Disallow: /still-building-test; Disallow: /still-building-test-thank-you; Disallow: /tabletkiosk; Disallow: /third-party-property-managers; Disallow: /Third-Party-Property-Managers; Disallow: /view-hotsheet; Disallow: /Warranty-TY; Disallow: /Website Shared Content; Disallow: /what-is-red-tag-event; Disallow: /zillow-offers",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 16,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.drhorton.com/new-homes"
+    },
+    {
+      "rank": 6,
+      "builder_name": "Pulte Homes",
+      "canonical_domain": "https://www.pulte.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.pulte.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /search; Disallow: /my-pulte-account/logout; Disallow: /sitecore/content/; Disallow: /EditorPage.aspx; Disallow: *secondary0$; Disallow: *secondary3$; Disallow: /*?RedirectUrl=; Disallow: /ratings-detail-list; User-agent: AspiegelBot  ; Disallow: /; User-agent: PetalBot  ; Disallow: /",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": true,
+          "has_sqft_range": true,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 3
+      },
+      "notes": "Probed starting URL: https://www.pulte.com/phoenix"
+    },
+    {
+      "rank": 7,
+      "builder_name": "Toll Brothers",
+      "canonical_domain": "https://www.tollbrothers.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.tollbrothers.com/robots.txt",
+        "robots_summary": "User-agent: Aboundexbot; Disallow: /; User-agent: AhrefsBot; Disallow: /; User-agent: aiHitBot; Disallow: /; User-agent: BLEXBot; Disallow: /; User-agent: EasouSpider; Disallow: /; User-agent: EC2LinkFinder; Disallow: /; User-agent: Exabot; Disallow: /; User-agent: Ezooms; Disallow: /; User-agent: InfoPath; Disallow: /; User-agent: InfoPath.2; Disallow: /; User-agent: ip-web-crawler.com; Disallow: /; User-agent: LinkpadBot; Disallow: /; User-agent: Mail.Ru; Disallow: /; User-agent: meanpathbot; Disallow: /; User-agent: MJ12bot; Disallow: /; User-agent: netEstate NE Crawler; Disallow: /; User-agent: panscient.com; Disallow: /; User-agent: psbot; Disallow: /; User-agent: SearchmetericsBot; Disallow: /; User-agent: SeznamBot; Disallow: /; User-agent: sistrix; Disallow: /; User-agent: sitebot; Disallow: /; User-agent: Sosospider; Disallow: /; User-agent: spbot; Disallow: /; User-agent: swebot; Disallow: /; User-agent: taptubot; Disallow: /; User-agent: TurnitinBot; Disallow: /; User-agent: TwengaBot; Disallow: /; User-agent: twiceler; Disallow: /; User-agent: vscooter; Disallow: /; User-agent: WBSearchBot; Disallow: /; User-agent: wotbox; Disallow: /; User-agent: Yandex; Disallow: /; User-agent: *; Disallow: /about/your-story; Disallow: /about/your-story?*; Disallow: /agent/rest/add/user/connect; Disallow: /agent/rest/add/user/new; Disallow: /agent/rest/login; Disallow: /best-offer/thank-you; Disallow: /best-offer/thank-you.php; Disallow: /blog/wp-admin/; Disallow: /cgi-bin/; Disallow: /compare; Disallow: /compare?*; Disallow: /contact/mortgageSubmit; Disallow: /external/; Disallow: /external/*; Disallow: /highrise; Disallow: /highrise/; Disallow: /highrise/*; Disallow: /lead/process; Disallow: /luxury-homes/Edgewood-TX; Disallow: /luxury-homes/Edgewood-TX?*; Disallow: /luxury-homes-for-sale/*/siteplans/*; Disallow: /my-favorites/offpagelogin; Disallow: /my_favorites/offpagelogin; Disallow: /my-favorites/processUnsubscribe; Disallow: /my_favorites/processUnsubscribe; Disallow: /new-home-journey; Disallow: /new-home-journey?*; Disallow: /new-homes; Disallow: /new-homes?*; Disallow: /nse; Disallow: /nse?*; Disallow: /print; Disallow: /print?*; Disallow: /service*; Disallow: /sitesearch; Disallow: /sitesearch?*; Disallow: /survey/; Disallow: /tb/about/index.html; Allow: /blog/wp-admin/admin-ajax.php",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 3,
+        "errors": 4
+      },
+      "notes": "Probed starting URL: https://www.tollbrothers.com"
+    },
+    {
+      "rank": 8,
+      "builder_name": "KB Home",
+      "canonical_domain": "https://www.kbhome.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.kbhome.com/robots.txt",
+        "robots_summary": "User-agent: *; Allow: /",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 4
+      },
+      "notes": "Probed starting URL: https://www.kbhome.com"
+    },
+    {
+      "rank": 9,
+      "builder_name": "Landsea Homes",
+      "canonical_domain": "https://www.landseahomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.landseahomes.com/robots.txt",
+        "robots_summary": "No directives found",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 4
+      },
+      "notes": "Probed starting URL: https://www.landseahomes.com"
+    },
+    {
+      "rank": 10,
+      "builder_name": "Ashton Woods Homes",
+      "canonical_domain": "https://www.ashtonwoods.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.ashtonwoods.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /walk-in/; Disallow: /input/; Disallow: /facebookcontact.html; Disallow: /facebookcontact; Disallow: /realtor-program/*; Disallow: /content/*; Disallow: /interactive-floorplan; Disallow: /welcome; Disallow: /sales_center/*; User-agent: bingbot; Disallow: /search; User-agent: BLEXBot; Disallow: *",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": true,
+          "has_sqft_range": true,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 3
+      },
+      "notes": "Probed starting URL: https://www.ashtonwoods.com/phoenix"
+    },
+    {
+      "rank": 11,
+      "builder_name": "Mattamy Homes",
+      "canonical_domain": "https://www.mattamyhomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.mattamyhomes.com/robots.txt",
+        "robots_summary": "User-agent: AspiegelBot; Disallow: /; User-agent: PetalBot; Disallow: /; User-agent: *; Allow: /",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.mattamyhomes.com/new-homes"
+    },
+    {
+      "rank": 12,
+      "builder_name": "Shea Homes",
+      "canonical_domain": "https://www.sheahomes.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.sheahomes.com/robots.txt",
+        "robots_summary": "Disallow: /acct/; Disallow: /blog/blog-category-listing/; Disallow: /blog/blog-tag-listing/; Disallow: /blog/category/; Disallow: /blog/january-2012/; Disallow: /blog/january-2013/; Disallow: /blog/january-2014/; Disallow: /blog/january-2015/; Disallow: /blog/january-2016/; Disallow: /blog/january-2017/; Disallow: /blog/january-2018/; Disallow: /blog/january-2019/; Disallow: /blog/january-2020/; Disallow: /blog/february-2011/; Disallow: /blog/february-2012/; Disallow: /blog/february-2013/; Disallow: /blog/february-2014/; Disallow: /blog/february-2015/; Disallow: /blog/february-2016/; Disallow: /blog/february-2017/; Disallow: /blog/february-2018/; Disallow: /blog/february-2019/; Disallow: /blog/february-2020/; Disallow: /blog/march-2012/; Disallow: /blog/march-2013/; Disallow: /blog/march-2014/; Disallow: /blog/march-2015/; Disallow: /blog/march-2016/; Disallow: /blog/march-2017/; Disallow: /blog/march-2018/; Disallow: /blog/march-2019/; Disallow: /blog/march-2020/; Disallow: /blog/april-2013/; Disallow: /blog/april-2014/; Disallow: /blog/april-2015/; Disallow: /blog/april-2016/; Disallow: /blog/april-2017/; Disallow: /blog/april-2018/; Disallow: /blog/april-2019/; Disallow: /blog/may-2012/; Disallow: /blog/may-2013/; Disallow: /blog/may-2014/; Disallow: /blog/may-2015/; Disallow: /blog/may-2016/; Disallow: /blog/may-2017/; Disallow: /blog/may-2018/; Disallow: /blog/may-2019/; Disallow: /blog/june-2011/; Disallow: /blog/june-2012/; Disallow: /blog/june-2013/; Disallow: /blog/june-2014/; Disallow: /blog/june-2015/; Disallow: /blog/june-2016/; Disallow: /blog/june-2017/; Disallow: /blog/june-2018/; Disallow: /blog/june-2019/; Disallow: /blog/july-2011/; Disallow: /blog/july-2012/; Disallow: /blog/july-2013/; Disallow: /blog/july-2014/; Disallow: /blog/july-2015/; Disallow: /blog/july-2016/; Disallow: /blog/july-2017/; Disallow: /blog/july-2018/; Disallow: /blog/july-2019/; Disallow: /blog/august-2011/; Disallow: /blog/august-2012/; Disallow: /blog/august-2014/; Disallow: /blog/august-2015/; Disallow: /blog/august-2016/; Disallow: /blog/august-2017/; Disallow: /blog/august-2018/; Disallow: /blog/august-2019/; Disallow: /blog/september-2011/; Disallow: /blog/september-2013/; Disallow: /blog/september-2014/; Disallow: /blog/september-2015/; Disallow: /blog/september-2016/; Disallow: /blog/september-2017/; Disallow: /blog/september-2018/; Disallow: /blog/september-2019/; Disallow: /blog/october-2011/; Disallow: /blog/october-2012/; Disallow: /blog/october-2013/; Disallow: /blog/october-2014/; Disallow: /blog/october-2015/; Disallow: /blog/october-2016/; Disallow: /blog/october-2017/; Disallow: /blog/october-2018/; Disallow: /blog/october-2019/; Disallow: /blog/october-2019-1/; Disallow: /blog/november-2011/; Disallow: /blog/november-2013/; Disallow: /blog/november-2014/; Disallow: /blog/november-2015/; Disallow: /blog/november-2016/; Disallow: /blog/november-2017/; Disallow: /blog/november-2018/; Disallow: /blog/november-2019/; Disallow: /blog/december-2011/; Disallow: /blog/december-2012/; Disallow: /blog/december-2013/; Disallow: /blog/december-2014/; Disallow: /blog/december-2015/; Disallow: /blog/december-2016/; Disallow: /blog/december-2017/; Disallow: /blog/december-2018/; Disallow: /blog/december-2019/; Disallow: /blog/tag/; Disallow: /patternlibrary/",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": true,
+          "has_sqft_range": true,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.sheahomes.com/new-homes"
+    },
+    {
+      "rank": 13,
+      "builder_name": "Woodside Homes",
+      "canonical_domain": "https://www.woodsidehomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.woodsidehomes.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /sign-in; Disallow: /account/",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 4
+      },
+      "notes": "Probed starting URL: https://www.woodsidehomes.com"
+    },
+    {
+      "rank": 14,
+      "builder_name": "TRI Pointe Homes",
+      "canonical_domain": "https://www.tripointehomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.tripointehomes.com/robots.txt",
+        "robots_summary": "User-agent: *; Allow: /",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 3
+      },
+      "notes": "Probed starting URL: https://www.tripointehomes.com/phoenix"
+    },
+    {
+      "rank": 15,
+      "builder_name": "Fulton Homes",
+      "canonical_domain": "https://www.fultonhomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.fultonhomes.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /bin/; Disallow: /envision_sso/; Disallow: /mfh/; Disallow: /survey/; Disallow: /warranty/",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 5,
+        "errors": 4
+      },
+      "notes": "Probed starting URL: https://www.fultonhomes.com"
+    },
+    {
+      "rank": 16,
+      "builder_name": "David Weekley Homes",
+      "canonical_domain": "https://www.davidweekleyhomes.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.davidweekleyhomes.com/robots.txt",
+        "robots_summary": "No directives found",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.davidweekleyhomes.com/new-homes"
+    },
+    {
+      "rank": 17,
+      "builder_name": "Brightland Homes",
+      "canonical_domain": "https://www.brightlandhomes.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.brightlandhomes.com/robots.txt",
+        "robots_summary": "User-Agent: *",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.brightlandhomes.com/new-homes"
+    },
+    {
+      "rank": 18,
+      "builder_name": "Century Communities",
+      "canonical_domain": "https://www.centurycommunities.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.centurycommunities.com/robots.txt",
+        "robots_summary": "User-agent: *; User-agent: OAI-SearchBot; Disallow:; User-agent: bingbot; Disallow:; User-agent: GPTBot; Disallow:; User-agent: ChatGPT-User; Disallow:; User-agent: Google-Extended; Disallow:; User-agent: ClaudeBot; Disallow:; User-agent: Claude-Web; Disallow:; User-agent: Amazonbot; Disallow:; User-agent: Applebot-Extended; Disallow:; Disallow: /EPiServer/CMS/*; Disallow: /EPiServer/*; Disallow: /episerver/*; Disallow: /util/; Disallow: /purchase/*; Disallow: /buy-online/email-verification/*; Disallow: /buy-online/emailverification2/*; Disallow: /site-data/*; Disallow: /b497531ea631441d99f88708e0f5d486.txt; Disallow: /*.pdf?*; Disallow: /?lotSku=*",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": true,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 3,
+        "errors": 1
+      },
+      "notes": "Probed starting URL: https://www.centurycommunities.com/new-homes/arizona/phoenix"
+    },
+    {
+      "rank": 19,
+      "builder_name": "K. Hovnanian Homes",
+      "canonical_domain": "https://www.khov.com",
+      "scraper_status": "NOT_EVALUATED",
+      "legal_assessment": {
+        "robots_url": "https://www.khov.com/robots.txt",
+        "robots_summary": "User-agent: *; Allow: /; Disallow: /contentassets/; Disallow: /episerver/cms; Disallow: /epiutil/; Disallow: /util/",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": false,
+          "has_sqft_range": false,
+          "has_bed_bath_range": false,
+          "has_hoa_or_fees": false,
+          "has_location_data": false,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 0,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 2,
+        "errors": 0
+      },
+      "notes": "Probed starting URL: https://www.khov.com/new-homes"
+    },
+    {
+      "rank": 20,
+      "builder_name": "Centex Homes",
+      "canonical_domain": "https://www.centex.com",
+      "scraper_status": "READY_FOR_RECON",
+      "legal_assessment": {
+        "robots_url": "https://www.centex.com/robots.txt",
+        "robots_summary": "User-agent: *; Disallow: /search; Disallow: /my-centex-account/logout; Disallow: /sitecore/content/; Disallow: /EditorPage.aspx; Disallow: *secondary0$; Disallow: *secondary3$; Disallow: /*?RedirectUrl=",
+        "risk_level": "LOW",
+        "notes": "robots.txt missing or permissive"
+      },
+      "field_coverage": {
+        "community": {
+          "has_price_range": true,
+          "has_sqft_range": false,
+          "has_bed_bath_range": true,
+          "has_hoa_or_fees": false,
+          "has_location_data": true,
+          "other_fields": []
+        },
+        "plan": {
+          "accessible": false,
+          "has_price": false,
+          "has_sqft": false,
+          "has_beds_baths": false
+        },
+        "listing": {
+          "accessible": false,
+          "has_price": false,
+          "has_status": false,
+          "has_qmi_date": false
+        }
+      },
+      "crawl_stats": {
+        "communities_sampled": 20,
+        "plans_sampled": 0,
+        "listings_sampled": 0,
+        "total_http_requests": 3,
+        "errors": 1
+      },
+      "notes": "Probed starting URL: https://www.centex.com/new-homes/arizona/phoenix"
+    }
+  ],
+  "intersection_dataset": {
+    "community_fields_common": [],
+    "plan_fields_common": [],
+    "listing_fields_common": []
+  }
+}

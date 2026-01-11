@@ -8,12 +8,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateCashFlow } from '@/lib/financial-engine/cashflow';
 import type { CashFlowEngineOptions } from '@/lib/financial-engine/cashflow';
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  context: Params
 ) {
   try {
-    const projectId = parseInt(params.projectId, 10);
+    const { projectId: projId } = await context.params;
+    const projectId = parseInt(projId, 10);
 
     if (isNaN(projectId)) {
       return NextResponse.json(

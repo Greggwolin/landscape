@@ -16,19 +16,27 @@ import { cilPencil, cilCheckCircle, cilXCircle } from '@coreui/icons';
 
 export type PicklistValue = {
   picklist_id: number;
+  picklist_type?: string;
   code: string;
   name: string;
   description?: string | null;
   parent_id?: number | null;
+  parent_code?: string | null;
   parent_name?: string | null;
   sort_order: number;
   is_active: boolean;
 };
 
+type ParentOption = {
+  picklist_id?: number;
+  code: string;
+  name: string;
+};
+
 type Props = {
   values: PicklistValue[];
   hasParent: boolean;
-  parentOptions: PicklistValue[];
+  parentOptions: ParentOption[];
   onEdit: (item: PicklistValue) => void;
   onToggleActive: (item: PicklistValue) => void;
 };
@@ -42,8 +50,39 @@ export function PicklistEditor({ values, hasParent, parentOptions, onEdit, onTog
     );
   }
 
+  // Build lookup maps for both ID-based and code-based parent references
   const parentNameById = new Map<number, string>();
-  parentOptions.forEach((p) => parentNameById.set(p.picklist_id, p.name));
+  const parentNameByCode = new Map<string, string>();
+  parentOptions.forEach((p) => {
+    if (p.picklist_id) parentNameById.set(p.picklist_id, p.name);
+    if (p.code) parentNameByCode.set(p.code, p.name);
+  });
+
+  // Helper to get parent display value
+  const getParentDisplay = (item: PicklistValue): string | null => {
+    // First check for direct parent_name
+    if (item.parent_name) return item.parent_name;
+    // Then check parent_code (for property subtypes)
+    if (item.parent_code) return parentNameByCode.get(item.parent_code) || item.parent_code;
+    // Finally check parent_id (for traditional picklists)
+    if (item.parent_id) return parentNameById.get(item.parent_id) || null;
+    return null;
+  };
+
+  // Color mapping for property type codes
+  const getParentBadgeColor = (item: PicklistValue): string => {
+    const code = item.parent_code || '';
+    switch (code) {
+      case 'MF': return 'primary';      // Blue - Multifamily
+      case 'OFF': return 'info';        // Cyan - Office
+      case 'RET': return 'success';     // Green - Retail
+      case 'IND': return 'warning';     // Yellow - Industrial
+      case 'HTL': return 'danger';      // Red - Hotel
+      case 'LAND': return 'dark';       // Dark - Land
+      case 'MXU': return 'secondary';   // Gray - Mixed-Use
+      default: return 'info';
+    }
+  };
 
   return (
     <CTable hover responsive size="sm" className="mb-0">
@@ -71,14 +110,16 @@ export function PicklistEditor({ values, hasParent, parentOptions, onEdit, onTog
             </CTableDataCell>
             {hasParent && (
               <CTableDataCell>
-                {item.parent_id
-                  ? (
-                    <CBadge color="info" shape="rounded-pill">
-                      {item.parent_name || parentNameById.get(item.parent_id) || 'Parent'}
+                {(() => {
+                  const parentDisplay = getParentDisplay(item);
+                  return parentDisplay ? (
+                    <CBadge color={getParentBadgeColor(item)} shape="rounded-pill">
+                      {parentDisplay}
                     </CBadge>
                   ) : (
                     <span className="text-muted">—</span>
-                  )}
+                  );
+                })()}
               </CTableDataCell>
             )}
             <CTableDataCell className="text-center">{item.sort_order}</CTableDataCell>

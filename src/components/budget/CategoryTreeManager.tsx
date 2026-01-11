@@ -392,7 +392,7 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
                 <CFormLabel>Color</CFormLabel>
                 <CFormInput
                   type="color"
-                  value={formData.color}
+                  value={formData.color || '#000000'}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                 />
               </div>

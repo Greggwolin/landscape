@@ -1,5 +1,5 @@
 // Group Row - Parent category row with subtotal and expand/collapse
-// v1.2 · 2025-11-03 · Added reconciliation support and enhanced tooltips
+// v1.3 · 2026-01-09 · ARGUS-style density upgrade
 
 'use client';
 
@@ -114,15 +114,11 @@ export default function GroupRow({
 
   return (
     <tr
-      className="budget-group-row"
+      className="ls-group-row"
       data-group-row="true"
-      style={{
-        cursor: 'pointer',
-        backgroundColor: 'var(--surface-subheader)',
-        borderTop: '2px solid var(--cui-border-color)',
-        borderBottom: '1px solid var(--cui-border-color)',
-      }}
+      data-level={categoryLevel}
       onClick={onToggle}
+      role="row"
     >
       {/* Category column with breadcrumb and chevron */}
       <td
@@ -138,8 +134,8 @@ export default function GroupRow({
         >
           <div className="d-flex align-items-center gap-2" style={{ overflow: 'visible' }}>
             {/* Chevron */}
-            <span style={{ fontSize: '0.875rem', width: '12px', flexShrink: 0 }}>
-              {isExpanded ? '▼' : '▶'}
+            <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>
+              ▶
             </span>
 
             {/* Breadcrumb - allows overflow into next column */}
@@ -210,21 +206,21 @@ export default function GroupRow({
       {mode === 'detail' && (<><td></td><td></td><td></td><td></td><td></td><td></td></>)}
 
       {/* Amount column with subtotal */}
-      <td className="text-end">
-        <span
-          className="text-success fw-bold tnum"
-          style={{ fontVariantNumeric: 'tabular-nums' }}
-        >
+      <td className="text-end group-subtotal">
+        <span className="ls-cell-calculated ls-cell-number">
           {formatMoney(amountSubtotal)}
         </span>
       </td>
 
       {/* Variance column (only shown in Standard and Detail modes) */}
       {(mode === 'standard' || mode === 'detail') && (
-        <td>
+        <td className="text-end">
           <span
-            className={`fw-semibold text-end d-block tnum ${varianceDisplay.colorClass}`}
-            style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.875rem' }}
+            className={`fw-semibold ls-cell-number ${
+              varianceDisplay.colorClass === 'text-success' ? 'ls-variance-positive' :
+              varianceDisplay.colorClass === 'text-danger' ? 'ls-variance-negative' :
+              'ls-variance-neutral'
+            }`}
             title={varianceDisplay.title}
           >
             {varianceDisplay.text}

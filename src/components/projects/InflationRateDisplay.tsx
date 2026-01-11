@@ -127,7 +127,7 @@ export function InflationRateDisplay({ projectId }: Props) {
     setName: string | undefined,
   ) => {
     const displayRate = formatRate(currentRate ?? null);
-    const selectWidth = 130; // widened for readability
+    const selectWidth = 82; // even narrower globally
 
     return (
       <div
@@ -189,7 +189,10 @@ export function InflationRateDisplay({ projectId }: Props) {
   };
 
   return (
-    <div className="d-flex flex-column align-items-end gap-2">
+    <div
+      className="d-flex flex-row flex-xl-column align-items-start align-xl-items-end justify-content-end gap-2 gap-xl-3 flex-wrap"
+      style={{ minWidth: 200, rowGap: '0.35rem' }}
+    >
       <div className="d-flex align-items-center gap-2">
         <span className="text-muted small">Cost Inflation</span>
         {renderInflationSelect(

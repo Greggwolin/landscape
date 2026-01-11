@@ -12,8 +12,9 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
   planning: 'Planning & Engineering',
   engineering: 'Planning & Engineering',
   predevelopment: 'Planning & Engineering',
-  development: 'Development',
-  construction: 'Development',
+  development: 'Improvements',  // Map old name to new
+  improvements: 'Improvements',
+  construction: 'Improvements',
   operations: 'Operations',
   operating: 'Operations',
   disposition: 'Disposition',
@@ -25,7 +26,7 @@ const LIFECYCLE_STAGE_ALIASES: Record<string, string> = {
 const VALID_LIFECYCLE_STAGES = new Set([
   'Acquisition',
   'Planning & Engineering',
-  'Development',
+  'Improvements',  // Renamed from Development
   'Operations',
   'Disposition',
   'Financing',
@@ -167,14 +168,15 @@ export async function GET(request: NextRequest) {
     } else if (entry.cost_scope) {
       // Map old cost_scope to activity
       const scopeMap: Record<string, string> = {
-        'development': 'Development',
+        'development': 'Improvements',  // Map to new name
+        'improvements': 'Improvements',
         'acquisition': 'Acquisition',
         'operations': 'Operations',
         'disposition': 'Disposition',
       };
-      activitys = [scopeMap[entry.cost_scope.toLowerCase()] || 'Development'];
+      activitys = [scopeMap[entry.cost_scope.toLowerCase()] || 'Improvements'];
     } else {
-      activitys = ['Development'];
+      activitys = ['Improvements'];  // Default to Improvements
     }
 
     const tags = Array.isArray(entry.tags) ? entry.tags : [];
