@@ -117,9 +117,23 @@ services/**/__pycache__/
 venv/
 services/**/.venv/
 
-# Archive and backup directories (historical code)
-archive/
+# Archive and backup directories
 backup_*/
+
+# Archive - track docs but ignore large GIS data
+archive/gis-data/**/*.dbf
+archive/gis-data/**/*.shp
+archive/gis-data/**/*.shx
+archive/gis-data/**/*.prj
+archive/gis-data/**/*.sbn
+archive/gis-data/**/*.sbx
+archive/gis-data/**/*.cpg
+archive/gis-data/**/*.geojson
+archive/gis-data/**/*.zip
+!archive/gis-data/.gitkeep
+!archive/docs/
+!archive/scripts/
+!archive/migrations-legacy/
 
 # Temporary working files (scratch/throwaway only)
 tmp_*
