@@ -2171,15 +2171,20 @@ def handle_update_unit_types(
     source_message_id: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Add or update unit types for a multifamily property."""
+    """Add or update unit types for a multifamily property.
+
+    When auto-executed (propose_only=False), uses MutationService._execute_mutation
+    for consistency with other rent roll batch operations.
+    """
     records = tool_input.get('records', [])
     reason = tool_input.get('reason', 'Update unit types')
 
     if not records:
         return {'success': False, 'error': 'No records provided'}
 
+    from .services.mutation_service import MutationService
+
     if propose_only:
-        from .services.mutation_service import MutationService
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='rent_roll_batch',
@@ -2191,71 +2196,25 @@ def handle_update_unit_types(
             source_message_id=source_message_id,
         )
 
-    # Direct execution
-    created_count = 0
-    updated_count = 0
-    results = []
+    # Direct execution - use MutationService for consistency
+    logger.info(f"Auto-executing update_unit_types for project {project_id} with {len(records)} records")
+    result = MutationService._execute_mutation(
+        project_id=project_id,
+        mutation_type='rent_roll_batch',
+        table_name='tbl_multifamily_unit_type',
+        field_name=None,
+        record_id=None,
+        proposed_value={'records': records, 'count': len(records)},
+    )
 
-    try:
-        with connection.cursor() as cursor:
-            for record in records:
-                unit_type_code = record.get('unit_type_code')
-                if not unit_type_code:
-                    results.append({'success': False, 'error': 'unit_type_code required'})
-                    continue
+    # Log the activity
+    if result.get('success'):
+        _log_rent_roll_activity(
+            project_id, 'tbl_multifamily_unit_type', 'batch_upsert',
+            result.get('created', 0), result.get('updated', 0), reason
+        )
 
-                # Check if exists
-                cursor.execute("""
-                    SELECT unit_type_id FROM landscape.tbl_multifamily_unit_type
-                    WHERE project_id = %s AND unit_type_code = %s
-                """, [project_id, unit_type_code])
-                existing = cursor.fetchone()
-
-                # Build update dict
-                updates = {k: v for k, v in record.items()
-                          if k in UNIT_TYPE_COLUMNS and v is not None}
-
-                if existing:
-                    # Update
-                    unit_type_id = existing[0]
-                    if updates:
-                        set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
-                        values = list(updates.values()) + [unit_type_id]
-                        cursor.execute(f"""
-                            UPDATE landscape.tbl_multifamily_unit_type
-                            SET {set_clauses}, updated_at = NOW()
-                            WHERE unit_type_id = %s
-                        """, values)
-                    updated_count += 1
-                    results.append({'success': True, 'action': 'updated', 'unit_type_code': unit_type_code})
-                else:
-                    # Insert
-                    updates['unit_type_code'] = unit_type_code
-                    col_names = ['project_id'] + list(updates.keys())
-                    placeholders = ', '.join(['%s'] * len(col_names))
-                    values = [project_id] + list(updates.values())
-
-                    cursor.execute(f"""
-                        INSERT INTO landscape.tbl_multifamily_unit_type ({', '.join(col_names)})
-                        VALUES ({placeholders})
-                        RETURNING unit_type_id
-                    """, values)
-                    created_count += 1
-                    results.append({'success': True, 'action': 'created', 'unit_type_code': unit_type_code})
-
-        _log_rent_roll_activity(project_id, 'tbl_multifamily_unit_type', 'batch_upsert',
-                                created_count, updated_count, reason)
-
-        return {
-            'success': True,
-            'created': created_count,
-            'updated': updated_count,
-            'records': results
-        }
-
-    except Exception as e:
-        logger.error(f"Error updating unit types: {e}")
-        return {'success': False, 'error': str(e), 'created': created_count, 'updated': updated_count}
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2335,15 +2294,20 @@ def handle_update_units(
     source_message_id: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Add or update individual units for a multifamily property."""
+    """Add or update individual units for a multifamily property.
+
+    When auto-executed (propose_only=False), uses MutationService._execute_mutation
+    which creates units, leases, AND unit types in one atomic operation.
+    """
     records = tool_input.get('records', [])
     reason = tool_input.get('reason', 'Update units')
 
     if not records:
         return {'success': False, 'error': 'No records provided'}
 
+    from .services.mutation_service import MutationService
+
     if propose_only:
-        from .services.mutation_service import MutationService
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='rent_roll_batch',
@@ -2355,92 +2319,26 @@ def handle_update_units(
             source_message_id=source_message_id,
         )
 
-    # Direct execution
-    created_count = 0
-    updated_count = 0
-    results = []
+    # Direct execution - use MutationService to get full functionality
+    # (creates units, leases, AND unit types in one operation)
+    logger.info(f"Auto-executing update_units for project {project_id} with {len(records)} records")
+    result = MutationService._execute_mutation(
+        project_id=project_id,
+        mutation_type='rent_roll_batch',
+        table_name='tbl_multifamily_unit',
+        field_name=None,
+        record_id=None,
+        proposed_value={'records': records, 'count': len(records)},
+    )
 
-    try:
-        with connection.cursor() as cursor:
-            for record in records:
-                unit_id = record.get('unit_id')
-                unit_number = record.get('unit_number')
+    # Log the activity
+    if result.get('success'):
+        _log_rent_roll_activity(
+            project_id, 'tbl_multifamily_unit', 'batch_upsert',
+            result.get('created', 0), result.get('updated', 0), reason
+        )
 
-                if not unit_id and not unit_number:
-                    results.append({'success': False, 'error': 'unit_id or unit_number required'})
-                    continue
-
-                # Check if exists - by unit_id first, then by unit_number
-                existing = None
-                if unit_id:
-                    cursor.execute("""
-                        SELECT unit_id, unit_number FROM landscape.tbl_multifamily_unit
-                        WHERE unit_id = %s AND project_id = %s
-                    """, [unit_id, project_id])
-                    row = cursor.fetchone()
-                    if row:
-                        existing = (row[0],)
-                        unit_number = row[1]  # Get unit_number from DB for logging
-                elif unit_number:
-                    cursor.execute("""
-                        SELECT unit_id FROM landscape.tbl_multifamily_unit
-                        WHERE project_id = %s AND unit_number = %s
-                    """, [project_id, unit_number])
-                    existing = cursor.fetchone()
-
-                # Build update dict
-                updates = {k: v for k, v in record.items()
-                          if k in UNIT_COLUMNS and v is not None}
-
-                if existing:
-                    # Update
-                    unit_id = existing[0]
-                    if updates:
-                        set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
-                        values = list(updates.values()) + [unit_id]
-                        cursor.execute(f"""
-                            UPDATE landscape.tbl_multifamily_unit
-                            SET {set_clauses}, updated_at = NOW()
-                            WHERE unit_id = %s
-                        """, values)
-                    updated_count += 1
-                    results.append({'success': True, 'action': 'updated', 'unit_number': unit_number})
-                else:
-                    # Insert - require unit_type and square_feet
-                    if not record.get('unit_type') or not record.get('square_feet'):
-                        results.append({
-                            'success': False,
-                            'error': 'unit_type and square_feet required for new units',
-                            'unit_number': unit_number
-                        })
-                        continue
-
-                    updates['unit_number'] = unit_number
-                    col_names = ['project_id'] + list(updates.keys())
-                    placeholders = ', '.join(['%s'] * len(col_names))
-                    values = [project_id] + list(updates.values())
-
-                    cursor.execute(f"""
-                        INSERT INTO landscape.tbl_multifamily_unit ({', '.join(col_names)})
-                        VALUES ({placeholders})
-                        RETURNING unit_id
-                    """, values)
-                    created_count += 1
-                    results.append({'success': True, 'action': 'created', 'unit_number': unit_number})
-
-        _log_rent_roll_activity(project_id, 'tbl_multifamily_unit', 'batch_upsert',
-                                created_count, updated_count, reason)
-
-        return {
-            'success': True,
-            'created': created_count,
-            'updated': updated_count,
-            'records': results
-        }
-
-    except Exception as e:
-        logger.error(f"Error updating units: {e}")
-        return {'success': False, 'error': str(e), 'created': created_count, 'updated': updated_count}
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -9067,6 +8965,15 @@ def acknowledge_insight(
 # Main Dispatcher (Registry-based)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Tools that should auto-execute without requiring user confirmation
+# These are batch operations where the user explicitly requested the action
+AUTO_EXECUTE_TOOLS = {
+    'update_units',       # Rent roll batch - populate units from document
+    'update_leases',      # Rent roll batch - populate leases from document
+    'update_unit_types',  # Rent roll batch - populate floorplan/unit types
+}
+
+
 def execute_tool(
     tool_name: str,
     tool_input: Dict[str, Any],
@@ -9079,6 +8986,10 @@ def execute_tool(
 
     When propose_only=True (default), mutation tools return proposals for user
     confirmation instead of executing immediately. Read-only tools always execute.
+
+    Exception: Tools in AUTO_EXECUTE_TOOLS always execute immediately because
+    they handle batch operations where the user explicitly requested the action
+    (e.g., "populate rent roll from this document").
 
     Args:
         tool_name: Name of the tool to execute
@@ -9099,6 +9010,12 @@ def execute_tool(
             'error': f"Unknown tool: {tool_name}",
             'available_tools': list(TOOL_REGISTRY.keys())
         }
+
+    # Auto-execute rent roll batch tools without requiring confirmation
+    # User explicitly asked for this action (e.g., "read document and populate rent roll")
+    if tool_name in AUTO_EXECUTE_TOOLS:
+        propose_only = False
+        logger.info(f"Auto-executing {tool_name} (in AUTO_EXECUTE_TOOLS list)")
 
     try:
         # All handlers receive the same kwargs for consistency

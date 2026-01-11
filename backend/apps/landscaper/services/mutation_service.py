@@ -1028,6 +1028,213 @@ class MutationService:
                         new_id = cursor.fetchone()[0]
                         return {"success": True, "action": "created", "opex_id": new_id}
 
+                elif mutation_type == "rent_roll_batch" and isinstance(proposed_value, dict):
+                    # Batch upsert for rent roll tables (unit_types, units, leases)
+                    records = proposed_value.get("records", [])
+                    if not records:
+                        return {"success": False, "error": "No records in batch"}
+
+                    created_count = 0
+                    updated_count = 0
+                    results = []
+
+                    if table_name == "tbl_multifamily_unit_type":
+                        for rec in records:
+                            cursor.execute("""
+                                INSERT INTO landscape.tbl_multifamily_unit_type
+                                (project_id, unit_type_code, unit_type_name, bedrooms, bathrooms,
+                                 avg_square_feet, market_rent, total_units, created_at, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                                ON CONFLICT (project_id, unit_type_code)
+                                DO UPDATE SET
+                                    unit_type_name = EXCLUDED.unit_type_name,
+                                    bedrooms = EXCLUDED.bedrooms,
+                                    bathrooms = EXCLUDED.bathrooms,
+                                    avg_square_feet = EXCLUDED.avg_square_feet,
+                                    market_rent = EXCLUDED.market_rent,
+                                    total_units = EXCLUDED.total_units,
+                                    updated_at = NOW()
+                                RETURNING unit_type_id, (xmax = 0) as is_insert
+                            """, [
+                                project_id,
+                                rec.get("unit_type_code"),
+                                rec.get("unit_type_name"),
+                                rec.get("bedrooms", 0),
+                                rec.get("bathrooms", 1),
+                                rec.get("avg_square_feet", 0),
+                                rec.get("market_rent", 0),
+                                rec.get("total_units", 0),
+                            ])
+                            row = cursor.fetchone()
+                            if row[1]:  # is_insert
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                            results.append({"unit_type_id": row[0], "code": rec.get("unit_type_code")})
+
+                    elif table_name == "tbl_multifamily_unit":
+                        # Track unit types for aggregation
+                        unit_type_stats = {}
+
+                        for rec in records:
+                            # Map unit_type from various possible field names
+                            unit_type = rec.get("unit_type") or rec.get("unit_type_code") or rec.get("unit_type_name", "")
+                            # Build unit_type string from bedrooms/bathrooms if not provided
+                            if not unit_type and (rec.get("bedrooms") is not None or rec.get("bathrooms") is not None):
+                                br = rec.get("bedrooms", 0)
+                                ba = rec.get("bathrooms", 1)
+                                unit_type = f"{int(br)}BR/{int(ba)}BA"
+
+                            bedrooms = rec.get("bedrooms", 0)
+                            bathrooms = rec.get("bathrooms", 1)
+                            square_feet = rec.get("square_feet", 0)
+                            current_rent = rec.get("current_rent", 0)
+                            market_rent = rec.get("market_rent", 0)
+                            occupancy_status = rec.get("occupancy_status") or rec.get("status", "occupied")
+
+                            cursor.execute("""
+                                INSERT INTO landscape.tbl_multifamily_unit
+                                (project_id, unit_number, unit_type, bedrooms, bathrooms, square_feet,
+                                 current_rent, market_rent, occupancy_status, created_at, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                                ON CONFLICT (project_id, unit_number)
+                                DO UPDATE SET
+                                    unit_type = EXCLUDED.unit_type,
+                                    bedrooms = EXCLUDED.bedrooms,
+                                    bathrooms = EXCLUDED.bathrooms,
+                                    square_feet = EXCLUDED.square_feet,
+                                    current_rent = EXCLUDED.current_rent,
+                                    market_rent = EXCLUDED.market_rent,
+                                    occupancy_status = EXCLUDED.occupancy_status,
+                                    updated_at = NOW()
+                                RETURNING unit_id, (xmax = 0) as is_insert
+                            """, [
+                                project_id,
+                                rec.get("unit_number"),
+                                unit_type,
+                                bedrooms,
+                                bathrooms,
+                                square_feet,
+                                current_rent,
+                                market_rent,
+                                occupancy_status,
+                            ])
+                            row = cursor.fetchone()
+                            unit_id = row[0]
+                            is_insert = row[1]
+
+                            if is_insert:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                            results.append({"unit_id": unit_id, "unit_number": rec.get("unit_number")})
+
+                            # Also create/update a lease for this unit so it shows in RentRollGrid
+                            # The grid reads from leases table, not units directly
+                            lease_status = "ACTIVE" if occupancy_status.lower() in ("occupied", "active") else "CANCELLED"
+
+                            # Check if lease exists for this unit
+                            cursor.execute("""
+                                SELECT lease_id FROM landscape.tbl_multifamily_lease
+                                WHERE unit_id = %s
+                                ORDER BY created_at DESC LIMIT 1
+                            """, [unit_id])
+                            existing_lease = cursor.fetchone()
+
+                            # Get lease dates from source data ONLY - never invent dates
+                            # If source document doesn't have dates, they should be NULL
+                            lease_start = rec.get("lease_start_date")
+                            lease_end = rec.get("lease_end_date")
+                            lease_term = rec.get("lease_term_months")
+
+                            if existing_lease:
+                                # Update existing lease
+                                cursor.execute("""
+                                    UPDATE landscape.tbl_multifamily_lease
+                                    SET base_rent_monthly = %s,
+                                        effective_rent_monthly = %s,
+                                        lease_status = %s,
+                                        lease_start_date = COALESCE(%s, lease_start_date),
+                                        lease_end_date = COALESCE(%s, lease_end_date),
+                                        lease_term_months = COALESCE(%s, lease_term_months),
+                                        updated_at = NOW()
+                                    WHERE lease_id = %s
+                                """, [current_rent, current_rent, lease_status, lease_start, lease_end, lease_term, existing_lease[0]])
+                            else:
+                                # Create new lease - use NULL for dates if not in source
+                                cursor.execute("""
+                                    INSERT INTO landscape.tbl_multifamily_lease
+                                    (unit_id, base_rent_monthly, effective_rent_monthly, lease_status,
+                                     lease_start_date, lease_end_date, lease_term_months, created_at, updated_at)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                                """, [unit_id, current_rent, current_rent, lease_status, lease_start, lease_end, lease_term])
+
+                            # Aggregate unit type stats for floorplan table
+                            if unit_type:
+                                if unit_type not in unit_type_stats:
+                                    unit_type_stats[unit_type] = {
+                                        "bedrooms": bedrooms,
+                                        "bathrooms": bathrooms,
+                                        "square_feet_total": 0,
+                                        "market_rent_total": 0,
+                                        "count": 0
+                                    }
+                                unit_type_stats[unit_type]["count"] += 1
+                                unit_type_stats[unit_type]["square_feet_total"] += (square_feet or 0)
+                                unit_type_stats[unit_type]["market_rent_total"] += (market_rent or 0)
+
+                        # Create/update unit_types (floorplan mix) from aggregated stats
+                        floorplan_count = 0
+                        for ut_code, stats in unit_type_stats.items():
+                            avg_sf = stats["square_feet_total"] / stats["count"] if stats["count"] > 0 else 0
+                            avg_market = stats["market_rent_total"] / stats["count"] if stats["count"] > 0 else 0
+
+                            try:
+                                cursor.execute("""
+                                    INSERT INTO landscape.tbl_multifamily_unit_type
+                                    (project_id, unit_type_code, unit_type_name, bedrooms, bathrooms,
+                                     avg_square_feet, current_market_rent, total_units, created_at, updated_at)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                                    ON CONFLICT (project_id, unit_type_code)
+                                    DO UPDATE SET
+                                        bedrooms = EXCLUDED.bedrooms,
+                                        bathrooms = EXCLUDED.bathrooms,
+                                        avg_square_feet = EXCLUDED.avg_square_feet,
+                                        current_market_rent = EXCLUDED.current_market_rent,
+                                        total_units = EXCLUDED.total_units,
+                                        updated_at = NOW()
+                                """, [
+                                    project_id,
+                                    ut_code,
+                                    ut_code,  # unit_type_name = code
+                                    stats["bedrooms"],
+                                    stats["bathrooms"],
+                                    avg_sf,
+                                    avg_market,
+                                    stats["count"],
+                                ])
+                                floorplan_count += 1
+                            except Exception as fp_err:
+                                logger.warning(f"Failed to create floorplan {ut_code}: {fp_err}")
+
+                        logger.info(f"Created/updated {floorplan_count} floorplan types from {len(records)} units")
+
+                    else:
+                        return {"success": False, "error": f"Unsupported table for rent_roll_batch: {table_name}"}
+
+                    # Include floorplan count in response if we created them
+                    response = {
+                        "success": True,
+                        "created": created_count,
+                        "updated": updated_count,
+                        "total": len(records),
+                        "results": results,
+                    }
+                    if table_name == "tbl_multifamily_unit":
+                        response["leases_created"] = len(records)  # One lease per unit
+                        response["floorplan_types_created"] = len(unit_type_stats)
+                    return response
+
                 else:
                     return {"success": False, "error": f"Unknown mutation type: {mutation_type}"}
 

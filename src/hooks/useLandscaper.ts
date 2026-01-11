@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 /**
  * Represents a mutation proposal from Landscaper (Level 2 autonomy).
@@ -44,6 +45,14 @@ export interface ChatMessage {
     mutationProposals?: MutationProposal[];
     has_pending_mutations?: boolean;
     hasPendingMutations?: boolean;
+    // Tool execution results (for auto-refresh detection)
+    tools_used?: string[];
+    tool_executions?: Array<{
+      tool: string;
+      success: boolean;
+      is_proposal?: boolean;
+      result?: Record<string, unknown>;
+    }>;
   };
 }
 
@@ -54,6 +63,75 @@ interface UseLandscaperOptions {
 }
 
 const REQUEST_TIMEOUT_MS = 90000;
+
+// Map tool names to the tables they affect
+const TOOL_TABLE_MAP: Record<string, string[]> = {
+  update_units: ['units', 'leases', 'unit_types'],
+  update_leases: ['leases'],
+  update_unit_types: ['unit_types'],
+  update_operating_expenses: ['operating_expenses'],
+  update_rental_comps: ['rental_comps'],
+  update_sales_comps: ['sales_comps'],
+  update_project_field: ['project'],
+  bulk_update_fields: ['project'],
+};
+
+/**
+ * Check tool executions for successful mutations and emit refresh events.
+ */
+function emitMutationEventsIfNeeded(
+  projectId: number,
+  metadata: ChatMessage['metadata']
+): void {
+  if (!metadata?.tool_executions) return;
+
+  const toolExecutions = metadata.tool_executions as Array<{
+    tool: string;
+    success: boolean;
+    is_proposal?: boolean;
+    result?: {
+      success?: boolean;
+      created?: number;
+      updated?: number;
+      total?: number;
+    };
+  }>;
+
+  // Find successful non-proposal tool executions that affect data
+  const executedMutations = toolExecutions.filter(
+    (t) =>
+      t.success &&
+      !t.is_proposal &&
+      t.result?.success &&
+      TOOL_TABLE_MAP[t.tool]
+  );
+
+  if (executedMutations.length === 0) return;
+
+  // Collect all affected tables
+  const affectedTables = new Set<string>();
+  let totalCreated = 0;
+  let totalUpdated = 0;
+
+  for (const mutation of executedMutations) {
+    const tables = TOOL_TABLE_MAP[mutation.tool] || [];
+    tables.forEach((t) => affectedTables.add(t));
+    totalCreated += mutation.result?.created || 0;
+    totalUpdated += mutation.result?.updated || 0;
+  }
+
+  // Emit a single event for all mutations
+  emitMutationComplete({
+    projectId,
+    mutationType: executedMutations.map((m) => m.tool).join(','),
+    tables: Array.from(affectedTables),
+    counts: {
+      created: totalCreated,
+      updated: totalUpdated,
+      total: totalCreated + totalUpdated,
+    },
+  });
+}
 
 export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: UseLandscaperOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -145,6 +223,10 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
         if (data.metadata?.fieldUpdates && onFieldUpdate) {
           onFieldUpdate(data.metadata.fieldUpdates);
         }
+
+        // Emit mutation events if any tools executed successfully
+        // This triggers auto-refresh in listening components (RentRollGrid, etc.)
+        emitMutationEventsIfNeeded(Number(projectId), data.metadata);
 
         if (data.wasDuplicate) {
           console.info('Response was cached (duplicate request)');

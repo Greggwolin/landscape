@@ -8,6 +8,9 @@ import { sql } from '@/lib/db';
 import { CreateDocZ } from './schema';
 import { z } from 'zod';
 
+const DJANGO_API_URL =
+  process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 /**
  * POST /api/dms/docs
  * Create a new document record with duplicate detection and tag tracking
@@ -190,6 +193,27 @@ export async function POST(req: NextRequest) {
         };
         console.log(`🔄 Queued document ${doc.doc_id} for extraction (queue_id=${processing.queue_id})`);
       }
+
+      // Trigger synchronous RAG processing (text extraction → chunking → embeddings)
+      // This runs in parallel with the response - fire and forget
+      // The sync endpoint handles its own status updates to core_doc
+      fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const result = await res.json();
+            console.log(`✅ RAG processing complete for doc_id=${doc.doc_id}: ${result.embeddings_created || 0} embeddings created`);
+          } else {
+            console.warn(`⚠️ RAG processing failed for doc_id=${doc.doc_id}: ${res.status} ${res.statusText}`);
+          }
+        })
+        .catch((processError) => {
+          // Log but don't fail - document is saved, processing can be retried manually
+          console.error(`⚠️ RAG processing error for doc_id=${doc.doc_id}:`, processError);
+        });
+
     } catch (queueError) {
       // Don't fail the upload if queueing fails - document is still created
       processing.status = 'queue_failed';

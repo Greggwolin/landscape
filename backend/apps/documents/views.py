@@ -151,6 +151,16 @@ def upload_document(request):
             status='pending'
         )
 
+        # Trigger synchronous RAG processing (text extraction → chunking → embeddings)
+        # Import here to avoid circular imports
+        from apps.knowledge.services.document_processor import processor
+        try:
+            process_result = processor.process_document(doc.doc_id)
+            logger.info(f"RAG processing complete for doc_id={doc.doc_id}: {process_result.get('embeddings_created', 0)} embeddings")
+        except Exception as process_error:
+            # Log but don't fail - document is saved, processing can be retried
+            logger.warning(f"RAG processing failed for doc_id={doc.doc_id}: {process_error}")
+
         return Response({
             'success': True,
             'doc_id': doc.doc_id,
@@ -677,6 +687,14 @@ def upload_new_version(request, project_id, doc_id):
             priority=5,
             status='pending'
         )
+
+        # Trigger synchronous RAG processing for new version
+        from apps.knowledge.services.document_processor import processor
+        try:
+            process_result = processor.process_document(doc_id)
+            logger.info(f"RAG processing complete for doc_id={doc_id} (v{existing_doc.version_no}): {process_result.get('embeddings_created', 0)} embeddings")
+        except Exception as process_error:
+            logger.warning(f"RAG processing failed for doc_id={doc_id}: {process_error}")
 
         return Response({
             "doc_id": doc_id,

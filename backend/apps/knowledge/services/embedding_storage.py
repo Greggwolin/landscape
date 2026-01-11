@@ -38,16 +38,29 @@ def store_embedding(
         print(f"Failed to generate embedding for source {source_type}:{source_id}")
         return None
 
+    # Use raw SQL because Django model doesn't have the pgvector 'embedding' field defined
+    # The column exists in the database but Django ORM can't handle vector types natively
     try:
-        record = KnowledgeEmbedding.objects.create(
-            content_text=content_text,
-            embedding=embedding_vector,
-            source_type=source_type,
-            source_id=source_id,
-            entity_ids=entity_ids or [],
-            tags=tags or []
-        )
-        return record.embedding_id
+        embedding_str = '[' + ','.join(str(x) for x in embedding_vector) + ']'
+        entity_ids_val = entity_ids or []
+        tags_val = tags or []
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO landscape.knowledge_embeddings
+                (content_text, embedding, source_type, source_id, entity_ids, tags, created_at)
+                VALUES (%s, %s::vector, %s, %s, %s, %s, NOW())
+                RETURNING embedding_id
+            """, [
+                content_text,
+                embedding_str,
+                source_type,
+                source_id,
+                entity_ids_val,
+                tags_val
+            ])
+            row = cursor.fetchone()
+            return row[0] if row else None
     except Exception as e:
         print(f"Error storing embedding: {e}")
         return None

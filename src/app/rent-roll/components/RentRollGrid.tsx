@@ -13,6 +13,7 @@ import {
   unitsAPI,
 } from '@/lib/api/multifamily'
 import { FloorplanUpdateDialog } from './FloorplanUpdateDialog'
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -157,18 +158,18 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     setTimeout(() => setNotification(null), 3000)
   }, [])
 
-  const { data: response, error, mutate } = useSWR(
+  const { data: response, error, mutate: mutateLeases } = useSWR(
     projectId ? `/api/multifamily/leases?project_id=${projectId}` : null,
     fetchLeases
   )
 
-  const { data: unitsResponse } = useSWR(
+  const { data: unitsResponse, mutate: mutateUnits } = useSWR(
     projectId ? `/api/multifamily/units?project_id=${projectId}` : null,
     fetchUnits
   )
 
   // Fetch unit types for DVL and auto-fill
-  const { data: unitTypesResponse } = useSWR(
+  const { data: unitTypesResponse, mutate: mutateUnitTypes } = useSWR(
     projectId ? `/api/multifamily/unit-types?project_id=${projectId}` : null,
     fetchUnitTypes,
     { revalidateOnFocus: false }
@@ -177,6 +178,20 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   const leases = response?.data ?? []
   const units = unitsResponse?.data ?? []
   const unitTypes = unitTypesResponse?.data ?? []
+
+  // Auto-refresh when Landscaper completes mutations affecting rent roll data
+  const refreshAllData = useCallback(() => {
+    console.log('[RentRollGrid] Refreshing data after Landscaper mutation')
+    mutateLeases()
+    mutateUnits()
+    mutateUnitTypes()
+  }, [mutateLeases, mutateUnits, mutateUnitTypes])
+
+  useLandscaperRefresh(
+    projectId,
+    ['units', 'leases', 'unit_types'],
+    refreshAllData
+  )
 
   // Build dropdown options from unit types
   const unitTypeOptions = useMemo(() => {
@@ -303,7 +318,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       await unitsAPI.delete(lease.unit_id)
 
       // Refresh grid
-      await mutate()
+      await mutateLeases()
       showNotification('✅ Deleted successfully', 'success')
 
     } catch (error) {
@@ -538,7 +553,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
                       bathrooms: floorplanData.bathrooms,
                       square_feet: floorplanData.square_feet
                     })
-                    await mutate()
+                    await mutateLeases()
                     showNotification('✅ Copied from floorplan', 'success')
                   } catch (error) {
                     showNotification('❌ Failed to copy', 'error')
@@ -705,7 +720,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       }
 
       console.log(`✅ Saved ${field}`)
-      await mutate()
+      await mutateLeases()
       showNotification('✅ Saved successfully', 'success')
 
     } catch (error) {
@@ -751,7 +766,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
       await leasesAPI.create(newLease)
 
-      await mutate() // Refresh grid
+      await mutateLeases() // Refresh grid
       showNotification('✅ Created new unit successfully', 'success')
     } catch (error) {
       console.error('Failed to add row:', error)
@@ -763,7 +778,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
   // Refresh data
   const handleRefresh = useCallback(async () => {
-    await mutate()
+    await mutateLeases()
   }, [mutate])
 
   // Handle floorplan dialog confirmation
@@ -789,7 +804,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       setFloorplanDialogOpen(false)
 
       // Refresh data
-      await mutate()
+      await mutateLeases()
       showNotification('✅ Saved successfully', 'success')
     } catch (error) {
       console.error('Failed to save with floorplan:', error)
