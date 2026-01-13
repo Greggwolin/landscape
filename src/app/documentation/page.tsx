@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Loss to Lease & Year 1 Buyer NOI (Jan 13, 2026)',
+      path: '/docs/09_session_notes/2026-01-13-loss-to-lease-year1-noi.md',
+      category: 'AI',
+      description: 'Income analysis tools for multifamily - LTL calculator (simple + time-weighted), Year 1 Buyer NOI, rent control awareness (CA AB 1482), Landscaper tool integration',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-13'
+    },
+    {
       title: 'Document Extraction for New Project Modal (Jan 10, 2026)',
       path: '/docs/09_session_notes/2026-01-10-document-extraction-integration.md',
       category: 'AI',

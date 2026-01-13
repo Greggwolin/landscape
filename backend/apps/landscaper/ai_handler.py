@@ -15,6 +15,279 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Platform Knowledge Integration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Primary triggers - explicit valuation/appraisal terminology
+PRIMARY_METHODOLOGY_TRIGGERS = {
+    # Core valuation terms
+    'value', 'valuation', 'appraisal', 'appraise', 'worth',
+    'market value', 'investment value', 'assessed value',
+
+    # Approaches to value
+    'income approach', 'cost approach', 'sales comparison',
+    'comparable', 'comps', 'adjustment', 'adjust for',
+
+    # Income metrics
+    'cap rate', 'capitalization', 'noi', 'net operating income',
+    'gross rent multiplier', 'grm', 'gim',
+    'discount rate', 'yield', 'dcf', 'discounted cash flow',
+    'irr', 'npv', 'cash on cash', 'cash-on-cash',
+
+    # Revenue/Expense
+    'potential gross', 'effective gross', 'pgi', 'egi',
+    'vacancy', 'collection loss', 'credit loss',
+    'operating expense', 'expense ratio', 'oer',
+    'replacement reserve', 'capex',
+
+    # Cost approach
+    'replacement cost', 'reproduction cost',
+    'depreciation', 'physical deterioration',
+    'functional obsolescence', 'external obsolescence',
+
+    # Other methodology
+    'highest and best use', 'hbu',
+    'reconciliation', 'reconcile',
+    'market rent', 'contract rent', 'loss to lease',
+    'absorption', 'stabilized', 'proforma',
+
+    # General appraisal
+    'methodology', 'appraisal', 'underwriting',
+    'rent roll', 'tenant mix', 'lease rollover',
+}
+
+# Secondary triggers - contextual questions that benefit from methodology
+SECONDARY_METHODOLOGY_TRIGGERS = {
+    'how do i', 'how should i', 'what is a good',
+    'is this reasonable', 'does this make sense',
+    'reasonable', 'makes sense',
+    'typical', 'standard', 'normal range',
+    'missing', 'forgot', 'need to add',
+    'validate', 'verify', 'check',
+    'what should', 'how much should',
+    'should i use', 'what to use',
+}
+
+# Context terms that activate secondary triggers
+SECONDARY_CONTEXT_TERMS = {
+    'property', 'building', 'unit', 'rent', 'expense',
+    'income', 'cost', 'price', 'rate', 'ratio',
+    'noi', 'cap', 'value', 'lease', 'tenant',
+    'management', 'vacancy', 'tax', 'insurance',
+    'reserve', 'budget', 'fee', 'occupancy',
+}
+
+# Task types that always trigger platform knowledge retrieval
+METHODOLOGY_TASK_TYPES = {
+    'om_extraction', 'rent_roll_analysis', 'expense_analysis',
+    'valuation', 'underwriting', 'proforma',
+}
+
+
+def _needs_platform_knowledge(message: str, task_type: Optional[str] = None) -> bool:
+    """
+    Detect if message or task requires appraisal methodology knowledge.
+
+    Two modes:
+    1. User question contains valuation-related terms (primary triggers)
+    2. Contextual question about property/financial data (secondary triggers)
+    3. Task involves data that should be validated against standards
+    """
+    message_lower = message.lower()
+
+    # Check primary triggers - explicit valuation questions
+    if any(trigger in message_lower for trigger in PRIMARY_METHODOLOGY_TRIGGERS):
+        return True
+
+    # Check secondary triggers - require additional context
+    if any(trigger in message_lower for trigger in SECONDARY_METHODOLOGY_TRIGGERS):
+        # Only fire if also discussing property/financial data
+        if any(term in message_lower for term in SECONDARY_CONTEXT_TERMS):
+            return True
+
+    # Check task context - always retrieve for certain task types
+    if task_type and task_type in METHODOLOGY_TASK_TYPES:
+        return True
+
+    return False
+
+
+def _get_platform_knowledge_context(
+    query: str,
+    property_type: Optional[str] = None,
+    max_chunks: int = 5
+) -> str:
+    """
+    Retrieve relevant platform knowledge and format for system prompt injection.
+
+    Returns formatted context string, or empty string if no relevant knowledge found.
+    """
+    try:
+        from apps.knowledge.services.platform_knowledge_retriever import get_platform_knowledge_retriever
+
+        retriever = get_platform_knowledge_retriever()
+        chunks = retriever.retrieve(
+            query=query,
+            property_type=property_type,
+            max_chunks=max_chunks,
+            similarity_threshold=0.65
+        )
+
+        if not chunks:
+            return ""
+
+        # Format chunks for system prompt
+        context_parts = [
+            "\n<platform_knowledge>",
+            "The following excerpts from authoritative appraisal texts inform this response:\n"
+        ]
+
+        for chunk in chunks:
+            source = chunk['source']
+            context_parts.append(
+                f"[{source['document_title']}, "
+                f"Ch. {source['chapter_number']}: {source['chapter_title']}, "
+                f"p. {source['page']}]"
+            )
+            context_parts.append(chunk['content'])
+            context_parts.append("")  # blank line between chunks
+
+        context_parts.append("</platform_knowledge>")
+
+        return "\n".join(context_parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to retrieve platform knowledge: {e}")
+        return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User Knowledge Integration
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_user_knowledge_context(
+    query: str,
+    user_id: int,
+    project_id: Optional[int] = None,
+    organization_id: Optional[int] = None,
+    property_type: Optional[str] = None,
+    market: Optional[str] = None,
+    max_per_type: int = 3
+) -> str:
+    """
+    Retrieve relevant user knowledge and format for system prompt injection.
+
+    Retrieves from:
+    1. Past assumptions the user has made (Entity-Fact)
+    2. Comparable facts from prior projects (Entity-Fact)
+
+    Returns formatted context string, or empty string if no relevant knowledge found.
+    """
+    try:
+        from apps.knowledge.services.user_knowledge_retriever import get_user_knowledge_retriever
+
+        retriever = get_user_knowledge_retriever(
+            organization_id=organization_id,
+            user_id=user_id,
+        )
+
+        predicates_to_check = [
+            'vacancy_rate',
+            'management_fee',
+            'cap_rate',
+            'expense_ratio',
+            'replacement_reserves_pct',
+        ]
+
+        assumption_stats = {}
+        for predicate in predicates_to_check:
+            stats = retriever.get_assumption_stats(
+                predicate=predicate,
+                property_type=property_type,
+                msa=market,
+            )
+            if stats:
+                assumption_stats[predicate] = stats
+
+        comparables = retriever.get_comparable_facts(
+            comp_type='sale',
+            property_type=property_type,
+            msa=market,
+            limit=max_per_type,
+        )
+
+        if not assumption_stats and not comparables:
+            return ""
+
+        context_parts = ["\n<user_knowledge>"]
+        context_parts.append(retriever.format_for_prompt(assumption_stats, comparables))
+        context_parts.append("</user_knowledge>")
+
+        return "\n".join(context_parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to retrieve user knowledge: {e}")
+        return ""
+
+
+def _needs_user_knowledge(message: str) -> bool:
+    """
+    Detect if message would benefit from user's historical knowledge.
+
+    Triggers on:
+    1. Questions about assumptions/values
+    2. Comparison questions ("what did I use before")
+    3. Validation questions ("is this reasonable")
+    4. Document references ("based on the OM", "from the rent roll")
+    """
+    message_lower = message.lower()
+
+    # Past experience triggers
+    past_triggers = {
+        'what did i use', 'what have i used', 'my previous',
+        'last time', 'in the past', 'typically use',
+        'usually use', 'normally use', 'my standard',
+        'based on my', 'from my', 'my projects',
+    }
+
+    # Document reference triggers
+    doc_triggers = {
+        'from the om', 'in the om', 'based on the om',
+        'from the rent roll', 'in the rent roll',
+        'from the appraisal', 'in the appraisal',
+        'from the document', 'uploaded document',
+        'from the t12', 'in the t-12', 't12 shows',
+        'from the financials', 'the proforma',
+    }
+
+    # Comparable triggers
+    comp_triggers = {
+        'comparable', 'comps', 'similar properties',
+        'other deals', 'recent sales', 'what sold',
+        'market comps', 'rental comps',
+    }
+
+    # Validation triggers (benefit from seeing what user did before)
+    validation_triggers = {
+        'is this reasonable', 'does this make sense',
+        'am i missing', 'should i add',
+        'typical for', 'normal for',
+    }
+
+    # Check all trigger groups
+    if any(trigger in message_lower for trigger in past_triggers):
+        return True
+    if any(trigger in message_lower for trigger in doc_triggers):
+        return True
+    if any(trigger in message_lower for trigger in comp_triggers):
+        return True
+    if any(trigger in message_lower for trigger in validation_triggers):
+        return True
+
+    return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -195,6 +468,14 @@ IMPORTANT: Use the 'focus' parameter when extracting specific data types to ensu
                     "type": "integer",
                     "description": "Document ID to retrieve content from (get from get_project_documents)"
                 },
+                "doc_type": {
+                    "type": "string",
+                    "description": "Document type hint (e.g., 'om', 'rent_roll', 't12') if doc_id is unknown"
+                },
+                "doc_name": {
+                    "type": "string",
+                    "description": "Document name hint (e.g., 'Vincent Village OM') if doc_id is unknown"
+                },
                 "max_length": {
                     "type": "integer",
                     "description": "Maximum characters to return (default 50000)"
@@ -205,7 +486,7 @@ IMPORTANT: Use the 'focus' parameter when extracting specific data types to ensu
                     "description": "Focus on specific content type. Use 'rental_comps' when extracting comparable properties, 'operating_expenses' for T-12/expense data."
                 }
             },
-            "required": ["doc_id"]
+            "required": []
         }
     },
     {
@@ -295,6 +576,22 @@ After using this tool, the data will appear in the Operations tab.""",
                             "annual_amount": {
                                 "type": "number",
                                 "description": "Annual expense amount in dollars"
+                            },
+                            "per_unit": {
+                                "type": "number",
+                                "description": "Per-unit annual amount (if provided)"
+                            },
+                            "per_sf": {
+                                "type": "number",
+                                "description": "Per-SF annual amount (if provided)"
+                            },
+                            "unit_amount": {
+                                "type": "number",
+                                "description": "Alias for per_unit (if provided)"
+                            },
+                            "amount_per_sf": {
+                                "type": "number",
+                                "description": "Alias for per_sf (if provided)"
                             },
                             "expense_type": {
                                 "type": "string",
@@ -3668,6 +3965,131 @@ Example: Acknowledge cap rate anomaly as "fixed" after updating assumption.""",
             },
             "required": ["insight_id", "user_action"]
         }
+    },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Income Analysis Tools - Loss to Lease & Year 1 Buyer NOI
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "analyze_loss_to_lease",
+        "description": """Calculate Loss to Lease for a multifamily property.
+
+Loss to Lease is the gap between current in-place rents and market rents.
+This analysis helps understand how much rental upside exists in the property.
+
+Two calculation methods:
+- simple: Annual gap = (Market Rent - Current Rent) × 12 for all units
+  Best when lease dates are unavailable or for quick analysis.
+
+- time_weighted: Present value of rent shortfall based on lease expirations
+  Accounts for the fact that below-market leases persist until they expire.
+  More accurate but requires lease end dates.
+
+Returns:
+- Total current vs market rent (monthly and annual)
+- Gap percentage (how far below market)
+- Units below/at/above market
+- Unit-level details (if include_details=true)
+- Lease expiration schedule (for time_weighted)
+
+Use this when:
+- User asks about rental upside or loss to lease
+- Comparing in-place rents to market
+- Evaluating value-add opportunities
+- Assessing lease-up potential after acquisition""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": ["simple", "time_weighted"],
+                    "description": "Calculation method: 'simple' for annual gap, 'time_weighted' for PV based on lease expirations"
+                },
+                "discount_rate": {
+                    "type": "number",
+                    "description": "Annual discount rate for time-weighted PV (default 0.08 = 8%)"
+                },
+                "include_details": {
+                    "type": "boolean",
+                    "description": "Include unit-level breakdown in response (default false)"
+                },
+                "include_schedule": {
+                    "type": "boolean",
+                    "description": "Include lease expiration schedule (default true for time_weighted)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "calculate_year1_buyer_noi",
+        "description": """Calculate realistic Year 1 NOI for a buyer.
+
+This bridges the gap between two misleading broker metrics:
+- Broker "Current NOI" = Actual Rents + Actual Expenses (historical, backward-looking)
+- Broker "Proforma NOI" = Market Rents + Projected Expenses (aspirational, may never materialize)
+
+Year 1 Buyer NOI = Actual Rents + Projected Expenses (realistic Day 1 cash flow)
+
+Key insight: Buyers inherit the rent roll (actual in-place rents) but face
+new expenses (taxes reassess on purchase price, insurance reprices,
+new management company, etc.)
+
+Returns:
+- Gross Potential Rent (actual rent roll annualized)
+- Vacancy and credit loss deductions
+- Effective Gross Income
+- Operating expenses (from proforma or T-12)
+- Net Operating Income
+- Comparison to broker current/proforma NOI
+- Loss to Lease summary (if available)
+- Per-unit and per-SF metrics
+
+Use this when:
+- User asks "what will my actual NOI be?"
+- Evaluating broker's proforma vs reality
+- Underwriting acquisition cash flow
+- Comparing asking price to realistic income""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "vacancy_rate": {
+                    "type": "number",
+                    "description": "Vacancy rate as decimal (default 0.05 = 5%)"
+                },
+                "credit_loss_rate": {
+                    "type": "number",
+                    "description": "Credit/bad debt loss rate as decimal (default 0.02 = 2%)"
+                },
+                "expense_scenario": {
+                    "type": "string",
+                    "enum": ["proforma", "t12", "default"],
+                    "description": "Which expense scenario to use (default 'proforma')"
+                },
+                "include_loss_to_lease": {
+                    "type": "boolean",
+                    "description": "Include Loss to Lease analysis in results (default true)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "check_income_analysis_availability",
+        "description": """Check if Loss to Lease and Year 1 Buyer NOI analyses are available.
+
+Returns data availability status and recommendations:
+- Whether rent roll has current and market rents
+- Whether lease dates exist for time-weighted analysis
+- Whether proforma/T-12 expenses exist
+- Whether rent gap is material (>5%)
+- Which analyses can be performed
+
+Use this to determine what income analyses to offer the user.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
     }
 ]
 
@@ -3981,6 +4403,34 @@ def get_landscaper_response(
     # Add project context to system prompt
     project_context_msg = _build_project_context_message(project_context)
     full_system = f"{system_prompt}\n\n---\n{project_context_msg}"
+
+    # Add platform knowledge if user query relates to valuation methodology
+    last_user_message = _get_last_user_message(messages)
+    if last_user_message and _needs_platform_knowledge(last_user_message):
+        pk_context = _get_platform_knowledge_context(
+            query=last_user_message,
+            property_type=project_type,
+            max_chunks=5
+        )
+        if pk_context:
+            full_system += pk_context
+            logger.info("Platform knowledge context added to system prompt")
+
+    # Add user knowledge if query benefits from past experience
+    user_id = project_context.get('user_id')
+    if last_user_message and user_id and _needs_user_knowledge(last_user_message):
+        uk_context = _get_user_knowledge_context(
+            query=last_user_message,
+            user_id=user_id,
+            project_id=project_context.get('project_id'),
+            organization_id=project_context.get('organization_id'),
+            property_type=project_type,
+            market=project_context.get('market'),
+            max_per_type=3
+        )
+        if uk_context:
+            full_system += uk_context
+            logger.info("User knowledge context added to system prompt")
 
     # Try Claude API first
     client = _get_anthropic_client()

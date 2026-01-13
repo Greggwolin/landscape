@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-10
-**Version:** 2.4
+**Last Updated:** 2026-01-13
+**Version:** 2.5
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1)
 
 ---
@@ -9,7 +9,15 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Python Financial Engine (Phase 1 Complete)**
+### 🆕 **Latest Update: Loss to Lease & Year 1 Buyer NOI (January 13, 2026)**
+Implemented comprehensive income analysis tools for multifamily underwriting:
+- ✅ **Loss to Lease Calculator** - Simple and time-weighted methods
+- ✅ **Year 1 Buyer NOI** - Actual rents + proforma expenses (realistic Day 1 cash flow)
+- ✅ **Rent Control Awareness** - California AB 1482 and local ordinances
+- ✅ **Landscaper Tool Integration** - 3 new AI tools for income analysis
+- 📁 **Location:** `backend/apps/landscaper/services/` - See session notes for details
+
+### Previous Update: Python Financial Engine (Phase 1 Complete)
 **October 21, 2025** - Migrated core financial calculations from TypeScript to Python using industry-standard libraries:
 - ✅ **5-10x Performance Improvement** - NumPy/Pandas vectorized operations
 - ✅ **Battle-tested Algorithms** - numpy-financial (same as Excel, Bloomberg, FactSet)
@@ -35,9 +43,17 @@ The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL ap
 
 ---
 
-## Current State Snapshot (2026-01-10)
+## Current State Snapshot (2026-01-13)
 
 ### 🆕 Latest Updates
+
+**January 13, 2026** - Loss to Lease & Year 1 Buyer NOI Implementation:
+- ✅ **IncomeAnalysisDetector** - Detects when LTL/Year 1 NOI analysis applies
+- ✅ **LossToLeaseCalculator** - Simple and time-weighted methods with lease expiration schedule
+- ✅ **Year1BuyerNOICalculator** - Realistic Day 1 cash flow (actual rents + proforma expenses)
+- ✅ **RentControlService** - CA AB 1482, local ordinances, new construction exemptions
+- ✅ **Landscaper Tools** - `analyze_loss_to_lease`, `calculate_year1_buyer_noi`, `check_income_analysis_availability`
+- 📊 **Test Results (Vincent Village):** 40 units, 33.7% below market, $268K annual LTL, 3.4 years recovery under rent control
 
 **January 10, 2026** - Document Extraction Integration for New Project Modal:
 - ✅ **NewProjectDropZone Integration** - Drop documents to auto-populate project creation form

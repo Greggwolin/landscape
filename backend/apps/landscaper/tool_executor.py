@@ -600,7 +600,9 @@ def upsert_operating_expense(
     expense_type: str = None,
     escalation_rate: float = 0.03,
     is_recoverable: bool = False,
-    notes: str = None
+    notes: str = None,
+    unit_amount: Optional[float] = None,
+    amount_per_sf: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Upsert an operating expense record for a project.
@@ -621,114 +623,36 @@ def upsert_operating_expense(
     Returns:
         Dict with success status and created/updated record info
     """
-    # Normalize the label and look up account_id
-    normalized_label = expense_label.lower().strip()
-    account_id = OPEX_ACCOUNT_MAPPING.get(normalized_label)
-
-    if account_id is None:
-        # Try partial matching
-        for key, aid in OPEX_ACCOUNT_MAPPING.items():
-            if key in normalized_label or normalized_label in key:
-                account_id = aid
-                break
-
-    # Determine expense type from label if not provided
-    if not expense_type:
-        if any(x in normalized_label for x in ['tax', 'insurance']):
-            expense_type = 'TAXES' if 'tax' in normalized_label else 'INSURANCE'
-        elif any(x in normalized_label for x in ['water', 'electric', 'gas', 'trash', 'utilit']):
-            expense_type = 'UTILITIES'
-        elif any(x in normalized_label for x in ['repair', 'maintenance', 'turnover', 'landscap', 'pest', 'pool']):
-            expense_type = 'REPAIRS'
-        elif any(x in normalized_label for x in ['management', 'admin', 'payroll', 'professional']):
-            expense_type = 'MANAGEMENT'
-        else:
-            expense_type = 'OTHER'
-
-    # Determine expense category from type
-    category_map = {
-        'TAXES': 'taxes',
-        'INSURANCE': 'insurance',
-        'UTILITIES': 'utilities',
-        'REPAIRS': 'maintenance',
-        'MANAGEMENT': 'management',
-        'CAM': 'cam',
-        'OTHER': 'other'
-    }
-    expense_category = category_map.get(expense_type, 'other')
-
     try:
-        with connection.cursor() as cursor:
-            # Check if record exists for this project/account combo
-            if account_id:
-                cursor.execute("""
-                    SELECT opex_id, annual_amount
-                    FROM landscape.tbl_operating_expenses
-                    WHERE project_id = %s AND account_id = %s
-                """, [project_id, account_id])
-            else:
-                # No account_id, check by expense_type and category
-                cursor.execute("""
-                    SELECT opex_id, annual_amount
-                    FROM landscape.tbl_operating_expenses
-                    WHERE project_id = %s AND expense_type = %s AND expense_category = %s
-                    AND account_id IS NULL
-                """, [project_id, expense_type, expense_category])
+        from apps.knowledge.services.opex_utils import upsert_opex_entry
 
-            existing = cursor.fetchone()
+        selector = {
+            'expense_type': expense_type,
+            'escalation_rate': escalation_rate,
+            'is_recoverable': is_recoverable,
+        }
+        if notes:
+            selector['notes'] = notes
+        if unit_amount is not None:
+            selector['unit_amount'] = unit_amount
+        if amount_per_sf is not None:
+            selector['amount_per_sf'] = amount_per_sf
 
-            if existing:
-                # Update existing record - ADD to existing amount for same account
-                opex_id, old_amount = existing
-                old_amount_float = float(old_amount) if old_amount else 0
-                new_total = old_amount_float + annual_amount
+        result = upsert_opex_entry(connection, project_id, expense_label, annual_amount, selector)
+        if result.get('success'):
+            return {
+                'success': True,
+                'action': result.get('action', 'updated'),
+                'opex_id': result.get('opex_id'),
+                'expense_label': expense_label,
+                'amount': annual_amount
+            }
 
-                cursor.execute("""
-                    UPDATE landscape.tbl_operating_expenses
-                    SET annual_amount = %s,
-                        escalation_rate = %s,
-                        is_recoverable = %s,
-                        notes = COALESCE(notes || '; ' || %s, %s),
-                        updated_at = NOW()
-                    WHERE opex_id = %s
-                """, [new_total, escalation_rate, is_recoverable, notes, notes, opex_id])
-
-                logger.info(f"Updated opex {opex_id} for project {project_id}: {expense_label} added ${annual_amount} (total now ${new_total})")
-
-                return {
-                    'success': True,
-                    'action': 'updated',
-                    'opex_id': opex_id,
-                    'expense_label': expense_label,
-                    'old_amount': old_amount_float,
-                    'added_amount': annual_amount,
-                    'new_amount': new_total,
-                    'account_id': account_id
-                }
-            else:
-                # Insert new record
-                cursor.execute("""
-                    INSERT INTO landscape.tbl_operating_expenses
-                    (project_id, expense_category, expense_type, annual_amount,
-                     escalation_rate, is_recoverable, start_period, account_id, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s, 1, %s, %s)
-                    RETURNING opex_id
-                """, [project_id, expense_category, expense_type, annual_amount,
-                      escalation_rate, is_recoverable, account_id, notes])
-
-                opex_id = cursor.fetchone()[0]
-
-                logger.info(f"Created opex {opex_id} for project {project_id}: {expense_label} = ${annual_amount}")
-
-                return {
-                    'success': True,
-                    'action': 'created',
-                    'opex_id': opex_id,
-                    'expense_label': expense_label,
-                    'amount': annual_amount,
-                    'account_id': account_id
-                }
-
+        return {
+            'success': False,
+            'error': result.get('error', 'Unknown error'),
+            'expense_label': expense_label
+        }
     except Exception as e:
         logger.error(f"Error upserting operating expense: {e}")
         return {
@@ -1180,14 +1104,33 @@ def bulk_upsert_operating_expenses(
     Returns:
         Dict with success status, created/updated counts, and details
     """
+    if not expenses:
+        return {
+            'success': False,
+            'created': 0,
+            'updated': 0,
+            'errors': 0,
+            'results': [],
+            'summary': 'No operating expenses provided'
+        }
+
     results = []
     created_count = 0
     updated_count = 0
     error_count = 0
 
+    logger.info(
+        "[bulk_upsert_operating_expenses] start project_id=%s source_document=%s expenses=%s",
+        project_id,
+        source_document,
+        len(expenses)
+    )
+
     for expense in expenses:
         label = expense.get('label', expense.get('expense_label', ''))
         amount = expense.get('annual_amount', expense.get('amount', 0))
+        unit_amount = expense.get('unit_amount', expense.get('per_unit'))
+        amount_per_sf = expense.get('amount_per_sf', expense.get('per_sf'))
 
         if not label or not amount:
             results.append({
@@ -1198,17 +1141,35 @@ def bulk_upsert_operating_expenses(
             error_count += 1
             continue
 
-        result = upsert_operating_expense(
-            project_id=project_id,
-            expense_label=label,
-            annual_amount=float(amount),
-            expense_type=expense.get('expense_type'),
-            escalation_rate=float(expense.get('escalation_rate', 0.03)),
-            is_recoverable=expense.get('is_recoverable', False),
-            notes=expense.get('notes')
-        )
+        try:
+            result = upsert_operating_expense(
+                project_id=project_id,
+                expense_label=label,
+                annual_amount=float(amount),
+                expense_type=expense.get('expense_type'),
+                escalation_rate=float(expense.get('escalation_rate', 0.03)),
+                is_recoverable=expense.get('is_recoverable', False),
+                notes=expense.get('notes'),
+                unit_amount=unit_amount,
+                amount_per_sf=amount_per_sf
+            )
+        except Exception as e:
+            result = {
+                'success': False,
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'failed_item': expense
+            }
 
         results.append(result)
+
+        if not result.get('success'):
+            logger.warning(
+                "[bulk_upsert_operating_expenses] failed project_id=%s label=%s error=%s",
+                project_id,
+                label,
+                result.get('error')
+            )
 
         if result.get('success'):
             if result.get('action') == 'created':
@@ -1228,14 +1189,58 @@ def bulk_upsert_operating_expenses(
             expenses=[r for r in results if r.get('success')]
         )
 
-    return {
-        'success': error_count == 0,
+    summary = {
+        'success': error_count == 0 and (created_count + updated_count) > 0,
         'created': created_count,
         'updated': updated_count,
         'errors': error_count,
         'results': results,
         'summary': f"Created {created_count}, updated {updated_count}, errors {error_count}"
     }
+    logger.info(
+        "[bulk_upsert_operating_expenses] done project_id=%s created=%s updated=%s errors=%s success=%s",
+        project_id,
+        created_count,
+        updated_count,
+        error_count,
+        summary.get('success')
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO landscape.ai_debug_log (log_type, payload, created_at)
+                VALUES (%s, %s::jsonb, NOW())
+                """,
+                ["OPEX_TOOL_RESULT", json.dumps(summary)]
+            )
+    except Exception as e:
+        err_msg = str(e)
+        if "ai_debug_log" in err_msg and "does not exist" in err_msg:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS landscape.ai_debug_log (
+                            id SERIAL PRIMARY KEY,
+                            log_type VARCHAR(50),
+                            payload JSONB,
+                            created_at TIMESTAMP DEFAULT NOW()
+                        )
+                        """
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO landscape.ai_debug_log (log_type, payload, created_at)
+                        VALUES (%s, %s::jsonb, NOW())
+                        """,
+                        ["OPEX_TOOL_RESULT", json.dumps(summary)]
+                    )
+            except Exception as create_err:
+                logger.error("Failed to create/write ai_debug_log: %s", create_err)
+        else:
+            logger.error("Failed to write OPEX_TOOL_RESULT debug log: %s", e)
+    return summary
 
 
 def _log_opex_bulk_activity(
@@ -1413,6 +1418,14 @@ def handle_update_operating_expenses(
     expenses = tool_input.get('expenses', [])
     source_doc = tool_input.get('source_document')
 
+    logger.info(
+        "[update_operating_expenses] invoked project_id=%s propose_only=%s source_doc=%s expenses=%s",
+        project_id,
+        propose_only,
+        source_doc,
+        len(expenses)
+    )
+
     if propose_only:
         proposals = []
         for expense in expenses:
@@ -1439,11 +1452,20 @@ def handle_update_operating_expenses(
             source_documents=[source_doc] if source_doc else None,
         )
     else:
-        return bulk_upsert_operating_expenses(
+        result = bulk_upsert_operating_expenses(
             project_id=project_id,
             expenses=expenses,
             source_document=source_doc
         )
+        logger.info(
+            "[update_operating_expenses] completed project_id=%s created=%s updated=%s errors=%s success=%s",
+            project_id,
+            result.get('created'),
+            result.get('updated'),
+            result.get('errors'),
+            result.get('success')
+        )
+        return result
 
 
 @register_tool('update_rental_comps', is_mutation=True)
@@ -1571,13 +1593,17 @@ def handle_get_document_content(
 ) -> Dict[str, Any]:
     """Get the full text content from a document."""
     doc_id = tool_input.get('doc_id')
-    if not doc_id:
-        return {'success': False, 'error': 'doc_id is required'}
+    doc_type = tool_input.get('doc_type') or tool_input.get('document_type')
+    doc_name = tool_input.get('doc_name') or tool_input.get('document_name')
+    if not doc_id and not doc_type and not doc_name:
+        return {'success': False, 'error': 'doc_id, doc_type, or doc_name is required'}
     return get_document_content(
         doc_id=doc_id,
         project_id=project_id,
         max_length=tool_input.get('max_length', 50000),
-        focus=tool_input.get('focus')
+        focus=tool_input.get('focus'),
+        doc_type=doc_type,
+        doc_name=doc_name
     )
 
 
@@ -8962,6 +8988,255 @@ def acknowledge_insight(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Income Analysis Tools - Loss to Lease & Year 1 Buyer NOI
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool("analyze_loss_to_lease")
+def analyze_loss_to_lease(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Calculate Loss to Lease for a multifamily property.
+
+    Supports simple (annual gap) and time-weighted (PV based on lease expirations) methods.
+    """
+    from .services.loss_to_lease_calculator import LossToLeaseCalculator
+    from decimal import Decimal
+
+    method = tool_input.get('method', 'simple')
+    discount_rate = tool_input.get('discount_rate')
+    include_details = tool_input.get('include_details', False)
+    include_schedule = tool_input.get('include_schedule', method == 'time_weighted')
+
+    try:
+        # Initialize calculator
+        calc_kwargs = {'project_id': project_id}
+        if discount_rate:
+            calc_kwargs['discount_rate'] = Decimal(str(discount_rate))
+
+        calculator = LossToLeaseCalculator(**calc_kwargs)
+
+        # Run calculation based on method
+        if method == 'time_weighted':
+            result = calculator.calculate_time_weighted()
+        else:
+            result = calculator.calculate_simple()
+
+        # Build response
+        response = {
+            'success': True,
+            'method': result.method,
+            'summary': {
+                'total_current_monthly': float(result.total_current_monthly),
+                'total_market_monthly': float(result.total_market_monthly),
+                'monthly_gap': float(result.monthly_gap),
+                'annual_gap': float(result.annual_gap),
+                'gap_percentage': float(result.gap_percentage),
+                'unit_count': result.unit_count,
+                'units_below_market': result.units_below_market,
+                'units_at_or_above_market': result.units_at_or_above_market,
+            }
+        }
+
+        # Time-weighted specific fields
+        if result.pv_of_loss is not None:
+            response['summary']['pv_of_loss'] = float(result.pv_of_loss)
+        if result.avg_months_to_expiration is not None:
+            response['summary']['avg_months_to_expiration'] = result.avg_months_to_expiration
+
+        # Include unit details if requested
+        if include_details:
+            response['unit_details'] = [u.to_dict() for u in result.unit_details]
+
+        # Include lease expiration schedule
+        if include_schedule:
+            response['lease_expiration_schedule'] = calculator.get_lease_expiration_schedule()
+
+        # Include rent control analysis
+        try:
+            rent_control = calculator.get_rent_control_impact(result)
+            response['rent_control'] = rent_control
+        except Exception as rc_error:
+            logger.warning(f"Could not get rent control analysis: {rc_error}")
+            response['rent_control'] = None
+
+        # Build narrative summary
+        gap_pct = result.gap_percentage
+        if gap_pct > 0:
+            response['narrative'] = (
+                f"Current rents are {gap_pct:.1f}% below market. "
+                f"Annual Loss to Lease is ${result.annual_gap:,.0f} across {result.units_below_market} "
+                f"of {result.unit_count} units."
+            )
+            if result.pv_of_loss is not None:
+                response['narrative'] += f" Present value of lost income: ${result.pv_of_loss:,.0f}."
+
+            # Add rent control warning if applicable
+            if response.get('rent_control') and response['rent_control'].get('rent_control_status', {}).get('is_rent_controlled'):
+                rc_status = response['rent_control']['rent_control_status']
+                rc_impact = response['rent_control'].get('recovery_impact', {})
+                response['narrative'] += (
+                    f" WARNING: Property is subject to {rc_status.get('ordinance_name', 'rent control')} "
+                    f"(max {(rc_status.get('max_annual_increase') or 0) * 100:.0f}% annual increase). "
+                )
+                if rc_impact.get('years_to_full_recovery'):
+                    response['narrative'] += f"Est. {rc_impact['years_to_full_recovery']:.1f} years to full LTL recovery."
+        else:
+            response['narrative'] = (
+                f"Current rents are at or above market levels. "
+                f"No Loss to Lease - {result.units_at_or_above_market} of {result.unit_count} units "
+                f"are at or above market rent."
+            )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error calculating loss to lease: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool("calculate_year1_buyer_noi")
+def calculate_year1_buyer_noi(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Calculate realistic Year 1 NOI for a buyer.
+
+    Uses actual in-place rents + projected expenses for Day 1 cash flow reality.
+    """
+    from .services.year1_noi_calculator import Year1BuyerNOICalculator, format_year1_noi_summary
+    from decimal import Decimal
+
+    vacancy_rate = tool_input.get('vacancy_rate')
+    credit_loss_rate = tool_input.get('credit_loss_rate')
+    expense_scenario = tool_input.get('expense_scenario', 'proforma')
+    include_ltl = tool_input.get('include_loss_to_lease', True)
+
+    try:
+        calculator = Year1BuyerNOICalculator(project_id)
+
+        # Build calculation kwargs
+        calc_kwargs = {
+            'expense_scenario': expense_scenario,
+            'include_loss_to_lease': include_ltl,
+        }
+        if vacancy_rate is not None:
+            calc_kwargs['vacancy_rate'] = Decimal(str(vacancy_rate))
+        if credit_loss_rate is not None:
+            calc_kwargs['credit_loss_rate'] = Decimal(str(credit_loss_rate))
+
+        result = calculator.calculate(**calc_kwargs)
+
+        # Build response
+        response = {
+            'success': True,
+            'year1_noi': result.to_dict(),
+            'formatted_summary': format_year1_noi_summary(result),
+        }
+
+        # Build narrative
+        narrative_parts = [
+            f"Year 1 Buyer NOI: ${result.net_operating_income:,.0f}",
+        ]
+
+        if result.noi_per_unit:
+            narrative_parts.append(f"(${result.noi_per_unit:,.0f}/unit)")
+
+        if result.vs_broker_current is not None:
+            diff = result.vs_broker_current
+            sign = '+' if diff >= 0 else ''
+            narrative_parts.append(f"- {sign}${diff:,.0f} vs Broker Current")
+
+        if result.vs_broker_proforma is not None:
+            diff = result.vs_broker_proforma
+            sign = '+' if diff >= 0 else ''
+            narrative_parts.append(f"- {sign}${diff:,.0f} vs Broker Proforma")
+
+        response['narrative'] = ' '.join(narrative_parts)
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error calculating Year 1 Buyer NOI: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool("check_income_analysis_availability")
+def check_income_analysis_availability(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Check if Loss to Lease and Year 1 Buyer NOI analyses are available.
+
+    Returns data availability and recommendations.
+    """
+    from .services.income_analysis_detector import IncomeAnalysisDetector
+
+    try:
+        detector = IncomeAnalysisDetector(project_id)
+        analysis = detector.analyze()
+
+        # Build recommendation
+        recommendations = []
+        if analysis['can_calculate_year1_buyer_noi']:
+            recommendations.append(
+                "Year 1 Buyer NOI analysis available - use calculate_year1_buyer_noi tool"
+            )
+        if analysis['can_calculate_timeweighted_ltl']:
+            recommendations.append(
+                "Time-weighted Loss to Lease available (lease dates present) - use analyze_loss_to_lease with method='time_weighted'"
+            )
+        elif analysis['can_calculate_simple_ltl']:
+            recommendations.append(
+                "Simple Loss to Lease available - use analyze_loss_to_lease tool"
+            )
+
+        if analysis['rent_gap_material']:
+            gap_pct = analysis['rent_gap_pct'] * 100 if analysis['rent_gap_pct'] else 0
+            recommendations.insert(0, f"ALERT: Current rents are {gap_pct:.0f}% below market - significant value-add opportunity")
+
+        return {
+            'success': True,
+            'availability': {
+                'has_rent_roll': analysis['has_rent_roll'],
+                'has_current_rents': analysis['has_current_rents'],
+                'has_market_rents': analysis['has_market_rents'],
+                'has_lease_dates': analysis['has_lease_dates'],
+                'has_proforma_expenses': analysis['has_proforma_expenses'],
+                'has_t12_expenses': analysis['has_t12_expenses'],
+            },
+            'analysis_options': {
+                'simple_loss_to_lease': analysis['can_calculate_simple_ltl'],
+                'time_weighted_loss_to_lease': analysis['can_calculate_timeweighted_ltl'],
+                'year1_buyer_noi': analysis['can_calculate_year1_buyer_noi'],
+            },
+            'rent_gap': {
+                'percentage': analysis['rent_gap_pct'],
+                'is_material': analysis['rent_gap_material'],
+            },
+            'recommendations': recommendations,
+            'rent_stats': analysis['rent_stats'],
+            'expense_stats': analysis['expense_stats'],
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking income analysis availability: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main Dispatcher (Registry-based)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -8971,6 +9246,7 @@ AUTO_EXECUTE_TOOLS = {
     'update_units',       # Rent roll batch - populate units from document
     'update_leases',      # Rent roll batch - populate leases from document
     'update_unit_types',  # Rent roll batch - populate floorplan/unit types
+    'update_operating_expenses',  # OpEx batch - populate from OM/T12/operating statement
 }
 
 
@@ -9054,6 +9330,104 @@ def get_registered_tools() -> Dict[str, Dict[str, Any]]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Document Reading Functions
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _is_rent_roll_doc(doc_name: Optional[str], doc_type: Optional[str]) -> bool:
+    name = (doc_name or '').lower()
+    dtype = (doc_type or '').lower()
+    return (
+        'rent roll' in name
+        or 'rr' in name.split()
+        or 'rent_roll' in dtype
+        or dtype == 'rent roll'
+    )
+
+
+def _select_document_id_for_request(
+    cursor,
+    project_id: int,
+    doc_type: Optional[str] = None,
+    doc_name: Optional[str] = None,
+    focus: Optional[str] = None,
+    exclude_doc_id: Optional[int] = None
+) -> Optional[int]:
+    doc_type = (doc_type or '').strip().lower()
+    doc_name = (doc_name or '').strip().lower()
+
+    focus_doc_types = []
+    if focus == 'operating_expenses':
+        focus_doc_types = ['om', 'offering_memorandum', 'operating_statement', 't12', 'financial_statement']
+    elif focus == 'rental_comps':
+        focus_doc_types = ['om', 'rent_comp', 'market_report', 'comp_report']
+
+    query = """
+        SELECT
+            d.doc_id,
+            d.doc_name,
+            d.doc_type,
+            d.created_at,
+            q.status as extraction_status,
+            (SELECT COUNT(*) FROM landscape.knowledge_embeddings ke
+             WHERE ke.source_type = 'document_chunk' AND ke.source_id = d.doc_id) as embedding_count
+        FROM landscape.core_doc d
+        LEFT JOIN landscape.dms_extract_queue q ON q.doc_id = d.doc_id
+        WHERE d.project_id = %s
+    """
+    params = [project_id]
+
+    if exclude_doc_id:
+        query += " AND d.doc_id <> %s"
+        params.append(exclude_doc_id)
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    best_doc_id = None
+    best_score = None
+    has_focus_candidate = False
+
+    for doc_id_row, name, dtype, created_at, extraction_status, embedding_count in rows:
+        name_lower = (name or '').lower()
+        dtype_lower = (dtype or '').lower()
+        score = 0
+
+        if doc_type and doc_type in dtype_lower:
+            score += 100
+        if doc_name and doc_name in name_lower:
+            score += 90
+
+        if focus_doc_types:
+            if any(dt in dtype_lower for dt in focus_doc_types):
+                score += 50
+                has_focus_candidate = True
+            if focus == 'operating_expenses' and ('om' in name_lower or 'offering memorandum' in name_lower):
+                score += 40
+
+        if focus == 'operating_expenses' and _is_rent_roll_doc(name, dtype):
+            score -= 50
+
+        if extraction_status == 'completed':
+            score += 10
+        if embedding_count and embedding_count > 0:
+            score += 5
+
+        if best_score is None or score > best_score:
+            best_score = score
+            best_doc_id = doc_id_row
+        elif score == best_score and created_at:
+            best_doc_id = doc_id_row
+
+    if focus == 'operating_expenses' and not has_focus_candidate:
+        if best_doc_id:
+            cursor.execute("""
+                SELECT doc_name, doc_type
+                FROM landscape.core_doc
+                WHERE doc_id = %s
+            """, [best_doc_id])
+            row = cursor.fetchone()
+            if row and _is_rent_roll_doc(row[0], row[1]):
+                return None
+
+    return best_doc_id
 
 def get_project_documents(
     project_id: int,
@@ -9177,7 +9551,9 @@ def get_document_content(
     doc_id: int,
     project_id: int,
     max_length: int = 15000,  # Reduced from 50K to prevent token explosion
-    focus: str = None
+    focus: str = None,
+    doc_type: str = None,
+    doc_name: str = None
 ) -> Dict[str, Any]:
     """
     Get extracted content from a document.
@@ -9205,13 +9581,31 @@ def get_document_content(
     import json
     try:
         with connection.cursor() as cursor:
+            resolved_doc_id = doc_id
+            original_doc_id = None
+
+            if not resolved_doc_id:
+                resolved_doc_id = _select_document_id_for_request(
+                    cursor=cursor,
+                    project_id=project_id,
+                    doc_type=doc_type,
+                    doc_name=doc_name,
+                    focus=focus
+                )
+
+            if not resolved_doc_id:
+                return {
+                    'success': False,
+                    'error': 'No matching document found for the requested type/name.'
+                }
+
             # First get document metadata and verify project access
             doc_query = """
                 SELECT d.doc_id, d.doc_name, d.doc_type, d.project_id, d.mime_type
                 FROM landscape.core_doc d
                 WHERE d.doc_id = %s AND d.project_id = %s
             """
-            cursor.execute(doc_query, [doc_id, project_id])
+            cursor.execute(doc_query, [resolved_doc_id, project_id])
             doc = cursor.fetchone()
 
             if not doc:
@@ -9221,6 +9615,22 @@ def get_document_content(
                 }
 
             doc_id, doc_name, doc_type, proj_id, mime_type = doc
+
+            if focus == 'operating_expenses' and _is_rent_roll_doc(doc_name, doc_type):
+                replacement_doc_id = _select_document_id_for_request(
+                    cursor=cursor,
+                    project_id=project_id,
+                    doc_type='om',
+                    doc_name=doc_name,
+                    focus=focus,
+                    exclude_doc_id=doc_id
+                )
+                if replacement_doc_id:
+                    original_doc_id = doc_id
+                    cursor.execute(doc_query, [replacement_doc_id, project_id])
+                    doc = cursor.fetchone()
+                    if doc:
+                        doc_id, doc_name, doc_type, proj_id, mime_type = doc
 
             # Get extracted data from the queue (including raw text)
             content_query = """
@@ -9263,7 +9673,9 @@ def get_document_content(
                         'content': combined_content,
                         'chunks': chunks,
                         'source': 'embeddings',
-                        'message': f"Retrieved {len(chunks)} text chunks from document embeddings."
+                        'message': f"Retrieved {len(chunks)} text chunks from document embeddings.",
+                        'doc_swapped': bool(original_doc_id),
+                        'original_doc_id': original_doc_id
                     }
 
                 return {
@@ -9272,7 +9684,9 @@ def get_document_content(
                     'doc_name': doc_name,
                     'doc_type': doc_type,
                     'content': None,
-                    'message': "No extracted content available. Document may not be indexed yet."
+                    'message': "No extracted content available. Document may not be indexed yet.",
+                    'doc_swapped': bool(original_doc_id),
+                    'original_doc_id': original_doc_id
                 }
 
             extracted_data, status, confidence, raw_text = result
