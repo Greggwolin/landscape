@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-13
-**Version:** 2.5
+**Last Updated:** 2026-01-14
+**Version:** 2.6
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1)
 
 ---
@@ -9,7 +9,15 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Loss to Lease & Year 1 Buyer NOI (January 13, 2026)**
+### 🆕 **Latest Update: Operations Tab Enhancements (January 14, 2026)**
+Enhanced the multifamily Operations Tab P&L interface with drag-and-drop and collapsible sections:
+- ✅ **Draggable OpEx Categorization** - Drag expense items between parent categories
+- ✅ **Detail/Summary Toggle** - All sections (Rental Income, Vacancy, OpEx) now collapsible
+- ✅ **Vacancy Summary Row** - Shows total deduction percentage and amount when collapsed
+- ✅ **CSS Refinements** - Fixed duplicate drag handles, tree connector alignment
+- 📁 **Location:** `src/components/operations/` - See session notes for details
+
+### Previous Update: Loss to Lease & Year 1 Buyer NOI (January 13, 2026)
 Implemented comprehensive income analysis tools for multifamily underwriting:
 - ✅ **Loss to Lease Calculator** - Simple and time-weighted methods
 - ✅ **Year 1 Buyer NOI** - Actual rents + proforma expenses (realistic Day 1 cash flow)
@@ -43,9 +51,17 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-01-13)
+## Current State Snapshot (2026-01-14)
 
 ### 🆕 Latest Updates
+
+**January 14, 2026** - Operations Tab Enhancements:
+- ✅ **DraggableOpexSection** - New component using React DnD for expense categorization
+- ✅ **DetailSummaryToggle** - Added to RentalIncomeSection and VacancyDeductionsSection
+- ✅ **Vacancy Summary** - Shows combined deduction percentage (e.g., "7.5%") and total amount
+- ✅ **CSS Fixes** - Removed duplicate drag handles, fixed tree connector for draggable rows
+- ✅ **API Enhancement** - All expense items now persistently draggable between categories
+- 📁 **Files:** `DraggableOpexSection.tsx`, `RentalIncomeSection.tsx`, `VacancyDeductionsSection.tsx`
 
 **January 13, 2026** - Loss to Lease & Year 1 Buyer NOI Implementation:
 - ✅ **IncomeAnalysisDetector** - Detects when LTL/Year 1 NOI analysis applies

@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Operations Tab Enhancements (Jan 14, 2026)',
+      path: '/docs/09_session_notes/2026-01-14-operations-tab-enhancements.md',
+      category: 'Component',
+      description: 'Draggable OpEx categorization with React DnD, Detail/Summary toggle for all P&L sections (Rental Income, Vacancy, OpEx), CSS fixes for drag handles',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-14'
+    },
+    {
       title: 'Loss to Lease & Year 1 Buyer NOI (Jan 13, 2026)',
       path: '/docs/09_session_notes/2026-01-13-loss-to-lease-year1-noi.md',
       category: 'AI',
@@ -210,9 +218,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement)',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Operations Tab enhancements',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2025-01-21'
+      lastModified: '2026-01-14'
     },
     {
       title: 'CRE Implementation Summary',
