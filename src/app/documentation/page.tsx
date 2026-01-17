@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Operations & Income Approach Data Flow Fix (Jan 17, 2026)',
+      path: '/docs/00_overview/status/OPERATIONS_INCOME_APPROACH_DATA_FLOW_COMPLETE_26-01-17.md',
+      category: 'Status',
+      description: 'Fixed Property → Operations → Income Approach data flow. Read-only rental income, calculated vacancy, NOI basis consolidation (4→3), 3-column P&L with toggles',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-17'
+    },
+    {
       title: 'Operations Tab Enhancements (Jan 14, 2026)',
       path: '/docs/09_session_notes/2026-01-14-operations-tab-enhancements.md',
       category: 'Component',
@@ -71,12 +79,12 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2025-12-23'
     },
     {
-      title: 'Implementation Status (Dec 21)',
+      title: 'Implementation Status (Jan 17, 2026)',
       path: '/docs/00_overview/status/IMPLEMENTATION_STATUS_25-12-21.md',
       category: 'Status',
-      description: 'Knowledge Extraction Platform, Developer Operations, Project Onboarding, Market Intelligence',
+      description: 'Operations & Income Approach data flow fix, NOI basis consolidation, Knowledge Extraction Platform, Developer Operations',
       icon: <FileText className="w-5 h-5" />,
-      lastModified: '2025-12-21'
+      lastModified: '2026-01-17'
     },
     {
       title: 'Project 42 Multi-Scenario OpEx Parser Proof',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useMemo, useEffect, useCallback } from 'react';
 import { CCard, CCardBody } from '@coreui/react';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
 import OpExHierarchy from '@/app/components/OpExHierarchy';
@@ -11,14 +11,18 @@ import {
   VacancyDeductionsSection,
   OtherIncomeSection,
   OperatingExpensesSection,
+  DraggableOpexSection,
   EGISubtotalBar,
   NOITotalBar,
   SummaryBar,
   OperationsHeader,
+  ValueAddCard,
   LineItemRow
 } from '@/components/operations';
 import '@/styles/operations-tab.css';
 import { useOperationsData } from '@/hooks/useOperationsData';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
+import { useValueAddAssumptions } from '@/hooks/useValueAddAssumptions';
 
 interface Project {
   project_id: number;
@@ -56,8 +60,89 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     updateInput,
     toggleValueAdd,
     toggleExpand,
-    saveAll
+    saveAll,
+    reload
   } = useOperationsData(project.project_id);
+
+  const rentalRows: LineItemRow[] = rentalIncome?.rows || [];
+  const unitCount = propertySummary?.unit_count || 0;
+  const totalSF = propertySummary?.total_sf || 0;
+
+  const unitMixStats = useMemo(() => {
+    const totalUnitsFromRows = rentalRows.reduce((sum, row) => sum + (row.as_is.count || 0), 0);
+    const weightedRent = rentalRows.reduce(
+      (sum, row) => sum + (row.as_is.rate || 0) * (row.as_is.count || 0),
+      0
+    );
+    const avgCurrentRent = totalUnitsFromRows > 0 ? weightedRent / totalUnitsFromRows : 0;
+    const avgUnitSf = propertySummary?.avg_unit_sf || (unitCount > 0 ? totalSF / unitCount : 0);
+
+    return {
+      totalUnits: unitCount || totalUnitsFromRows,
+      avgUnitSf,
+      avgCurrentRent
+    };
+  }, [rentalRows, propertySummary?.avg_unit_sf, totalSF, unitCount]);
+
+  const {
+    state: valueAddState,
+    calculated: valueAddCalculated,
+    updateField: updateValueAddField,
+    isLoading: isValueAddLoading,
+    isSaving: isValueAddSaving,
+    error: valueAddError
+  } = useValueAddAssumptions(project.project_id, unitMixStats);
+
+  const handleValueAddToggle = useCallback(async () => {
+    const nextValue = !valueAddEnabled;
+    await toggleValueAdd();
+    updateValueAddField('isEnabled', nextValue);
+  }, [toggleValueAdd, updateValueAddField, valueAddEnabled]);
+
+  useEffect(() => {
+    if (!isValueAddLoading && valueAddState.isEnabled !== valueAddEnabled) {
+      updateValueAddField('isEnabled', valueAddEnabled);
+    }
+  }, [isValueAddLoading, updateValueAddField, valueAddEnabled, valueAddState.isEnabled]);
+
+  const getValueAddErrors = useCallback((nextState: typeof valueAddState) => {
+    const errors: Partial<Record<keyof typeof valueAddState, string>> = {};
+    if (nextState.renoCost <= 0) errors.renoCost = 'Must be greater than 0.';
+    if (nextState.relocationIncentive < 0) errors.relocationIncentive = 'Must be 0 or greater.';
+    if (!nextState.renovateAll) {
+      if (nextState.unitsToRenovate === null || nextState.unitsToRenovate <= 0) {
+        errors.unitsToRenovate = 'Enter a positive unit count.';
+      } else if (unitMixStats.totalUnits > 0 && nextState.unitsToRenovate > unitMixStats.totalUnits) {
+        errors.unitsToRenovate = `Cannot exceed total units (${unitMixStats.totalUnits}).`;
+      }
+    }
+    if (nextState.renoStartsPerMonth <= 0) errors.renoStartsPerMonth = 'Must be greater than 0.';
+    if (nextState.renoStartMonth < 1) errors.renoStartMonth = 'Must be 1 or greater.';
+    if (nextState.monthsToComplete < 1) errors.monthsToComplete = 'Must be 1 or greater.';
+    if (nextState.rentPremiumPct < 0 || nextState.rentPremiumPct > 1) {
+      errors.rentPremiumPct = 'Must be between 0 and 1.';
+    }
+    if (nextState.reletMonths < 0) errors.reletMonths = 'Must be 0 or greater.';
+    return errors;
+  }, [unitMixStats.totalUnits]);
+
+  const valueAddErrors = useMemo(() => getValueAddErrors(valueAddState), [getValueAddErrors, valueAddState]);
+
+  const handleValueAddUpdate = useCallback(<K extends keyof typeof valueAddState>(
+    key: K,
+    value: (typeof valueAddState)[K]
+  ) => {
+    const nextState = { ...valueAddState, [key]: value };
+    const nextErrors = getValueAddErrors(nextState);
+    updateValueAddField(key, value, { skipSave: Object.keys(nextErrors).length > 0 });
+  }, [getValueAddErrors, updateValueAddField, valueAddState]);
+
+  // Auto-refresh when Landscaper updates operating expenses
+  useLandscaperRefresh(
+    project.project_id,
+    ['operating_expenses', 'units', 'unit_types', 'leases'],
+    reload
+  );
 
   // Handle input updates - route to correct section
   const handleUpdateRow = (section: 'rental_income' | 'vacancy_deductions' | 'other_income' | 'operating_expenses') =>
@@ -70,6 +155,32 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     (lineItemKey: string) => {
       toggleExpand(section, lineItemKey);
     };
+
+  // Handle expense category change (drag and drop)
+  const handleCategoryChange = async (opexId: number, newCategory: string, label: string) => {
+    try {
+      const response = await fetch('/api/opex/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opex_id: opexId,
+          new_category: newCategory,
+          label: label
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update category');
+      }
+
+      // Reload data to reflect the change
+      reload();
+    } catch (error) {
+      console.error('Failed to categorize expense:', error);
+      throw error;
+    }
+  };
 
   // Land projects use OpExHierarchy
   if (isLand) {
@@ -184,29 +295,52 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
   }
 
   // Extract row data for sections
-  const rentalRows: LineItemRow[] = rentalIncome?.rows || [];
   const vacancyRows: LineItemRow[] = vacancyDeductions?.rows || [];
   const otherRows: LineItemRow[] = otherIncome?.rows || [];
   const opexRows: LineItemRow[] = operatingExpenses?.rows || [];
 
   // Calculate GPR for vacancy calculations
   const grossPotentialRent = totals?.gross_potential_rent || 0;
-  const unitCount = propertySummary?.unit_count || 0;
-  const totalSF = propertySummary?.total_sf || 0;
 
   return (
-    <div className="ops-container">
-      {/* Header with Value-Add toggle */}
+    <CCard>
+      {/* Header */}
       <OperationsHeader
         projectName={project.project_name}
         unitCount={unitCount}
         totalSF={totalSF}
-        valueAddEnabled={valueAddEnabled}
-        onToggleValueAdd={toggleValueAdd}
         isSaving={isSaving}
         isDirty={isDirty}
         onSave={saveAll}
       />
+      <CCardBody className="p-0">
+        <div className="ops-container">
+          {/* Value-Add Compact Card */}
+          <ValueAddCard
+            isEnabled={valueAddEnabled}
+            state={valueAddState}
+            calculated={valueAddCalculated}
+            stats={unitMixStats}
+            onToggle={handleValueAddToggle}
+            onUpdate={handleValueAddUpdate}
+            isLoading={isValueAddLoading}
+            isSaving={isValueAddSaving}
+          />
+
+      {valueAddError && (
+        <div
+          className="rounded-lg px-4 py-2 border flex items-center gap-2"
+          style={{
+            backgroundColor: 'var(--cui-warning-bg)',
+            borderColor: 'var(--cui-warning)'
+          }}
+        >
+          <svg className="w-4 h-4" style={{ color: 'var(--cui-warning)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm" style={{ color: 'var(--cui-warning)' }}>{valueAddError}</span>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -224,7 +358,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         </div>
       )}
 
-      {/* Section 1: Rental Income */}
+      {/* Section 1: Rental Income - Read-only (from rent roll) */}
       {rentalRows.length > 0 && (
         <RentalIncomeSection
           rows={rentalRows}
@@ -232,6 +366,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           availableScenarios={availableScenarios}
           preferredScenario={preferredScenario}
           valueAddEnabled={valueAddEnabled}
+          rentPremiumPct={valueAddState.rentPremiumPct}
+          hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
           onUpdateRow={handleUpdateRow('rental_income')}
         />
       )}
@@ -244,6 +380,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           availableScenarios={availableScenarios}
           preferredScenario={preferredScenario}
           valueAddEnabled={valueAddEnabled}
+          hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
           onUpdateRow={handleUpdateRow('vacancy_deductions')}
         />
       )}
@@ -269,9 +406,9 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         availableScenarios={availableScenarios}
       />
 
-      {/* Section 4: Operating Expenses */}
+      {/* Section 4: Operating Expenses - Always draggable for category reassignment */}
       {opexRows.length > 0 && (
-        <OperatingExpensesSection
+        <DraggableOpexSection
           rows={opexRows}
           unitCount={unitCount}
           totalSF={totalSF}
@@ -280,6 +417,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           valueAddEnabled={valueAddEnabled}
           onUpdateRow={handleUpdateRow('operating_expenses')}
           onToggleExpand={handleToggleExpand('operating_expenses')}
+          onCategoryChange={handleCategoryChange}
         />
       )}
 
@@ -299,7 +437,9 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         noiUpliftPercent={totals?.noi_uplift_percent || 0}
         valueAddEnabled={valueAddEnabled}
       />
-    </div>
+        </div>
+      </CCardBody>
+    </CCard>
   );
 }
 

@@ -1,0 +1,337 @@
+/**
+ * TypeScript types for Income Approach Valuation UI
+ *
+ * Session: QK-11
+ */
+
+// ============================================================================
+// NOI BASIS TYPES
+// ============================================================================
+
+// F-12 Current = Current rents (in-place), F-12 Market = Market rents, Stabilized = Market at stabilized vacancy
+export type NOIBasis = 'f12_current' | 'f12_market' | 'stabilized';
+
+// Legacy basis type for backwards compatibility during migration
+export type LegacyNOIBasis = 'trailing_12' | 'forward_12' | 'avg_straddle' | 'stabilized';
+
+export type CapRateMethod = 'comp_sales' | 'band_investment' | 'investor_survey' | 'other';
+
+// ============================================================================
+// VALUE TILE
+// ============================================================================
+
+export interface NOICalculation {
+  gpr: number;
+  vacancy_loss: number;
+  vacancy_rate: number;
+  credit_loss: number;
+  credit_loss_rate: number;
+  other_income: number;
+  egi: number;
+  base_opex: number;
+  management_fee: number;
+  management_fee_pct: number;
+  replacement_reserves: number;
+  total_opex: number;
+  noi: number;
+  expense_ratio: number;
+}
+
+export interface ValueTile {
+  id: NOIBasis;
+  label: string;
+  value: number | null;
+  noi: number;
+  cap_rate: number;
+  price_per_unit: number | null;
+  price_per_sf: number | null;
+  calculation: NOICalculation;
+  uses_stabilized_vacancy?: boolean;
+}
+
+// ============================================================================
+// RENT ROLL & OPEX
+// ============================================================================
+
+export interface RentRollItem {
+  line_item_key: string;
+  label: string;
+  unit_count: number;
+  avg_sf: number;
+  monthly_rent: number;
+  annual_total: number;
+}
+
+export interface RentRollData {
+  t12_gpr: number;
+  forward_gpr: number;
+  items: RentRollItem[];
+}
+
+export interface OpExItem {
+  category: string;
+  expense_type: string;
+  annual_amount: number;
+  per_unit: number;
+  per_sf: number;
+}
+
+export interface OperatingExpensesData {
+  total: number;
+  items: OpExItem[];
+}
+
+// ============================================================================
+// ASSUMPTIONS
+// ============================================================================
+
+export interface IncomeApproachAssumptions {
+  // Income - These are READ-ONLY (pulled from Operations Tab)
+  vacancy_rate: number;           // From Operations - physical vacancy
+  credit_loss_rate: number;       // From Operations
+  concessions_rate?: number;      // From Operations
+
+  // Income - These are EDITABLE (Income Approach specific)
+  stabilized_vacancy_rate: number; // Editable - for Stabilized scenario only
+  other_income: number;           // Editable - other income assumption
+  income_growth_rate: number;     // Editable - for DCF projection
+
+  // Expenses - READ-ONLY (pulled from Operations Tab)
+  management_fee_pct: number;     // From Operations
+  total_opex?: number;            // From Operations - total annual OpEx
+
+  // Expenses - EDITABLE (Income Approach specific)
+  replacement_reserves_per_unit: number; // Editable
+  expense_growth_rate: number;    // Editable - for DCF projection
+
+  // Capitalization (all editable)
+  selected_cap_rate: number;
+  cap_rate_interval: number;
+  market_cap_rate_method: CapRateMethod;
+  cap_rate_justification: string;
+
+  // DCF Parameters (all editable)
+  hold_period_years: number;
+  terminal_cap_rate: number;
+  discount_rate: number;
+  discount_rate_interval: number;
+  selling_costs_pct: number;
+
+  // Selection
+  noi_capitalization_basis: NOIBasis;
+}
+
+/**
+ * Indicates which fields are read-only vs editable in Income Approach
+ */
+export interface IncomeApproachFieldMetadata {
+  isReadOnly: boolean;
+  source: 'operations' | 'income_approach' | 'rent_roll';
+  label: string;
+}
+
+// ============================================================================
+// SENSITIVITY MATRIX
+// ============================================================================
+
+export interface SensitivityPoint {
+  cap_rate: number;
+  value: number | null;
+  price_per_unit: number | null;
+  is_selected: boolean;
+}
+
+// ============================================================================
+// KEY METRICS
+// ============================================================================
+
+export interface KeyMetrics {
+  price_per_unit: number | null;
+  price_per_sf: number | null;
+  grm: number | null;
+  expense_ratio: number;
+  opex_per_unit: number | null;
+  opex_per_sf: number | null;
+  break_even_occupancy: number | null;
+}
+
+// ============================================================================
+// PROPERTY SUMMARY
+// ============================================================================
+
+export interface PropertySummary {
+  unit_count: number;
+  total_sf: number;
+  avg_unit_sf: number;
+}
+
+// ============================================================================
+// FULL API RESPONSE
+// ============================================================================
+
+export interface IncomeApproachData {
+  project_id: number;
+  project_name: string;
+  project_type_code: string;
+
+  property_summary: PropertySummary;
+  rent_roll: RentRollData;
+  operating_expenses: OperatingExpensesData;
+  assumptions: IncomeApproachAssumptions;
+
+  value_tiles: ValueTile[];
+
+  selected_basis: NOIBasis;
+  selected_calculation: NOICalculation;
+  selected_value: number | null;
+
+  sensitivity_matrix: SensitivityPoint[];
+  key_metrics: KeyMetrics;
+
+  income_approach_id: number;
+}
+
+// ============================================================================
+// UPDATE PAYLOAD
+// ============================================================================
+
+export type IncomeApproachUpdatePayload = Partial<IncomeApproachAssumptions>;
+
+// ============================================================================
+// COMPONENT PROPS
+// ============================================================================
+
+export interface ValueTilesProps {
+  tiles: ValueTile[];
+  selectedBasis: NOIBasis;
+  onSelectBasis: (basis: NOIBasis) => void;
+  unitCount: number;
+}
+
+export interface AssumptionsPanelProps {
+  assumptions: IncomeApproachAssumptions;
+  rentRoll: RentRollData;
+  operatingExpenses: OperatingExpensesData;
+  onAssumptionChange: (field: keyof IncomeApproachAssumptions, value: number | string) => void;
+  isLoading?: boolean;
+  isSaving?: boolean;
+}
+
+export interface DirectCapViewProps {
+  calculation: NOICalculation;
+  value: number | null;
+  capRate: number;
+  propertySummary: PropertySummary;
+  rentRollItems: RentRollItem[];
+  opexItems: OpExItem[];
+  sensitivityMatrix: SensitivityPoint[];
+  keyMetrics: KeyMetrics;
+  selectedBasis: NOIBasis;
+  /** All value tiles for 3-column P&L display */
+  allTiles?: ValueTile[];
+}
+
+export interface SensitivityMatrixProps {
+  data: SensitivityPoint[];
+  selectedCapRate: number;
+  unitCount: number;
+}
+
+// ============================================================================
+// FORMATTING UTILITIES
+// ============================================================================
+
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `$${value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+export function formatCurrencyCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  if (value >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `$${(value / 1_000).toFixed(0)}K`;
+  }
+  return `$${value.toFixed(0)}`;
+}
+
+export function formatPercent(value: number | null | undefined, decimals: number = 2): string {
+  if (value === null || value === undefined) return '—';
+  return `${(value * 100).toFixed(decimals)}%`;
+}
+
+export function formatPerUnit(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `$${value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}/unit`;
+}
+
+export function formatPerSF(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `$${value.toFixed(2)}/SF`;
+}
+
+export function formatMultiple(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `${value.toFixed(2)}x`;
+}
+
+// ============================================================================
+// NOI BASIS LABELS
+// ============================================================================
+
+export const NOI_BASIS_LABELS: Record<NOIBasis, string> = {
+  f12_current: 'F-12 Current',
+  f12_market: 'F-12 Market',
+  stabilized: 'Stabilized',
+};
+
+export const NOI_BASIS_DESCRIPTIONS: Record<NOIBasis, string> = {
+  f12_current: 'Forward 12 months using current in-place rents',
+  f12_market: 'Forward 12 months using market rents',
+  stabilized: 'Market rent at stabilized occupancy',
+};
+
+// Legacy labels for migration compatibility
+export const LEGACY_NOI_BASIS_LABELS: Record<LegacyNOIBasis, string> = {
+  trailing_12: 'T-12',
+  forward_12: 'Forward 12',
+  avg_straddle: 'Average',
+  stabilized: 'Stabilized',
+};
+
+// ============================================================================
+// TILE COLORS
+// ============================================================================
+
+export const TILE_COLORS: Record<NOIBasis, { bg: string; border: string; text: string }> = {
+  f12_current: {
+    bg: 'rgba(71, 85, 105, 0.2)',
+    border: '#475569',
+    text: '#94a3b8',
+  },
+  f12_market: {
+    bg: 'rgba(13, 148, 136, 0.2)',
+    border: '#0D9488',
+    text: '#5eead4',
+  },
+  stabilized: {
+    bg: 'rgba(5, 150, 105, 0.2)',
+    border: '#059669',
+    text: '#6ee7b7',
+  },
+};
+
+// DCF tile color (separate since it's a different valuation method)
+export const DCF_TILE_COLOR = {
+  bg: 'rgba(124, 58, 237, 0.2)',
+  border: '#7C3AED',
+  text: '#c4b5fd',
+};

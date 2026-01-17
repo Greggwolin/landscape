@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react';
 import { SectionCard } from './SectionCard';
+import { DetailSummaryToggle, ViewMode } from './DetailSummaryToggle';
 import { InputCell } from './InputCell';
 import { EvidenceCell } from './EvidenceCell';
 import { AddButton } from './AddButton';
-import { LineItemRow, formatCurrency } from './types';
+import { LockClosedIcon } from '@heroicons/react/20/solid';
+import { LineItemRow, formatCurrency, formatPercent } from './types';
 
 interface VacancyDeductionsSectionProps {
   rows: LineItemRow[];
@@ -13,6 +15,7 @@ interface VacancyDeductionsSectionProps {
   availableScenarios: string[];
   preferredScenario: string;
   valueAddEnabled: boolean;
+  hasDetailedRentRoll?: boolean;
   onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
   onAddItem?: () => void;
 }
@@ -29,9 +32,11 @@ export function VacancyDeductionsSection({
   availableScenarios,
   preferredScenario,
   valueAddEnabled,
+  hasDetailedRentRoll = false,
   onUpdateRow,
   onAddItem
 }: VacancyDeductionsSectionProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
   // Calculate totals (all deductions are negative)
@@ -47,14 +52,23 @@ export function VacancyDeductionsSection({
   const netRentalIncomeAsIs = grossPotentialRent + totals.as_is_total; // totals are negative
   const netRentalIncomePostReno = grossPotentialRent + totals.post_reno_total;
 
+  // Calculate total deduction percentage of GPR
+  const totalDeductionPercentAsIs = grossPotentialRent > 0
+    ? Math.abs(totals.as_is_total) / grossPotentialRent
+    : 0;
+  const totalDeductionPercentPostReno = grossPotentialRent > 0
+    ? Math.abs(totals.post_reno_total) / grossPotentialRent
+    : 0;
+
   // Determine if there are extra scenarios beyond the preferred one
   const hasExtraScenarios = availableScenarios.length > 1;
   const extraScenarios = availableScenarios.filter(s => s !== preferredScenario);
 
   const controls = (
-    <>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       {onAddItem && <AddButton label="Add" onClick={onAddItem} />}
-    </>
+      <DetailSummaryToggle value={viewMode} onChange={setViewMode} />
+    </div>
   );
 
   return (
@@ -100,23 +114,40 @@ export function VacancyDeductionsSection({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {viewMode === 'detail' && rows.map((row) => {
             // Calculate amount from rate if it's a percentage
             const isPercentage = row.is_percentage;
             const asIsAmount = row.as_is.total;
             const postRenoAmount = row.post_reno?.total;
+            // Physical vacancy is read-only if calculated from rent roll
+            const isReadOnly = row.is_readonly || (row.line_item_key === 'physical_vacancy' && hasDetailedRentRoll);
 
             return (
               <tr key={row.line_item_key}>
-                <td>{row.label}</td>
+                <td className="flex items-center gap-1">
+                  {row.label}
+                  {isReadOnly && (
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 ml-1">
+                      <LockClosedIcon className="w-3 h-3" />
+                      <span className="hidden sm:inline">Calculated</span>
+                    </span>
+                  )}
+                </td>
                 <td className="num">{row.as_is.count ?? '—'}</td>
                 <td className="num">
-                  <InputCell
-                    value={row.as_is.rate}
-                    variant="as-is"
-                    format={isPercentage ? 'percent' : 'currency'}
-                    onChange={(val) => onUpdateRow(row.line_item_key, 'as_is_rate', val)}
-                  />
+                  {isReadOnly ? (
+                    // Read-only display for calculated vacancy
+                    <span className="text-sm font-medium">
+                      {formatPercent(row.as_is.rate)}
+                    </span>
+                  ) : (
+                    <InputCell
+                      value={row.as_is.rate}
+                      variant="as-is"
+                      format={isPercentage ? 'percent' : 'currency'}
+                      onChange={(val) => onUpdateRow(row.line_item_key, 'as_is_rate', val)}
+                    />
+                  )}
                 </td>
                 <td className="num">—</td>
                 <td className={`num ops-calc ${asIsAmount && asIsAmount < 0 ? 'ops-negative' : ''}`}>
@@ -158,18 +189,46 @@ export function VacancyDeductionsSection({
             );
           })}
 
-          {/* Subtotal Row - Net Rental Income */}
+          {/* Total Deductions Row - only in summary mode */}
+          {viewMode === 'summary' && (
+            <tr className="ops-subtotal-row">
+              <td>Total Vacancy & Deductions</td>
+              <td className="num">—</td>
+              <td className="num">
+                <span className="ops-subtotal-value">{(totalDeductionPercentAsIs * 100).toFixed(1)}%</span>
+              </td>
+              <td className="num">—</td>
+              <td className="num ops-calc ops-negative">({formatCurrency(Math.abs(totals.as_is_total))})</td>
+              <td className="num"></td>
+              {valueAddEnabled && (
+                <>
+                  <td className="num post-reno">
+                    <span className="ops-subtotal-value">{(totalDeductionPercentPostReno * 100).toFixed(1)}%</span>
+                  </td>
+                  <td className="num post-reno ops-calc ops-negative">({formatCurrency(Math.abs(totals.post_reno_total))})</td>
+                </>
+              )}
+              {availableScenarios.length > 0 && (
+                <td className="num evidence ops-evidence-group">—</td>
+              )}
+              {evidenceExpanded && extraScenarios.map(scenario => (
+                <td key={scenario} className="num evidence ops-evidence-extra">—</td>
+              ))}
+            </tr>
+          )}
+
+          {/* Net Rental Income Subtotal Row - always visible */}
           <tr className="ops-subtotal-row">
             <td>Net Rental Income</td>
             <td className="num"></td>
             <td className="num"></td>
             <td className="num"></td>
-            <td className="num">{formatCurrency(netRentalIncomeAsIs)}</td>
+            <td className="num ops-calc">{formatCurrency(netRentalIncomeAsIs)}</td>
             <td className="num"></td>
             {valueAddEnabled && (
               <>
                 <td className="num post-reno"></td>
-                <td className="num post-reno">{formatCurrency(netRentalIncomePostReno)}</td>
+                <td className="num post-reno ops-calc">{formatCurrency(netRentalIncomePostReno)}</td>
               </>
             )}
             {availableScenarios.length > 0 && (

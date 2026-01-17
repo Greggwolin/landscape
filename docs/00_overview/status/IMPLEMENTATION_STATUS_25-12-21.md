@@ -1,14 +1,43 @@
 # Landscape Implementation Status
 
-**Version:** 7.0
-**Last Updated:** 2025-12-21
+**Version:** 7.1
+**Last Updated:** 2026-01-17
 **Purpose:** Comprehensive implementation status reference for AI context
 
 ---
 
-## 🆕 Recent Updates (December 3 - December 21, 2025)
+## 🆕 Recent Updates (January 2026)
 
-### Knowledge Extraction Platform (Dec 20-21, 2025) ⭐ NEW
+### Operations Tab & Income Approach Data Flow Fix (Jan 17, 2026) ⭐ NEW
+- ✅ **Data Flow Architecture** - Fixed broken Property → Operations → Income Approach data flow
+- ✅ **Operations Tab Read-Only** - Rental income now pulled from Property Tab (read-only with lock icons)
+- ✅ **Vacancy Calculation** - Physical vacancy calculated from `occupancy_status` when rent roll exists
+- ✅ **Current/Market Columns** - Operations Tab shows both current and market rent columns
+- ✅ **NOI Basis Consolidation** - Reduced from 4 bases to 3: F-12 Current, F-12 Market, Stabilized
+- ✅ **Value Tiles 3+1** - 3 Direct Cap tiles + DCF placeholder
+- ✅ **3-Column P&L** - DirectCapView shows all 3 bases side-by-side with visibility toggles
+- 📁 Files Modified:
+  - `src/app/api/projects/[projectId]/operations/route.ts` (new data source)
+  - `backend/apps/financial/views_income_approach.py` (3-basis calculation)
+  - `src/components/operations/RentalIncomeSection.tsx` (read-only)
+  - `src/components/operations/VacancyDeductionsSection.tsx` (conditional edit)
+  - `src/components/valuation/income-approach/DirectCapView.tsx` (3-column P&L)
+  - `src/components/valuation/income-approach/ValueTiles.tsx` (3+1 layout)
+  - `src/types/income-approach.ts` (NOIBasis type update)
+- 📖 Documentation: [2026-01-17-operations-income-approach-data-flow.md](../09_session_notes/2026-01-17-operations-income-approach-data-flow.md)
+- 🎯 Status: Complete - Numbers now tie across all tabs
+
+### Loss to Lease & Year 1 Buyer NOI Tools (Jan 2026)
+- ✅ **Loss to Lease Analysis** - Compare current rents to market rents
+- ✅ **Year 1 Buyer NOI** - Calculate buyer's first-year NOI with rent growth assumptions
+- 📖 Documentation: See commit `4c1963f`
+- 🎯 Status: Complete
+
+---
+
+## Previous Updates (December 2025)
+
+### Knowledge Extraction Platform (Dec 20-21, 2025)
 - ✅ **New Django App** - `apps.knowledge` with registry-based extraction, classification, and status APIs
 - ✅ **Extraction Services** - Batched extractor (`extract_document_batched`), registry writer, rent-roll chunker, document processor, and field registry
 - ✅ **Embeddings Pipeline** - Text extraction → chunking → OpenAI embeddings → `knowledge_embeddings` storage

@@ -1,0 +1,197 @@
+'use client';
+
+/**
+ * SensitivityMatrix Component
+ *
+ * Displays a cap rate sensitivity table showing value at different
+ * cap rates around the selected rate.
+ *
+ * Session: QK-11
+ */
+
+import React from 'react';
+import type { SensitivityMatrixProps } from '@/types/income-approach';
+import { formatCurrencyCompact, formatPercent } from '@/types/income-approach';
+
+export function SensitivityMatrix({
+  data,
+  selectedCapRate,
+  unitCount: _unitCount,
+}: SensitivityMatrixProps) {
+  void _unitCount; // Reserved for price per unit display
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        border: '1px solid var(--cui-border-color)',
+      }}
+    >
+      <div
+        className="px-4 py-3 border-b"
+        style={{ borderColor: 'var(--cui-border-color)' }}
+      >
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider"
+          style={{ color: 'var(--cui-body-color)' }}
+        >
+          Cap Rate Sensitivity
+        </h3>
+      </div>
+
+      <div className="p-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th
+                className="text-left py-2 px-3 text-xs uppercase tracking-wider"
+                style={{ color: 'var(--cui-secondary-color)' }}
+              >
+                Metric
+              </th>
+              {data.map((point) => (
+                <th
+                  key={point.cap_rate}
+                  className="text-center py-2 px-3"
+                  style={{
+                    backgroundColor: point.is_selected
+                      ? 'var(--cui-primary)'
+                      : 'transparent',
+                    color: point.is_selected
+                      ? 'white'
+                      : 'var(--cui-secondary-color)',
+                    borderRadius: point.is_selected ? '4px 4px 0 0' : 0,
+                  }}
+                >
+                  {formatPercent(point.cap_rate)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {/* Value Row */}
+            <tr>
+              <td
+                className="py-3 px-3 font-medium"
+                style={{ color: 'var(--cui-body-color)' }}
+              >
+                Value
+              </td>
+              {data.map((point) => (
+                <td
+                  key={point.cap_rate}
+                  className="text-center py-3 px-3 font-semibold"
+                  style={{
+                    backgroundColor: point.is_selected
+                      ? 'rgba(var(--cui-primary-rgb), 0.1)'
+                      : 'transparent',
+                    color: point.is_selected
+                      ? 'var(--cui-primary)'
+                      : 'var(--cui-body-color)',
+                  }}
+                >
+                  {point.value ? formatCurrencyCompact(point.value) : '—'}
+                </td>
+              ))}
+            </tr>
+
+            {/* Price per Unit Row */}
+            <tr style={{ borderTop: '1px solid var(--cui-border-color)' }}>
+              <td
+                className="py-3 px-3"
+                style={{ color: 'var(--cui-secondary-color)' }}
+              >
+                $/Unit
+              </td>
+              {data.map((point) => (
+                <td
+                  key={point.cap_rate}
+                  className="text-center py-3 px-3"
+                  style={{
+                    backgroundColor: point.is_selected
+                      ? 'rgba(var(--cui-primary-rgb), 0.1)'
+                      : 'transparent',
+                    color: point.is_selected
+                      ? 'var(--cui-primary)'
+                      : 'var(--cui-secondary-color)',
+                  }}
+                >
+                  {point.price_per_unit
+                    ? `$${Math.round(point.price_per_unit / 1000)}K`
+                    : '—'}
+                </td>
+              ))}
+            </tr>
+
+            {/* Change from Selected Row */}
+            <tr style={{ borderTop: '1px solid var(--cui-border-color)' }}>
+              <td
+                className="py-3 px-3"
+                style={{ color: 'var(--cui-secondary-color)' }}
+              >
+                vs Selected
+              </td>
+              {data.map((point) => {
+                const selectedPoint = data.find((p) => p.is_selected);
+                const selectedValue = selectedPoint?.value || 0;
+                const diff = point.value && selectedValue
+                  ? ((point.value - selectedValue) / selectedValue)
+                  : 0;
+                const isPositive = diff > 0;
+                const isNegative = diff < 0;
+
+                return (
+                  <td
+                    key={point.cap_rate}
+                    className="text-center py-3 px-3 text-xs"
+                    style={{
+                      backgroundColor: point.is_selected
+                        ? 'rgba(var(--cui-primary-rgb), 0.1)'
+                        : 'transparent',
+                      color: point.is_selected
+                        ? 'var(--cui-secondary-color)'
+                        : isPositive
+                        ? 'var(--cui-success)'
+                        : isNegative
+                        ? 'var(--cui-danger)'
+                        : 'var(--cui-secondary-color)',
+                    }}
+                  >
+                    {point.is_selected
+                      ? '—'
+                      : `${isPositive ? '+' : ''}${(diff * 100).toFixed(1)}%`}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div
+        className="px-4 py-2 border-t text-xs flex items-center gap-4"
+        style={{
+          borderColor: 'var(--cui-border-color)',
+          color: 'var(--cui-secondary-color)',
+        }}
+      >
+        <span>
+          <span
+            className="inline-block w-3 h-3 rounded mr-1"
+            style={{ backgroundColor: 'var(--cui-primary)' }}
+          />
+          Selected cap rate ({formatPercent(selectedCapRate)})
+        </span>
+        <span className="text-green-500">Green = higher value</span>
+        <span className="text-red-500">Red = lower value</span>
+      </div>
+    </div>
+  );
+}
+
+export default SensitivityMatrix;

@@ -29,8 +29,11 @@ export interface EvidenceByScenario {
 export interface AsIsInputs {
   count?: number | null;
   rate?: number | null;
+  market_rate?: number | null; // Market rent (for comparison with current)
   per_sf?: number | null;
+  market_per_sf?: number | null; // Market $/SF
   total: number;
+  market_total?: number; // Market total (for comparison)
   growth_rate?: number;
   growth_type?: GrowthType;
 }
@@ -56,6 +59,7 @@ export interface LineItemRow {
   level: number; // 0=parent, 1=child
   is_calculated: boolean; // true for parent rollup rows
   is_percentage?: boolean; // true for vacancy %, management fee %
+  is_readonly?: boolean; // true for read-only fields (from rent roll, calculated vacancy)
   calculation_base?: string; // 'gpr', 'egi', 'nri' for % calculations
 
   // User inputs (editable)
@@ -71,6 +75,12 @@ export interface LineItemRow {
   // Child rows (for hierarchical sections)
   children?: LineItemRow[];
   is_expanded?: boolean;
+
+  // Drag-and-drop support for OpEx categorization
+  opex_id?: number;
+  parent_category?: string;
+  is_draggable?: boolean; // true for unclassified items
+  is_unclassified_section?: boolean; // true for the unclassified parent group
 }
 
 /**
@@ -78,9 +88,13 @@ export interface LineItemRow {
  */
 export interface SectionData {
   section_type: 'flat' | 'hierarchical';
+  is_readonly?: boolean; // true if entire section is read-only
+  has_detailed_rent_roll?: boolean; // true if data comes from detailed rent roll
+  calculated_physical_vacancy?: number | null; // calculated vacancy rate from rent roll
   rows: LineItemRow[];
   section_total: {
     as_is: number;
+    as_is_market?: number; // Market rent total
     post_reno: number;
   };
 }
@@ -99,12 +113,17 @@ export interface PropertySummary {
  * Calculated totals
  */
 export interface OperationsTotals {
+  // Current rent totals (F-12 Current)
   gross_potential_rent: number;
+  gross_potential_rent_market?: number; // Market GPR (F-12 Market)
   net_rental_income: number;
+  net_rental_income_market?: number;
   total_other_income: number;
   effective_gross_income: number;
+  effective_gross_income_market?: number;
   total_operating_expenses: number;
-  as_is_noi: number;
+  as_is_noi: number; // F-12 Current NOI
+  market_noi?: number; // F-12 Market NOI
   post_reno_noi: number;
   noi_uplift: number;
   noi_uplift_percent: number;
@@ -120,6 +139,10 @@ export interface OperationsResponse {
 
   // Toggle state
   value_add_enabled: boolean;
+
+  // Data source indicators
+  has_detailed_rent_roll?: boolean; // true if detailed unit data exists
+  calculated_physical_vacancy?: number | null; // calculated vacancy from rent roll
 
   // Four P&L sections
   rental_income: SectionData;
