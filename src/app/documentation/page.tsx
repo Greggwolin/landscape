@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Documentation Update (Jan 18, 2026)',
+      path: '/docs/09_session_notes/2026-01-18-documentation-update.md',
+      category: 'Status',
+      description: 'Comprehensive documentation center update - consolidated recent session notes, updated status pages, refreshed timestamps',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-01-18'
+    },
+    {
       title: 'Operations & Income Approach Data Flow Fix (Jan 17, 2026)',
       path: '/docs/00_overview/status/OPERATIONS_INCOME_APPROACH_DATA_FLOW_COMPLETE_26-01-17.md',
       category: 'Status',
@@ -226,9 +234,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Operations Tab enhancements',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Operations & Income Approach data flow fix (Jan 17)',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-01-14'
+      lastModified: '2026-01-18'
     },
     {
       title: 'CRE Implementation Summary',

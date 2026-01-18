@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-14
-**Version:** 2.6
+**Last Updated:** 2026-01-18
+**Version:** 2.7
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1)
 
 ---
@@ -9,7 +9,16 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Operations Tab Enhancements (January 14, 2026)**
+### 🆕 **Latest Update: Operations & Income Approach Data Flow Fix (January 17, 2026)**
+Major refactoring to establish single source of truth for financial data across tabs:
+- ✅ **Property Tab as Source** - Rental income and occupancy data flows from `tbl_multifamily_unit`
+- ✅ **Operations Tab Read-Only** - Rental income now read-only with lock icon, calculated vacancy when rent roll exists
+- ✅ **NOI Basis Consolidation** - Reduced from 4 to 3 bases (F-12 Current, F-12 Market, Stabilized)
+- ✅ **3-Column P&L** - Income Approach now shows multi-column P&L with visibility toggles
+- ✅ **Value Tiles 3+1** - Three Direct Cap tiles plus DCF placeholder
+- 📁 **Location:** See `docs/00_overview/status/OPERATIONS_INCOME_APPROACH_DATA_FLOW_COMPLETE_26-01-17.md`
+
+### Previous Update: Operations Tab Enhancements (January 14, 2026)
 Enhanced the multifamily Operations Tab P&L interface with drag-and-drop and collapsible sections:
 - ✅ **Draggable OpEx Categorization** - Drag expense items between parent categories
 - ✅ **Detail/Summary Toggle** - All sections (Rental Income, Vacancy, OpEx) now collapsible
@@ -51,9 +60,19 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-01-14)
+## Current State Snapshot (2026-01-18)
 
 ### 🆕 Latest Updates
+
+**January 17, 2026** - Operations & Income Approach Data Flow Fix:
+- ✅ **Data Flow Architecture** - Property Tab → Operations Tab → Income Approach (single source of truth)
+- ✅ **Operations Backend** - Query `tbl_multifamily_unit` directly, add current/market rent columns, calculate vacancy
+- ✅ **Read-Only Rental Income** - Operations Tab now shows lock icon, "from Rent Roll" indicator
+- ✅ **Conditional Vacancy Edit** - Physical vacancy calculated when rent roll exists, editable otherwise
+- ✅ **NOI Basis Consolidation** - Changed from 4 bases to 3: F-12 Current, F-12 Market, Stabilized
+- ✅ **3-Column P&L** - DirectCapView with visibility toggles, color-coded columns
+- ✅ **Value Tiles 3+1** - Three Direct Cap tiles + DCF placeholder
+- 📁 **Files:** See `docs/00_overview/status/OPERATIONS_INCOME_APPROACH_DATA_FLOW_COMPLETE_26-01-17.md`
 
 **January 14, 2026** - Operations Tab Enhancements:
 - ✅ **DraggableOpexSection** - New component using React DnD for expense categorization
