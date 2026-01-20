@@ -20,29 +20,62 @@
  * // WRONG - Tailwind color class
  * <div className="bg-gray-800">  // NO!
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-01-20
+ * @updated 2026-01-20 - Added TileGrid, LandscaperPanel, StudioPanel
  */
 
-// Layout components
+// =============================================================================
+// LAYOUT COMPONENTS
+// =============================================================================
 export { StudioLayout } from './layout/StudioLayout';
+export type { StudioLayoutProps } from './layout/StudioLayout';
 
-// Core components (placeholders for future)
-// export { StudioPanel } from './core/StudioPanel';
+// =============================================================================
+// PANEL COMPONENTS
+// =============================================================================
+export { StudioPanel } from './StudioPanel';
+export type { StudioPanelProps } from './StudioPanel';
+
+// =============================================================================
+// NAVIGATION COMPONENTS
+// =============================================================================
+export { TileGrid } from './TileGrid';
+export type {
+  TileGridProps,
+  TileConfig,
+  TileStatus,
+  AnalysisType,
+} from './TileGrid';
+
+export { LandscaperPanel } from './LandscaperPanel';
+export type { LandscaperPanelProps, ActivityItem } from './LandscaperPanel';
+
+// =============================================================================
+// CORE COMPONENTS (placeholders for future)
+// =============================================================================
 // export { StudioCard } from './core/StudioCard';
 
-// Property components (placeholders for future)
+// =============================================================================
+// PROPERTY COMPONENTS (placeholders for future)
+// =============================================================================
 // export { PropertyAttributeForm } from './property/PropertyAttributeForm';
 // export { PropertyAttributeGrid } from './property/PropertyAttributeGrid';
 
-// Valuation components (placeholders for future)
+// =============================================================================
+// VALUATION COMPONENTS (placeholders for future)
+// =============================================================================
 // export { ValuationSummary } from './valuation/ValuationSummary';
 // export { HBUPanel } from './valuation/HBUPanel';
 
-// Form components (placeholders for future)
+// =============================================================================
+// FORM COMPONENTS (placeholders for future)
+// =============================================================================
 // export { StudioInput } from './forms/StudioInput';
 // export { StudioSelect } from './forms/StudioSelect';
 
-// Shared components (placeholders for future)
+// =============================================================================
+// SHARED COMPONENTS (placeholders for future)
+// =============================================================================
 // export { StudioBadge } from './shared/StudioBadge';
 // export { StudioDivider } from './shared/StudioDivider';

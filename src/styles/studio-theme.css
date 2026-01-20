@@ -422,3 +422,67 @@
 .studio-tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* ==========================================================================
+   TILE COLORS BY CATEGORY
+   Each tile has a gradient background based on its function
+   ========================================================================== */
+
+:root {
+  /* Tile backgrounds (gradient from/to) */
+  --studio-tile-home-from: #1f2937;
+  --studio-tile-home-to: #374151;
+
+  --studio-tile-property-from: #1e3a5f;
+  --studio-tile-property-to: #1e40af;
+
+  --studio-tile-market-from: #4c1d95;
+  --studio-tile-market-to: #5b21b6;
+
+  --studio-tile-hbu-from: #064e3b;
+  --studio-tile-hbu-to: #065f46;
+
+  --studio-tile-valuation-from: #831843;
+  --studio-tile-valuation-to: #9d174d;
+
+  --studio-tile-capitalization-from: #92400e;
+  --studio-tile-capitalization-to: #b45309;
+
+  --studio-tile-reports-from: #374151;
+  --studio-tile-reports-to: #4b5563;
+
+  --studio-tile-documents-from: #1f2937;
+  --studio-tile-documents-to: #374151;
+
+  --studio-tile-operations-from: #065f46;
+  --studio-tile-operations-to: #047857;
+
+  /* Tile states */
+  --studio-tile-border-active: rgba(255, 255, 255, 0.3);
+  --studio-tile-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  /* Tile text */
+  --studio-tile-label: rgba(255, 255, 255, 0.9);
+  --studio-tile-status: rgba(255, 255, 255, 0.6);
+
+  /* Status indicators */
+  --studio-status-ready: #10b981;
+  --studio-status-review: #f59e0b;
+  --studio-status-locked: #6b7280;
+  --studio-status-error: #ef4444;
+
+  /* Landscaper */
+  --studio-landscaper-avatar-from: #10b981;
+  --studio-landscaper-avatar-to: #059669;
+  --studio-landscaper-status: #10b981;
+
+  /* Activity feed */
+  --studio-activity-border: var(--studio-border);
+  --studio-activity-time: var(--studio-text-muted);
+
+  /* Surface aliases for panel components */
+  --studio-surface-panel: var(--studio-panel-bg);
+  --studio-surface-sunken: var(--studio-bg-sunken);
+  --studio-border-soft: var(--studio-border);
+  --studio-text-primary: var(--studio-text);
+}
