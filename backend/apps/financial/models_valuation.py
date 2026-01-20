@@ -734,3 +734,146 @@ class HBUZoningDocument(models.Model):
     def has_extractions(self):
         """Check if AI extractions have been completed."""
         return self.extraction_date is not None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Property Attribute Definitions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class PropertyAttributeDef(models.Model):
+    """
+    Configurable property attribute definitions for site and improvement characteristics.
+
+    Maps to landscape.tbl_property_attribute_def
+
+    These definitions drive:
+    - Dynamic form rendering in the Property tab
+    - Landscaper extraction targeting
+    - USPAP-compliant property descriptions
+
+    Categories:
+    - site: Site characteristics (physical, utilities, flood, environmental)
+    - improvement: Improvement characteristics (construction, mechanical, amenities, obsolescence)
+    """
+
+    CATEGORY_CHOICES = [
+        ('site', 'Site'),
+        ('improvement', 'Improvement'),
+    ]
+
+    DATA_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('number', 'Number'),
+        ('boolean', 'Boolean'),
+        ('date', 'Date'),
+        ('select', 'Select'),
+        ('multiselect', 'Multi-Select'),
+        ('rating', 'Rating'),
+        ('narrative', 'Narrative'),
+    ]
+
+    DISPLAY_WIDTH_CHOICES = [
+        ('full', 'Full Width'),
+        ('half', 'Half Width'),
+        ('third', 'Third Width'),
+    ]
+
+    attribute_id = models.BigAutoField(primary_key=True)
+
+    # Classification
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    subcategory = models.CharField(max_length=50, blank=True, null=True)
+
+    # Attribute definition
+    attribute_code = models.CharField(max_length=50)
+    attribute_label = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+
+    # Data type and validation
+    data_type = models.CharField(max_length=20, choices=DATA_TYPE_CHOICES)
+    options = models.JSONField(blank=True, null=True)  # For select/multiselect
+    default_value = models.TextField(blank=True, null=True)
+    is_required = models.BooleanField(default=False)
+
+    # Display
+    sort_order = models.IntegerField(default=0)
+    display_width = models.CharField(
+        max_length=20,
+        choices=DISPLAY_WIDTH_CHOICES,
+        default='full'
+    )
+    help_text = models.TextField(blank=True, null=True)
+
+    # Property type applicability (null = all types)
+    property_types = models.JSONField(blank=True, null=True)
+
+    # Status
+    is_system = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_property_attribute_def'
+        ordering = ['category', 'subcategory', 'sort_order']
+        unique_together = ['category', 'attribute_code']
+        verbose_name = 'Property Attribute Definition'
+        verbose_name_plural = 'Property Attribute Definitions'
+
+    def __str__(self):
+        return f"{self.category}/{self.subcategory}: {self.attribute_label}"
+
+    @property
+    def full_code(self):
+        """Return fully qualified attribute code (category.attribute_code)."""
+        return f"{self.category}.{self.attribute_code}"
+
+    def get_options_list(self):
+        """Return options as list of dicts for select/multiselect types."""
+        if self.options and self.data_type in ('select', 'multiselect'):
+            return self.options
+        return []
+
+    @classmethod
+    def get_by_category(cls, category, property_type=None, active_only=True):
+        """
+        Get all attribute definitions for a category.
+
+        Args:
+            category: 'site' or 'improvement'
+            property_type: Optional property type code to filter by
+            active_only: Only return active definitions
+
+        Returns:
+            QuerySet of PropertyAttributeDef
+        """
+        qs = cls.objects.filter(category=category)
+        if active_only:
+            qs = qs.filter(is_active=True)
+        if property_type:
+            # Filter where property_types is null (all types) or contains this type
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(property_types__isnull=True) |
+                Q(property_types__contains=[property_type])
+            )
+        return qs.order_by('subcategory', 'sort_order')
+
+    @classmethod
+    def get_grouped_by_subcategory(cls, category, property_type=None):
+        """
+        Get attribute definitions grouped by subcategory.
+
+        Returns:
+            Dict[str, List[PropertyAttributeDef]]
+        """
+        from collections import defaultdict
+        attrs = cls.get_by_category(category, property_type)
+        grouped = defaultdict(list)
+        for attr in attrs:
+            grouped[attr.subcategory or 'general'].append(attr)
+        return dict(grouped)

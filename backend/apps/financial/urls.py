@@ -22,6 +22,8 @@ from .views_valuation import (
     HBUAnalysisViewSet,
     HBUComparableUseViewSet,
     HBUZoningDocumentViewSet,
+    PropertyAttributeDefViewSet,
+    ProjectPropertyAttributesViewSet,
 )
 from .views_variance import (
     get_project_variance_summary,
@@ -71,6 +73,10 @@ router.register(r'valuation/summary', ValuationSummaryViewSet, basename='valuati
 router.register(r'valuation/hbu', HBUAnalysisViewSet, basename='hbuanalysis')
 router.register(r'valuation/hbu-uses', HBUComparableUseViewSet, basename='hbucomparableuse')
 router.register(r'valuation/hbu-zoning-docs', HBUZoningDocumentViewSet, basename='hbuzoningdocument')
+
+# Property Attributes endpoints
+router.register(r'valuation/property-attributes', PropertyAttributeDefViewSet, basename='propertyattributedef')
+router.register(r'valuation/project-property-attributes', ProjectPropertyAttributesViewSet, basename='projectpropertyattributes')
 
 # Unit Costs and Category Taxonomy endpoints
 router.register(r'unit-costs/tags', CategoryTagLibraryViewSet, basename='categorytags')

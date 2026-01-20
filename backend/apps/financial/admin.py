@@ -12,6 +12,7 @@ from .models_valuation import (
     HBUAnalysis,
     HBUComparableUse,
     HBUZoningDocument,
+    PropertyAttributeDef,
 )
 
 # Import scenario admin (registers itself with @admin.register decorators)
@@ -819,3 +820,103 @@ class HBUZoningDocumentAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('hbu', 'document')
+
+
+# ============================================================================
+# Property Attribute Definitions Admin
+# ============================================================================
+
+
+@admin.register(PropertyAttributeDef)
+class PropertyAttributeDefAdmin(admin.ModelAdmin):
+    """Admin interface for Property Attribute Definitions."""
+
+    list_display = [
+        'attribute_id',
+        'category',
+        'subcategory',
+        'attribute_code',
+        'attribute_label',
+        'data_type',
+        'is_required',
+        'sort_order',
+        'is_system',
+        'is_active',
+    ]
+    list_filter = [
+        'category',
+        'subcategory',
+        'data_type',
+        'is_required',
+        'is_system',
+        'is_active',
+    ]
+    search_fields = [
+        'attribute_code',
+        'attribute_label',
+        'description',
+        'help_text',
+    ]
+    readonly_fields = [
+        'attribute_id',
+        'created_at',
+        'updated_at',
+    ]
+    ordering = ['category', 'subcategory', 'sort_order']
+    list_per_page = 50
+    list_editable = ['sort_order', 'is_active']
+
+    fieldsets = (
+        ('Classification', {
+            'fields': (
+                'attribute_id',
+                'category',
+                'subcategory',
+            )
+        }),
+        ('Attribute Definition', {
+            'fields': (
+                'attribute_code',
+                'attribute_label',
+                'description',
+            )
+        }),
+        ('Data Type & Validation', {
+            'fields': (
+                'data_type',
+                'options',
+                'default_value',
+                'is_required',
+            )
+        }),
+        ('Display', {
+            'fields': (
+                'sort_order',
+                'display_width',
+                'help_text',
+            )
+        }),
+        ('Applicability', {
+            'fields': (
+                'property_types',
+            ),
+            'description': 'Leave empty to apply to all property types'
+        }),
+        ('Status', {
+            'fields': (
+                'is_system',
+                'is_active',
+            )
+        }),
+        ('Audit', {
+            'fields': (
+                'created_at',
+                'updated_at',
+            ),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Standard queryset - no relations needed."""
+        return super().get_queryset(request)

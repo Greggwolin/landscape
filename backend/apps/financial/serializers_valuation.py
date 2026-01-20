@@ -20,6 +20,7 @@ from .models_valuation import (
     HBUAnalysis,
     HBUComparableUse,
     HBUZoningDocument,
+    PropertyAttributeDef,
 )
 from apps.projects.models import Project
 from decimal import Decimal
@@ -583,3 +584,120 @@ class HBUCompareResponseSerializer(serializers.Serializer):
         child=serializers.DictField()
     )
     winner = serializers.DictField(allow_null=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Property Attribute Definition Serializers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class PropertyAttributeDefSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for PropertyAttributeDef.
+    Used for API endpoints that manage attribute definitions.
+    """
+
+    category_display = serializers.CharField(
+        source='get_category_display',
+        read_only=True
+    )
+    data_type_display = serializers.CharField(
+        source='get_data_type_display',
+        read_only=True
+    )
+    full_code = serializers.CharField(read_only=True)
+    options_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PropertyAttributeDef
+        fields = [
+            'attribute_id',
+            # Classification
+            'category',
+            'category_display',
+            'subcategory',
+            # Attribute definition
+            'attribute_code',
+            'attribute_label',
+            'description',
+            'full_code',
+            # Data type
+            'data_type',
+            'data_type_display',
+            'options',
+            'options_list',
+            'default_value',
+            'is_required',
+            # Display
+            'sort_order',
+            'display_width',
+            'help_text',
+            # Property types
+            'property_types',
+            # Status
+            'is_system',
+            'is_active',
+            # Audit
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['attribute_id', 'created_at', 'updated_at', 'full_code']
+
+    def get_options_list(self, obj):
+        """Return parsed options for select/multiselect types."""
+        return obj.get_options_list()
+
+
+class PropertyAttributeDefListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for listing attribute definitions.
+    """
+
+    class Meta:
+        model = PropertyAttributeDef
+        fields = [
+            'attribute_id',
+            'category',
+            'subcategory',
+            'attribute_code',
+            'attribute_label',
+            'data_type',
+            'is_required',
+            'sort_order',
+            'is_system',
+            'is_active',
+        ]
+
+
+class PropertyAttributeGroupedSerializer(serializers.Serializer):
+    """
+    Serializer for grouped attribute definitions by subcategory.
+    Used for rendering dynamic forms in the UI.
+    """
+
+    category = serializers.CharField()
+    subcategories = serializers.DictField(
+        child=PropertyAttributeDefSerializer(many=True)
+    )
+
+
+class ProjectPropertyAttributesSerializer(serializers.Serializer):
+    """
+    Serializer for project property attributes (the JSONB values).
+    Used for reading/writing site_attributes and improvement_attributes.
+    """
+
+    site_attributes = serializers.JSONField(default=dict)
+    improvement_attributes = serializers.JSONField(default=dict)
+
+    def validate_site_attributes(self, value):
+        """Validate site_attributes against defined attribute codes."""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("site_attributes must be a dict")
+        return value
+
+    def validate_improvement_attributes(self, value):
+        """Validate improvement_attributes against defined attribute codes."""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("improvement_attributes must be a dict")
+        return value

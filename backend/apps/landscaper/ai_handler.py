@@ -4107,6 +4107,13 @@ try:
 except ImportError:
     pass  # H&BU tools not available
 
+# Add Property Attribute tools
+try:
+    from .services.property_tools import PROPERTY_ATTRIBUTE_TOOLS
+    LANDSCAPER_TOOLS.extend(PROPERTY_ATTRIBUTE_TOOLS)
+except ImportError:
+    pass  # Property attribute tools not available
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # System Prompts by Project Type

@@ -92,6 +92,40 @@ class Project(models.Model):
     # Analysis Mode (napkin = simplified, developer = full tabs)
     analysis_mode = models.CharField(max_length=20, blank=True, null=True, default='napkin')
 
+    # =========================================================================
+    # Property Attributes - Core Fields (Migration 063)
+    # =========================================================================
+
+    # Site characteristics
+    site_shape = models.CharField(max_length=50, blank=True, null=True)
+    site_utility_rating = models.IntegerField(blank=True, null=True)
+    location_rating = models.IntegerField(blank=True, null=True)
+    access_rating = models.IntegerField(blank=True, null=True)
+    visibility_rating = models.IntegerField(blank=True, null=True)
+
+    # Improvement characteristics
+    building_count = models.IntegerField(blank=True, null=True)
+    net_rentable_area = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    land_to_building_ratio = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+    construction_class = models.CharField(max_length=20, blank=True, null=True)
+    construction_type = models.CharField(max_length=50, blank=True, null=True)
+    condition_rating = models.IntegerField(blank=True, null=True)
+    quality_rating = models.IntegerField(blank=True, null=True)
+
+    # Parking
+    parking_spaces = models.IntegerField(blank=True, null=True)
+    parking_ratio = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    parking_type = models.CharField(max_length=50, blank=True, null=True)
+
+    # Economic life (for cost approach depreciation)
+    effective_age = models.IntegerField(blank=True, null=True)
+    total_economic_life = models.IntegerField(blank=True, null=True)
+    remaining_economic_life = models.IntegerField(blank=True, null=True)
+
+    # Configurable attributes (JSONB columns)
+    site_attributes = models.JSONField(default=dict, blank=True)
+    improvement_attributes = models.JSONField(default=dict, blank=True)
+
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

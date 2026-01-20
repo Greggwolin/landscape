@@ -11075,3 +11075,32 @@ def _register_hbu_tools():
 
 # Register H&BU tools on module load
 _register_hbu_tools()
+
+
+# =============================================================================
+# Register Property Attribute tools
+
+def _register_property_tools():
+    """Register Property Attribute tools from the services module."""
+    try:
+        from .services.property_tools import PROPERTY_ATTRIBUTE_TOOL_HANDLERS
+
+        for tool_name, handler in PROPERTY_ATTRIBUTE_TOOL_HANDLERS.items():
+            # Wrap handler to match registry signature
+            def make_wrapper(h, name):
+                def wrapper(tool_input, project_id, propose_only=True, source_message_id=None, **kwargs):
+                    return h(tool_input=tool_input, project_id=project_id, **kwargs)
+                wrapper._tool_name = name
+                wrapper._is_mutation = name in {
+                    'update_property_attributes',
+                    'update_site_attribute',
+                    'update_improvement_attribute',
+                }
+                return wrapper
+            TOOL_REGISTRY[tool_name] = make_wrapper(handler, tool_name)
+            logger.debug(f"Registered property tool: {tool_name}")
+    except ImportError as e:
+        logger.warning(f"Could not import property tools: {e}")
+
+# Register property tools on module load
+_register_property_tools()

@@ -24,6 +24,7 @@ from .models_valuation import (
     HBUAnalysis,
     HBUComparableUse,
     HBUZoningDocument,
+    PropertyAttributeDef,
 )
 from .serializers_valuation import (
     SalesComparableSerializer,
@@ -41,6 +42,9 @@ from .serializers_valuation import (
     HBUZoningDocumentSerializer,
     HBUCompareRequestSerializer,
     HBUCompareResponseSerializer,
+    PropertyAttributeDefSerializer,
+    PropertyAttributeDefListSerializer,
+    ProjectPropertyAttributesSerializer,
 )
 from apps.projects.models import Project
 
@@ -702,3 +706,259 @@ class HBUZoningDocumentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(zoning_doc)
         return Response(serializer.data)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Property Attribute Definition ViewSets
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class PropertyAttributeDefViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for PropertyAttributeDef - configurable property attribute definitions.
+
+    These definitions drive dynamic form rendering in the Property tab and
+    Landscaper extraction targeting.
+
+    Endpoints:
+    - GET /api/valuation/property-attributes/ - List all attribute definitions
+    - POST /api/valuation/property-attributes/ - Create attribute definition
+    - GET /api/valuation/property-attributes/:id/ - Retrieve attribute definition
+    - PUT/PATCH /api/valuation/property-attributes/:id/ - Update attribute definition
+    - DELETE /api/valuation/property-attributes/:id/ - Delete attribute definition
+    - GET /api/valuation/property-attributes/by_category/:category/ - Get by category
+    - GET /api/valuation/property-attributes/grouped/:category/ - Get grouped by subcategory
+    """
+
+    queryset = PropertyAttributeDef.objects.all()
+    serializer_class = PropertyAttributeDefSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter by category, subcategory, and active status."""
+        queryset = self.queryset
+
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+
+        # Filter by subcategory
+        subcategory = self.request.query_params.get('subcategory')
+        if subcategory:
+            queryset = queryset.filter(subcategory=subcategory)
+
+        # Filter by active status (default: only active)
+        include_inactive = self.request.query_params.get('include_inactive', 'false')
+        if include_inactive.lower() != 'true':
+            queryset = queryset.filter(is_active=True)
+
+        # Filter by system status
+        system_only = self.request.query_params.get('system_only', 'false')
+        if system_only.lower() == 'true':
+            queryset = queryset.filter(is_system=True)
+
+        # Filter by property type
+        property_type = self.request.query_params.get('property_type')
+        if property_type:
+            queryset = queryset.filter(
+                Q(property_types__isnull=True) |
+                Q(property_types__contains=[property_type])
+            )
+
+        return queryset.order_by('category', 'subcategory', 'sort_order')
+
+    def get_serializer_class(self):
+        """Use list serializer for list action."""
+        if self.action == 'list':
+            return PropertyAttributeDefListSerializer
+        return PropertyAttributeDefSerializer
+
+    @action(detail=False, methods=['get'], url_path='by_category/(?P<category>site|improvement)')
+    def by_category(self, request, category=None):
+        """Get all attribute definitions for a specific category."""
+        queryset = self.get_queryset().filter(category=category)
+        serializer = PropertyAttributeDefSerializer(queryset, many=True)
+
+        # Summary by subcategory
+        subcategory_counts = {}
+        for attr in queryset:
+            subcat = attr.subcategory or 'general'
+            subcategory_counts[subcat] = subcategory_counts.get(subcat, 0) + 1
+
+        return Response({
+            'category': category,
+            'attributes': serializer.data,
+            'subcategory_counts': subcategory_counts,
+            'total': queryset.count()
+        })
+
+    @action(detail=False, methods=['get'], url_path='grouped/(?P<category>site|improvement)')
+    def grouped(self, request, category=None):
+        """
+        Get attribute definitions grouped by subcategory.
+        This format is optimized for rendering dynamic forms.
+        """
+        property_type = request.query_params.get('property_type')
+        grouped = PropertyAttributeDef.get_grouped_by_subcategory(category, property_type)
+
+        # Serialize each group
+        result = {}
+        for subcategory, attrs in grouped.items():
+            result[subcategory] = PropertyAttributeDefSerializer(attrs, many=True).data
+
+        return Response({
+            'category': category,
+            'subcategories': result
+        })
+
+    @action(detail=False, methods=['get'], url_path='for_extraction')
+    def for_extraction(self, request):
+        """
+        Get attribute definitions formatted for Landscaper extraction.
+        Returns a simplified structure for AI extraction targeting.
+        """
+        category = request.query_params.get('category')
+        property_type = request.query_params.get('property_type')
+
+        queryset = self.get_queryset()
+        if category:
+            queryset = queryset.filter(category=category)
+
+        extraction_targets = []
+        for attr in queryset:
+            target = {
+                'code': attr.full_code,
+                'label': attr.attribute_label,
+                'data_type': attr.data_type,
+                'help_text': attr.help_text,
+            }
+            if attr.data_type in ('select', 'multiselect') and attr.options:
+                target['valid_values'] = [opt.get('value') for opt in attr.options]
+            extraction_targets.append(target)
+
+        return Response({
+            'extraction_targets': extraction_targets,
+            'count': len(extraction_targets)
+        })
+
+
+class ProjectPropertyAttributesViewSet(viewsets.ViewSet):
+    """
+    ViewSet for managing project-level property attributes (JSONB values).
+
+    Endpoints:
+    - GET /api/valuation/project-property-attributes/:project_id/ - Get project attributes
+    - PUT /api/valuation/project-property-attributes/:project_id/ - Update project attributes
+    - PATCH /api/valuation/project-property-attributes/:project_id/site/ - Update site attributes only
+    - PATCH /api/valuation/project-property-attributes/:project_id/improvement/ - Update improvement attributes only
+    """
+
+    permission_classes = [AllowAny]
+
+    def retrieve(self, request, pk=None):
+        """Get property attributes for a project."""
+        project = get_object_or_404(Project, project_id=pk)
+
+        # Get attribute definitions for context
+        site_defs = PropertyAttributeDef.get_grouped_by_subcategory(
+            'site', project.project_type_code
+        )
+        improvement_defs = PropertyAttributeDef.get_grouped_by_subcategory(
+            'improvement', project.project_type_code
+        )
+
+        data = {
+            'project_id': project.project_id,
+            # Core fields
+            'core': {
+                'site_shape': project.site_shape,
+                'site_utility_rating': project.site_utility_rating,
+                'location_rating': project.location_rating,
+                'access_rating': project.access_rating,
+                'visibility_rating': project.visibility_rating,
+                'building_count': project.building_count,
+                'net_rentable_area': float(project.net_rentable_area) if project.net_rentable_area else None,
+                'land_to_building_ratio': float(project.land_to_building_ratio) if project.land_to_building_ratio else None,
+                'construction_class': project.construction_class,
+                'construction_type': project.construction_type,
+                'condition_rating': project.condition_rating,
+                'quality_rating': project.quality_rating,
+                'parking_spaces': project.parking_spaces,
+                'parking_ratio': float(project.parking_ratio) if project.parking_ratio else None,
+                'parking_type': project.parking_type,
+                'effective_age': project.effective_age,
+                'total_economic_life': project.total_economic_life,
+                'remaining_economic_life': project.remaining_economic_life,
+            },
+            # JSONB attributes
+            'site_attributes': project.site_attributes or {},
+            'improvement_attributes': project.improvement_attributes or {},
+            # Attribute definitions for UI rendering
+            'definitions': {
+                'site': {k: PropertyAttributeDefSerializer(v, many=True).data for k, v in site_defs.items()},
+                'improvement': {k: PropertyAttributeDefSerializer(v, many=True).data for k, v in improvement_defs.items()},
+            }
+        }
+
+        return Response(data)
+
+    def update(self, request, pk=None):
+        """Update property attributes for a project."""
+        project = get_object_or_404(Project, project_id=pk)
+
+        # Update core fields if provided
+        core_fields = [
+            'site_shape', 'site_utility_rating', 'location_rating', 'access_rating',
+            'visibility_rating', 'building_count', 'net_rentable_area', 'land_to_building_ratio',
+            'construction_class', 'construction_type', 'condition_rating', 'quality_rating',
+            'parking_spaces', 'parking_ratio', 'parking_type',
+            'effective_age', 'total_economic_life', 'remaining_economic_life',
+        ]
+
+        for field in core_fields:
+            if field in request.data:
+                setattr(project, field, request.data[field])
+
+        # Update JSONB attributes
+        if 'site_attributes' in request.data:
+            project.site_attributes = request.data['site_attributes']
+        if 'improvement_attributes' in request.data:
+            project.improvement_attributes = request.data['improvement_attributes']
+
+        project.save()
+
+        # Return updated data
+        return self.retrieve(request, pk)
+
+    @action(detail=True, methods=['patch'], url_path='site')
+    def update_site(self, request, pk=None):
+        """Update only site_attributes for a project."""
+        project = get_object_or_404(Project, project_id=pk)
+
+        # Merge with existing attributes
+        current = project.site_attributes or {}
+        current.update(request.data)
+        project.site_attributes = current
+        project.save(update_fields=['site_attributes'])
+
+        return Response({
+            'project_id': project.project_id,
+            'site_attributes': project.site_attributes
+        })
+
+    @action(detail=True, methods=['patch'], url_path='improvement')
+    def update_improvement(self, request, pk=None):
+        """Update only improvement_attributes for a project."""
+        project = get_object_or_404(Project, project_id=pk)
+
+        # Merge with existing attributes
+        current = project.improvement_attributes or {}
+        current.update(request.data)
+        project.improvement_attributes = current
+        project.save(update_fields=['improvement_attributes'])
+
+        return Response({
+            'project_id': project.project_id,
+            'improvement_attributes': project.improvement_attributes
+        })
