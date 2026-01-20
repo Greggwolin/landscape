@@ -106,7 +106,86 @@ class Project(models.Model):
     def __str__(self):
         return self.project_name or f'Project {self.project_id}'
 
+# Analysis Type choices (orthogonal to property type)
+ANALYSIS_TYPE_CHOICES = [
+    ('VALUATION', 'Valuation'),
+    ('INVESTMENT', 'Investment'),
+    ('DEVELOPMENT', 'Development'),
+    ('FEASIBILITY', 'Feasibility'),
+]
+
+
+class AnalysisTypeConfig(models.Model):
+    """
+    Configuration for each analysis type - controls tile visibility,
+    required inputs, and Landscaper behavior.
+
+    Analysis types are orthogonal to property types:
+    - VALUATION: Market value opinion (USPAP compliant appraisals)
+    - INVESTMENT: Acquisition underwriting (IRR, returns analysis)
+    - DEVELOPMENT: Ground-up or redevelopment returns
+    - FEASIBILITY: Go/no-go binary decision analysis
+    """
+    config_id = models.BigAutoField(primary_key=True)
+    analysis_type = models.CharField(
+        max_length=50,
+        unique=True,
+        choices=ANALYSIS_TYPE_CHOICES
+    )
+
+    # Tile visibility flags
+    tile_hbu = models.BooleanField(default=False, help_text="Show H&BU tile")
+    tile_valuation = models.BooleanField(default=False, help_text="Show Valuation tile (3 approaches)")
+    tile_capitalization = models.BooleanField(default=False, help_text="Show Capitalization tile")
+    tile_returns = models.BooleanField(default=False, help_text="Show Returns tile")
+    tile_development_budget = models.BooleanField(default=False, help_text="Show Dev Budget tile")
+
+    # Feature/requirement flags
+    requires_capital_stack = models.BooleanField(default=False)
+    requires_comparable_sales = models.BooleanField(default=False)
+    requires_income_approach = models.BooleanField(default=False)
+    requires_cost_approach = models.BooleanField(default=False)
+
+    # Report types available (JSON array of report type codes)
+    available_reports = models.JSONField(default=list, blank=True)
+
+    # Landscaper behavior context
+    landscaper_context = models.TextField(blank=True, null=True)
+
+    # Audit columns
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tbl_analysis_type_config'
+        managed = False  # Table created by migration
+        verbose_name = 'Analysis Type Config'
+        verbose_name_plural = 'Analysis Type Configs'
+
+    def __str__(self):
+        return f"{self.analysis_type} Config"
+
+    def get_visible_tiles(self):
+        """Return list of visible tile IDs for this analysis type."""
+        # Always visible
+        tiles = ['project_home', 'property', 'market', 'reports', 'documents']
+
+        # Conditionally visible based on flags
+        if self.tile_hbu:
+            tiles.insert(3, 'hbu')
+        if self.tile_valuation:
+            tiles.insert(4, 'valuation')
+        if self.tile_capitalization:
+            tiles.append('capitalization')
+        if self.tile_returns:
+            tiles.append('returns')
+        if self.tile_development_budget:
+            tiles.append('development_budget')
+
+        return tiles
+
+
 # Phase 5: Import User model to make it available to Django
 from .models_user import User, UserProfile, APIKey, PasswordResetToken
 
-__all__ = ['Project', 'User', 'UserProfile', 'APIKey', 'PasswordResetToken']
+__all__ = ['Project', 'AnalysisTypeConfig', 'ANALYSIS_TYPE_CHOICES', 'User', 'UserProfile', 'APIKey', 'PasswordResetToken']

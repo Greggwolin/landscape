@@ -14,6 +14,7 @@ import {
 } from '@coreui/react';
 import { UnitMixAccordion, UnitMixRow } from './UnitMixAccordion';
 import { ExtractionFieldRow } from './ExtractionFieldRow';
+import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 interface FieldMapping {
   extraction_id?: number;
@@ -66,6 +67,17 @@ const SCOPE_CONFIG: Record<string, { label: string; icon: string; order: number 
   underwriting: { label: 'Underwriting', icon: '📋', order: 4 },
 };
 
+const SCOPE_TABLE_MAP: Record<string, string[]> = {
+  core_property: ['project'],
+  financials: ['project'],
+  deal_market: ['project'],
+  unit_types: ['unit_types'],
+  operating_expenses: ['operating_expenses'],
+  rent_roll: ['units', 'leases'],
+  property: ['project'],
+  budget: ['project'],
+};
+
 // Map field names to scopes for backwards compatibility
 const FIELD_TO_SCOPE: Record<string, string> = {
   project_name: 'core_property',
@@ -103,6 +115,18 @@ const getScopeForField = (field: FieldMapping): string => {
   // Fall back to field name mapping
   const normalized = field.suggested_field.toLowerCase().replace(/\s+/g, '_');
   return FIELD_TO_SCOPE[normalized] || 'core_property';
+};
+
+const getTablesForMappings = (mappings: FieldMapping[]): string[] => {
+  const tables = new Set<string>();
+  mappings.forEach((mapping) => {
+    const scope = getScopeForField(mapping);
+    const mappedTables = SCOPE_TABLE_MAP[scope];
+    if (mappedTables) {
+      mappedTables.forEach((table) => tables.add(table));
+    }
+  });
+  return Array.from(tables);
 };
 
 interface FieldState {
@@ -308,6 +332,18 @@ export function ExtractionReviewModal({
       });
 
       if (response.ok) {
+        const tables = getTablesForMappings(fieldMappings);
+        if (tables.length > 0) {
+          emitMutationComplete({
+            projectId,
+            mutationType: 'extraction_commit',
+            tables,
+            counts: {
+              created: fieldsToCommit.length,
+              total: fieldsToCommit.length,
+            },
+          });
+        }
         onCommit();
       } else {
         console.error('Failed to commit extraction:', await response.text());

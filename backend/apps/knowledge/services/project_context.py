@@ -426,7 +426,7 @@ class ProjectContextService:
                     SELECT
                         COALESCE(c.name, oe.expense_category, 'Other') as category_name,
                         SUM(oe.annual_amount) as total_amount
-                    FROM landscape.tbl_operating_expense oe
+                    FROM landscape.tbl_operating_expenses oe
                     LEFT JOIN landscape.core_lookup_item c ON oe.category_id = c.item_id
                     WHERE oe.project_id = %s
                     GROUP BY COALESCE(c.name, oe.expense_category, 'Other')

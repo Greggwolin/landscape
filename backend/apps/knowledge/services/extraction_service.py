@@ -15,6 +15,7 @@ from decimal import Decimal
 from django.db import connection
 from django.conf import settings
 from anthropic import Anthropic
+from .opex_utils import upsert_opex_entry
 
 logger = logging.getLogger(__name__)
 
@@ -344,7 +345,7 @@ Return as JSON array of objects. Only include data you find in the documents.'''
         'required_fields': ['unit_number', 'rent_current'],
     },
     'opex': {
-        'target_table': 'tbl_operating_expense',
+        'target_table': 'tbl_operating_expenses',
         'prompt_template': '''Extract operating expense data from the document. For each expense category, provide:
 - category: The expense category name (e.g., "Property Tax", "Insurance", "Utilities")
 - subcategory: Subcategory if applicable
@@ -942,24 +943,28 @@ DOCUMENT CONTENT:
 
     def _apply_opex(self, cursor, value: Dict) -> bool:
         """Insert operating expense data."""
-        cursor.execute("""
-            INSERT INTO landscape.tbl_operating_expense (
-                project_id,
-                category,
-                subcategory,
-                amount,
-                per_unit,
-                year
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-        """, [
-            self.project_id,
-            value.get('category'),
-            value.get('subcategory'),
-            value.get('amount'),
-            value.get('per_unit'),
-            value.get('year'),
-        ])
-        return True
+        category_label = (
+            value.get('category')
+            or value.get('expense_category')
+            or value.get('label')
+            or value.get('subcategory')
+        )
+        amount = value.get('amount') or value.get('annual_amount') or value.get('total')
+
+        if not category_label or amount is None:
+            logger.warning("Skipping opex extraction: missing category or amount (%s)", value)
+            return False
+
+        selector = {}
+        if value.get('year'):
+            selector['statement_discriminator'] = str(value['year'])
+
+        result = upsert_opex_entry(connection, self.project_id, category_label, amount, selector)
+        if result.get('success'):
+            return True
+
+        logger.warning("Failed to upsert opex: %s", result.get('error'))
+        return False
 
     def _apply_market_comp(self, cursor, value: Dict) -> bool:
         """Insert rental comp data."""
@@ -2636,6 +2641,10 @@ def extract_document_batched(
     user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Convenience function for batched extraction."""
+    print(f"=== EXTRACT_DOCUMENT_BATCHED SERVICE ENTRY ===")
+    print(f"PROJECT_ID: {project_id}, DOC_ID: {doc_id}, PROPERTY_TYPE: {property_type}")
+    print(f"BATCHES: {batches}")
+
     service = BatchedExtractionService(project_id, property_type)
     return service.extract_document_batched(doc_id, batches, user_id)
 

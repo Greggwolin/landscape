@@ -205,6 +205,9 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false,
     if (result.city) {
       setValue('city', result.city, { shouldDirty: true })
     }
+    if (result.county) {
+      setValue('county', result.county, { shouldDirty: true })
+    }
     if (result.state) {
       const stateMatch = US_STATES.find(
         s => s.label.toLowerCase() === result.state?.toLowerCase() ||
@@ -239,8 +242,14 @@ const LocationSection = ({ form, analysisType, isDark = false, hasError = false,
     return null
   }
 
-  const parsedLat = latitude ? parseFloat(latitude) : undefined
-  const parsedLng = longitude ? parseFloat(longitude) : undefined
+  // Parse lat/lng, ensuring we get valid numbers or undefined
+  const parsedLat = latitude && !isNaN(parseFloat(latitude)) ? parseFloat(latitude) : undefined
+  const parsedLng = longitude && !isNaN(parseFloat(longitude)) ? parseFloat(longitude) : undefined
+
+  // Debug logging for coordinate changes
+  useEffect(() => {
+    console.log('[LocationSection] Coordinates from form - lat:', latitude, 'lng:', longitude, 'parsed:', { parsedLat, parsedLng })
+  }, [latitude, longitude, parsedLat, parsedLng])
 
   return (
     <div className="space-y-4">

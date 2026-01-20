@@ -10,7 +10,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Navigation from '@/app/components/Navigation';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
@@ -20,6 +20,7 @@ type Tab = 'sales-comparison' | 'cost' | 'income';
 
 export default function ValuationPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = parseInt(params.projectId as string);
 
   const [activeView, setActiveView] = useState('project-overview');
@@ -49,11 +50,21 @@ export default function ValuationPage() {
     }
   }, [projectId]);
 
-  const tabs: { id: Tab; label: string; enabled: boolean }[] = [
+  const tabs: { id: Tab; label: string; enabled: boolean; isLink?: boolean }[] = [
     { id: 'sales-comparison', label: 'Sales Comparison', enabled: true },
     { id: 'cost', label: 'Cost Approach', enabled: false },
-    { id: 'income', label: 'Income Approach', enabled: false }
+    { id: 'income', label: 'Income Approach', enabled: true, isLink: true }
   ];
+
+  // Handle tab click - navigate to standalone page for Income Approach
+  const handleTabClick = (tab: typeof tabs[0]) => {
+    if (!tab.enabled) return;
+    if (tab.isLink && tab.id === 'income') {
+      router.push(`/projects/${projectId}/valuation/income-approach`);
+    } else {
+      setActiveTab(tab.id);
+    }
+  };
 
   return (
     <div
@@ -132,9 +143,9 @@ export default function ValuationPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => tab.enabled && setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab)}
                 disabled={!tab.enabled}
-                className="px-5 py-3 text-sm font-medium transition-colors relative rounded-t-lg"
+                className="px-5 py-3 text-sm font-medium transition-colors relative rounded-t-lg flex items-center gap-2"
                 style={{
                   color: activeTab === tab.id
                     ? 'var(--cui-primary)'
@@ -163,6 +174,11 @@ export default function ValuationPage() {
                 }}
               >
                 {tab.label}
+                {tab.isLink && tab.enabled && (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                )}
                 {!tab.enabled && (
                   <span
                     className="ml-2 text-xs px-1.5 py-0.5 rounded"

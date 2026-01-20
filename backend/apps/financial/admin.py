@@ -8,6 +8,11 @@ from .models_finance_structure import (
     SaleSettlement,
     ParticipationPayment,
 )
+from .models_valuation import (
+    HBUAnalysis,
+    HBUComparableUse,
+    HBUZoningDocument,
+)
 
 # Import scenario admin (registers itself with @admin.register decorators)
 from . import admin_scenario  # noqa: F401
@@ -591,3 +596,226 @@ class ParticipationPaymentAdmin(admin.ModelAdmin):
         """Optimize queryset with select_related."""
         qs = super().get_queryset(request)
         return qs.select_related('settlement', 'project')
+
+
+# ============================================================================
+# H&BU (Highest & Best Use) Admin
+# ============================================================================
+
+
+class HBUComparableUseInline(admin.TabularInline):
+    """Inline admin for comparable uses within H&BU analysis."""
+
+    model = HBUComparableUse
+    extra = 0
+    fields = [
+        'use_name',
+        'use_category',
+        'is_legally_permissible',
+        'is_physically_possible',
+        'is_economically_feasible',
+        'residual_land_value',
+        'feasibility_rank',
+    ]
+
+
+class HBUZoningDocumentInline(admin.TabularInline):
+    """Inline admin for zoning documents within H&BU analysis."""
+
+    model = HBUZoningDocument
+    extra = 0
+    fields = [
+        'document',
+        'jurisdiction_name',
+        'zoning_designation',
+        'extraction_confidence',
+        'user_verified',
+    ]
+    readonly_fields = ['extraction_confidence']
+
+
+@admin.register(HBUAnalysis)
+class HBUAnalysisAdmin(admin.ModelAdmin):
+    """Admin interface for H&BU Analysis."""
+
+    list_display = [
+        'hbu_id',
+        'project',
+        'scenario_name',
+        'scenario_type',
+        'legal_permissible',
+        'physical_possible',
+        'economic_feasible',
+        'is_maximally_productive',
+        'productivity_rank',
+        'status',
+    ]
+    list_filter = [
+        'scenario_type',
+        'status',
+        'legal_permissible',
+        'physical_possible',
+        'economic_feasible',
+        'is_maximally_productive',
+        'project',
+    ]
+    search_fields = [
+        'scenario_name',
+        'legal_zoning_code',
+        'conclusion_use_type',
+        'project__project_name',
+    ]
+    readonly_fields = [
+        'hbu_id',
+        'created_at',
+        'updated_at',
+    ]
+    inlines = [HBUComparableUseInline, HBUZoningDocumentInline]
+    ordering = ['project', 'productivity_rank', 'scenario_name']
+    list_per_page = 50
+
+    fieldsets = (
+        ('Scenario', {
+            'fields': (
+                'hbu_id',
+                'project',
+                'scenario_name',
+                'scenario_type',
+                'status',
+            )
+        }),
+        ('1. Legally Permissible', {
+            'fields': (
+                'legal_permissible',
+                'legal_zoning_code',
+                'legal_zoning_source_doc',
+                'legal_permitted_uses',
+                'legal_requires_variance',
+                'legal_variance_type',
+                'legal_narrative',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('2. Physically Possible', {
+            'fields': (
+                'physical_possible',
+                'physical_site_adequate',
+                'physical_topography_suitable',
+                'physical_utilities_available',
+                'physical_access_adequate',
+                'physical_constraints',
+                'physical_narrative',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('3. Economically Feasible', {
+            'fields': (
+                'economic_feasible',
+                'economic_development_cost',
+                'economic_stabilized_value',
+                'economic_residual_land_value',
+                'economic_profit_margin_pct',
+                'economic_irr_pct',
+                'economic_feasibility_threshold',
+                'economic_narrative',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('4. Maximally Productive', {
+            'fields': (
+                'is_maximally_productive',
+                'productivity_rank',
+                'productivity_metric',
+                'productivity_narrative',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('Conclusion', {
+            'fields': (
+                'conclusion_use_type',
+                'conclusion_density',
+                'conclusion_summary',
+                'conclusion_full_narrative',
+            ),
+        }),
+        ('Audit', {
+            'fields': (
+                'created_at',
+                'updated_at',
+                'created_by',
+                'updated_by',
+            ),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Optimize queryset with select_related."""
+        qs = super().get_queryset(request)
+        return qs.select_related('project', 'legal_zoning_source_doc')
+
+
+@admin.register(HBUComparableUse)
+class HBUComparableUseAdmin(admin.ModelAdmin):
+    """Admin interface for H&BU Comparable Use."""
+
+    list_display = [
+        'comparable_use_id',
+        'hbu',
+        'use_name',
+        'use_category',
+        'is_legally_permissible',
+        'is_physically_possible',
+        'is_economically_feasible',
+        'residual_land_value',
+        'feasibility_rank',
+    ]
+    list_filter = [
+        'use_category',
+        'is_legally_permissible',
+        'is_physically_possible',
+        'is_economically_feasible',
+        'hbu__project',
+    ]
+    search_fields = [
+        'use_name',
+        'hbu__scenario_name',
+    ]
+    readonly_fields = ['comparable_use_id', 'created_at']
+    ordering = ['hbu', 'feasibility_rank', 'use_name']
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('hbu', 'hbu__project')
+
+
+@admin.register(HBUZoningDocument)
+class HBUZoningDocumentAdmin(admin.ModelAdmin):
+    """Admin interface for H&BU Zoning Document."""
+
+    list_display = [
+        'zoning_doc_id',
+        'hbu',
+        'document',
+        'jurisdiction_name',
+        'zoning_designation',
+        'extraction_confidence',
+        'user_verified',
+    ]
+    list_filter = [
+        'user_verified',
+        'hbu__project',
+    ]
+    search_fields = [
+        'jurisdiction_name',
+        'zoning_designation',
+        'hbu__scenario_name',
+    ]
+    readonly_fields = ['zoning_doc_id', 'created_at']
+    ordering = ['hbu', '-created_at']
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('hbu', 'document')

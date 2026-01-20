@@ -48,9 +48,35 @@ interface Unit {
   bedrooms: number
   bathrooms: number
   square_feet: number
+  current_rent: number | null
   market_rent: number
+  occupancy_status: string | null
   renovation_status: string
   other_features: string | null
+}
+
+// Unified row type for grid display - works with either lease or unit data
+interface RentRollRow {
+  // Identifiers
+  lease_id?: number
+  unit_id: number
+  unit_number: string
+  building_name: string | null
+  // Unit properties
+  unit_type: string
+  bedrooms: number | null
+  bathrooms: number | null
+  square_feet: number
+  market_rent: number | null
+  other_features: string | null
+  // Lease/rent properties
+  resident_name?: string | null
+  lease_start_date?: string
+  lease_end_date?: string
+  base_rent_monthly: number  // from lease or unit.current_rent
+  lease_status: string       // from lease or derived from occupancy_status
+  // Source tracking
+  _source: 'lease' | 'unit'
 }
 
 interface UnitType {
@@ -179,6 +205,39 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   const units = unitsResponse?.data ?? []
   const unitTypes = unitTypesResponse?.data ?? []
 
+  // Convert units to RentRollRow format when no leases exist
+  const unitsAsRows: RentRollRow[] = useMemo(() => {
+    return units.map((unit: Unit) => ({
+      unit_id: unit.unit_id,
+      unit_number: unit.unit_number,
+      building_name: unit.building_name,
+      unit_type: unit.unit_type || 'Unknown',
+      bedrooms: unit.bedrooms,
+      bathrooms: unit.bathrooms,
+      square_feet: unit.square_feet || 0,
+      market_rent: unit.market_rent,
+      other_features: unit.other_features,
+      base_rent_monthly: Number(unit.current_rent) || 0,
+      lease_status: unit.occupancy_status === 'Vacant' ? 'VACANT' : 'ACTIVE',
+      resident_name: null,
+      _source: 'unit' as const
+    }))
+  }, [units])
+
+  // Use leases if available, otherwise fall back to units
+  const gridData: RentRollRow[] = useMemo(() => {
+    if (leases.length > 0) {
+      return leases.map((lease: Lease) => ({
+        ...lease,
+        base_rent_monthly: Number(lease.base_rent_monthly) || 0,
+        _source: 'lease' as const
+      }))
+    }
+    return unitsAsRows
+  }, [leases, unitsAsRows])
+
+  const isShowingUnitsOnly = leases.length === 0 && units.length > 0
+
   // Auto-refresh when Landscaper completes mutations affecting rent roll data
   const refreshAllData = useCallback(() => {
     console.log('[RentRollGrid] Refreshing data after Landscaper mutation')
@@ -212,16 +271,24 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     return map
   }, [unitTypes])
 
-  // Calculate metrics
+  // Calculate metrics - works with either leases or units
   const metrics = useMemo(() => {
     const totalUnits = units.length
-    const occupiedUnits = leases.filter(l => l.lease_status === 'ACTIVE').length
+    // When showing units only, count occupied from occupancy_status
+    const occupiedUnits = leases.length > 0
+      ? leases.filter(l => l.lease_status === 'ACTIVE').length
+      : units.filter((u: Unit) => u.occupancy_status === 'Occupied').length
     const vacantUnits = totalUnits - occupiedUnits
     const physicalOccupancyPct = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0
 
-    const monthlyScheduledRent = leases
-      .filter(l => l.lease_status === 'ACTIVE')
-      .reduce((sum, l) => sum + (Number(l.base_rent_monthly) || 0), 0)
+    // Monthly rent from leases or units
+    const monthlyScheduledRent = leases.length > 0
+      ? leases
+          .filter(l => l.lease_status === 'ACTIVE')
+          .reduce((sum, l) => sum + (Number(l.base_rent_monthly) || 0), 0)
+      : units
+          .filter((u: Unit) => u.occupancy_status === 'Occupied')
+          .reduce((sum, u: Unit) => sum + (Number(u.current_rent) || 0), 0)
 
     const annualScheduledRent = monthlyScheduledRent * 12
 
@@ -848,12 +915,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     )
   }
 
-  // Empty state
-  if (leases.length === 0) {
+  // Empty state - only show when BOTH leases and units are empty
+  if (gridData.length === 0) {
     return (
       <div className="p-6">
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400 mb-4">No leases found. Click "Add Unit/Suite" to start.</p>
+          <p className="text-gray-400 mb-4">No leases or units found. Click "Add Unit/Suite" to start.</p>
           <button
             onClick={handleAddRow}
             className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white border border-blue-500 hover:bg-blue-500"
@@ -941,11 +1008,28 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         </div>
       )}
 
+      {/* Units-only mode banner */}
+      {isShowingUnitsOnly && (
+        <div className="px-6 pb-4">
+          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 flex items-center gap-3">
+            <span className="text-blue-400 text-xl">ℹ️</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-300">Showing Unit Data (No Lease Records)</p>
+              <p className="text-xs text-blue-400/80">
+                Extracted from rent roll. Monthly rent shown from unit current_rent field.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex justify-between items-center mb-4 px-6">
         <div>
-          <h2 className="text-lg font-semibold text-white">Current Leases</h2>
-          <p className="text-sm text-gray-400">{leases.length} units/suites</p>
+          <h2 className="text-lg font-semibold text-white">
+            {isShowingUnitsOnly ? 'Unit Inventory' : 'Current Leases'}
+          </h2>
+          <p className="text-sm text-gray-400">{gridData.length} units/suites</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -973,8 +1057,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       {/* AG-Grid */}
       <div className="flex-1 px-6 pb-6 overflow-auto">
         <div className="ag-theme-alpine" style={{ height: '600px', minWidth: '1200px', width: '100%' }}>
-          <AgGridReact<Lease>
-            rowData={leases}
+          <AgGridReact<RentRollRow>
+            rowData={gridData}
             columnDefs={columnDefs}
             defaultColDef={{
               resizable: true,

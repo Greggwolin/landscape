@@ -1,6 +1,6 @@
 # Parcel ID Audit
 
-Source: docs/schema/landscape_rich_schema_2026-01-06.json
+Source: docs/schema/landscape_rich_schema_2026-01-16.json
 
 ## Summary
 
@@ -45,11 +45,4 @@ Source: docs/schema/landscape_rich_schema_2026-01-06.json
 
 ## Indexes Added
 
-Source: docs/schema/landscape_rich_schema_2026-01-06.json (CSV inputs not present)
-
-| Table | Index Name | FK Exists |
-| --- | --- | --- |
-| core_doc | idx_core_doc__parcel_id | yes |
-| gis_plan_parcel | idx_gis_plan_parcel__parcel_id | yes |
-| tbl_acreage_allocation | idx_tbl_acreage_allocation__parcel_id | yes |
-| tbl_cre_property | idx_tbl_cre_property__parcel_id | yes |
+None present in `docs/schema/landscape_rich_schema_2026-01-16.json`.

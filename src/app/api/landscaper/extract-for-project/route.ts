@@ -17,16 +17,31 @@ const EXTRACTION_PROMPT = `You are a real estate document analyzer. Extract key 
 
 Extract the following fields if present (return null for fields not found):
 - property_name: The name of the property or project
-- street_address: Full street address (number and street name)
+- street_address: Full street address (number and street name only, not city/state/zip)
 - city: City name
 - state: US state (2-letter abbreviation preferred)
-- zip_code: ZIP code
+- zip_code: 5-digit ZIP code (look in address lines, headers, property summary sections)
+- county: County name (e.g., "Los Angeles" not "Los Angeles County"). Look for county mentions in headers, location sections, or market analysis. If city is in California (e.g., Torrance, Los Angeles), look up the correct county.
 - total_units: Total number of units (for multifamily/residential)
 - building_sf: Total building square footage
 - site_area: Site/land area (in acres)
-- property_subtype: Type like MULTIFAMILY, OFFICE, RETAIL, INDUSTRIAL, LAND
+- property_subtype: Property type. MUST be one of: MULTIFAMILY, OFFICE, RETAIL, INDUSTRIAL, MIXED_USE, HOTEL, SELF_STORAGE, MPC, INFILL, LOT_DEVELOPMENT, ENTITLED_LAND
+- property_class: Property class if mentioned (CLASS_A, CLASS_B, CLASS_C, or CLASS_D). Look for phrases like "Class A", "Class B property", "B-class", etc.
 - year_built: Year the property was built
 - asking_price: Asking or list price
+
+IMPORTANT for property_subtype detection:
+- If document mentions "apartment", "units", "multifamily", "residential rental" -> MULTIFAMILY
+- Look for unit counts like "43-unit" or "120 units" which indicate MULTIFAMILY
+- If document mentions "warehouse", "distribution", "logistics" -> INDUSTRIAL
+- If document mentions "shopping", "strip mall", "retail center" -> RETAIL
+
+IMPORTANT for zip_code: Look carefully in:
+1. Property address lines (often after city, state)
+2. Cover page headers
+3. Property summary sections
+4. Location/market sections
+Even if not on the same line as the street address, find the ZIP code associated with this property.
 
 Also determine the document_type from these options:
 - Offering Memorandum

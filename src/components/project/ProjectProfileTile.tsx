@@ -59,9 +59,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (isLoading) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)' }}>
+        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.75rem 1rem', minHeight: '52px' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0 h5">Project Profile</h2>
+            <h2 className="mb-0 h5" style={{ fontSize: '1rem', fontWeight: 600 }}>Project Profile</h2>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -74,9 +74,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (error || !profile) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)' }}>
+        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.75rem 1rem', minHeight: '52px' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0 h5">Project Profile</h2>
+            <h2 className="mb-0 h5" style={{ fontSize: '1rem', fontWeight: 600 }}>Project Profile</h2>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -90,17 +90,26 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
 
   return (
     <>
-      <CCard className="mb-3 h-100" style={{ backgroundColor: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', borderColor: 'var(--cui-border-color)' }}>
+      <CCard
+        className="mb-3 h-100"
+        style={{
+          backgroundColor: 'var(--cui-body-bg)',
+          color: 'var(--cui-body-color)',
+          borderColor: 'var(--cui-border-color)',
+          height: '100%'
+        }}
+      >
         <CCardHeader
           className="d-flex align-items-center justify-content-between"
           style={{
             backgroundColor: 'var(--cui-card-cap-bg)',
             color: 'var(--cui-body-color)',
             borderColor: 'var(--cui-border-color)',
-            padding: '0.5rem 1rem'
+            padding: '0.75rem 1rem',
+            minHeight: '52px'
           }}
         >
-          <span className="fw-semibold" style={{ letterSpacing: '0.02em' }}>
+          <span className="fw-semibold" style={{ letterSpacing: '0.02em', fontSize: '1rem' }}>
             Project Profile
           </span>
           <div className="d-flex align-items-center gap-3 flex-wrap">

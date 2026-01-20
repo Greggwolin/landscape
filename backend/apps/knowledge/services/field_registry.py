@@ -46,7 +46,7 @@ class FieldMapping:
 
     @property
     def is_row_based(self) -> bool:
-        return self.db_write_type in ('row_assumption', 'row_opex', 'row_allocation', 'row_budget', 'row_milestone')
+        return self.db_write_type in ('row_assumption', 'row_opex', 'row_allocation', 'row_budget', 'row_milestone', 'upsert')
 
     @property
     def table_name(self) -> str:

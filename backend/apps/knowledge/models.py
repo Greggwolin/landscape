@@ -532,3 +532,484 @@ class KnowledgeInsight(models.Model):
         if action:
             self.user_action = action
         self.save(update_fields=['acknowledged', 'acknowledged_at', 'acknowledged_by', 'user_action'])
+
+
+# =============================================================================
+# PLATFORM KNOWLEDGE MODELS
+# Foundational reference documents for Landscaper AI - NOT USER FACING
+# =============================================================================
+
+class PlatformKnowledge(models.Model):
+    """
+    Foundational reference documents for Landscaper AI.
+
+    IMPORTANT: NOT exposed via any user-facing API.
+    These documents provide canonical knowledge for AI reasoning without
+    being visible to or searchable by users.
+
+    Examples: The Appraisal of Real Estate, Marshall & Swift, USPAP
+    """
+
+    class IngestionStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        INDEXED = 'indexed', 'Indexed'
+        FAILED = 'failed', 'Failed'
+
+    class KnowledgeDomain(models.TextChoices):
+        VALUATION = 'valuation', 'Valuation'
+        COST = 'cost', 'Cost'
+        MARKET = 'market', 'Market'
+        LEGAL = 'legal', 'Legal'
+        STANDARDS = 'standards', 'Standards'
+        DEVELOPMENT = 'development', 'Development'
+        OPERATING_EXPENSES = 'operating_expenses', 'Operating Expenses'
+        VALUATION_METHODOLOGY = 'valuation_methodology', 'Valuation Methodology'
+        MARKET_DATA = 'market_data', 'Market Data'
+        LEGAL_REGULATORY = 'legal_regulatory', 'Legal/Regulatory'
+        COST_ESTIMATION = 'cost_estimation', 'Cost Estimation'
+        OTHER = 'other', 'Other'
+
+    document_key = models.CharField(max_length=100, unique=True)
+    title = models.CharField(max_length=500)
+    subtitle = models.CharField(max_length=500, blank=True, null=True)
+    edition = models.CharField(max_length=50, blank=True, null=True)
+    publisher = models.CharField(max_length=255, blank=True, null=True)
+    publication_year = models.IntegerField(blank=True, null=True)
+    isbn = models.CharField(max_length=20, blank=True, null=True)
+
+    knowledge_domain = models.CharField(
+        max_length=100,
+        choices=KnowledgeDomain.choices
+    )
+    property_types = models.JSONField(default=list)
+
+    description = models.TextField(blank=True, null=True)
+    total_chapters = models.IntegerField(blank=True, null=True)
+    total_pages = models.IntegerField(blank=True, null=True)
+    page_count = models.IntegerField(blank=True, null=True)
+
+    file_path = models.CharField(max_length=500, blank=True, null=True)
+    file_hash = models.CharField(max_length=64, blank=True, null=True)
+    file_size_bytes = models.BigIntegerField(blank=True, null=True)
+
+    ingestion_status = models.CharField(
+        max_length=50,
+        choices=IngestionStatus.choices,
+        default=IngestionStatus.PENDING
+    )
+    chunk_count = models.IntegerField(default=0)
+    last_indexed_at = models.DateTimeField(blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=100, default='system')
+
+    class Meta:
+        db_table = 'landscape"."tbl_platform_knowledge'
+        verbose_name = 'Platform Knowledge Document'
+        verbose_name_plural = 'Platform Knowledge Documents'
+
+    def __str__(self):
+        return f"{self.title} ({self.edition})"
+
+
+class PlatformKnowledgeChapter(models.Model):
+    """
+    Chapter-level metadata for targeted RAG retrieval.
+    Enables filtering by topic, property type, and task type.
+    """
+
+    document = models.ForeignKey(
+        PlatformKnowledge,
+        on_delete=models.CASCADE,
+        related_name='chapters'
+    )
+
+    chapter_number = models.IntegerField()
+    chapter_title = models.CharField(max_length=500)
+    page_start = models.IntegerField(blank=True, null=True)
+    page_end = models.IntegerField(blank=True, null=True)
+
+    # Classification for targeted retrieval
+    topics = models.JSONField(default=list)
+    property_types = models.JSONField(default=list)
+    applies_to = models.JSONField(default=list)
+
+    # AI-generated summary
+    summary = models.TextField(blank=True, null=True)
+    key_concepts = models.JSONField(default=dict)
+
+    # Processing
+    chunk_ids = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_platform_knowledge_chapters'
+        unique_together = ['document', 'chapter_number']
+        ordering = ['document', 'chapter_number']
+
+    def __str__(self):
+        return f"Ch. {self.chapter_number}: {self.chapter_title}"
+
+
+class PlatformKnowledgeChunk(models.Model):
+    """
+    Chunked content with vector embeddings for semantic RAG retrieval.
+    """
+
+    class ContentType(models.TextChoices):
+        TEXT = 'text', 'Text'
+        TABLE = 'table', 'Table'
+        FORMULA = 'formula', 'Formula'
+        EXAMPLE = 'example', 'Example'
+        LIST = 'list', 'List'
+
+    document = models.ForeignKey(
+        PlatformKnowledge,
+        on_delete=models.CASCADE,
+        related_name='chunks'
+    )
+    chapter = models.ForeignKey(
+        PlatformKnowledgeChapter,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='chunks'
+    )
+
+    chunk_index = models.IntegerField()
+    content = models.TextField()
+    content_type = models.CharField(
+        max_length=50,
+        choices=ContentType.choices,
+        default=ContentType.TEXT
+    )
+
+    page_number = models.IntegerField(blank=True, null=True)
+    section_path = models.CharField(max_length=500, blank=True, null=True)
+
+    # Embedding stored as JSON array (pgvector handled at SQL level)
+    # Raw SQL queries will use the actual vector column
+    embedding_model = models.CharField(max_length=100, default='text-embedding-3-small')
+
+    token_count = models.IntegerField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_platform_knowledge_chunks'
+        unique_together = ['document', 'chunk_index']
+        ordering = ['document', 'chunk_index']
+
+    def __str__(self):
+        return f"Chunk {self.chunk_index} - {self.section_path}"
+
+
+# =============================================================================
+# USER KNOWLEDGE MODELS
+# Personalized learning from user's projects, documents, and comparables
+# =============================================================================
+
+class AssumptionHistory(models.Model):
+    """
+    Tracks all assumptions users have made across projects.
+
+    Enables pattern learning - e.g., "You've typically used 5% management fee
+    for multifamily in this market. Use that here too?"
+    """
+
+    class SourceType(models.TextChoices):
+        USER_INPUT = 'user_input', 'User Input'
+        AI_SUGGESTION = 'ai_suggestion', 'AI Suggestion'
+        DOCUMENT_EXTRACT = 'document_extract', 'Document Extraction'
+
+    # Scope
+    organization_id = models.BigIntegerField(null=True, blank=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='assumption_history',
+        db_column='user_id'
+    )
+    project_id = models.BigIntegerField(null=True, blank=True)
+
+    # Property context
+    property_type = models.CharField(max_length=50)
+    property_subtype = models.CharField(max_length=100, null=True, blank=True)
+    market = models.CharField(max_length=100, null=True, blank=True)
+    submarket = models.CharField(max_length=100, null=True, blank=True)
+
+    # Assumption content
+    assumption_category = models.CharField(max_length=100)
+    assumption_key = models.CharField(max_length=200)
+    assumption_value = models.DecimalField(
+        max_digits=20, decimal_places=6, null=True, blank=True
+    )
+    assumption_text = models.TextField(null=True, blank=True)
+    assumption_unit = models.CharField(max_length=50, null=True, blank=True)
+
+    # Context
+    context_json = models.JSONField(default=dict)
+    source_type = models.CharField(
+        max_length=50,
+        choices=SourceType.choices
+    )
+    source_reference = models.TextField(null=True, blank=True)
+
+    # Learning signals
+    confidence_score = models.DecimalField(
+        max_digits=3, decimal_places=2, default=1.00
+    )
+    was_modified = models.BooleanField(default=False)
+    original_value = models.DecimalField(
+        max_digits=20, decimal_places=6, null=True, blank=True
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_assumption_history'
+        managed = False
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'property_type']),
+            models.Index(fields=['assumption_category', 'assumption_key']),
+            models.Index(fields=['market', 'submarket']),
+        ]
+
+    def __str__(self):
+        return f"{self.assumption_category}.{self.assumption_key} = {self.assumption_value or self.assumption_text}"
+
+
+class UserDocumentChunk(models.Model):
+    """
+    Chunked content from user-uploaded documents with embeddings.
+
+    Enables RAG over user's own documents - "Based on the T-12 you uploaded,
+    the operating expenses are..."
+    """
+
+    # Document reference
+    document_id = models.BigIntegerField()
+    project_id = models.BigIntegerField(null=True, blank=True)
+    organization_id = models.BigIntegerField(null=True, blank=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='document_chunks',
+        db_column='user_id'
+    )
+
+    # Document metadata
+    document_name = models.CharField(max_length=500)
+    document_type = models.CharField(max_length=100, null=True, blank=True)
+
+    # Chunk content
+    chunk_index = models.IntegerField()
+    content = models.TextField()
+    content_type = models.CharField(max_length=50, default='text')
+
+    # Location
+    page_number = models.IntegerField(null=True, blank=True)
+    section_path = models.CharField(max_length=500, null=True, blank=True)
+
+    # Extracted entities
+    property_type = models.CharField(max_length=50, null=True, blank=True)
+    entities_json = models.JSONField(default=dict)
+
+    # Embedding metadata
+    token_count = models.IntegerField(null=True, blank=True)
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_user_document_chunks'
+        managed = False
+        unique_together = ['document_id', 'chunk_index']
+        ordering = ['document_id', 'chunk_index']
+
+    def __str__(self):
+        return f"{self.document_name} - Chunk {self.chunk_index}"
+
+
+class UserComparable(models.Model):
+    """
+    Comparable properties/sales the user has referenced.
+
+    Enables comp suggestions - "You used a 5.25% cap rate for the similar
+    property at 123 Main St. Consider that for this one."
+    """
+
+    class ComparableType(models.TextChoices):
+        SALE = 'sale', 'Sale Comparable'
+        LEASE = 'lease', 'Lease Comparable'
+        RENT = 'rent', 'Rent Comparable'
+        EXPENSE = 'expense', 'Expense Comparable'
+
+    class SourceType(models.TextChoices):
+        USER_INPUT = 'user_input', 'User Input'
+        DOCUMENT_EXTRACT = 'document_extract', 'Document Extraction'
+        MARKET_DATA = 'market_data', 'Market Data'
+
+    # Ownership
+    organization_id = models.BigIntegerField(null=True, blank=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='comparables',
+        db_column='user_id'
+    )
+    project_id = models.BigIntegerField(null=True, blank=True)
+
+    # Comparable identification
+    comparable_type = models.CharField(
+        max_length=50,
+        choices=ComparableType.choices
+    )
+    property_name = models.CharField(max_length=500)
+    property_address = models.TextField(null=True, blank=True)
+
+    # Property characteristics
+    property_type = models.CharField(max_length=50)
+    property_subtype = models.CharField(max_length=100, null=True, blank=True)
+    market = models.CharField(max_length=100, null=True, blank=True)
+    submarket = models.CharField(max_length=100, null=True, blank=True)
+
+    # Size metrics
+    size_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    size_unit = models.CharField(max_length=50, null=True, blank=True)
+    year_built = models.IntegerField(null=True, blank=True)
+
+    # Transaction data
+    transaction_date = models.DateField(null=True, blank=True)
+    price_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    price_unit = models.CharField(max_length=50, null=True, blank=True)
+    cap_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True
+    )
+    noi = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+
+    # Additional metrics
+    metrics_json = models.JSONField(default=dict)
+
+    # Source
+    source_type = models.CharField(
+        max_length=50,
+        choices=SourceType.choices
+    )
+    source_reference = models.TextField(null=True, blank=True)
+    source_document_id = models.BigIntegerField(null=True, blank=True)
+
+    # Quality
+    confidence_score = models.DecimalField(
+        max_digits=3, decimal_places=2, default=1.00
+    )
+    is_verified = models.BooleanField(default=False)
+    notes = models.TextField(null=True, blank=True)
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_user_comparables'
+        managed = False
+        ordering = ['-transaction_date', '-created_at']
+        indexes = [
+            models.Index(fields=['user', 'property_type']),
+            models.Index(fields=['comparable_type']),
+            models.Index(fields=['market', 'submarket']),
+        ]
+
+    def __str__(self):
+        return f"{self.comparable_type}: {self.property_name}"
+
+
+# =============================================================================
+# BENCHMARK MODELS
+# Structured industry benchmarks (IREM, BOMA, NAA) for direct SQL queries
+# =============================================================================
+
+class OpexBenchmark(models.Model):
+    """
+    Operating expense benchmarks from industry sources (IREM, BOMA, NAA).
+
+    Used for direct SQL queries, not RAG retrieval. Provides structured
+    numeric data that can be queried for expense validation and comparison.
+    """
+
+    PROPERTY_TYPES = [
+        ('multifamily', 'Multifamily'),
+        ('office', 'Office'),
+        ('retail', 'Retail'),
+        ('industrial', 'Industrial'),
+    ]
+
+    GEOGRAPHIC_SCOPES = [
+        ('national', 'National'),
+        ('regional', 'Regional'),
+        ('msa', 'MSA'),
+        ('state', 'State'),
+    ]
+
+    # Source identification
+    source = models.CharField(max_length=50, db_index=True)  # IREM, BOMA, NAA
+    source_year = models.IntegerField(db_index=True)
+    report_name = models.CharField(max_length=255, blank=True, null=True)
+
+    # Scope
+    property_type = models.CharField(max_length=50, choices=PROPERTY_TYPES, db_index=True)
+    property_subtype = models.CharField(max_length=100, blank=True, null=True)
+    geographic_scope = models.CharField(max_length=50, choices=GEOGRAPHIC_SCOPES)
+    geography_name = models.CharField(max_length=100, blank=True, null=True)
+
+    # Expense category (maps to OpEx hierarchy)
+    expense_category = models.CharField(max_length=100, db_index=True)
+    expense_subcategory = models.CharField(max_length=100, blank=True, null=True)
+
+    # Benchmark values
+    per_unit_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    per_sf_amount = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    pct_of_egi = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    pct_of_gpi = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    # Sample info (for confidence context)
+    sample_size = models.IntegerField(null=True, blank=True)
+    sample_units = models.IntegerField(null=True, blank=True)
+
+    # Metadata
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."opex_benchmark'
+        unique_together = [
+            'source', 'source_year', 'property_type',
+            'geographic_scope', 'geography_name',
+            'expense_category', 'expense_subcategory'
+        ]
+        indexes = [
+            models.Index(fields=['source', 'source_year']),
+            models.Index(fields=['property_type', 'property_subtype']),
+            models.Index(fields=['expense_category', 'expense_subcategory']),
+            models.Index(fields=['geographic_scope', 'geography_name']),
+        ]
+        verbose_name = 'OpEx Benchmark'
+        verbose_name_plural = 'OpEx Benchmarks'
+
+    def __str__(self):
+        return f"{self.source} {self.source_year} - {self.expense_category} ({self.geographic_scope})"

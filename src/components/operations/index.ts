@@ -21,6 +21,8 @@ export type { GrowthBadgeType } from './GrowthBadge';
 export { SectionCard } from './SectionCard';
 export { DetailSummaryToggle } from './DetailSummaryToggle';
 export { ValueAddToggle } from './ValueAddToggle';
+export { ValueAddAccordion } from './ValueAddAccordion';
+export { ValueAddCard } from './ValueAddCard';
 export { AddButton } from './AddButton';
 
 // Section Components
@@ -28,6 +30,7 @@ export { RentalIncomeSection } from './RentalIncomeSection';
 export { VacancyDeductionsSection } from './VacancyDeductionsSection';
 export { OtherIncomeSection } from './OtherIncomeSection';
 export { OperatingExpensesSection } from './OperatingExpensesSection';
+export { DraggableOpexSection } from './DraggableOpexSection';
 
 // Summary Components
 export { EGISubtotalBar } from './EGISubtotalBar';

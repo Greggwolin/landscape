@@ -3,7 +3,7 @@ Knowledge API URLs
 """
 
 from django.urls import path
-from .views import session_views, extraction_views, status_views, chat_views
+from .views import session_views, extraction_views, status_views, chat_views, platform_knowledge_views, benchmark_views
 
 urlpatterns = [
     # Session management
@@ -59,4 +59,17 @@ urlpatterns = [
     path('chat/<int:project_id>/clear/', chat_views.clear_chat, name='knowledge_chat_clear'),
     # Document-scoped chat endpoint
     path('projects/<int:project_id>/docs/<int:doc_id>/chat/', chat_views.document_chat, name='knowledge_doc_chat'),
+    # Platform knowledge ingestion endpoints
+    path('platform/analyze/', platform_knowledge_views.analyze_platform_document, name='platform_knowledge_analyze'),
+    path('platform/ingest/', platform_knowledge_views.ingest_platform_document, name='platform_knowledge_ingest'),
+    path('platform/query/', platform_knowledge_views.query_platform_knowledge, name='platform_knowledge_query'),
+    path('platform/<str:document_key>/chat/', platform_knowledge_views.chat_with_document, name='platform_knowledge_chat'),
+    path('platform/<str:document_key>/', platform_knowledge_views.update_platform_knowledge, name='platform_knowledge_update'),
+
+    # Benchmark endpoints (IREM, BOMA, NAA structured data)
+    path('benchmarks/expense/', benchmark_views.get_expense_benchmark, name='benchmark_expense'),
+    path('benchmarks/compare/', benchmark_views.compare_expense, name='benchmark_compare'),
+    path('benchmarks/summary/', benchmark_views.get_expense_summary, name='benchmark_summary'),
+    path('benchmarks/search/', benchmark_views.search_benchmarks, name='benchmark_search'),
+    path('benchmarks/trend/', benchmark_views.get_category_trend, name='benchmark_trend'),
 ]

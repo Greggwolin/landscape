@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "apps.users",  # Phase 7: User settings and tier management
     "apps.acquisition",  # Acquisition tracking and ledger
     "apps.knowledge",  # Knowledge/RAG extraction system
+    "apps.contacts",  # Cabinet/Contact management system
 ]
 
 MIDDLEWARE = [

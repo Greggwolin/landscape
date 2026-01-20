@@ -4,7 +4,7 @@ Django admin configuration for projects app.
 
 from django.contrib import admin
 from django import forms
-from .models import Project
+from .models import Project, AnalysisTypeConfig, ANALYSIS_TYPE_CHOICES
 from .lookups import LookupType, LookupSubtype, LookupFamily, PropertyTypeConfig
 
 
@@ -48,11 +48,11 @@ CALCULATION_FREQUENCIES = [
 class ProjectAdminForm(forms.ModelForm):
     """Custom form for Project admin with dropdown choices from lookup tables."""
 
-    # New Taxonomy Fields (migration 013)
+    # Analysis Type (refactored in migration 061)
     analysis_type = forms.ChoiceField(
         required=False,
         label="Analysis Type",
-        help_text="Land Development or Income Property"
+        help_text="What the user is doing: Valuation, Investment, Development, or Feasibility"
     )
 
     property_subtype = forms.ChoiceField(
@@ -105,12 +105,8 @@ class ProjectAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Populate analysis_type choices
-        analysis_type_choices = [
-            ('', '---------'),
-            ('Land Development', 'Land Development'),
-            ('Income Property', 'Income Property'),
-        ]
+        # Populate analysis_type choices (new orthogonal taxonomy)
+        analysis_type_choices = [('', '---------')] + list(ANALYSIS_TYPE_CHOICES)
         self.fields['analysis_type'].choices = analysis_type_choices
 
         # Populate property_subtype choices (simplified for admin)
@@ -288,6 +284,59 @@ class ProjectAdmin(admin.ModelAdmin):
             self.message_user(request, f'Project "{obj.project_name}" was updated successfully.')
         else:
             self.message_user(request, f'Project "{obj.project_name}" was created successfully.')
+
+@admin.register(AnalysisTypeConfig)
+class AnalysisTypeConfigAdmin(admin.ModelAdmin):
+    """Admin interface for Analysis Type Configuration."""
+
+    list_display = [
+        'analysis_type',
+        'tile_hbu',
+        'tile_valuation',
+        'tile_capitalization',
+        'tile_returns',
+        'tile_development_budget',
+        'updated_at',
+    ]
+
+    list_filter = ['analysis_type']
+
+    readonly_fields = ['config_id', 'created_at', 'updated_at']
+
+    fieldsets = (
+        ('Analysis Type', {
+            'fields': ('config_id', 'analysis_type')
+        }),
+        ('Tile Visibility', {
+            'fields': (
+                'tile_hbu',
+                'tile_valuation',
+                'tile_capitalization',
+                'tile_returns',
+                'tile_development_budget',
+            ),
+            'description': 'Control which tiles are visible for this analysis type'
+        }),
+        ('Requirements', {
+            'fields': (
+                'requires_capital_stack',
+                'requires_comparable_sales',
+                'requires_income_approach',
+                'requires_cost_approach',
+            )
+        }),
+        ('Reports & Landscaper', {
+            'fields': (
+                'available_reports',
+                'landscaper_context',
+            )
+        }),
+        ('Audit', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
 
 # Import auth admin
 from .admin_auth import UserAdmin, UserProfileAdmin, APIKeyAdmin, PasswordResetTokenAdmin

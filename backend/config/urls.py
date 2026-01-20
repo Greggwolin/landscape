@@ -47,4 +47,5 @@ urlpatterns = [
     path("api/users/", include('apps.users.urls')),  # Phase 7: User settings
     path("api/", include('apps.acquisition.urls')),  # Acquisition tracking
     path("api/knowledge/", include('apps.knowledge.urls')),  # Knowledge/extraction system
+    path("api/", include('apps.contacts.urls')),  # Cabinet/Contact management
 ]

@@ -5,9 +5,13 @@ Converts Django ORM models to/from JSON for the REST API.
 """
 
 from rest_framework import serializers
-from .models import Project
+from .models import Project, AnalysisTypeConfig, ANALYSIS_TYPE_CHOICES
 from .primary_measure import sync_primary_measure_on_legacy_update
 from .models_user import UserPreference
+
+
+# Valid analysis type codes
+VALID_ANALYSIS_TYPES = [code for code, _ in ANALYSIS_TYPE_CHOICES]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -17,6 +21,13 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     market_velocity_annual = serializers.IntegerField(required=False, allow_null=True)
     velocity_override_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    analysis_type = serializers.ChoiceField(
+        choices=ANALYSIS_TYPE_CHOICES,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Analysis type: VALUATION, INVESTMENT, DEVELOPMENT, or FEASIBILITY"
+    )
 
     class Meta:
         model = Project
@@ -28,6 +39,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             'last_calculated_at',
             'ai_last_reviewed',
         ]
+
+    def validate_analysis_type(self, value):
+        """Validate analysis_type is one of the new codes."""
+        if value and value not in VALID_ANALYSIS_TYPES:
+            raise serializers.ValidationError(
+                f"Invalid analysis_type '{value}'. Must be one of: {', '.join(VALID_ANALYSIS_TYPES)}"
+            )
+        return value
 
     def create(self, validated_data):
         instance = super().create(validated_data)
@@ -189,3 +208,81 @@ class UserPreferenceBulkSerializer(serializers.Serializer):
                 raise serializers.ValidationError(f"Unexpected keys: {extra}")
 
         return value
+
+
+# ========================================================================
+# Analysis Type Config Serializers
+# ========================================================================
+
+class AnalysisTypeConfigSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for AnalysisTypeConfig.
+    Used for detail views and configuration management.
+    """
+    tiles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AnalysisTypeConfig
+        fields = [
+            'config_id',
+            'analysis_type',
+            'tile_hbu',
+            'tile_valuation',
+            'tile_capitalization',
+            'tile_returns',
+            'tile_development_budget',
+            'requires_capital_stack',
+            'requires_comparable_sales',
+            'requires_income_approach',
+            'requires_cost_approach',
+            'available_reports',
+            'landscaper_context',
+            'tiles',  # Computed field
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['config_id', 'created_at', 'updated_at', 'tiles']
+
+    def get_tiles(self, obj):
+        """Return list of visible tiles for this analysis type."""
+        return obj.get_visible_tiles()
+
+
+class AnalysisTypeConfigListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for listing analysis type configs.
+    """
+    tiles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AnalysisTypeConfig
+        fields = [
+            'analysis_type',
+            'tile_hbu',
+            'tile_valuation',
+            'tile_capitalization',
+            'tile_returns',
+            'tile_development_budget',
+            'tiles',
+        ]
+
+    def get_tiles(self, obj):
+        """Return list of visible tiles for this analysis type."""
+        return obj.get_visible_tiles()
+
+
+class AnalysisTypeTilesSerializer(serializers.Serializer):
+    """
+    Response serializer for the tiles endpoint.
+    """
+    analysis_type = serializers.CharField()
+    tiles = serializers.ListField(child=serializers.CharField())
+
+
+class AnalysisTypeLandscaperContextSerializer(serializers.Serializer):
+    """
+    Response serializer for Landscaper context endpoint.
+    """
+    analysis_type = serializers.CharField()
+    context = serializers.CharField(allow_null=True)
+    required_inputs = serializers.DictField()

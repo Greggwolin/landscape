@@ -1,26 +1,67 @@
 /**
  * Project Taxonomy Types
  *
- * Defines the hierarchical taxonomy for project classification:
- * 1. Analysis Type (top level) - What kind of financial analysis
- * 2. Property Subtype (second level) - What is being built/analyzed
+ * This file defines the Property Category taxonomy (what the asset is):
+ * 1. Property Category (top level) - Land Development vs Income Property
+ * 2. Property Subtype (second level) - Specific property type
  * 3. Property Class (optional, Income Property only) - Quality/institutional grade
  *
- * Migration: 013_restructure_project_taxonomy.up.sql
+ * NOTE: As of migration 061, "Analysis Type" is now a SEPARATE orthogonal dimension
+ * that describes what the user is doing (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY).
+ * See useAnalysisTypeConfig.ts for the new Analysis Type system.
+ *
+ * Migration: 013_restructure_project_taxonomy.up.sql (original)
+ * Migration: 061_analysis_type_refactor.sql (orthogonal analysis types)
  */
 
 // ============================================================================
-// Analysis Type (Top Level)
+// NEW: Analysis Type (Orthogonal - What the user is doing)
 // ============================================================================
 
-export type AnalysisType = 'Land Development' | 'Income Property';
+/**
+ * Analysis Type - What the user is trying to accomplish.
+ * Orthogonal to Property Category (what the asset is).
+ */
+export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY';
 
 export const ANALYSIS_TYPES: readonly AnalysisType[] = [
+  'VALUATION',
+  'INVESTMENT',
+  'DEVELOPMENT',
+  'FEASIBILITY'
+] as const;
+
+export const ANALYSIS_TYPE_LABELS: Record<AnalysisType, string> = {
+  'VALUATION': 'Valuation',
+  'INVESTMENT': 'Investment',
+  'DEVELOPMENT': 'Development',
+  'FEASIBILITY': 'Feasibility'
+};
+
+export const ANALYSIS_TYPE_DESCRIPTIONS: Record<AnalysisType, string> = {
+  'VALUATION': 'Market value opinion - USPAP compliant appraisal',
+  'INVESTMENT': 'Acquisition underwriting - IRR, returns analysis',
+  'DEVELOPMENT': 'Ground-up or redevelopment returns',
+  'FEASIBILITY': 'Go/no-go binary feasibility analysis'
+};
+
+// ============================================================================
+// Property Category (Top Level - What the asset is)
+// ============================================================================
+
+/**
+ * @deprecated Use PropertyCategory instead. This type alias exists for backward compatibility.
+ */
+export type LegacyAnalysisType = 'Land Development' | 'Income Property';
+
+export type PropertyCategory = 'Land Development' | 'Income Property';
+
+export const PROPERTY_CATEGORIES: readonly PropertyCategory[] = [
   'Land Development',
   'Income Property'
 ] as const;
 
-export const ANALYSIS_TYPE_DESCRIPTIONS: Record<AnalysisType, string> = {
+export const PROPERTY_CATEGORY_DESCRIPTIONS: Record<PropertyCategory, string> = {
   'Land Development': 'Development feasibility, lot absorption, phased infrastructure, residual value',
   'Income Property': 'NOI analysis, cap rates, leasing, stabilization, existing property valuation'
 };
@@ -170,19 +211,26 @@ export const PROPERTY_CLASS_DESCRIPTIONS: Record<PropertyClass, string> = {
 // ============================================================================
 
 /**
- * Get available property subtypes based on the selected analysis type
+ * Get available property subtypes based on the selected property category
  */
-export function getSubtypesForAnalysisType(analysisType: AnalysisType): readonly PropertySubtype[] {
-  return analysisType === 'Land Development'
+export function getSubtypesForPropertyCategory(category: PropertyCategory): readonly PropertySubtype[] {
+  return category === 'Land Development'
     ? LAND_DEVELOPMENT_SUBTYPES
     : INCOME_PROPERTY_SUBTYPES;
 }
 
 /**
+ * @deprecated Use getSubtypesForPropertyCategory instead
+ */
+export function getSubtypesForAnalysisType(category: PropertyCategory): readonly PropertySubtype[] {
+  return getSubtypesForPropertyCategory(category);
+}
+
+/**
  * Determine if property class field should be shown (Income Property only)
  */
-export function showsPropertyClass(analysisType: AnalysisType): boolean {
-  return analysisType === 'Income Property';
+export function showsPropertyClass(category: PropertyCategory): boolean {
+  return category === 'Income Property';
 }
 
 /**
@@ -203,14 +251,24 @@ export function getIncomePropertyCategory(subtype: IncomePropertySubtype): strin
 }
 
 /**
- * Validate that a subtype is valid for the given analysis type
+ * Validate that a subtype is valid for the given property category
  */
-export function isValidSubtypeForAnalysisType(
-  analysisType: AnalysisType,
+export function isValidSubtypeForPropertyCategory(
+  category: PropertyCategory,
   subtype: PropertySubtype
 ): boolean {
-  const validSubtypes = getSubtypesForAnalysisType(analysisType);
+  const validSubtypes = getSubtypesForPropertyCategory(category);
   return validSubtypes.includes(subtype);
+}
+
+/**
+ * @deprecated Use isValidSubtypeForPropertyCategory instead
+ */
+export function isValidSubtypeForAnalysisType(
+  category: PropertyCategory,
+  subtype: PropertySubtype
+): boolean {
+  return isValidSubtypeForPropertyCategory(category, subtype);
 }
 
 // ============================================================================
@@ -251,6 +309,7 @@ export const INCOME_PROPERTY_SUBTYPE_GROUPS: readonly SubtypeGroup[] = [
 
 export interface PropertyTaxonomy {
   analysis_types: readonly AnalysisType[];
+  property_categories: readonly PropertyCategory[];
   subtypes: {
     'Land Development': readonly LandDevelopmentSubtype[];
     'Income Property': readonly IncomePropertySubtype[];
@@ -261,6 +320,7 @@ export interface PropertyTaxonomy {
 
 export const PROPERTY_TAXONOMY: PropertyTaxonomy = {
   analysis_types: ANALYSIS_TYPES,
+  property_categories: PROPERTY_CATEGORIES,
   subtypes: {
     'Land Development': LAND_DEVELOPMENT_SUBTYPES,
     'Income Property': INCOME_PROPERTY_SUBTYPES
@@ -275,15 +335,23 @@ export const PROPERTY_TAXONOMY: PropertyTaxonomy = {
 
 export interface ProjectTaxonomyFields {
   analysis_type: AnalysisType;
+  property_category?: PropertyCategory;  // What the asset is
   property_subtype: PropertySubtype;
   property_class?: PropertyClass | null;
 }
 
 /**
- * Type guard to check if a value is a valid AnalysisType
+ * Type guard to check if a value is a valid AnalysisType (new orthogonal type)
  */
 export function isAnalysisType(value: unknown): value is AnalysisType {
   return typeof value === 'string' && ANALYSIS_TYPES.includes(value as AnalysisType);
+}
+
+/**
+ * Type guard to check if a value is a valid PropertyCategory
+ */
+export function isPropertyCategory(value: unknown): value is PropertyCategory {
+  return typeof value === 'string' && PROPERTY_CATEGORIES.includes(value as PropertyCategory);
 }
 
 /**

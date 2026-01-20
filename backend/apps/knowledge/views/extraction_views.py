@@ -4,6 +4,8 @@ Extraction API Views
 Endpoints for AI-based data extraction from documents.
 """
 
+print("=== EXTRACTION VERSION 2025-01-14 ===")
+
 import json
 import logging
 from django.http import JsonResponse
@@ -714,6 +716,9 @@ def extract_document_batched(request, doc_id: int):
 
     Returns summary of all batches with staged extraction counts.
     """
+    print(f"=== EXTRACT_DOCUMENT_BATCHED ENTRY ===")
+    print(f"DOC_ID: {doc_id}")
+
     from ..services.extraction_service import extract_document_batched as do_extract_batched
 
     try:
@@ -1641,6 +1646,9 @@ def approve_high_confidence(request, project_id: int):
         "fields": ["property_name", "total_units", ...]
     }
     """
+    print(f"=== APPROVE_HIGH_CONFIDENCE ENTRY ===", flush=True)
+    print(f"PROJECT_ID: {project_id}", flush=True)
+
     from django.db import connection
     from ..services.extraction_writer import ExtractionWriter
     from ..services.field_registry import get_registry
@@ -1651,6 +1659,8 @@ def approve_high_confidence(request, project_id: int):
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
 
     confidence_threshold = float(body.get('confidence_threshold', 0.90))
+    # Lower threshold for opex fields (0.70) - utility values often have lower confidence
+    opex_confidence_threshold = float(body.get('opex_confidence_threshold', 0.70))
     category_filter = body.get('category')
 
     # Get username
@@ -1676,6 +1686,7 @@ def approve_high_confidence(request, project_id: int):
     input_field_keys = {k for k, m in property_mappings.items() if m.field_role == 'input'}
 
     # Get high-confidence pending extractions
+    # Use lower threshold for opex fields (they often have lower confidence for utilities)
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT
@@ -1684,9 +1695,12 @@ def approve_high_confidence(request, project_id: int):
             FROM landscape.ai_extraction_staging
             WHERE project_id = %s
               AND status = 'pending'
-              AND confidence_score >= %s
+              AND (
+                  (field_key LIKE 'opex_%%' AND confidence_score >= %s)
+                  OR (field_key NOT LIKE 'opex_%%' AND confidence_score >= %s)
+              )
             ORDER BY created_at DESC
-        """, [int(project_id), confidence_threshold])
+        """, [int(project_id), opex_confidence_threshold, confidence_threshold])
 
         columns = ['extraction_id', 'field_key', 'property_type', 'extracted_value',
                   'scope_id', 'doc_id', 'source_page', 'confidence_score']
@@ -1768,10 +1782,22 @@ def approve_high_confidence(request, project_id: int):
             logger.error(f"High-confidence approval error for {ext_id}: {e}")
             failed.append({'id': ext_id, 'error': str(e)})
 
+    # After all extractions are written, aggregate unit types for multifamily projects
+    unit_types_created = 0
+    if registry_property_type == 'multifamily' and len(applied) > 0:
+        try:
+            from ..services.extraction_writer import aggregate_unit_types
+            agg_result = aggregate_unit_types(int(project_id))
+            unit_types_created = agg_result.get('created', 0) + agg_result.get('updated', 0)
+            logger.info(f"Unit type aggregation complete: {unit_types_created} types created/updated")
+        except Exception as e:
+            logger.error(f"Unit type aggregation failed for project {project_id}: {e}")
+
     return JsonResponse({
         'success': True,
         'approved': len(approved),
         'applied_to_model': len(applied),
         'fields': list(set(applied)),
-        'failed': failed
+        'failed': failed,
+        'unit_types_created': unit_types_created
     })

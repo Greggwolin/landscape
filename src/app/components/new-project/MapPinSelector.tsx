@@ -182,11 +182,36 @@ const MapPinSelector = ({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update marker when external coordinates change
+  // Track previous coordinates to detect changes
+  const prevCoordsRef = useRef<{ lat?: number; lng?: number }>({})
+
+  // Refs for callbacks to avoid effect dependency issues
+  const onLocationSelectRef = useRef(onLocationSelect)
+  const onGeocodeRef = useRef(onGeocode)
+  const reverseGeocodeRef = useRef(reverseGeocode)
+
+  // Keep refs updated
   useEffect(() => {
-    if (!map.current || isLoading) return
+    onLocationSelectRef.current = onLocationSelect
+    onGeocodeRef.current = onGeocode
+    reverseGeocodeRef.current = reverseGeocode
+  }, [onLocationSelect, onGeocode, reverseGeocode])
+
+  // Update marker when external coordinates change
+  // IMPORTANT: Only depend on lat/lng/isLoading - not callbacks
+  useEffect(() => {
+    console.log('[MapPinSelector] Coords effect - latitude:', latitude, 'longitude:', longitude, 'isLoading:', isLoading, 'map exists:', !!map.current)
+
+    if (!map.current || isLoading) {
+      console.log('[MapPinSelector] Skipping - map not ready or loading')
+      return
+    }
 
     if (latitude && longitude) {
+      // Check if coordinates actually changed
+      const coordsChanged = prevCoordsRef.current.lat !== latitude || prevCoordsRef.current.lng !== longitude
+      console.log('[MapPinSelector] Coords changed:', coordsChanged, 'prev:', prevCoordsRef.current, 'new:', { lat: latitude, lng: longitude })
+
       if (marker.current) {
         marker.current.setLngLat([longitude, latitude])
       } else {
@@ -200,11 +225,11 @@ const MapPinSelector = ({
         marker.current.on('dragend', async () => {
           const lngLat = marker.current?.getLngLat()
           if (lngLat) {
-            onLocationSelect({ lat: lngLat.lat, lng: lngLat.lng })
-            if (onGeocode) {
-              const result = await reverseGeocode(lngLat.lat, lngLat.lng)
+            onLocationSelectRef.current({ lat: lngLat.lat, lng: lngLat.lng })
+            if (onGeocodeRef.current) {
+              const result = await reverseGeocodeRef.current(lngLat.lat, lngLat.lng)
               if (result) {
-                onGeocode(result)
+                onGeocodeRef.current(result)
               }
             }
           }
@@ -212,13 +237,19 @@ const MapPinSelector = ({
       }
 
       setHasMarker(true)
-      map.current.flyTo({
-        center: [longitude, latitude],
-        zoom: 14,
-        duration: 1000
-      })
+
+      // Only fly if coordinates actually changed
+      if (coordsChanged) {
+        console.log('[MapPinSelector] Flying to:', [longitude, latitude])
+        map.current.flyTo({
+          center: [longitude, latitude],
+          zoom: 14,
+          duration: 1000
+        })
+        prevCoordsRef.current = { lat: latitude, lng: longitude }
+      }
     }
-  }, [latitude, longitude, isLoading, onLocationSelect, onGeocode, reverseGeocode])
+  }, [latitude, longitude, isLoading]) // Only depend on the values that matter
 
   return (
     <div

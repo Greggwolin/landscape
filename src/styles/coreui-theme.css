@@ -509,6 +509,23 @@ thead th,
   color: #111827 !important;
 }
 
+/* Royal blue buttons keep white text for contrast */
+.light-theme button.bg-blue-600,
+.light-theme button.bg-blue-700,
+.light-theme .btn.bg-blue-600,
+.light-theme .btn.bg-blue-700,
+.light-theme [role="button"].bg-blue-600,
+.light-theme [role="button"].bg-blue-700,
+.light-theme a.bg-blue-600,
+.light-theme a.bg-blue-700 {
+  color: #ffffff !important;
+}
+
+.light-theme .bg-blue-600.text-white,
+.light-theme .bg-blue-700.text-white {
+  color: #ffffff !important;
+}
+
 .light-theme .text-gray-300 {
   color: #374151 !important;
 }

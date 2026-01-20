@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { LandscaperChat } from './LandscaperChat';
 import { ActivityFeed } from './ActivityFeed';
 import { useUploadThing } from '@/lib/uploadthing';
@@ -56,7 +57,15 @@ interface ExtractionResult {
 export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
   const [isActivityExpanded, setActivityExpanded] = useState(true);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [expandedSplitRatio, setExpandedSplitRatio] = useState(0.25);
+  const [collapsedSplitRatio, setCollapsedSplitRatio] = useState(0.75);
+  const [splitRatio, setSplitRatio] = useState(0.25);
+  const [splitContainerHeight, setSplitContainerHeight] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const splitRatioRef = useRef(splitRatio);
+  const expandedSplitRef = useRef(expandedSplitRatio);
+  const collapsedSplitRef = useRef(collapsedSplitRatio);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -64,7 +73,10 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const dragDepth = useRef(0);
+
+  const RESIZER_SIZE = 10;
+  const MIN_CHAT_HEIGHT = 180;
+  const MIN_ACTIVITY_HEIGHT = 160;
 
   // Default workspace ID (should match dms_workspaces.is_default = true)
   const defaultWorkspaceId = 1;
@@ -413,57 +425,79 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
   // Restore state from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('landscape-activity-expanded');
-    if (saved !== null) {
-      setActivityExpanded(saved === 'true');
-    }
+    const savedExpanded = localStorage.getItem('landscape-landscaper-split-expanded');
+    const savedCollapsed = localStorage.getItem('landscape-landscaper-split-collapsed');
+    const nextIsExpanded = saved === null ? true : saved === 'true';
+    const parsedExpanded = Number.parseFloat(savedExpanded ?? '');
+    const parsedCollapsed = Number.parseFloat(savedCollapsed ?? '');
+    const nextExpandedRatio = Number.isFinite(parsedExpanded) && parsedExpanded > 0 && parsedExpanded < 1
+      ? parsedExpanded
+      : 0.25;
+    const nextCollapsedRatio = Number.isFinite(parsedCollapsed) && parsedCollapsed > 0 && parsedCollapsed < 1
+      ? parsedCollapsed
+      : 0.75;
+
+    setActivityExpanded(nextIsExpanded);
+    setExpandedSplitRatio(nextExpandedRatio);
+    setCollapsedSplitRatio(nextCollapsedRatio);
+    setSplitRatio(nextIsExpanded ? nextExpandedRatio : nextCollapsedRatio);
   }, []);
+
+  useEffect(() => {
+    splitRatioRef.current = splitRatio;
+  }, [splitRatio]);
+
+  useEffect(() => {
+    expandedSplitRef.current = expandedSplitRatio;
+  }, [expandedSplitRatio]);
+
+  useEffect(() => {
+    collapsedSplitRef.current = collapsedSplitRatio;
+  }, [collapsedSplitRatio]);
 
   const handleActivityToggle = () => {
     const newValue = !isActivityExpanded;
     setActivityExpanded(newValue);
     localStorage.setItem('landscape-activity-expanded', String(newValue));
+    setSplitRatio(newValue ? expandedSplitRatio : collapsedSplitRatio);
   };
 
-  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current += 1;
-    setIsDragOver(true);
-  };
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!isDragOver) {
-      setIsDragOver(true);
-    }
-  };
-
-  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current = Math.max(0, dragDepth.current - 1);
-    if (dragDepth.current === 0) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current = 0;
-    setIsDragOver(false);
-
-    const files = Array.from(event.dataTransfer?.files || []);
-    if (files.length > 0 && !isUploading && !uploadThingIsUploading) {
-      // Actually upload the files
-      uploadFiles(files);
+  // Handle dropped files via react-dropzone
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0 && !isUploading && !uploadThingIsUploading) {
+      uploadFiles(acceptedFiles);
     } else if (isUploading || uploadThingIsUploading) {
       setDropNotice('Upload in progress, please wait...');
     } else {
       setDropNotice('No files detected in drop.');
     }
-  };
+  }, [uploadFiles, isUploading, uploadThingIsUploading]);
+
+  // Use react-dropzone for more reliable drag and drop
+  // Supports multiple files for OM packages (rent roll + T-12 + OM together)
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    isDragAccept,
+    isDragReject,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 50 * 1024 * 1024, // 50MB per file
+    multiple: true, // Allow multiple files (OM packages: rent roll + T-12 + OM)
+    disabled: isUploading || uploadThingIsUploading,
+    noClick: true, // Don't open file dialog on click - we want the whole panel as drop zone
+    noKeyboard: true,
+  });
 
   useEffect(() => {
     if (!dropNotice) return;
@@ -471,33 +505,124 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
     return () => clearTimeout(timer);
   }, [dropNotice]);
 
+  useEffect(() => {
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    const updateHeight = () => {
+      setSplitContainerHeight(container.clientHeight);
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const clampSplitRatio = useCallback((ratio: number, containerHeight: number) => {
+    const availableHeight = Math.max(containerHeight - RESIZER_SIZE, 1);
+    const minRatio = Math.min(0.9, MIN_CHAT_HEIGHT / availableHeight);
+    const maxRatio = Math.max(0.1, 1 - MIN_ACTIVITY_HEIGHT / availableHeight);
+    if (minRatio > maxRatio) {
+      return 0.5;
+    }
+    return Math.min(Math.max(ratio, minRatio), maxRatio);
+  }, []);
+
+  const getRatioFromClientY = useCallback((clientY: number) => {
+    const container = splitContainerRef.current;
+    if (!container) return splitRatioRef.current;
+    const rect = container.getBoundingClientRect();
+    const availableHeight = Math.max(container.clientHeight - RESIZER_SIZE, 1);
+    const offset = clientY - rect.top;
+    return offset / availableHeight;
+  }, []);
+
+  const updateSplitRatio = useCallback((ratio: number) => {
+    const clampedRatio = clampSplitRatio(ratio, splitContainerHeight);
+    setSplitRatio(clampedRatio);
+    if (isActivityExpanded) {
+      setExpandedSplitRatio(clampedRatio);
+    } else {
+      setCollapsedSplitRatio(clampedRatio);
+    }
+  }, [clampSplitRatio, isActivityExpanded, splitContainerHeight]);
+
+  const handleResizerPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    updateSplitRatio(getRatioFromClientY(event.clientY));
+    setIsResizing(true);
+  }, [getRatioFromClientY, updateSplitRatio]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updateSplitRatio(getRatioFromClientY(event.clientY));
+    };
+
+    const handlePointerUp = () => {
+      setIsResizing(false);
+      localStorage.setItem('landscape-landscaper-split-expanded', String(expandedSplitRef.current));
+      localStorage.setItem('landscape-landscaper-split-collapsed', String(collapsedSplitRef.current));
+    };
+
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isResizing, updateSplitRatio]);
+
+  useEffect(() => {
+    if (!splitContainerHeight) return;
+    const nextRatio = clampSplitRatio(splitRatioRef.current, splitContainerHeight);
+    if (nextRatio !== splitRatioRef.current) {
+      updateSplitRatio(nextRatio);
+    }
+  }, [clampSplitRatio, splitContainerHeight, updateSplitRatio]);
+
+  const availableHeight = Math.max(splitContainerHeight - RESIZER_SIZE, 0);
+  const chatHeight = Math.round(availableHeight * splitRatio);
+  const activityHeight = Math.max(availableHeight - chatHeight, 0);
+  const hasMeasuredHeight = splitContainerHeight > 0;
+
   return (
     <div
+      {...getRootProps()}
       className="flex flex-col h-full gap-3 relative"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
       style={{
         borderRadius: '12px',
-        border: isDragOver ? '2px dashed var(--cui-primary)' : '1px dashed transparent',
-        backgroundColor: isDragOver ? 'var(--cui-tertiary-bg)' : 'transparent',
+        border: isDragActive ? '2px dashed var(--cui-primary)' : '1px dashed transparent',
+        backgroundColor: isDragActive ? 'var(--cui-tertiary-bg)' : 'transparent',
         transition: 'border-color 0.15s ease, background-color 0.15s ease'
       }}
     >
-      {isDragOver && (
+      {/* Hidden file input for react-dropzone */}
+      <input {...getInputProps()} />
+
+      {isDragActive && (
         <div
-          className="absolute inset-0 d-flex flex-column align-items-center justify-content-center text-center"
+          className="absolute inset-0 d-flex flex-column align-items-center justify-content-center text-center z-50"
           style={{
             borderRadius: '12px',
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: isDragAccept ? 'rgba(34, 197, 94, 0.1)' : isDragReject ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             color: 'var(--cui-body-color)',
             pointerEvents: 'none'
           }}
         >
-          <div className="fw-semibold">Drop documents for Landscaper</div>
+          <div className="fw-semibold">
+            {isDragReject ? 'File type not supported' : 'Drop documents for Landscaper'}
+          </div>
           <div className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-            Files land in this project for model updates.
+            {isDragReject
+              ? 'Use PDF, Word, Excel, or image files'
+              : 'Drop multiple files at once (OM + Rent Roll + T-12)'}
           </div>
         </div>
       )}
@@ -514,38 +639,69 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
           {dropNotice}
         </div>
       )}
-      {/* Landscaper Chat Card - 75% when expanded, 25% when collapsed */}
       <div
-        className="flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          flex: isActivityExpanded ? '0 0 calc(25% - 12px)' : '0 0 75%',
-        }}
+        ref={splitContainerRef}
+        className="flex flex-col flex-1 min-h-0"
+        style={{ cursor: isResizing ? 'row-resize' : 'default' }}
       >
-        <LandscaperChat
-          projectId={projectId}
-          activeTab={activeTab}
-          isIngesting={isUploading || uploadThingIsUploading}
-          ingestionProgress={uploadProgress}
-          ingestionMessage={uploadMessage}
-          isExpanded={!isActivityExpanded}
-          onToggleExpand={handleActivityToggle}
-        />
-      </div>
+        {/* Landscaper Chat Card */}
+        <div
+          className="flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden"
+          style={{
+            backgroundColor: 'var(--cui-card-bg)',
+            height: hasMeasuredHeight ? `${chatHeight}px` : undefined,
+            flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
+          }}
+        >
+          <LandscaperChat
+            projectId={projectId}
+            activeTab={activeTab}
+            isIngesting={isUploading || uploadThingIsUploading}
+            ingestionProgress={uploadProgress}
+            ingestionMessage={uploadMessage}
+            isExpanded={!isActivityExpanded}
+            onToggleExpand={handleActivityToggle}
+          />
+        </div>
 
-      {/* Activity Feed Card - 75% when expanded, 25% when collapsed */}
-      <div
-        className="rounded-xl shadow-lg overflow-hidden"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          flex: isActivityExpanded ? '0 0 75%' : '0 0 calc(25% - 12px)',
-        }}
-      >
-        <ActivityFeed
-          projectId={projectId}
-          isExpanded={isActivityExpanded}
-          onToggle={handleActivityToggle}
-        />
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize Landscaper panel"
+          className="flex items-center justify-center"
+          style={{
+            height: `${RESIZER_SIZE}px`,
+            cursor: 'row-resize',
+            backgroundColor: 'transparent',
+          }}
+          onPointerDown={handleResizerPointerDown}
+        >
+          <div
+            style={{
+              width: '60px',
+              height: '2px',
+              borderRadius: '999px',
+              backgroundColor: 'var(--cui-border-color)',
+              opacity: 0.7,
+            }}
+          />
+        </div>
+
+        {/* Activity Feed Card */}
+        <div
+          className="rounded-xl shadow-lg overflow-hidden"
+          style={{
+            backgroundColor: 'var(--cui-card-bg)',
+            height: hasMeasuredHeight ? `${activityHeight}px` : undefined,
+            flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
+          }}
+        >
+          <ActivityFeed
+            projectId={projectId}
+            isExpanded={isActivityExpanded}
+            onToggle={handleActivityToggle}
+          />
+        </div>
       </div>
 
       {/* Extraction Review Modal */}

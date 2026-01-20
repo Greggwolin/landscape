@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect, memo } from 'react';
+import { useRouter } from 'next/navigation';
 import { CCard, CCardBody } from '@coreui/react';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
@@ -15,11 +16,19 @@ import { SalesComparisonApproach } from '../../valuation/components/SalesCompari
 
 type Tab = 'sales-comparison' | 'cost' | 'income';
 
+interface TabConfig {
+  id: Tab;
+  label: string;
+  enabled: boolean;
+  isLink?: boolean;
+}
+
 interface ValuationTabProps {
   project: any;
 }
 
 function ValuationTab({ project }: ValuationTabProps) {
+  const router = useRouter();
   const projectId = project.project_id;
   const [activeTab, setActiveTab] = useState<Tab>('sales-comparison');
   const [valuationData, setValuationData] = useState<ValuationSummary | null>(null);
@@ -47,11 +56,23 @@ function ValuationTab({ project }: ValuationTabProps) {
     }
   }, [projectId]);
 
-  const tabs: { id: Tab; label: string; enabled: boolean }[] = [
+  const tabs: TabConfig[] = [
     { id: 'sales-comparison', label: 'Sales Comparison', enabled: true },
     { id: 'cost', label: 'Cost Approach', enabled: false },
-    { id: 'income', label: 'Income Approach', enabled: false }
+    { id: 'income', label: 'Income Approach', enabled: true, isLink: true }
   ];
+
+  // Handle tab click - navigate to standalone page if isLink
+  const handleTabClick = (tab: TabConfig) => {
+    if (!tab.enabled) return;
+
+    if (tab.isLink) {
+      // Navigate to standalone page
+      router.push(`/projects/${projectId}/valuation/${tab.id === 'income' ? 'income-approach' : tab.id}`);
+    } else {
+      setActiveTab(tab.id);
+    }
+  };
 
   return (
     <div>
@@ -67,7 +88,7 @@ function ValuationTab({ project }: ValuationTabProps) {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => tab.enabled && setActiveTab(tab.id)}
+              onClick={() => handleTabClick(tab)}
               disabled={!tab.enabled}
               className="px-4 py-3 text-sm font-medium transition-colors relative"
               style={{

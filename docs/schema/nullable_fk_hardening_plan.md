@@ -1,7 +1,7 @@
 # Nullable FK Hardening Plan (Phase 1: DMS/Core Doc)
 
 Date: 2026-01-06
-Source schema: docs/schema/landscape_rich_schema_2026-01-06.json
+Source schema: docs/schema/landscape_rich_schema_2026-01-16.json
 DB row counts: unavailable in this environment (null_count = unknown)
 
 ## Scope

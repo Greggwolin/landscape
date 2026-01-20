@@ -11013,3 +11013,65 @@ def _log_contacts_activity(
         )
     except Exception as e:
         logger.error(f"Failed to log contacts activity: {e}")
+
+
+# =============================================================================
+# Cabinet-Based Contact Tools Registration
+# =============================================================================
+# Register the new contact tools that use the cabinet-based architecture
+
+def _register_contact_tools():
+    """Register contact tools from the services module."""
+    try:
+        from .services.contact_tools import CONTACT_TOOL_HANDLERS
+
+        for tool_name, handler in CONTACT_TOOL_HANDLERS.items():
+            # Wrap handler to match registry signature
+            def make_wrapper(h, name):
+                def wrapper(tool_input, project_id, propose_only=True, source_message_id=None, **kwargs):
+                    return h(tool_input=tool_input, project_id=project_id, **kwargs)
+                wrapper._tool_name = name
+                wrapper._is_mutation = name in {
+                    'create_cabinet_contact',
+                    'assign_contact_to_project',
+                    'remove_contact_from_project',
+                    'extract_and_save_contacts',
+                }
+                return wrapper
+            TOOL_REGISTRY[tool_name] = make_wrapper(handler, tool_name)
+            logger.debug(f"Registered contact tool: {tool_name}")
+    except ImportError as e:
+        logger.warning(f"Could not import contact tools: {e}")
+
+# Register contact tools on module load
+_register_contact_tools()
+
+
+# =============================================================================
+# Register H&BU (Highest & Best Use) analysis tools
+
+def _register_hbu_tools():
+    """Register H&BU tools from the services module."""
+    try:
+        from .services.hbu_tools import HBU_TOOL_HANDLERS
+
+        for tool_name, handler in HBU_TOOL_HANDLERS.items():
+            # Wrap handler to match registry signature
+            def make_wrapper(h, name):
+                def wrapper(tool_input, project_id, propose_only=True, source_message_id=None, **kwargs):
+                    return h(tool_input=tool_input, project_id=project_id, **kwargs)
+                wrapper._tool_name = name
+                wrapper._is_mutation = name in {
+                    'create_hbu_scenario',
+                    'update_hbu_scenario',
+                    'compare_hbu_scenarios',
+                    'add_hbu_comparable_use',
+                }
+                return wrapper
+            TOOL_REGISTRY[tool_name] = make_wrapper(handler, tool_name)
+            logger.debug(f"Registered H&BU tool: {tool_name}")
+    except ImportError as e:
+        logger.warning(f"Could not import H&BU tools: {e}")
+
+# Register H&BU tools on module load
+_register_hbu_tools()

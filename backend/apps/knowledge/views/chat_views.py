@@ -190,7 +190,9 @@ def _send_message(request, project_id: int) -> JsonResponse:
             field_updates=ai_response.get('suggestions'),
             client_request_id=client_request_id,
             tools_used=ai_metadata.get('tools_used'),
-            tool_executions=ai_metadata.get('tool_executions')
+            tool_executions=ai_metadata.get('tool_executions'),
+            error=ai_metadata.get('error'),
+            traceback=ai_metadata.get('traceback')
         )
 
         user_msg, assistant_msg = save_message_pair(
@@ -360,6 +362,11 @@ def document_chat(request, project_id: int, doc_id: int):
 You are Landscaper, assisting with a SPECIFIC document: "{doc.doc_name}" (Version {doc.version_no}, Type: {doc.doc_type}).
 
 IMPORTANT: Answer questions based ONLY on this document's content. If the information isn't in this document, clearly say so.
+
+Formatting instructions:
+- Use plain text with clear line breaks.
+- Avoid markdown headers, bullets, or bold markers (no #, **, or * formatting).
+- Use short labeled lines and indentation for hierarchy.
 
 """
         if facts_text:

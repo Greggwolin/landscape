@@ -22,6 +22,19 @@ from .opex_utils import upsert_opex_entry, resolve_opex_category
 
 logger = logging.getLogger(__name__)
 
+# Field patterns that should create Entity-Fact records
+FACTABLE_FIELD_PATTERNS = [
+    'cap_rate', 'vacancy', 'rent', 'price', 'rate', 'pct',
+    'noi', 'expense', 'income', 'growth', 'absorption',
+    'discount', 'ltv', 'dscr', 'yield', 'margin'
+]
+
+
+def _should_create_fact(field_key: str) -> bool:
+    """Determine if this field should create a knowledge fact."""
+    field_lower = field_key.lower()
+    return any(pattern in field_lower for pattern in FACTABLE_FIELD_PATTERNS)
+
 
 class ExtractionWriter:
     """Writes validated extractions to production tables per registry contract."""
@@ -57,18 +70,102 @@ class ExtractionWriter:
 
         try:
             if mapping.is_row_based:
-                return self._write_row_based(mapping, value, scope_id, source_doc_id, source_page)
+                success, message = self._write_row_based(mapping, value, scope_id, source_doc_id, source_page)
             else:
-                return self._write_column(mapping, value, scope_id)
+                success, message = self._write_column(mapping, value, scope_id, source_doc_id)
+
+            # Create Entity-Fact record after successful write
+            if success and _should_create_fact(field_key):
+                self._create_fact_from_extraction(
+                    field_key=field_key,
+                    value=value,
+                    source_doc_id=source_doc_id,
+                )
+
+            return success, message
         except Exception as e:
             logger.error(f"Write failed for {field_key}: {e}")
             return False, f"Write failed: {str(e)}"
+
+    def _create_fact_from_extraction(
+        self,
+        field_key: str,
+        value: Any,
+        source_doc_id: Optional[int] = None,
+        confidence_score: float = 0.85,
+    ) -> None:
+        """
+        Create Entity-Fact record from successful extraction.
+
+        This is called after a successful write to production tables.
+        Failures here are logged but don't fail the extraction.
+        """
+        try:
+            from .fact_service import FactService
+            from decimal import Decimal
+
+            fact_service = FactService()
+            fact_service.create_assumption_fact(
+                project_id=self.project_id,
+                assumption_key=field_key,
+                value=value,
+                source_type='document_extract',
+                source_id=source_doc_id,
+                confidence_score=Decimal(str(confidence_score)),
+            )
+            self._link_document_entity(source_doc_id)
+        except Exception as e:
+            # Log but don't fail - fact creation is non-critical
+            logger.warning(f"Entity-Fact creation failed for {field_key} (non-fatal): {e}")
+
+    def _link_document_entity(self, source_doc_id: Optional[int]) -> None:
+        """Ensure document entities exist and link them to the project."""
+        if not source_doc_id:
+            return
+
+        try:
+            from apps.documents.models import Document
+            from .entity_sync_service import EntitySyncService
+            from .fact_service import FactService
+        except Exception as e:
+            logger.warning(f"Document entity linking unavailable: {e}")
+            return
+
+        doc = Document.objects.filter(doc_id=source_doc_id).first()
+        if not doc:
+            return
+
+        sync_service = EntitySyncService()
+        doc_entity = sync_service.ensure_document_entity(
+            document_id=doc.doc_id,
+            document_name=doc.doc_name,
+            document_type=doc.doc_type,
+            project_id=doc.project_id,
+            doc_date=str(doc.doc_date) if doc.doc_date else None,
+        )
+
+        project_entity = sync_service.get_project_entity(self.project_id)
+        if not project_entity:
+            project_name = doc.project.project_name if doc.project else f"Project {self.project_id}"
+            project_entity = sync_service.get_or_create_project_entity(
+                project_id=self.project_id,
+                project_name=project_name,
+            )
+
+        FactService().create_relationship_fact(
+            subject_entity=project_entity,
+            predicate='extracted_from',
+            object_entity=doc_entity,
+            source_type='document_extract',
+            source_id=doc.doc_id,
+        )
 
     def _write_column(
         self,
         mapping: FieldMapping,
         value: Any,
-        scope_id: Optional[int] = None
+        scope_id: Optional[int] = None,
+        source_doc_id: Optional[int] = None,
     ) -> Tuple[bool, str]:
         """Write to a direct column on a table."""
 
@@ -180,13 +277,13 @@ class ExtractionWriter:
             # Sales comparable - handled separately via _insert_comp_row
             # Use raw value (not converted) if it's a dict - conversion would stringify it
             comp_value = value if isinstance(value, dict) else converted_value
-            return self._insert_comp_row(mapping, comp_value, 'sales', scope_id)
+            return self._insert_comp_row(mapping, comp_value, 'sales', scope_id, source_doc_id)
 
         elif mapping.scope == 'rent_comp':
             # Rent comparable - handled separately via _insert_comp_row
             # Use raw value (not converted) if it's a dict - conversion would stringify it
             comp_value = value if isinstance(value, dict) else converted_value
-            return self._insert_comp_row(mapping, comp_value, 'rent', scope_id)
+            return self._insert_comp_row(mapping, comp_value, 'rent', scope_id, source_doc_id)
 
         elif mapping.scope == 'assumption':
             # Project assumption - upsert with assumption_key selector
@@ -257,6 +354,21 @@ class ExtractionWriter:
 
         elif mapping.db_write_type == 'row_milestone':
             return self._write_milestone(mapping, value)
+
+        elif mapping.db_write_type == 'upsert':
+            # Handle upserts based on target table
+            target_table = mapping.table_name or ''
+            if 'unit_type' in target_table:
+                return self._write_unit_type_upsert(mapping, value, scope_id)
+            elif 'unit' in target_table:
+                print(f"=== UNIT UPSERT DISPATCHED ===", flush=True)
+                print(f"VALUE TYPE: {type(value)}, VALUE: {value}", flush=True)
+                return self._write_unit_upsert(mapping, value, scope_id)
+            elif 'operating_expense' in target_table:
+                return self._write_opex(mapping, value, selector)
+            elif 'revenue_other' in target_table:
+                return self._write_income_upsert(mapping, value)
+            return False, f"Unknown upsert target table: {target_table}"
 
         return False, f"Unknown row-based write type: {mapping.db_write_type}"
 
@@ -513,32 +625,14 @@ class ExtractionWriter:
         Uses expense_category from selector_json for matching.
         """
         selector = mapping.selector_json or {}
-        category = selector.get('category', mapping.field_key.replace('opex_', ''))
+        category_label = mapping.label or selector.get('category') or mapping.field_key.replace('opex_', '')
 
-        # Convert value to decimal
-        try:
-            amount = Decimal(str(value).replace(',', '').replace('$', ''))
-        except (InvalidOperation, ValueError):
-            return False, f"Invalid amount value: {value}"
+        result = upsert_opex_entry(connection, self.project_id, category_label, value, selector)
+        if result.get('success'):
+            action = result.get('action', 'updated')
+            return True, f"{action.title()} OpEx: {category_label}"
 
-        sql = """
-            INSERT INTO landscape.tbl_operating_expense
-                (project_id, expense_category, category_name, amount, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, NOW(), NOW())
-            ON CONFLICT (project_id, expense_category)
-            DO UPDATE SET
-                amount = EXCLUDED.amount,
-                category_name = EXCLUDED.category_name,
-                updated_at = NOW()
-        """
-
-        # Use category as category_name too for now
-        category_name = category.replace('_', ' ').title()
-
-        with connection.cursor() as cursor:
-            cursor.execute(sql, [self.project_id, category, category_name, amount])
-
-        return True, f"Upserted OpEx: {category}"
+        return False, result.get('error', f"Failed to upsert OpEx: {category_label}")
 
     def _write_income_upsert(
         self,
@@ -689,10 +783,15 @@ class ExtractionWriter:
         For array extractions from chunked rent roll, value is a dict with all unit fields.
         We match on unit_number for upsert.
         """
+        print(f"=== _WRITE_UNIT_UPSERT CALLED ===", flush=True)
+        print(f"PROJECT: {self.project_id}, VALUE TYPE: {type(value)}, SCOPE_ID: {scope_id}", flush=True)
+        print(f"VALUE: {value}", flush=True)
+
         table = 'tbl_multifamily_unit'
 
         # If value is a dict (full unit data from chunked extraction)
         if isinstance(value, dict):
+            print(f"=== CALLING _insert_full_unit ===")
             return self._insert_full_unit(value)
 
         # Single column update - need scope_id (unit_id)
@@ -712,6 +811,11 @@ class ExtractionWriter:
 
     def _insert_full_unit(self, data: Dict[str, Any]) -> Tuple[bool, str]:
         """Insert or update a rent roll unit row from extracted dict."""
+        print(f"=== _INSERT_FULL_UNIT CALLED ===", flush=True)
+        print(f"DATA KEYS: {list(data.keys())}", flush=True)
+        print(f"UNIT NUMBER: {data.get('unit_number')}, RENT: {data.get('current_rent')}, STATUS: {data.get('occupancy_status')}", flush=True)
+        print(f"FULL DATA: {data}", flush=True)
+
         # Extract unit number for matching
         unit_number = data.get('unit_number')
         if not unit_number:
@@ -726,19 +830,31 @@ class ExtractionWriter:
             row = cursor.fetchone()
 
         # Map extracted field names to column names
+        # Support both prefixed (unit_bedrooms) and non-prefixed (bedrooms) field names
         field_mapping = {
             'unit_number': 'unit_number',
             'unit_type': 'unit_type',
+            'unit_unit_type': 'unit_type',  # Prefixed version
             'bedrooms': 'bedrooms',
+            'unit_bedrooms': 'bedrooms',  # Prefixed version
             'bathrooms': 'bathrooms',
+            'unit_bathrooms': 'bathrooms',  # Prefixed version
             'square_feet': 'square_feet',
+            'unit_square_feet': 'square_feet',  # Prefixed version
             'current_rent': 'current_rent',
+            'unit_current_rent': 'current_rent',  # Prefixed version
             'market_rent': 'market_rent',
+            'unit_market_rent': 'market_rent',  # Prefixed version
             'lease_start': 'lease_start_date',
+            'unit_lease_start': 'lease_start_date',  # Prefixed version
             'lease_end': 'lease_end_date',
+            'unit_lease_end': 'lease_end_date',  # Prefixed version
             'occupancy_status': 'occupancy_status',
+            'unit_occupancy_status': 'occupancy_status',  # Prefixed version
             'tenant_name': None,  # Not in table
+            'unit_tenant_name': None,  # Not in table
             'move_in_date': None,  # Not in table
+            'unit_move_in_date': None,  # Not in table
             'rent_effective_date': None,  # Not in table
             'is_section8': 'is_section8',
             'is_manager_unit': 'is_manager',
@@ -813,7 +929,8 @@ class ExtractionWriter:
         mapping: FieldMapping,
         value: Any,
         comp_type: str,  # 'sales' or 'rent'
-        scope_id: Optional[int] = None
+        scope_id: Optional[int] = None,
+        source_doc_id: Optional[int] = None,
     ) -> Tuple[bool, str]:
         """
         Insert a comparable property row.
@@ -825,7 +942,7 @@ class ExtractionWriter:
 
         # If value is a dict (full comp data), extract all fields
         if isinstance(value, dict):
-            return self._insert_full_comp(table, value, comp_type)
+            return self._insert_full_comp(table, value, comp_type, source_doc_id)
 
         # Otherwise, single column update if scope_id provided
         if scope_id:
@@ -844,7 +961,8 @@ class ExtractionWriter:
         self,
         table: str,
         data: Dict[str, Any],
-        comp_type: str
+        comp_type: str,
+        source_doc_id: Optional[int] = None,
     ) -> Tuple[bool, str]:
         """Insert a full comparable row from extracted dict."""
 
@@ -892,6 +1010,7 @@ class ExtractionWriter:
                 """, params)
 
             name = data.get('property_name', 'Unknown')
+            self._create_comp_facts(data, comp_type, source_doc_id)
             return True, f"Inserted sales comp: {name}"
 
         else:  # rent comp
@@ -933,7 +1052,48 @@ class ExtractionWriter:
                 """, params)
 
             name = data.get('property_name', 'Unknown')
+            self._create_comp_facts(data, comp_type, source_doc_id)
             return True, f"Inserted rent comp: {name}"
+
+    def _create_comp_facts(
+        self,
+        data: Dict[str, Any],
+        comp_type: str,
+        source_doc_id: Optional[int] = None,
+    ) -> None:
+        """Create knowledge facts for a comparable property."""
+        try:
+            from .entity_sync_service import EntitySyncService
+            from .fact_service import FactService
+        except Exception as e:
+            logger.warning(f"Comparable fact creation unavailable: {e}")
+            return
+
+        name = data.get('property_name') or data.get('name') or 'Comparable'
+        address = data.get('address') or ''
+        city = data.get('city') or ''
+        state = data.get('state') or ''
+        property_type = self.property_type or 'unknown'
+
+        sync_service = EntitySyncService()
+        comp_entity = sync_service.ensure_property_entity(
+            name=name,
+            address=address,
+            city=city,
+            state=state,
+            property_type=property_type,
+            unit_count=data.get('unit_count') or data.get('units'),
+            year_built=data.get('year_built'),
+        )
+
+        fact_service = FactService()
+        normalized_type = 'sale' if comp_type == 'sales' else 'rent'
+        fact_service.create_comparable_facts(
+            comp_entity=comp_entity,
+            comp_type=normalized_type,
+            values=data,
+            source_document_id=source_doc_id,
+        )
 
     def _upsert_unit_row(
         self,
@@ -945,23 +1105,40 @@ class ExtractionWriter:
 
         Uses unit_number as the match key for upsert.
         """
+        print(f"=== UNIT UPSERT TRACE ===")
+        print(f"WRITING UNIT: {data.get('unit_number')}, rent={data.get('current_rent')}, status={data.get('occupancy_status')}")
+        print(f"FULL UNIT DATA: {data}")
+
         unit_number = data.get('unit_number')
         if not unit_number:
             return False, "Unit number required for unit upsert"
 
         # Map extracted fields to table columns
+        # Support both prefixed (unit_bedrooms) and non-prefixed (bedrooms) field names
         field_map = {
             'unit_number': 'unit_number',
             'unit_type': 'unit_type_code',
+            'unit_unit_type': 'unit_type_code',  # Prefixed version
             'bedrooms': 'bedrooms',
+            'unit_bedrooms': 'bedrooms',  # Prefixed version
             'bathrooms': 'bathrooms',
+            'unit_bathrooms': 'bathrooms',  # Prefixed version
             'square_feet': 'square_feet',
+            'unit_square_feet': 'square_feet',  # Prefixed version
             'current_rent': 'current_rent',
+            'unit_current_rent': 'current_rent',  # Prefixed version
             'market_rent': 'market_rent',
+            'unit_market_rent': 'market_rent',  # Prefixed version
             'move_in_date': 'move_in_date',
+            'unit_move_in_date': 'move_in_date',  # Prefixed version
             'lease_start': 'lease_start_date',
+            'unit_lease_start': 'lease_start_date',  # Prefixed version
             'lease_end': 'lease_end_date',
+            'unit_lease_end': 'lease_end_date',  # Prefixed version
             'tenant_name': 'tenant_name',
+            'unit_tenant_name': 'tenant_name',  # Prefixed version
+            'occupancy_status': 'occupancy_status',
+            'unit_occupancy_status': 'occupancy_status',  # Prefixed version
             'is_vacant': 'is_vacant',
             'floor_number': 'floor_number',
         }
@@ -1023,6 +1200,9 @@ class ExtractionWriter:
 
         Returns summary of successes and failures.
         """
+        print(f"=== WRITE_UNIT_ARRAY CALLED ===")
+        print(f"PROJECT: {self.project_id}, NUM UNITS: {len(units)}, SOURCE_DOC: {source_doc_id}")
+
         results = {'success': 0, 'failed': 0, 'errors': []}
 
         for unit in units:
@@ -1055,7 +1235,7 @@ class ExtractionWriter:
 
         for comp in comps:
             try:
-                success, msg = self._insert_full_comp(table, comp, comp_type)
+                success, msg = self._insert_full_comp(table, comp, comp_type, source_doc_id)
                 if success:
                     results['success'] += 1
                 else:
@@ -1169,3 +1349,139 @@ def write_multiple_extractions(
             })
 
     return results
+
+
+def aggregate_unit_types(project_id: int) -> Dict[str, Any]:
+    """
+    Aggregate individual units into unit types for the floorplan matrix.
+
+    Groups units by bedroom count and calculates:
+    - Unit count per type
+    - Average current rent
+    - Average square feet
+    - Average market rent
+
+    Inserts/updates rows in tbl_multifamily_unit_type.
+
+    Should be called after unit extraction/persistence completes.
+
+    Returns:
+        Dict with 'created', 'updated', and 'unit_types' counts
+    """
+    print("=== AGGREGATE_UNIT_TYPES CALLED ===")
+    print(f"=== Project ID: {project_id} ===")
+    logger.info(f"[aggregate_unit_types] Starting aggregation for project {project_id}")
+
+    results = {
+        'created': 0,
+        'updated': 0,
+        'unit_types': [],
+        'errors': []
+    }
+
+    try:
+        with connection.cursor() as cursor:
+            # Get unit aggregates grouped by bedroom count
+            cursor.execute("""
+                SELECT
+                    COALESCE(bedrooms, 0) as bedrooms,
+                    COALESCE(bathrooms, 1) as bathrooms,
+                    COUNT(*) as unit_count,
+                    ROUND(AVG(NULLIF(current_rent, 0))::numeric, 2) as avg_current_rent,
+                    ROUND(AVG(NULLIF(market_rent, 0))::numeric, 2) as avg_market_rent,
+                    ROUND(AVG(NULLIF(square_feet, 0))::numeric, 0) as avg_square_feet
+                FROM landscape.tbl_multifamily_unit
+                WHERE project_id = %s
+                GROUP BY COALESCE(bedrooms, 0), COALESCE(bathrooms, 1)
+                ORDER BY bedrooms, bathrooms
+            """, [project_id])
+
+            aggregates = cursor.fetchall()
+
+            if not aggregates:
+                logger.warning(f"[aggregate_unit_types] No units found for project {project_id}")
+                return results
+
+            for row in aggregates:
+                bedrooms, bathrooms, unit_count, avg_rent, avg_market_rent, avg_sf = row
+
+                # Generate unit type code (e.g., "1BR/1BA", "2BR/2BA")
+                br_int = int(bedrooms) if bedrooms else 0
+                ba_int = int(bathrooms) if bathrooms else 1
+                unit_type_code = f"{br_int}BR/{ba_int}BA"
+                unit_type_name = f"{br_int} Bedroom / {ba_int} Bath"
+
+                # Use avg_rent for market rent if market_rent not available
+                market_rent_value = avg_market_rent if avg_market_rent else avg_rent or 0
+
+                logger.info(f"[aggregate_unit_types] Processing {unit_type_code}: {unit_count} units, avg rent ${avg_rent}")
+
+                # Check if unit type exists
+                cursor.execute("""
+                    SELECT unit_type_id
+                    FROM landscape.tbl_multifamily_unit_type
+                    WHERE project_id = %s AND unit_type_code = %s
+                """, [project_id, unit_type_code])
+
+                existing = cursor.fetchone()
+
+                # Handle square feet - constraint requires > 0, use 1 as placeholder if unknown
+                avg_sf_value = int(avg_sf) if avg_sf and avg_sf > 0 else 1
+
+                if existing:
+                    # Update existing
+                    cursor.execute("""
+                        UPDATE landscape.tbl_multifamily_unit_type
+                        SET
+                            bedrooms = %s,
+                            bathrooms = %s,
+                            total_units = %s,
+                            unit_count = %s,
+                            current_market_rent = %s,
+                            market_rent = %s,
+                            current_rent_avg = %s,
+                            avg_square_feet = %s,
+                            unit_type_name = %s,
+                            updated_at = NOW()
+                        WHERE project_id = %s AND unit_type_code = %s
+                    """, [
+                        br_int, ba_int, unit_count, unit_count,
+                        market_rent_value, market_rent_value, avg_rent or 0,
+                        avg_sf_value, unit_type_name,
+                        project_id, unit_type_code
+                    ])
+                    results['updated'] += 1
+                else:
+                    # Insert new
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_multifamily_unit_type (
+                            project_id, unit_type_code, unit_type_name,
+                            bedrooms, bathrooms, total_units, unit_count,
+                            current_market_rent, market_rent, current_rent_avg,
+                            avg_square_feet, created_at, updated_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW()
+                        )
+                    """, [
+                        project_id, unit_type_code, unit_type_name,
+                        br_int, ba_int, unit_count, unit_count,
+                        market_rent_value, market_rent_value, avg_rent or 0,
+                        avg_sf_value
+                    ])
+                    results['created'] += 1
+
+                results['unit_types'].append({
+                    'unit_type_code': unit_type_code,
+                    'bedrooms': br_int,
+                    'bathrooms': ba_int,
+                    'unit_count': unit_count,
+                    'avg_rent': float(avg_rent) if avg_rent else 0
+                })
+
+        logger.info(f"[aggregate_unit_types] Completed: {results['created']} created, {results['updated']} updated")
+        return results
+
+    except Exception as e:
+        logger.error(f"[aggregate_unit_types] Error: {e}")
+        results['errors'].append(str(e))
+        return results

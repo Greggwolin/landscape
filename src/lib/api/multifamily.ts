@@ -43,7 +43,9 @@ export interface Unit {
   bedrooms: number;
   bathrooms: number;
   square_feet: number;
+  current_rent?: number | null;
   market_rent: number;
+  occupancy_status?: string | null;
   renovation_status: string;
   renovation_date?: string | null;
   renovation_cost?: number | null;

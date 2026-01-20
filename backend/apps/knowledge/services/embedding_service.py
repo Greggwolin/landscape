@@ -14,7 +14,7 @@ _client: Optional[OpenAI] = None
 EMBEDDING_MODEL = "text-embedding-ada-002"
 EMBEDDING_DIMENSIONS = 1536
 MAX_TOKENS = 8191  # ada-002 token limit
-MAX_CHARS = 30000  # Conservative char estimate (~4 chars per token)
+MAX_CHARS = 8000  # Conservative char estimate (~1 char per token for safety)
 OPENAI_TIMEOUT_SECONDS = 30
 
 

@@ -13,6 +13,7 @@ type MinimalProjectRequest = {
   city?: string
   state?: string
   zip_code?: string
+  county?: string
   latitude?: number | null
   longitude?: number | null
   site_area?: number | null
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as MinimalProjectRequest
 
+    console.log('=== PROJECT CREATION TRACE ===')
+    console.log('PROJECT INPUT BODY:', JSON.stringify(body, null, 2))
+    console.log('RECEIVED LATITUDE:', body.latitude, 'type:', typeof body.latitude)
+    console.log('RECEIVED LONGITUDE:', body.longitude, 'type:', typeof body.longitude)
+
     if (!body.project_name || !body.project_type_code) {
       return NextResponse.json(
         { error: 'project_name and project_type_code are required' },
@@ -65,10 +71,15 @@ export async function POST(request: NextRequest) {
     const locationDescription = buildLocationDescription(body)
     const latitude = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null
     const longitude = typeof body.longitude === 'number' && Number.isFinite(body.longitude) ? body.longitude : null
+
+    console.log('FINAL LATITUDE TO INSERT:', latitude)
+    console.log('FINAL LONGITUDE TO INSERT:', longitude)
+    console.log('=== END PROJECT CREATION TRACE ===')
     const streetAddress = body.street_address?.trim() || null
     const city = body.city?.trim() || null
     const state = body.state?.trim()?.toUpperCase() || null
     const zipCode = body.zip_code?.trim() || null
+    const county = body.county?.trim()?.replace(/\s*county$/i, '') || null  // Strip "County" suffix if present
     const totalUnits = typeof body.total_units === 'number' && Number.isFinite(body.total_units)
       ? Math.round(body.total_units)
       : null
@@ -77,6 +88,7 @@ export async function POST(request: NextRequest) {
       : null
     const jurisdictionCity = city
     const jurisdictionState = state
+    const jurisdictionCounty = county
 
     const inserted = await sql<{
       project_id: number
@@ -98,6 +110,7 @@ export async function POST(request: NextRequest) {
         location_description,
         jurisdiction_city,
         jurisdiction_state,
+        jurisdiction_county,
         acres_gross,
         location_lat,
         location_lon,
@@ -122,6 +135,7 @@ export async function POST(request: NextRequest) {
         ${locationDescription},
         ${jurisdictionCity},
         ${jurisdictionState},
+        ${jurisdictionCounty},
         ${acresGross},
         ${latitude},
         ${longitude},

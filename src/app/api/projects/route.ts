@@ -104,7 +104,7 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         property_class,
         COALESCE(analysis_mode, 'napkin') AS analysis_mode,
         -- Phase 5 fields (nullable in legacy DB)
-        NULL::numeric AS total_residential_units,
+        COALESCE(total_units, target_units)::numeric AS total_residential_units,
         NULL::numeric AS total_commercial_sqft,
         updated_at
       FROM landscape.tbl_project

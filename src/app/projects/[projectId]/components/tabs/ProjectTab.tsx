@@ -410,9 +410,9 @@ export default function ProjectTab({
   };
 
   const renderMapCard = () => (
-    <CCard style={{ height: '100%', minHeight: '520px' }}>
-      <CCardHeader>Map - 3D Oblique View</CCardHeader>
-      <CCardBody style={{ padding: '12px', minHeight: '500px' }}>
+    <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
+      <CCardHeader style={{ padding: '0.5rem 1rem', minHeight: '44px' }}>Map - 3D Oblique View</CCardHeader>
+      <CCardBody style={{ padding: '12px', flex: 1 }}>
         <div style={{ height: '100%' }}>
           <ProjectTabMap
             projectId={String(project.project_id)}
@@ -922,25 +922,25 @@ export default function ProjectTab({
     <>
       <div
         className="d-flex flex-column"
-        style={{ gap: 'var(--component-gap)', padding: '0 var(--app-padding)' }}
+        style={{ gap: 'var(--component-gap)', padding: '0' }}
       >
       {/* Section 1: Project Profile + Map */}
       <CCard>
       <CCardHeader
         className="d-flex justify-content-between align-items-center"
-        style={{ cursor: 'pointer' }}
+        style={{ cursor: 'pointer', padding: '0.75rem 1rem', minHeight: '52px' }}
         onClick={() => setProfileMapExpanded(!profileMapExpanded)}
       >
-        <span>Project Profile &amp; Map</span>
+        <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile &amp; Map</span>
         <CIcon icon={profileMapExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
       </CCardHeader>
       {profileMapExpanded && (
-        <CCardBody>
-          <CRow className="g-3">
-            <CCol md={5} lg={4}>
+        <CCardBody className="p-2">
+          <CRow className="g-2" style={{ alignItems: 'stretch' }}>
+            <CCol md={6} lg={5}>
               <ProjectProfileTile projectId={project.project_id} />
             </CCol>
-            <CCol md={7} lg={8}>
+            <CCol md={6} lg={7}>
               {renderMapCard()}
             </CCol>
           </CRow>
@@ -1180,14 +1180,14 @@ export default function ProjectTab({
       <CCard>
         <CCardHeader
           className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', padding: '0.5rem 1rem' }}
           onClick={() => setContactsExpanded(!contactsExpanded)}
         >
-          <span>Contacts</span>
+          <span className="fw-semibold" style={{ fontSize: '1rem' }}>Contacts</span>
           <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
         {contactsExpanded && (
-          <CCardBody>
+          <CCardBody style={{ padding: '0.75rem 1rem' }}>
             {/* Contacts Section - includes listing brokers */}
             <ContactsSection projectId={project.project_id} />
           </CCardBody>

@@ -63,6 +63,27 @@ export interface SearchableDocument {
   parcel_name?: string | null;
 }
 
+export interface PlatformKnowledgeDocument {
+  id: number;
+  document_key: string;
+  title: string;
+  subtitle?: string | null;
+  edition?: string | null;
+  publisher?: string | null;
+  publication_year?: number | null;
+  page_count?: number | null;
+  knowledge_domain?: string | null;
+  property_types?: string[] | null;
+  description?: string | null;
+  ingestion_status?: string | null;
+  chunk_count?: number | null;
+  file_path?: string | null;
+  file_hash?: string | null;
+  file_size_bytes?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 // Navigation event types
 export interface NavigationEvent {
   view?: string;

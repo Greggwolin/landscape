@@ -25,10 +25,10 @@ export async function GET(
       FROM landscape.tbl_operating_expenses
       WHERE project_id = ${projectIdNum}
     `;
-    const available = availableResult.rows.map(r => r.statement_discriminator).filter(Boolean);
+    const available = availableResult.map(r => r.statement_discriminator).filter(Boolean);
     const activeDiscriminator = (overrideDiscriminator && available.includes(overrideDiscriminator))
       ? overrideDiscriminator
-      : (activeResult.rows[0]?.active_opex_discriminator || 'default');
+      : (activeResult[0]?.active_opex_discriminator || 'default');
 
     const expenses = await sql`
       SELECT

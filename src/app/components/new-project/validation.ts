@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import type { NewProjectFormData } from './types'
 
-const analysisTypeEnum = z.enum(['Land Development', 'Income Property'])
-const developmentTypeEnum = analysisTypeEnum // backwards compatibility
+// New orthogonal analysis type (what the user is doing)
+const analysisTypeEnum = z.enum(['VALUATION', 'INVESTMENT', 'DEVELOPMENT', 'FEASIBILITY'])
+// Property category (what the asset is) - cascades to property_subtype
+const propertyCategoryEnum = z.enum(['Land Development', 'Income Property'])
+const developmentTypeEnum = propertyCategoryEnum // backwards compatibility
 const locationModeEnum = z.enum(['address', 'cross_streets', 'coordinates', 'map_pin'])
 const siteAreaUnitEnum = z.enum(['AC', 'SF', 'SM'])
 const scaleMethodEnum = z.enum(['units', 'density', 'later'])
@@ -11,10 +14,11 @@ const optionalString = (message?: string) =>
   z.string({ required_error: message }).max(255).optional().or(z.literal(''))
 
 export const newProjectSchema = z.object({
-  // New fields
-  analysis_type: analysisTypeEnum,
-  property_subtype: optionalString(),
-  property_class: optionalString(),
+  // Asset classification (two orthogonal dimensions)
+  analysis_type: analysisTypeEnum, // What the user is doing
+  property_category: propertyCategoryEnum.optional().or(z.literal('')), // What the asset is
+  property_subtype: optionalString(), // Cascades from property_category
+  property_class: optionalString(), // Income Property only
 
   // Deprecated fields (keeping for backwards compatibility)
   development_type: developmentTypeEnum.optional().or(z.literal('')),
@@ -31,6 +35,7 @@ export const newProjectSchema = z.object({
     .max(10, 'ZIP Code too long')
     .optional()
     .or(z.literal('')),
+  county: optionalString(),
   cross_streets: optionalString(),
   latitude: optionalString(),
   longitude: optionalString(),
@@ -100,10 +105,11 @@ export const newProjectSchema = z.object({
       }
     }
 
-    // Use analysis_type (new) or fall back to development_type (deprecated)
-    const analysisType = data.analysis_type || data.development_type
+    // Use property_category (new) or fall back to development_type (deprecated) for validation
+    // Note: analysis_type is now orthogonal and doesn't affect property data validation
+    const propertyCategory = data.property_category || data.development_type
 
-    if (analysisType === 'Income Property') {
+    if (propertyCategory === 'Income Property') {
       const units = data.total_units ? Number(data.total_units) : NaN
       const buildingSf = data.building_sf ? Number(data.building_sf) : NaN
       if (
@@ -125,7 +131,7 @@ export const newProjectSchema = z.object({
       }
     }
 
-    if (analysisType === 'Land Development') {
+    if (propertyCategory === 'Land Development') {
       const siteArea = Number(data.site_area)
       if (Number.isNaN(siteArea) || siteArea <= 0) {
         ctx.addIssue({
@@ -162,10 +168,11 @@ export const newProjectSchema = z.object({
 export type NewProjectSchema = z.infer<typeof newProjectSchema>
 
 export const emptyFormDefaults: NewProjectFormData = {
-  // New fields
-  analysis_type: '',
-  property_subtype: '',
-  property_class: '',
+  // Asset classification (two orthogonal dimensions)
+  analysis_type: '', // What the user is doing
+  property_category: '', // What the asset is
+  property_subtype: '', // Cascades from property_category
+  property_class: '', // Income Property only
 
   // Deprecated fields
   development_type: '',
@@ -178,6 +185,7 @@ export const emptyFormDefaults: NewProjectFormData = {
   city: '',
   state: '',
   zip: '',
+  county: '',
   cross_streets: '',
   latitude: '',
   longitude: '',

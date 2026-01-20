@@ -60,6 +60,13 @@ class MultifamilyUnit(models.Model):
         ('PLANNED', 'Planned'),
     ]
 
+    OCCUPANCY_STATUS_CHOICES = [
+        ('Occupied', 'Occupied'),
+        ('Vacant', 'Vacant'),
+        ('Notice', 'Notice'),
+        ('Down', 'Down'),
+    ]
+
     unit_id = models.AutoField(primary_key=True)
     project = models.ForeignKey(
         Project,
@@ -73,7 +80,14 @@ class MultifamilyUnit(models.Model):
     bedrooms = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
     bathrooms = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
     square_feet = models.IntegerField()
+    current_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     market_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    occupancy_status = models.CharField(
+        max_length=20,
+        choices=OCCUPANCY_STATUS_CHOICES,
+        null=True,
+        blank=True
+    )
     renovation_status = models.CharField(
         max_length=50,
         choices=RENOVATION_STATUS_CHOICES,
@@ -196,3 +210,37 @@ class MultifamilyTurn(models.Model):
 
     def __str__(self):
         return f"Turn {self.turn_id} - Unit {self.unit.unit_number}"
+
+
+class ValueAddAssumptions(models.Model):
+    """
+    Model for value-add underwriting assumptions.
+    Maps to landscape.tbl_value_add_assumptions
+    """
+
+    value_add_id = models.AutoField(primary_key=True)
+    project = models.OneToOneField(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='value_add_assumptions'
+    )
+    is_enabled = models.BooleanField(default=False)
+    reno_cost_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=8.00)
+    relocation_incentive = models.DecimalField(max_digits=10, decimal_places=2, default=1500.00)
+    renovate_all = models.BooleanField(default=True)
+    units_to_renovate = models.IntegerField(null=True, blank=True)
+    reno_pace_per_month = models.IntegerField(default=4)
+    reno_start_month = models.IntegerField(default=3)
+    rent_premium_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0.15)
+    relet_lag_months = models.IntegerField(default=2)
+    created_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_value_add_assumptions'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Value-Add Assumptions for Project {self.project_id}"

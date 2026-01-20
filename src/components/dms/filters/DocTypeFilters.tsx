@@ -17,17 +17,19 @@ export interface SmartFilter {
 }
 
 interface DocTypeFiltersProps {
-  projectId: number;
+  projectId: number | null;
   selectedDocType: string | null;
   onFilterChange: (docType: string | null) => void;
   className?: string;
+  workspaceId?: number;
 }
 
 export default function DocTypeFilters({
   projectId,
   selectedDocType,
   onFilterChange,
-  className = ''
+  className = '',
+  workspaceId = 1
 }: DocTypeFiltersProps) {
   const [docTypes, setDocTypes] = useState<DocTypeFilter[]>([]);
   const [smartFilters, setSmartFilters] = useState<SmartFilter[]>([]);
@@ -36,23 +38,99 @@ export default function DocTypeFilters({
 
   useEffect(() => {
     void fetchCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  const applyPlatformKnowledge = (entries: DocTypeFilter[], platformCount = 0) => {
+    const normalized = entries.filter(
+      (item) => item.doc_type.toLowerCase() !== 'platform knowledge'
+    );
+    const existing = entries.find(
+      (item) => item.doc_type.toLowerCase() === 'platform knowledge'
+    );
+    return [
+      ...normalized,
+      {
+        doc_type: 'Platform Knowledge',
+        count: existing?.count ?? platformCount
+      }
+    ];
+  };
 
   const fetchCounts = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/dms/filters/counts?project_id=${projectId}`);
-      if (!response.ok) throw new Error('Failed to fetch filter counts');
-      const data = await response.json();
-      setDocTypes(
-        Array.isArray(data.doc_type_counts)
-          ? data.doc_type_counts.map((item: any) => ({
-              doc_type: item.doc_type,
-              count: item.count ?? 0
+      if (!projectId) {
+        const [response, platformResponse] = await Promise.all([
+          fetch('/api/dms/search?limit=0&offset=0'),
+          fetch('/api/platform-knowledge?limit=0&offset=0')
+        ]);
+        if (!response.ok) throw new Error('Failed to fetch global filters');
+        const data = await response.json();
+        const platformData = platformResponse.ok ? await platformResponse.json() : { totalHits: 0 };
+        const facetDocTypes = data?.facets?.doc_type || {};
+        const docTypeEntries = Object.entries(facetDocTypes)
+          .filter(([docType]) => docType && docType !== 'null')
+          .map(([docType, count]) => ({
+            doc_type: docType,
+            count: Number(count) || 0
+          }))
+          .sort((a, b) => a.doc_type.localeCompare(b.doc_type));
+        setDocTypes(applyPlatformKnowledge(docTypeEntries, platformData.totalHits || 0));
+        setSmartFilters([]);
+        return;
+      }
+
+      const [docTypesResponse, countsResponse] = await Promise.all([
+        fetch(`/api/dms/templates/doc-types?project_id=${projectId}&workspace_id=${workspaceId}`),
+        fetch(`/api/dms/filters/counts?project_id=${projectId}`)
+      ]);
+      const platformResponse = await fetch('/api/platform-knowledge?limit=0&offset=0');
+
+      let docTypeOptions: string[] = [];
+      if (docTypesResponse.ok) {
+        const data = await docTypesResponse.json();
+        docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
+      }
+
+      if (!countsResponse.ok) throw new Error('Failed to fetch filter counts');
+      const countsData = await countsResponse.json();
+      const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(countsData.doc_type_counts)
+        ? countsData.doc_type_counts
+        : [];
+      const countMap = new Map<string, number>();
+      countEntries.forEach(({ doc_type, count }) => {
+        if (!doc_type) return;
+        countMap.set(doc_type, count ?? 0);
+        countMap.set(doc_type.toLowerCase(), count ?? 0);
+      });
+
+      const templateFilters = docTypeOptions.map((type) => ({
+        doc_type: type,
+        count: countMap.get(type) ?? countMap.get(type.toLowerCase()) ?? 0
+      }));
+
+      const templateSet = new Set(docTypeOptions.map((type) => type.toLowerCase()));
+      const extraFilters = countEntries
+        .filter(({ doc_type }) => doc_type && !templateSet.has(doc_type.toLowerCase()))
+        .map(({ doc_type, count }) => ({
+          doc_type,
+          count: count ?? 0
+        }));
+
+      const platformData = platformResponse.ok ? await platformResponse.json() : { totalHits: 0 };
+      setDocTypes(applyPlatformKnowledge([...templateFilters, ...extraFilters], platformData.totalHits || 0));
+      setSmartFilters(
+        Array.isArray(countsData.smart_filters)
+          ? countsData.smart_filters.map((item: any) => ({
+              filter_id: item.filter_id,
+              filter_name: item.filter_name,
+              doc_type: item.query?.doc_type || '',
+              tags: item.query?.tags || [],
+              count: 0
             }))
           : []
       );
-      setSmartFilters(Array.isArray(data.smart_filters) ? data.smart_filters : []);
     } catch (error) {
       console.error('DocTypeFilters load error:', error);
       setDocTypes([]);
@@ -112,7 +190,7 @@ export default function DocTypeFilters({
                 handleToggle(item.doc_type);
                 onFilterChange(item.doc_type);
               }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors ${
+              className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
                 isActive ? 'bg-[#EBF5FF] text-[#1E40AF]' : 'text-gray-800 dark:text-gray-100'
               }`}
             >

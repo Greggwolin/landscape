@@ -76,6 +76,10 @@ OPEX_ACCOUNT_MAPPING = {
     'management fee': 73,               # 5410 - Property Management (renamed)
     'management': 73,
     'property management': 73,
+    'on-site management': 90,            # 5551 - On-Site Manager Salary
+    'onsite management': 90,
+    'off-site management': 73,           # 5410 - Property Management (off-site = PM fee)
+    'offsite management': 73,
     'professional services': 74,        # 5420 - Professional Services
     'professional fees': 74,
     'legal': 74,
@@ -96,6 +100,7 @@ OPEX_ACCOUNT_MAPPING = {
     'internet': 88,                     # 5425 - Internet Service
     'cable': 88,
     'miscellaneous': 68,                # map to Other/Trash category family for catch-all
+    'office supplies': 56,              # 5400 - Administrative
 
     # --- MARKETING (5500) ---
     'marketing': 57,                    # 5500 - Marketing (parent)
@@ -141,4 +146,138 @@ OPEX_ACCOUNT_MAPPING = {
     'capex reserve': 98,                # 5992 - Capital Expenditure Reserve
     'capital reserve': 98,
     'capital reserves': 98,
+
+    # --- WORKERS COMPENSATION ---
+    'workman comp': 94,                 # Map to payroll taxes
+    'workers comp': 94,
+    'workmans comp': 94,
+    'workers compensation': 94,
+    'workman compensation': 94,
+    'work comp': 94,
+
+    # --- BANK & FINANCIAL FEES ---
+    'bank charges': 85,                 # Map to Telephone/Admin expense
+    'bank fees': 85,
+    'merchant fees': 85,
+    'credit card fees': 85,
+    'processing fees': 85,
+    'payment processing': 85,
+
+    # --- SECURITY SERVICES ---
+    'security services': 86,            # 5423 - Security/Fire/Alarm
+    'patrol services': 86,
+    'guard services': 86,
+    'security patrol': 86,
+    'night patrol': 86,
+
+    # --- TECHNOLOGY / SOFTWARE ---
+    'computer software': 85,            # Map to admin
+    'software': 85,
+    'computer': 85,
+    'computers': 85,
+    'appfolio': 85,
+    'yardi': 85,
+    'rent manager': 85,
+    'property software': 85,
+    'it services': 85,
+    'technology': 85,
+
+    # --- OUTSIDE / CONTRACT SERVICES ---
+    'outside services': 73,             # Map to Property Management
+    'vendor services': 73,
+    'third party services': 73,
+
+    # --- LEGAL & EVICTION ---
+    'legal fees': 74,                   # 5420 - Professional Services
+    'attorney': 74,
+    'attorney fees': 74,
+    'eviction costs': 74,
+    'eviction': 74,
+    'evictions': 74,
+    'court costs': 74,
+    'legal and court': 74,
+
+    # --- ADDITIONAL UTILITIES ---
+    'cable tv': 88,                     # 5425 - Internet Service
+    'television': 88,
+    'tv service': 88,
+    'common area electric': 69,         # 5230 - Electricity
+    'common electric': 69,
+    'hallway electric': 69,
+
+    # --- LAUNDRY ---
+    'laundry': 68,                      # Map to Other/Misc (income offset)
+    'laundry expense': 68,
+    'laundry supplies': 68,
+    'laundry equipment': 68,
+
+    # --- LICENSES & PERMITS ---
+    'permits': 87,                      # 5424 - Business License/Tax
+    'permit fees': 87,
+    'licensing': 87,
+    'license fees': 87,
+    'regulatory': 87,
+
+    # --- ADDITIONAL PAYROLL ---
+    'payroll expenses': 89,             # 5550 - Payroll & Personnel
+    'staff payroll': 89,
+    'employee wages': 89,
+    'labor': 89,
+    'labor costs': 89,
+    'total payroll': 89,
+
+    # --- HVAC & MECHANICAL ---
+    'hvac': 72,                         # 5320 - Maintenance Contracts
+    'hvac maintenance': 72,
+    'heating': 72,
+    'air conditioning': 72,
+    'mechanical': 72,
+
+    # --- ROOFING & STRUCTURAL ---
+    'roof repairs': 71,                 # 5310 - Repairs & Labor
+    'roofing': 71,
+    'roof': 71,
+    'structural repairs': 71,
+
+    # --- PLUMBING ---
+    'plumbing': 71,                     # 5310 - Repairs & Labor
+    'plumbing repairs': 71,
+
+    # --- APPLIANCES ---
+    'appliances': 71,                   # 5310 - Repairs & Labor
+    'appliance repairs': 71,
+    'appliance replacement': 71,
+
+    # --- FLOORING ---
+    'flooring': 71,                     # 5310 - Repairs & Labor
+    'carpet': 71,
+    'carpet cleaning': 80,              # 5321 - Janitorial Services
+    'floor cleaning': 80,
+
+    # --- PAINTING ---
+    'painting': 71,                     # 5310 - Repairs & Labor
+    'paint': 71,
+    'interior painting': 71,
+    'exterior painting': 71,
+
+    # --- SUPPLIES ---
+    'supplies': 56,                     # 5400 - Administrative
+    'maintenance supplies': 55,         # 5300 - Repairs & Maintenance
+    'cleaning supplies': 80,            # 5321 - Janitorial
+    'office expense': 56,               # 5400 - Administrative
+
+    # --- BAD DEBT ---
+    'bad debt': 68,                     # Map to Other (loss category)
+    'bad debt expense': 68,
+    'uncollectable': 68,
+    'write offs': 68,
+    'write-offs': 68,
+
+    # --- MISCELLANEOUS / OTHER ---
+    'other expenses': 68,
+    'other operating': 68,
+    'other operating expenses': 68,
+    'general expenses': 56,
+    'sundry': 68,
+    'contingency': 68,
 }

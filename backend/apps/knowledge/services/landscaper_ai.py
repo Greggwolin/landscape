@@ -35,15 +35,49 @@ class DecimalEncoder(json.JSONEncoder):
 from .rag_retrieval import retrieve_rag_context, get_conversation_context, RAGContext
 from .query_builder import execute_project_query
 from .project_context import get_project_context
+from .entity_fact_retriever import get_entity_fact_context
 
 # Import tool definitions and executor from landscaper app
 from apps.landscaper.ai_handler import LANDSCAPER_TOOLS
 from apps.landscaper.tool_executor import execute_tool
 
+# Import analysis type config model
+from apps.projects.models import AnalysisTypeConfig
+
 logger = logging.getLogger(__name__)
 
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 ANTHROPIC_TIMEOUT_SECONDS = 60
+
+# ---------------------------------------------------------------------------
+# Strict document extraction guardrails
+# ---------------------------------------------------------------------------
+
+DOC_EXTRACTION_VERBS = (
+    'extract', 'populate', 'import', 'add', 'insert', 'update', 'pull'
+)
+
+OPEX_KEYWORDS = (
+    'operating expenses', 'operating expense', 'opex', 't-12', 't12'
+)
+
+DOC_REFERENCE_PATTERNS = (
+    r'\bom\b',
+    r'offering memorandum',
+    r'\bmemorandum\b',
+    r'\bdocument\b',
+    r'\bt-12\b',
+    r'\bt12\b',
+)
+
+
+def _is_opex_document_extraction_request(message: str) -> bool:
+    message_lower = message.lower()
+    if not any(verb in message_lower for verb in DOC_EXTRACTION_VERBS):
+        return False
+    if not any(keyword in message_lower for keyword in OPEX_KEYWORDS):
+        return False
+    return any(re.search(pattern, message_lower) for pattern in DOC_REFERENCE_PATTERNS)
 
 
 def _get_anthropic_client() -> Anthropic:
@@ -161,6 +195,38 @@ TAB_CONTEXT = {
 }
 
 
+def _get_analysis_type_context(project_id: int) -> Optional[str]:
+    """
+    Get analysis-type-aware context for Landscaper.
+
+    Retrieves the project's analysis_type (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
+    and returns the corresponding context instructions.
+
+    Returns None if analysis type not set or config not found.
+    """
+    try:
+        # Get the project's analysis_type
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT analysis_type FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id]
+            )
+            row = cursor.fetchone()
+            if not row or not row[0]:
+                return None
+            analysis_type = row[0]
+
+        # Get the analysis type configuration
+        config = AnalysisTypeConfig.objects.filter(analysis_type=analysis_type).first()
+        if not config or not config.landscaper_context:
+            return None
+
+        return config.landscaper_context
+    except Exception as e:
+        logger.warning(f"Failed to retrieve analysis type context for project {project_id}: {e}")
+        return None
+
+
 def get_landscaper_response(
     user_message: str,
     project_id: int,
@@ -182,6 +248,8 @@ def get_landscaper_response(
     Returns:
         Dict with 'content', 'metadata', 'context_used'
     """
+
+    strict_opex_extraction = _is_opex_document_extraction_request(user_message)
 
     # 1. Retrieve or hydrate RAG context
     if isinstance(rag_context, RAGContext):
@@ -225,10 +293,35 @@ def get_landscaper_response(
     tab_config = TAB_CONTEXT.get(active_tab, TAB_CONTEXT['home'])
     tab_context = tab_config['prompt_addition']
 
-    # 5. Build system prompt with RAG context + project context + tab context
+    # 4b. Get analysis-type-specific context (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
+    analysis_type_context = _get_analysis_type_context(project_id)
+
+    # 5. Build system prompt with RAG context + project context + tab context + Entity-Fact knowledge + Analysis Type
     t0 = time.time()
-    system_prompt = _build_system_prompt(rag_context_obj, project_context, tab_context)
+    system_prompt = _build_system_prompt(
+        rag_context_obj,
+        project_context,
+        tab_context,
+        project_id,
+        analysis_type_context
+    )
     print(f"[AI_TIMING] _build_system_prompt: {time.time() - t0:.2f}s (prompt len: {len(system_prompt)} chars)")
+
+    if strict_opex_extraction:
+        has_doc_chunks = bool(getattr(rag_context_obj, 'document_chunks', []))
+        strict_notice = "Document excerpts are available for extraction." if has_doc_chunks else (
+            "No document excerpts are currently available; you must call get_project_documents "
+            "and get_document_content (focus='operating_expenses') before extracting."
+        )
+        system_prompt += f"""
+
+=== STRICT DOCUMENT EXTRACTION (OPERATING EXPENSES) ===
+You MUST only extract operating expenses from the actual document content.
+Do NOT estimate or use industry standards.
+If the document does not explicitly list a line item, do not include it.
+{strict_notice}
+When calling update_operating_expenses, include source_document and only values explicitly cited.
+If per-unit or per-SF amounts are listed, include per_unit and per_sf."""
 
     # 4. Build messages array
     messages = []
@@ -253,6 +346,9 @@ def get_landscaper_response(
 
         # Track mutation proposals (Level 2 autonomy)
         mutation_proposals = []
+
+        last_doc_source = None
+        last_doc_has_content = False
 
         # Generate a source message ID for linking proposals to this chat message
         source_message_id = f"msg_{uuid.uuid4().hex[:12]}"
@@ -301,7 +397,7 @@ def get_landscaper_response(
             for content_block in response.content:
                 if content_block.type == "tool_use":
                     tool_name = content_block.name
-                    tool_input = content_block.input
+                    tool_input = content_block.input or {}
                     tool_use_id = content_block.id
 
                     logger.info(f"Executing tool: {tool_name} with input: {json.dumps(tool_input)[:200]}")
@@ -309,12 +405,41 @@ def get_landscaper_response(
                     # Execute the tool (with proposal mode for mutations)
                     tool_exec_start = time.time()
                     try:
+                        tool_input_exec = dict(tool_input)
+                        propose_only = True
+
+                        if tool_name == 'update_operating_expenses' and strict_opex_extraction:
+                            if not last_doc_has_content:
+                                tool_result = {
+                                    'success': False,
+                                    'error': "Document content required before updating operating expenses.",
+                                }
+                                tool_executions.append({
+                                    'tool': tool_name,
+                                    'input': tool_input_exec,
+                                    'result': tool_result,
+                                    'success': False,
+                                    'is_proposal': False,
+                                })
+                                tool_results.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": json.dumps(tool_result),
+                                    "is_error": True,
+                                })
+                                continue
+
+                            if last_doc_source and not tool_input_exec.get('source_document'):
+                                tool_input_exec['source_document'] = last_doc_source
+
+                            propose_only = False
+
                         tool_result = execute_tool(
                             tool_name,
-                            tool_input,
+                            tool_input_exec,
                             project_id,
                             source_message_id=source_message_id,
-                            propose_only=True  # Level 2 autonomy: propose, don't execute
+                            propose_only=propose_only
                         )
                         print(f"[AI_TIMING] Tool {tool_name} execution: {time.time() - tool_exec_start:.2f}s")
 
@@ -326,7 +451,7 @@ def get_landscaper_response(
 
                         tool_executions.append({
                             'tool': tool_name,
-                            'input': tool_input,
+                            'input': tool_input_exec,
                             'result': tool_result,
                             'success': tool_result.get('success', not tool_result.get('error')),
                             'is_proposal': bool(tool_result.get('mutation_id') or tool_result.get('batch_id'))
@@ -347,6 +472,10 @@ def get_landscaper_response(
                         "tool_use_id": tool_use_id,
                         "content": result_content
                     })
+
+                    if tool_name == 'get_document_content' and tool_result.get('success'):
+                        last_doc_source = tool_result.get('doc_name') or last_doc_source
+                        last_doc_has_content = bool(tool_result.get('content'))
 
             # Add assistant's response (with tool_use) and tool results to messages
             messages.append({"role": "assistant", "content": response.content})
@@ -419,10 +548,35 @@ def get_landscaper_response(
 
             # Build a new request with just the content and direct instruction
             # This avoids the tool_result message format issues
-            continuation_messages = [
-                {
-                    "role": "user",
-                    "content": f"""Here is the document content with rental comparable data:
+            if data_type_requested == 'operating_expenses':
+                continuation_messages = [
+                    {
+                        "role": "user",
+                        "content": f"""Here is the document content with operating expenses:
+
+{doc_content}
+
+Extract ALL operating expense line items explicitly listed in the document.
+For each line item, provide:
+- label: The exact expense name (e.g., "Real Estate Taxes", "Insurance", "Water & Sewer")
+- annual_amount: Annual amount in dollars
+- per_unit: Per-unit annual amount if shown
+- per_sf: Per-SF annual amount if shown
+
+Do NOT estimate or use industry standards. If a line item is not explicitly listed, omit it.
+Call {target_tool} with all the extracted expenses now. Include source_document if known."""
+                    }
+                ]
+                continuation_system = (
+                    "You are a data extraction assistant. Extract structured operating expense line items "
+                    "from the provided document content and call update_operating_expenses to save them. "
+                    "Do not fabricate values."
+                )
+            else:
+                continuation_messages = [
+                    {
+                        "role": "user",
+                        "content": f"""Here is the document content with rental comparable data:
 
 {doc_content}
 
@@ -437,14 +591,18 @@ For each property and unit type combination, create an entry with:
 - asking_rent: Monthly rent in dollars
 
 Call {target_tool} with all the extracted comps now."""
-                }
-            ]
+                    }
+                ]
+                continuation_system = (
+                    "You are a data extraction assistant. Extract structured rental comparable data from the "
+                    "provided document content and call update_rental_comps to save it."
+                )
 
             # Make a fresh API call with just the content
             response = anthropic.messages.create(
                 model=CLAUDE_MODEL,
                 max_tokens=8000,
-                system="You are a data extraction assistant. Extract structured rental comparable data from the provided document content and call the update_rental_comps tool to save it.",
+                system=continuation_system,
                 messages=continuation_messages,
                 tools=LANDSCAPER_TOOLS
             )
@@ -584,22 +742,34 @@ Call {target_tool} with all the extracted comps now."""
         }
 
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Landscaper AI error: {e}\n{error_traceback}")
+        print(f"[LANDSCAPER_ERROR] {e}\n{error_traceback}")
         return {
             'content': f"I apologize, but I encountered an error processing your request. Please try again.",
-            'metadata': {'error': str(e)},
+            'metadata': {'error': str(e), 'traceback': error_traceback},
             'context_used': {},
             'usage': {}
         }
 
 
-def _build_system_prompt(rag_context: RAGContext, project_context: str = "", tab_context: str = "") -> str:
+def _build_system_prompt(
+    rag_context: RAGContext,
+    project_context: str = "",
+    tab_context: str = "",
+    project_id: Optional[int] = None,
+    analysis_type_context: Optional[str] = None
+) -> str:
     """
-    Build system prompt with full project context + RAG context + tab context.
+    Build system prompt with full project context + RAG context + tab context + Entity-Fact knowledge + Analysis Type context.
 
     Args:
         rag_context: RAG context with document chunks and query results
         project_context: Full structured data context from ProjectContextService
         tab_context: Tab-specific focus instructions
+        project_id: Project ID for Entity-Fact knowledge retrieval
+        analysis_type_context: Analysis-type-specific behavior context (from tbl_analysis_type_config)
     """
 
     sections = rag_context.to_prompt_sections()
@@ -640,7 +810,52 @@ When to use tools:
 
 IMPORTANT: When user asks to POPULATE or ADD data, ALWAYS use the appropriate tool. Don't just describe the data - actually save it!
 - "populate rental comps from the OM" → CALL update_rental_comps with the extracted data
-- "add the operating expenses" → CALL update_operating_expenses with the extracted data"""
+- "add the operating expenses" → CALL update_operating_expenses with the extracted data
+
+=== MULTI-DOCUMENT EXTRACTION HIERARCHY ===
+
+When multiple documents are available for the same property (e.g., OM + Rent Roll + T-12):
+
+**DOCUMENT PRIORITY BY DATA TYPE:**
+
+1. **Rent/Occupancy Data** (Rent Roll wins)
+   - Rent Roll → T-12 → OM
+   - Rent rolls are updated monthly; treat as source of truth for current rents
+   - OMs often contain stale or "proforma" rent figures
+
+2. **Expense/Operating Data** (T-12 wins)
+   - T-12 → Appraisal → OM
+   - T-12 shows actual historical expenses
+   - OM expenses may be "adjusted" or "proforma"
+
+3. **Property Details** (Appraisal/OM wins)
+   - Appraisal → OM → Rent Roll
+   - Use OM for address, year built, SF, amenities, narrative
+
+4. **Financing/Loan Data** (OM wins)
+   - OM → Appraisal → Proforma
+   - Assumable debt terms typically in OM
+
+**CONFLICT HANDLING:**
+- When rent roll and OM show different rent totals, USE THE RENT ROLL
+- Flag discrepancies >5% to the user with both values
+- Note the date of each document if available
+- Example: "Rent roll shows $86,936/mo (41 occupied units), OM shows $92,958/mo. Using rent roll as current source of truth."
+
+**EXPENSE LABEL NORMALIZATION:**
+- Strip GL account codes from labels (e.g., "6320: Insurance" → "Insurance")
+- Map common variations (e.g., "R&M" → "Repairs & Maintenance")
+- Flag anomalously high expenses (e.g., software >$500/unit/year)"""
+
+    # ANALYSIS TYPE CONTEXT: What the user is trying to accomplish
+    if analysis_type_context and analysis_type_context.strip():
+        base_prompt += f"""
+
+=== ANALYSIS TYPE FOCUS ===
+
+{analysis_type_context}
+
+Tailor your guidance to this analysis type. Emphasize the metrics, approaches, and considerations most relevant to this goal."""
 
     # TAB CONTEXT: Current UI context the user is viewing
     if tab_context and tab_context.strip():
@@ -661,6 +876,21 @@ Focus your answers on topics relevant to this context. If the user asks about so
 {project_context}
 
 IMPORTANT: This is live, validated project data. Always prefer this structured data over document excerpts when both contain the same information."""
+
+    # ENTITY-FACT KNOWLEDGE: Provenance-tracked facts from knowledge graph
+    if project_id:
+        try:
+            entity_fact_context = get_entity_fact_context(project_id)
+            if entity_fact_context and entity_fact_context.strip():
+                base_prompt += f"""
+
+=== KNOWLEDGE GRAPH (provenance-tracked assumptions) ===
+
+{entity_fact_context}
+
+Note: These facts have been validated and tracked with full provenance. They show the source of each value (user-entered, extracted from document, AI-suggested, etc.) and confidence levels."""
+        except Exception as e:
+            logger.warning(f"Failed to retrieve Entity-Fact context for project {project_id}: {e}")
 
     # QUERY RESULT: Specific database query match (if question matched a pattern)
     if sections.get('db_query_result'):

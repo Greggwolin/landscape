@@ -108,6 +108,9 @@ pnpm dev  # or npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
 
+### Utility scripts
+- `./scripts/git-push.sh "message"` stages all changes, updates `docs/session-notes`, commits, and pushes.
+
 ## 📊 Technology Stack
 
 ### Frontend

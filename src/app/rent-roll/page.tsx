@@ -72,8 +72,8 @@ export default function RentRollPage() {
   }
 
   const handleCommit = () => {
-    // Refresh rent roll data
-    window.location.reload()
+    setShowStaging(false)
+    setStagingDocId(null)
   }
 
   if (isLoading) {

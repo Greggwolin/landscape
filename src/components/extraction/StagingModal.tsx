@@ -26,6 +26,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
+import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 interface StagingModalProps {
   open: boolean;
@@ -131,6 +132,15 @@ export const StagingModal: React.FC<StagingModalProps> = ({
 
       if (response.ok) {
         console.log('✅ Commit successful!');
+        emitMutationComplete({
+          projectId,
+          mutationType: 'staging_commit',
+          tables: ['units', 'leases', 'unit_types'],
+          counts: {
+            created: approvedIds.length,
+            total: approvedIds.length,
+          },
+        });
         onCommit();
         onClose();
       } else {

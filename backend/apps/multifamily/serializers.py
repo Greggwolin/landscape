@@ -8,6 +8,7 @@ from .models import (
     MultifamilyUnitType,
     MultifamilyLease,
     MultifamilyTurn,
+    ValueAddAssumptions,
 )
 
 
@@ -53,7 +54,9 @@ class MultifamilyUnitSerializer(serializers.ModelSerializer):
             'bedrooms',
             'bathrooms',
             'square_feet',
+            'current_rent',
             'market_rent',
+            'occupancy_status',
             'renovation_status',
             'renovation_date',
             'renovation_cost',
@@ -197,6 +200,60 @@ class MultifamilyTurnSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['turn_id', 'total_make_ready_cost', 'created_at', 'updated_at']
+
+
+class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
+    """Serializer for ValueAddAssumptions model."""
+
+    project_id = serializers.IntegerField(source='project.project_id', read_only=True)
+
+    class Meta:
+        model = ValueAddAssumptions
+        fields = [
+            'value_add_id',
+            'project_id',
+            'is_enabled',
+            'reno_cost_per_sf',
+            'relocation_incentive',
+            'renovate_all',
+            'units_to_renovate',
+            'reno_pace_per_month',
+            'reno_start_month',
+            'rent_premium_pct',
+            'relet_lag_months',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['value_add_id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        """Enforce basic field constraints."""
+        reno_cost_per_sf = attrs.get('reno_cost_per_sf')
+        relocation_incentive = attrs.get('relocation_incentive')
+        reno_pace_per_month = attrs.get('reno_pace_per_month')
+        reno_start_month = attrs.get('reno_start_month')
+        rent_premium_pct = attrs.get('rent_premium_pct')
+        relet_lag_months = attrs.get('relet_lag_months')
+        renovate_all = attrs.get('renovate_all')
+        units_to_renovate = attrs.get('units_to_renovate')
+
+        if reno_cost_per_sf is not None and reno_cost_per_sf <= 0:
+            raise serializers.ValidationError({'reno_cost_per_sf': 'Must be greater than 0.'})
+        if relocation_incentive is not None and relocation_incentive < 0:
+            raise serializers.ValidationError({'relocation_incentive': 'Must be 0 or greater.'})
+        if reno_pace_per_month is not None and reno_pace_per_month <= 0:
+            raise serializers.ValidationError({'reno_pace_per_month': 'Must be greater than 0.'})
+        if reno_start_month is not None and reno_start_month < 1:
+            raise serializers.ValidationError({'reno_start_month': 'Must be 1 or greater.'})
+        if rent_premium_pct is not None and (rent_premium_pct < 0 or rent_premium_pct > 1):
+            raise serializers.ValidationError({'rent_premium_pct': 'Must be between 0 and 1.'})
+        if relet_lag_months is not None and relet_lag_months < 0:
+            raise serializers.ValidationError({'relet_lag_months': 'Must be 0 or greater.'})
+        if renovate_all is False:
+            if units_to_renovate is None or units_to_renovate <= 0:
+                raise serializers.ValidationError({'units_to_renovate': 'Enter a positive unit count.'})
+
+        return attrs
 
 
 class OccupancyReportSerializer(serializers.Serializer):

@@ -4,13 +4,27 @@ ViewSets for Project models.
 Provides REST API endpoints for CRUD operations on projects.
 """
 
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from django.db.models import Sum, F, DecimalField
+from django.db.models.functions import Coalesce
+from django.db import connection
+from decimal import Decimal
+import math
 
-from .models import Project
-from .serializers import ProjectSerializer, ProjectListSerializer
+from .models import Project, AnalysisTypeConfig
+from .serializers import (
+    ProjectSerializer,
+    ProjectListSerializer,
+    AnalysisTypeConfigSerializer,
+    AnalysisTypeConfigListSerializer,
+    AnalysisTypeTilesSerializer,
+    AnalysisTypeLandscaperContextSerializer,
+)
+from apps.multifamily.models import MultifamilyUnitType, ValueAddAssumptions
+from apps.multifamily.serializers import ValueAddAssumptionsSerializer
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -71,3 +85,219 @@ class ProjectViewSet(viewsets.ModelViewSet):
             'project_name': project.project_name,
             'message': 'Financial summary endpoint - to be implemented'
         })
+
+    @action(detail=True, methods=['get', 'put'], url_path='value-add')
+    def value_add(self, request, pk=None):
+        """
+        GET/PUT /api/projects/:id/value-add/
+
+        Returns or updates value-add assumptions for a project.
+        """
+        project = self.get_object()
+
+        def assumptions_table_exists() -> bool:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT to_regclass('landscape.tbl_value_add_assumptions')")
+                    result = cursor.fetchone()
+                return bool(result and result[0])
+            except Exception:
+                return False
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        COALESCE(SUM(COALESCE(total_units, unit_count, 0)), 0) AS total_units,
+                        COALESCE(SUM(COALESCE(total_units, unit_count, 0) * COALESCE(avg_square_feet, 0)), 0) AS total_sf,
+                        COALESCE(SUM(COALESCE(total_units, unit_count, 0) * COALESCE(current_market_rent, market_rent, 0)), 0) AS total_rent
+                    FROM landscape.tbl_multifamily_unit_type
+                    WHERE project_id = %s
+                    """,
+                    [project.project_id]
+                )
+                row = cursor.fetchone() or (0, 0, 0)
+        except Exception as exc:
+            return Response(
+                {'error': f'Failed to aggregate unit mix data: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        total_units = int(row[0] or 0)
+        total_sf = Decimal(row[1] or 0)
+        total_rent = Decimal(row[2] or 0)
+        avg_unit_sf = (total_sf / total_units) if total_units > 0 else Decimal('0')
+        avg_current_rent = (total_rent / total_units) if total_units > 0 else Decimal('0')
+
+        def build_calculated(assumptions: ValueAddAssumptions):
+            reno_cost_per_sf = Decimal(str(assumptions.reno_cost_per_sf or 0))
+            relocation_incentive = Decimal(str(assumptions.relocation_incentive or 0))
+            rent_premium_pct = Decimal(str(assumptions.rent_premium_pct or 0))
+            units_in_program = total_units if assumptions.renovate_all else int(assumptions.units_to_renovate or 0)
+
+            effective_cost_per_unit = (reno_cost_per_sf * avg_unit_sf) + relocation_incentive
+            total_renovation_cost = effective_cost_per_unit * units_in_program
+
+            reno_pace = int(assumptions.reno_pace_per_month or 0)
+            renovation_duration_months = math.ceil(units_in_program / reno_pace) if reno_pace > 0 else 0
+
+            monthly_premium_per_unit = avg_current_rent * rent_premium_pct
+            stabilized_annual_premium = monthly_premium_per_unit * Decimal('12') * units_in_program
+
+            simple_payback_months = 0
+            if stabilized_annual_premium > 0:
+                monthly_premium_total = stabilized_annual_premium / Decimal('12')
+                simple_payback_months = math.ceil(float(total_renovation_cost / monthly_premium_total))
+
+            return {
+                'effective_cost_per_unit': float(effective_cost_per_unit),
+                'units_in_program': units_in_program,
+                'total_renovation_cost': float(total_renovation_cost),
+                'renovation_duration_months': renovation_duration_months,
+                'stabilized_annual_premium': float(stabilized_annual_premium),
+                'simple_payback_months': simple_payback_months
+            }
+
+        if request.method == 'GET':
+            if not assumptions_table_exists():
+                assumptions = ValueAddAssumptions(
+                    project=project,
+                    is_enabled=False,
+                    reno_cost_per_sf=Decimal('8.00'),
+                    relocation_incentive=Decimal('1500.00'),
+                    renovate_all=True,
+                    units_to_renovate=None,
+                    reno_pace_per_month=4,
+                    reno_start_month=3,
+                    rent_premium_pct=Decimal('0.15'),
+                    relet_lag_months=2,
+                )
+                serializer = ValueAddAssumptionsSerializer(assumptions)
+                return Response({
+                    **serializer.data,
+                    'calculated': build_calculated(assumptions),
+                    'warning': 'Value-add assumptions table not found. Run migration 20260115_add_value_add_assumptions.sql.'
+                })
+
+            assumptions = ValueAddAssumptions.objects.filter(project=project).first()
+            if not assumptions:
+                assumptions = ValueAddAssumptions(
+                    project=project,
+                    is_enabled=False,
+                    reno_cost_per_sf=Decimal('8.00'),
+                    relocation_incentive=Decimal('1500.00'),
+                    renovate_all=True,
+                    units_to_renovate=None,
+                    reno_pace_per_month=4,
+                    reno_start_month=3,
+                    rent_premium_pct=Decimal('0.15'),
+                    relet_lag_months=2,
+                )
+
+            serializer = ValueAddAssumptionsSerializer(assumptions)
+            return Response({
+                **serializer.data,
+                'calculated': build_calculated(assumptions)
+            })
+
+        if not assumptions_table_exists():
+            return Response(
+                {'error': 'Value-add assumptions table not found. Run migration 20260115_add_value_add_assumptions.sql.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = ValueAddAssumptionsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated = serializer.validated_data
+        renovate_all = validated.get('renovate_all', True)
+        units_to_renovate = validated.get('units_to_renovate')
+
+        if renovate_all:
+            validated['units_to_renovate'] = None
+        elif total_units > 0 and units_to_renovate and units_to_renovate > total_units:
+            return Response(
+                {'units_to_renovate': f'Units to renovate cannot exceed total units ({total_units}).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        assumptions, _ = ValueAddAssumptions.objects.update_or_create(
+            project=project,
+            defaults=validated
+        )
+
+        response_serializer = ValueAddAssumptionsSerializer(assumptions)
+        return Response({
+            **response_serializer.data,
+            'calculated': build_calculated(assumptions)
+        })
+
+
+class AnalysisTypeConfigViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only ViewSet for Analysis Type Configuration.
+
+    Provides configuration data for controlling tile visibility,
+    required inputs, and Landscaper behavior based on analysis type.
+
+    Analysis types are orthogonal to property types:
+    - VALUATION: Market value opinion (USPAP compliant appraisals)
+    - INVESTMENT: Acquisition underwriting (IRR, returns analysis)
+    - DEVELOPMENT: Ground-up or redevelopment returns
+    - FEASIBILITY: Go/no-go binary decision analysis
+
+    Endpoints:
+    - GET /api/config/analysis-types/ - List all configs
+    - GET /api/config/analysis-types/{analysis_type}/ - Get single config
+    - GET /api/config/analysis-types/{analysis_type}/tiles/ - Get visible tiles
+    - GET /api/config/analysis-types/{analysis_type}/landscaper_context/ - Get Landscaper hints
+    """
+
+    queryset = AnalysisTypeConfig.objects.all()
+    permission_classes = [AllowAny]  # Read-only config data
+    lookup_field = 'analysis_type'
+
+    def get_serializer_class(self):
+        """Use lightweight serializer for list, full serializer for detail."""
+        if self.action == 'list':
+            return AnalysisTypeConfigListSerializer
+        return AnalysisTypeConfigSerializer
+
+    @action(detail=True, methods=['get'])
+    def tiles(self, request, analysis_type=None):
+        """
+        GET /api/config/analysis-types/{analysis_type}/tiles/
+
+        Returns the list of visible tiles for this analysis type.
+        """
+        config = self.get_object()
+        tiles = config.get_visible_tiles()
+
+        serializer = AnalysisTypeTilesSerializer({
+            'analysis_type': analysis_type,
+            'tiles': tiles
+        })
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def landscaper_context(self, request, analysis_type=None):
+        """
+        GET /api/config/analysis-types/{analysis_type}/landscaper_context/
+
+        Returns Landscaper behavior hints for this analysis type.
+        """
+        config = self.get_object()
+
+        serializer = AnalysisTypeLandscaperContextSerializer({
+            'analysis_type': analysis_type,
+            'context': config.landscaper_context,
+            'required_inputs': {
+                'capital_stack': config.requires_capital_stack,
+                'comparable_sales': config.requires_comparable_sales,
+                'income_approach': config.requires_income_approach,
+                'cost_approach': config.requires_cost_approach,
+            }
+        })
+        return Response(serializer.data)

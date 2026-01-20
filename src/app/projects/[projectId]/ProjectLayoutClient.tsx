@@ -49,7 +49,7 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
   console.log('[ProjectLayoutClient] queryTab:', queryTab, '-> activeTab:', activeTab);
 
   return (
-    <div className="flex flex-1 min-h-0 gap-3" style={{ alignItems: 'flex-start' }}>
+    <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start' }}>
       {/* Left Panel - Landscaper (30%) - sticky to stay visible while scrolling */}
       {/* Key forces re-mount when tab changes to ensure fresh state */}
       <div

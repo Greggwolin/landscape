@@ -44,7 +44,7 @@ interface Unit {
   leaseStart: string;
   leaseEnd: string;
   tenantName: string;
-  status: 'Occupied' | 'Vacant' | 'Notice' | 'Renewal';
+  status: 'Occupied' | 'Vacant' | 'Notice' | 'Renewal' | 'Unknown';
   deposit: number;
   monthlyIncome: number;
   rentPerSF: number;
@@ -60,6 +60,58 @@ interface ColumnConfig {
   type: 'input' | 'calculated';
   description?: string;
 }
+
+const isEmptyColumnValue = (value: unknown) => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'number') return !Number.isFinite(value) || value === 0;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return true;
+    return trimmed.toLowerCase() === 'unknown';
+  }
+  return false;
+};
+
+const getUnitValueForColumn = (unit: Unit, columnId: string) => {
+  switch (columnId) {
+    case 'unitNumber':
+      return unit.unitNumber;
+    case 'floorPlan':
+      return unit.floorPlan;
+    case 'bedrooms':
+      return unit.bedrooms;
+    case 'bathrooms':
+      return unit.bathrooms;
+    case 'sqft':
+      return unit.sqft;
+    case 'tenantName':
+      return unit.tenantName;
+    case 'status':
+      return unit.status;
+    case 'leaseStart':
+      return unit.leaseStart;
+    case 'leaseEnd':
+      return unit.leaseEnd;
+    case 'deposit':
+      return unit.deposit;
+    case 'currentRent':
+      return unit.currentRent;
+    case 'marketRent':
+      return unit.marketRent;
+    case 'proformaRent':
+      return unit.proformaRent;
+    case 'monthlyIncome':
+      return unit.monthlyIncome;
+    case 'rentPerSF':
+      return unit.rentPerSF;
+    case 'proformaRentPerSF':
+      return unit.proformaRentPerSF;
+    case 'notes':
+      return unit.notes;
+    default:
+      return null;
+  }
+};
 
 // Mock data with AI estimates
 const mockFloorPlans: FloorPlan[] = [
@@ -273,6 +325,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
   const [showFieldChooser, setShowFieldChooser] = useState(false);
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
+  const [hasCustomizedColumns, setHasCustomizedColumns] = useState(false);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -484,10 +537,23 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         const leasesData = await leasesAPI.list(projectId);
         const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
 
+        const normalizeStatus = (status?: string | null): Unit['status'] => {
+          if (!status) return 'Unknown';
+          const normalized = status.toLowerCase();
+          if (normalized === 'occupied') return 'Occupied';
+          if (normalized === 'vacant') return 'Vacant';
+          if (normalized === 'notice') return 'Notice';
+          if (normalized === 'renewal') return 'Renewal';
+          return 'Unknown';
+        };
+
         const transformedUnits: Unit[] = unitsData.map(u => {
           const lease = leasesByUnit.get(u.unit_id);
-          const baseRent = lease ? Math.round(lease.base_rent_monthly || 0) : 0;
+          const unitRent = Math.round(u.current_rent ?? 0);
+          const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
           const marketRent = Math.round(u.market_rent || 0);
+          const unitStatus = normalizeStatus(u.occupancy_status);
+          const leaseStatus = lease?.lease_status === 'ACTIVE' ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
           return {
             id: u.unit_id.toString(),
             unitNumber: u.unit_number,
@@ -501,7 +567,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
             leaseStart: lease?.lease_start_date || '',
             leaseEnd: lease?.lease_end_date || '',
             tenantName: lease?.resident_name || '',
-            status: lease?.lease_status === 'ACTIVE' ? 'Occupied' : 'Vacant',
+            status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
             deposit: Math.round(lease?.security_deposit || 0),
             monthlyIncome: baseRent,
             rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
@@ -536,6 +602,17 @@ export default function PropertyTab({ project }: PropertyTabProps) {
 
     loadData();
   }, [projectId, isMultifamily]);
+
+  useEffect(() => {
+    if (!units.length || hasCustomizedColumns) return;
+    setColumns((prev) =>
+      prev.map((col) => {
+        if (!col.visible) return col;
+        const hasAnyValue = units.some((unit) => !isEmptyColumnValue(getUnitValueForColumn(unit, col.id)));
+        return hasAnyValue ? col : { ...col, visible: false };
+      })
+    );
+  }, [units, hasCustomizedColumns]);
 
   // Get visible columns
   const visibleColumns = useMemo(() => {
@@ -594,13 +671,14 @@ export default function PropertyTab({ project }: PropertyTabProps) {
         return isEdit ? (
           <select
             className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
-            value={editDraft?.status || 'Vacant'}
+            value={editDraft?.status || 'Unknown'}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, status: e.target.value as Unit['status'] } : null)}
           >
             <option value="Occupied">Occupied</option>
             <option value="Vacant">Vacant</option>
             <option value="Notice">Notice</option>
             <option value="Renewal">Renewal</option>
+            <option value="Unknown">Unknown</option>
           </select>
         ) : (
           <span className={getStatusBadge(unit.status)}>{unit.status}</span>
@@ -725,7 +803,8 @@ export default function PropertyTab({ project }: PropertyTabProps) {
       'Occupied': 'bg-emerald-900 text-emerald-300 border-emerald-700',
       'Vacant': 'bg-red-900 text-red-300 border-red-700',
       'Notice': 'bg-amber-900 text-amber-300 border-amber-700',
-      'Renewal': 'bg-blue-900 text-blue-300 border-blue-700'
+      'Renewal': 'bg-blue-900 text-blue-300 border-blue-700',
+      'Unknown': 'bg-gray-800 text-gray-300 border-gray-600'
     };
     return `px-2 py-0.5 rounded text-xs font-medium border ${styles[status]}`;
   };
@@ -1492,6 +1571,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                           id={`field-${col.id}`}
                           checked={col.visible}
                           onChange={(e) => {
+                            setHasCustomizedColumns(true);
                             setColumns(prev => prev.map(c =>
                               c.id === col.id ? { ...c, visible: e.target.checked } : c
                             ));
@@ -1524,6 +1604,7 @@ export default function PropertyTab({ project }: PropertyTabProps) {
             >
               <button
                 onClick={() => {
+                  setHasCustomizedColumns(false);
                   setColumns(defaultColumns);
                 }}
                 className="px-3 py-1.5 text-xs rounded transition-colors"

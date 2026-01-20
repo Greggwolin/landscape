@@ -19,6 +19,9 @@ from .views_valuation import (
     IncomeApproachViewSet,
     ValuationReconciliationViewSet,
     ValuationSummaryViewSet,
+    HBUAnalysisViewSet,
+    HBUComparableUseViewSet,
+    HBUZoningDocumentViewSet,
 )
 from .views_variance import (
     get_project_variance_summary,
@@ -32,6 +35,11 @@ from .views_unit_costs import (
     PlanningStandardView,
 )
 from .views_budget_categories import BudgetCategoryViewSet
+from .views_income_approach import (
+    income_approach_data,
+    update_income_approach_assumptions,
+    income_approach_dcf,
+)
 
 router = DefaultRouter()
 
@@ -59,12 +67,24 @@ router.register(r'valuation/income-approach', IncomeApproachViewSet, basename='i
 router.register(r'valuation/reconciliation', ValuationReconciliationViewSet, basename='valuationreconciliation')
 router.register(r'valuation/summary', ValuationSummaryViewSet, basename='valuationsummary')
 
+# H&BU (Highest & Best Use) endpoints
+router.register(r'valuation/hbu', HBUAnalysisViewSet, basename='hbuanalysis')
+router.register(r'valuation/hbu-uses', HBUComparableUseViewSet, basename='hbucomparableuse')
+router.register(r'valuation/hbu-zoning-docs', HBUZoningDocumentViewSet, basename='hbuzoningdocument')
+
 # Unit Costs and Category Taxonomy endpoints
 router.register(r'unit-costs/tags', CategoryTagLibraryViewSet, basename='categorytags')
 router.register(r'unit-costs/categories', UnitCostCategoryViewSet, basename='unitcostcategories')
 router.register(r'unit-costs/items', UnitCostItemViewSet, basename='unitcostitems')  # Renamed from templates to items in migration 0018
 
 urlpatterns = [
+    # Income Approach UI endpoints - MUST be before router to avoid conflict with ViewSet
+    # QK-22: These function-based views need to be matched before the router's valuation/income-approach ViewSet
+    path('valuation/income-approach-data/<int:project_id>/', income_approach_data, name='income-approach-data'),
+    path('valuation/income-approach-data/<int:project_id>/update/', update_income_approach_assumptions, name='income-approach-update'),
+    path('valuation/income-approach-data/<int:project_id>/dcf/', income_approach_dcf, name='income-approach-dcf'),
+
+    # Router URLs (ViewSets)
     path('', include(router.urls)),
 
     # Budget Variance endpoints

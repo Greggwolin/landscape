@@ -26,7 +26,7 @@ export const ProfileField: React.FC<ProfileFieldProps> = ({
   return (
     <div
       className={`d-flex gap-3 py-2 ${!isLast ? 'border-bottom' : ''}`}
-      style={{ borderColor: 'var(--cui-border-color)' }}
+      style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
     >
       <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
         {label}

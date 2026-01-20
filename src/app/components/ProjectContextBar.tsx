@@ -26,7 +26,7 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
-  const stickyTop = 'calc(58px + var(--app-padding) + 16px)'; // top nav height + extra breathing room
+  const stickyTop = 'calc(58px + var(--app-padding) + 6px)'; // top nav height + tighter spacing
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -60,7 +60,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
       <div
         style={{
           backgroundColor: 'var(--surface-card-header)',
-          padding: '0.75rem var(--app-padding)'
+          padding: '0.5rem var(--app-padding)'
         }}
       >
         <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -100,7 +100,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
       </div>
 
       {/* Lifecycle Tiles + Inflation selectors */}
-      <div style={{ padding: '0.75rem var(--app-padding)' }}>
+      <div style={{ padding: '0.5rem var(--app-padding)' }}>
         <div className="d-flex flex-wrap gap-3 justify-content-between align-items-start">
           <div className="flex-grow-1">
             <LifecycleTileNav

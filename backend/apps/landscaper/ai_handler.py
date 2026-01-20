@@ -4093,6 +4093,20 @@ Use this to determine what income analyses to offer the user.""",
     }
 ]
 
+# Add cabinet-based contact tools
+try:
+    from .services.contact_tools import CONTACT_TOOLS
+    LANDSCAPER_TOOLS.extend(CONTACT_TOOLS)
+except ImportError:
+    pass  # Contact tools not available
+
+# Add H&BU (Highest & Best Use) analysis tools
+try:
+    from .services.hbu_tools import HBU_TOOLS
+    LANDSCAPER_TOOLS.extend(HBU_TOOLS)
+except ImportError:
+    pass  # H&BU tools not available
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # System Prompts by Project Type
@@ -4510,6 +4524,18 @@ def get_landscaper_response(
                                 'type': 'operating_expenses',
                                 'created': result.get('created', 0),
                                 'updated': result.get('updated', 0),
+                                'summary': result.get('summary', '')
+                            })
+                    elif tool_name == 'update_units':
+                        # Track unit/rent roll updates for frontend refresh
+                        if result.get('success') or result.get('created', 0) > 0 or result.get('updated', 0) > 0:
+                            field_updates.append({
+                                'tool': tool_name,
+                                'type': 'units',
+                                'success': True,
+                                'created': result.get('created', 0),
+                                'updated': result.get('updated', 0),
+                                'total': result.get('total', result.get('created', 0) + result.get('updated', 0)),
                                 'summary': result.get('summary', '')
                             })
 

@@ -42,19 +42,29 @@ export function OperatingExpensesSection({
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
 
   // Calculate totals (expenses are positive in input, displayed as negative)
-  const totals = rows.reduce(
-    (acc, row) => {
-      // Only count leaf rows (not parents)
-      if (!row.is_calculated) {
+  // Recursively sum leaf rows (children) since top-level rows are parent categories
+  const sumRowsRecursive = (items: LineItemRow[]): { as_is_total: number; post_reno_total: number } => {
+    return items.reduce(
+      (acc, row) => {
+        // If row has children, sum the children instead
+        if (row.children && row.children.length > 0) {
+          const childTotals = sumRowsRecursive(row.children);
+          return {
+            as_is_total: acc.as_is_total + childTotals.as_is_total,
+            post_reno_total: acc.post_reno_total + childTotals.post_reno_total
+          };
+        }
+        // Leaf row - add its total
         return {
-          as_is_total: acc.as_is_total + (row.as_is.total || 0),
+          as_is_total: acc.as_is_total + (row.as_is?.total || 0),
           post_reno_total: acc.post_reno_total + (row.post_reno?.total || 0)
         };
-      }
-      return acc;
-    },
-    { as_is_total: 0, post_reno_total: 0 }
-  );
+      },
+      { as_is_total: 0, post_reno_total: 0 }
+    );
+  };
+
+  const totals = sumRowsRecursive(rows);
 
   // Calculate per-unit totals
   const asIsPerUnit = unitCount > 0 ? totals.as_is_total / unitCount : 0;
@@ -66,25 +76,34 @@ export function OperatingExpensesSection({
   const hasExtraScenarios = availableScenarios.length > 1;
   const extraScenarios = availableScenarios.filter(s => s !== preferredScenario);
 
-  // Filter rows based on view mode
-  const visibleRows = viewMode === 'summary'
-    ? rows.filter(row => !row.is_calculated) // Only leaf items
-    : rows; // All rows including parents
-
   // Flatten hierarchical rows for display with unique keys
+  // In summary mode, show parent categories collapsed (with totals)
+  // In detail mode, show parent categories with their expanded children
   const flattenRows = (items: LineItemRow[], parentKey = ''): Array<LineItemRow & { _uniqueKey: string }> => {
     const result: Array<LineItemRow & { _uniqueKey: string }> = [];
     items.forEach((row, idx) => {
       const uniqueKey = parentKey ? `${parentKey}_${row.line_item_key}_${idx}` : `${row.line_item_key}_${idx}`;
+
+      // In summary mode, show parent rows collapsed (with totals)
+      if (viewMode === 'summary') {
+        if (row.is_calculated) {
+          // Parent row - show it collapsed with totals
+          result.push({ ...row, _uniqueKey: uniqueKey, is_expanded: false });
+        }
+        // Don't show children in summary mode
+        return;
+      }
+
+      // Detail mode - show all rows with normal expansion
       result.push({ ...row, _uniqueKey: uniqueKey });
-      if (row.children && row.is_expanded !== false && viewMode === 'detail') {
+      if (row.children && row.is_expanded !== false) {
         result.push(...flattenRows(row.children, uniqueKey));
       }
     });
     return result;
   };
 
-  const displayRows = flattenRows(visibleRows);
+  const displayRows = flattenRows(rows);
 
   const controls = (
     <DetailSummaryToggle value={viewMode} onChange={setViewMode} />
@@ -154,13 +173,17 @@ export function OperatingExpensesSection({
               ? row.post_reno.total / unitCount
               : row.post_reno?.rate;
 
+            // Parent rows only show totals when collapsed
+            const isCollapsed = row.is_expanded === false;
+            const showParentTotals = isParent && isCollapsed;
+
             return (
               <tr key={row._uniqueKey} className={rowClass}>
                 <td>
                   {isParent && (
                     <>
                       <span
-                        className={`ops-expand-icon ${row.is_expanded === false ? 'collapsed' : ''}`}
+                        className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
                         onClick={() => onToggleExpand?.(row.line_item_key)}
                       >
                         ▼
@@ -177,10 +200,12 @@ export function OperatingExpensesSection({
                   )}
                   {!isParent && row.label}
                 </td>
-                <td className="num">{isPercent ? '—' : (unitCount || '—')}</td>
+                <td className="num">{isPercent ? '—' : (isParent && !isCollapsed ? '' : (unitCount || '—'))}</td>
                 <td className="num">
                   {isParent ? (
-                    <span className="ops-calc">{formatCurrency(rowPerUnit)}</span>
+                    showParentTotals ? (
+                      <span className="ops-calc">{formatCurrency(rowPerUnit)}</span>
+                    ) : null
                   ) : isPercent ? (
                     <InputCell
                       value={row.as_is.rate}
@@ -198,9 +223,11 @@ export function OperatingExpensesSection({
                   )}
                 </td>
                 <td className="num ops-calc">
-                  {isPercent ? '—' : formatPerSF(rowPerSF)}
+                  {isPercent ? '—' : (isParent && !isCollapsed ? '' : formatPerSF(rowPerSF))}
                 </td>
-                <td className="num ops-calc">{formatCurrency(row.as_is.total)}</td>
+                <td className="num ops-calc">
+                  {isParent && !isCollapsed ? '' : formatCurrency(row.as_is.total)}
+                </td>
                 <td className="num">
                   {!isParent && (
                     isPercent ? (
@@ -217,7 +244,9 @@ export function OperatingExpensesSection({
                   <>
                     <td className="num post-reno">
                       {isParent ? (
-                        <span className="ops-calc">{formatCurrency(postRenoRowPerUnit)}</span>
+                        showParentTotals ? (
+                          <span className="ops-calc">{formatCurrency(postRenoRowPerUnit)}</span>
+                        ) : null
                       ) : isPercent ? (
                         <InputCell
                           value={row.post_reno?.rate}
@@ -235,7 +264,7 @@ export function OperatingExpensesSection({
                       )}
                     </td>
                     <td className="num post-reno ops-calc">
-                      {formatCurrency(row.post_reno?.total)}
+                      {isParent && !isCollapsed ? '' : formatCurrency(row.post_reno?.total)}
                     </td>
                   </>
                 )}

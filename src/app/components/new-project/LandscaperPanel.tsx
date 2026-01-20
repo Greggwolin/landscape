@@ -26,6 +26,7 @@ interface LandscaperPanelProps {
   onSuggestionApply?: (field: string, value: string) => void
   onDocumentExtracted?: (fields: ExtractedFields, file: File) => void
   isDark?: boolean
+  initialFiles?: File[]
 }
 
 // Rule-based response triggers for MVP
@@ -160,18 +161,23 @@ const LandscaperPanel = ({
   formData,
   onSuggestionApply: _onSuggestionApply,
   onDocumentExtracted,
-  isDark = false
+  isDark = false,
+  initialFiles
 }: LandscaperPanelProps) => {
   const [userInput, setUserInput] = useState('')
   const [userMessages, setUserMessages] = useState<LandscaperMessage[]>([])
   const [isExtracting, setIsExtracting] = useState(false)
   const [showDropZone, setShowDropZone] = useState(true)
+  const [uploadedDocNames, setUploadedDocNames] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Handle document drop and extraction
+  // Handle single document drop and extraction
   const handleDocumentDrop = useCallback(async (file: File) => {
     setIsExtracting(true)
     setShowDropZone(false)
+
+    // Track this document as uploaded
+    setUploadedDocNames(prev => [...prev, file.name])
 
     // Add receipt message
     const receiptMessage: LandscaperMessage = {
@@ -206,7 +212,7 @@ const LandscaperPanel = ({
       const summaryMessage: LandscaperMessage = {
         id: `summary-${Date.now()}`,
         role: 'landscaper',
-        content: formatExtractionSummary(result),
+        content: formatExtractionSummary(result, file.name),
         timestamp: new Date()
       }
       setUserMessages(prev => [...prev, summaryMessage])
@@ -226,6 +232,141 @@ const LandscaperPanel = ({
     }
   }, [onDocumentExtracted])
 
+  // Handle multiple document drops (OM packages)
+  const handleMultipleDocumentsDrop = useCallback(async (files: File[]) => {
+    if (files.length === 0) return
+
+    // If only one file, use single handler
+    if (files.length === 1) {
+      return handleDocumentDrop(files[0])
+    }
+
+    setIsExtracting(true)
+    setShowDropZone(false)
+
+    // Track these documents as uploaded
+    setUploadedDocNames(prev => [...prev, ...files.map(f => f.name)])
+
+    // Add receipt message for multiple files
+    const fileNames = files.map(f => f.name).join(', ')
+    const receiptMessage: LandscaperMessage = {
+      id: `receipt-${Date.now()}`,
+      role: 'landscaper',
+      content: `I received **${files.length} documents**: ${fileNames}. Analyzing them...`,
+      timestamp: new Date()
+    }
+    setUserMessages(prev => [...prev, receiptMessage])
+
+    // Process files sequentially to merge extracted fields
+    const allExtractedFields: ExtractedFields = {}
+    const processedFiles: string[] = []
+    const failedFiles: string[] = []
+
+    for (const file of files) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/landscaper/extract-for-project', {
+          method: 'POST',
+          body: formData
+        })
+
+        const result = await response.json()
+
+        if (response.ok && result.extracted_fields) {
+          // Merge fields - later files can override earlier ones if confidence is higher
+          for (const [key, field] of Object.entries(result.extracted_fields)) {
+            const typedField = field as { value: any; confidence: number }
+            const existing = allExtractedFields[key]
+            if (!existing || typedField.confidence > existing.confidence) {
+              allExtractedFields[key] = typedField
+            }
+          }
+          processedFiles.push(file.name)
+        } else {
+          failedFiles.push(file.name)
+        }
+      } catch (error) {
+        console.error(`Error extracting ${file.name}:`, error)
+        failedFiles.push(file.name)
+      }
+    }
+
+    // Notify parent with merged fields AND all processed files
+    // Call onDocumentExtracted for EACH file so they all get added to pendingDocuments
+    if (onDocumentExtracted) {
+      // First call with merged fields for form population
+      if (Object.keys(allExtractedFields).length > 0) {
+        onDocumentExtracted(allExtractedFields, files[0])
+      }
+      // Then call for each additional file (with empty fields, just to register the file)
+      for (let i = 1; i < files.length; i++) {
+        onDocumentExtracted({}, files[i])
+      }
+    }
+
+    // Add summary message with hints about what else can be extracted
+    const fieldCount = Object.keys(allExtractedFields).length
+    let summaryContent = `Processed **${processedFiles.length}** of **${files.length}** documents.\n`
+    summaryContent += `Extracted **${fieldCount} fields** for the project form.\n\n`
+
+    if (failedFiles.length > 0) {
+      summaryContent += `Could not process: ${failedFiles.join(', ')}\n\n`
+    }
+
+    summaryContent += `I've populated the form with the best values from all documents.\n\n`
+
+    // Add detailed hints about additional extraction available after project creation
+    const fileNamesLower = files.map(f => f.name.toLowerCase()).join(' ')
+    const deepExtractionItems: string[] = []
+
+    // Rent roll with unit count
+    if (fileNamesLower.includes('rent') || fileNamesLower.includes('roll') || allExtractedFields.total_units) {
+      const units = allExtractedFields.total_units?.value
+      if (units) {
+        deepExtractionItems.push(`**Rent Roll**: ${units} units with individual rents, lease terms, move-in dates`)
+      } else {
+        deepExtractionItems.push('**Rent Roll**: Unit-by-unit rents, lease terms, occupancy details')
+      }
+    }
+
+    // T-12 / Operating expenses
+    if (fileNamesLower.includes('t-12') || fileNamesLower.includes('t12') || fileNamesLower.includes('operating') || fileNamesLower.includes('expense')) {
+      deepExtractionItems.push('**T-12 Statement**: 30+ expense line items, monthly actuals, year-over-year trends')
+    }
+
+    // OM details
+    if (fileNamesLower.includes('om') || fileNamesLower.includes('offering') || fileNamesLower.includes('memorandum')) {
+      deepExtractionItems.push('**OM Details**: Cap rate, asking price, NOI projections, market comps, value-add budget')
+    }
+
+    // Estimate total extractable data points
+    let estimatedDataPoints = fieldCount
+    if (allExtractedFields.total_units?.value) {
+      const units = parseInt(String(allExtractedFields.total_units.value), 10)
+      estimatedDataPoints += units * 8 // ~8 fields per unit (unit #, type, SF, rent, market rent, status, lease dates, etc.)
+    }
+    if (fileNamesLower.includes('t-12') || fileNamesLower.includes('t12') || fileNamesLower.includes('operating')) {
+      estimatedDataPoints += 40 // ~40 expense line items
+    }
+
+    if (deepExtractionItems.length > 0) {
+      summaryContent += `**These documents contain ~${estimatedDataPoints}+ extractable data points.**\n`
+      summaryContent += `Create the project to unlock full extraction:\n\n`
+      summaryContent += `• ${deepExtractionItems.join('\n• ')}`
+    }
+
+    const summaryMessage: LandscaperMessage = {
+      id: `summary-${Date.now()}`,
+      role: 'landscaper',
+      content: summaryContent,
+      timestamp: new Date()
+    }
+    setUserMessages(prev => [...prev, summaryMessage])
+    setIsExtracting(false)
+  }, [handleDocumentDrop, onDocumentExtracted])
+
   // Generate rule-based messages from form state
   const systemMessages = useMemo(
     () => generateLandscaperResponses(formData, analysisType),
@@ -244,6 +385,47 @@ const LandscaperPanel = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [allMessages])
 
+  // Track which files we've processed by their names to avoid reprocessing
+  const processedFilesRef = useRef<string>('')
+
+  // Process initial files when provided (e.g., from dashboard drop)
+  useEffect(() => {
+    console.log('[LandscaperPanel] initialFiles effect triggered:', {
+      hasInitialFiles: !!initialFiles,
+      fileCount: initialFiles?.length || 0,
+      fileNames: initialFiles?.map(f => f.name) || []
+    })
+
+    if (!initialFiles || initialFiles.length === 0) {
+      console.log('[LandscaperPanel] No initial files, skipping')
+      return
+    }
+
+    // Create a fingerprint of the files to detect new sets
+    const filesFingerprint = initialFiles.map(f => `${f.name}-${f.size}`).sort().join('|')
+    console.log('[LandscaperPanel] Files fingerprint:', filesFingerprint)
+    console.log('[LandscaperPanel] Previous fingerprint:', processedFilesRef.current)
+
+    // Skip if we've already processed this exact set of files
+    if (processedFilesRef.current === filesFingerprint) {
+      console.log('[LandscaperPanel] Already processed these files, skipping')
+      return
+    }
+
+    // Mark as processed
+    processedFilesRef.current = filesFingerprint
+    setShowDropZone(false)
+
+    console.log('[LandscaperPanel] Processing files now...')
+
+    // Process the files
+    if (initialFiles.length === 1) {
+      handleDocumentDrop(initialFiles[0])
+    } else {
+      handleMultipleDocumentsDrop(initialFiles)
+    }
+  }, [initialFiles, handleDocumentDrop, handleMultipleDocumentsDrop])
+
   const handleSendMessage = () => {
     if (!userInput.trim()) return
 
@@ -256,9 +438,12 @@ const LandscaperPanel = ({
 
     setUserMessages(prev => [...prev, userMessage])
 
+    // Check for extraction intent first, passing uploaded doc names
+    const extractionIntent = detectExtractionIntent(userInput.trim(), uploadedDocNames)
+
     // Generate a simple response (MVP - rule-based)
     setTimeout(() => {
-      const responseContent = generateUserResponse(userInput.trim(), analysisType)
+      const responseContent = generateUserResponse(userInput.trim(), analysisType, uploadedDocNames)
       const response: LandscaperMessage = {
         id: `response-${Date.now()}`,
         role: 'landscaper',
@@ -266,6 +451,11 @@ const LandscaperPanel = ({
         timestamp: new Date()
       }
       setUserMessages(prev => [...prev, response])
+
+      // Show dropzone if extraction intent detected AND we don't already have docs uploaded
+      if (extractionIntent.showDropzone && uploadedDocNames.length === 0) {
+        setShowDropZone(true)
+      }
     }, 800)
 
     setUserInput('')
@@ -298,9 +488,11 @@ const LandscaperPanel = ({
         <div className={`border-b p-3 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
           <NewProjectDropZone
             onFileDrop={handleDocumentDrop}
+            onFilesDrop={handleMultipleDocumentsDrop}
             isDark={isDark}
             isProcessing={isExtracting}
             compact
+            multiple
           />
         </div>
       )}
@@ -395,8 +587,10 @@ const LandscaperPanel = ({
 function formatExtractionSummary(result: {
   extracted_fields?: Record<string, { value: any; confidence: number }>
   document_type?: string
-}): string {
-  const { extracted_fields, document_type } = result
+  potential_fields?: number
+  available_data_types?: string[]
+}, fileName?: string): string {
+  const { extracted_fields, document_type, potential_fields, available_data_types } = result
 
   if (!extracted_fields || Object.keys(extracted_fields).length === 0) {
     return "I couldn't extract any fields from this document. Please enter the details manually."
@@ -405,7 +599,7 @@ function formatExtractionSummary(result: {
   const fieldCount = Object.keys(extracted_fields).length
   const fields = extracted_fields
 
-  let summary = `I found a **${document_type || 'document'}** and extracted **${fieldCount} fields**.\n\n`
+  let summary = `I found a **${document_type || 'document'}** and extracted **${fieldCount} fields** for the form.\n\n`
 
   // Key fields summary
   if (fields.property_name?.value) {
@@ -428,14 +622,163 @@ function formatExtractionSummary(result: {
     summary += `**Site:** ${fields.site_area.value} acres\n`
   }
 
-  summary += `\nI've populated the form with these values. Review and adjust as needed.`
+  summary += `\nI've populated the form with these values.\n\n`
+
+  // Show potential extraction stats from the API response
+  const fileNameLower = (fileName || '').toLowerCase()
+  const docTypeLower = (document_type || '').toLowerCase()
+  const isOM = docTypeLower.includes('offering') || docTypeLower.includes('memorandum') || fileNameLower.includes('om')
+  const hasRentRoll = fields.total_units?.value || fileNameLower.includes('rent') || fileNameLower.includes('roll')
+  const hasOpex = fileNameLower.includes('t-12') || fileNameLower.includes('t12') || docTypeLower.includes('operating')
+
+  // Build more detailed extraction potential message
+  const deepExtractionItems: string[] = []
+
+  if (hasRentRoll && fields.total_units?.value) {
+    const units = parseInt(String(fields.total_units.value), 10)
+    if (units > 0) {
+      deepExtractionItems.push(`**Rent Roll**: ${units} units with individual rents, lease terms, move-in dates`)
+    }
+  } else if (hasRentRoll) {
+    deepExtractionItems.push('**Rent Roll**: Unit-by-unit rents, lease terms, occupancy details')
+  }
+
+  if (hasOpex) {
+    deepExtractionItems.push('**T-12 Statement**: 30+ expense line items, monthly actuals, year-over-year comparison')
+  }
+
+  if (isOM) {
+    const omItems: string[] = []
+    omItems.push('Cap rate & asking price')
+    omItems.push('Pro forma NOI projections')
+    omItems.push('Market rent comps')
+    omItems.push('Renovation/value-add budgets')
+    if (omItems.length > 0) {
+      deepExtractionItems.push(`**OM Details**: ${omItems.join(', ')}`)
+    }
+  }
+
+  // Use API-provided potential count if available
+  if (potential_fields && potential_fields > fieldCount) {
+    summary += `**This document contains ~${potential_fields} extractable data points.**\n`
+    summary += `I've extracted ${fieldCount} for the project form. Create the project to unlock full extraction:\n\n`
+  } else if (deepExtractionItems.length > 0) {
+    summary += `**Create the project to unlock deep extraction:**\n`
+  }
+
+  if (deepExtractionItems.length > 0) {
+    summary += `• ${deepExtractionItems.join('\n• ')}`
+  }
 
   return summary
 }
 
-// Simple rule-based responses for user questions (MVP)
-function generateUserResponse(question: string, analysisType: string): string {
+// Intent detection for extraction-related queries
+interface ExtractionIntent {
+  detected: boolean
+  response: string
+  showDropzone?: boolean
+}
+
+// Helper to check if user has uploaded a document of a certain type
+function hasDocumentType(docNames: string[], type: 'rent_roll' | 'opex' | 'om'): boolean {
+  const nameStr = docNames.join(' ').toLowerCase()
+  if (type === 'rent_roll') {
+    return nameStr.includes('rent') || nameStr.includes('roll') || nameStr.includes('tenant')
+  }
+  if (type === 'opex') {
+    return nameStr.includes('t-12') || nameStr.includes('t12') || nameStr.includes('operating') || nameStr.includes('expense')
+  }
+  if (type === 'om') {
+    return nameStr.includes('om') || nameStr.includes('offering') || nameStr.includes('memorandum') || nameStr.includes('brochure')
+  }
+  return false
+}
+
+function detectExtractionIntent(question: string, uploadedDocs: string[] = []): ExtractionIntent {
   const q = question.toLowerCase()
+  const hasUploadedDocs = uploadedDocs.length > 0
+
+  // Rent roll related
+  if (q.includes('rent roll') || q.includes('rent-roll') || q.includes('rentroll') ||
+      q.includes('tenant') || q.includes('leases') || q.includes('occupancy')) {
+    if (hasUploadedDocs && hasDocumentType(uploadedDocs, 'rent_roll')) {
+      return {
+        detected: true,
+        response: `I see you've already uploaded documents including what looks like a rent roll. I've extracted the basic property info. For full rent roll processing with unit-by-unit detail, create the project first — then I'll run comprehensive extraction on all **${uploadedDocs.length}** documents.`,
+        showDropzone: false
+      }
+    }
+    return {
+      detected: true,
+      response: "I can extract rent roll data! Drop your rent roll document above and I'll pull out unit mix, rents, and occupancy details. Once the project is created, the full rent roll will be available in the Operations tab.",
+      showDropzone: true
+    }
+  }
+
+  // Operating expenses related
+  if (q.includes('operating expense') || q.includes('opex') || q.includes('t-12') ||
+      q.includes('t12') || q.includes('expenses') || q.includes('noi')) {
+    if (hasUploadedDocs && hasDocumentType(uploadedDocs, 'opex')) {
+      return {
+        detected: true,
+        response: `You've uploaded operating expense documents. I've extracted the headline numbers. For detailed line-item extraction, create the project first — then I'll parse out all expense categories from your **${uploadedDocs.length}** documents.`,
+        showDropzone: false
+      }
+    }
+    return {
+      detected: true,
+      response: "I can extract operating expenses from T-12 statements! Drop your T-12 or operating statement above. After the project is created, I'll run comprehensive extraction to populate the OpEx tab with line-item detail.",
+      showDropzone: true
+    }
+  }
+
+  // General extraction intent - user wants more data
+  if (q.includes('extract') || q.includes('more data') || q.includes('additional data') ||
+      q.includes('pull out') || q.includes('get more') || q.includes('import')) {
+    if (hasUploadedDocs) {
+      const docList = uploadedDocs.map(d => `**${d}**`).join(', ')
+      return {
+        detected: true,
+        response: `I've already processed ${docList}. I extracted the core property details for the form. For deeper extraction (rent roll detail, T-12 line items, etc.), create the project first — that unlocks comprehensive document analysis.`,
+        showDropzone: false
+      }
+    }
+    return {
+      detected: true,
+      response: "Drop additional documents above and I'll extract what I can! For comprehensive extraction including rent rolls and operating expenses, create the project first — then I'll run deep analysis on all your documents.",
+      showDropzone: true
+    }
+  }
+
+  // Document-related questions
+  if (q.includes('document') && (q.includes('more') || q.includes('upload') || q.includes('add'))) {
+    if (hasUploadedDocs) {
+      return {
+        detected: true,
+        response: `You've already uploaded **${uploadedDocs.length}** document(s). You can drop more above if needed. Once you create the project, I'll process everything in full detail.`,
+        showDropzone: true
+      }
+    }
+    return {
+      detected: true,
+      response: "You can drop more documents above! I'll extract property details from each one. For full rent roll and OpEx extraction, create the project first and I'll process everything in detail.",
+      showDropzone: true
+    }
+  }
+
+  return { detected: false, response: '' }
+}
+
+// Simple rule-based responses for user questions (MVP)
+function generateUserResponse(question: string, analysisType: string, uploadedDocs: string[] = []): string {
+  const q = question.toLowerCase()
+
+  // Check for extraction intents first
+  const extractionIntent = detectExtractionIntent(question, uploadedDocs)
+  if (extractionIntent.detected) {
+    return extractionIntent.response
+  }
 
   if (q.includes('absorption') || q.includes('velocity')) {
     if (analysisType === 'Land Development') {

@@ -56,6 +56,19 @@ export function ChatMessageBubble({
             Contains recommendations
           </div>
         )}
+
+        {!isUser && message.metadata?.error && (
+          <div className="mt-2 text-xs" style={{ color: '#b91c1c' }}>
+            Error: {message.metadata.error}
+          </div>
+        )}
+
+        {!isUser && message.metadata?.traceback && (
+          <details className="mt-2 text-xs" style={{ color: '#6b7280' }}>
+            <summary>Traceback</summary>
+            <pre className="whitespace-pre-wrap">{message.metadata.traceback}</pre>
+          </details>
+        )}
       </div>
 
       {/* Mutation proposals card (below assistant message) */}

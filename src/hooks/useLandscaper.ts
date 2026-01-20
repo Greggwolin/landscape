@@ -53,6 +53,8 @@ export interface ChatMessage {
       is_proposal?: boolean;
       result?: Record<string, unknown>;
     }>;
+    error?: string;
+    traceback?: string;
   };
 }
 
@@ -83,7 +85,12 @@ function emitMutationEventsIfNeeded(
   projectId: number,
   metadata: ChatMessage['metadata']
 ): void {
-  if (!metadata?.tool_executions) return;
+  console.log('[useLandscaper] Checking for mutations in metadata:', metadata);
+
+  if (!metadata?.tool_executions) {
+    console.log('[useLandscaper] No tool_executions in metadata');
+    return;
+  }
 
   const toolExecutions = metadata.tool_executions as Array<{
     tool: string;
@@ -97,6 +104,8 @@ function emitMutationEventsIfNeeded(
     };
   }>;
 
+  console.log('[useLandscaper] Tool executions:', toolExecutions);
+
   // Find successful non-proposal tool executions that affect data
   const executedMutations = toolExecutions.filter(
     (t) =>
@@ -106,7 +115,12 @@ function emitMutationEventsIfNeeded(
       TOOL_TABLE_MAP[t.tool]
   );
 
-  if (executedMutations.length === 0) return;
+  console.log('[useLandscaper] Filtered mutations:', executedMutations);
+
+  if (executedMutations.length === 0) {
+    console.log('[useLandscaper] No mutations matched criteria');
+    return;
+  }
 
   // Collect all affected tables
   const affectedTables = new Set<string>();
@@ -121,7 +135,7 @@ function emitMutationEventsIfNeeded(
   }
 
   // Emit a single event for all mutations
-  emitMutationComplete({
+  const eventDetail = {
     projectId,
     mutationType: executedMutations.map((m) => m.tool).join(','),
     tables: Array.from(affectedTables),
@@ -130,7 +144,9 @@ function emitMutationEventsIfNeeded(
       updated: totalUpdated,
       total: totalCreated + totalUpdated,
     },
-  });
+  };
+  console.log('[useLandscaper] Emitting mutation event:', eventDetail);
+  emitMutationComplete(eventDetail);
 }
 
 export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: UseLandscaperOptions) {

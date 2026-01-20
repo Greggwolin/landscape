@@ -652,7 +652,13 @@ class MutationService:
 
         Returns:
             Dict with success status and execution result
+
+        Note: This method is wrapped in @transaction.atomic to ensure all
+        database operations (mutation execution, status update, audit log)
+        are committed together or rolled back together.
         """
+        logger.info(f"[MUTATION] Starting confirm for mutation_id={mutation_id}")
+
         # Get the pending mutation with row lock
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -665,10 +671,13 @@ class MutationService:
             row = cursor.fetchone()
 
             if not row:
+                logger.warning(f"[MUTATION] Not found: {mutation_id}")
                 return {"success": False, "error": "Mutation not found"}
 
             (project_id, mutation_type, table_name, field_name, record_id,
              current_value, proposed_value, reason, status, expires_at) = row
+
+            logger.info(f"[MUTATION] Found: type={mutation_type}, table={table_name}, status={status}, project={project_id}")
 
             if status != "pending":
                 return {"success": False, "error": f"Mutation already {status}"}
@@ -693,12 +702,15 @@ class MutationService:
                 )
 
                 if execution_result.get("success"):
+                    logger.info(f"[MUTATION] Execution succeeded: {execution_result.get('created', 0)} created, {execution_result.get('updated', 0)} updated")
+
                     # Mark as confirmed
                     cursor.execute("""
                         UPDATE landscape.pending_mutations
                         SET status = 'confirmed', resolved_at = NOW(), resolved_by = %s
                         WHERE mutation_id = %s
                     """, [user_id, mutation_id])
+                    logger.info(f"[MUTATION] Status updated to confirmed, rowcount={cursor.rowcount}")
 
                     # Log success
                     cls._log_audit(
@@ -714,6 +726,7 @@ class MutationService:
                         reason=reason,
                         confirmed_by=user_id,
                     )
+                    logger.info(f"[MUTATION] Audit logged, transaction will commit on function exit")
 
                     return {
                         "success": True,
@@ -723,6 +736,9 @@ class MutationService:
                     }
                 else:
                     # Execution failed
+                    error_msg = execution_result.get("error", "Execution failed")
+                    logger.error(f"[MUTATION] Execution failed: {error_msg}")
+
                     cls._log_audit(
                         mutation_id=mutation_id,
                         project_id=project_id,
@@ -734,15 +750,15 @@ class MutationService:
                         new_value=proposed_value,
                         action="failed",
                         reason=reason,
-                        error_message=execution_result.get("error"),
+                        error_message=error_msg,
                     )
                     return {
                         "success": False,
-                        "error": execution_result.get("error", "Execution failed"),
+                        "error": error_msg,
                     }
 
             except Exception as e:
-                logger.exception(f"Mutation execution failed: {e}")
+                logger.exception(f"[MUTATION] Exception during execution: {e}")
                 cls._log_audit(
                     mutation_id=mutation_id,
                     project_id=project_id,
@@ -1091,6 +1107,10 @@ class MutationService:
                             current_rent = rec.get("current_rent", 0)
                             market_rent = rec.get("market_rent", 0)
                             occupancy_status = rec.get("occupancy_status") or rec.get("status", "occupied")
+
+                            print(f"=== MUTATION_SERVICE UNIT INSERT ===")
+                            print(f"WRITING UNIT: {rec.get('unit_number')}, rent={current_rent}, status={occupancy_status}")
+                            print(f"FULL RECORD: {rec}")
 
                             cursor.execute("""
                                 INSERT INTO landscape.tbl_multifamily_unit

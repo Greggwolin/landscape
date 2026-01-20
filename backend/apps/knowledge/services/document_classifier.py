@@ -42,6 +42,7 @@ class DocumentType(Enum):
             'rentroll': cls.RENT_ROLL,
             't12': cls.T12,
             'trailing_12': cls.T12,
+            'operating_statement': cls.T12,
             'appraisal': cls.APPRAISAL,
             'comp_report': cls.COMP_REPORT,
             'comps': cls.COMP_REPORT,
@@ -50,6 +51,186 @@ class DocumentType(Enum):
             'proforma': cls.PROFORMA,
         }
         return mapping.get(value.lower(), cls.UNKNOWN)
+
+
+# =============================================================================
+# DOCUMENT PRIORITY SYSTEM FOR CONFLICT RESOLUTION
+# =============================================================================
+# When multiple documents contain conflicting values for the same field,
+# the document with higher priority wins. Priority is field-dependent:
+#
+# For RENT/OCCUPANCY data: Rent Roll > T-12 > OM
+#   - Rent rolls are updated monthly, most current source
+#   - T-12 shows historical actuals
+#   - OMs often have stale/optimistic marketing figures
+#
+# For EXPENSE data: T-12 > Appraisal > OM
+#   - T-12 has actual historical expenses
+#   - Appraisals verify expenses independently
+#   - OMs may show "proforma" or "adjusted" expenses
+#
+# For PROPERTY DETAILS: Appraisal > OM > Rent Roll
+#   - Appraisals verify physical details
+#   - OMs have comprehensive property info
+#   - Rent rolls are transaction-focused
+
+DOCUMENT_PRIORITY_BY_FIELD_TYPE = {
+    # Rent/income fields - Rent Roll is source of truth
+    'rent': {
+        DocumentType.RENT_ROLL: 1,      # Highest priority
+        DocumentType.T12: 2,
+        DocumentType.APPRAISAL: 3,
+        DocumentType.OFFERING_MEMORANDUM: 4,
+        DocumentType.PROFORMA: 5,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Occupancy fields - Rent Roll is source of truth
+    'occupancy': {
+        DocumentType.RENT_ROLL: 1,
+        DocumentType.T12: 2,
+        DocumentType.APPRAISAL: 3,
+        DocumentType.OFFERING_MEMORANDUM: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Unit/tenant data - Rent Roll is source of truth
+    'unit': {
+        DocumentType.RENT_ROLL: 1,
+        DocumentType.OFFERING_MEMORANDUM: 2,
+        DocumentType.APPRAISAL: 3,
+        DocumentType.T12: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Expense data - T-12 is source of truth
+    'expense': {
+        DocumentType.T12: 1,            # Highest priority for expenses
+        DocumentType.APPRAISAL: 2,
+        DocumentType.OFFERING_MEMORANDUM: 3,
+        DocumentType.PROFORMA: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Property details - Appraisal/OM are sources of truth
+    'property': {
+        DocumentType.APPRAISAL: 1,
+        DocumentType.OFFERING_MEMORANDUM: 2,
+        DocumentType.COMP_REPORT: 3,
+        DocumentType.T12: 4,
+        DocumentType.RENT_ROLL: 5,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Financing/loan data - OM is source of truth
+    'financing': {
+        DocumentType.OFFERING_MEMORANDUM: 1,
+        DocumentType.APPRAISAL: 2,
+        DocumentType.PROFORMA: 3,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Default priority if field type not specified
+    'default': {
+        DocumentType.RENT_ROLL: 1,
+        DocumentType.T12: 2,
+        DocumentType.APPRAISAL: 3,
+        DocumentType.OFFERING_MEMORANDUM: 4,
+        DocumentType.PROFORMA: 5,
+        DocumentType.COMP_REPORT: 6,
+        DocumentType.SITE_PLAN: 7,
+        DocumentType.UNKNOWN: 99,
+    },
+}
+
+# Map field_key patterns to field types for priority lookup
+FIELD_KEY_TO_TYPE = {
+    # Rent-related fields
+    'rent': 'rent',
+    'market_rent': 'rent',
+    'current_rent': 'rent',
+    'gross_potential_rent': 'rent',
+    'effective_gross_income': 'rent',
+    'gpr': 'rent',
+    'egi': 'rent',
+    'noi': 'rent',
+    'income': 'rent',
+    # Occupancy fields
+    'occupancy': 'occupancy',
+    'vacancy': 'occupancy',
+    'economic_occupancy': 'occupancy',
+    'physical_occupancy': 'occupancy',
+    # Unit/tenant fields
+    'unit': 'unit',
+    'tenant': 'unit',
+    'lease': 'unit',
+    'unit_count': 'unit',
+    'total_units': 'unit',
+    'unit_mix': 'unit',
+    # Expense fields
+    'expense': 'expense',
+    'opex': 'expense',
+    'operating_expense': 'expense',
+    'tax': 'expense',
+    'insurance': 'expense',
+    'utilities': 'expense',
+    'maintenance': 'expense',
+    'management_fee': 'expense',
+    'payroll': 'expense',
+    # Property fields
+    'property': 'property',
+    'address': 'property',
+    'city': 'property',
+    'state': 'property',
+    'zip': 'property',
+    'year_built': 'property',
+    'sf': 'property',
+    'square_feet': 'property',
+    'lot_size': 'property',
+    'property_class': 'property',
+    'property_type': 'property',
+    # Financing fields
+    'loan': 'financing',
+    'debt': 'financing',
+    'financing': 'financing',
+    'mortgage': 'financing',
+    'interest_rate': 'financing',
+    'loan_balance': 'financing',
+    'assumable': 'financing',
+}
+
+
+def get_field_type(field_key: str) -> str:
+    """
+    Determine the field type for a given field_key.
+    Used to look up the appropriate document priority.
+    """
+    field_key_lower = field_key.lower()
+
+    # Direct match
+    if field_key_lower in FIELD_KEY_TO_TYPE:
+        return FIELD_KEY_TO_TYPE[field_key_lower]
+
+    # Partial match
+    for pattern, field_type in FIELD_KEY_TO_TYPE.items():
+        if pattern in field_key_lower:
+            return field_type
+
+    return 'default'
+
+
+def get_document_priority(doc_type: DocumentType, field_key: str) -> int:
+    """
+    Get the priority of a document type for a specific field.
+    Lower number = higher priority (wins in conflicts).
+
+    Args:
+        doc_type: The document type
+        field_key: The field being extracted (determines priority rules)
+
+    Returns:
+        Priority number (1 = highest priority)
+    """
+    field_type = get_field_type(field_key)
+    priority_map = DOCUMENT_PRIORITY_BY_FIELD_TYPE.get(
+        field_type,
+        DOCUMENT_PRIORITY_BY_FIELD_TYPE['default']
+    )
+    return priority_map.get(doc_type, 99)
 
 
 # Maps DocumentType to CSV evidence_types values

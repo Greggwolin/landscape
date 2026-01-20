@@ -21,27 +21,7 @@
    ============================================================================= */
 
 .ops-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 0.5rem 1rem;
-  background: var(--cui-card-bg);
-  border: 1px solid var(--cui-border-color);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
-
-.ops-header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.ops-header-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--cui-body-color);
-  margin: 0;
 }
 
 .ops-header-pills {
@@ -201,8 +181,8 @@
 }
 
 .ops-view-toggle button.active {
-  background: var(--cui-secondary-bg);
-  color: var(--cui-body-color);
+  background: var(--cui-primary);
+  color: #fff;
 }
 
 .ops-view-toggle button:hover:not(.active) {
@@ -271,7 +251,7 @@
   text-align: left;
   font-weight: 500;
   font-size: 0.875rem; /* 14px - matches text-sm */
-  color: var(--cui-secondary-color);
+  color: var(--cui-tertiary-color);
   border-bottom: 1px solid var(--cui-border-color);
   background: var(--surface-card-header);
   position: sticky;
@@ -371,7 +351,8 @@
   padding-left: 2.25rem;
 }
 
-.ops-child-row td:first-child::before {
+/* Tree connector only for non-draggable child rows */
+.ops-child-row:not(.draggable-opex-row) td:first-child::before {
   content: '├─';
   color: var(--cui-border-color);
   margin-right: 0.5rem;
@@ -379,7 +360,7 @@
   font-size: 0.625rem;
 }
 
-.ops-child-row:last-of-type td:first-child::before {
+.ops-child-row:not(.draggable-opex-row):last-of-type td:first-child::before {
   content: '└─';
 }
 
@@ -393,6 +374,16 @@
 
 .ops-subtotal-row td.evidence {
   background: var(--ops-evidence-bg);
+}
+
+/* Subtotal value wrapper - matches InputCell width for alignment */
+.ops-subtotal-value {
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 6rem;
+  padding: 0.25rem 0.5rem;
+  text-align: right;
+  color: var(--cui-body-color);
 }
 
 /* Grand Total (NOI) Row */
@@ -410,12 +401,12 @@
 
 .ops-input {
   display: inline-flex;
-  justify-content: center;
+  justify-content: flex-end;
   width: 6rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   font-size: 0.875rem;
-  text-align: center;
+  text-align: right;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   background: var(--cui-tertiary-bg);
@@ -478,6 +469,588 @@
 /* Hidden when Value-Add mode is off */
 .ops-value-add-hidden .post-reno {
   display: none;
+}
+
+/* =============================================================================
+   VALUE-ADD ASSUMPTIONS ACCORDION
+   ============================================================================= */
+
+.ops-value-add-accordion {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+
+.ops-value-add-accordion.open {
+  max-height: 2000px;
+  opacity: 1;
+  margin-top: var(--component-gap);
+}
+
+.ops-value-add-card {
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.35);
+}
+
+.ops-value-add-section + .ops-value-add-section {
+  margin-top: 1.5rem;
+}
+
+.ops-value-add-section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cui-secondary-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ops-value-add-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.ops-value-add-field-wide {
+  grid-column: span 2;
+}
+
+.ops-value-add-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--cui-body-color);
+  margin-bottom: 0.4rem;
+}
+
+.ops-value-add-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ops-value-add-suffix {
+  font-size: 0.75rem;
+  color: var(--cui-secondary-color);
+  min-width: 52px;
+  text-align: right;
+}
+
+.ops-value-add-units {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ops-value-add-toggle {
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.ops-value-add-toggle.active {
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.15);
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+}
+
+.ops-value-add-disabled {
+  opacity: 0.7;
+}
+
+.ops-value-add-help {
+  font-size: 0.7rem;
+  color: var(--cui-secondary-color);
+  margin-top: 0.35rem;
+}
+
+.ops-value-add-error {
+  margin-top: 0.35rem;
+  color: var(--cui-danger);
+  font-size: 0.7rem;
+}
+
+.ops-value-add-divider {
+  height: 1px;
+  background: var(--cui-border-color);
+  margin: 1rem 0;
+}
+
+.ops-value-add-calc {
+  background: var(--cui-tertiary-bg);
+  border-radius: 0.65rem;
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ops-value-add-calc-label {
+  font-size: 0.75rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-value-add-calc-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.ops-value-add-calc-help {
+  grid-column: span 2;
+  font-size: 0.7rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-value-add-summary {
+  background: rgba(14, 116, 144, 0.08);
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  border-radius: 0.65rem;
+  padding: 0.75rem 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.ops-value-add-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--cui-body-color);
+}
+
+.ops-value-add-summary-note {
+  font-size: 0.7rem;
+  color: var(--cui-secondary-color);
+  margin-top: 0.5rem;
+}
+
+/* =============================================================================
+   VALUE-ADD TWO-PANEL CARD (v2 Design)
+   Uses ops-card and ops-section-header from above for consistent styling
+   ============================================================================= */
+
+/* Saving indicator in header */
+.va-saving {
+  font-size: 0.75rem;
+  color: var(--cui-primary);
+  font-style: italic;
+  margin-left: 0.5rem;
+  font-weight: 400;
+}
+
+/* Toggle switch */
+.va-toggle {
+  position: relative;
+  width: 2.25rem;
+  height: 1.25rem;
+  background: var(--cui-border-color);
+  border: none;
+  border-radius: 0.625rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.va-toggle.on {
+  background: var(--cui-primary);
+}
+
+.va-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.va-toggle.on .va-toggle-slider {
+  transform: translateX(1rem);
+}
+
+.va-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Three-column body (Inputs | Summary | Graphic) */
+.va-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* Left panel: Inputs in 2-column layout */
+.va-inputs-panel {
+  padding: 0.5rem 0.75rem;
+  border-right: 1px solid var(--cui-border-color);
+}
+
+.va-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.va-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.va-label {
+  font-size: 0.75rem;
+  color: var(--cui-body-color);
+  white-space: nowrap;
+}
+
+.va-input {
+  width: 3.5rem;
+  height: 1.5rem;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  color: var(--cui-body-color);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.va-input:focus {
+  border-color: var(--cui-primary);
+}
+
+.va-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input group for toggle + input combos */
+.va-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Currency input with $ prefix */
+.va-input-currency {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.va-prefix {
+  font-size: 0.7rem;
+  color: var(--cui-secondary-color);
+}
+
+.va-select {
+  height: 1.5rem;
+  padding: 0 0.25rem;
+  font-size: 0.7rem;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  color: var(--cui-body-color);
+  cursor: pointer;
+  outline: none;
+}
+
+.va-select:focus {
+  border-color: var(--cui-primary);
+}
+
+/* SF/Unit toggle */
+.va-basis-toggle {
+  display: flex;
+  background: var(--cui-tertiary-bg);
+  border-radius: 0.25rem;
+  border: 1px solid var(--cui-border-color);
+  overflow: hidden;
+  height: 1.5rem;
+}
+
+.va-basis-btn {
+  padding: 0 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.va-basis-btn:first-child {
+  border-right: 1px solid var(--cui-border-color);
+}
+
+.va-basis-btn.active {
+  background: var(--cui-primary);
+  color: white;
+}
+
+.va-basis-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Middle panel: Costs + Annual Impact stacked */
+.va-summary-panel {
+  padding: 0.5rem 0.75rem;
+  background: var(--cui-tertiary-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 1px solid var(--cui-border-color);
+  border-right: 1px solid var(--cui-border-color);
+}
+
+/* Section container (Costs, Annual Impact) */
+.va-section {
+  background: var(--cui-card-bg);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--cui-border-color);
+}
+
+.va-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0 0 0.5rem 0;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.va-section-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.va-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  gap: 1rem;
+}
+
+.va-section-label {
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
+}
+
+.va-section-value {
+  font-weight: 500;
+  color: var(--cui-body-color);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.va-section-row-total {
+  margin-top: 0.25rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.va-section-row-total .va-section-label,
+.va-section-row-total .va-section-value {
+  font-weight: 600;
+}
+
+/* Right panel: Graphic with treemap */
+.va-graphic-panel {
+  padding: 0.375rem 0.5rem;
+  background: var(--cui-tertiary-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.va-graphic-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0;
+}
+
+/* Treemap container */
+.va-treemap {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  min-height: 160px;
+  gap: 3px;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.va-treemap-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem 0.25rem;
+  border-radius: 0.25rem;
+  color: white;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.va-treemap-reno {
+  flex-shrink: 0;
+}
+
+.va-treemap-right {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.va-treemap-right .va-treemap-cell {
+  flex: 1;
+  min-height: 0;
+}
+
+.va-treemap-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+.va-treemap-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.va-treemap-pct {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.85;
+  line-height: 1;
+}
+
+.va-graphic-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--cui-border-color);
+  margin-top: auto;
+}
+
+.va-graphic-total-label {
+  font-size: 0.7rem;
+  color: var(--cui-secondary-color);
+}
+
+.va-graphic-total-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.va-positive {
+  color: var(--ops-positive, #22c55e);
+}
+
+.va-negative {
+  color: var(--ops-negative, #ef4444);
+}
+
+/* Bottom metrics row */
+.va-metrics {
+  display: flex;
+  justify-content: space-around;
+  padding: 0.375rem 0;
+  margin-top: auto;
+  background: var(--cui-card-bg);
+  border-radius: 0.5rem;
+  border: 1px solid var(--cui-border-color);
+}
+
+.va-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.0625rem;
+}
+
+.va-metric-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.va-metric-label {
+  font-size: 0.55rem;
+  color: var(--cui-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive: stack panels on smaller screens */
+@media (max-width: 900px) {
+  .va-body {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .va-graphic-panel {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-around;
+  }
+
+  .va-summary-panel {
+    border-right: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .va-body {
+    grid-template-columns: 1fr;
+  }
+
+  .va-inputs-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--cui-border-color);
+  }
+
+  .va-summary-panel {
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid var(--cui-border-color);
+  }
+
+  .va-graphic-panel {
+    flex-direction: column;
+  }
 }
 
 /* =============================================================================
@@ -609,4 +1182,78 @@
   .ops-header-pills {
     flex-wrap: wrap;
   }
+}
+
+/* =============================================================================
+   DRAGGABLE OPEX STYLES
+   ============================================================================= */
+
+/* Draggable expense rows */
+.draggable-opex-row {
+  cursor: grab;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.draggable-opex-row:hover {
+  background-color: rgba(59, 130, 246, 0.08);
+}
+
+.draggable-opex-row.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Droppable parent category rows */
+.droppable-parent-row {
+  transition: background-color 0.2s ease;
+}
+
+.droppable-parent-row.drop-target-available {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.droppable-parent-row.drop-target-active {
+  background-color: rgba(59, 130, 246, 0.15);
+  outline: 2px dashed #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Unclassified section highlighting */
+.unclassified-section {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+
+.unclassified-section td:first-child {
+  border-left: 3px solid #ef4444;
+}
+
+/* Unclassified badge */
+.unclassified-badge {
+  display: inline-block;
+  background-color: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+
+/* Drag handle is rendered via JSX in DraggableOpexSection */
+
+/* Saving indicator animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }

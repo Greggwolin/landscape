@@ -6,9 +6,11 @@ import { FileText, Upload, Loader2, CheckCircle, AlertCircle, Clipboard } from '
 
 interface NewProjectDropZoneProps {
   onFileDrop: (file: File) => void;
+  onFilesDrop?: (files: File[]) => void; // For multi-file drops (OM packages)
   isDark?: boolean;
   isProcessing?: boolean;
   compact?: boolean;
+  multiple?: boolean; // Allow multiple file selection
 }
 
 type DropPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
@@ -26,18 +28,24 @@ const ALLOWED_MIME_TYPES = [
 
 export default function NewProjectDropZone({
   onFileDrop,
+  onFilesDrop,
   isDark = false,
   isProcessing = false,
   compact = false,
+  multiple = false,
 }: NewProjectDropZoneProps) {
   const [phase, setPhase] = useState<DropPhase>('idle');
   const [fileName, setFileName] = useState<string>('');
+  const [fileCount, setFileCount] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Shared file processing logic
-  const processFile = useCallback(async (file: File) => {
-    setFileName(file.name);
+  // Process multiple files
+  const processFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setFileCount(files.length);
+    setFileName(files.length === 1 ? files[0].name : `${files.length} files`);
     setPhase('uploading');
     setErrorMessage('');
 
@@ -46,8 +54,15 @@ export default function NewProjectDropZone({
       await new Promise(resolve => setTimeout(resolve, 500));
       setPhase('analyzing');
 
-      // Call parent handler
-      onFileDrop(file);
+      // Call appropriate parent handler
+      if (files.length > 1 && onFilesDrop) {
+        onFilesDrop(files);
+      } else {
+        // Process files one at a time if no multi-file handler
+        for (const file of files) {
+          onFileDrop(file);
+        }
+      }
 
       // Parent will handle the actual processing
       // We just show a brief success state
@@ -56,6 +71,7 @@ export default function NewProjectDropZone({
         setTimeout(() => {
           setPhase('idle');
           setFileName('');
+          setFileCount(0);
         }, 2000);
       }, 500);
     } catch (error) {
@@ -64,9 +80,15 @@ export default function NewProjectDropZone({
       setTimeout(() => {
         setPhase('idle');
         setErrorMessage('');
+        setFileCount(0);
       }, 3000);
     }
-  }, [onFileDrop]);
+  }, [onFileDrop, onFilesDrop]);
+
+  // Single file processing (backwards compatible)
+  const processFile = useCallback(async (file: File) => {
+    processFiles([file]);
+  }, [processFiles]);
 
   // Handle pasted files from clipboard
   const handlePaste = useCallback((event: ClipboardEvent) => {
@@ -109,8 +131,9 @@ export default function NewProjectDropZone({
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
-    processFile(acceptedFiles[0]);
-  }, [processFile]);
+    // Use processFiles for all drops (handles single and multi-file)
+    processFiles(acceptedFiles);
+  }, [processFiles]);
 
   const {
     getRootProps,
@@ -130,7 +153,8 @@ export default function NewProjectDropZone({
       'image/png': ['.png'],
     },
     maxSize: 32 * 1024 * 1024, // 32MB
-    maxFiles: 1,
+    maxFiles: multiple ? 20 : 1, // Allow up to 20 files for OM packages
+    multiple,
     disabled: isProcessing || phase !== 'idle',
   });
 
@@ -168,7 +192,10 @@ export default function NewProjectDropZone({
             <>
               <Upload className={`h-5 w-5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                {isDragActive ? 'Drop document here' : 'Drag, paste, or click to browse'}
+                {isDragActive
+                  ? (multiple ? 'Drop documents here' : 'Drop document here')
+                  : (multiple ? 'Drag, paste, or click to browse files' : 'Drag, paste, or click to browse')
+                }
               </span>
             </>
           )}
@@ -183,14 +210,18 @@ export default function NewProjectDropZone({
           {phase === 'analyzing' && (
             <>
               <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
-              <span className="text-sm text-amber-600">Analyzing document...</span>
+              <span className="text-sm text-amber-600">
+                {fileCount > 1 ? `Analyzing ${fileCount} documents...` : 'Analyzing document...'}
+              </span>
             </>
           )}
 
           {phase === 'complete' && (
             <>
               <CheckCircle className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-green-600">Document received!</span>
+              <span className="text-sm text-green-600">
+                {fileCount > 1 ? `${fileCount} documents received!` : 'Document received!'}
+              </span>
             </>
           )}
 
@@ -246,10 +277,13 @@ export default function NewProjectDropZone({
           ) : (
             <div>
               <p className={`text-base font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                Drop or paste a document here
+                {multiple ? 'Drop or paste documents here' : 'Drop or paste a document here'}
               </p>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Offering memorandum, rent roll, T-12, or appraisal
+                {multiple
+                  ? 'OM package, rent roll, T-12, appraisal (multi-file supported)'
+                  : 'Offering memorandum, rent roll, T-12, or appraisal'
+                }
               </p>
             </div>
           )}
@@ -260,7 +294,7 @@ export default function NewProjectDropZone({
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition"
             >
               <Upload className="h-4 w-4" />
-              Select File
+              {multiple ? 'Select Files' : 'Select File'}
             </button>
             <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>or</span>
             <span className={`inline-flex items-center gap-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -296,7 +330,9 @@ export default function NewProjectDropZone({
             </div>
           </div>
           <div>
-            <p className="text-base font-medium text-amber-600">Analyzing document...</p>
+            <p className="text-base font-medium text-amber-600">
+              {fileCount > 1 ? `Analyzing ${fileCount} documents...` : 'Analyzing document...'}
+            </p>
             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Extracting fields for Landscaper
             </p>
@@ -310,7 +346,9 @@ export default function NewProjectDropZone({
             <CheckCircle className="h-6 w-6 text-white" />
           </div>
           <div>
-            <p className="text-base font-medium text-green-600">Document received!</p>
+            <p className="text-base font-medium text-green-600">
+              {fileCount > 1 ? `${fileCount} documents received!` : 'Document received!'}
+            </p>
             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Landscaper is reviewing the content
             </p>

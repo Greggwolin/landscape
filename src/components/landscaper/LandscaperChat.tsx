@@ -6,6 +6,7 @@ import CIcon from '@coreui/icons-react';
 import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
 import { ChatMessageBubble } from './ChatMessageBubble';
+import { LandscaperProgress } from './LandscaperProgress';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -38,6 +39,7 @@ function getTabContextHint(tab: string): string {
 export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand }: LandscaperChatProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userHasSentMessage = useRef(false);
   const prevMessageCount = useRef(0);
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
@@ -106,6 +108,23 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     }
     prevMessageCount.current = messages.length;
   }, [messages]);
+
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight || '20', 10);
+    const maxHeight = lineHeight * 8;
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [input, resizeTextarea]);
 
   const handleSend = () => {
     if (!input.trim() || isLoading) return;
@@ -235,12 +254,6 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
           ))
         )}
 
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-            <div className="h-4 w-4 animate-spin rounded-full border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
-            <span>Thinking...</span>
-          </div>
-        )}
         {error && !isLoading && (
           <div className="rounded-md border px-3 py-2 text-sm" style={{
             borderColor: 'var(--cui-danger-border-subtle)',
@@ -253,23 +266,33 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Progress indicator - shows during processing */}
+      <LandscaperProgress isProcessing={isLoading} />
+
       {/* Input */}
       <div
         className="border-t p-3"
         style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
       >
         <div className="flex gap-2">
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder={promptCopy}
-            className="flex-1 rounded-lg border px-3 py-2 text-sm"
+            rows={1}
+            className="flex-1 rounded-lg border px-3 py-2 text-sm resize-none"
             style={{
               borderColor: 'var(--cui-border-color)',
               backgroundColor: 'var(--cui-body-bg)',
               color: 'var(--cui-body-color)',
+              maxHeight: '200px',
             }}
             disabled={isLoading}
           />

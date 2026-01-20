@@ -28,6 +28,8 @@ class ChatMetadata:
     client_request_id: Optional[str] = None
     tools_used: Optional[List[str]] = None
     tool_executions: Optional[List[Dict[str, Any]]] = None
+    error: Optional[str] = None
+    traceback: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
@@ -44,6 +46,10 @@ class ChatMetadata:
             result['tools_used'] = self.tools_used
         if self.tool_executions:
             result['tool_executions'] = self.tool_executions
+        if self.error:
+            result['error'] = self.error
+        if self.traceback:
+            result['traceback'] = self.traceback
         return result
 
 

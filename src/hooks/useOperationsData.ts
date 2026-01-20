@@ -369,22 +369,25 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
   // =============================================================================
 
   const recalculateTotals = (response: OperationsResponse): OperationsTotals => {
-    // Sum rental income
-    const sumSection = (section: SectionData, isExpense = false): number => {
-      return section.rows.reduce((sum, row) => {
-        if (row.is_calculated) {
-          // Skip parent rows, they're calculated from children
-          return sum;
+    // Recursively sum leaf rows (those without children or not calculated)
+    const sumRowsRecursive = (rows: LineItemRow[], field: 'as_is' | 'post_reno'): number => {
+      return rows.reduce((sum, row) => {
+        // If row has children, sum the children instead
+        if (row.children && row.children.length > 0) {
+          return sum + sumRowsRecursive(row.children, field);
         }
-        return sum + (row.as_is.total || 0);
+        // Leaf row - add its total
+        const value = field === 'as_is' ? row.as_is?.total : row.post_reno?.total;
+        return sum + (value || 0);
       }, 0);
     };
 
+    const sumSection = (section: SectionData): number => {
+      return sumRowsRecursive(section.rows, 'as_is');
+    };
+
     const sumSectionPostReno = (section: SectionData): number => {
-      return section.rows.reduce((sum, row) => {
-        if (row.is_calculated) return sum;
-        return sum + (row.post_reno?.total || 0);
-      }, 0);
+      return sumRowsRecursive(section.rows, 'post_reno');
     };
 
     const gpr = sumSection(response.rental_income);

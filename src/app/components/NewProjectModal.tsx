@@ -1,5 +1,7 @@
 'use client'
 
+console.log("=== MODAL VERSION 2025-01-14 ===")
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, type FieldErrors, type Path } from 'react-hook-form'
@@ -19,6 +21,7 @@ import { useTheme } from '@/app/components/CoreUIThemeProvider'
 type NewProjectModalProps = {
   isOpen: boolean
   onClose: () => void
+  initialFiles?: File[]
 }
 
 const getNumeric = (value: string) => {
@@ -29,8 +32,17 @@ const getNumeric = (value: string) => {
 
 type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData'
 
+// Analysis Type options (new orthogonal taxonomy - what the user is doing)
+const ANALYSIS_TYPE_OPTIONS = [
+  { value: 'VALUATION', label: 'Valuation', description: 'Market value opinion', icon: '📈' },
+  { value: 'INVESTMENT', label: 'Investment', description: 'Acquisition analysis', icon: '💰' },
+  { value: 'DEVELOPMENT', label: 'Development', description: 'Ground-up returns', icon: '🔨' },
+  { value: 'FEASIBILITY', label: 'Feasibility', description: 'Go/no-go decision', icon: '✅' }
+]
+
 const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   analysis_type: 'asset',
+  property_category: 'asset',
   development_type: 'asset',
   project_type_code: 'asset',
   property_subtype: 'configure',
@@ -100,11 +112,19 @@ const getSectionForField = (fieldName: string): SectionKey | undefined => {
   return FIELD_SECTION_MAP[root]
 }
 
-const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
+const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps) => {
   const router = useRouter()
   const { refreshProjects, selectProject } = useProjectContext()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+
+  // Debug logging
+  console.log('[NewProjectModal] Rendered with:', {
+    isOpen,
+    hasInitialFiles: !!initialFiles,
+    fileCount: initialFiles?.length || 0,
+    fileNames: initialFiles?.map(f => f.name) || []
+  })
 
   const form = useForm<NewProjectFormData>({
     resolver: zodResolver(newProjectSchema),
@@ -124,14 +144,15 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   } = form
 
   const formData = watch()
-  const analysisType = watch('analysis_type')
+  const analysisType = watch('analysis_type') // What the user is doing (VALUATION, INVESTMENT, etc.)
+  const propertyCategory = watch('property_category') // What the asset is (Land Development, Income Property)
   const subtypeOptions = useMemo(() => {
-    if (analysisType === 'Land Development') return LAND_SUBTYPE_OPTIONS
-    if (analysisType === 'Income Property') return INCOME_SUBTYPE_OPTIONS
+    if (propertyCategory === 'Land Development') return LAND_SUBTYPE_OPTIONS
+    if (propertyCategory === 'Income Property') return INCOME_SUBTYPE_OPTIONS
     return []
-  }, [analysisType])
+  }, [propertyCategory])
 
-  const showPropertyClass = analysisType === 'Income Property'
+  const showPropertyClass = propertyCategory === 'Income Property'
   const [subtypeFocused, setSubtypeFocused] = useState(false)
   const [classFocused, setClassFocused] = useState(false)
   const hasSubtypeValue = Boolean(formData.property_subtype)
@@ -141,7 +162,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [invalidSections, setInvalidSections] = useState<SectionKey[]>([])
   const [extractedFieldKeys, setExtractedFieldKeys] = useState<Set<string>>(new Set())
-  const [pendingDocument, setPendingDocument] = useState<File | null>(null)
+  const [pendingDocuments, setPendingDocuments] = useState<File[]>([])
 
   const assetSectionRef = useRef<HTMLDivElement>(null)
   const locationSectionRef = useRef<HTMLDivElement>(null)
@@ -161,30 +182,39 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
     }
   }, [isOpen])
 
-  const previousAnalysisType = useRef<string | null>(null)
+  const previousPropertyCategory = useRef<string | null>(null)
+  // Track whether current property_subtype was set by extraction (don't clear it)
+  const subtypeFromExtraction = useRef<boolean>(false)
 
+  // Effect to handle property_category changes (cascading subtypes)
   useEffect(() => {
-    if (previousAnalysisType.current === analysisType) return
+    if (previousPropertyCategory.current === propertyCategory) return
 
-    setValue('development_type', analysisType || '', { shouldDirty: false })
+    setValue('development_type', propertyCategory || '', { shouldDirty: false })
 
-    const hasChanged = previousAnalysisType.current !== null
+    const hasChanged = previousPropertyCategory.current !== null
 
-    setValue('property_subtype', '', {
-      shouldDirty: hasChanged,
-      shouldValidate: hasChanged
-    })
-    setValue('project_type_code', '', { shouldDirty: hasChanged })
+    // Don't clear property_subtype if it was set from extraction
+    // (extraction sets property_category, which triggers this effect)
+    if (!subtypeFromExtraction.current) {
+      setValue('property_subtype', '', {
+        shouldDirty: hasChanged,
+        shouldValidate: hasChanged
+      })
+      setValue('project_type_code', '', { shouldDirty: hasChanged })
+    }
+    // Reset the extraction flag after the effect runs
+    subtypeFromExtraction.current = false
 
-    if (analysisType !== 'Income Property' || hasChanged) {
+    if (propertyCategory !== 'Income Property' || hasChanged) {
       setValue('property_class', '', {
         shouldDirty: hasChanged,
         shouldValidate: hasChanged
       })
     }
 
-    previousAnalysisType.current = analysisType
-  }, [analysisType, setValue])
+    previousPropertyCategory.current = propertyCategory
+  }, [propertyCategory, setValue])
 
   const invalidSectionSet = useMemo(() => new Set(invalidSections), [invalidSections])
 
@@ -213,9 +243,17 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }, [errors, globalError])
 
   // Handle document extraction - populate form fields and store pending document
+  // Note: Initial files are processed by LandscaperPanel which shows proper UI feedback
   const handleDocumentExtracted = (fields: ExtractedFields, file: File) => {
+    console.log('[handleDocumentExtracted] Received fields:', fields)
+    console.log('[handleDocumentExtracted] File:', file.name)
+
     // Store the file for DMS ingestion after project creation
-    setPendingDocument(file)
+    setPendingDocuments(prev => {
+      // Avoid duplicates by checking filename
+      if (prev.some(f => f.name === file.name)) return prev
+      return [...prev, file]
+    })
     const fieldMapping: Record<string, keyof NewProjectFormData> = {
       // Extraction field -> Form field
       property_name: 'project_name',
@@ -225,6 +263,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
       state: 'state',
       zip_code: 'zip',
       zip: 'zip',
+      county: 'county',
       total_units: 'total_units',
       building_sf: 'building_sf',
       rentable_sf: 'building_sf',
@@ -240,26 +279,382 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
 
     const updatedKeys = new Set<string>()
 
+    // IMPORTANT: Set property_category FIRST before property_subtype
+    // The property_subtype dropdown only renders when property_category is set
+    // Also set the flag to prevent the useEffect from clearing property_subtype
+    if (fields.property_subtype?.value) {
+      const subtype = String(fields.property_subtype.value).toUpperCase()
+      const incomeTypes = ['MULTIFAMILY', 'OFFICE', 'RETAIL', 'INDUSTRIAL', 'MIXED_USE', 'HOTEL', 'SELF_STORAGE']
+      const landTypes = ['MPC', 'INFILL', 'LOT_DEVELOPMENT', 'ENTITLED_LAND', 'LAND_BANK']
+      if (incomeTypes.includes(subtype)) {
+        console.log('[handleDocumentExtracted] Setting property_category to Income Property')
+        subtypeFromExtraction.current = true  // Prevent clearing property_subtype
+        setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('property_category')
+        // Default to INVESTMENT analysis type for income properties
+        if (!formData.analysis_type) {
+          setValue('analysis_type', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_type')
+        }
+      } else if (landTypes.includes(subtype)) {
+        console.log('[handleDocumentExtracted] Setting property_category to Land Development')
+        subtypeFromExtraction.current = true  // Prevent clearing property_subtype
+        setValue('property_category', 'Land Development', { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('property_category')
+        // Default to DEVELOPMENT analysis type for land development
+        if (!formData.analysis_type) {
+          setValue('analysis_type', 'DEVELOPMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_type')
+        }
+      }
+    } else if (fields.total_units?.value) {
+      // Fallback: If total_units is present but no property_subtype, infer Income Property
+      const units = parseInt(String(fields.total_units.value), 10)
+      if (units > 0) {
+        console.log('[handleDocumentExtracted] Inferred Income Property from total_units')
+        subtypeFromExtraction.current = true  // Prevent clearing property_subtype
+        setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('property_category')
+        // Default to INVESTMENT analysis type for income properties
+        if (!formData.analysis_type) {
+          setValue('analysis_type', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_type')
+        }
+      }
+    }
+
+    // Now set all other fields (including property_subtype)
     Object.entries(fields).forEach(([extractKey, fieldData]) => {
       const formKey = fieldMapping[extractKey]
       if (formKey && fieldData?.value !== undefined && fieldData?.value !== null) {
         const value = String(fieldData.value)
+        console.log(`[handleDocumentExtracted] Setting ${formKey} = ${value}`)
         setValue(formKey, value, { shouldDirty: true, shouldValidate: true })
         updatedKeys.add(formKey)
       }
     })
 
-    // Auto-detect analysis type from property_subtype if present
-    if (fields.property_subtype?.value) {
-      const subtype = String(fields.property_subtype.value).toUpperCase()
-      const incomeTypes = ['MULTIFAMILY', 'OFFICE', 'RETAIL', 'INDUSTRIAL', 'MIXED_USE', 'HOTEL', 'SELF_STORAGE']
-      if (incomeTypes.includes(subtype)) {
-        setValue('analysis_type', 'Income Property', { shouldDirty: true, shouldValidate: true })
-        updatedKeys.add('analysis_type')
+    // Fallback: If total_units is present but no property_subtype, set to MULTIFAMILY
+    if (!updatedKeys.has('property_subtype') && fields.total_units?.value) {
+      const units = parseInt(String(fields.total_units.value), 10)
+      if (units > 0) {
+        console.log('[handleDocumentExtracted] Inferred MULTIFAMILY from total_units')
+        setValue('property_subtype', 'MULTIFAMILY', { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('property_subtype')
+      }
+    }
+
+    // Zipcode fallback: Try to parse from street_address if zip was not extracted
+    if (!updatedKeys.has('zip') && fields.street_address?.value) {
+      const addressStr = String(fields.street_address.value)
+      // Look for 5-digit ZIP code pattern at the end of address
+      const zipMatch = addressStr.match(/\b(\d{5})(?:-\d{4})?\s*$/);
+      if (zipMatch) {
+        setValue('zip', zipMatch[1], { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('zip')
+      }
+    }
+
+    // Also try to extract zip from city/state line if present (e.g., "Torrance, CA 90502")
+    if (!updatedKeys.has('zip') && fields.city?.value && fields.state?.value) {
+      const cityState = `${fields.city.value}, ${fields.state.value}`
+      // Some documents include zip with city/state
+      const fullAddress = fields.street_address?.value
+        ? `${fields.street_address.value} ${cityState}`
+        : cityState
+      const zipMatch = String(fullAddress).match(/\b(\d{5})(?:-\d{4})?\b/)
+      if (zipMatch) {
+        setValue('zip', zipMatch[1], { shouldDirty: true, shouldValidate: true })
+        updatedKeys.add('zip')
       }
     }
 
     setExtractedFieldKeys(updatedKeys)
+
+    // Forward geocode address to get coordinates for map zoom
+    // Only if we have address components but no lat/lng
+    const hasFullAddress = fields.street_address?.value && fields.city?.value && fields.state?.value
+    const hasCityState = fields.city?.value && fields.state?.value
+    const hasCoords = fields.latitude?.value && fields.longitude?.value
+
+    if (!hasCoords && (hasFullAddress || hasCityState)) {
+      // Try forward geocoding with whatever address info we have
+      forwardGeocodeAddress(
+        fields.street_address?.value ? String(fields.street_address.value) : '',
+        String(fields.city?.value || ''),
+        String(fields.state?.value || ''),
+        fields.zip_code?.value ? String(fields.zip_code.value) :
+          (fields.zip?.value ? String(fields.zip.value) : undefined)
+      )
+    }
+  }
+
+  // Normalize address for better geocoding results
+  // Expands abbreviations that Nominatim often fails on
+  const normalizeStreetAddress = (street: string): string[] => {
+    const variations: string[] = [street]
+
+    // Direction abbreviations to expand
+    const directionMap: Record<string, string> = {
+      'N.': 'North', 'N ': 'North ',
+      'S.': 'South', 'S ': 'South ',
+      'E.': 'East', 'E ': 'East ',
+      'W.': 'West', 'W ': 'West ',
+      'NE': 'Northeast', 'NW': 'Northwest',
+      'SE': 'Southeast', 'SW': 'Southwest'
+    }
+
+    // Street type abbreviations
+    const streetTypeMap: Record<string, string> = {
+      'Ave': 'Avenue', 'Ave.': 'Avenue',
+      'St': 'Street', 'St.': 'Street',
+      'Rd': 'Road', 'Rd.': 'Road',
+      'Blvd': 'Boulevard', 'Blvd.': 'Boulevard',
+      'Dr': 'Drive', 'Dr.': 'Drive',
+      'Ln': 'Lane', 'Ln.': 'Lane',
+      'Ct': 'Court', 'Ct.': 'Court',
+      'Pl': 'Place', 'Pl.': 'Place',
+      'Pkwy': 'Parkway', 'Hwy': 'Highway'
+    }
+
+    let normalized = street
+
+    // Expand direction abbreviations
+    for (const [abbr, full] of Object.entries(directionMap)) {
+      if (street.includes(abbr)) {
+        normalized = street.replace(abbr, full)
+        if (!variations.includes(normalized)) variations.push(normalized)
+      }
+    }
+
+    // Expand street type abbreviations
+    for (const [abbr, full] of Object.entries(streetTypeMap)) {
+      const regex = new RegExp(`\\b${abbr}\\b`, 'gi')
+      if (regex.test(normalized)) {
+        const expanded = normalized.replace(regex, full)
+        if (!variations.includes(expanded)) variations.push(expanded)
+      }
+    }
+
+    // Also try without direction prefix entirely
+    const withoutDirection = street.replace(/^[NSEW]\.\s*/i, '').replace(/^(North|South|East|West)\s+/i, '')
+    if (withoutDirection !== street && !variations.includes(withoutDirection)) {
+      variations.push(withoutDirection)
+    }
+
+    return variations
+  }
+
+  // Forward geocode address using Google (preferred) or Nominatim (fallback)
+  // Google is more accurate for US addresses
+  const forwardGeocodeAddress = async (
+    street: string,
+    city: string,
+    state: string,
+    zip?: string
+  ) => {
+    // Build full address query
+    const fullAddress = [street, city, state, zip].filter(Boolean).join(', ')
+    console.log('=== GEOCODING TRACE START ===')
+    console.log('GEOCODING INPUT:', { street, city, state, zip })
+    console.log('GEOCODING FULL ADDRESS:', fullAddress)
+    if (!fullAddress) {
+      console.warn('[forwardGeocodeAddress] No address to geocode')
+      return
+    }
+
+    // Helper to set coordinates and return success
+    const setCoordinates = (lat: string, lon: string) => {
+      console.log('=== GEOCODING RESULT ===')
+      console.log('GEOCODING COORDINATES:', lat, lon)
+      console.log('=== GEOCODING TRACE END ===')
+      setValue('latitude', lat, { shouldDirty: true })
+      setValue('longitude', lon, { shouldDirty: true })
+      const currentMode = form.getValues('location_mode')
+      if (currentMode !== 'address') {
+        setValue('location_mode', 'address', { shouldDirty: true })
+      }
+    }
+
+    // Try Google Geocoding API first (more accurate)
+    const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY
+    if (googleApiKey) {
+      try {
+        console.log('[forwardGeocodeAddress] Trying Google API for:', fullAddress)
+        const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${googleApiKey}`
+        const googleResponse = await fetch(googleUrl)
+
+        if (googleResponse.ok) {
+          const googleData = await googleResponse.json()
+          console.log('[forwardGeocodeAddress] Google response:', googleData.status)
+
+          if (googleData.status === 'OK' && googleData.results?.length > 0) {
+            const location = googleData.results[0].geometry.location
+            const parsedLat = parseFloat(location.lat).toFixed(6)
+            const parsedLon = parseFloat(location.lng).toFixed(6)
+            console.log('[forwardGeocodeAddress] Google result:', parsedLat, parsedLon, googleData.results[0].formatted_address)
+            console.log('=== GEOCODING RESULT (Google) ===')
+            console.log('GEOCODING COORDINATES:', parsedLat, parsedLon)
+            console.log('=== GEOCODING TRACE END ===')
+            setCoordinates(parsedLat, parsedLon)
+            return
+          } else if (googleData.status !== 'OK') {
+            console.warn('[forwardGeocodeAddress] Google API error status:', googleData.status, googleData.error_message || '')
+          }
+        }
+      } catch (error) {
+        console.error('[forwardGeocodeAddress] Google API error:', error)
+      }
+    }
+
+    // Fallback to Nominatim (OpenStreetMap) with address normalization
+    console.log('[forwardGeocodeAddress] Falling back to Nominatim with address normalization')
+
+    // Generate normalized street variations
+    const streetVariations = street ? normalizeStreetAddress(street) : ['']
+    const queries: string[] = []
+
+    // Build query variations with normalized addresses
+    for (const streetVar of streetVariations) {
+      if (streetVar && city && state) {
+        queries.push(`${streetVar}, ${city}, ${state}, USA`)
+        if (zip) queries.push(`${streetVar}, ${city}, ${state} ${zip}, USA`)
+      }
+    }
+
+    // Add city/state fallbacks (but these are less accurate)
+    if (city && state && zip) {
+      queries.push(`${city}, ${state} ${zip}, USA`)
+    }
+
+    // First try structured search (more accurate for addresses)
+    if (street && city && state) {
+      try {
+        // Build structured query URL - Nominatim structured search is more precise
+        const structuredUrl = new URL('https://nominatim.openstreetmap.org/search')
+        structuredUrl.searchParams.set('street', street)
+        structuredUrl.searchParams.set('city', city)
+        structuredUrl.searchParams.set('state', state)
+        if (zip) structuredUrl.searchParams.set('postalcode', zip)
+        structuredUrl.searchParams.set('country', 'USA')
+        structuredUrl.searchParams.set('format', 'json')
+        structuredUrl.searchParams.set('limit', '1')
+        structuredUrl.searchParams.set('addressdetails', '1')
+
+        console.log('[forwardGeocodeAddress] Trying Nominatim STRUCTURED query:', structuredUrl.toString())
+
+        const structuredResponse = await fetch(structuredUrl.toString(), {
+          headers: { 'User-Agent': 'Landscape-App/1.0' }
+        })
+
+        if (structuredResponse.ok) {
+          const structuredResults = await structuredResponse.json()
+          console.log('[forwardGeocodeAddress] Nominatim structured results:', structuredResults?.length || 0)
+
+          if (structuredResults && structuredResults.length > 0) {
+            const result = structuredResults[0]
+            const { lat, lon, display_name, address } = result
+
+            // With structured search, verify the city matches
+            const resultCity = (address?.city || address?.town || address?.municipality || '').toLowerCase()
+            const inputCityLower = city.toLowerCase()
+
+            console.log('[forwardGeocodeAddress] Structured result address:', address)
+            console.log('[forwardGeocodeAddress] City comparison:', { resultCity, inputCityLower })
+
+            // Accept if the city matches OR if display_name contains our city
+            if (resultCity === inputCityLower || display_name.toLowerCase().includes(inputCityLower)) {
+              const parsedLat = parseFloat(lat).toFixed(6)
+              const parsedLon = parseFloat(lon).toFixed(6)
+              console.log('[forwardGeocodeAddress] Nominatim STRUCTURED matched:', display_name)
+              console.log('=== GEOCODING RESULT ===')
+              console.log('GEOCODING COORDINATES:', parsedLat, parsedLon)
+              console.log('=== GEOCODING TRACE END ===')
+              setCoordinates(parsedLat, parsedLon)
+              return
+            } else {
+              console.log('[forwardGeocodeAddress] Structured result rejected - city mismatch:', { resultCity, inputCityLower })
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[forwardGeocodeAddress] Nominatim structured error:', error)
+      }
+    }
+
+    // Fallback to free-form queries
+    for (const query of queries) {
+      try {
+        console.log('[forwardGeocodeAddress] Trying Nominatim free-form query:', query)
+
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=us`,
+          {
+            headers: {
+              'User-Agent': 'Landscape-App/1.0'
+            }
+          }
+        )
+
+        if (!response.ok) {
+          console.warn('[forwardGeocodeAddress] Nominatim failed:', response.status)
+          continue
+        }
+
+        const results = await response.json()
+        console.log('[forwardGeocodeAddress] Nominatim free-form results:', results?.length || 0)
+
+        if (results && results.length > 0) {
+          const { lat, lon, display_name } = results[0]
+
+          // Validate result is actually in the expected city AND contains street info
+          const displayLower = (display_name || '').toLowerCase()
+          const cityLower = city.toLowerCase()
+
+          // Extract street number from input for validation
+          const streetNumberMatch = street.match(/^(\d+)/)
+          const inputStreetNumber = streetNumberMatch ? streetNumberMatch[1] : null
+
+          // Check if display_name contains the street number (if we have one)
+          // This prevents accepting results that are just city-center or wrong street
+          const hasStreetNumber = inputStreetNumber ? displayLower.includes(inputStreetNumber) : true
+
+          // Also check if the city name appears in the result
+          // For Torrance, we need "torrance" in the display_name, not just nearby cities
+          const hasCityName = displayLower.includes(cityLower)
+
+          console.log('[forwardGeocodeAddress] Nominatim validation:', {
+            display_name,
+            inputStreetNumber,
+            hasStreetNumber,
+            hasCityName,
+            cityLower
+          })
+
+          // Require BOTH city match AND street number match (if street number provided)
+          if (hasCityName && hasStreetNumber) {
+            const parsedLat = parseFloat(lat).toFixed(6)
+            const parsedLon = parseFloat(lon).toFixed(6)
+            console.log('[forwardGeocodeAddress] Nominatim matched:', display_name)
+            console.log('=== GEOCODING RESULT ===')
+            console.log('GEOCODING COORDINATES:', parsedLat, parsedLon)
+            console.log('=== GEOCODING TRACE END ===')
+            setCoordinates(parsedLat, parsedLon)
+            return
+          } else {
+            console.log('[forwardGeocodeAddress] Nominatim result rejected:', {
+              reason: !hasCityName ? 'wrong city' : 'wrong street number',
+              display_name
+            })
+          }
+        }
+      } catch (error) {
+        console.error('[forwardGeocodeAddress] Nominatim error:', query, error)
+      }
+    }
+
+    console.warn('[forwardGeocodeAddress] All geocoding attempts failed - coordinates will need manual entry')
+    console.log('=== GEOCODING FAILED - NO RESULT ===')
   }
 
   const closeModal = () => {
@@ -280,31 +675,82 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }
 
   const handleCreationSuccess = async (projectId: number) => {
-    // If we have a pending document, ingest it to DMS
-    if (pendingDocument) {
-      try {
+    // Collect all files to upload (pendingDocuments + any initialFiles not already included)
+    const filesToUpload: File[] = [...pendingDocuments]
+
+    if (initialFiles && initialFiles.length > 0) {
+      const pendingNames = new Set(pendingDocuments.map(d => d.name))
+      for (const file of initialFiles) {
+        if (!pendingNames.has(file.name)) {
+          filesToUpload.push(file)
+        }
+      }
+    }
+
+    console.log(`[handleCreationSuccess] Total files to upload: ${filesToUpload.length}`)
+    console.log(`[handleCreationSuccess] File names:`, filesToUpload.map(f => f.name))
+
+    // Upload all documents to DMS with deep extraction
+    // Use Promise.allSettled to start all uploads and wait for them to complete
+    if (filesToUpload.length > 0) {
+      const uploadPromises = filesToUpload.map(async (doc) => {
         const dmsFormData = new FormData()
-        dmsFormData.append('file', pendingDocument)
+        dmsFormData.append('file', doc)
         dmsFormData.append('project_id', projectId.toString())
-        dmsFormData.append('doc_type', 'offering_memorandum') // Default type
+
+        // Detect document type from filename
+        // Map to DMS folder names from Commercial / Multifam template:
+        // {Offering, Property Data, Market Data, Diligence, Agreements, Leases, Title & Survey, Operations, Corresponsdence, Accounting, Misc}
+        const nameLower = doc.name.toLowerCase()
+        let docType = 'Misc'
+        if (nameLower.includes('rent') || nameLower.includes('roll')) {
+          docType = 'Property Data'  // Rent rolls go to Property Data folder
+        } else if (nameLower.includes('t-12') || nameLower.includes('t12') || nameLower.includes('operating')) {
+          docType = 'Operations'  // T-12 / Operating statements go to Operations folder
+        } else if (nameLower.includes('om') || nameLower.includes('offering') || nameLower.includes('memorandum')) {
+          docType = 'Offering'  // OMs go to Offering folder
+        } else if (nameLower.includes('lease')) {
+          docType = 'Leases'
+        } else if (nameLower.includes('survey') || nameLower.includes('title')) {
+          docType = 'Title & Survey'
+        } else if (nameLower.includes('market') || nameLower.includes('comp')) {
+          docType = 'Market Data'
+        } else if (nameLower.includes('agreement') || nameLower.includes('contract') || nameLower.includes('psa')) {
+          docType = 'Agreements'
+        }
+
+        dmsFormData.append('doc_type', docType)
         dmsFormData.append('run_full_extraction', 'true')
 
-        // Fire and forget - don't block navigation
-        fetch('/api/dms/upload', {
+        console.log(`[handleCreationSuccess] Starting upload: ${doc.name} as ${docType}`)
+
+        const response = await fetch('/api/dms/upload', {
           method: 'POST',
           body: dmsFormData
-        }).catch(err => {
-          console.error('Document ingestion failed:', err)
         })
-      } catch (err) {
-        console.error('Document ingestion setup failed:', err)
-      }
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`[handleCreationSuccess] Upload failed for ${doc.name}:`, response.status, errorText)
+          throw new Error(`Upload failed: ${response.status}`)
+        }
+
+        const result = await response.json()
+        console.log(`[handleCreationSuccess] Upload success for ${doc.name}:`, result)
+        return { file: doc.name, result }
+      })
+
+      // Wait for all uploads to complete (or fail)
+      const results = await Promise.allSettled(uploadPromises)
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      console.log(`[handleCreationSuccess] Upload results: ${succeeded} succeeded, ${failed} failed`)
     }
 
     await refreshProjects()
     selectProject(projectId)
     resetFormState()
-    setPendingDocument(null)
+    setPendingDocuments([])
     onClose()
     router.push(`/projects/${projectId}`)
   }
@@ -314,6 +760,8 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }
 
   const onSubmit = async (data: NewProjectFormData) => {
+    console.log('[onSubmit] Starting project creation with data:', data)
+    console.log('[onSubmit] pendingDocuments:', pendingDocuments.map(f => f.name))
     setIsSubmitting(true)
     setGlobalError(null)
 
@@ -322,7 +770,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
       // For Land Development, always use 'LAND' as the project_type_code
       // For Income Property, map property_subtype to valid codes
       const getProjectTypeCode = () => {
-        if (data.analysis_type === 'Land Development') {
+        if (data.property_category === 'Land Development') {
           return 'LAND'
         }
         // Map Income Property subtypes to valid project_type_codes
@@ -340,16 +788,17 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
       const projectTypeCode = getProjectTypeCode()
       const payload = {
         project_name: projectName,
-        analysis_type: data.analysis_type,
+        analysis_type: data.analysis_type, // New orthogonal value (VALUATION, INVESTMENT, etc.)
         property_subtype: data.property_subtype || undefined,
         property_class: data.property_class || undefined,
-        development_type: data.analysis_type,
+        development_type: data.property_category, // Backwards compatibility
         project_type_code: projectTypeCode,
         street_address: data.street_address || undefined,
         cross_streets: data.cross_streets || undefined,
         city: data.city || undefined,
         state: data.state || undefined,
         zip_code: data.zip || undefined,
+        county: data.county || undefined,
         latitude: getNumeric(data.latitude),
         longitude: getNumeric(data.longitude),
         site_area: getNumeric(data.site_area),
@@ -388,6 +837,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
   }
 
   const handleInvalidSubmit = (formErrors: FieldErrors<NewProjectFormData>) => {
+    console.log('[handleInvalidSubmit] Form validation failed with errors:', formErrors)
     setIsSubmitting(false)
     const fieldNames = collectErrorFieldNames(formErrors)
     if (fieldNames.length === 0) return
@@ -458,18 +908,47 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
             style={{ flexBasis: '60%' }}
           >
             <div className="space-y-6 max-w-2xl">
-              {/* Analysis Type Toggle */}
+              {/* Analysis Type Selector (what the user is doing) */}
               <div ref={assetSectionRef}>
                 <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                   Analysis Type
                 </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {ANALYSIS_TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setValue('analysis_type', opt.value as 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY', { shouldDirty: true, shouldValidate: true })}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium transition flex flex-col items-center gap-1 ${
+                        analysisType === opt.value
+                          ? 'bg-blue-600 text-white'
+                          : isDark
+                            ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="text-lg">{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {errors.analysis_type && (
+                  <p className="mt-2 text-xs text-rose-500">{errors.analysis_type.message as string}</p>
+                )}
+              </div>
+
+              {/* Property Category Toggle (what the asset is) */}
+              <div>
+                <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Property Category
+                </label>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setValue('analysis_type', 'Land Development', { shouldDirty: true, shouldValidate: true })}
+                    onClick={() => setValue('property_category', 'Land Development', { shouldDirty: true, shouldValidate: true })}
                     className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
-                      analysisType === 'Land Development'
-                        ? 'bg-blue-600 text-white'
+                      propertyCategory === 'Land Development'
+                        ? 'bg-emerald-600 text-white'
                         : isDark
                           ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -479,10 +958,10 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setValue('analysis_type', 'Income Property', { shouldDirty: true, shouldValidate: true })}
+                    onClick={() => setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })}
                     className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
-                      analysisType === 'Income Property'
-                        ? 'bg-blue-600 text-white'
+                      propertyCategory === 'Income Property'
+                        ? 'bg-emerald-600 text-white'
                         : isDark
                           ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -491,13 +970,13 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
                     Income Property
                   </button>
                 </div>
-                {errors.analysis_type && (
-                  <p className="mt-2 text-xs text-rose-500">{errors.analysis_type.message as string}</p>
+                {errors.property_category && (
+                  <p className="mt-2 text-xs text-rose-500">{errors.property_category.message as string}</p>
                 )}
               </div>
 
               {/* Property Subtype & Class (Income Property only) */}
-              {analysisType === 'Income Property' && (
+              {propertyCategory === 'Income Property' && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <div className="relative">
@@ -640,7 +1119,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
               </div>
 
               {/* Implied Density Display */}
-              {analysisType === 'Land Development' && impliedDensity && (
+              {propertyCategory === 'Land Development' && impliedDensity && (
                 <div className={`rounded-lg px-4 py-3 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Implied Density</span>
@@ -661,10 +1140,11 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
           {/* Right column - Landscaper (40%) */}
           <div className="overflow-hidden p-4" style={{ flexBasis: '40%' }}>
             <LandscaperPanel
-              analysisType={analysisType}
+              analysisType={propertyCategory} // Pass property category for extraction context
               formData={formData}
               onDocumentExtracted={handleDocumentExtracted}
               isDark={isDark}
+              initialFiles={initialFiles}
             />
           </div>
         </div>
@@ -676,7 +1156,7 @@ const NewProjectModal = ({ isOpen, onClose }: NewProjectModalProps) => {
             onClick={() => {
               resetFormState()
               setExtractedFieldKeys(new Set())
-              setPendingDocument(null)
+              setPendingDocuments([])
             }}
             disabled={isSubmitting}
             className="text-xs text-slate-400 hover:text-slate-600 transition disabled:opacity-50"

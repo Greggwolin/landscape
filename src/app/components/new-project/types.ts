@@ -1,9 +1,12 @@
-import type { AnalysisType } from '@/types/project-taxonomy'
+import type { AnalysisType, PropertyCategory } from '@/types/project-taxonomy'
 
 // Re-export for backwards compatibility
-export type DevelopmentType = AnalysisType
+export type DevelopmentType = PropertyCategory
 
 export type LocationMode = 'address' | 'cross_streets' | 'coordinates' | 'map_pin'
+
+// New Analysis Type (orthogonal to property type)
+export type { AnalysisType } from '@/types/project-taxonomy'
 
 export type SiteAreaUnit = 'AC' | 'SF' | 'SM'
 
@@ -40,13 +43,18 @@ export interface UploadedDocument {
 }
 
 export interface NewProjectFormData {
-  // Step 1: Asset Type
-  analysis_type: AnalysisType | '' // NEW: replaces development_type
-  property_subtype: PropertySubtypeCode | '' // UPDATED: now cascades from analysis_type
-  property_class: PropertyClassCode | '' // NEW: Income Property only
+  // Step 1: Asset Classification (two orthogonal dimensions)
+  // What the user is doing (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
+  analysis_type: AnalysisType | ''
+  // What the asset is (Land Development, Income Property)
+  property_category: PropertyCategory | ''
+  // Property subtype cascades from property_category
+  property_subtype: PropertySubtypeCode | ''
+  // Property class (Income Property only)
+  property_class: PropertyClassCode | ''
 
   // DEPRECATED: keeping for backwards compatibility
-  development_type: AnalysisType | ''
+  development_type: PropertyCategory | ''
   project_type_code: string
 
   // Location
@@ -56,6 +64,7 @@ export interface NewProjectFormData {
   city: string
   state: string
   zip: string
+  county: string
   cross_streets: string
   latitude: string
   longitude: string

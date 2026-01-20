@@ -1,0 +1,159 @@
+'use client';
+
+import React from 'react';
+import { CButton, CBadge, CSpinner } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilCheckCircle, cilWarning, cilPencil, cilSync } from '@coreui/icons';
+import type { IngestionDocument, DocumentStatus } from './types';
+
+interface DocumentCardProps {
+  document: IngestionDocument;
+  onConfirm?: (docId: number) => void;
+  onEdit?: (docId: number) => void;
+}
+
+const statusConfig: Record<DocumentStatus, {
+  badge: string;
+  badgeColor: 'success' | 'warning' | 'info' | 'danger';
+  borderClass: string;
+  opacity: string;
+}> = {
+  confirmed: {
+    badge: 'Confirmed',
+    badgeColor: 'success',
+    borderClass: 'border-start border-success border-3',
+    opacity: '',
+  },
+  pending: {
+    badge: 'Review',
+    badgeColor: 'warning',
+    borderClass: 'border-start border-warning border-3',
+    opacity: 'opacity-75',
+  },
+  processing: {
+    badge: 'Processing...',
+    badgeColor: 'info',
+    borderClass: 'border-start border-info border-3',
+    opacity: 'opacity-50',
+  },
+  uploading: {
+    badge: 'Uploading...',
+    badgeColor: 'info',
+    borderClass: 'border-start border-info border-3',
+    opacity: 'opacity-50',
+  },
+  error: {
+    badge: 'Error',
+    badgeColor: 'danger',
+    borderClass: 'border-start border-danger border-3',
+    opacity: 'opacity-75',
+  },
+};
+
+export function DocumentCard({ document, onConfirm, onEdit }: DocumentCardProps) {
+  const config = statusConfig[document.status];
+  const extraction = document.extraction;
+
+  return (
+    <div
+      className={`card mb-3 ${config.borderClass} ${config.opacity}`}
+      style={{
+        background: 'var(--cui-tertiary-bg)',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <div className="card-body p-3">
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-start mb-2">
+          <span className="fw-semibold text-body" style={{ fontSize: '13px' }}>
+            {document.doc_name}
+          </span>
+          <CBadge
+            color={config.badgeColor}
+            shape="rounded-pill"
+            style={{ fontSize: '10px' }}
+          >
+            {document.status === 'confirmed' && (
+              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+            )}
+            {config.badge}
+          </CBadge>
+        </div>
+
+        {/* Extraction Summary */}
+        {document.status === 'processing' ? (
+          <div className="d-flex align-items-center text-body-secondary" style={{ fontSize: '11px' }}>
+            <CSpinner size="sm" className="me-2" />
+            Extracting document data...
+          </div>
+        ) : extraction ? (
+          <div
+            className="text-body-secondary"
+            style={{ fontSize: '11px', lineHeight: 1.5 }}
+            dangerouslySetInnerHTML={{ __html: extraction.summary }}
+          />
+        ) : null}
+
+        {/* Warnings */}
+        {extraction?.warnings && extraction.warnings.length > 0 && (
+          <div className="mt-2">
+            {extraction.warnings.slice(0, 2).map((warning, idx) => (
+              <div
+                key={idx}
+                className="d-flex align-items-start text-warning"
+                style={{ fontSize: '10px' }}
+              >
+                <CIcon icon={cilWarning} size="sm" className="me-1 flex-shrink-0 mt-1" />
+                <span>{warning}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Actions for pending documents */}
+        {document.status === 'pending' && (
+          <div className="d-flex gap-2 mt-2">
+            <CButton
+              color="success"
+              size="sm"
+              variant="ghost"
+              onClick={() => onConfirm?.(document.doc_id)}
+              style={{ fontSize: '11px', padding: '4px 10px' }}
+            >
+              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+              Confirm
+            </CButton>
+            <CButton
+              color="secondary"
+              size="sm"
+              variant="ghost"
+              onClick={() => onEdit?.(document.doc_id)}
+              style={{ fontSize: '11px', padding: '4px 10px' }}
+            >
+              <CIcon icon={cilPencil} size="sm" className="me-1" />
+              Edit
+            </CButton>
+          </div>
+        )}
+
+        {/* Reprocess action for error state */}
+        {document.status === 'error' && (
+          <div className="mt-2">
+            <CButton
+              color="info"
+              size="sm"
+              variant="ghost"
+              onClick={() => onEdit?.(document.doc_id)}
+              style={{ fontSize: '11px', padding: '4px 10px' }}
+            >
+              <CIcon icon={cilSync} size="sm" className="me-1" />
+              Retry
+            </CButton>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default DocumentCard;

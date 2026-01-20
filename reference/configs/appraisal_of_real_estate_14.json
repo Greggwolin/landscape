@@ -1,0 +1,362 @@
+{
+  "title": "The Appraisal of Real Estate",
+  "subtitle": null,
+  "edition": "14th Edition",
+  "publisher": "Appraisal Institute",
+  "publication_year": 2013,
+  "isbn": "978-1-935328-38-4",
+  "knowledge_domain": "valuation",
+  "property_types": [
+    "residential",
+    "multifamily",
+    "retail",
+    "office",
+    "industrial",
+    "hotel",
+    "land",
+    "subdivision",
+    "special-purpose"
+  ],
+  "description": "The definitive text on real estate appraisal methodology, used for MAI designation and accepted by courts and lenders as the authoritative reference for valuation principles and practices.",
+  "total_pages": 865,
+  "chapters": [
+    {
+      "chapter_number": 1,
+      "title": "Introduction to Appraisal",
+      "page_start": 1,
+      "page_end": 10,
+      "topics": ["appraisal definition", "real property", "bundle of rights", "why appraisals needed", "purpose of appraisal"],
+      "property_types": [],
+      "applies_to": ["fundamentals"]
+    },
+    {
+      "chapter_number": 2,
+      "title": "Land, Real Estate, and Ownership of Real Property",
+      "page_start": 11,
+      "page_end": 18,
+      "topics": ["land concepts", "real estate", "real property", "ownership forms", "public restrictions", "private restrictions"],
+      "property_types": [],
+      "applies_to": ["fundamentals"]
+    },
+    {
+      "chapter_number": 3,
+      "title": "The Nature of Value",
+      "page_start": 19,
+      "page_end": 34,
+      "topics": ["market value", "value in use", "investment value", "value concepts", "supply and demand", "principles of value"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "valuation"]
+    },
+    {
+      "chapter_number": 4,
+      "title": "The Valuation Process",
+      "page_start": 35,
+      "page_end": 48,
+      "topics": ["valuation process", "problem identification", "scope of work", "data analysis", "approaches to value", "reconciliation"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "methodology"]
+    },
+    {
+      "chapter_number": 5,
+      "title": "Elements of the Assignment",
+      "page_start": 49,
+      "page_end": 56,
+      "topics": ["assignment elements", "client identification", "intended use", "intended users", "effective date"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "methodology"]
+    },
+    {
+      "chapter_number": 6,
+      "title": "Identifying the Type of Value and Its Definition",
+      "page_start": 57,
+      "page_end": 68,
+      "topics": ["market value definition", "value types", "fee simple", "leased fee", "leasehold", "investment value"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "valuation"]
+    },
+    {
+      "chapter_number": 7,
+      "title": "Identifying the Rights to Be Appraised",
+      "page_start": 69,
+      "page_end": 86,
+      "topics": ["property rights", "fee simple", "leased fee", "leasehold", "partial interests", "easements", "encumbrances"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "valuation"]
+    },
+    {
+      "chapter_number": 8,
+      "title": "Scope of Work",
+      "page_start": 87,
+      "page_end": 94,
+      "topics": ["scope of work", "USPAP", "assignment conditions", "extraordinary assumptions", "hypothetical conditions"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "methodology"]
+    },
+    {
+      "chapter_number": 9,
+      "title": "Data Collection",
+      "page_start": 95,
+      "page_end": 128,
+      "topics": ["data collection", "general data", "specific data", "competitive supply", "demand analysis", "data sources"],
+      "property_types": [],
+      "applies_to": ["fundamentals", "extraction"]
+    },
+    {
+      "chapter_number": 10,
+      "title": "Economic Trends in Real Estate Markets and Capital Markets",
+      "page_start": 129,
+      "page_end": 162,
+      "topics": ["economic trends", "real estate cycles", "capital markets", "interest rates", "mortgage markets", "investment trends"],
+      "property_types": [],
+      "applies_to": ["market", "fundamentals"]
+    },
+    {
+      "chapter_number": 11,
+      "title": "Neighborhoods, Districts, and Market Areas",
+      "page_start": 163,
+      "page_end": 188,
+      "topics": ["neighborhood analysis", "district analysis", "market area", "location factors", "demographic analysis", "economic base"],
+      "property_types": [],
+      "applies_to": ["market", "extraction"]
+    },
+    {
+      "chapter_number": 12,
+      "title": "Land and Site Description",
+      "page_start": 189,
+      "page_end": 218,
+      "topics": ["site description", "legal description", "physical characteristics", "topography", "utilities", "access", "zoning"],
+      "property_types": ["land"],
+      "applies_to": ["extraction", "fundamentals"]
+    },
+    {
+      "chapter_number": 13,
+      "title": "Building Description",
+      "page_start": 219,
+      "page_end": 274,
+      "topics": ["building description", "construction types", "quality ratings", "condition assessment", "functional utility", "building components"],
+      "property_types": [],
+      "applies_to": ["extraction", "cost"]
+    },
+    {
+      "chapter_number": 14,
+      "title": "Statistical Analysis in Appraisal",
+      "page_start": 275,
+      "page_end": 298,
+      "topics": ["statistics", "regression analysis", "correlation", "standard deviation", "confidence intervals", "sampling"],
+      "property_types": [],
+      "applies_to": ["validation", "methodology"]
+    },
+    {
+      "chapter_number": 15,
+      "title": "Market Analysis",
+      "page_start": 299,
+      "page_end": 330,
+      "topics": ["market analysis", "supply analysis", "demand analysis", "absorption", "vacancy rates", "rent trends", "marketability"],
+      "property_types": [],
+      "applies_to": ["market", "valuation"]
+    },
+    {
+      "chapter_number": 16,
+      "title": "Highest and Best Use Analysis",
+      "page_start": 331,
+      "page_end": 358,
+      "topics": ["highest and best use", "legally permissible", "physically possible", "financially feasible", "maximally productive", "as vacant", "as improved"],
+      "property_types": [],
+      "applies_to": ["valuation", "fundamentals"]
+    },
+    {
+      "chapter_number": 17,
+      "title": "Land and Site Valuation",
+      "page_start": 359,
+      "page_end": 376,
+      "topics": ["land valuation", "sales comparison", "allocation", "extraction method", "ground rent capitalization", "subdivision development", "land residual"],
+      "property_types": ["land", "subdivision"],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 18,
+      "title": "The Sales Comparison Approach",
+      "page_start": 377,
+      "page_end": 396,
+      "topics": ["sales comparison approach", "comparable selection", "units of comparison", "elements of comparison", "adjustment process"],
+      "property_types": [],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 19,
+      "title": "Comparative Analysis",
+      "page_start": 397,
+      "page_end": 426,
+      "topics": ["comparative analysis", "adjustment grid", "paired sales", "qualitative analysis", "quantitative adjustments", "market extraction"],
+      "property_types": [],
+      "applies_to": ["valuation", "extraction"]
+    },
+    {
+      "chapter_number": 20,
+      "title": "Applications of the Sales Comparison Approach",
+      "page_start": 427,
+      "page_end": 438,
+      "topics": ["sales comparison applications", "residential", "commercial", "land sales", "reconciliation of adjustments"],
+      "property_types": [],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 21,
+      "title": "The Income Capitalization Approach",
+      "page_start": 439,
+      "page_end": 462,
+      "topics": ["income capitalization", "income approach overview", "PGI", "EGI", "NOI", "capitalization theory", "direct vs yield"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation", "fundamentals"]
+    },
+    {
+      "chapter_number": 22,
+      "title": "Income and Expense Analysis",
+      "page_start": 463,
+      "page_end": 490,
+      "topics": ["income analysis", "rent roll", "contract rent", "market rent", "vacancy", "collection loss", "other income", "expense analysis", "operating expenses", "OER"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation", "extraction", "validation"]
+    },
+    {
+      "chapter_number": 23,
+      "title": "Direct Capitalization",
+      "page_start": 491,
+      "page_end": 508,
+      "topics": ["direct capitalization", "cap rate", "overall rate", "band of investment", "market extraction", "GRM", "GIM"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 24,
+      "title": "Yield Capitalization",
+      "page_start": 509,
+      "page_end": 528,
+      "topics": ["yield capitalization", "discount rate", "yield rate", "terminal cap rate", "reversion", "holding period"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 25,
+      "title": "Discounted Cash Flow Analysis and Investment Analysis",
+      "page_start": 529,
+      "page_end": 540,
+      "topics": ["DCF", "discounted cash flow", "IRR", "NPV", "investment analysis", "leverage", "equity yield", "cash on cash"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 26,
+      "title": "Applications of the Income Capitalization Approach",
+      "page_start": 541,
+      "page_end": 560,
+      "topics": ["income approach applications", "lease analysis", "credit tenant", "lease rollover", "tenant improvements", "leasing commissions"],
+      "property_types": ["multifamily", "retail", "office", "industrial"],
+      "applies_to": ["valuation", "extraction"]
+    },
+    {
+      "chapter_number": 27,
+      "title": "The Cost Approach",
+      "page_start": 561,
+      "page_end": 580,
+      "topics": ["cost approach", "replacement cost", "reproduction cost", "cost approach steps", "when to use cost approach"],
+      "property_types": [],
+      "applies_to": ["valuation", "cost"]
+    },
+    {
+      "chapter_number": 28,
+      "title": "Building Cost Estimates",
+      "page_start": 581,
+      "page_end": 596,
+      "topics": ["cost estimates", "comparative unit method", "unit-in-place method", "quantity survey", "cost services", "Marshall Swift"],
+      "property_types": [],
+      "applies_to": ["valuation", "cost"]
+    },
+    {
+      "chapter_number": 29,
+      "title": "Depreciation Estimates",
+      "page_start": 597,
+      "page_end": 640,
+      "topics": ["depreciation", "physical deterioration", "functional obsolescence", "external obsolescence", "age-life method", "breakdown method", "curable", "incurable"],
+      "property_types": [],
+      "applies_to": ["valuation", "cost"]
+    },
+    {
+      "chapter_number": 30,
+      "title": "Reconciling Value Indications",
+      "page_start": 641,
+      "page_end": 648,
+      "topics": ["reconciliation", "value indications", "weighting approaches", "final value opinion", "rounding"],
+      "property_types": [],
+      "applies_to": ["valuation"]
+    },
+    {
+      "chapter_number": 31,
+      "title": "The Appraisal Report",
+      "page_start": 649,
+      "page_end": 670,
+      "topics": ["appraisal report", "report types", "USPAP reporting", "narrative report", "restricted report", "certification"],
+      "property_types": [],
+      "applies_to": ["reporting"]
+    },
+    {
+      "chapter_number": 32,
+      "title": "Appraisal Review",
+      "page_start": 671,
+      "page_end": 682,
+      "topics": ["appraisal review", "technical review", "administrative review", "desk review", "field review"],
+      "property_types": [],
+      "applies_to": ["validation", "reporting"]
+    },
+    {
+      "chapter_number": 33,
+      "title": "Consulting",
+      "page_start": 683,
+      "page_end": 688,
+      "topics": ["consulting", "feasibility analysis", "market studies", "investment counseling", "litigation support"],
+      "property_types": [],
+      "applies_to": ["methodology"]
+    },
+    {
+      "chapter_number": 34,
+      "title": "Valuation for Financial Reporting",
+      "page_start": 689,
+      "page_end": 702,
+      "topics": ["financial reporting", "fair value", "FASB", "IFRS", "purchase price allocation", "impairment"],
+      "property_types": [],
+      "applies_to": ["valuation", "reporting"]
+    },
+    {
+      "chapter_number": 35,
+      "title": "Valuation of Real Property with Related Personal Property or Intangible Property",
+      "page_start": 703,
+      "page_end": 716,
+      "topics": ["personal property", "intangible assets", "going concern", "business value", "FF&E", "trade fixtures", "goodwill"],
+      "property_types": ["hotel", "special-purpose"],
+      "applies_to": ["valuation"]
+    }
+  ],
+  "appendices": [
+    {
+      "appendix": "A",
+      "title": "Professional Practice and Law",
+      "page_start": 717,
+      "page_end": 732,
+      "topics": ["USPAP", "licensing", "ethics", "legal issues", "expert testimony"]
+    },
+    {
+      "appendix": "B",
+      "title": "Regression Analysis and Statistical Applications",
+      "page_start": 733,
+      "page_end": 752,
+      "topics": ["regression", "multiple regression", "statistical modeling", "AVM"]
+    },
+    {
+      "appendix": "C",
+      "title": "Financial Formulas",
+      "page_start": 753,
+      "page_end": 796,
+      "topics": ["compound interest", "present value", "future value", "annuities", "mortgage calculations", "six functions of dollar"]
+    }
+  ]
+}

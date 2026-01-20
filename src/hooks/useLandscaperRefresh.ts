@@ -27,14 +27,20 @@ export function useLandscaperRefresh(
   onRefresh: () => void
 ): void {
   useEffect(() => {
+    console.log(`[useLandscaperRefresh] Subscribing for project ${projectId}, watching tables:`, tables);
+
     const unsubscribe = onMutationComplete((detail: LandscaperMutationDetail) => {
+      console.log(`[useLandscaperRefresh] Received event:`, detail);
+
       // Only refresh if this mutation is for our project
       if (detail.projectId !== projectId) {
+        console.log(`[useLandscaperRefresh] Skipping - wrong project (got ${detail.projectId}, want ${projectId})`);
         return;
       }
 
       // Only refresh if this mutation affects tables we care about
       if (!affectsAnyTable(detail, tables)) {
+        console.log(`[useLandscaperRefresh] Skipping - tables don't match (got ${detail.tables}, want ${tables})`);
         return;
       }
 
@@ -46,6 +52,9 @@ export function useLandscaperRefresh(
       onRefresh();
     });
 
-    return unsubscribe;
+    return () => {
+      console.log(`[useLandscaperRefresh] Unsubscribing for project ${projectId}`);
+      unsubscribe();
+    };
   }, [projectId, tables, onRefresh]);
 }

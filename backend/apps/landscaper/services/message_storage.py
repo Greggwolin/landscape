@@ -119,7 +119,7 @@ class MessageStorageService:
             cursor.execute("""
                 INSERT INTO landscape.landscaper_chat_message
                 (project_id, message_id, role, content, metadata, timestamp, active_tab)
-                VALUES (%s, %s, 'assistant', %s, %s::jsonb, NOW(), %s)
+                VALUES (%s, %s, 'assistant', %s, %s::jsonb, NOW() + interval '1 millisecond', %s)
                 RETURNING message_id, timestamp
             """, [
                 project_id,

@@ -275,6 +275,16 @@ class IncomeApproach(models.Model):
     """
     Income Approach valuation methodology.
     Maps to landscape.tbl_income_approach
+
+    ARCHITECTURE NOTE (QK-16):
+    This model contains fields stored ONLY in tbl_income_approach.
+    Most assumptions are sourced from normalized tables via IncomeApproachDataService:
+      - Vacancy/credit loss -> tbl_project_assumption (physical_vacancy_pct, bad_debt_pct)
+      - DCF params -> tbl_cre_dcf_analysis (hold_period_years, discount_rate, etc.)
+      - Growth rates -> core_fin_growth_rate_sets/steps (by card_type)
+      - Management fee -> tbl_project_assumption (management_fee_pct)
+
+    Migration 046 adds only 4 UI-specific fields not stored elsewhere.
     """
 
     CAP_RATE_METHODS = [
@@ -284,6 +294,13 @@ class IncomeApproach(models.Model):
         ('other', 'Other'),
     ]
 
+    NOI_BASIS_CHOICES = [
+        ('trailing_12', 'Trailing 12 Months'),
+        ('forward_12', 'Forward 12 Months'),
+        ('avg_straddle', 'Average (Straddle)'),
+        ('stabilized', 'Stabilized'),
+    ]
+
     income_approach_id = models.AutoField(primary_key=True)
     project = models.ForeignKey(
         Project,
@@ -291,6 +308,10 @@ class IncomeApproach(models.Model):
         db_column='project_id',
         related_name='income_approach'
     )
+
+    # ==========================================================================
+    # ORIGINAL FIELDS (exist in DB pre-migration 046)
+    # ==========================================================================
 
     # Direct Capitalization
     market_cap_rate_method = models.CharField(
@@ -303,7 +324,7 @@ class IncomeApproach(models.Model):
     cap_rate_justification = models.TextField(null=True, blank=True)
     direct_cap_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
-    # DCF (optional)
+    # DCF Parameters (original - legacy, prefer tbl_cre_dcf_analysis via service)
     forecast_period_years = models.IntegerField(null=True, blank=True)
     terminal_cap_rate = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
     discount_rate = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
@@ -311,6 +332,38 @@ class IncomeApproach(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # ==========================================================================
+    # MIGRATION 046 FIELDS (UI-specific, not duplicated elsewhere)
+    # Run: psql -f migrations/046_income_approach_enhancements.sql
+    # ==========================================================================
+
+    # NOI Capitalization Basis - UI state for which NOI to display
+    noi_capitalization_basis = models.CharField(
+        max_length=20,
+        choices=NOI_BASIS_CHOICES,
+        default='forward_12',
+        null=True,
+        blank=True,
+        help_text='NOI basis for direct cap: trailing_12, forward_12, avg_straddle, stabilized'
+    )
+
+    # Stabilized Vacancy Rate - separate from physical_vacancy_pct in tbl_project_assumption
+    # This is market-standard vacancy specifically for stabilized NOI calculation
+    stabilized_vacancy_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, default=0.05, null=True, blank=True,
+        help_text='Market-standard vacancy for stabilized NOI (0.05 = 5%)'
+    )
+
+    # Sensitivity Analysis Intervals - UI parameters for sensitivity matrix
+    cap_rate_interval = models.DecimalField(
+        max_digits=5, decimal_places=4, default=0.0050, null=True, blank=True,
+        help_text='Interval for cap rate sensitivity (0.0050 = 50 bps)'
+    )
+    discount_rate_interval = models.DecimalField(
+        max_digits=5, decimal_places=4, default=0.0050, null=True, blank=True,
+        help_text='Interval for discount rate sensitivity (0.0050 = 50 bps)'
+    )
 
     class Meta:
         managed = False
@@ -401,3 +454,283 @@ class ValuationReconciliation(models.Model):
             float(self.cost_approach_weight or 0) +
             float(self.income_approach_weight or 0)
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Highest & Best Use (H&BU) Analysis Models
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class HBUAnalysis(models.Model):
+    """
+    Highest & Best Use analysis implementing the four-test framework.
+
+    Maps to landscape.tbl_hbu_analysis
+
+    Use Cases:
+    - Existing Stabilized Property: 1 row (as_improved)
+    - Value-Add Analysis: 2 rows (current + renovated)
+    - Proposed Development: 2 rows (as_vacant + as_improved)
+    - Feasibility Study: 3+ rows (multiple alternatives)
+    """
+
+    SCENARIO_TYPES = [
+        ('as_vacant', 'As Vacant'),
+        ('as_improved', 'As Improved'),
+        ('alternative', 'Alternative'),
+    ]
+
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('ai_generated', 'AI Generated'),
+        ('user_reviewed', 'User Reviewed'),
+        ('final', 'Final'),
+    ]
+
+    PRODUCTIVITY_METRICS = [
+        ('residual_land_value', 'Residual Land Value'),
+        ('irr', 'Internal Rate of Return'),
+        ('profit_margin', 'Profit Margin'),
+    ]
+
+    hbu_id = models.BigAutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='hbu_analyses'
+    )
+
+    # Scenario identification
+    scenario_name = models.CharField(max_length=200)
+    scenario_type = models.CharField(max_length=50, choices=SCENARIO_TYPES)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 1. Legally Permissible
+    # ─────────────────────────────────────────────────────────────────────────
+    legal_permissible = models.BooleanField(null=True, blank=True)
+    legal_zoning_code = models.CharField(max_length=100, blank=True, null=True)
+    legal_zoning_source_doc = models.ForeignKey(
+        'documents.Document',
+        on_delete=models.SET_NULL,
+        db_column='legal_zoning_source_doc_id',
+        null=True,
+        blank=True,
+        related_name='hbu_zoning_sources'
+    )
+    legal_permitted_uses = models.JSONField(null=True, blank=True)
+    legal_requires_variance = models.BooleanField(default=False)
+    legal_variance_type = models.CharField(max_length=200, blank=True, null=True)
+    legal_narrative = models.TextField(blank=True, null=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 2. Physically Possible
+    # ─────────────────────────────────────────────────────────────────────────
+    physical_possible = models.BooleanField(null=True, blank=True)
+    physical_site_adequate = models.BooleanField(null=True, blank=True)
+    physical_topography_suitable = models.BooleanField(null=True, blank=True)
+    physical_utilities_available = models.BooleanField(null=True, blank=True)
+    physical_access_adequate = models.BooleanField(null=True, blank=True)
+    physical_constraints = models.JSONField(null=True, blank=True)
+    physical_narrative = models.TextField(blank=True, null=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3. Economically Feasible
+    # ─────────────────────────────────────────────────────────────────────────
+    economic_feasible = models.BooleanField(null=True, blank=True)
+    economic_development_cost = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    economic_stabilized_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    economic_residual_land_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    economic_profit_margin_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    economic_irr_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    economic_feasibility_threshold = models.CharField(
+        max_length=50, blank=True, null=True
+    )
+    economic_narrative = models.TextField(blank=True, null=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 4. Maximally Productive
+    # ─────────────────────────────────────────────────────────────────────────
+    is_maximally_productive = models.BooleanField(default=False)
+    productivity_rank = models.IntegerField(null=True, blank=True)
+    productivity_metric = models.CharField(
+        max_length=50, choices=PRODUCTIVITY_METRICS, blank=True, null=True
+    )
+    productivity_narrative = models.TextField(blank=True, null=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Conclusion
+    # ─────────────────────────────────────────────────────────────────────────
+    conclusion_use_type = models.CharField(max_length=200, blank=True, null=True)
+    conclusion_density = models.CharField(max_length=100, blank=True, null=True)
+    conclusion_summary = models.TextField(blank=True, null=True)
+    conclusion_full_narrative = models.TextField(blank=True, null=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Status & Audit
+    # ─────────────────────────────────────────────────────────────────────────
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True, null=True)
+    updated_by = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_hbu_analysis'
+        ordering = ['project', 'productivity_rank', 'scenario_name']
+        verbose_name = 'H&BU Analysis'
+        verbose_name_plural = 'H&BU Analyses'
+
+    def __str__(self):
+        return f"{self.scenario_name} ({self.get_scenario_type_display()})"
+
+    @property
+    def passes_all_tests(self):
+        """Check if this scenario passes all four H&BU tests."""
+        return (
+            self.legal_permissible is True and
+            self.physical_possible is True and
+            self.economic_feasible is True
+        )
+
+    @property
+    def test_summary(self):
+        """Return a summary of test results."""
+        return {
+            'legal': self.legal_permissible,
+            'physical': self.physical_possible,
+            'economic': self.economic_feasible,
+            'is_hbu': self.is_maximally_productive,
+        }
+
+
+class HBUComparableUse(models.Model):
+    """
+    Individual uses tested within an H&BU analysis for feasibility comparison.
+
+    Maps to landscape.tbl_hbu_comparable_use
+    """
+
+    comparable_use_id = models.BigAutoField(primary_key=True)
+    hbu = models.ForeignKey(
+        HBUAnalysis,
+        on_delete=models.CASCADE,
+        db_column='hbu_id',
+        related_name='comparable_uses'
+    )
+
+    # Use identification
+    use_name = models.CharField(max_length=200)
+    use_category = models.CharField(max_length=100, blank=True, null=True)
+
+    # Four tests for this specific use
+    is_legally_permissible = models.BooleanField(null=True, blank=True)
+    is_physically_possible = models.BooleanField(null=True, blank=True)
+    is_economically_feasible = models.BooleanField(null=True, blank=True)
+
+    # Key metrics
+    proposed_density = models.CharField(max_length=100, blank=True, null=True)
+    development_cost = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    stabilized_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    residual_land_value = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    irr_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    # Ranking
+    feasibility_rank = models.IntegerField(null=True, blank=True)
+
+    # Notes
+    notes = models.TextField(blank=True, null=True)
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_hbu_comparable_use'
+        ordering = ['hbu', 'feasibility_rank', 'use_name']
+        verbose_name = 'H&BU Comparable Use'
+        verbose_name_plural = 'H&BU Comparable Uses'
+
+    def __str__(self):
+        return f"{self.use_name} (Rank: {self.feasibility_rank or 'N/A'})"
+
+    @property
+    def passes_feasibility(self):
+        """Check if this use passes all feasibility tests."""
+        return (
+            self.is_legally_permissible is True and
+            self.is_physically_possible is True and
+            self.is_economically_feasible is True
+        )
+
+
+class HBUZoningDocument(models.Model):
+    """
+    Zoning documents linked to H&BU analysis with AI-extracted data.
+
+    Maps to landscape.tbl_hbu_zoning_document
+    """
+
+    zoning_doc_id = models.BigAutoField(primary_key=True)
+    hbu = models.ForeignKey(
+        HBUAnalysis,
+        on_delete=models.CASCADE,
+        db_column='hbu_id',
+        related_name='zoning_documents'
+    )
+    document = models.ForeignKey(
+        'documents.Document',
+        on_delete=models.CASCADE,
+        db_column='document_id',
+        related_name='hbu_zoning_extractions'
+    )
+
+    # Extracted data
+    jurisdiction_name = models.CharField(max_length=200, blank=True, null=True)
+    zoning_designation = models.CharField(max_length=100, blank=True, null=True)
+    permitted_uses_extracted = models.JSONField(null=True, blank=True)
+    conditional_uses_extracted = models.JSONField(null=True, blank=True)
+    prohibited_uses_extracted = models.JSONField(null=True, blank=True)
+    development_standards_extracted = models.JSONField(null=True, blank=True)
+
+    # Extraction metadata
+    extraction_confidence = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True
+    )
+    extraction_date = models.DateTimeField(null=True, blank=True)
+    user_verified = models.BooleanField(default=False)
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_hbu_zoning_document'
+        ordering = ['hbu', '-created_at']
+        verbose_name = 'H&BU Zoning Document'
+        verbose_name_plural = 'H&BU Zoning Documents'
+
+    def __str__(self):
+        return f"Zoning: {self.zoning_designation or 'Pending'} - {self.document.doc_name if self.document else 'No doc'}"
+
+    @property
+    def has_extractions(self):
+        """Check if AI extractions have been completed."""
+        return self.extraction_date is not None

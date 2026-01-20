@@ -31,6 +31,21 @@ interface DocumentChatModalProps {
   };
 }
 
+const formatChatResponse = (content: string) => {
+  let text = content || '';
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  text = text.replace(/\s*#{2,6}\s*/g, '\n');
+  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  text = text.replace(/__(.*?)__/g, '$1');
+  text = text.replace(/\s*-\s+/g, '\n  ');
+  text = text.replace(/\s*\*\s+/g, '\n  ');
+  text = text.replace(/(^|\s)\*(\S)/g, '$1$2');
+  text = text.replace(/(\S)\*(\s|$)/g, '$1$2');
+  text = text.replace(/[ \t]+\n/g, '\n');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  return text.trim();
+};
+
 export default function DocumentChatModal({
   visible,
   onClose,
@@ -83,7 +98,7 @@ export default function DocumentChatModal({
         ...prev,
         {
           role: 'assistant',
-          content: data.content || data.response,
+          content: formatChatResponse(data.content || data.response || ''),
           sources_used: data.metadata?.rag_chunks_used || data.sources_used,
         },
       ]);
@@ -175,7 +190,9 @@ export default function DocumentChatModal({
                 }`}
                 style={{ maxWidth: '85%' }}
               >
-                <p className="mb-0 white-space-pre-wrap">{msg.content}</p>
+                <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                  {msg.content}
+                </p>
                 {msg.sources_used !== undefined && msg.sources_used > 0 && (
                   <p className="mb-0 mt-1 small opacity-75">
                     Based on {msg.sources_used} passage

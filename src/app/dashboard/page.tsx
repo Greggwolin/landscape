@@ -7,6 +7,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import UserTile from '@/app/components/dashboard/UserTile';
 import DashboardMap from '@/app/components/dashboard/DashboardMap';
+import TriageModal from '@/app/components/dashboard/TriageModal';
 import { LandscapeButton } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
 
@@ -287,8 +288,10 @@ export default function DashboardPage() {
   const { projects, selectProject } = useProjectContext();
   const router = useRouter();
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<PropertyFilterKey>('ALL');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const sortedProjects = useMemo(() => {
     // Get last accessed timestamps from localStorage
@@ -359,6 +362,76 @@ export default function DashboardPage() {
     setActiveFilter((prev) => (prev === filter ? 'ALL' : filter));
   };
 
+  // Handle file drop from UserTile - show triage modal first
+  const handleFileDrop = (files: File[]) => {
+    setPendingFiles(files);
+    setIsTriageModalOpen(true);
+  };
+
+  // Clear pending files when modal closes
+  const handleModalClose = () => {
+    setIsNewProjectModalOpen(false);
+    setPendingFiles([]);
+  };
+
+  // Triage modal handlers
+  const handleTriageClose = () => {
+    setIsTriageModalOpen(false);
+    setPendingFiles([]);
+  };
+
+  const handleTriageNewProject = (files: File[]) => {
+    // First set the files, then open modal in next tick to ensure state is updated
+    setPendingFiles(files);
+    setIsTriageModalOpen(false);
+    // Use setTimeout to ensure pendingFiles state is committed before modal checks it
+    setTimeout(() => {
+      setIsNewProjectModalOpen(true);
+    }, 0);
+  };
+
+  const handleTriageAssociate = async (projectId: number, files: File[]) => {
+    // Upload files to DMS for the existing project
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('project_id', projectId.toString());
+
+        await fetch('/api/dms/upload', {
+          method: 'POST',
+          body: formData
+        });
+      }
+
+      // Navigate to the project
+      selectProject(projectId);
+      router.push(`/projects/${projectId}`);
+    } catch (error) {
+      console.error('Failed to associate files with project:', error);
+    }
+  };
+
+  const handleTriageKnowledge = async (files: File[]) => {
+    // Upload to knowledge store without project association
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('knowledge_only', 'true');
+
+        await fetch('/api/dms/upload', {
+          method: 'POST',
+          body: formData
+        });
+      }
+      // Could show a toast notification here
+      console.log('Files added to knowledge store');
+    } catch (error) {
+      console.error('Failed to add files to knowledge store:', error);
+    }
+  };
+
   return (
     <CContainer fluid className="p-4 space-y-2">
       <div className="sticky top-0 z-30 pb-1" style={{ backgroundColor: 'transparent' }}>
@@ -391,7 +464,7 @@ export default function DashboardPage() {
               handleProjectClick(project.project_id);
             }}
           />
-          <UserTile username="Gregg" onSubmit={handleLandscaperMessage} />
+          <UserTile username="Gregg" onSubmit={handleLandscaperMessage} onFileDrop={handleFileDrop} />
         </div>
 
         <CCard className="h-full">
@@ -408,9 +481,20 @@ export default function DashboardPage() {
         </CCard>
       </div>
 
+      <TriageModal
+        isOpen={isTriageModalOpen}
+        onClose={handleTriageClose}
+        files={pendingFiles}
+        projects={projects}
+        onNewProject={handleTriageNewProject}
+        onAssociateWithProject={handleTriageAssociate}
+        onAddToKnowledge={handleTriageKnowledge}
+      />
+
       <NewProjectModal
         isOpen={isNewProjectModalOpen}
-        onClose={() => setIsNewProjectModalOpen(false)}
+        onClose={handleModalClose}
+        initialFiles={pendingFiles.length > 0 ? pendingFiles : undefined}
       />
     </CContainer>
   );
