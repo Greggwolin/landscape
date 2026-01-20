@@ -1,6 +1,7 @@
 /* MapLibre GL CSS - must be first */
 @import 'maplibre-gl/dist/maplibre-gl.css';
 @import '../styles/tokens.css';
+@import '../styles/studio-theme.css';
 @import '../styles/component-patterns.css';
 
 /* MapLibre popup styles */

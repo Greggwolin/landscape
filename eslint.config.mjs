@@ -114,6 +114,24 @@ const eslintConfig = [
       "@typescript-eslint/no-empty-object-type": "warn",
     },
   },
+
+  // STUDIO COMPONENTS: Enforce CSS variables for colors (no Tailwind color classes)
+  // This ensures theming consistency and prevents hardcoded colors in Studio components
+  {
+    files: ["src/components/studio/**/*.tsx", "src/components/studio/**/*.ts"],
+    rules: {
+      // Warn on Tailwind color classes - must use CSS variables from studio-theme.css
+      // Pattern matches: bg-*, text-*, border-* with color names (red, blue, gray, etc.)
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "JSXAttribute[name.name='className'][value.type='Literal']",
+          message:
+            "Studio components: Review className for Tailwind color classes (bg-*, text-*, border-* with colors). Use CSS variables from studio-theme.css instead. Layout utilities (flex, grid, p-*, m-*, etc.) are allowed.",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

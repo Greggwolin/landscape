@@ -1,0 +1,424 @@
+/**
+ * Studio Theme - CSS Variables for Studio Components
+ *
+ * CRITICAL: Studio components use CSS variables exclusively for colors.
+ * NO Tailwind color classes (bg-*, text-*, border-*) are allowed.
+ * Use Tailwind only for layout utilities (flex, grid, p-*, m-*, etc.)
+ *
+ * @version 1.0
+ * @created 2026-01-20
+ */
+
+:root {
+  /* ========================================
+   * STUDIO BRAND / PRIMARY
+   * ======================================== */
+  --studio-primary: var(--brand-primary);
+  --studio-primary-hover: color-mix(in srgb, var(--brand-primary) 85%, black);
+  --studio-primary-muted: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  --studio-accent: var(--brand-accent);
+
+  /* ========================================
+   * STUDIO SURFACES
+   * ======================================== */
+  --studio-bg: var(--surface-bg);
+  --studio-bg-elevated: var(--surface-card);
+  --studio-bg-sunken: var(--surface-page-bg);
+  --studio-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Panel backgrounds */
+  --studio-panel-bg: var(--surface-card);
+  --studio-panel-header-bg: var(--surface-card-header);
+  --studio-panel-border: var(--line-soft);
+
+  /* Card backgrounds */
+  --studio-card-bg: var(--surface-tile);
+  --studio-card-header-bg: var(--surface-card-header);
+  --studio-card-border: var(--line-soft);
+
+  /* ========================================
+   * STUDIO TEXT
+   * ======================================== */
+  --studio-text: var(--text-primary);
+  --studio-text-secondary: var(--text-secondary);
+  --studio-text-muted: color-mix(in srgb, var(--text-secondary) 70%, transparent);
+  --studio-text-inverse: var(--text-inverse);
+  --studio-text-link: var(--brand-primary);
+  --studio-text-link-hover: var(--studio-primary-hover);
+
+  /* ========================================
+   * STUDIO BORDERS
+   * ======================================== */
+  --studio-border: var(--line-soft);
+  --studio-border-strong: var(--line-strong);
+  --studio-border-focus: var(--brand-primary);
+  --studio-border-error: var(--chip-error);
+
+  /* ========================================
+   * STUDIO INPUTS / FORMS
+   * ======================================== */
+  --studio-input-bg: var(--surface-card);
+  --studio-input-border: var(--line-soft);
+  --studio-input-border-hover: var(--line-strong);
+  --studio-input-border-focus: var(--brand-primary);
+  --studio-input-text: var(--text-primary);
+  --studio-input-placeholder: var(--text-secondary);
+  --studio-input-disabled-bg: color-mix(in srgb, var(--surface-card) 50%, var(--surface-bg));
+  --studio-input-disabled-text: var(--text-secondary);
+
+  /* ========================================
+   * STUDIO BUTTONS
+   * ======================================== */
+  /* Primary button */
+  --studio-btn-primary-bg: var(--brand-primary);
+  --studio-btn-primary-bg-hover: var(--studio-primary-hover);
+  --studio-btn-primary-text: var(--text-inverse);
+  --studio-btn-primary-border: var(--brand-primary);
+
+  /* Secondary button */
+  --studio-btn-secondary-bg: transparent;
+  --studio-btn-secondary-bg-hover: var(--hover-overlay);
+  --studio-btn-secondary-text: var(--text-primary);
+  --studio-btn-secondary-border: var(--line-soft);
+
+  /* Ghost button */
+  --studio-btn-ghost-bg: transparent;
+  --studio-btn-ghost-bg-hover: var(--hover-overlay);
+  --studio-btn-ghost-text: var(--text-secondary);
+
+  /* Danger button */
+  --studio-btn-danger-bg: var(--chip-error);
+  --studio-btn-danger-bg-hover: color-mix(in srgb, var(--chip-error) 85%, black);
+  --studio-btn-danger-text: var(--text-inverse);
+
+  /* ========================================
+   * STUDIO SEMANTIC STATES
+   * ======================================== */
+  /* Success */
+  --studio-success: var(--chip-success);
+  --studio-success-bg: color-mix(in srgb, var(--chip-success) 10%, transparent);
+  --studio-success-border: color-mix(in srgb, var(--chip-success) 30%, transparent);
+
+  /* Warning */
+  --studio-warning: var(--chip-warning);
+  --studio-warning-bg: color-mix(in srgb, var(--chip-warning) 10%, transparent);
+  --studio-warning-border: color-mix(in srgb, var(--chip-warning) 30%, transparent);
+
+  /* Error / Danger */
+  --studio-error: var(--chip-error);
+  --studio-error-bg: color-mix(in srgb, var(--chip-error) 10%, transparent);
+  --studio-error-border: color-mix(in srgb, var(--chip-error) 30%, transparent);
+
+  /* Info */
+  --studio-info: var(--chip-info);
+  --studio-info-bg: color-mix(in srgb, var(--chip-info) 10%, transparent);
+  --studio-info-border: color-mix(in srgb, var(--chip-info) 30%, transparent);
+
+  /* ========================================
+   * STUDIO INTERACTIVE STATES
+   * ======================================== */
+  --studio-hover-overlay: var(--hover-overlay);
+  --studio-active-overlay: var(--active-overlay);
+  --studio-focus-ring: 0 0 0 2px var(--brand-primary);
+  --studio-disabled-opacity: 0.5;
+
+  /* ========================================
+   * STUDIO SHADOWS
+   * ======================================== */
+  --studio-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --studio-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --studio-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --studio-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  /* ========================================
+   * STUDIO TYPOGRAPHY (sizes reference Tailwind)
+   * ======================================== */
+  --studio-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --studio-font-mono: ui-monospace, monospace;
+
+  /* ========================================
+   * STUDIO LAYOUT DIMENSIONS
+   * ======================================== */
+  --studio-sidebar-width: 280px;
+  --studio-header-height: 56px;
+  --studio-panel-gap: 16px;
+  --studio-border-radius: 6px;
+  --studio-border-radius-lg: 8px;
+
+  /* ========================================
+   * STUDIO DATA VISUALIZATION
+   * ======================================== */
+  --studio-chart-primary: var(--brand-primary);
+  --studio-chart-secondary: var(--brand-accent);
+  --studio-chart-success: var(--chip-success);
+  --studio-chart-warning: var(--chip-warning);
+  --studio-chart-error: var(--chip-error);
+  --studio-chart-neutral: var(--chip-muted);
+
+  /* ========================================
+   * STUDIO PROPERTY/VALUATION SPECIFIC
+   * ======================================== */
+  --studio-attribute-label: var(--text-secondary);
+  --studio-attribute-value: var(--text-primary);
+  --studio-attribute-unit: var(--text-secondary);
+  --studio-rating-star: #fbbf24;
+  --studio-rating-empty: var(--line-soft);
+}
+
+/* ========================================
+ * DARK THEME OVERRIDES
+ * ======================================== */
+[data-coreui-theme='dark'] {
+  /* Surfaces - darker backgrounds */
+  --studio-bg: var(--surface-bg);
+  --studio-bg-elevated: var(--surface-card);
+  --studio-bg-sunken: #070c14;
+  --studio-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Shadows - more prominent in dark mode */
+  --studio-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --studio-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --studio-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --studio-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
+
+  /* Semantic states - slightly more vibrant backgrounds in dark */
+  --studio-success-bg: color-mix(in srgb, var(--chip-success) 15%, transparent);
+  --studio-warning-bg: color-mix(in srgb, var(--chip-warning) 15%, transparent);
+  --studio-error-bg: color-mix(in srgb, var(--chip-error) 15%, transparent);
+  --studio-info-bg: color-mix(in srgb, var(--chip-info) 15%, transparent);
+}
+
+/* ========================================
+ * STUDIO COMPONENT CLASSES
+ * These provide semantic styling for common patterns
+ * ======================================== */
+
+/* Studio Panel - Main content container */
+.studio-panel {
+  background-color: var(--studio-panel-bg);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-border-radius-lg);
+  box-shadow: var(--studio-shadow-sm);
+}
+
+.studio-panel-header {
+  background-color: var(--studio-panel-header-bg);
+  border-bottom: 1px solid var(--studio-panel-border);
+  padding: 12px 16px;
+  border-radius: var(--studio-border-radius-lg) var(--studio-border-radius-lg) 0 0;
+}
+
+.studio-panel-body {
+  padding: 16px;
+}
+
+/* Studio Card - Smaller content container */
+.studio-card {
+  background-color: var(--studio-card-bg);
+  border: 1px solid var(--studio-card-border);
+  border-radius: var(--studio-border-radius);
+  box-shadow: var(--studio-shadow-sm);
+}
+
+.studio-card-header {
+  background-color: var(--studio-card-header-bg);
+  border-bottom: 1px solid var(--studio-card-border);
+  padding: 10px 14px;
+  font-weight: 500;
+  color: var(--studio-text);
+}
+
+.studio-card-body {
+  padding: 14px;
+}
+
+/* Studio Form Group */
+.studio-form-group {
+  margin-bottom: 16px;
+}
+
+.studio-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--studio-text-secondary);
+}
+
+.studio-input {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--studio-input-bg);
+  border: 1px solid var(--studio-input-border);
+  border-radius: var(--studio-border-radius);
+  color: var(--studio-input-text);
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+}
+
+.studio-input:hover {
+  border-color: var(--studio-input-border-hover);
+}
+
+.studio-input:focus {
+  outline: none;
+  border-color: var(--studio-input-border-focus);
+  box-shadow: var(--studio-focus-ring);
+}
+
+.studio-input:disabled {
+  background-color: var(--studio-input-disabled-bg);
+  color: var(--studio-input-disabled-text);
+  cursor: not-allowed;
+}
+
+.studio-input::placeholder {
+  color: var(--studio-input-placeholder);
+}
+
+/* Studio Buttons */
+.studio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--studio-border-radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.studio-btn:disabled {
+  opacity: var(--studio-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.studio-btn-primary {
+  background-color: var(--studio-btn-primary-bg);
+  color: var(--studio-btn-primary-text);
+  border: 1px solid var(--studio-btn-primary-border);
+}
+
+.studio-btn-primary:hover:not(:disabled) {
+  background-color: var(--studio-btn-primary-bg-hover);
+}
+
+.studio-btn-secondary {
+  background-color: var(--studio-btn-secondary-bg);
+  color: var(--studio-btn-secondary-text);
+  border: 1px solid var(--studio-btn-secondary-border);
+}
+
+.studio-btn-secondary:hover:not(:disabled) {
+  background-color: var(--studio-btn-secondary-bg-hover);
+}
+
+.studio-btn-ghost {
+  background-color: var(--studio-btn-ghost-bg);
+  color: var(--studio-btn-ghost-text);
+  border: none;
+}
+
+.studio-btn-ghost:hover:not(:disabled) {
+  background-color: var(--studio-btn-ghost-bg-hover);
+}
+
+.studio-btn-danger {
+  background-color: var(--studio-btn-danger-bg);
+  color: var(--studio-btn-danger-text);
+  border: 1px solid var(--studio-btn-danger-bg);
+}
+
+.studio-btn-danger:hover:not(:disabled) {
+  background-color: var(--studio-btn-danger-bg-hover);
+}
+
+/* Studio Text utilities */
+.studio-text-primary {
+  color: var(--studio-text);
+}
+
+.studio-text-secondary {
+  color: var(--studio-text-secondary);
+}
+
+.studio-text-muted {
+  color: var(--studio-text-muted);
+}
+
+.studio-text-success {
+  color: var(--studio-success);
+}
+
+.studio-text-warning {
+  color: var(--studio-warning);
+}
+
+.studio-text-error {
+  color: var(--studio-error);
+}
+
+/* Studio Background utilities */
+.studio-bg-success {
+  background-color: var(--studio-success-bg);
+}
+
+.studio-bg-warning {
+  background-color: var(--studio-warning-bg);
+}
+
+.studio-bg-error {
+  background-color: var(--studio-error-bg);
+}
+
+.studio-bg-info {
+  background-color: var(--studio-info-bg);
+}
+
+/* Studio Divider */
+.studio-divider {
+  height: 1px;
+  background-color: var(--studio-border);
+  margin: 16px 0;
+}
+
+/* Studio Badge */
+.studio-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+.studio-badge-success {
+  background-color: var(--studio-success-bg);
+  color: var(--studio-success);
+  border: 1px solid var(--studio-success-border);
+}
+
+.studio-badge-warning {
+  background-color: var(--studio-warning-bg);
+  color: var(--studio-warning);
+  border: 1px solid var(--studio-warning-border);
+}
+
+.studio-badge-error {
+  background-color: var(--studio-error-bg);
+  color: var(--studio-error);
+  border: 1px solid var(--studio-error-border);
+}
+
+.studio-badge-info {
+  background-color: var(--studio-info-bg);
+  color: var(--studio-info);
+  border: 1px solid var(--studio-info-border);
+}
+
+/* Studio Tabular Numbers */
+.studio-tnum {
+  font-variant-numeric: tabular-nums;
+}
