@@ -1,0 +1,1318 @@
+{
+  "generated": "2026-01-21T00:02:54.635087",
+  "database": "land_v2",
+  "schema": "landscape",
+  "tables": [
+    {
+      "name": "_migrations",
+      "columns": 4,
+      "rows": 8
+    },
+    {
+      "name": "ai_correction_log",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "ai_debug_log",
+      "columns": 4,
+      "rows": 14
+    },
+    {
+      "name": "ai_extraction_staging",
+      "columns": 27,
+      "rows": 646
+    },
+    {
+      "name": "ai_extraction_warnings",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "ai_ingestion_history",
+      "columns": 7,
+      "rows": 64
+    },
+    {
+      "name": "ai_review_history",
+      "columns": 8,
+      "rows": 35
+    },
+    {
+      "name": "auth_group",
+      "columns": 2,
+      "rows": 0
+    },
+    {
+      "name": "auth_group_permissions",
+      "columns": 3,
+      "rows": 0
+    },
+    {
+      "name": "auth_permission",
+      "columns": 4,
+      "rows": 400
+    },
+    {
+      "name": "auth_user",
+      "columns": 18,
+      "rows": 1
+    },
+    {
+      "name": "auth_user_groups",
+      "columns": 3,
+      "rows": 0
+    },
+    {
+      "name": "auth_user_user_permissions",
+      "columns": 3,
+      "rows": 0
+    },
+    {
+      "name": "bmk_absorption_velocity",
+      "columns": 8,
+      "rows": 0
+    },
+    {
+      "name": "bmk_builder_communities",
+      "columns": 27,
+      "rows": 20
+    },
+    {
+      "name": "bmk_builder_inventory",
+      "columns": 23,
+      "rows": 0
+    },
+    {
+      "name": "bmk_builder_plans",
+      "columns": 20,
+      "rows": 0
+    },
+    {
+      "name": "bmk_resale_closings",
+      "columns": 27,
+      "rows": 7
+    },
+    {
+      "name": "core_category_lifecycle_stages",
+      "columns": 5,
+      "rows": 94
+    },
+    {
+      "name": "core_category_tag_library",
+      "columns": 9,
+      "rows": 16
+    },
+    {
+      "name": "core_doc",
+      "columns": 32,
+      "rows": 66
+    },
+    {
+      "name": "core_doc_attr_enum",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "core_doc_attr_lookup",
+      "columns": 4,
+      "rows": 0
+    },
+    {
+      "name": "core_doc_folder",
+      "columns": 9,
+      "rows": 5
+    },
+    {
+      "name": "core_doc_folder_link",
+      "columns": 4,
+      "rows": 0
+    },
+    {
+      "name": "core_doc_smartfilter",
+      "columns": 6,
+      "rows": 0
+    },
+    {
+      "name": "core_doc_text",
+      "columns": 6,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_budget_version",
+      "columns": 6,
+      "rows": 5
+    },
+    {
+      "name": "core_fin_category_uom",
+      "columns": 2,
+      "rows": 10
+    },
+    {
+      "name": "core_fin_confidence_policy",
+      "columns": 6,
+      "rows": 4
+    },
+    {
+      "name": "core_fin_crosswalk_ad",
+      "columns": 3,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_crosswalk_ae",
+      "columns": 3,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_curve",
+      "columns": 4,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_division_applicability",
+      "columns": 2,
+      "rows": 15
+    },
+    {
+      "name": "core_fin_fact_actual",
+      "columns": 12,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_fact_budget",
+      "columns": 81,
+      "rows": 44
+    },
+    {
+      "name": "core_fin_fact_tags",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_funding_source",
+      "columns": 7,
+      "rows": 0
+    },
+    {
+      "name": "core_fin_growth_rate_sets",
+      "columns": 10,
+      "rows": 20
+    },
+    {
+      "name": "core_fin_growth_rate_steps",
+      "columns": 8,
+      "rows": 9
+    },
+    {
+      "name": "core_fin_uom",
+      "columns": 5,
+      "rows": 17
+    },
+    {
+      "name": "core_item_benchmark_link",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "core_lookup_item",
+      "columns": 7,
+      "rows": 18
+    },
+    {
+      "name": "core_lookup_list",
+      "columns": 5,
+      "rows": 4
+    },
+    {
+      "name": "core_planning_standards",
+      "columns": 8,
+      "rows": 1
+    },
+    {
+      "name": "core_unit_cost_category",
+      "columns": 12,
+      "rows": 95
+    },
+    {
+      "name": "core_unit_cost_item",
+      "columns": 19,
+      "rows": 293
+    },
+    {
+      "name": "core_workspace_member",
+      "columns": 4,
+      "rows": 0
+    },
+    {
+      "name": "density_classification",
+      "columns": 12,
+      "rows": 8
+    },
+    {
+      "name": "developer_fees",
+      "columns": 14,
+      "rows": 1
+    },
+    {
+      "name": "django_admin_log",
+      "columns": 8,
+      "rows": 1
+    },
+    {
+      "name": "django_content_type",
+      "columns": 3,
+      "rows": 100
+    },
+    {
+      "name": "django_migrations",
+      "columns": 4,
+      "rows": 38
+    },
+    {
+      "name": "django_session",
+      "columns": 3,
+      "rows": 1
+    },
+    {
+      "name": "dms_assertion",
+      "columns": 16,
+      "rows": 12
+    },
+    {
+      "name": "dms_attributes",
+      "columns": 13,
+      "rows": 10
+    },
+    {
+      "name": "dms_extract_queue",
+      "columns": 16,
+      "rows": 24
+    },
+    {
+      "name": "dms_profile_audit",
+      "columns": 9,
+      "rows": 8
+    },
+    {
+      "name": "dms_template_attributes",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "dms_templates",
+      "columns": 10,
+      "rows": 4
+    },
+    {
+      "name": "dms_unmapped",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "dms_workspaces",
+      "columns": 7,
+      "rows": 1
+    },
+    {
+      "name": "doc_extracted_facts",
+      "columns": 10,
+      "rows": 0
+    },
+    {
+      "name": "doc_processing_queue",
+      "columns": 11,
+      "rows": 2
+    },
+    {
+      "name": "gis_boundary_history",
+      "columns": 7,
+      "rows": 0
+    },
+    {
+      "name": "gis_document_ingestion",
+      "columns": 12,
+      "rows": 7
+    },
+    {
+      "name": "gis_mapping_history",
+      "columns": 7,
+      "rows": 0
+    },
+    {
+      "name": "gis_plan_parcel",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "gis_project_boundary",
+      "columns": 5,
+      "rows": 1
+    },
+    {
+      "name": "gis_tax_parcel_ref",
+      "columns": 7,
+      "rows": 5
+    },
+    {
+      "name": "glossary_zoning",
+      "columns": 33,
+      "rows": 0
+    },
+    {
+      "name": "knowledge_embeddings",
+      "columns": 10,
+      "rows": 788
+    },
+    {
+      "name": "knowledge_entities",
+      "columns": 7,
+      "rows": 24
+    },
+    {
+      "name": "knowledge_facts",
+      "columns": 14,
+      "rows": 48
+    },
+    {
+      "name": "knowledge_insights",
+      "columns": 14,
+      "rows": 0
+    },
+    {
+      "name": "knowledge_interactions",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "knowledge_sessions",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "land_use_pricing",
+      "columns": 12,
+      "rows": 45
+    },
+    {
+      "name": "landscaper_absorption_detail",
+      "columns": 25,
+      "rows": 0
+    },
+    {
+      "name": "landscaper_activity",
+      "columns": 16,
+      "rows": 97
+    },
+    {
+      "name": "landscaper_advice",
+      "columns": 9,
+      "rows": 1
+    },
+    {
+      "name": "landscaper_chat_message",
+      "columns": 8,
+      "rows": 271
+    },
+    {
+      "name": "lu_acreage_allocation_type",
+      "columns": 8,
+      "rows": 11
+    },
+    {
+      "name": "lu_com_spec",
+      "columns": 15,
+      "rows": 6
+    },
+    {
+      "name": "lu_family",
+      "columns": 5,
+      "rows": 11
+    },
+    {
+      "name": "lu_lease_status",
+      "columns": 5,
+      "rows": 5
+    },
+    {
+      "name": "lu_lease_type",
+      "columns": 4,
+      "rows": 5
+    },
+    {
+      "name": "lu_market",
+      "columns": 5,
+      "rows": 28
+    },
+    {
+      "name": "lu_picklist_display_config",
+      "columns": 6,
+      "rows": 28
+    },
+    {
+      "name": "lu_property_subtype",
+      "columns": 7,
+      "rows": 45
+    },
+    {
+      "name": "lu_recovery_structure",
+      "columns": 4,
+      "rows": 6
+    },
+    {
+      "name": "lu_res_spec",
+      "columns": 18,
+      "rows": 5
+    },
+    {
+      "name": "lu_subtype",
+      "columns": 9,
+      "rows": 33
+    },
+    {
+      "name": "lu_type",
+      "columns": 7,
+      "rows": 34
+    },
+    {
+      "name": "management_overhead",
+      "columns": 12,
+      "rows": 1
+    },
+    {
+      "name": "market_activity",
+      "columns": 11,
+      "rows": 9392
+    },
+    {
+      "name": "market_assumptions",
+      "columns": 12,
+      "rows": 0
+    },
+    {
+      "name": "market_competitive_project_exclusions",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "market_competitive_project_products",
+      "columns": 23,
+      "rows": 25
+    },
+    {
+      "name": "market_competitive_projects",
+      "columns": 22,
+      "rows": 25
+    },
+    {
+      "name": "mkt_data_source_registry",
+      "columns": 18,
+      "rows": 3
+    },
+    {
+      "name": "mkt_new_home_project",
+      "columns": 101,
+      "rows": 729
+    },
+    {
+      "name": "mkt_permit_history",
+      "columns": 16,
+      "rows": 9405
+    },
+    {
+      "name": "mutation_audit_log",
+      "columns": 17,
+      "rows": 68
+    },
+    {
+      "name": "opex_account_migration_map",
+      "columns": 5,
+      "rows": 40
+    },
+    {
+      "name": "opex_benchmark",
+      "columns": 19,
+      "rows": 29
+    },
+    {
+      "name": "opex_label_mapping",
+      "columns": 8,
+      "rows": 2
+    },
+    {
+      "name": "pending_mutations",
+      "columns": 19,
+      "rows": 50
+    },
+    {
+      "name": "planning_doc",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "project_boundaries",
+      "columns": 7,
+      "rows": 1
+    },
+    {
+      "name": "project_jurisdiction_mapping",
+      "columns": 10,
+      "rows": 0
+    },
+    {
+      "name": "project_parcel_boundaries",
+      "columns": 9,
+      "rows": 1
+    },
+    {
+      "name": "report_templates",
+      "columns": 10,
+      "rows": 5
+    },
+    {
+      "name": "res_lot_product",
+      "columns": 9,
+      "rows": 40
+    },
+    {
+      "name": "sale_names",
+      "columns": 6,
+      "rows": 0
+    },
+    {
+      "name": "spatial_ref_sys",
+      "columns": 5,
+      "rows": 8500
+    },
+    {
+      "name": "tbl_absorption_schedule",
+      "columns": 23,
+      "rows": 1
+    },
+    {
+      "name": "tbl_acquisition",
+      "columns": 15,
+      "rows": 5
+    },
+    {
+      "name": "tbl_acreage_allocation",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_additional_income",
+      "columns": 8,
+      "rows": 0
+    },
+    {
+      "name": "tbl_ai_adjustment_suggestions",
+      "columns": 9,
+      "rows": 3
+    },
+    {
+      "name": "tbl_analysis_type_config",
+      "columns": 15,
+      "rows": 4
+    },
+    {
+      "name": "tbl_approval",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "tbl_area",
+      "columns": 4,
+      "rows": 8
+    },
+    {
+      "name": "tbl_assumptionrule",
+      "columns": 4,
+      "rows": 19
+    },
+    {
+      "name": "tbl_base_rent",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_benchmark_ai_suggestions",
+      "columns": 23,
+      "rows": 0
+    },
+    {
+      "name": "tbl_benchmark_contingency",
+      "columns": 4,
+      "rows": 2
+    },
+    {
+      "name": "tbl_benchmark_transaction_cost",
+      "columns": 10,
+      "rows": 5
+    },
+    {
+      "name": "tbl_benchmark_unit_cost",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "tbl_budget",
+      "columns": 12,
+      "rows": 2
+    },
+    {
+      "name": "tbl_budget_fact",
+      "columns": 17,
+      "rows": 0
+    },
+    {
+      "name": "tbl_budget_items",
+      "columns": 20,
+      "rows": 8
+    },
+    {
+      "name": "tbl_budget_structure",
+      "columns": 14,
+      "rows": 31
+    },
+    {
+      "name": "tbl_budget_timing",
+      "columns": 6,
+      "rows": 0
+    },
+    {
+      "name": "tbl_cabinet",
+      "columns": 8,
+      "rows": 1
+    },
+    {
+      "name": "tbl_calculation_period",
+      "columns": 12,
+      "rows": 0
+    },
+    {
+      "name": "tbl_cap_rate_comps",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "tbl_capex_reserve",
+      "columns": 20,
+      "rows": 0
+    },
+    {
+      "name": "tbl_capital_call",
+      "columns": 10,
+      "rows": 0
+    },
+    {
+      "name": "tbl_capital_reserves",
+      "columns": 14,
+      "rows": 0
+    },
+    {
+      "name": "tbl_capitalization",
+      "columns": 5,
+      "rows": 0
+    },
+    {
+      "name": "tbl_cashflow",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_cashflow_summary",
+      "columns": 21,
+      "rows": 0
+    },
+    {
+      "name": "tbl_closing_event",
+      "columns": 24,
+      "rows": 2
+    },
+    {
+      "name": "tbl_contact",
+      "columns": 26,
+      "rows": 10
+    },
+    {
+      "name": "tbl_contact_relationship",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "tbl_contact_role",
+      "columns": 12,
+      "rows": 26
+    },
+    {
+      "name": "tbl_contacts_legacy",
+      "columns": 31,
+      "rows": 11
+    },
+    {
+      "name": "tbl_cost_allocation",
+      "columns": 11,
+      "rows": 3
+    },
+    {
+      "name": "tbl_cost_approach",
+      "columns": 25,
+      "rows": 0
+    },
+    {
+      "name": "tbl_cre_base_rent",
+      "columns": 11,
+      "rows": 13
+    },
+    {
+      "name": "tbl_cre_expense_recovery",
+      "columns": 11,
+      "rows": 1
+    },
+    {
+      "name": "tbl_cre_lease",
+      "columns": 29,
+      "rows": 5
+    },
+    {
+      "name": "tbl_cre_percentage_rent",
+      "columns": 10,
+      "rows": 1
+    },
+    {
+      "name": "tbl_cre_property",
+      "columns": 25,
+      "rows": 2
+    },
+    {
+      "name": "tbl_cre_rent_escalation",
+      "columns": 14,
+      "rows": 2
+    },
+    {
+      "name": "tbl_cre_space",
+      "columns": 17,
+      "rows": 41
+    },
+    {
+      "name": "tbl_cre_tenant",
+      "columns": 20,
+      "rows": 78
+    },
+    {
+      "name": "tbl_debt_draw_schedule",
+      "columns": 33,
+      "rows": 0
+    },
+    {
+      "name": "tbl_debt_facility",
+      "columns": 60,
+      "rows": 0
+    },
+    {
+      "name": "tbl_division",
+      "columns": 14,
+      "rows": 239
+    },
+    {
+      "name": "tbl_document_project",
+      "columns": 6,
+      "rows": 0
+    },
+    {
+      "name": "tbl_equity",
+      "columns": 43,
+      "rows": 4
+    },
+    {
+      "name": "tbl_equity_distribution",
+      "columns": 11,
+      "rows": 0
+    },
+    {
+      "name": "tbl_equity_partner",
+      "columns": 12,
+      "rows": 0
+    },
+    {
+      "name": "tbl_equity_structure",
+      "columns": 12,
+      "rows": 2
+    },
+    {
+      "name": "tbl_escalation",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_expense_detail",
+      "columns": 13,
+      "rows": 0
+    },
+    {
+      "name": "tbl_extraction_log",
+      "columns": 16,
+      "rows": 0
+    },
+    {
+      "name": "tbl_extraction_mapping",
+      "columns": 18,
+      "rows": 145
+    },
+    {
+      "name": "tbl_field_catalog",
+      "columns": 21,
+      "rows": 3664
+    },
+    {
+      "name": "tbl_finance_structure",
+      "columns": 18,
+      "rows": 2
+    },
+    {
+      "name": "tbl_global_benchmark_registry",
+      "columns": 23,
+      "rows": 25
+    },
+    {
+      "name": "tbl_hbu_analysis",
+      "columns": 39,
+      "rows": 1
+    },
+    {
+      "name": "tbl_hbu_comparable_use",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_hbu_zoning_document",
+      "columns": 13,
+      "rows": 0
+    },
+    {
+      "name": "tbl_income_approach",
+      "columns": 16,
+      "rows": 1
+    },
+    {
+      "name": "tbl_inventory_item",
+      "columns": 22,
+      "rows": 53
+    },
+    {
+      "name": "tbl_item_dependency",
+      "columns": 14,
+      "rows": 3
+    },
+    {
+      "name": "tbl_landuse",
+      "columns": 10,
+      "rows": 36
+    },
+    {
+      "name": "tbl_landuse_program",
+      "columns": 10,
+      "rows": 4
+    },
+    {
+      "name": "tbl_lease",
+      "columns": 41,
+      "rows": 40
+    },
+    {
+      "name": "tbl_lease_assumptions",
+      "columns": 17,
+      "rows": 1
+    },
+    {
+      "name": "tbl_lease_revenue_timing",
+      "columns": 14,
+      "rows": 0
+    },
+    {
+      "name": "tbl_leasing_commission",
+      "columns": 8,
+      "rows": 0
+    },
+    {
+      "name": "tbl_loan",
+      "columns": 26,
+      "rows": 0
+    },
+    {
+      "name": "tbl_lot",
+      "columns": 23,
+      "rows": 0
+    },
+    {
+      "name": "tbl_lot_type",
+      "columns": 4,
+      "rows": 0
+    },
+    {
+      "name": "tbl_market_rate_analysis",
+      "columns": 36,
+      "rows": 1
+    },
+    {
+      "name": "tbl_measures",
+      "columns": 10,
+      "rows": 19
+    },
+    {
+      "name": "tbl_milestone",
+      "columns": 15,
+      "rows": 0
+    },
+    {
+      "name": "tbl_msa",
+      "columns": 9,
+      "rows": 40
+    },
+    {
+      "name": "tbl_multifamily_lease",
+      "columns": 19,
+      "rows": 153
+    },
+    {
+      "name": "tbl_multifamily_property",
+      "columns": 59,
+      "rows": 3
+    },
+    {
+      "name": "tbl_multifamily_turn",
+      "columns": 16,
+      "rows": 1
+    },
+    {
+      "name": "tbl_multifamily_unit",
+      "columns": 31,
+      "rows": 209
+    },
+    {
+      "name": "tbl_multifamily_unit_type",
+      "columns": 19,
+      "rows": 31
+    },
+    {
+      "name": "tbl_operating_expense",
+      "columns": 16,
+      "rows": 44
+    },
+    {
+      "name": "tbl_operating_expenses",
+      "columns": 22,
+      "rows": 93
+    },
+    {
+      "name": "tbl_operations_user_inputs",
+      "columns": 25,
+      "rows": 5
+    },
+    {
+      "name": "tbl_opex_accounts_deprecated",
+      "columns": 10,
+      "rows": 40
+    },
+    {
+      "name": "tbl_opex_timing",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "tbl_parcel",
+      "columns": 45,
+      "rows": 93
+    },
+    {
+      "name": "tbl_parcel_sale_assumptions",
+      "columns": 31,
+      "rows": 39
+    },
+    {
+      "name": "tbl_parcel_sale_event",
+      "columns": 26,
+      "rows": 31
+    },
+    {
+      "name": "tbl_participation_payment",
+      "columns": 16,
+      "rows": 1
+    },
+    {
+      "name": "tbl_phase",
+      "columns": 11,
+      "rows": 16
+    },
+    {
+      "name": "tbl_platform_knowledge",
+      "columns": 23,
+      "rows": 2
+    },
+    {
+      "name": "tbl_platform_knowledge_chapters",
+      "columns": 14,
+      "rows": 35
+    },
+    {
+      "name": "tbl_platform_knowledge_chunks",
+      "columns": 12,
+      "rows": 998
+    },
+    {
+      "name": "tbl_project",
+      "columns": 126,
+      "rows": 10
+    },
+    {
+      "name": "tbl_project_assumption",
+      "columns": 13,
+      "rows": 13
+    },
+    {
+      "name": "tbl_project_config",
+      "columns": 19,
+      "rows": 5
+    },
+    {
+      "name": "tbl_project_contact",
+      "columns": 9,
+      "rows": 8
+    },
+    {
+      "name": "tbl_project_inventory_columns",
+      "columns": 19,
+      "rows": 27
+    },
+    {
+      "name": "tbl_project_metrics",
+      "columns": 22,
+      "rows": 0
+    },
+    {
+      "name": "tbl_project_settings",
+      "columns": 11,
+      "rows": 3
+    },
+    {
+      "name": "tbl_property_acquisition",
+      "columns": 24,
+      "rows": 4
+    },
+    {
+      "name": "tbl_property_apn",
+      "columns": 8,
+      "rows": 0
+    },
+    {
+      "name": "tbl_property_attribute_def",
+      "columns": 18,
+      "rows": 37
+    },
+    {
+      "name": "tbl_property_type_config",
+      "columns": 8,
+      "rows": 6
+    },
+    {
+      "name": "tbl_property_use_template",
+      "columns": 8,
+      "rows": 3
+    },
+    {
+      "name": "tbl_recovery",
+      "columns": 7,
+      "rows": 0
+    },
+    {
+      "name": "tbl_rent_comparable",
+      "columns": 21,
+      "rows": 14
+    },
+    {
+      "name": "tbl_rent_roll",
+      "columns": 29,
+      "rows": 1
+    },
+    {
+      "name": "tbl_rent_roll_unit",
+      "columns": 13,
+      "rows": 0
+    },
+    {
+      "name": "tbl_rental_comparable",
+      "columns": 23,
+      "rows": 51
+    },
+    {
+      "name": "tbl_revenue_other",
+      "columns": 23,
+      "rows": 2
+    },
+    {
+      "name": "tbl_revenue_rent",
+      "columns": 17,
+      "rows": 1
+    },
+    {
+      "name": "tbl_revenue_timing",
+      "columns": 13,
+      "rows": 0
+    },
+    {
+      "name": "tbl_sale_benchmarks",
+      "columns": 18,
+      "rows": 13
+    },
+    {
+      "name": "tbl_sale_phases",
+      "columns": 9,
+      "rows": 9
+    },
+    {
+      "name": "tbl_sale_settlement",
+      "columns": 29,
+      "rows": 2
+    },
+    {
+      "name": "tbl_sales_comp_adjustments",
+      "columns": 11,
+      "rows": 6
+    },
+    {
+      "name": "tbl_sales_comparables",
+      "columns": 25,
+      "rows": 3
+    },
+    {
+      "name": "tbl_scenario",
+      "columns": 19,
+      "rows": 0
+    },
+    {
+      "name": "tbl_scenario_comparison",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "tbl_system_picklist",
+      "columns": 10,
+      "rows": 82
+    },
+    {
+      "name": "tbl_template_column_config",
+      "columns": 15,
+      "rows": 34
+    },
+    {
+      "name": "tbl_tenant_improvement",
+      "columns": 10,
+      "rows": 0
+    },
+    {
+      "name": "tbl_uom_calculation_formulas",
+      "columns": 8,
+      "rows": 9
+    },
+    {
+      "name": "tbl_user_preference",
+      "columns": 9,
+      "rows": 0
+    },
+    {
+      "name": "tbl_vacancy_assumption",
+      "columns": 16,
+      "rows": 1
+    },
+    {
+      "name": "tbl_valuation_reconciliation",
+      "columns": 13,
+      "rows": 1
+    },
+    {
+      "name": "tbl_value_add_assumptions",
+      "columns": 15,
+      "rows": 2
+    },
+    {
+      "name": "tbl_waterfall",
+      "columns": 7,
+      "rows": 0
+    },
+    {
+      "name": "tbl_waterfall_tier",
+      "columns": 21,
+      "rows": 6
+    },
+    {
+      "name": "tbl_zoning_control",
+      "columns": 19,
+      "rows": 2
+    },
+    {
+      "name": "type_lot_product",
+      "columns": 2,
+      "rows": 78
+    },
+    {
+      "name": "user_profile",
+      "columns": 6,
+      "rows": 1
+    },
+    {
+      "name": "user_settings",
+      "columns": 4,
+      "rows": 1
+    },
+    {
+      "name": "zonda_subdivisions",
+      "columns": 26,
+      "rows": 704
+    }
+  ],
+  "views": [
+    "core_lookup_vw",
+    "geography_columns",
+    "geometry_columns",
+    "mv_doc_search",
+    "v_ai_review_summary",
+    "v_contact_projects",
+    "v_contact_relationships",
+    "v_lease_summary",
+    "v_project_contacts",
+    "v_project_contacts_detail",
+    "v_rent_roll",
+    "vw_absorption_with_dependencies",
+    "vw_acreage_allocation",
+    "vw_budget_grid_items",
+    "vw_budget_variance",
+    "vw_budget_with_dependencies",
+    "vw_category_hierarchy",
+    "vw_debt_balance_summary",
+    "vw_extraction_mapping_stats",
+    "vw_item_dependency_status",
+    "vw_lease_expiration_schedule",
+    "vw_map_plan_parcels",
+    "vw_map_tax_parcels",
+    "vw_mkt_absorption_by_lot_width",
+    "vw_mkt_absorption_by_lu_product",
+    "vw_mkt_current_projects",
+    "vw_mkt_landscaper_summary",
+    "vw_mkt_pricing_by_city_lotwidth",
+    "vw_multifamily_lease_expirations",
+    "vw_multifamily_occupancy_summary",
+    "vw_multifamily_project_summary",
+    "vw_multifamily_turn_metrics",
+    "vw_multifamily_unit_status",
+    "vw_parcels_with_sales",
+    "vw_permit_annual_by_jurisdiction",
+    "vw_permit_msa_monthly",
+    "vw_rent_roll",
+    "vw_revenue_timeline",
+    "vw_zoning_glossary_export"
+  ],
+  "summary": {
+    "table_count": 253,
+    "view_count": 39,
+    "total_rows": 39438
+  }
+}
