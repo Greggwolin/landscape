@@ -210,12 +210,62 @@ These tables form a legitimate CRE (Commercial Real Estate) analysis module:
 | Migrate then drop | 3 | Low | Pending |
 | Keep CRE with data | 8 | N/A | Preserved |
 
-**Table count:** 281 → **253 tables** (28 dropped)
+**Table count:** 281 → **253 tables** (28 dropped) → **268 tables** (15 new extension/module tables added)
 **View count:** 41 → **40 views** (1 dropped: vw_property_performance)
 
 ---
 
 ## Execution Log
+
+### Phase 2 Execution: Income Property Schema Architecture (2026-01-20)
+
+```
+Migrations: 066, 067, 068
+Status: EXECUTED SUCCESSFULLY
+
+Table Renames (Migration 066):
+- tbl_cre_property → tbl_income_property
+- tbl_cre_lease → tbl_commercial_lease (kept separate from existing tbl_lease)
+- tbl_cre_base_rent → tbl_rent_schedule
+- tbl_cre_expense_recovery → tbl_expense_recovery
+- tbl_cre_percentage_rent → tbl_percentage_rent
+- tbl_cre_rent_escalation → tbl_rent_escalation
+
+Note: tbl_space, tbl_tenant, tbl_lease already existed with data, so those
+CRE versions were handled differently (tbl_cre_space/tenant were already
+renamed earlier, tbl_cre_lease became tbl_commercial_lease).
+
+Extension Tables Created (Migration 067) - 9 tables:
+- tbl_income_property_mf_ext (37 cols) - Multifamily property extension
+- tbl_income_property_ret_ext (32 cols) - Retail property extension
+- tbl_income_property_ind_ext (42 cols) - Industrial property extension
+- tbl_space_mf_ext (28 cols) - Multifamily unit extension
+- tbl_space_ret_ext (22 cols) - Retail space extension
+- tbl_space_ind_ext (17 cols) - Industrial space extension
+- tbl_lease_mf_ext (21 cols) - Multifamily lease extension
+- tbl_lease_ret_ext (31 cols) - Retail lease extension
+- tbl_lease_ind_ext (21 cols) - Industrial lease extension
+
+Module Tables Created (Migration 068) - 6 new tables:
+- tbl_renewal_option (32 cols) - Renewal option tracking
+- tbl_expansion_option (23 cols) - Expansion/ROFO/ROFR options
+- tbl_termination_option (25 cols) - Early termination options
+- tbl_rent_concession (22 cols) - Free rent/concessions
+- tbl_security_deposit (29 cols) - Security deposit tracking
+- tbl_rent_step (22 cols) - Rent escalation schedules
+
+Pre-existing Module Tables (2 tables already existed):
+- tbl_tenant_improvement (10 cols)
+- tbl_leasing_commission (8 cols)
+
+Discriminator Columns Added:
+- tbl_income_property.property_type_code (MF, RET, IND, OFF, CRE)
+- tbl_space.space_type_code
+- tbl_lease.lease_type_code
+- tbl_commercial_lease.lease_type_code
+```
+
+---
 
 ### Phase 1 Execution (2026-01-20)
 
@@ -272,4 +322,58 @@ Validation:
 
 1. OpEx table consolidation (2 tables → 1)
 2. Contact legacy migration
-3. CRE table renaming (remove `_cre_` prefix for clarity)
+
+---
+
+## Income Property Schema Summary
+
+The database now supports ARGUS-grade commercial real estate analysis with a Core + Extension pattern:
+
+### Core Tables (9 tables)
+| Table | Rows | Cols | Purpose |
+|-------|------|------|---------|
+| `tbl_income_property` | 2 | 26 | Property master with type discriminator |
+| `tbl_space` | 41 | 18 | Rentable spaces/units |
+| `tbl_tenant` | 78 | 20 | Tenant/lessee records |
+| `tbl_lease` | 40 | 42 | Residential leases (MF) |
+| `tbl_commercial_lease` | 5 | 30 | Commercial leases (CRE) |
+| `tbl_rent_schedule` | 13 | 11 | Base rent periods |
+| `tbl_expense_recovery` | 1 | 11 | CAM/NNN recovery |
+| `tbl_percentage_rent` | 1 | 10 | Retail percentage rent |
+| `tbl_rent_escalation` | 2 | 14 | Rent bumps/escalations |
+
+### Extension Tables (9 tables)
+| Property Type | Property Ext | Space Ext | Lease Ext |
+|--------------|--------------|-----------|-----------|
+| Multifamily  | `_mf_ext` (37 cols) | `_mf_ext` (28 cols) | `_mf_ext` (21 cols) |
+| Retail       | `_ret_ext` (32 cols) | `_ret_ext` (22 cols) | `_ret_ext` (31 cols) |
+| Industrial   | `_ind_ext` (42 cols) | `_ind_ext` (17 cols) | `_ind_ext` (21 cols) |
+
+### Module Tables (8 tables)
+| Table | Cols | Purpose |
+|-------|------|---------|
+| `tbl_tenant_improvement` | 10 | TI allowances and amortization |
+| `tbl_leasing_commission` | 8 | Broker commissions |
+| `tbl_renewal_option` | 32 | Renewal option tracking |
+| `tbl_expansion_option` | 23 | ROFO/ROFR/must-take options |
+| `tbl_termination_option` | 25 | Early termination rights |
+| `tbl_rent_concession` | 22 | Free rent/concessions |
+| `tbl_security_deposit` | 29 | Deposits and LOCs |
+| `tbl_rent_step` | 22 | Rent escalation schedules |
+
+### Architecture Pattern
+
+```
+Property Type Code → Extension Table Selection
+─────────────────────────────────────────────
+MF  (Multifamily) → tbl_income_property_mf_ext
+RET (Retail)      → tbl_income_property_ret_ext
+IND (Industrial)  → tbl_income_property_ind_ext
+OFF (Office)      → (uses base tables only for now)
+CRE (Generic)     → (uses base tables only)
+```
+
+**Total Field Capacity:**
+- Multifamily: 183 fields (core + extension)
+- Retail: 215 fields (core + extension)
+- Industrial: 195 fields (core + extension)
