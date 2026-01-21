@@ -39,47 +39,49 @@ export interface TileGridProps {
 }
 
 // Tile configuration by Analysis Type
-// Routes use ?tab= query params to switch between tabs on the main project page
-// Property tab for MF includes: Rent Roll, Floorplan Matrix, Comp Map
+// Mirrors LifecycleTileNav from src/components/projects/tiles/tileConfig.ts
+// Income properties use ?tab= query params; Land dev uses path routes
 const TILE_CONFIGS: Record<AnalysisType, TileConfig[]> = {
-  // VALUATION: Appraisal workflow (Sales Comparison, Income, Cost approaches)
+  // VALUATION: Appraisal workflow - uses income property tabs
   VALUATION: [
     { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
     { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'market', label: 'Market', icon: '📊', route: 'analysis/market-data', color: 'market' },
-    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: 'analysis', color: 'hbu' },
+    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
     { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
     { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
     { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
-  // INVESTMENT: Multifamily acquisition/disposition (Rent Roll, OpEx, Cap Stack)
+  // INVESTMENT: Multifamily acquisition/disposition
+  // Property tab: Rent Roll, Floorplan Matrix, Comp Map (via PropertyTab)
+  // Operations tab: Rent Roll subtab, Expenses, NOI
   INVESTMENT: [
     { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' }, // Rent Roll, Floorplan Matrix, Comp Map
-    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' }, // OpEx, NOI
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' }, // Income Approach
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
-  ],
-  // DEVELOPMENT: Land development workflow (Planning, Budget, Sales Absorption)
-  DEVELOPMENT: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
     { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'planning', label: 'Planning', icon: '📐', route: '?tab=planning', color: 'market' },
-    { id: 'budget', label: 'Budget', icon: '💰', route: '?tab=budget', color: 'operations' },
-    { id: 'sales', label: 'Sales', icon: '🏷️', route: '?tab=sales', color: 'capitalization' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
+    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
+    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
     { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
     { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
-  // FEASIBILITY: HBU analysis with valuation approaches
+  // DEVELOPMENT: Land development workflow (path-based routing)
+  DEVELOPMENT: [
+    { id: 'home', label: 'Project Home', icon: '🏠', route: '', color: 'home' },
+    { id: 'planning', label: 'Planning', icon: '📐', route: '/planning/market', color: 'property' },
+    { id: 'budget', label: 'Budget', icon: '💰', route: '/budget', color: 'operations' },
+    { id: 'sales', label: 'Sales', icon: '🏷️', route: '/project/sales', color: 'capitalization' },
+    { id: 'feasibility', label: 'Feasibility', icon: '📊', route: '/results', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: '📑', route: '/analysis', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: '📁', route: '/documents', color: 'documents' },
+  ],
+  // FEASIBILITY: HBU analysis - uses income property tabs
   FEASIBILITY: [
     { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
     { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: '?tab=feasibility', color: 'hbu' },
+    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
     { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
     { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
     { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
