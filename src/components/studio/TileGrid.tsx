@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 // Types
 export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY';
@@ -39,42 +39,49 @@ export interface TileGridProps {
 }
 
 // Tile configuration by Analysis Type
+// Routes use ?tab= query params to switch between tabs on the main project page
+// Property tab for MF includes: Rent Roll, Floorplan Matrix, Comp Map
 const TILE_CONFIGS: Record<AnalysisType, TileConfig[]> = {
+  // VALUATION: Appraisal workflow (Sales Comparison, Income, Cost approaches)
   VALUATION: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: 'overview', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: 'property', color: 'property' },
-    { id: 'market', label: 'Market', icon: '📊', route: 'market', color: 'market' },
-    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: 'hbu', color: 'hbu' },
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: 'valuation', color: 'valuation' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: 'reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: 'documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
+    { id: 'market', label: 'Market', icon: '📊', route: 'analysis/market-data', color: 'market' },
+    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: 'analysis', color: 'hbu' },
+    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
+    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
+  // INVESTMENT: Multifamily acquisition/disposition (Rent Roll, OpEx, Cap Stack)
   INVESTMENT: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: 'overview', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: 'property', color: 'property' },
-    { id: 'operations', label: 'Operations', icon: '📋', route: 'operations', color: 'operations' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: 'capitalization', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: 'reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: 'documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' }, // Rent Roll, Floorplan Matrix, Comp Map
+    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' }, // OpEx, NOI
+    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' }, // Income Approach
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
+  // DEVELOPMENT: Land development workflow (Planning, Budget, Sales Absorption)
   DEVELOPMENT: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: 'overview', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: 'property', color: 'property' },
-    { id: 'planning', label: 'Planning', icon: '📐', route: 'planning', color: 'market' },
-    { id: 'budget', label: 'Budget', icon: '💰', route: 'budget', color: 'operations' },
-    { id: 'sales', label: 'Sales', icon: '🏷️', route: 'sales', color: 'capitalization' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: 'capitalization', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: 'reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: 'documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
+    { id: 'planning', label: 'Planning', icon: '📐', route: '?tab=planning', color: 'market' },
+    { id: 'budget', label: 'Budget', icon: '💰', route: '?tab=budget', color: 'operations' },
+    { id: 'sales', label: 'Sales', icon: '🏷️', route: '?tab=sales', color: 'capitalization' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
+  // FEASIBILITY: HBU analysis with valuation approaches
   FEASIBILITY: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: 'overview', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: 'property', color: 'property' },
-    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: 'hbu', color: 'hbu' },
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: 'valuation', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: 'capitalization', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: 'reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: 'documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
+    { id: 'hbu', label: 'H&BU', icon: '⚖️', route: '?tab=feasibility', color: 'hbu' },
+    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '?tab=capitalization', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
   ],
 };
 
@@ -100,15 +107,35 @@ export function TileGrid({
 }: TileGridProps): JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const tiles = TILE_CONFIGS[analysisType] || TILE_CONFIGS.INVESTMENT;
   const badgeStyle = ANALYSIS_BADGE_STYLES[analysisType];
 
-  // Determine active tile from pathname if not provided
-  const currentTile = activeTile || pathname?.split('/').pop() || 'overview';
+  // Determine active tile from URL
+  // Priority: 1) explicit activeTile prop, 2) ?tab= param, 3) path segment
+  const tabParam = searchParams.get('tab');
+  const pathSegments = pathname?.split('/') || [];
+  const lastSegment = pathSegments[pathSegments.length - 1];
+
+  // Map tab param or path segment to tile id
+  const getCurrentTileId = () => {
+    if (activeTile) return activeTile;
+    if (tabParam) return tabParam; // ?tab=property -> 'property'
+    // Fall back to path-based detection for non-tab routes
+    if (lastSegment === 'studio' || lastSegment === String(projectId)) return 'home';
+    return lastSegment || 'home';
+  };
+  const currentTile = getCurrentTileId();
 
   const handleTileClick = (route: string) => {
-    router.push(`/projects/${projectId}/${route}`);
+    // Routes starting with ? are tab params on the main project page
+    // Other routes are direct paths (e.g., analysis/market-data)
+    if (route.startsWith('?')) {
+      router.push(`/projects/${projectId}${route}`);
+    } else {
+      router.push(`/projects/${projectId}/${route}`);
+    }
   };
 
   // Get status for a tile
@@ -121,7 +148,7 @@ export function TileGrid({
 
   return (
     <div
-      className="p-4"
+      className="p-4 flex-shrink-0"
       style={{ borderBottom: '1px solid var(--studio-border-soft)' }}
     >
       {/* Header */}
@@ -147,7 +174,9 @@ export function TileGrid({
       {/* Tile Grid */}
       <div className="grid grid-cols-2 gap-2">
         {tiles.map((tile) => {
-          const isActive = currentTile === tile.route || currentTile === tile.id;
+          // For tab-based routes (?tab=property), extract the tab name
+          const tileTab = tile.route.startsWith('?tab=') ? tile.route.replace('?tab=', '') : tile.id;
+          const isActive = currentTile === tileTab || currentTile === tile.id;
           const { status, statusText } = getTileStatus(tile);
 
           return (
