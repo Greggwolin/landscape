@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-18
-**Version:** 2.7
+**Last Updated:** 2026-01-22
+**Version:** 2.8
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1)
 
 ---
@@ -9,7 +9,17 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Operations & Income Approach Data Flow Fix (January 17, 2026)**
+### 🆕 **Latest Update: Architecture Documentation & Studio UI (January 22, 2026)**
+Comprehensive architecture documentation and Studio UI development:
+- ✅ **Architecture Documentation** - New `LANDSCAPE_ARCHITECTURE.md` (964 lines) providing complete technical map
+- ✅ **System Prompts Documented** - All AI system prompts by property type now documented inline
+- ✅ **Database Schema Map** - 253 tables documented with 35-40 key tables by domain
+- ✅ **Data Flow Diagrams** - ASCII diagrams for chat, document extraction, project load
+- ✅ **Studio UI Progress** - TileGrid, LandscaperPanel, ViewModeToggle components
+- ✅ **Schema Consolidation** - Dropped 28 empty/backup tables (Jan 20)
+- 📁 **Location:** `/LANDSCAPE_ARCHITECTURE.md` (repo root)
+
+### Previous Update: Operations & Income Approach Data Flow Fix (January 17, 2026)
 Major refactoring to establish single source of truth for financial data across tabs:
 - ✅ **Property Tab as Source** - Rental income and occupancy data flows from `tbl_multifamily_unit`
 - ✅ **Operations Tab Read-Only** - Rental income now read-only with lock icon, calculated vacancy when rent roll exists

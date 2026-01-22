@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Architecture Documentation (Jan 22, 2026)',
+      path: '/LANDSCAPE_ARCHITECTURE.md',
+      category: 'Architecture',
+      description: 'Comprehensive technical map of the codebase - frontend/backend architecture, AI integration points, database schema (253 tables), data flow diagrams, quick reference',
+      icon: <Map className="w-5 h-5" />,
+      lastModified: '2026-01-22'
+    },
+    {
+      title: 'Architecture Session Notes (Jan 22, 2026)',
+      path: '/docs/09_session_notes/2026-01-22-architecture-documentation.md',
+      category: 'Status',
+      description: 'Session notes for architecture documentation generation - Studio UI progress, schema consolidation, system prompts documentation',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-01-22'
+    },
+    {
       title: 'Documentation Update (Jan 18, 2026)',
       path: '/docs/09_session_notes/2026-01-18-documentation-update.md',
       category: 'Status',
