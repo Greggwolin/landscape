@@ -89,7 +89,7 @@ export function IndicatedValueSummary({
 
       {/* Comparables Table */}
       <div className="mb-6 overflow-x-auto">
-        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+        <table className="w-full" style={{ borderCollapse: 'collapse', fontSize: '0.9375rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--cui-border-color)' }}>
               <th className="text-left py-2 px-3 font-semibold" style={{ color: 'var(--cui-body-color)' }}>
@@ -196,8 +196,8 @@ export function IndicatedValueSummary({
       {/* Subject Comparison */}
       <div className="space-y-3">
         <div
-          className="flex justify-between items-center text-sm"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="flex justify-between items-center"
+          style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9375rem' }}
         >
           <span>Subject Asking Price</span>
           <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>
@@ -206,8 +206,8 @@ export function IndicatedValueSummary({
         </div>
 
         <div
-          className="flex justify-between items-center text-sm"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="flex justify-between items-center"
+          style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9375rem' }}
         >
           <span>Variance</span>
           <span

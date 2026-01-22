@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import type { SalesComparable } from '@/types/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -327,7 +328,9 @@ Focus on NOI growth through:
               className="text-sm whitespace-pre-line leading-relaxed"
               style={{ color: 'var(--cui-body-color)' }}
             >
-              {msg.content}
+              {msg.role === 'assistant'
+                ? sanitizeLandscaperResponse(msg.content)
+                : msg.content}
             </div>
           </div>
         ))}

@@ -52,7 +52,11 @@ export default function ContactsSection({ projectId }: ContactsSectionProps) {
   };
 
   if (loading) {
-    return <div className="text-gray-500">Loading contacts...</div>;
+    return (
+      <div style={{ color: 'var(--cui-secondary-color)' }}>
+        Loading contacts...
+      </div>
+    );
   }
 
   // Role configuration: standard roles to always show (even if empty)

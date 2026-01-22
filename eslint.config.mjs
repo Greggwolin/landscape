@@ -1,9 +1,14 @@
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
+import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Import custom ESLint rules
+const require = createRequire(import.meta.url);
+const noIllegalColors = require("./eslint-rules/no-illegal-colors.js");
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -130,6 +135,22 @@ const eslintConfig = [
             "Studio components: Review className for Tailwind color classes (bg-*, text-*, border-* with colors). Use CSS variables from studio-theme.css instead. Layout utilities (flex, grid, p-*, m-*, etc.) are allowed.",
         },
       ],
+    },
+  },
+
+  // Custom color token enforcement rule
+  // Prevents usage of forbidden color tokens (--cui-warning, --cui-success as fills)
+  {
+    files: ["src/**/*.tsx", "src/**/*.ts"],
+    plugins: {
+      "landscape-colors": {
+        rules: {
+          "no-illegal-colors": noIllegalColors,
+        },
+      },
+    },
+    rules: {
+      "landscape-colors/no-illegal-colors": "warn",
     },
   },
 ];

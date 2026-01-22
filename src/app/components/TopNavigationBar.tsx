@@ -9,6 +9,7 @@ import { useIssueReporter } from '@/components/IssueReporter';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
+import ViewModeToggle from '@/components/studio/ViewModeToggle';
 import LandscaperChatModal from './LandscaperChatModal';
 import CIcon from '@coreui/icons-react';
 import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
@@ -128,8 +129,12 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               Landscaper AI
             </button>
 
-            {/* Dropdowns */}
-            <SandboxDropdown />
+            {/* View Mode Toggle (Studio) or Sandbox Dropdown */}
+            {pathname?.includes('/studio') ? (
+              <ViewModeToggle projectId={pathname.split('/projects/')[1]?.split('/')[0] || ''} />
+            ) : (
+              <SandboxDropdown />
+            )}
             <UserMenuDropdown />
 
             {/* Mode Toggle (Analyst/Developer) */}

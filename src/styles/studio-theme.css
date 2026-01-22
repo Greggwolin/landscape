@@ -139,8 +139,8 @@
   /* ========================================
    * STUDIO LAYOUT DIMENSIONS
    * ======================================== */
-  --studio-sidebar-width: 280px;
-  --studio-header-height: 56px;
+  --studio-sidebar-width: 378px;
+  --studio-header-height: 58px;
   --studio-panel-gap: 16px;
   --studio-border-radius: 6px;
   --studio-border-radius-lg: 8px;
@@ -425,56 +425,72 @@
 
 /* ==========================================================================
    TILE COLORS BY CATEGORY
-   Each tile has a gradient background based on its function
+   Derived from CoreUI brand colors:
+   - Primary: #3d99f5 (blue)
+   - Secondary: #6b7785 (gray)
+   - Success: #57c68a (green)
+   - Danger: #e64072 (red/pink)
+   - Warning: #f2c40d (yellow)
+   - Info: #7a80ec (purple)
+   - Dark: #212631
    ========================================================================== */
 
 :root {
-  /* Tile backgrounds (gradient from/to) */
-  --studio-tile-home-from: #1f2937;
-  --studio-tile-home-to: #374151;
+  /* Tile backgrounds (gradient from/to) - CoreUI aligned */
+  /* Home: Dark/Secondary */
+  --studio-tile-home-from: #212631;
+  --studio-tile-home-to: #3a4150;
 
-  --studio-tile-property-from: #1e3a5f;
-  --studio-tile-property-to: #1e40af;
+  /* Property: Primary (blue) */
+  --studio-tile-property-from: #2d7acc;
+  --studio-tile-property-to: #3d99f5;
 
-  --studio-tile-market-from: #4c1d95;
-  --studio-tile-market-to: #5b21b6;
+  /* Market/Operations: Info (purple) */
+  --studio-tile-market-from: #5a60c4;
+  --studio-tile-market-to: #7a80ec;
 
-  --studio-tile-hbu-from: #064e3b;
-  --studio-tile-hbu-to: #065f46;
+  /* HBU: Success (green) */
+  --studio-tile-hbu-from: #3da36e;
+  --studio-tile-hbu-to: #57c68a;
 
-  --studio-tile-valuation-from: #831843;
-  --studio-tile-valuation-to: #9d174d;
+  /* Valuation: Danger (pink/red) */
+  --studio-tile-valuation-from: #c4305c;
+  --studio-tile-valuation-to: #e64072;
 
-  --studio-tile-capitalization-from: #92400e;
-  --studio-tile-capitalization-to: #b45309;
+  /* Capitalization: Warning (gold) */
+  --studio-tile-capitalization-from: #d4a90b;
+  --studio-tile-capitalization-to: #f2c40d;
 
-  --studio-tile-reports-from: #374151;
-  --studio-tile-reports-to: #4b5563;
+  /* Reports: Secondary (gray) */
+  --studio-tile-reports-from: #555f6d;
+  --studio-tile-reports-to: #6b7785;
 
-  --studio-tile-documents-from: #1f2937;
-  --studio-tile-documents-to: #374151;
+  /* Documents: Dark */
+  --studio-tile-documents-from: #212631;
+  --studio-tile-documents-to: #3a4150;
 
-  --studio-tile-operations-from: #065f46;
-  --studio-tile-operations-to: #047857;
+  /* Operations: Success (green) - same as HBU for consistency */
+  --studio-tile-operations-from: #3da36e;
+  --studio-tile-operations-to: #57c68a;
 
   /* Tile states */
-  --studio-tile-border-active: rgba(255, 255, 255, 0.3);
+  --studio-tile-border-active: rgba(255, 255, 255, 0.4);
   --studio-tile-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
 
   /* Tile text */
-  --studio-tile-label: rgba(255, 255, 255, 0.9);
-  --studio-tile-status: rgba(255, 255, 255, 0.6);
+  --studio-tile-label: rgba(255, 255, 255, 0.95);
+  --studio-tile-status: rgba(255, 255, 255, 0.7);
 
-  /* Status indicators */
-  --studio-status-ready: #10b981;
-  --studio-status-review: #f59e0b;
-  --studio-status-locked: #6b7280;
-  --studio-status-error: #ef4444;
+  /* Status indicators - CoreUI aligned */
+  --studio-status-ready: #57c68a;
+  --studio-status-review: #f2c40d;
+  --studio-status-locked: #6b7785;
+  --studio-status-error: #e64072;
 
-  /* Landscaper */
-  --studio-landscaper-avatar-from: #10b981;
-  --studio-landscaper-avatar-to: #059669;
-  --studio-landscaper-status: #10b981;
+  /* Landscaper - using Success color */
+  --studio-landscaper-avatar-from: #57c68a;
+  --studio-landscaper-avatar-to: #3da36e;
+  --studio-landscaper-status: #57c68a;
 
   /* Activity feed */
   --studio-activity-border: var(--studio-border);
@@ -485,4 +501,18 @@
   --studio-surface-sunken: var(--studio-bg-sunken);
   --studio-border-soft: var(--studio-border);
   --studio-text-primary: var(--studio-text);
+
+  /* Analysis Type Badge Colors - CoreUI aligned */
+  /* Valuation: Danger (pink) */
+  --studio-badge-valuation-bg: rgba(230, 64, 114, 0.2);
+  --studio-badge-valuation-color: #e64072;
+  /* Investment: Primary (blue) */
+  --studio-badge-investment-bg: rgba(61, 153, 245, 0.2);
+  --studio-badge-investment-color: #3d99f5;
+  /* Development: Success (green) */
+  --studio-badge-development-bg: rgba(87, 198, 138, 0.2);
+  --studio-badge-development-color: #57c68a;
+  /* Feasibility: Warning (gold) */
+  --studio-badge-feasibility-bg: rgba(242, 196, 13, 0.2);
+  --studio-badge-feasibility-color: #f2c40d;
 }

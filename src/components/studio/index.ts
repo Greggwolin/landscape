@@ -52,6 +52,11 @@ export { LandscaperPanel } from './LandscaperPanel';
 export type { LandscaperPanelProps, ActivityItem } from './LandscaperPanel';
 
 // =============================================================================
+// VIEW MODE COMPONENTS
+// =============================================================================
+export { default as ViewModeToggle } from './ViewModeToggle';
+
+// =============================================================================
 // CORE COMPONENTS (placeholders for future)
 // =============================================================================
 // export { StudioCard } from './core/StudioCard';

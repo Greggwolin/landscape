@@ -25,6 +25,7 @@ export default function ValuationSalesCompMap({
 }: ValuationSalesCompMapProps) {
   const { data, error, isLoading } = useCompsMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Color comps by selected state
   const compsWithColor = useMemo(() => {
@@ -96,6 +97,23 @@ export default function ValuationSalesCompMap({
     }, 500);
   }, [data]);
 
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const handleResize = () => {
+      mapRef.current?.resize();
+    };
+
+    handleResize();
+    const observer = new ResizeObserver(handleResize);
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div
@@ -141,6 +159,7 @@ export default function ValuationSalesCompMap({
 
   return (
     <div
+      ref={containerRef}
       className="rounded-lg border overflow-hidden"
       style={{
         height,

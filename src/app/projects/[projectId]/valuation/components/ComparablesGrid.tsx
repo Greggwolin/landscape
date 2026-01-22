@@ -369,7 +369,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
         }}
       >
         <div className="overflow-x-auto">
-          <table className="text-sm" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
+          <table style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%', fontSize: '0.9375rem' }}>
             {/* Column widths */}
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
@@ -743,7 +743,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
         }}
       >
         <div className="overflow-x-auto">
-          <table className="text-sm" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
+          <table style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%', fontSize: '0.9375rem' }}>
             {/* Column widths - 3 columns per comp (Ai, Icons, Final) */}
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />

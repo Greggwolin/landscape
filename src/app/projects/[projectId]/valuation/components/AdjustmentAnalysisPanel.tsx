@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react';
 import type { AIAdjustmentSuggestion, SalesComparable } from '@/types/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -329,7 +330,9 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
               {msg.role === 'assistant' ? '🤖 Landscaper' : 'You'}
             </div>
             <div className="whitespace-pre-line leading-relaxed">
-              {msg.content}
+              {msg.role === 'assistant'
+                ? sanitizeLandscaperResponse(msg.content)
+                : msg.content}
             </div>
           </div>
         ))}

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { CCard, CCardHeader, CCardBody, CButton, CFormInput } from '@coreui/react';
 import { Send, Upload } from 'lucide-react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface LandscaperPanelProps {
   onDataIngested: () => void;
@@ -271,7 +272,9 @@ export default function LandscaperPanel({ onDataIngested }: LandscaperPanelProps
                   </span>
                 </div>
                 <div style={{ whiteSpace: 'pre-wrap' }}>
-                  {message.content}
+                  {message.role === 'landscaper'
+                    ? sanitizeLandscaperResponse(message.content)
+                    : message.content}
                 </div>
                 {message.actions && message.actions.length > 0 && (
                   <div className="d-flex gap-2 mt-3">

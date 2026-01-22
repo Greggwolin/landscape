@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import Dropzone from '@/components/dms/upload/Dropzone'
 import { DMSDocument } from '@/types/dms'
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse'
 
 // Enhanced Inline Field Control Component with AI reconciliation support
 interface InlineFieldControlProps {
@@ -469,7 +470,9 @@ const InlineFieldControl: React.FC<InlineFieldControlProps> = ({
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-200'
                     }`}>
-                      {msg.content}
+                      {msg.role === 'assistant'
+                        ? sanitizeLandscaperResponse(msg.content)
+                        : msg.content}
                       {msg.proposedValue && (
                         <div className="mt-1 pt-1 border-t border-gray-600">
                           <strong className="text-green-400">Proposed: {msg.proposedValue}</strong>

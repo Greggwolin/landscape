@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilSend, cilLightbulb, cilBook, cilCog, cilList } from '@coreui/icons';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -156,7 +157,11 @@ export default function PlatformKnowledgeAccordion({
                             : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
                         }`}
                       >
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                        <div className="whitespace-pre-wrap">
+                          {msg.role === 'assistant'
+                            ? sanitizeLandscaperResponse(msg.content)
+                            : msg.content}
+                        </div>
                         <div
                           className={`text-xs mt-1 ${
                             msg.role === 'user' ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'

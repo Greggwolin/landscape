@@ -1,0 +1,49 @@
+{
+  "fillAllowed": [
+    "--cui-primary",
+    "--cui-secondary",
+    "--cui-danger",
+    "--cui-primary-dark",
+    "--cui-secondary-dark",
+    "--cui-danger-dark",
+    "--surface-700",
+    "--surface-800",
+    "--surface-900"
+  ],
+  "textOnly": [
+    "--cui-warning",
+    "--cui-success",
+    "--cui-info",
+    "--cui-primary-text",
+    "--cui-secondary-text"
+  ],
+  "backgroundOnly": [
+    "--cui-primary-bg",
+    "--cui-success-bg",
+    "--cui-danger-bg",
+    "--cui-warning-bg",
+    "--cui-primary-bg-subtle",
+    "--cui-light-bg-subtle",
+    "--cui-dark-bg-subtle"
+  ],
+  "borderOnly": [
+    "--cui-primary-border-subtle",
+    "--cui-danger-border-subtle"
+  ],
+  "forbidden": [
+    "--cui-warning-bg-subtle",
+    "--cui-success-bg-subtle"
+  ],
+  "rules": {
+    "whiteTextMinimumContrast": 4.5,
+    "allowWhiteTextOn": [
+      "--cui-primary",
+      "--cui-primary-dark",
+      "--cui-danger",
+      "--cui-danger-dark",
+      "--surface-700",
+      "--surface-800",
+      "--surface-900"
+    ]
+  }
+}

@@ -937,6 +937,29 @@ When referencing document content, cite the specific document name."""
 7. Ask clarifying questions if needed to give better advice
 8. If you don't have enough information, say so rather than guessing"""
 
+    base_prompt += """
+
+=== RESPONSE FORMATTING RULES ===
+
+- Do NOT use markdown syntax. No **, ##, ###, *, or emoji characters.
+- Use plain text only.
+- Use blank lines between sections for readability.
+- Use indentation (2-4 spaces) for sub-items, not bullets or dashes.
+- Keep responses concise and scannable.
+- For lists, use line breaks between items, not inline formatting.
+
+Example good format:
+  Property Analysis:
+
+    Address: 123 Main St
+    Units: 48
+    Year Built: 2019
+
+  Key Findings:
+
+    The property shows strong NOI growth potential.
+    Cap rate aligns with market at 5.2%."""
+
     if citation_hint:
         base_prompt += f"\n9. For this query, your primary source is: {citation_hint}"
 

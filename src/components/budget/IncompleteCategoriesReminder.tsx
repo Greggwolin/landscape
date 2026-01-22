@@ -162,13 +162,13 @@ export function IncompleteCategoriesReminder({
               variant="default"
               size="sm"
               onClick={() => {
-                // Open admin panel in new tab
-                window.open('/admin/preferences', '_blank');
+                // Open system preferences modal
+                window.dispatchEvent(new CustomEvent('open-admin-modal', { detail: { tab: 'preferences' } }));
               }}
               className="h-6 px-2 text-xs bg-amber-600 hover:bg-amber-700"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
-              Complete Now
+              Open System Preferences
             </Button>
           </div>
         </AlertTitle>
@@ -176,7 +176,7 @@ export function IncompleteCategoriesReminder({
         <AlertDescription>
           <p className="text-sm mb-2">
             You have {data.count} categor{data.count === 1 ? 'y' : 'ies'} that need completion
-            (description, icon, color). Complete them in Admin → Preferences to improve budget
+            (description, icon, color). Complete them in System Preferences to improve budget
             organization.
           </p>
 

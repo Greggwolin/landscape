@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilCloudUpload, cilSend } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 // ============================================
 // INTENT DETECTION SYSTEM
@@ -532,7 +533,9 @@ export default function DmsLandscaperPanel({
             }`}
             style={{ whiteSpace: 'pre-wrap' }}
           >
-            {msg.content}
+            {msg.role === 'assistant'
+              ? sanitizeLandscaperResponse(msg.content)
+              : msg.content}
           </div>
         ))}
       </div>

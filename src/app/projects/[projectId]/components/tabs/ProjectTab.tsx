@@ -410,9 +410,9 @@ export default function ProjectTab({
   };
 
   const renderMapCard = () => (
-    <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
+    <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <CCardHeader style={{ padding: '0.5rem 1rem', minHeight: '44px' }}>Map - 3D Oblique View</CCardHeader>
-      <CCardBody style={{ padding: '12px', flex: 1 }}>
+      <CCardBody style={{ padding: '0.75rem', flex: 1 }}>
         <div style={{ height: '100%' }}>
           <ProjectTabMap
             projectId={String(project.project_id)}

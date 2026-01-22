@@ -1,7 +1,22 @@
 /* MapLibre GL CSS - must be first */
 @import 'maplibre-gl/dist/maplibre-gl.css';
+
+/* Design tokens - foundation for all theming */
 @import '../styles/tokens.css';
+
+/* CoreUI theme - imports CoreUI base CSS and bridges to our tokens */
+@import '../styles/coreui-theme.css';
+
+/* Studio-specific theme variables */
 @import '../styles/studio-theme.css';
+
+/* Studio flyout + layout */
+@import '../styles/studio-flyout.css';
+
+/* Color guard - dev-time enforcement for color token usage */
+@import '../styles/color-guard.css';
+
+/* Component patterns */
 @import '../styles/component-patterns.css';
 
 /* MapLibre popup styles */

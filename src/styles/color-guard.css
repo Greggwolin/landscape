@@ -1,0 +1,31 @@
+/* COLOR GUARD — DO NOT BYPASS */
+
+[data-fill] {
+  color: #ffffff;
+}
+
+/* FORBIDDEN AS FILLS */
+[data-fill="--cui-warning"],
+[data-fill="--cui-success"],
+[data-fill="--cui-info"] {
+  outline: 3px solid red !important;
+  background: repeating-linear-gradient(
+    45deg,
+    #000,
+    #000 10px,
+    #ff0000 10px,
+    #ff0000 20px
+  ) !important;
+}
+
+/* TEXT-ONLY TOKENS USED AS BACKGROUNDS */
+[data-bg="--cui-warning"],
+[data-bg="--cui-success"] {
+  outline: 3px dashed orange !important;
+}
+
+/* BORDER-ONLY TOKENS */
+[data-fill="--cui-primary-border-subtle"],
+[data-fill="--cui-danger-border-subtle"] {
+  outline: 3px dashed purple !important;
+}

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { MessageCircle, Send, Loader2 } from 'lucide-react'
 import type { NewProjectFormData } from './types'
 import NewProjectDropZone from '@/components/projects/onboarding/NewProjectDropZone'
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse'
 
 export interface LandscaperMessage {
   id: string
@@ -513,17 +514,15 @@ const LandscaperPanel = ({
                     : 'bg-white border border-slate-200 text-slate-700'
               }`}
             >
-              {/* Render message with basic markdown support */}
               <div className="whitespace-pre-wrap">
-                {message.content.split('\n').map((line, idx) => {
-                  const boldLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                  return (
-                    <div
-                      key={idx}
-                      dangerouslySetInnerHTML={{ __html: boldLine }}
-                    />
-                  )
-                })}
+                {(message.role === 'user'
+                  ? message.content
+                  : sanitizeLandscaperResponse(message.content)
+                )
+                  .split('\n')
+                  .map((line, idx) => (
+                    <div key={idx}>{line}</div>
+                  ))}
               </div>
             </div>
           </div>

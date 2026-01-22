@@ -14,6 +14,7 @@ import {
 import CIcon from '@coreui/icons-react';
 import { cilBook, cilSend, cilCommentSquare } from '@coreui/icons';
 import type { PlatformKnowledgeDocument } from '@/types/dms';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -27,20 +28,7 @@ interface PlatformKnowledgeChatModalProps {
   document: PlatformKnowledgeDocument;
 }
 
-const formatChatResponse = (content: string) => {
-  let text = content || '';
-  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  text = text.replace(/\s*#{2,6}\s*/g, '\n');
-  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
-  text = text.replace(/__(.*?)__/g, '$1');
-  text = text.replace(/\s*-\s+/g, '\n  ');
-  text = text.replace(/\s*\*\s+/g, '\n  ');
-  text = text.replace(/(^|\s)\*(\S)/g, '$1$2');
-  text = text.replace(/(\S)\*(\s|$)/g, '$1$2');
-  text = text.replace(/[ \t]+\n/g, '\n');
-  text = text.replace(/\n{3,}/g, '\n\n');
-  return text.trim();
-};
+const formatChatResponse = (content: string) => sanitizeLandscaperResponse(content);
 
 export default function PlatformKnowledgeChatModal({
   visible,
@@ -191,7 +179,9 @@ export default function PlatformKnowledgeChatModal({
                 style={{ maxWidth: '85%' }}
               >
                 <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
+                  {msg.role === 'assistant'
+                    ? sanitizeLandscaperResponse(msg.content)
+                    : msg.content}
                 </p>
                 {msg.sources_used !== undefined && msg.sources_used > 0 && (
                   <p className="mb-0 mt-1 small opacity-75">

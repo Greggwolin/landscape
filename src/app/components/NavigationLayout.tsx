@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import TopNavigationBar from './TopNavigationBar';
 import { AdminModal } from '@/components/admin';
@@ -18,6 +18,15 @@ const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password
  * @param children - Page content to render
  * @param hideNavigation - Optional flag to hide navigation (for auth pages, etc.)
  */
+type AdminModalTab =
+  | 'preferences'
+  | 'benchmarks'
+  | 'cost-library'
+  | 'dms-admin'
+  | 'report-configurator'
+  | 'users'
+  | 'landscaper';
+
 interface NavigationLayoutProps {
   children: React.ReactNode;
   hideNavigation?: boolean;
@@ -28,10 +37,26 @@ export default function NavigationLayout({
   hideNavigation = false,
 }: NavigationLayoutProps) {
   const [isAdminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminModalTab, setAdminModalTab] = useState<AdminModalTab>('preferences');
   const pathname = usePathname();
 
   // Auto-hide navigation on auth routes
   const isAuthRoute = AUTH_ROUTES.some(route => pathname?.startsWith(route));
+
+  useEffect(() => {
+    const handleOpenAdminModal = (event: Event) => {
+      const customEvent = event as CustomEvent<{ tab?: AdminModalTab }>;
+      if (customEvent.detail?.tab) {
+        setAdminModalTab(customEvent.detail.tab);
+      }
+      setAdminModalOpen(true);
+    };
+
+    window.addEventListener('open-admin-modal', handleOpenAdminModal);
+    return () => {
+      window.removeEventListener('open-admin-modal', handleOpenAdminModal);
+    };
+  }, []);
 
   if (hideNavigation || isAuthRoute) {
     return <>{children}</>;
@@ -46,6 +71,8 @@ export default function NavigationLayout({
       <AdminModal
         isOpen={isAdminModalOpen}
         onClose={() => setAdminModalOpen(false)}
+        activeTab={adminModalTab}
+        onTabChange={setAdminModalTab}
       />
     </div>
   );

@@ -265,10 +265,11 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
 
       {/* Controls Panel - Accordion */}
       <div
-        className="rounded-lg border"
+        className="border overflow-hidden"
         style={{
           backgroundColor: 'var(--cui-card-bg)',
-          borderColor: 'var(--cui-border-color)'
+          borderColor: 'var(--cui-border-color)',
+          borderRadius: 'var(--radius-card, 0.5rem)'
         }}
       >
         {/* Accordion Header */}
@@ -279,7 +280,8 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
             backgroundColor: 'var(--cui-tertiary-bg)',
             color: 'var(--cui-body-color)',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            borderRadius: controlsExpanded ? 'var(--radius-card-inner, calc(0.5rem - 1px)) var(--radius-card-inner, calc(0.5rem - 1px)) 0 0' : 'var(--radius-card-inner, calc(0.5rem - 1px))'
           }}
         >
           <div className="flex items-center gap-2">

@@ -9,12 +9,16 @@
  * - Tailwind layout utilities (flex, grid, gap, p-*, m-*) are allowed
  * - CoreUI components for interactive elements
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-01-20
+ * @updated 2026-01-21 - Connected to useLandscaper hook, added landscaper-icon.svg
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { CFormInput, CButton } from '@coreui/react';
+import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 export interface ActivityItem {
   id: string;
@@ -34,6 +38,8 @@ export interface LandscaperPanelProps {
   placeholder?: string;
   /** Whether Landscaper is currently processing */
   isProcessing?: boolean;
+  /** Toggle activity feed visibility when an external feed is used */
+  showActivity?: boolean;
 }
 
 // Default activities for demo
@@ -97,20 +103,42 @@ function getStatusColor(type: ActivityItem['type']): string {
  * - Chat input for user queries
  */
 export function LandscaperPanel({
-  projectId: _projectId, // Reserved for future API integration
+  projectId,
   activities = DEFAULT_ACTIVITIES,
   onSendMessage,
   contextLabel = 'Project Overview',
   placeholder = 'Ask about valuation approaches...',
-  isProcessing = false,
+  isProcessing: externalIsProcessing,
+  showActivity = true,
 }: LandscaperPanelProps): JSX.Element {
   const [message, setMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Connect to the real Landscaper API
+  const { messages, sendMessage: apiSendMessage, isLoading, error } = useLandscaper({
+    projectId: projectId.toString(),
+    activeTab: 'studio',
+  });
+
+  const isProcessing = externalIsProcessing || isLoading;
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   const handleSend = () => {
-    if (message.trim() && onSendMessage) {
+    if (!message.trim()) return;
+
+    // If external handler provided, use it; otherwise use the API
+    if (onSendMessage) {
       onSendMessage(message);
-      setMessage('');
+    } else {
+      apiSendMessage(message);
     }
+    setMessage('');
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -121,21 +149,20 @@ export function LandscaperPanel({
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+    <div className="landscaper-panel flex flex-col flex-1 overflow-hidden" style={{ minHeight: 0 }}>
       {/* Header */}
       <div
-        className="flex items-center gap-3 px-4 py-3"
+        className="landscaper-header flex items-center gap-3 px-4 py-3 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--studio-border-soft)' }}
       >
-        {/* Avatar */}
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
-          style={{
-            background: `linear-gradient(135deg, var(--studio-landscaper-avatar-from), var(--studio-landscaper-avatar-to))`,
-          }}
-        >
-          🌿
-        </div>
+        {/* Icon */}
+        <img
+          src="/landscaper-icon.svg"
+          alt="Landscaper"
+          width={36}
+          height={36}
+          className="landscaper-icon"
+        />
 
         {/* Info */}
         <div className="flex-1">
@@ -153,64 +180,109 @@ export function LandscaperPanel({
           </div>
         </div>
 
-        {/* Context label */}
-        <span
-          className="text-xs px-2 py-1 rounded"
-          style={{
-            backgroundColor: 'var(--studio-surface-sunken)',
-            color: 'var(--studio-text-secondary)',
-          }}
-        >
-          {contextLabel}
-        </span>
       </div>
 
-      {/* Activity Feed */}
-      <div className="flex-1 overflow-y-auto px-4 py-3" style={{ minHeight: 0 }}>
-        {activities.map((activity, index) => (
+      {/* Chat Messages Area */}
+      <div
+        className="landscaper-messages flex-1 overflow-y-auto px-4 py-3"
+        style={{ minHeight: '120px' }}
+      >
+        {messages.length === 0 ? (
           <div
-            key={activity.id}
-            className="flex gap-3 py-3"
+            className="text-center py-4 text-xs"
+            style={{ color: 'var(--studio-text-muted)' }}
+          >
+            Ask Landscaper anything about this project...
+          </div>
+        ) : (
+          messages.map((msg: ChatMessage) => (
+            <div
+              key={msg.messageId}
+              className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}
+            >
+              <div
+                className="inline-block px-2 py-1.5 rounded-lg text-sm max-w-[90%]"
+                style={{
+                  backgroundColor:
+                    msg.role === 'user'
+                      ? 'var(--studio-primary)'
+                      : 'var(--studio-surface-sunken)',
+                  color:
+                    msg.role === 'user'
+                      ? '#fff'
+                      : 'var(--studio-text-primary)',
+                  textAlign: 'left',
+                }}
+              >
+                {msg.role === 'assistant'
+                  ? sanitizeLandscaperResponse(msg.content)
+                  : msg.content}
+              </div>
+            </div>
+          ))
+        )}
+        {error && (
+          <div
+            className="text-xs px-3 py-2 rounded mb-2"
             style={{
-              borderBottom:
-                index < activities.length - 1
-                  ? '1px solid var(--studio-border-soft)'
-                  : 'none',
+              backgroundColor: 'color-mix(in srgb, var(--cui-danger) 15%, transparent)',
+              color: 'var(--cui-danger)',
             }}
           >
-            {/* Icon */}
-            <div
-              className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0"
-              style={{
-                backgroundColor: `color-mix(in srgb, ${getStatusColor(activity.type)} 20%, transparent)`,
-                color: getStatusColor(activity.type),
-              }}
-            >
-              {activity.icon}
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm" style={{ color: 'var(--studio-text-secondary)' }}>
-                <strong style={{ color: 'var(--studio-text-primary)' }}>
-                  {activity.text}
-                </strong>
-                {activity.highlight && ` ${activity.highlight}`}
-              </div>
-              <div
-                className="text-xs mt-1"
-                style={{ color: 'var(--studio-text-muted)' }}
-              >
-                {activity.time}
-              </div>
-            </div>
+            {error}
           </div>
-        ))}
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Chat Input */}
+      {/* Activity Feed (legacy) */}
+      {showActivity ? (
+        <div className="flex-1 overflow-y-auto px-4 py-3" style={{ minHeight: 0 }}>
+          {activities.map((activity, index) => (
+            <div
+              key={activity.id}
+              className="flex gap-3 py-3"
+              style={{
+                borderBottom:
+                  index < activities.length - 1
+                    ? '1px solid var(--studio-border-soft)'
+                    : 'none',
+              }}
+            >
+              {/* Icon */}
+              <div
+                className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${getStatusColor(activity.type)} 20%, transparent)`,
+                  color: getStatusColor(activity.type),
+                }}
+              >
+                {activity.icon}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm" style={{ color: 'var(--studio-text-secondary)' }}>
+                  <strong style={{ color: 'var(--studio-text-primary)' }}>
+                    {activity.text}
+                  </strong>
+                  {activity.highlight && ` ${activity.highlight}`}
+                </div>
+                <div
+                  className="text-xs mt-1"
+                  style={{ color: 'var(--studio-text-muted)' }}
+                >
+                  {activity.time}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Chat Input - flex-shrink-0 ensures it's always visible */}
       <div
-        className="px-4 py-3"
+        className="landscaper-chat-input px-4 py-3 flex-shrink-0"
         style={{ borderTop: '1px solid var(--studio-border-soft)' }}
       >
         <div className="flex gap-2">

@@ -14,6 +14,21 @@
 
 import React from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import CIcon from '@coreui/icons-react';
+import {
+  cilHome,
+  cilBuilding,
+  cilChartLine,
+  cilSearch,
+  cilGraph,
+  cilFile,
+  cilFolder,
+  cilClipboard,
+  cilDollar,
+  cilTag,
+  cilInstitution,
+  cilPencil,
+} from '@coreui/icons';
 
 // Types
 export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY';
@@ -23,7 +38,7 @@ export type TileStatus = 'ready' | 'review' | 'locked' | 'none';
 export interface TileConfig {
   id: string;
   label: string;
-  icon: string;
+  icon: string[]; // CoreUI icon array
   route: string;
   color: string; // CSS variable name without --studio-tile-
   status?: TileStatus;
@@ -42,57 +57,64 @@ export interface TileGridProps {
 // Mirrors LifecycleTileNav from src/components/projects/tiles/tileConfig.ts
 // Income properties use ?tab= query params; Land dev uses path routes
 const TILE_CONFIGS: Record<AnalysisType, TileConfig[]> = {
-  // VALUATION: Appraisal workflow - uses income property tabs
+  // VALUATION: Appraisal workflow (7 tiles)
+  // 1. Project Home - Dashboard/synopsis
+  // 2. Property - Site, improvements, zoning, taxes + Rent Roll, OpEx, NOI
+  // 3. Market - Regional → Local → Submarket
+  // 4. H&BU - Doc uploads (zoning, site plans, parcel maps) + Four-test analysis
+  // 5. Valuation - Sub-tabs: Sales Comparison, Cost Approach (incl. Land Value), Income Approach, Reconciliation
+  // 6. Reports - Report generation
+  // 7. Documents - DMS
   VALUATION: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: cilHome, route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: cilBuilding, route: '?tab=property', color: 'property' },
+    { id: 'market', label: 'Market', icon: cilChartLine, route: '?tab=market', color: 'operations' },
+    { id: 'hbu', label: 'Highest & Best Use', icon: cilSearch, route: '?tab=hbu', color: 'valuation' },
+    { id: 'valuation', label: 'Valuation', icon: cilGraph, route: '?tab=valuation', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: cilFile, route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: cilFolder, route: '?tab=documents', color: 'documents' },
   ],
   // INVESTMENT: Multifamily acquisition/disposition
   // Property tab: Rent Roll, Floorplan Matrix, Comp Map (via PropertyTab)
   // Operations tab: Rent Roll subtab, Expenses, NOI
   INVESTMENT: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: cilHome, route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: cilBuilding, route: '?tab=property', color: 'property' },
+    { id: 'operations', label: 'Operations', icon: cilClipboard, route: '?tab=operations', color: 'operations' },
+    { id: 'valuation', label: 'Valuation', icon: cilGraph, route: '?tab=valuation', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: cilInstitution, route: '/capitalization/equity', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: cilFile, route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: cilFolder, route: '?tab=documents', color: 'documents' },
   ],
   // DEVELOPMENT: Land development workflow (path-based routing)
   DEVELOPMENT: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: '', color: 'home' },
-    { id: 'planning', label: 'Planning', icon: '📐', route: '/planning/market', color: 'property' },
-    { id: 'budget', label: 'Budget', icon: '💰', route: '/budget', color: 'operations' },
-    { id: 'sales', label: 'Sales', icon: '🏷️', route: '/project/sales', color: 'capitalization' },
-    { id: 'feasibility', label: 'Feasibility', icon: '📊', route: '/results', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: '/analysis', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: '/documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: cilHome, route: '', color: 'home' },
+    { id: 'planning', label: 'Planning', icon: cilPencil, route: '/planning/market', color: 'property' },
+    { id: 'budget', label: 'Budget', icon: cilDollar, route: '/budget', color: 'operations' },
+    { id: 'sales', label: 'Sales', icon: cilTag, route: '/project/sales', color: 'capitalization' },
+    { id: 'feasibility', label: 'Feasibility', icon: cilChartLine, route: '/results', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: cilInstitution, route: '/capitalization/equity', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: cilFile, route: '/analysis', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: cilFolder, route: '/documents', color: 'documents' },
   ],
   // FEASIBILITY: HBU analysis - uses income property tabs
   FEASIBILITY: [
-    { id: 'home', label: 'Project Home', icon: '🏠', route: '?tab=project', color: 'home' },
-    { id: 'property', label: 'Property', icon: '🏢', route: '?tab=property', color: 'property' },
-    { id: 'operations', label: 'Operations', icon: '📋', route: '?tab=operations', color: 'operations' },
-    { id: 'valuation', label: 'Valuation', icon: '📈', route: '?tab=valuation', color: 'valuation' },
-    { id: 'capitalization', label: 'Capitalization', icon: '🏦', route: '/capitalization/equity', color: 'capitalization' },
-    { id: 'reports', label: 'Reports', icon: '📑', route: '?tab=reports', color: 'reports' },
-    { id: 'documents', label: 'Documents', icon: '📁', route: '?tab=documents', color: 'documents' },
+    { id: 'home', label: 'Project Home', icon: cilHome, route: '?tab=project', color: 'home' },
+    { id: 'property', label: 'Property', icon: cilBuilding, route: '?tab=property', color: 'property' },
+    { id: 'operations', label: 'Operations', icon: cilClipboard, route: '?tab=operations', color: 'operations' },
+    { id: 'valuation', label: 'Valuation', icon: cilGraph, route: '?tab=valuation', color: 'valuation' },
+    { id: 'capitalization', label: 'Capitalization', icon: cilInstitution, route: '/capitalization/equity', color: 'capitalization' },
+    { id: 'reports', label: 'Reports', icon: cilFile, route: '?tab=reports', color: 'reports' },
+    { id: 'documents', label: 'Documents', icon: cilFolder, route: '?tab=documents', color: 'documents' },
   ],
 };
 
-// Analysis Type badge colors (using inline styles with semantic values)
+// Analysis Type badge colors (using CSS variables for theming)
 const ANALYSIS_BADGE_STYLES: Record<AnalysisType, { bg: string; color: string }> = {
-  VALUATION: { bg: 'rgba(131, 24, 67, 0.3)', color: '#f9a8d4' },
-  INVESTMENT: { bg: 'rgba(30, 64, 175, 0.3)', color: '#93c5fd' },
-  DEVELOPMENT: { bg: 'rgba(22, 101, 52, 0.3)', color: '#86efac' },
-  FEASIBILITY: { bg: 'rgba(146, 64, 14, 0.3)', color: '#fcd34d' },
+  VALUATION: { bg: 'var(--studio-badge-valuation-bg)', color: 'var(--studio-badge-valuation-color)' },
+  INVESTMENT: { bg: 'var(--studio-badge-investment-bg)', color: 'var(--studio-badge-investment-color)' },
+  DEVELOPMENT: { bg: 'var(--studio-badge-development-bg)', color: 'var(--studio-badge-development-color)' },
+  FEASIBILITY: { bg: 'var(--studio-badge-feasibility-bg)', color: 'var(--studio-badge-feasibility-color)' },
 };
 
 /**
@@ -111,7 +133,11 @@ export function TileGrid({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  console.log('[TileGrid] analysisType prop:', analysisType);
+  console.log('[TileGrid] Available configs:', Object.keys(TILE_CONFIGS));
+
   const tiles = TILE_CONFIGS[analysisType] || TILE_CONFIGS.INVESTMENT;
+  console.log('[TileGrid] Using tiles for:', analysisType, '- count:', tiles.length);
   const badgeStyle = ANALYSIS_BADGE_STYLES[analysisType];
 
   // Determine active tile from URL
@@ -156,20 +182,20 @@ export function TileGrid({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <span
-          className="text-xs font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--studio-text-muted)' }}
+          className="font-semibold"
+          style={{ color: 'var(--studio-text-muted)', fontSize: '0.8125rem' }}
         >
           Studio
         </span>
         <span
-          className="text-xs font-semibold uppercase px-2 py-1 rounded"
+          className="font-semibold px-2 py-1 rounded"
           style={{
             backgroundColor: badgeStyle.bg,
             color: badgeStyle.color,
-            letterSpacing: '0.5px',
+            fontSize: '0.75rem',
           }}
         >
-          {analysisType}
+          Scope: {analysisType.charAt(0).toUpperCase() + analysisType.slice(1).toLowerCase()}
         </span>
       </div>
 
@@ -209,10 +235,10 @@ export function TileGrid({
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <span className="text-base">{tile.icon}</span>
+              <CIcon icon={tile.icon} style={{ color: 'var(--studio-tile-label)', width: '1.125rem', height: '1.125rem' }} />
               <span
-                className="text-xs font-semibold"
-                style={{ color: 'var(--studio-tile-label)' }}
+                className="font-semibold"
+                style={{ color: 'var(--studio-tile-label)', fontSize: '0.8125rem' }}
               >
                 {tile.label}
               </span>

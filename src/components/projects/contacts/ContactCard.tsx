@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * ContactCard - Individual contact display/edit component
+ *
+ * STYLING RULES:
+ * - All colors use CSS variables (--cui-*)
+ * - No Tailwind color classes (bg-*, text-*, border-* with colors)
+ * - Tailwind layout utilities (flex, grid, gap, p-*, m-*) are allowed
+ *
+ * @updated 2026-01-21 - CoreUI theming
+ */
+
 import { useState } from 'react';
 import { Mail, Phone, Building2, User, StickyNote, Edit2, Trash2 } from 'lucide-react';
 import { ProjectContact } from '@/types/contacts';
@@ -66,23 +77,44 @@ export default function ContactCard({
     setIsEditing(false);
   };
 
+  // Shared input styles using CSS variables
+  const inputStyle = {
+    backgroundColor: 'var(--cui-body-bg)',
+    color: 'var(--cui-body-color)',
+    borderColor: 'var(--cui-border-color)',
+  };
+
   if (isEditing) {
     return (
-      <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+      <div
+        className="rounded-lg p-4 space-y-3"
+        style={{
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          border: '1px solid var(--cui-border-color)',
+        }}
+      >
         <div className="grid grid-cols-2 gap-3">
           <input
             type="text"
             placeholder="Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+            style={{
+              ...inputStyle,
+              border: '1px solid var(--cui-border-color)',
+            }}
           />
           <input
             type="text"
             placeholder="Title"
             value={formData.title || ''}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+            style={{
+              ...inputStyle,
+              border: '1px solid var(--cui-border-color)',
+            }}
           />
         </div>
         <input
@@ -90,14 +122,22 @@ export default function ContactCard({
           placeholder="Company"
           value={formData.company || ''}
           onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+          style={{
+            ...inputStyle,
+            border: '1px solid var(--cui-border-color)',
+          }}
         />
         <input
           type="email"
           placeholder="Email"
           value={formData.email || ''}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+          style={{
+            ...inputStyle,
+            border: '1px solid var(--cui-border-color)',
+          }}
         />
         <div className="grid grid-cols-2 gap-3">
           <input
@@ -105,14 +145,22 @@ export default function ContactCard({
             placeholder="Direct Phone"
             value={formData.phone_direct || ''}
             onChange={(e) => setFormData({ ...formData, phone_direct: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+            style={{
+              ...inputStyle,
+              border: '1px solid var(--cui-border-color)',
+            }}
           />
           <input
             type="text"
             placeholder="Mobile Phone"
             value={formData.phone_mobile || ''}
             onChange={(e) => setFormData({ ...formData, phone_mobile: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+            style={{
+              ...inputStyle,
+              border: '1px solid var(--cui-border-color)',
+            }}
           />
         </div>
         <textarea
@@ -120,7 +168,11 @@ export default function ContactCard({
           value={formData.notes || ''}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           rows={2}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+          style={{
+            ...inputStyle,
+            border: '1px solid var(--cui-border-color)',
+          }}
         />
         <div className="flex justify-end gap-2">
           <button
@@ -142,15 +194,25 @@ export default function ContactCard({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-white hover:border-gray-300 transition-colors">
+    <div
+      className="rounded-lg p-4 space-y-2 transition-colors"
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        border: '1px solid var(--cui-border-color)',
+      }}
+    >
       {/* Name and Title */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-gray-400" />
-            <span className="font-medium text-gray-900">{contact.name}</span>
+            <User className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
+            <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>
+              {contact.name}
+            </span>
             {contact.title && (
-              <span className="text-sm text-gray-500">- {contact.title}</span>
+              <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                - {contact.title}
+              </span>
             )}
           </div>
         </div>
@@ -174,19 +236,20 @@ export default function ContactCard({
 
       {/* Company */}
       {contact.company && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Building2 className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+          <Building2 className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
           <span>{contact.company}</span>
         </div>
       )}
 
       {/* Email */}
       {contact.email && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Mail className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+          <Mail className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
           <a
             href={`mailto:${contact.email}`}
-            className="text-blue-600 hover:underline"
+            className="hover:underline"
+            style={{ color: 'var(--cui-primary)' }}
           >
             {contact.email}
           </a>
@@ -195,8 +258,8 @@ export default function ContactCard({
 
       {/* Phones */}
       {(contact.phone_direct || contact.phone_mobile) && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Phone className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+          <Phone className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
           <div className="flex gap-3">
             {contact.phone_direct && (
               <span>D: {contact.phone_direct}</span>
@@ -210,8 +273,14 @@ export default function ContactCard({
 
       {/* Notes */}
       {contact.notes && (
-        <div className="flex items-start gap-2 text-sm text-gray-600 mt-2 pt-2 border-t border-gray-100">
-          <StickyNote className="w-4 h-4 text-gray-400 mt-0.5" />
+        <div
+          className="flex items-start gap-2 text-sm mt-2 pt-2"
+          style={{
+            color: 'var(--cui-secondary-color)',
+            borderTop: '1px solid var(--cui-border-color)',
+          }}
+        >
+          <StickyNote className="w-4 h-4 mt-0.5" style={{ color: 'var(--cui-secondary-color)' }} />
           <span className="text-xs">{contact.notes}</span>
         </div>
       )}

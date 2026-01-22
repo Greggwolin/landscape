@@ -3,6 +3,7 @@
 import React from 'react';
 import { ChatMessage } from '@/hooks/useLandscaper';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
+import { sanitizeLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -18,6 +19,7 @@ export function ChatMessageBubble({
   onConfirmBatch,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
+  const messageContent = isUser ? message.content : sanitizeLandscaperResponse(message.content);
 
   // Check for mutation proposals in metadata
   const proposals: MutationProposal[] = message.metadata?.mutation_proposals ||
@@ -35,7 +37,7 @@ export function ChatMessageBubble({
           color: isUser ? 'white' : 'var(--cui-body-color)',
         }}
       >
-        <div className="whitespace-pre-wrap">{message.content}</div>
+        <div className="whitespace-pre-wrap">{messageContent}</div>
 
         {!isUser && message.metadata?.sources && message.metadata.sources.length > 0 && (
           <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>

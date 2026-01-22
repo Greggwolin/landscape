@@ -95,7 +95,6 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          borderColor: 'var(--cui-border-color)',
           height: '100%'
         }}
       >
@@ -104,7 +103,6 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           style={{
             backgroundColor: 'var(--cui-card-cap-bg)',
             color: 'var(--cui-body-color)',
-            borderColor: 'var(--cui-border-color)',
             padding: '0.75rem 1rem',
             minHeight: '52px'
           }}
@@ -126,6 +124,10 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
         </CCardHeader>
         <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
           <div className="d-flex flex-column">
+            <ProfileField
+              label="Project Name"
+              value={profile.project_name}
+            />
             <ProfileField
               label="Analysis Type"
               value={profile.analysis_type}

@@ -3,6 +3,8 @@
   /* Brand */
   --brand-primary: #0ea5e9;
   --brand-accent: #14b8a6;
+  --landscape-cyan: #00d9ff;
+  --landscape-cyan-rgb: 0, 217, 255;
 
   /* Surfaces */
   --surface-bg: #ffffff;
@@ -49,6 +51,10 @@
   /* Spacing */
   --app-padding: 0.75rem; /* align to nav bar horizontal padding */
   --component-gap: 0.75rem;
+
+  /* Border Radius */
+  --radius-card: 0.5rem;
+  --radius-card-inner: calc(var(--radius-card) - 1px);
 
   /* Operations Tab - Input styling */
   --ops-input-as-is: #63b3ed;

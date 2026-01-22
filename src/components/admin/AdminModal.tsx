@@ -27,12 +27,21 @@ import LandscaperAdminPanel from './LandscaperAdminPanel';
 interface AdminModalProps {
   isOpen: boolean;
   onClose: () => void;
+  activeTab?: AdminTab;
+  onTabChange?: (tab: AdminTab) => void;
 }
 
 type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users' | 'landscaper';
 
-export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
+export default function AdminModal({
+  isOpen,
+  onClose,
+  activeTab,
+  onTabChange
+}: AdminModalProps) {
+  const [internalTab, setInternalTab] = useState<AdminTab>('preferences');
+  const currentTab = activeTab ?? internalTab;
+  const setTab = onTabChange ?? setInternalTab;
 
   // ESC key handler
   useEffect(() => {
@@ -73,10 +82,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'preferences'}
+              active={currentTab === 'preferences'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('preferences');
+                setTab('preferences');
               }}
             >
               Preferences
@@ -85,10 +94,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'benchmarks'}
+              active={currentTab === 'benchmarks'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('benchmarks');
+                setTab('benchmarks');
               }}
             >
               Benchmarks
@@ -97,10 +106,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'cost-library'}
+              active={currentTab === 'cost-library'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('cost-library');
+                setTab('cost-library');
               }}
             >
               Cost Library
@@ -109,10 +118,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'dms-admin'}
+              active={currentTab === 'dms-admin'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('dms-admin');
+                setTab('dms-admin');
               }}
             >
               DMS Admin
@@ -121,10 +130,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'report-configurator'}
+              active={currentTab === 'report-configurator'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('report-configurator');
+                setTab('report-configurator');
               }}
             >
               Report Configurator
@@ -133,10 +142,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'users'}
+              active={currentTab === 'users'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('users');
+                setTab('users');
               }}
             >
               Users
@@ -147,10 +156,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
           <CNavItem>
             <CNavLink
               href="#"
-              active={activeTab === 'landscaper'}
+              active={currentTab === 'landscaper'}
               onClick={(e) => {
                 e.preventDefault();
-                setActiveTab('landscaper');
+                setTab('landscaper');
               }}
               className="d-flex align-items-center gap-2"
               style={{ marginLeft: 80 }}
@@ -167,13 +176,13 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
         {/* Tab Content Panels */}
         <div className="admin-modal-content p-4">
-          {activeTab === 'preferences' && <PreferencesPanel />}
-          {activeTab === 'benchmarks' && <BenchmarksPanel />}
-          {activeTab === 'cost-library' && <CostLibraryPanel />}
-          {activeTab === 'dms-admin' && <DMSAdminPanel />}
-          {activeTab === 'report-configurator' && <ReportConfiguratorPanel />}
-          {activeTab === 'users' && <UserManagementPanel />}
-          {activeTab === 'landscaper' && <LandscaperAdminPanel />}
+          {currentTab === 'preferences' && <PreferencesPanel />}
+          {currentTab === 'benchmarks' && <BenchmarksPanel />}
+          {currentTab === 'cost-library' && <CostLibraryPanel />}
+          {currentTab === 'dms-admin' && <DMSAdminPanel />}
+          {currentTab === 'report-configurator' && <ReportConfiguratorPanel />}
+          {currentTab === 'users' && <UserManagementPanel />}
+          {currentTab === 'landscaper' && <LandscaperAdminPanel />}
         </div>
       </CModalBody>
     </CModal>

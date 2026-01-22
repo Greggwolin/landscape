@@ -16,7 +16,6 @@ interface AdminNavItem {
 }
 
 const ADMIN_NAV_ITEMS: AdminNavItem[] = [
-  { id: 'preferences', label: 'Preferences', href: '/admin/preferences' },
   { id: 'benchmarks', label: 'Benchmarks', href: '/admin/benchmarks' },
   { id: 'cost-library', label: 'Cost Library', href: '/admin/benchmarks/cost-library' },
   { id: 'dms', label: 'DMS Admin', href: '/admin/dms/templates' },

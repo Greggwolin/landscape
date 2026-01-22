@@ -1,7 +1,6 @@
 import { ComplexityModeProvider } from '@/contexts/ComplexityModeContext';
 import { ProjectModeProvider } from '@/contexts/ProjectModeContext';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
-import { ProjectLayoutClient } from './ProjectLayoutClient';
+import { ProjectLayoutContent } from './ProjectLayoutContent';
 
 type Params = { projectId: string };
 
@@ -21,15 +20,9 @@ export default async function ProjectLayout({
       projectId={projectIdNum}
     >
       <ProjectModeProvider projectId={projectIdNum}>
-        <div className="app-page flex-1 min-h-0">
-          {/* Full-width header */}
-          <ProjectContextBar projectId={projectIdNum} />
-
-          {/* 30/70 split content area */}
-          <ProjectLayoutClient projectId={projectIdNum}>
-            {children}
-          </ProjectLayoutClient>
-        </div>
+        <ProjectLayoutContent projectId={projectIdNum}>
+          {children}
+        </ProjectLayoutContent>
       </ProjectModeProvider>
     </ComplexityModeProvider>
   );

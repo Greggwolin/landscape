@@ -149,14 +149,14 @@ export function SalesComparisonApproach({
         >
           <div className="text-6xl mb-4">🏢</div>
           <h3
-            className="text-lg font-semibold mb-2"
-            style={{ color: 'var(--cui-body-color)' }}
+            className="font-semibold mb-2"
+            style={{ fontSize: '1.125rem', color: 'var(--cui-body-color)' }}
           >
             No Comparables Yet
           </h3>
           <p
-            className="text-sm mb-4"
-            style={{ color: 'var(--cui-secondary-color)' }}
+            className="mb-4"
+            style={{ fontSize: '0.9375rem', color: 'var(--cui-secondary-color)' }}
           >
             Add comparable sales to begin the valuation analysis
           </p>

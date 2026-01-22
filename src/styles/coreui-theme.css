@@ -3,7 +3,7 @@
 /* Import CoreUI base styles */
 @import '@coreui/coreui/dist/css/coreui.min.css';
 
-/* v1.0 – CoreUI Bridge (2025-11-07) */
+/* v1.1 – CoreUI Bridge (2026-01-21) - Updated with brand colors and bg variants */
 :root {
   --bs-body-bg: var(--surface-bg);
   --bs-body-color: var(--text-primary);
@@ -16,21 +16,82 @@
   --cui-card-border-color: var(--line-soft);
   --cui-footer-bg: var(--surface-card);
 
-  /* Primary brand bridge */
-  --bs-primary: var(--brand-primary);
-  --bs-link-color: var(--brand-primary);
-  --cui-primary: var(--brand-primary);
-  --cui-primary-rgb: 14, 165, 233;
+  /* Primary brand bridge - #3d99f5 */
+  --bs-primary: #3d99f5;
+  --bs-link-color: #3d99f5;
+  --cui-primary: #3d99f5;
+  --cui-primary-rgb: 61, 153, 245;
 
-  /* CoreUI semantic colors */
-  --cui-success: #198754;
-  --cui-success-rgb: 25, 135, 84;
-  --cui-warning: #ffc107;
-  --cui-warning-rgb: 255, 193, 7;
-  --cui-danger: #dc3545;
-  --cui-danger-rgb: 220, 53, 69;
-  --cui-info: #0dcaf0;
-  --cui-info-rgb: 13, 202, 240;
+  /* CoreUI semantic colors - Updated to match brand palette */
+  /* Secondary: #6b7785 */
+  --cui-secondary: #6b7785;
+  --cui-secondary-rgb: 107, 119, 133;
+
+  /* Success: #57c68a */
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+
+  /* Danger: #e64072 */
+  --cui-danger: #e64072;
+  --cui-danger-rgb: 230, 64, 114;
+
+  /* Warning: #f2c40d */
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+
+  /* Info: #7a80ec */
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
+
+  /* Light: #f3f4f7 */
+  --cui-light: #f3f4f7;
+  --cui-light-rgb: 243, 244, 247;
+
+  /* Dark: #212631 */
+  --cui-dark: #212631;
+  --cui-dark-rgb: 33, 38, 49;
+
+  /* Background variations for light tints (light mode) */
+  --cui-primary-bg: rgba(61, 153, 245, 0.1);
+  --cui-secondary-bg: rgba(107, 119, 133, 0.1);
+  --cui-success-bg: rgba(87, 198, 138, 0.1);
+  --cui-danger-bg: rgba(230, 64, 114, 0.1);
+  --cui-warning-bg: rgba(242, 196, 13, 0.1);
+  --cui-info-bg: rgba(122, 128, 236, 0.1);
+  --cui-light-bg-subtle: rgba(243, 244, 247, 0.5);
+  --cui-dark-bg-subtle: rgba(33, 38, 49, 0.1);
+
+  /* Subtle background variations (lighter than -bg) */
+  --cui-primary-bg-subtle: rgba(61, 153, 245, 0.05);
+  --cui-secondary-bg-subtle: rgba(107, 119, 133, 0.05);
+  --cui-success-bg-subtle: rgba(87, 198, 138, 0.05);
+  --cui-danger-bg-subtle: rgba(230, 64, 114, 0.05);
+  --cui-warning-bg-subtle: rgba(242, 196, 13, 0.05);
+  --cui-info-bg-subtle: rgba(122, 128, 236, 0.05);
+
+  /* Border subtle variations */
+  --cui-primary-border-subtle: rgba(61, 153, 245, 0.3);
+  --cui-secondary-border-subtle: rgba(107, 119, 133, 0.3);
+  --cui-success-border-subtle: rgba(87, 198, 138, 0.3);
+  --cui-danger-border-subtle: rgba(230, 64, 114, 0.3);
+  --cui-warning-border-subtle: rgba(242, 196, 13, 0.3);
+  --cui-info-border-subtle: rgba(122, 128, 236, 0.3);
+
+  /* Text color variations (for use on light backgrounds) */
+  --cui-primary-text: #2d7acc;
+  --cui-secondary-text: #555f6d;
+  --cui-success-text: #3da36e;
+  --cui-danger-text: #c4305c;
+  --cui-warning-text: #c9a00a;
+  --cui-info-text: #5a60c4;
+
+  /* Semantic color aliases */
+  --cui-primary-color: #3d99f5;
+  --cui-success-color: #57c68a;
+  --cui-danger-color: #e64072;
+  --cui-warning-color: #f2c40d;
+  --cui-info-color: #7a80ec;
+
   --filter-icon-color: var(--cui-body-color);
 
   /* Top Navigation Bridge */
@@ -75,15 +136,60 @@
   --cui-card-border-color: var(--line-strong);
   --cui-footer-bg: var(--surface-card);
 
-  /* CoreUI semantic colors - same in dark mode */
-  --cui-success: #198754;
-  --cui-success-rgb: 25, 135, 84;
-  --cui-warning: #ffc107;
-  --cui-warning-rgb: 255, 193, 7;
-  --cui-danger: #dc3545;
-  --cui-danger-rgb: 220, 53, 69;
-  --cui-info: #0dcaf0;
-  --cui-info-rgb: 13, 202, 240;
+  /* CoreUI semantic colors - brand aligned */
+  --cui-primary: #3d99f5;
+  --cui-primary-rgb: 61, 153, 245;
+  --cui-secondary: #6b7785;
+  --cui-secondary-rgb: 107, 119, 133;
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+  --cui-danger: #e64072;
+  --cui-danger-rgb: 230, 64, 114;
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
+
+  /* Background variations for light tints (dark mode - more subtle) */
+  --cui-primary-bg: rgba(61, 153, 245, 0.15);
+  --cui-secondary-bg: rgba(107, 119, 133, 0.15);
+  --cui-success-bg: rgba(87, 198, 138, 0.15);
+  --cui-danger-bg: rgba(230, 64, 114, 0.15);
+  --cui-warning-bg: rgba(242, 196, 13, 0.15);
+  --cui-info-bg: rgba(122, 128, 236, 0.15);
+  --cui-light-bg-subtle: rgba(243, 244, 247, 0.1);
+  --cui-dark-bg-subtle: rgba(33, 38, 49, 0.3);
+
+  /* Subtle background variations */
+  --cui-primary-bg-subtle: rgba(61, 153, 245, 0.08);
+  --cui-secondary-bg-subtle: rgba(107, 119, 133, 0.08);
+  --cui-success-bg-subtle: rgba(87, 198, 138, 0.08);
+  --cui-danger-bg-subtle: rgba(230, 64, 114, 0.08);
+  --cui-warning-bg-subtle: rgba(242, 196, 13, 0.08);
+  --cui-info-bg-subtle: rgba(122, 128, 236, 0.08);
+
+  /* Border subtle variations */
+  --cui-primary-border-subtle: rgba(61, 153, 245, 0.4);
+  --cui-secondary-border-subtle: rgba(107, 119, 133, 0.4);
+  --cui-success-border-subtle: rgba(87, 198, 138, 0.4);
+  --cui-danger-border-subtle: rgba(230, 64, 114, 0.4);
+  --cui-warning-border-subtle: rgba(242, 196, 13, 0.4);
+  --cui-info-border-subtle: rgba(122, 128, 236, 0.4);
+
+  /* Text color variations */
+  --cui-primary-text: #5aabf7;
+  --cui-secondary-text: #8a95a3;
+  --cui-success-text: #6fd19d;
+  --cui-danger-text: #ec6690;
+  --cui-warning-text: #f5d23d;
+  --cui-info-text: #9598f0;
+
+  /* Semantic color aliases */
+  --cui-primary-color: #3d99f5;
+  --cui-success-color: #57c68a;
+  --cui-danger-color: #e64072;
+  --cui-warning-color: #f2c40d;
+  --cui-info-color: #7a80ec;
 
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
@@ -99,6 +205,61 @@
   --cui-tertiary-bg: var(--surface-card);
   --cui-secondary-color: var(--text-secondary);
   --cui-card-bg: var(--surface-card);
+
+  /* Brand colors for light mode */
+  --cui-primary: #3d99f5;
+  --cui-primary-rgb: 61, 153, 245;
+  --cui-secondary: #6b7785;
+  --cui-secondary-rgb: 107, 119, 133;
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+  --cui-danger: #e64072;
+  --cui-danger-rgb: 230, 64, 114;
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
+
+  /* Background variations - light tints for light mode */
+  --cui-primary-bg: rgba(61, 153, 245, 0.1);
+  --cui-secondary-bg: rgba(107, 119, 133, 0.1);
+  --cui-success-bg: rgba(87, 198, 138, 0.1);
+  --cui-danger-bg: rgba(230, 64, 114, 0.1);
+  --cui-warning-bg: rgba(242, 196, 13, 0.1);
+  --cui-info-bg: rgba(122, 128, 236, 0.1);
+  --cui-light-bg-subtle: rgba(243, 244, 247, 0.5);
+  --cui-dark-bg-subtle: rgba(33, 38, 49, 0.1);
+
+  /* Subtle background variations (lighter than -bg) */
+  --cui-primary-bg-subtle: rgba(61, 153, 245, 0.05);
+  --cui-secondary-bg-subtle: rgba(107, 119, 133, 0.05);
+  --cui-success-bg-subtle: rgba(87, 198, 138, 0.05);
+  --cui-danger-bg-subtle: rgba(230, 64, 114, 0.05);
+  --cui-warning-bg-subtle: rgba(242, 196, 13, 0.05);
+  --cui-info-bg-subtle: rgba(122, 128, 236, 0.05);
+
+  /* Border subtle variations */
+  --cui-primary-border-subtle: rgba(61, 153, 245, 0.3);
+  --cui-secondary-border-subtle: rgba(107, 119, 133, 0.3);
+  --cui-success-border-subtle: rgba(87, 198, 138, 0.3);
+  --cui-danger-border-subtle: rgba(230, 64, 114, 0.3);
+  --cui-warning-border-subtle: rgba(242, 196, 13, 0.3);
+  --cui-info-border-subtle: rgba(122, 128, 236, 0.3);
+
+  /* Text color variations (for use on light backgrounds) */
+  --cui-primary-text: #2d7acc;
+  --cui-secondary-text: #555f6d;
+  --cui-success-text: #3da36e;
+  --cui-danger-text: #c4305c;
+  --cui-warning-text: #c9a00a;
+  --cui-info-text: #5a60c4;
+
+  /* Semantic color aliases */
+  --cui-primary-color: #3d99f5;
+  --cui-success-color: #57c68a;
+  --cui-danger-color: #e64072;
+  --cui-warning-color: #f2c40d;
+  --cui-info-color: #7a80ec;
 }
 
 [data-coreui-theme='dark'] {
@@ -110,74 +271,129 @@
   --cui-card-bg: var(--surface-card);
   --filter-icon-color: #ffffff;
   --validation-unit-price-color: #07FF8A;
+
+  /* Brand colors for dark mode */
+  --cui-primary: #3d99f5;
+  --cui-primary-rgb: 61, 153, 245;
+  --cui-secondary: #6b7785;
+  --cui-secondary-rgb: 107, 119, 133;
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+  --cui-danger: #e64072;
+  --cui-danger-rgb: 230, 64, 114;
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
+
+  /* Background variations - subtle in dark mode */
+  --cui-primary-bg: rgba(61, 153, 245, 0.15);
+  --cui-secondary-bg: rgba(107, 119, 133, 0.15);
+  --cui-success-bg: rgba(87, 198, 138, 0.15);
+  --cui-danger-bg: rgba(230, 64, 114, 0.15);
+  --cui-warning-bg: rgba(242, 196, 13, 0.15);
+  --cui-info-bg: rgba(122, 128, 236, 0.15);
+  --cui-light-bg-subtle: rgba(243, 244, 247, 0.1);
+  --cui-dark-bg-subtle: rgba(33, 38, 49, 0.3);
+
+  /* Subtle background variations (lighter than -bg in dark mode) */
+  --cui-primary-bg-subtle: rgba(61, 153, 245, 0.08);
+  --cui-secondary-bg-subtle: rgba(107, 119, 133, 0.08);
+  --cui-success-bg-subtle: rgba(87, 198, 138, 0.08);
+  --cui-danger-bg-subtle: rgba(230, 64, 114, 0.08);
+  --cui-warning-bg-subtle: rgba(242, 196, 13, 0.08);
+  --cui-info-bg-subtle: rgba(122, 128, 236, 0.08);
+
+  /* Border subtle variations (more visible in dark mode) */
+  --cui-primary-border-subtle: rgba(61, 153, 245, 0.4);
+  --cui-secondary-border-subtle: rgba(107, 119, 133, 0.4);
+  --cui-success-border-subtle: rgba(87, 198, 138, 0.4);
+  --cui-danger-border-subtle: rgba(230, 64, 114, 0.4);
+  --cui-warning-border-subtle: rgba(242, 196, 13, 0.4);
+  --cui-info-border-subtle: rgba(122, 128, 236, 0.4);
+
+  /* Text color variations (brighter for dark backgrounds) */
+  --cui-primary-text: #5aabf7;
+  --cui-secondary-text: #8a95a3;
+  --cui-success-text: #6fd19d;
+  --cui-danger-text: #ec6690;
+  --cui-warning-text: #f5d23d;
+  --cui-info-text: #9598f0;
+
+  /* Semantic color aliases (same as base colors in dark mode) */
+  --cui-primary-color: #3d99f5;
+  --cui-success-color: #57c68a;
+  --cui-danger-color: #e64072;
+  --cui-warning-color: #f2c40d;
+  --cui-info-color: #7a80ec;
 }
 
-/* Dark mode button overrides - direct rules, not variables */
+/* Dark mode button overrides - using brand colors */
 [data-coreui-theme='dark'] .btn-warning {
-  background-color: rgba(255, 193, 7, 0.2) !important;
-  border-color: #ffc107 !important;
-  color: #ffc107 !important;
+  background-color: rgba(242, 196, 13, 0.2) !important;
+  border-color: #f2c40d !important;
+  color: #f2c40d !important;
 }
 
 [data-coreui-theme='dark'] .btn-warning:hover {
-  background-color: rgba(255, 193, 7, 0.3) !important;
-  color: #ffc107 !important;
+  background-color: rgba(242, 196, 13, 0.3) !important;
+  color: #f2c40d !important;
 }
 
 [data-coreui-theme='dark'] .btn-success {
-  background-color: rgba(25, 135, 84, 0.2) !important;
-  border-color: #198754 !important;
-  color: #198754 !important;
+  background-color: rgba(87, 198, 138, 0.2) !important;
+  border-color: #57c68a !important;
+  color: #57c68a !important;
 }
 
 [data-coreui-theme='dark'] .btn-success:hover {
-  background-color: rgba(25, 135, 84, 0.3) !important;
-  color: #198754 !important;
+  background-color: rgba(87, 198, 138, 0.3) !important;
+  color: #57c68a !important;
 }
 
 [data-coreui-theme='dark'] .btn-danger {
-  background-color: rgba(220, 53, 69, 0.2) !important;
-  border-color: #dc3545 !important;
-  color: #dc3545 !important;
+  background-color: rgba(230, 64, 114, 0.2) !important;
+  border-color: #e64072 !important;
+  color: #e64072 !important;
 }
 
 [data-coreui-theme='dark'] .btn-danger:hover {
-  background-color: rgba(220, 53, 69, 0.3) !important;
-  color: #dc3545 !important;
+  background-color: rgba(230, 64, 114, 0.3) !important;
+  color: #e64072 !important;
 }
 
-/* Outline buttons get special treatment */
+/* Outline buttons get special treatment - using brand colors */
 [data-coreui-theme='dark'] .btn-outline-warning {
-  border-color: #ffc107 !important;
-  color: #ffc107 !important;
+  border-color: #f2c40d !important;
+  color: #f2c40d !important;
   background-color: transparent !important;
 }
 
 [data-coreui-theme='dark'] .btn-outline-success {
-  border-color: #198754 !important;
-  color: #198754 !important;
+  border-color: #57c68a !important;
+  color: #57c68a !important;
   background-color: transparent !important;
 }
 
 [data-coreui-theme='dark'] .btn-outline-danger {
-  border-color: #dc3545 !important;
-  color: #dc3545 !important;
+  border-color: #e64072 !important;
+  color: #e64072 !important;
   background-color: transparent !important;
 }
 
 /* Active state for outline buttons in dark mode */
 [data-coreui-theme='dark'] .btn-outline-warning.active {
-  background-color: rgba(255, 193, 7, 0.15) !important;
+  background-color: rgba(242, 196, 13, 0.15) !important;
   font-weight: 600 !important;
 }
 
 [data-coreui-theme='dark'] .btn-outline-success.active {
-  background-color: rgba(25, 135, 84, 0.15) !important;
+  background-color: rgba(87, 198, 138, 0.15) !important;
   font-weight: 600 !important;
 }
 
 [data-coreui-theme='dark'] .btn-outline-danger.active {
-  background-color: rgba(220, 53, 69, 0.15) !important;
+  background-color: rgba(230, 64, 114, 0.15) !important;
   font-weight: 600 !important;
 }
 
@@ -320,7 +536,20 @@ body {
   background-color: var(--cui-card-bg);
   border-color: var(--cui-card-border-color);
   box-shadow: var(--cui-box-shadow-sm);
-  border-radius: 0.375rem;
+  border-radius: var(--radius-card, 0.5rem);
+  overflow: hidden;
+}
+
+/* Ensure card header/footer corners match card border-radius */
+.card > .card-header:first-child {
+  border-top-left-radius: var(--radius-card-inner, calc(0.5rem - 1px));
+  border-top-right-radius: var(--radius-card-inner, calc(0.5rem - 1px));
+}
+
+.card > .card-body:last-child,
+.card > .card-footer:last-child {
+  border-bottom-left-radius: var(--radius-card-inner, calc(0.5rem - 1px));
+  border-bottom-right-radius: var(--radius-card-inner, calc(0.5rem - 1px));
 }
 
 .card-header,
