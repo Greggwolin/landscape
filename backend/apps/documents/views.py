@@ -1,15 +1,26 @@
 """API views for Documents application."""
 
+print("DOCS URL IMPORT CHECKPOINT: rest_framework")
 from rest_framework import viewsets, status
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.decorators")
 from rest_framework.decorators import action, api_view, parser_classes, permission_classes
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.parsers")
 from rest_framework.parsers import MultiPartParser
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.response")
 from rest_framework.response import Response
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.permissions")
 from rest_framework.permissions import AllowAny
+print("DOCS URL IMPORT CHECKPOINT: django.core.files.storage")
 from django.core.files.storage import default_storage
+print("DOCS URL IMPORT CHECKPOINT: django.utils")
 from django.utils import timezone
+print("DOCS URL IMPORT CHECKPOINT: django.db.models")
 from django.db.models import Q
+print("DOCS URL IMPORT CHECKPOINT: apps.documents.models")
 from .models import Document, DocumentFolder, DMSExtractQueue, DMSAssertion, AICorrectionLog
+print("DOCS URL IMPORT CHECKPOINT: apps.documents.serializers")
 from .serializers import DocumentSerializer, DocumentFolderSerializer
+print("DOCS URL IMPORT CHECKPOINT: apps.multifamily.models")
 from apps.multifamily.models import MultifamilyUnitType, MultifamilyUnit, MultifamilyLease
 import uuid
 import json
@@ -153,6 +164,7 @@ def upload_document(request):
 
         # Trigger synchronous RAG processing (text extraction → chunking → embeddings)
         # Import here to avoid circular imports
+        print("DOCS URL IMPORT CHECKPOINT: apps.knowledge.services.document_processor")
         from apps.knowledge.services.document_processor import processor
         try:
             process_result = processor.process_document(doc.doc_id)

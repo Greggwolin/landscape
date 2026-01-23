@@ -8,10 +8,15 @@ Provides endpoints for:
 - Analytics on correction patterns
 """
 
+print("DOCS URL IMPORT CHECKPOINT: rest_framework")
 from rest_framework import viewsets, status
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.decorators")
 from rest_framework.decorators import action
+print("DOCS URL IMPORT CHECKPOINT: rest_framework.response")
 from rest_framework.response import Response
+print("DOCS URL IMPORT CHECKPOINT: django.db")
 from django.db import transaction, connection
+print("DOCS URL IMPORT CHECKPOINT: django.utils")
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
