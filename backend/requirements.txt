@@ -26,7 +26,6 @@ anthropic>=0.18.0
 pypdf>=3.0.0
 openpyxl>=3.0.0
 pdfplumber==0.10.4
-camelot-py[cv]>=0.11.0
 reportlab>=4.0.0
 Faker>=20.0.0
 PyYAML>=6.0.0

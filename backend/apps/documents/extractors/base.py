@@ -1,7 +1,6 @@
 """Base class for document extractors."""
 
 from abc import ABC, abstractmethod
-import camelot
 import pandas as pd
 from pathlib import Path
 import yaml
