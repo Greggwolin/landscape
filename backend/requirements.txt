@@ -5,6 +5,7 @@ djangorestframework-simplejwt==5.3.0
 psycopg2-binary==2.9.9
 django-cors-headers==4.3.1
 python-decouple==3.8
+dj-database-url>=2.1
 gunicorn==21.2.0
 whitenoise==6.6.0
 drf-spectacular==0.27.0
