@@ -23,6 +23,7 @@ class ParcelTableExtractor(BaseExtractor):
 
     def extract_from_pdf(self, file_path):
         """Extract parcel table from PDF"""
+        import pdfplumber
         logger.info(f"Extracting parcel table from PDF: {file_path}")
 
         try:

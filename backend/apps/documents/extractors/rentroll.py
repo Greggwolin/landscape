@@ -25,6 +25,7 @@ class RentRollExtractor(BaseExtractor):
 
     def extract_from_pdf(self, file_path):
         """Extract rent roll from PDF"""
+        import pdfplumber
         logger.info(f"Extracting rent roll from PDF: {file_path}")
 
         # Try pdfplumber first (better for text-based PDFs)

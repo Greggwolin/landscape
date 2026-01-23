@@ -23,6 +23,7 @@ class OperatingExtractor(BaseExtractor):
 
     def extract_from_pdf(self, file_path):
         """Extract operating statement from PDF"""
+        import pdfplumber
         logger.info(f"Extracting operating statement from PDF: {file_path}")
 
         try:

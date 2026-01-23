@@ -113,6 +113,7 @@ class DocumentSectionDetector:
             }
         """
 
+        import pdfplumber
         logger.info(f"Analyzing document sections for {pdf_path} (rule-based, no API calls)")
 
         with pdfplumber.open(pdf_path) as pdf:
