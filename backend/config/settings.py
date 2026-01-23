@@ -81,7 +81,7 @@ try:
         "apps.commercial",
         "apps.landuse",
         "apps.gis",
-        "apps.documents",
+        # "apps.documents",
         "apps.market_intel",
         "apps.reports",  # Report generation and PDF export
         "apps.landscaper",  # Phase 6: Landscaper AI chat interface
