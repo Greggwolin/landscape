@@ -15,7 +15,9 @@ try:
     from pathlib import Path
     import os
     import sys
+    print("IMPORT CHECKPOINT: decouple")
     from decouple import config, Csv
+    print("IMPORT CHECKPOINT: dj_database_url")
     import dj_database_url
 
     # Build paths inside the project like this: BASE_DIR / 'subdir'.
