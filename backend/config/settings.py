@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 import sys
 from decouple import config, Csv
 import dj_database_url
@@ -34,6 +35,18 @@ SECRET_KEY = config('SECRET_KEY', default="django-insecure-m4j1s&_epy_a97&vwg2qz
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+
+try:
+    print(
+        "STARTUP DIAGNOSTICS: "
+        f"python={sys.version.split()[0]} "
+        f"database_url={'SET' if os.environ.get('DATABASE_URL') else 'MISSING'} "
+        f"debug={DEBUG} "
+        f"allowed_hosts={ALLOWED_HOSTS}"
+    )
+except Exception as exc:
+    print(f"STARTUP DIAGNOSTICS ERROR: {exc}")
+    raise
 
 
 # Application definition
