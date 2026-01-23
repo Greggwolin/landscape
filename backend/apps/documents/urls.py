@@ -1,10 +1,7 @@
 """URL routing for Documents application."""
 
-print("DOCS URL IMPORT CHECKPOINT: django.urls")
 from django.urls import path, include
-print("DOCS URL IMPORT CHECKPOINT: rest_framework.routers")
 from rest_framework.routers import DefaultRouter
-print("DOCS URL IMPORT CHECKPOINT: apps.documents.views")
 from .views import (
     DocumentViewSet,
     DocumentFolderViewSet,
@@ -16,9 +13,7 @@ from .views import (
     soft_delete_document,
     rename_document,
 )
-print("DOCS URL IMPORT CHECKPOINT: apps.documents.api.corrections")
 from .api.corrections import ExtractionReviewViewSet
-print("DOCS URL IMPORT CHECKPOINT: apps.documents.api.section_detection")
 from .api.section_detection import DocumentSectionViewSet
 
 router = DefaultRouter()

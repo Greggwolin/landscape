@@ -9,20 +9,14 @@ Analyzes offering memos and multi-page PDFs to identify:
 - Financial summaries
 """
 
-print("DOCS URL IMPORT CHECKPOINT: rest_framework")
 from rest_framework import viewsets, status
-print("DOCS URL IMPORT CHECKPOINT: rest_framework.decorators")
 from rest_framework.decorators import action, api_view
-print("DOCS URL IMPORT CHECKPOINT: rest_framework.response")
 from rest_framework.response import Response
-print("DOCS URL IMPORT CHECKPOINT: django.db")
 from django.db import transaction, connection
-print("DOCS URL IMPORT CHECKPOINT: django.conf")
 from django.conf import settings
 import os
 import logging
 
-print("DOCS URL IMPORT CHECKPOINT: apps.documents.extractors.document_classifier")
 from ..extractors.document_classifier import DocumentSectionDetector
 
 logger = logging.getLogger(__name__)
@@ -150,7 +144,6 @@ class DocumentSectionViewSet(viewsets.ViewSet):
                         ])
 
             # Get total pages
-            print("DOCS URL IMPORT CHECKPOINT: pdfplumber")
             import pdfplumber
             with pdfplumber.open(pdf_path) as pdf:
                 total_pages = len(pdf.pages)
