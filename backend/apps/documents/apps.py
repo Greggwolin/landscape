@@ -8,6 +8,7 @@ class DocumentsConfig(AppConfig):
     def ready(self):
         try:
             # deferred heavy/native imports go here
-            pass
+            import pdfplumber
+            print("DOCUMENTS IMPORT OK:", "pdfplumber")
         except ImportError as e:
-            print("DOCUMENTS APP IMPORT SKIPPED:", repr(e))
+            print("DOCUMENTS IMPORT SKIPPED:", "pdfplumber", repr(e))

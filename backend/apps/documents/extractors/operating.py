@@ -1,7 +1,6 @@
 """Operating statement extractor."""
 
 from .base import BaseExtractor
-import pdfplumber
 import pandas as pd
 import logging
 from pathlib import Path

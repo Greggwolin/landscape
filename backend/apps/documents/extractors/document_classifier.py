@@ -13,8 +13,6 @@ Uses RULE-BASED detection (keyword matching + table analysis) - NO API calls req
 """
 
 from typing import List, Dict, Tuple, Optional
-print("DOCS URL IMPORT CHECKPOINT: pdfplumber")
-import pdfplumber
 import re
 import logging
 from collections import Counter

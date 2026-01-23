@@ -1,7 +1,6 @@
 """Rent roll extractor."""
 
 from .base import BaseExtractor
-import pdfplumber
 import pandas as pd
 import logging
 import os
