@@ -9,243 +9,251 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-
-from pathlib import Path
-import os
-import sys
-from decouple import config, Csv
-import dj_database_url
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Add Python calculation engine to path
-ENGINE_PATH = BASE_DIR.parent / 'services' / 'financial_engine_py'
-if ENGINE_PATH.exists():
-    sys.path.insert(0, str(ENGINE_PATH))
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default="django-insecure-m4j1s&_epy_a97&vwg2qzu1bi6c-!$5i)68a72rpi+86evj^dg")
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
-
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
-
 try:
-    print(
-        "STARTUP DIAGNOSTICS: "
-        f"python={sys.version.split()[0]} "
-        f"database_url={'SET' if os.environ.get('DATABASE_URL') else 'MISSING'} "
-        f"debug={DEBUG} "
-        f"allowed_hosts={ALLOWED_HOSTS}"
-    )
-except Exception as exc:
-    print(f"STARTUP DIAGNOSTICS ERROR: {exc}")
-    raise
 
 
-# Application definition
+    from pathlib import Path
+    import os
+    import sys
+    from decouple import config, Csv
+    import dj_database_url
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
+    # Build paths inside the project like this: BASE_DIR / 'subdir'.
+    BASE_DIR = Path(__file__).resolve().parent.parent
 
-    # Third-party apps
-    "rest_framework",
-    "rest_framework_simplejwt",
-    "corsheaders",
-    "django_extensions",
-    "drf_spectacular",
+    # Add Python calculation engine to path
+    ENGINE_PATH = BASE_DIR.parent / 'services' / 'financial_engine_py'
+    if ENGINE_PATH.exists():
+        sys.path.insert(0, str(ENGINE_PATH))
 
-    # Project apps (Phase 3 Complete - All apps registered)
-    "apps.projects",
-    "apps.containers",
-    "apps.financial",
-    "apps.benchmarks",
-    "apps.sales_absorption",
-    "apps.calculations",
-    "apps.multifamily",
-    "apps.commercial",
-    "apps.landuse",
-    "apps.gis",
-    "apps.documents",
-    "apps.market_intel",
-    "apps.reports",  # Report generation and PDF export
-    "apps.landscaper",  # Phase 6: Landscaper AI chat interface
-    "apps.users",  # Phase 7: User settings and tier management
-    "apps.acquisition",  # Acquisition tracking and ledger
-    "apps.knowledge",  # Knowledge/RAG extraction system
-    "apps.contacts",  # Cabinet/Contact management system
-]
 
-MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-]
+    # Quick-start development settings - unsuitable for production
+    # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
-ROOT_URLCONF = "config.urls"
+    # SECURITY WARNING: keep the secret key used in production secret!
+    SECRET_KEY = config('SECRET_KEY', default="django-insecure-m4j1s&_epy_a97&vwg2qzu1bi6c-!$5i)68a72rpi+86evj^dg")
 
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
+    # SECURITY WARNING: don't run with debug turned on in production!
+    DEBUG = config('DEBUG', default=True, cast=bool)
+
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+
+    try:
+        print(
+            "STARTUP DIAGNOSTICS: "
+            f"python={sys.version.split()[0]} "
+            f"database_url={'SET' if os.environ.get('DATABASE_URL') else 'MISSING'} "
+            f"debug={DEBUG} "
+            f"allowed_hosts={ALLOWED_HOSTS}"
+        )
+    except Exception as exc:
+        print(f"STARTUP DIAGNOSTICS ERROR: {exc}")
+        raise
+
+
+    # Application definition
+
+    INSTALLED_APPS = [
+        "django.contrib.admin",
+        "django.contrib.auth",
+        "django.contrib.contenttypes",
+        "django.contrib.sessions",
+        "django.contrib.messages",
+        "django.contrib.staticfiles",
+
+        # Third-party apps
+        "rest_framework",
+        "rest_framework_simplejwt",
+        "corsheaders",
+        "django_extensions",
+        "drf_spectacular",
+
+        # Project apps (Phase 3 Complete - All apps registered)
+        "apps.projects",
+        "apps.containers",
+        "apps.financial",
+        "apps.benchmarks",
+        "apps.sales_absorption",
+        "apps.calculations",
+        "apps.multifamily",
+        "apps.commercial",
+        "apps.landuse",
+        "apps.gis",
+        "apps.documents",
+        "apps.market_intel",
+        "apps.reports",  # Report generation and PDF export
+        "apps.landscaper",  # Phase 6: Landscaper AI chat interface
+        "apps.users",  # Phase 7: User settings and tier management
+        "apps.acquisition",  # Acquisition tracking and ledger
+        "apps.knowledge",  # Knowledge/RAG extraction system
+        "apps.contacts",  # Cabinet/Contact management system
+    ]
+
+    MIDDLEWARE = [
+        "django.middleware.security.SecurityMiddleware",
+        "whitenoise.middleware.WhiteNoiseMiddleware",
+        "corsheaders.middleware.CorsMiddleware",
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.middleware.common.CommonMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "django.contrib.messages.middleware.MessageMiddleware",
+        "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    ]
+
+    ROOT_URLCONF = "config.urls"
+
+    TEMPLATES = [
+        {
+            "BACKEND": "django.template.backends.django.DjangoTemplates",
+            "DIRS": [],
+            "APP_DIRS": True,
+            "OPTIONS": {
+                "context_processors": [
+                    "django.template.context_processors.debug",
+                    "django.template.context_processors.request",
+                    "django.contrib.auth.context_processors.auth",
+                    "django.contrib.messages.context_processors.messages",
+                ],
+            },
         },
-    },
-]
+    ]
 
-WSGI_APPLICATION = "config.wsgi.application"
+    WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+    # Database
+    # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# Parse DATABASE_URL from environment
-DATABASE_URL = config('DATABASE_URL')
+    # Parse DATABASE_URL from environment
+    DATABASE_URL = config('DATABASE_URL')
 
-DATABASES = {
-    'default': dj_database_url.parse(
-        DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+
+    # Use custom database backend that sets search_path to landscape schema
+    # Neon pooled connections don't support search_path in startup options,
+    # so we set it after connection in our custom backend
+    DATABASES['default']['ENGINE'] = 'db_backend'
+
+
+    # Password validation
+    # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
+
+    AUTH_PASSWORD_VALIDATORS = [
+        {
+            "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        },
+    ]
+
+    # Custom User Model (Phase 5)
+    AUTH_USER_MODEL = "projects.User"
+
+
+    # Internationalization
+    # https://docs.djangoproject.com/en/5.0/topics/i18n/
+
+    LANGUAGE_CODE = "en-us"
+
+    TIME_ZONE = "UTC"
+
+    USE_I18N = True
+
+    USE_TZ = True
+
+
+    # Static files (CSS, JavaScript, Images)
+    # https://docs.djangoproject.com/en/5.0/howto/static-files/
+
+    STATIC_URL = "static/"
+
+    # Default primary key field type
+    # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
+
+    DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+    # ============================================================================
+    # REST FRAMEWORK CONFIGURATION
+    # ============================================================================
+
+    REST_FRAMEWORK = {
+        'DEFAULT_AUTHENTICATION_CLASSES': [
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
+        ],
+        'DEFAULT_PERMISSION_CLASSES': [
+            'rest_framework.permissions.IsAuthenticated',
+        ],
+        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+        'PAGE_SIZE': 1000,  # Increased from 100 to handle large rent rolls (e.g., Chadron 129 units)
+        'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+        'DEFAULT_RENDERER_CLASSES': [
+            'rest_framework.renderers.JSONRenderer',
+        ],
+        'DEFAULT_PARSER_CLASSES': [
+            'rest_framework.parsers.JSONParser',
+        ],
+    }
+
+    # JWT Settings
+    from datetime import timedelta
+
+    SIMPLE_JWT = {
+        'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+        'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+        'ROTATE_REFRESH_TOKENS': True,
+        'BLACKLIST_AFTER_ROTATION': True,
+        'UPDATE_LAST_LOGIN': True,
+    }
+
+    # ============================================================================
+    # CORS CONFIGURATION
+    # ============================================================================
+
+    CORS_ALLOWED_ORIGINS = config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173',
+        cast=Csv()
     )
-}
 
-# Use custom database backend that sets search_path to landscape schema
-# Neon pooled connections don't support search_path in startup options,
-# so we set it after connection in our custom backend
-DATABASES['default']['ENGINE'] = 'db_backend'
+    CORS_ALLOW_CREDENTIALS = True
 
+    # ============================================================================
+    # API DOCUMENTATION (drf-spectacular)
+    # ============================================================================
 
-# Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
+    SPECTACULAR_SETTINGS = {
+        'TITLE': 'Landscape Platform API',
+        'DESCRIPTION': 'Django REST API for real estate development platform',
+        'VERSION': '1.0.0',
+        'SERVE_INCLUDE_SCHEMA': False,
+    }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
-]
+    # ============================================================================
+    # CALCULATION ENGINE CONFIGURATION
+    # ============================================================================
 
-# Custom User Model (Phase 5)
-AUTH_USER_MODEL = "projects.User"
+    # Financial calculation defaults
+    DEFAULT_DISCOUNT_RATE = config('DEFAULT_DISCOUNT_RATE', default=0.10, cast=float)
+    DEFAULT_EXIT_CAP_RATE = config('DEFAULT_EXIT_CAP_RATE', default=0.065, cast=float)
+    DEFAULT_VACANCY_PCT = config('DEFAULT_VACANCY_PCT', default=0.05, cast=float)
+    DEFAULT_CREDIT_LOSS_PCT = config('DEFAULT_CREDIT_LOSS_PCT', default=0.02, cast=float)
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
-STATIC_URL = "static/"
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# ============================================================================
-# REST FRAMEWORK CONFIGURATION
-# ============================================================================
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 1000,  # Increased from 100 to handle large rent rolls (e.g., Chadron 129 units)
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ],
-}
-
-# JWT Settings
-from datetime import timedelta
-
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': True,
-}
-
-# ============================================================================
-# CORS CONFIGURATION
-# ============================================================================
-
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173',
-    cast=Csv()
-)
-
-CORS_ALLOW_CREDENTIALS = True
-
-# ============================================================================
-# API DOCUMENTATION (drf-spectacular)
-# ============================================================================
-
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'Landscape Platform API',
-    'DESCRIPTION': 'Django REST API for real estate development platform',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-}
-
-# ============================================================================
-# CALCULATION ENGINE CONFIGURATION
-# ============================================================================
-
-# Financial calculation defaults
-DEFAULT_DISCOUNT_RATE = config('DEFAULT_DISCOUNT_RATE', default=0.10, cast=float)
-DEFAULT_EXIT_CAP_RATE = config('DEFAULT_EXIT_CAP_RATE', default=0.065, cast=float)
-DEFAULT_VACANCY_PCT = config('DEFAULT_VACANCY_PCT', default=0.05, cast=float)
-DEFAULT_CREDIT_LOSS_PCT = config('DEFAULT_CREDIT_LOSS_PCT', default=0.02, cast=float)
+except ImportError as e:
+    print('IMPORT ERROR DURING SETTINGS LOAD')
+    print(repr(e))
+    print(__name__)
+    raise
