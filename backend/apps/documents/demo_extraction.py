@@ -22,11 +22,9 @@ from apps.documents.testing.generators import (
     OperatingStatementGenerator,
     ParcelTableGenerator
 )
-from apps.documents.extractors import (
-    RentRollExtractor,
-    OperatingExtractor,
-    ParcelTableExtractor
-)
+from apps.documents.extractors.rentroll import RentRollExtractor
+from apps.documents.extractors.operating import OperatingExtractor
+from apps.documents.extractors.parcel_table import ParcelTableExtractor
 
 
 def demo_rentroll_extraction(tier='institutional'):

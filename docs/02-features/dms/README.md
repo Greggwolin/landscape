@@ -86,7 +86,7 @@ backend/apps/documents/
 
 ```python
 from apps.documents.testing.generators import RentRollGenerator
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 # Generate synthetic document
 generator = RentRollGenerator(tier='institutional', seed=42)

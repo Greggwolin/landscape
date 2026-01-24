@@ -1,9 +1,7 @@
 """Document extractors for AI-powered extraction."""
 
-from .base import BaseExtractor
-from .rentroll import RentRollExtractor
-from .operating import OperatingExtractor
-from .parcel_table import ParcelTableExtractor
+# Lazy imports - import classes only when needed to avoid loading pdfplumber at startup
+# Usage: from apps.documents.extractors.rentroll import RentRollExtractor
 
 __all__ = [
     'BaseExtractor',

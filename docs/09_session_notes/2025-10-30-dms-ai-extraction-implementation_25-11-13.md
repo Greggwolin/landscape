@@ -584,7 +584,7 @@ generator.generate_answer_key('/tmp/answers.csv', units)
 
 ### Example 2: Extract Data
 ```python
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 extractor = RentRollExtractor()
 result = extractor.extract('/tmp/rentroll.pdf')
@@ -606,7 +606,7 @@ for warning in result['validation_warnings']:
 ### Example 3: Django Integration
 ```python
 from apps.documents.models import Document, DMSExtractQueue
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 # Create document record
 doc = Document.objects.create(
@@ -740,7 +740,7 @@ generator.generate_excel('/tmp/test.xlsx', units_count=50)
 
 ### Extract Data
 ```python
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 extractor = RentRollExtractor()
 result = extractor.extract('/tmp/test.xlsx')

@@ -24,7 +24,9 @@ django.setup()
 
 from apps.documents.models import Document, DMSExtractQueue, DMSAssertion, AICorrectionLog
 from apps.projects.models import Project
-from apps.documents.extractors import RentRollExtractor, OperatingExtractor, ParcelTableExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
+from apps.documents.extractors.operating import OperatingExtractor
+from apps.documents.extractors.parcel_table import ParcelTableExtractor
 
 
 def example_rent_roll_workflow(project_id, file_path):

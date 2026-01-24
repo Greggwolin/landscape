@@ -85,7 +85,9 @@ parcel_data = parcel_generator.generate_pdf(
 ### 2. Extract Data from Documents
 
 ```python
-from apps.documents.extractors import RentRollExtractor, OperatingExtractor, ParcelTableExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
+from apps.documents.extractors.operating import OperatingExtractor
+from apps.documents.extractors.parcel_table import ParcelTableExtractor
 
 # Extract rent roll
 extractor = RentRollExtractor()
@@ -279,7 +281,7 @@ generator.generate_answer_key(
 ### RentRollExtractor
 
 ```python
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 extractor = RentRollExtractor()
 result = extractor.extract('/path/to/rentroll.pdf')  # or .xlsx, .csv
@@ -327,7 +329,7 @@ result = extractor.extract('/path/to/rentroll.pdf')  # or .xlsx, .csv
 ### OperatingExtractor
 
 ```python
-from apps.documents.extractors import OperatingExtractor
+from apps.documents.extractors.operating import OperatingExtractor
 
 extractor = OperatingExtractor()
 result = extractor.extract('/path/to/operating.pdf')
@@ -354,7 +356,7 @@ result = extractor.extract('/path/to/operating.pdf')
 ### ParcelTableExtractor
 
 ```python
-from apps.documents.extractors import ParcelTableExtractor
+from apps.documents.extractors.parcel_table import ParcelTableExtractor
 
 extractor = ParcelTableExtractor()
 result = extractor.extract('/path/to/parcels.pdf')
@@ -455,7 +457,7 @@ pytest apps/documents/tests/ -v
 ```python
 import tempfile
 from apps.documents.testing.generators import RentRollGenerator
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 # Generate test document
 generator = RentRollGenerator(tier='institutional', seed=42)
@@ -493,7 +495,7 @@ The existing models in `apps/documents/models.py` support the DMS workflow:
 
 ```python
 from apps.documents.models import Document, DMSExtractQueue
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 # 1. Upload document
 doc = Document.objects.create(

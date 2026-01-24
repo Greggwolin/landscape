@@ -26,7 +26,7 @@ pytest apps/documents/tests/test_basic_extraction.py -v
 ```python
 # In Django shell or Python script
 from apps.documents.testing.generators import RentRollGenerator
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 import tempfile
 
 # Generate a rent roll
@@ -81,11 +81,9 @@ gen.generate_excel('/tmp/parcels.xlsx', parcel_count=20)
 ### Extract Data
 
 ```python
-from apps.documents.extractors import (
-    RentRollExtractor,
-    OperatingExtractor,
-    ParcelTableExtractor
-)
+from apps.documents.extractors.rentroll import RentRollExtractor
+from apps.documents.extractors.operating import OperatingExtractor
+from apps.documents.extractors.parcel_table import ParcelTableExtractor
 
 # Rent Roll
 extractor = RentRollExtractor()

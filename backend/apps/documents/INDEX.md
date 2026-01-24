@@ -320,7 +320,7 @@ python -c "from apps.documents.testing.generators import RentRollGenerator; \
   RentRollGenerator(tier='institutional').generate_pdf('/tmp/test.pdf', units_count=50)"
 
 # Extract data
-python -c "from apps.documents.extractors import RentRollExtractor; \
+python -c "from apps.documents.extractors.rentroll import RentRollExtractor; \
   result = RentRollExtractor().extract('/tmp/test.pdf'); \
   print(f\"Extracted {result['metadata']['units_count']} units\")"
 ```

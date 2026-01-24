@@ -302,7 +302,7 @@ generator.generate_answer_key('/tmp/answers.csv', units_data)
 
 ### Extract from Document
 ```python
-from apps.documents.extractors import RentRollExtractor
+from apps.documents.extractors.rentroll import RentRollExtractor
 
 extractor = RentRollExtractor()
 result = extractor.extract('/tmp/test_rentroll.pdf')
