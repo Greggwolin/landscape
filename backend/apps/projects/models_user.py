@@ -23,7 +23,7 @@ class User(AbstractUser):
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
     
     class Meta:
-        db_table = 'auth_user'
+        db_table = 'landscape"."auth_user'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -40,8 +40,8 @@ class UserProfile(models.Model):
     preferences = models.JSONField(default=dict)
     
     class Meta:
-        db_table = 'user_profile'
-    
+        db_table = 'landscape"."user_profile'
+
     def __str__(self):
         return f"Profile for {self.user.email}"
 
@@ -58,9 +58,9 @@ class APIKey(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        db_table = 'api_keys'
+        db_table = 'landscape"."api_keys'
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.name} - {self.user.email}"
     
@@ -83,7 +83,7 @@ class PasswordResetToken(models.Model):
     expires_at = models.DateTimeField()
 
     class Meta:
-        db_table = 'password_reset_tokens'
+        db_table = 'landscape"."password_reset_tokens'
         ordering = ['-created_at']
 
     def is_valid(self):
