@@ -1,6 +1,19 @@
+/**
+ * Project Layout
+ *
+ * Layout hierarchy:
+ * Two-column layout:
+ *   - Left: Project selector card + Landscaper panel
+ *   - Right: Folder tabs + content area
+ *
+ * The folder tabs REPLACE the colored tile navigation.
+ *
+ * @version 2.1
+ * @updated 2026-01-23 - Moved project selector into left column above Landscaper
+ */
+
 import { ComplexityModeProvider } from '@/contexts/ComplexityModeContext';
 import { ProjectModeProvider } from '@/contexts/ProjectModeContext';
-import ProjectContextBar from '@/app/components/ProjectContextBar';
 import { ProjectLayoutClient } from './ProjectLayoutClient';
 
 type Params = { projectId: string };
@@ -22,10 +35,7 @@ export default async function ProjectLayout({
     >
       <ProjectModeProvider projectId={projectIdNum}>
         <div className="app-page flex-1 min-h-0">
-          {/* Full-width header */}
-          <ProjectContextBar projectId={projectIdNum} />
-
-          {/* 30/70 split content area */}
+          {/* Two-column layout: Project Selector + Landscaper | Folder Tabs/Content */}
           <ProjectLayoutClient projectId={projectIdNum}>
             {children}
           </ProjectLayoutClient>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { LandscapeButton } from '@/components/ui/landscape';
+import StyleCatalogContent from '@/app/components/StyleCatalog/StyleCatalogContent';
 
 // Dynamically import components to avoid SSR issues
 const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
@@ -56,6 +57,12 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     label: 'System Picklists',
     description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
     icon: 'List'
+  },
+  {
+    key: 'style_catalog',
+    label: 'Canonical Styles',
+    description: 'Read-only style catalog for governance and review',
+    icon: 'Palette'
   }
 ];
 
@@ -122,6 +129,7 @@ export default function PreferencesPanel() {
                     {category.key === 'land_use_taxonomy' && <TaxonomyPage />}
                     {category.key === 'uom_manager' && <UnitOfMeasureManager />}
                     {category.key === 'system_picklists' && <SystemPicklistsAccordion />}
+                    {category.key === 'style_catalog' && <StyleCatalogContent title="Canonical Styles" />}
                   </div>
                 )}
               </div>

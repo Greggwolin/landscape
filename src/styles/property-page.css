@@ -1,0 +1,327 @@
+/**
+ * Property Page Styles
+ * Property page component styling
+ *
+ * Uses CoreUI CSS variables for theming
+ * Follows CoreUI patterns for consistency
+ */
+
+/* ========================================
+ * PROPERTY PAGE LAYOUT
+ * ======================================== */
+
+.property-page {
+  padding: 0;
+}
+
+.property-page .g-3 {
+  --cui-gutter-y: 1rem;
+}
+
+/* ========================================
+ * STUDIO CARD STYLES
+ * ======================================== */
+
+.studio-card {
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius, 0.375rem);
+}
+
+.studio-card-header {
+  background: var(--cui-tertiary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+
+.studio-card-body {
+  padding: 1rem;
+}
+
+/* ========================================
+ * STUDIO TABLE OVERRIDES
+ * ======================================== */
+
+.studio-table {
+  --cui-table-bg: transparent;
+  --cui-table-hover-bg: rgba(var(--cui-primary-rgb), 0.08);
+  font-size: 0.875rem;
+}
+
+.studio-table th {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.studio-table td {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  vertical-align: middle;
+}
+
+.studio-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.studio-table tbody tr:hover {
+  background: rgba(var(--cui-primary-rgb), 0.08);
+}
+
+/* Vacancy row highlighting */
+.studio-table .vacancy-row {
+  background: rgba(var(--cui-danger-rgb), 0.1);
+}
+
+.studio-table .vacancy-row:hover {
+  background: color-mix(in srgb, rgba(var(--cui-danger-rgb), 0.1) 80%, rgba(var(--cui-primary-rgb), 0.08));
+}
+
+/* ========================================
+ * FLOOR PLAN MATRIX
+ * ======================================== */
+
+.floor-plan-matrix .studio-card-body {
+  padding: 0.5rem;
+}
+
+.floor-plan-matrix .table-responsive {
+  overflow: hidden;
+}
+
+/* Match Physical Description section header styling */
+.floor-plan-matrix .studio-table thead tr {
+  background: var(--cui-tertiary-bg);
+}
+
+.floor-plan-matrix .studio-table thead tr:first-child th:first-child {
+  border-top-left-radius: 4px;
+}
+
+.floor-plan-matrix .studio-table thead tr:first-child th:last-child {
+  border-top-right-radius: 4px;
+}
+
+/* Remove bottom border from first header row cells that span rows */
+.floor-plan-matrix .studio-table thead tr:first-child th[rowspan] {
+  border-bottom: none;
+}
+
+.floor-plan-matrix .studio-table {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* ========================================
+ * RENT ROLL
+ * ======================================== */
+
+.rent-roll .studio-card-body {
+  padding: 0;
+}
+
+.rent-roll .table-responsive {
+  border-radius: 0 0 var(--cui-border-radius) var(--cui-border-radius);
+}
+
+/* Sticky header for scrollable rent roll */
+.rent-roll .table-responsive thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--cui-tertiary-bg);
+}
+
+/* Sort indicators */
+.rent-roll th[style*="cursor: pointer"]:hover {
+  background: rgba(var(--cui-primary-rgb), 0.08);
+}
+
+/* ========================================
+ * PHYSICAL DESCRIPTION
+ * ======================================== */
+
+.physical-description .physical-section {
+  padding: 0 0.5rem;
+}
+
+/* Hide empty columns when fields are not rendered */
+.physical-description .row > [class*="col"]:empty,
+.physical-description .row > [class*="col"]:not(:has(*)) {
+  display: none;
+}
+
+/* When only one field visible in a row, let it take full width */
+.physical-description .row:has(> [class*="col"]:only-child) > [class*="col"] {
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+/* Field row styling */
+.physical-description .field-row,
+.physical-description .editable-field-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+/* Editable field hover state */
+.physical-description .editable-value:hover {
+  background-color: rgba(var(--cui-primary-rgb), 0.08);
+}
+
+/* Editable field input styling */
+.physical-description .form-control,
+.physical-description .form-select {
+  background-color: var(--cui-card-bg);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+.physical-description .form-control:focus,
+.physical-description .form-select:focus {
+  background-color: var(--cui-card-bg);
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 2px rgba(var(--cui-primary-rgb), 0.15);
+  color: var(--cui-body-color);
+}
+
+
+.physical-description .field-label {
+  color: var(--cui-secondary-color);
+  font-size: 0.875rem;
+}
+
+.physical-description .field-value {
+  color: var(--cui-body-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.physical-description .field-value.empty {
+  color: var(--cui-secondary-color);
+  font-weight: 400;
+}
+
+/* Rating stars */
+.physical-description .rating-stars {
+  color: var(--cui-warning);
+  letter-spacing: 0.1em;
+}
+
+.physical-description .rating-stars .empty {
+  color: var(--cui-border-color);
+}
+
+/* ========================================
+ * WALKABILITY SCORE CIRCLES
+ * ======================================== */
+
+.walkability-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.walkability-score-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--cui-card-bg);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.walkability-score.walk {
+  background: conic-gradient(var(--cui-success) var(--score-pct, 0%), var(--cui-border-color) 0);
+}
+
+.walkability-score.bike {
+  background: conic-gradient(var(--cui-info) var(--score-pct, 0%), var(--cui-border-color) 0);
+}
+
+.walkability-score.transit {
+  background: conic-gradient(var(--cui-warning) var(--score-pct, 0%), var(--cui-border-color) 0);
+}
+
+/* ========================================
+ * COMPLETION BADGES
+ * ======================================== */
+
+.completion-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+.completion-badge.high {
+  background: rgba(var(--cui-success-rgb), 0.1);
+  color: var(--cui-success);
+  border: 1px solid var(--cui-success);
+}
+
+.completion-badge.medium {
+  background: rgba(var(--cui-warning-rgb), 0.1);
+  color: var(--cui-warning);
+  border: 1px solid var(--cui-warning);
+}
+
+.completion-badge.low {
+  background: var(--cui-secondary-bg);
+  color: var(--cui-secondary-color);
+  border: 1px solid var(--cui-border-color);
+}
+
+/* ========================================
+ * DATA SOURCE BADGES
+ * ======================================== */
+
+.data-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.data-source-badge.rent-roll {
+  background: rgba(var(--cui-success-rgb), 0.1);
+  color: var(--cui-success);
+}
+
+.data-source-badge.unit-types {
+  background: rgba(var(--cui-info-rgb), 0.1);
+  color: var(--cui-info);
+}
+
+/* ========================================
+ * RESPONSIVE ADJUSTMENTS
+ * ======================================== */
+
+@media (max-width: 768px) {
+  .studio-table th,
+  .studio-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .physical-description .physical-section {
+    padding: 0 0.25rem;
+  }
+}

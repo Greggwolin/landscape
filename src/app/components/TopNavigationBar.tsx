@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useIssueReporter } from '@/components/IssueReporter';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
-import SandboxDropdown from './navigation/SandboxDropdown';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
-import LandscaperChatModal from './LandscaperChatModal';
 import CIcon from '@coreui/icons-react';
 import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
 
@@ -37,9 +35,8 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
-  const [isLandscaperOpen, setLandscaperOpen] = useState(false);
-  const [showBugHint, setShowBugHint] = useState(false);
-  const [mode, setMode] = useState<'analyst' | 'developer'>('analyst');
+  const [showBugHint, setShowBugHint] = React.useState(false);
+  const [mode, setMode] = React.useState<'analyst' | 'developer'>('analyst');
   const logoSrc = '/logo-invert.png';
 
   const toggleMode = () => {
@@ -117,19 +114,7 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               </Link>
             ))}
 
-            {/* Landscaper AI Button */}
-            <button
-              type="button"
-              onClick={() => setLandscaperOpen(true)}
-              className="rounded-full px-3 py-2 text-sm transition-colors"
-              style={{ color: 'var(--nav-text)' }}
-              {...navHoverHandlers()}
-            >
-              Landscaper AI
-            </button>
-
             {/* Dropdowns */}
-            <SandboxDropdown />
             <UserMenuDropdown />
 
             {/* Mode Toggle (Analyst/Developer) */}
@@ -213,12 +198,6 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
           </div>
         </div>
       </header>
-
-      {/* Landscaper AI Modal */}
-      <LandscaperChatModal
-        isOpen={isLandscaperOpen}
-        onClose={() => setLandscaperOpen(false)}
-      />
     </>
   );
 }

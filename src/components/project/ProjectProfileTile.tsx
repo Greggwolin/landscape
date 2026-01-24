@@ -59,9 +59,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (isLoading) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.75rem 1rem', minHeight: '52px' }}>
+        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.5rem 1rem', minHeight: '44px' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0 h5" style={{ fontSize: '1rem', fontWeight: 600 }}>Project Profile</h2>
+            <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile</span>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -74,9 +74,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (error || !profile) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.75rem 1rem', minHeight: '52px' }}>
+        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.5rem 1rem', minHeight: '44px' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0 h5" style={{ fontSize: '1rem', fontWeight: 600 }}>Project Profile</h2>
+            <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile</span>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -96,6 +96,8 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
           borderColor: 'var(--cui-border-color)',
+          borderRadius: '0.5rem',
+          overflow: 'hidden',
           height: '100%'
         }}
       >
@@ -105,24 +107,31 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             backgroundColor: 'var(--cui-card-cap-bg)',
             color: 'var(--cui-body-color)',
             borderColor: 'var(--cui-border-color)',
-            padding: '0.75rem 1rem',
-            minHeight: '52px'
+            padding: '0.5rem 1rem',
+            minHeight: '44px',
+            lineHeight: 1
           }}
         >
-          <span className="fw-semibold" style={{ letterSpacing: '0.02em', fontSize: '1rem' }}>
+          <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>
             Project Profile
           </span>
-          <div className="d-flex align-items-center gap-3 flex-wrap">
-            <CButton
-              type="button"
-              color="link"
-              className="text-uppercase fw-semibold text-decoration-none px-0"
-              style={{ letterSpacing: '0.08em' }}
-              onClick={handleEditClick}
-            >
-              Edit
-            </CButton>
-          </div>
+          <button
+            type="button"
+            style={{
+              fontSize: '0.7rem',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '999px',
+              lineHeight: 1,
+              fontWeight: 600,
+              backgroundColor: 'var(--cui-primary)',
+              color: '#FFFFFF',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            onClick={handleEditClick}
+          >
+            Edit
+          </button>
         </CCardHeader>
         <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
           <div className="d-flex flex-column">

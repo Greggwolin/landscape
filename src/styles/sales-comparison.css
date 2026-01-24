@@ -1,0 +1,311 @@
+/**
+ * Sales Comparison Tab Styles
+ *
+ * Styles for the redesigned Sales Comparison tab including:
+ * - Map accordion
+ * - Report-ready grid
+ * - Collapsible narrative canvas
+ *
+ * Uses CoreUI CSS variables exclusively - no Tailwind colors.
+ */
+
+/* ==========================================================================
+   Map Accordion
+   ========================================================================== */
+
+.sales-comparison-map-accordion {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.sales-comparison-map-accordion .accordion-item {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  background-color: var(--cui-card-bg);
+  overflow: hidden;
+}
+
+.sales-comparison-map-accordion .accordion-item:first-child {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.sales-comparison-map-accordion .accordion-item:last-child {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+.sales-comparison-map-accordion .accordion-header {
+  margin: 0;
+}
+
+.sales-comparison-map-accordion .accordion-button {
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  background-color: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Collapsed state - show rounded corners on button */
+.sales-comparison-map-accordion .accordion-button.collapsed {
+  border-radius: 0.5rem;
+}
+
+/* Expanded state - only round top corners */
+.sales-comparison-map-accordion .accordion-button:not(.collapsed) {
+  background-color: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+  box-shadow: none;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sales-comparison-map-accordion .accordion-button::after {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236c757d'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+  width: 1.25rem;
+  height: 1.25rem;
+  background-size: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.sales-comparison-map-accordion .accordion-button:focus {
+  box-shadow: none;
+  border-color: var(--cui-border-color);
+}
+
+.sales-comparison-map-accordion .accordion-body {
+  padding: 0;
+  background-color: var(--cui-body-bg);
+}
+
+.sales-comparison-map-container {
+  border-top: 1px solid var(--cui-border-color);
+}
+
+/* ==========================================================================
+   Narrative Canvas
+   ========================================================================== */
+
+.narrative-canvas {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  margin-left: 1rem;
+  transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
+}
+
+.narrative-canvas-collapsed {
+  display: flex;
+  align-items: stretch;
+}
+
+.narrative-canvas-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  background-color: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  color: var(--cui-secondary-color);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.narrative-canvas-expand-btn:hover {
+  background-color: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+}
+
+.narrative-canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  background-color: var(--cui-secondary-bg);
+}
+
+.narrative-version-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--cui-info-bg);
+  color: var(--cui-info);
+  border-radius: 4px;
+}
+
+.narrative-canvas-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  color: var(--cui-body-color);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.narrative-canvas-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--cui-body-color);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.narrative-canvas-content p {
+  margin-bottom: 1rem;
+}
+
+.narrative-canvas-content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.narrative-canvas-content li {
+  margin-bottom: 0.5rem;
+}
+
+/* ==========================================================================
+   Sales Comparison Panel Layout
+   ========================================================================== */
+
+.sales-comparison-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.sales-comparison-content {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  min-height: 500px;
+}
+
+.sales-comparison-grid-section {
+  flex: 1;
+  min-width: 0;
+  transition: flex 0.2s ease;
+}
+
+/* ==========================================================================
+   Report-Ready Grid Styles
+   ========================================================================== */
+
+/* Ensure clean table appearance without interactive affordances */
+.sales-comparison-grid-section table {
+  border-collapse: collapse;
+}
+
+.sales-comparison-grid-section td,
+.sales-comparison-grid-section th {
+  vertical-align: middle;
+}
+
+.sales-comparison-grid-section .sticky.left-0 {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.comp-edit-icon {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.comp-edit-icon:hover {
+  opacity: 1;
+}
+
+.comp-edit-icon img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* Remove any hover states that suggest editability */
+.sales-comparison-grid-section tbody tr:hover {
+  background-color: transparent;
+}
+
+/* Section headers */
+.sales-comparison-grid-section .section-header {
+  background-color: var(--cui-tertiary-bg);
+  font-weight: 600;
+}
+
+/* Value coloring */
+.adjustment-positive {
+  color: var(--cui-success);
+}
+
+.adjustment-negative {
+  color: var(--cui-danger);
+}
+
+.adjustment-neutral {
+  color: var(--cui-body-color);
+}
+
+/* ==========================================================================
+   Dark Theme Adjustments
+   ========================================================================== */
+
+[data-coreui-theme="dark"] .sales-comparison-map-accordion .accordion-button::after {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23adb5bd'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+[data-coreui-theme="dark"] .narrative-canvas {
+  background-color: var(--cui-tertiary-bg);
+}
+
+[data-coreui-theme="dark"] .narrative-canvas-expand-btn {
+  background-color: var(--cui-tertiary-bg);
+}
+
+[data-coreui-theme="dark"] .narrative-canvas-expand-btn:hover {
+  background-color: var(--cui-secondary-bg);
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+  .narrative-canvas {
+    width: 420px;
+    min-width: 420px;
+  }
+}
+
+@media (max-width: 992px) {
+  .sales-comparison-content {
+    flex-direction: column;
+  }
+
+  .narrative-canvas {
+    width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-top: 1rem;
+    border: 1px solid var(--cui-border-color);
+  }
+
+  .narrative-canvas-collapsed {
+    display: none;
+  }
+}

@@ -197,7 +197,6 @@ export default function ProjectTab({
   const [editingLocation, setEditingLocation] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
-  const [profileMapExpanded, setProfileMapExpanded] = useState(true);
   const [financialSummaryExpanded, setFinancialSummaryExpanded] = useState(false);
   const [contactsExpanded, setContactsExpanded] = useState(true);
 
@@ -411,7 +410,7 @@ export default function ProjectTab({
 
   const renderMapCard = () => (
     <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
-      <CCardHeader style={{ padding: '0.5rem 1rem', minHeight: '44px' }}>Map - 3D Oblique View</CCardHeader>
+      <CCardHeader className="fw-semibold" style={{ padding: '0.5rem 1rem', minHeight: '44px', fontSize: '0.875rem', lineHeight: 1 }}>Map - 3D Oblique View</CCardHeader>
       <CCardBody style={{ padding: '12px', flex: 1 }}>
         <div style={{ height: '100%' }}>
           <ProjectTabMap
@@ -924,29 +923,15 @@ export default function ProjectTab({
         className="d-flex flex-column"
         style={{ gap: 'var(--component-gap)', padding: '0' }}
       >
-      {/* Section 1: Project Profile + Map */}
-      <CCard>
-      <CCardHeader
-        className="d-flex justify-content-between align-items-center"
-        style={{ cursor: 'pointer', padding: '0.75rem 1rem', minHeight: '52px' }}
-        onClick={() => setProfileMapExpanded(!profileMapExpanded)}
-      >
-        <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile &amp; Map</span>
-        <CIcon icon={profileMapExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
-      </CCardHeader>
-      {profileMapExpanded && (
-        <CCardBody className="p-2">
-          <CRow className="g-2" style={{ alignItems: 'stretch' }}>
-            <CCol md={6} lg={5}>
-              <ProjectProfileTile projectId={project.project_id} />
-            </CCol>
-            <CCol md={6} lg={7}>
-              {renderMapCard()}
-            </CCol>
-          </CRow>
-        </CCardBody>
-      )}
-    </CCard>
+      {/* Section 1: Project Profile + Map - Side by side, no wrapper */}
+      <CRow className="g-3" style={{ alignItems: 'stretch' }}>
+        <CCol md={6} lg={5}>
+          <ProjectProfileTile projectId={project.project_id} />
+        </CCol>
+        <CCol md={6} lg={7}>
+          {renderMapCard()}
+        </CCol>
+      </CRow>
 
       {/* Section 2: Financial Summary */}
       {hasFinancialData && (

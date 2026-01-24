@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { CCard, CCardBody, CCardHeader, CNav, CNavItem, CNavLink } from '@coreui/react';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
+import { PhysicalDescription } from '../property';
 import { formatNumber, formatCurrency, formatDecimal } from '@/utils/formatNumber';
 import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-react';
 
@@ -15,6 +15,7 @@ interface Project {
 
 interface PropertyTabProps {
   project: Project;
+  activeTab?: string;
 }
 
 // Mock data types
@@ -307,7 +308,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'notes', label: 'Notes', category: 'unit', visible: false, type: 'input', description: 'Free-form notes for this unit' },
 ];
 
-export default function PropertyTab({ project }: PropertyTabProps) {
+export default function PropertyTab({ project, activeTab = 'details' }: PropertyTabProps) {
   const projectId = project.project_id;
   const projectType = project.project_type_code;
 
@@ -969,62 +970,40 @@ export default function PropertyTab({ project }: PropertyTabProps) {
     );
   }
 
-  return (
-    <CCard>
-      <CCardHeader>
-        <span>Project Design and Market Analysis</span>
-      </CCardHeader>
-      <div
-        style={{
-          background: 'var(--cui-tertiary-bg)',
-          borderBottom: '1px solid var(--cui-border-color)',
-          padding: '0 1.5rem',
-        }}
-      >
-        <CNav variant="underline-border">
-          <CNavItem>
-            <CNavLink href="#property-design">Design</CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink href="#property-market">Market</CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink href="#property-rent-roll">Rent Roll</CNavLink>
-          </CNavItem>
-        </CNav>
-      </div>
-      <CCardBody>
-        <div className="space-y-4">
-          {/* Upper Row: Floor Plans (left) + Comparables Map (right) */}
-          <div id="property-design" className="grid gap-4 grid-cols-1 lg:grid-cols-[1.3fr_1fr]">
-        {/* Floor Plan Matrix - Upper Left (WIDER) */}
-        <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-          <div className="border-b" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Floor Plan Matrix</h3>
-                <div className="flex items-center gap-2 px-2 py-1 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
-                  <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                  </svg>
-                  <span className="text-blue-300 font-medium">Aggregates from Units</span>
-                </div>
+  // Render content based on activeTab (controlled by folder tabs)
+  const renderDetailsContent = () => (
+    <div className="space-y-4">
+      {/* Physical Description - Property Attributes Panel */}
+      <PhysicalDescription projectId={projectId} />
+
+      {/* Floor Plan Matrix - Full Width */}
+      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+        <div className="border-b" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Floor Plan Matrix</h3>
+              <div className="flex items-center gap-2 px-2 py-1 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
+                <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                </svg>
+                <span className="text-blue-300 font-medium">Aggregates from Units</span>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Total Units:</span> <span className="text-white font-semibold">{formatNumber(totalUnits)}</span>
-                </div>
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Avg Current:</span> <span className="text-white font-semibold">{formatCurrency(avgCurrentRent)}</span>
-                </div>
-                <div className="text-gray-400">
-                  <span className="text-gray-500">Avg Market:</span> <span className="text-white font-semibold">{formatCurrency(avgMarketRent)}</span>
-                </div>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="text-gray-400">
+                <span className="text-gray-500">Total Units:</span> <span className="text-white font-semibold">{formatNumber(totalUnits)}</span>
+              </div>
+              <div className="text-gray-400">
+                <span className="text-gray-500">Avg Current:</span> <span className="text-white font-semibold">{formatCurrency(avgCurrentRent)}</span>
+              </div>
+              <div className="text-gray-400">
+                <span className="text-gray-500">Avg Market:</span> <span className="text-white font-semibold">{formatCurrency(avgMarketRent)}</span>
               </div>
             </div>
           </div>
-          <div className="p-4" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-            <div className="overflow-x-auto">
+        </div>
+        <div className="p-4" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+          <div>
               <table className="w-full text-sm">
                 <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
                   <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
@@ -1200,12 +1179,16 @@ export default function PropertyTab({ project }: PropertyTabProps) {
                 </div>
               </div>
             </div>
-          </div>
         </div>
+      </div>
+    </div>
+  );
 
-        {/* Comparable Rentals - Upper Right */}
-        <div id="property-market" className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-          <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+  const renderMarketContent = () => (
+    <div className="space-y-4">
+      {/* Comparable Rentals with Map */}
+      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+        <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
             <div className="flex items-center gap-3">
               <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-700/40">
@@ -1343,9 +1326,12 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           </div>
         </div>
       </div>
+  );
 
-      {/* Detailed Rent Roll Table - Bottom (FULL WIDTH) */}
-      <div id="property-rent-roll" className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+  const renderRentRollContent = () => (
+    <div className="space-y-4">
+      {/* Detailed Rent Roll Table */}
+      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
@@ -1623,8 +1609,15 @@ export default function PropertyTab({ project }: PropertyTabProps) {
           </div>
         </div>
       )}
-        </div>
-      </CCardBody>
-    </CCard>
+    </div>
+  );
+
+  // Main return - render content based on activeTab
+  return (
+    <>
+      {activeTab === 'details' && renderDetailsContent()}
+      {activeTab === 'market' && renderMarketContent()}
+      {activeTab === 'rent-roll' && renderRentRollContent()}
+    </>
   );
 }

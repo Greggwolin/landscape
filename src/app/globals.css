@@ -2,6 +2,8 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 @import '../styles/tokens.css';
 @import '../styles/component-patterns.css';
+@import '../styles/folder-tabs.css';
+@import '../styles/property-page.css';
 
 /* MapLibre popup styles */
 .maplibregl-popup {

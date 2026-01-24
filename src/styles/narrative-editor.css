@@ -1,0 +1,484 @@
+/**
+ * Narrative Editor Styles
+ *
+ * Styles for the TipTap rich text editor with track changes and inline comments.
+ */
+
+/* ============================================================================
+   Track Changes Custom Properties
+   These are semantic colors for Word-style redlining, not theme colors.
+   ============================================================================ */
+
+:root {
+  /* Addition colors (blue - industry standard for insertions) */
+  --track-change-addition: #0066cc;
+  --track-change-addition-bg: rgba(0, 102, 204, 0.1);
+
+  /* Deletion colors (red - industry standard for deletions) */
+  --track-change-deletion: #cc0000;
+  --track-change-deletion-bg: rgba(204, 0, 0, 0.1);
+
+  /* Comment colors (yellow/amber for highlights) */
+  --track-comment: #cc9900;
+  --track-comment-bg: rgba(255, 200, 0, 0.25);
+
+  /* Question colors (purple for questions) */
+  --track-question: #8000ff;
+  --track-question-bg: rgba(128, 0, 255, 0.15);
+}
+
+[data-coreui-theme="dark"] {
+  --track-change-addition: #66b3ff;
+  --track-change-addition-bg: rgba(102, 179, 255, 0.15);
+
+  --track-change-deletion: #ff6666;
+  --track-change-deletion-bg: rgba(255, 102, 102, 0.15);
+
+  --track-comment: #ffcc00;
+  --track-comment-bg: rgba(255, 200, 0, 0.2);
+
+  --track-question: #b464ff;
+  --track-question-bg: rgba(180, 100, 255, 0.2);
+}
+
+/* ============================================================================
+   Container
+   ============================================================================ */
+
+.narrative-editor-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+  background: var(--cui-body-bg);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Toolbar
+   ============================================================================ */
+
+.narrative-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.narrative-toolbar-btn {
+  padding: 0.25rem 0.5rem;
+}
+
+.narrative-toolbar-btn:focus {
+  box-shadow: none;
+}
+
+.narrative-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--cui-border-color);
+  margin: 0 0.5rem;
+}
+
+/* ============================================================================
+   Editor Content
+   ============================================================================ */
+
+.narrative-editor-wrapper {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.narrative-editor-content {
+  padding: 1rem;
+  outline: none;
+  font-family: var(--cui-font-sans-serif);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--cui-body-color);
+}
+
+.narrative-editor-content:focus {
+  outline: none;
+}
+
+/* Placeholder */
+.narrative-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--cui-tertiary-color);
+  pointer-events: none;
+  height: 0;
+}
+
+/* ============================================================================
+   Typography within editor
+   ============================================================================ */
+
+.narrative-editor-content h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.narrative-editor-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.narrative-editor-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.narrative-editor-content p {
+  margin-bottom: 0.75rem;
+}
+
+.narrative-editor-content ul,
+.narrative-editor-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.narrative-editor-content li {
+  margin-bottom: 0.25rem;
+}
+
+.narrative-editor-content blockquote {
+  border-left: 3px solid var(--cui-primary);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--cui-secondary-color);
+  font-style: italic;
+}
+
+/* ============================================================================
+   Track Changes Styles
+   ============================================================================ */
+
+/* Additions - blue text */
+.track-change-addition {
+  color: var(--track-change-addition);
+  background-color: var(--track-change-addition-bg);
+  text-decoration: none;
+  border-bottom: 2px solid var(--track-change-addition);
+}
+
+/* Deletions - red strikethrough */
+.track-change-deletion {
+  color: var(--track-change-deletion);
+  background-color: var(--track-change-deletion-bg);
+  text-decoration: line-through;
+  text-decoration-color: var(--track-change-deletion);
+}
+
+/* ============================================================================
+   Inline Comments
+   ============================================================================ */
+
+.inline-comment {
+  display: inline;
+  background: var(--track-comment-bg);
+  border-bottom: 2px dashed var(--track-comment);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 2px;
+  position: relative;
+}
+
+.inline-comment:hover {
+  background: var(--track-comment-bg);
+  filter: brightness(1.2);
+}
+
+/* Question comments - different styling */
+.inline-comment[data-is-question="true"] {
+  background: var(--track-question-bg);
+  border-bottom-color: var(--track-question);
+}
+
+.inline-comment[data-is-question="true"]:hover {
+  background: var(--track-question-bg);
+  filter: brightness(1.2);
+}
+
+/* Resolved comments - muted */
+.inline-comment[data-is-resolved="true"] {
+  background: var(--cui-tertiary-bg);
+  border-bottom-color: var(--cui-secondary-color);
+  opacity: 0.7;
+}
+
+/* Hidden comments */
+.inline-comment.comments-hidden {
+  background: transparent;
+  border-bottom: none;
+}
+
+/* Comment indicator icon (future enhancement) */
+.inline-comment::after {
+  content: '';
+  display: none; /* Enable when comment indicator is needed */
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--track-comment);
+  border-radius: 50%;
+}
+
+.inline-comment[data-is-question="true"]::after {
+  background: var(--track-question);
+}
+
+/* ============================================================================
+   Footer
+   ============================================================================ */
+
+.narrative-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.narrative-editor-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Narrative canvas footer actions */
+.narrative-canvas-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+}
+
+/* ============================================================================
+   Version Dropdown
+   ============================================================================ */
+
+.version-dropdown-menu {
+  min-width: 280px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.version-dropdown-item {
+  padding: 0.5rem 1rem;
+}
+
+.version-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.version-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.version-number {
+  font-weight: 500;
+  color: var(--cui-body-color);
+}
+
+.version-latest-badge {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--cui-success);
+  margin-left: 0.25rem;
+}
+
+.version-item-date {
+  font-size: 0.75rem;
+  color: var(--cui-tertiary-color);
+}
+
+.version-restore-item {
+  color: var(--cui-primary);
+}
+
+.version-restore-item:hover {
+  background: var(--cui-primary-bg-subtle);
+}
+
+/* ============================================================================
+   Read-only state
+   ============================================================================ */
+
+.narrative-editor-container.read-only .narrative-editor-content {
+  cursor: default;
+}
+
+.narrative-editor-container.read-only .narrative-toolbar-btn:not(:disabled) {
+  opacity: 0.6;
+}
+
+/* ============================================================================
+   Responsive adjustments
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .narrative-toolbar {
+    padding: 0.375rem;
+  }
+
+  .narrative-toolbar-divider {
+    display: none;
+  }
+
+  .narrative-editor-content {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .narrative-editor-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .narrative-editor-status {
+    justify-content: center;
+  }
+}
+
+/* ============================================================================
+   ProseMirror specific overrides
+   ============================================================================ */
+
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0 0 0.75rem 0;
+}
+
+.ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Selection styling */
+.ProseMirror ::selection {
+  background: var(--cui-primary);
+  color: white;
+}
+
+/* Cursor styles */
+.ProseMirror .ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+}
+
+.ProseMirror .ProseMirror-gapcursor:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--cui-body-color);
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* ============================================================================
+   Sales Comparison Panel - Resize Handle & Layout
+   ============================================================================ */
+
+.sales-comparison-panel {
+  position: relative;
+}
+
+.sales-comparison-content {
+  min-height: 400px;
+}
+
+/* Grid section with horizontal scroll when needed */
+.sales-comparison-grid-section {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cui-border-color) transparent;
+}
+
+.sales-comparison-grid-section::-webkit-scrollbar {
+  height: 8px;
+}
+
+.sales-comparison-grid-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sales-comparison-grid-section::-webkit-scrollbar-thumb {
+  background-color: var(--cui-border-color);
+  border-radius: 4px;
+}
+
+/* Resize handle styling */
+.sales-comparison-resize-handle {
+  user-select: none;
+  touch-action: none;
+}
+
+.sales-comparison-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 32px;
+  background: var(--cui-border-color);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sales-comparison-resize-handle:hover::before,
+.sales-comparison-resize-handle:active::before {
+  opacity: 1;
+}
+
+/* Narrative wrapper */
+.sales-comparison-narrative-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================================
+   Narrative Canvas - Consolidated Header Toolbar
+   ============================================================================ */
+
+.narrative-canvas-toolbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.narrative-canvas-toolbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Compact toolbar styling adjustments */
+.narrative-canvas-toolbar .narrative-toolbar-divider {
+  height: 20px;
+  margin: 0 0.375rem;
+}

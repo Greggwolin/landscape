@@ -279,7 +279,8 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
             backgroundColor: 'var(--cui-tertiary-bg)',
             color: 'var(--cui-body-color)',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            borderRadius: controlsExpanded ? '0.5rem 0.5rem 0 0' : '0.5rem'
           }}
         >
           <div className="flex items-center gap-2">
@@ -317,7 +318,8 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
               gridTemplateColumns: 'auto auto 1fr 1fr',
               gap: 16,
               alignItems: 'center',
-              borderTop: '1px solid var(--cui-border-color)'
+              borderTop: '1px solid var(--cui-border-color)',
+              borderRadius: '0 0 0.5rem 0.5rem'
             }}
           >
             <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
