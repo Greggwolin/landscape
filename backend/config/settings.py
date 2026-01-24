@@ -15,6 +15,7 @@ from pathlib import Path
 import sys
 from decouple import config, Csv
 import dj_database_url
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
