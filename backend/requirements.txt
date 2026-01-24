@@ -56,3 +56,4 @@ ruff==0.6.0
 flake8==7.0.0
 ipython==8.19.0
 django-extensions==3.2.3
+openai>=1.0.0
