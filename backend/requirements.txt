@@ -57,3 +57,4 @@ flake8==7.0.0
 ipython==8.19.0
 django-extensions==3.2.3
 openai>=1.0.0
+requests>=2.28.0
