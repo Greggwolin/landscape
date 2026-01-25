@@ -17,7 +17,7 @@ import NavigationLayout from "@/app/components/NavigationLayout";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
 
 export const metadata: Metadata = {
-  title: "Landscape (Materio Skin)",
+  title: "Landscape (Alpha)",
   description: "UI/UX-first prototype with MUI shell",
   icons: {
     icon: '/favicon.ico',
