@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "apps.acquisition",  # Acquisition tracking and ledger
     "apps.knowledge",  # Knowledge/RAG extraction system
     "apps.contacts",  # Cabinet/Contact management system
+    "apps.feedback",  # Tester feedback system
 ]
 
 MIDDLEWARE = [
@@ -239,3 +240,12 @@ DEFAULT_DISCOUNT_RATE = config('DEFAULT_DISCOUNT_RATE', default=0.10, cast=float
 DEFAULT_EXIT_CAP_RATE = config('DEFAULT_EXIT_CAP_RATE', default=0.065, cast=float)
 DEFAULT_VACANCY_PCT = config('DEFAULT_VACANCY_PCT', default=0.05, cast=float)
 DEFAULT_CREDIT_LOSS_PCT = config('DEFAULT_CREDIT_LOSS_PCT', default=0.02, cast=float)
+
+# ============================================================================
+# DEMO PROJECT CONFIGURATION
+# ============================================================================
+# Project IDs to clone for new alpha testers on first login
+DEMO_PROJECT_IDS = {
+    'chadron': 17,       # Chadron Terrace - Multifamily demo
+    'peoria_lakes': 7,   # Peoria Lakes MPC - Land development demo
+}

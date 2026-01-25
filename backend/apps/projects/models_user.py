@@ -12,33 +12,56 @@ class User(AbstractUser):
     Extended User model with additional fields.
     Extends Django's AbstractUser for authentication.
     """
-    
+
+    # Role choices for RBAC
+    ROLE_ADMIN = 'admin'
+    ROLE_ALPHA_TESTER = 'alpha_tester'
+    ROLE_CHOICES = [
+        (ROLE_ADMIN, 'Admin'),
+        (ROLE_ALPHA_TESTER, 'Alpha Tester'),
+    ]
+
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20, null=True, blank=True)
     company = models.CharField(max_length=200, null=True, blank=True)
-    role = models.CharField(max_length=50, default='user')
+    role = models.CharField(
+        max_length=50,
+        choices=ROLE_CHOICES,
+        default=ROLE_ALPHA_TESTER
+    )
     is_verified = models.BooleanField(default=False)
+    demo_projects_provisioned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'landscape"."auth_user'
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return self.email
+
+    @property
+    def is_admin(self):
+        """Check if user has admin role."""
+        return self.role == self.ROLE_ADMIN
+
+    @property
+    def is_alpha_tester(self):
+        """Check if user has alpha_tester role."""
+        return self.role == self.ROLE_ALPHA_TESTER
 
 
 class UserProfile(models.Model):
     """Extended user profile information."""
-    
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     bio = models.TextField(null=True, blank=True)
     avatar_url = models.URLField(null=True, blank=True)
     timezone = models.CharField(max_length=50, default='UTC')
     preferences = models.JSONField(default=dict)
-    
+
     class Meta:
         db_table = 'landscape"."user_profile'
 
@@ -48,7 +71,7 @@ class UserProfile(models.Model):
 
 class APIKey(models.Model):
     """API key for programmatic access."""
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_keys')
     name = models.CharField(max_length=100)
     key = models.CharField(max_length=64, unique=True, db_index=True)
@@ -56,14 +79,14 @@ class APIKey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'landscape"."api_keys'
         ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.name} - {self.user.email}"
-    
+
     def is_valid(self):
         """Check if API key is valid and not expired."""
         if not self.is_active:

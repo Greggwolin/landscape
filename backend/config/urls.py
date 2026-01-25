@@ -48,4 +48,5 @@ urlpatterns = [
     path("api/", include('apps.acquisition.urls')),  # Acquisition tracking
     path("api/knowledge/", include('apps.knowledge.urls')),  # Knowledge/extraction system
     path("api/", include('apps.contacts.urls')),  # Cabinet/Contact management
+    path("api/", include('apps.feedback.urls')),  # Tester feedback system
 ]
