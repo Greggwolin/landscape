@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * AdminNavBar Component
@@ -13,6 +14,7 @@ interface AdminNavItem {
   id: string;
   label: string;
   href: string;
+  requiresAdmin?: boolean;
 }
 
 const ADMIN_NAV_ITEMS: AdminNavItem[] = [
@@ -20,10 +22,20 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { id: 'benchmarks', label: 'Benchmarks', href: '/admin/benchmarks' },
   { id: 'cost-library', label: 'Cost Library', href: '/admin/benchmarks/cost-library' },
   { id: 'dms', label: 'DMS Admin', href: '/admin/dms/templates' },
+  { id: 'feedback', label: 'Feedback', href: '/admin/feedback', requiresAdmin: true },
 ];
 
 export default function AdminNavBar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const isAdmin = Boolean(
+    (user as { is_admin?: boolean } | null)?.is_admin || user?.role === 'admin'
+  );
+
+  const navItems = useMemo(
+    () => ADMIN_NAV_ITEMS.filter((item) => !item.requiresAdmin || isAdmin),
+    [isAdmin]
+  );
 
   const isActive = (href: string) => {
     if (href === '/admin/benchmarks/cost-library') {
@@ -51,7 +63,7 @@ export default function AdminNavBar() {
         </span>
       </div>
       <div className="flex flex-1 gap-0">
-        {ADMIN_NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item.href);
           return (
             <Link

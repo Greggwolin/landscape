@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import NavigationLayout from "@/app/components/NavigationLayout";
 import { CrispChat } from "@/components/crisp/CrispChat";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       {children}
                     </NavigationLayout>
                     <CrispChat />
+                    <FeedbackButton />
                   </IssueReporterProvider>
                 </ProjectProvider>
               </ToastProvider>
