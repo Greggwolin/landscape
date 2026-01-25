@@ -11,10 +11,6 @@ const loaderMap: Record<string, () => Promise<{ default: ComponentType<Record<st
   // The CoreUI shell is optional because it lives on another branch.
   'coreui-shell': () => import('@/prototypes/remote/CoreUIShellPlaceholder'),
   'glide-parcel-grid': () => import('@/prototypes/glide/ParcelGridPrototype'),
-  'gis-test': () => import('@/prototypes/gis/GISTestPrototype'),
-  'gis-simple-test': () => import('@/prototypes/gis/GISSimpleTestPrototype'),
-  'map-debug': () => import('@/prototypes/gis/MapDebugPrototype'),
-  'parcel-test': () => import('@/prototypes/gis/ParcelTestPrototype'),
   'project-topnav': () => import('@/prototypes/project/TopNavProjectPrototype')
 };
 
