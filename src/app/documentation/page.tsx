@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Location Intelligence System (Jan 26, 2026)',
+      path: '/docs/09_session_notes/2026-01-26-location-intelligence-implementation.md',
+      category: 'Technical',
+      description: 'Census demographics with PostGIS ring calculations (1/3/5 mi), Django REST API, MapLibre flyout with Turf.js visualization, TIGER/Line + ACS data loading',
+      icon: <Map className="w-5 h-5" />,
+      lastModified: '2026-01-26'
+    },
+    {
       title: 'Documentation Update (Jan 18, 2026)',
       path: '/docs/09_session_notes/2026-01-18-documentation-update.md',
       category: 'Status',
