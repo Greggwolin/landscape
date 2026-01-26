@@ -47,6 +47,14 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2026-01-26'
     },
     {
+      title: 'Cost Category Management Overview',
+      path: '/docs/02-features/financial-engine/COST_CATEGORY_MANAGEMENT_OVERVIEW.md',
+      category: 'Component',
+      description: 'Overview of cost category management, hierarchy rules, and how categories integrate with budget and financial engine workflows.',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-26'
+    },
+    {
       title: 'Documentation Update (Jan 18, 2026)',
       path: '/docs/09_session_notes/2026-01-18-documentation-update.md',
       category: 'Status',
