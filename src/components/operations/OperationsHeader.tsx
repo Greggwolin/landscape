@@ -31,7 +31,7 @@ export function OperationsHeader({
 }: OperationsHeaderProps) {
   return (
     <CCardHeader className="ops-header d-flex justify-content-between align-items-center">
-      <span className="fw-semibold">Operations · {projectName}</span>
+      <span className="fw-semibold">Operating Statement · {projectName}</span>
       <div className="ops-header-right">
         {/* Value-Add Toggle */}
         <div className="ops-header-toggle">

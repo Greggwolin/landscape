@@ -136,18 +136,20 @@ function DraggableExpenseRow({
       <div className="ops-cell">
         {isParent && (
           <>
-            <span
-              className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
-              onClick={() => onToggleExpand?.(row.line_item_key)}
-            >
-              ▼
-            </span>
             {isUnclassifiedSection && (
               <span className="unclassified-badge">
                 NEEDS REVIEW
               </span>
             )}
-            {row.label}
+            <span className="ops-parent-label">
+              {row.label}
+              <span
+                className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
+                onClick={() => onToggleExpand?.(row.line_item_key)}
+              >
+                ▼
+              </span>
+            </span>
             {onAddItem && (
               <AddButton
                 label="Add"
@@ -284,18 +286,20 @@ function DroppableParentRow({
   return (
     <div ref={drop} className={rowClass}>
       <div className="ops-cell">
-        <span
-          className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
-          onClick={() => onToggleExpand?.(row.line_item_key)}
-        >
-          ▼
-        </span>
         {isUnclassifiedSection && (
           <span className="unclassified-badge">
             NEEDS REVIEW
           </span>
         )}
-        {row.label}
+        <span className="ops-parent-label">
+          {row.label}
+          <span
+            className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
+            onClick={() => onToggleExpand?.(row.line_item_key)}
+          >
+            ▼
+          </span>
+        </span>
         {isOver && canDrop && <span className="ops-drop-hint">Drop here</span>}
         {onAddItem && (
           <AddButton
@@ -436,7 +440,7 @@ export function OperatingStatement({
       <div className="ops-statement-scroll">
         <div className={`ops-statement-grid ${valueAddEnabled ? '' : 'ops-hide-post'}`}>
           <div className="ops-row ops-header-row">
-            <div className="ops-cell ops-header-cell">Operating Statement</div>
+            <div className="ops-cell ops-header-cell">Revenue</div>
             <div className="ops-cell ops-header-cell num">Units</div>
             <div className="ops-cell ops-header-cell num">Current</div>
             <div className="ops-cell ops-header-cell num">Annual</div>
@@ -463,7 +467,7 @@ export function OperatingStatement({
             const postRenoTotal = row.post_reno?.total || 0;
 
             return (
-              <div key={row.line_item_key} className="ops-row ops-child-row">
+              <div key={row.line_item_key} className="ops-row ops-child-row ops-income-item">
                 <div className="ops-cell">{row.label}</div>
                 <div className="ops-cell num">{row.as_is.count ? row.as_is.count : '—'}</div>
                 <div className="ops-cell num">{currentRate > 0 ? formatCurrency(currentRate) : '—'}</div>
@@ -561,7 +565,7 @@ export function OperatingStatement({
             const vacancyLossToLease = valueAddEnabled ? Math.abs(amount) - Math.abs(postRenoTotal) : 0;
 
             return (
-              <div key={row.line_item_key} className="ops-row ops-child-row">
+              <div key={row.line_item_key} className="ops-row ops-child-row ops-vacancy-item">
                 <div className="ops-cell">
                   <span className="ops-label-inline">
                     {row.label}
@@ -613,7 +617,7 @@ export function OperatingStatement({
             );
           })}
 
-          <div className="ops-row ops-total-row">
+          <div className="ops-row ops-egi-row">
             <div className="ops-cell font-bold">Effective Gross Income</div>
             <div className="ops-cell num font-semibold">{rentalTotals.count}</div>
             <div className="ops-cell num font-semibold">—</div>
@@ -624,7 +628,7 @@ export function OperatingStatement({
             <div className="ops-cell num ops-col-reno">{valueAddEnabled ? '—' : null}</div>
           </div>
 
-          <div className="ops-row ops-section-row">
+          <div className="ops-row ops-section-row ops-expense-header">
             <div className="ops-cell ops-section-cell">
               <span>Operating Expenses</span>
               <div className="ops-section-controls">

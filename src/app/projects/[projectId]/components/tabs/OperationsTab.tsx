@@ -7,9 +7,7 @@ import OpExHierarchy from '@/app/components/OpExHierarchy';
 
 // New Operations components
 import {
-  OperatingIncomeCard,
-  DraggableOpexSection,
-  NOITotalBar,
+  OperatingStatement,
   SummaryBar,
   OperationsHeader,
   LineItemRow
@@ -343,39 +341,25 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         </div>
       )}
 
-      {/* Unified Operating Income Card (P&L style) */}
-      <OperatingIncomeCard
+      {/* Unified Operating Statement */}
+      <OperatingStatement
         rentalRows={rentalRows}
         vacancyRows={vacancyRows}
         otherIncomeRows={otherRows}
+        opexRows={opexRows}
+        unitCount={unitCount}
+        totalSF={totalSF}
         grossPotentialRent={grossPotentialRent}
         effectiveGrossIncome={totals?.effective_gross_income || 0}
-        totalSF={totalSF}
-        hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
-        valueAddEnabled={valueAddEnabled}
-        onUpdateVacancy={handleUpdateRow('vacancy_deductions')}
-        onUpdateOtherIncome={handleUpdateRow('other_income')}
-      />
-
-      {/* Operating Expenses - Draggable for category reassignment */}
-      {opexRows.length > 0 && (
-        <DraggableOpexSection
-          rows={opexRows}
-          unitCount={unitCount}
-          totalSF={totalSF}
-          valueAddEnabled={valueAddEnabled}
-          onUpdateRow={handleUpdateRow('operating_expenses')}
-          onToggleExpand={handleToggleExpand('operating_expenses')}
-          onCategoryChange={handleCategoryChange}
-        />
-      )}
-
-      {/* NOI Total */}
-      <NOITotalBar
         asIsNOI={totals?.as_is_noi || 0}
         postRenoNOI={totals?.post_reno_noi || 0}
         valueAddEnabled={valueAddEnabled}
-        availableScenarios={availableScenarios}
+        hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
+        onUpdateVacancy={handleUpdateRow('vacancy_deductions')}
+        onUpdateOtherIncome={handleUpdateRow('other_income')}
+        onUpdateOpex={handleUpdateRow('operating_expenses')}
+        onToggleExpand={handleToggleExpand('operating_expenses')}
+        onCategoryChange={handleCategoryChange}
       />
 
       {/* Sticky Summary Bar */}

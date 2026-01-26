@@ -355,49 +355,230 @@
 }
 
 /* =============================================================================
-   TABLE
+   OPERATING STATEMENT GRID
+   ============================================================================= */
+
+.ops-statement-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.ops-statement-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(60px, 70px)
+    minmax(90px, 100px)
+    minmax(100px, 120px)
+    minmax(70px, 80px)
+    minmax(100px, 110px)
+    minmax(90px, 100px)
+    minmax(100px, 120px);
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.8125rem;
+}
+
+.ops-row {
+  display: contents;
+}
+
+.ops-cell {
+  position: relative;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
+  white-space: nowrap;
+}
+
+.ops-cell.num {
+  text-align: right;
+}
+
+.ops-header-row .ops-cell {
+  background: var(--surface-card-header);
+  font-weight: 600;
+  color: #111111;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.ops-section-cell {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--cui-tertiary-bg);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.ops-expense-header .ops-section-cell {
+  background: var(--surface-card-header);
+  color: #111111;
+}
+
+.ops-section-subtle {
+  color: var(--cui-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.ops-section-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ops-section-hint {
+  color: var(--cui-secondary-color);
+  font-size: 0.75rem;
+}
+
+.ops-parent-row > .ops-cell {
+  background: var(--cui-tertiary-bg);
+  font-weight: 600;
+}
+
+.ops-child-row > .ops-cell:first-child {
+  padding-left: 1rem;
+}
+
+.ops-income-item > .ops-cell:first-child,
+.ops-vacancy-item > .ops-cell:first-child {
+  padding-left: 1.5rem;
+}
+
+.ops-egi-row > .ops-cell {
+  background: transparent;
+  font-weight: 700;
+  border-bottom: none;
+  padding-bottom: 0.75rem;
+}
+
+.ops-egi-row > .ops-cell:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 6px;
+  right: 6px;
+  border-top: 1px solid #111111;
+}
+
+.ops-subtotal-row > .ops-cell {
+  background: var(--cui-tertiary-bg);
+  font-weight: 700;
+}
+
+.ops-noi-row > .ops-cell {
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.12);
+  font-weight: 700;
+  border-top: 2px solid var(--cui-primary);
+  border-bottom: 2px solid var(--cui-primary);
+}
+
+.ops-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ops-parent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.ops-drag-handle {
+  cursor: grab;
+  color: #9ca3af;
+}
+
+.ops-drop-hint {
+  margin-left: 0.5rem;
+  color: #3b82f6;
+  font-size: 0.75rem;
+}
+
+.unclassified-badge {
+  background-color: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-right: 6px;
+}
+
+.ops-lock {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+  color: var(--cui-secondary-color);
+}
+
+.ops-hide-post .ops-col-post,
+.ops-hide-post .ops-col-reno {
+  visibility: hidden;
+}
+
+.ops-saving-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #1f2937;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+}
+
+/* =============================================================================
+   LEGACY TABLE STYLES (used in other components)
    ============================================================================= */
 
 .ops-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem; /* 14px - matches text-sm */
+  font-size: 0.875rem;
 }
 
-/* Shared column widths for aligned income/expense tables */
-.ops-table.ops-grid {
-  table-layout: fixed;
-  width: auto;
-}
-
-.ops-table.ops-grid {
-  --ops-col-label: 200px;
-  --ops-col-units: 60px;
-  --ops-col-current: 85px;
-  --ops-col-annual: 110px;
-  --ops-col-psf: 60px;
-  --ops-col-loss: 95px;
-  --ops-col-post: 95px;
-  --ops-col-reno: 110px;
-  --ops-grid-total: calc(
-    var(--ops-col-label) +
-    var(--ops-col-units) +
-    var(--ops-col-current) +
-    var(--ops-col-annual) +
-    var(--ops-col-psf) +
-    var(--ops-col-loss) +
-    var(--ops-col-post) +
-    var(--ops-col-reno)
-  );
-}
-
-.ops-table.ops-grid {
-  width: var(--ops-grid-total);
-}
-
-.ops-table.ops-grid th:not(:first-child),
-.ops-table.ops-grid td:not(:first-child) {
+.ops-table thead th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--cui-tertiary-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--surface-card-header);
+  position: sticky;
+  top: 0;
+  z-index: 5;
   white-space: nowrap;
+}
+
+.ops-table thead th.num {
+  text-align: right;
+}
+
+.ops-table tbody td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  vertical-align: middle;
+  color: var(--cui-body-color);
+}
+
+.ops-table tbody tr:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.ops-table .num {
+  text-align: right;
 }
 
 /* Column Headers */
@@ -594,6 +775,10 @@
 .ops-loss-to-lease {
   color: #d97706; /* amber-600 - works in both light and dark mode */
   font-weight: normal;
+}
+
+.ops-positive {
+  color: var(--cui-success);
 }
 
 /* Compact input for vacancy/credit loss rows */
