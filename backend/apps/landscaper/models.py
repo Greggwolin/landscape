@@ -2,17 +2,214 @@
 Landscaper AI models for chat history and advice tracking.
 
 These models store:
+- Chat threads for organizing conversations by page context
 - Chat message history between users and Landscaper AI
 - AI-suggested assumptions and their confidence levels
 - Variance tracking between AI advice and user decisions
+- Chat embeddings for cross-thread RAG retrieval
 """
 
 from django.db import models
 from django.contrib.auth import get_user_model
 import time
 import random
+import uuid
 
 User = get_user_model()
+
+
+# =============================================================================
+# Thread-based Chat Models (New)
+# =============================================================================
+
+class ChatThread(models.Model):
+    """
+    Chat thread container for organizing Landscaper conversations.
+
+    Each thread is scoped to a project and page context (e.g., 'property', 'operations').
+    Threads support auto-generated titles, summaries for RAG, and user editing.
+
+    Maps to landscape.landscaper_chat_thread table.
+    """
+
+    PAGE_CONTEXT_CHOICES = [
+        ('home', 'Home'),
+        ('property', 'Property'),
+        ('operations', 'Operations'),
+        ('feasibility', 'Feasibility'),
+        ('capitalization', 'Capitalization'),
+        ('reports', 'Reports'),
+        ('documents', 'Documents'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='chat_threads'
+    )
+    page_context = models.CharField(
+        max_length=50,
+        choices=PAGE_CONTEXT_CHOICES,
+        help_text='Folder/page context: home, property, operations, etc.'
+    )
+    subtab_context = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='Optional subtab context for finer granularity (reserved for future)'
+    )
+    title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Thread title, auto-generated after first AI response, user-editable'
+    )
+    summary = models.TextField(
+        null=True,
+        blank=True,
+        help_text='AI-generated summary for cross-thread RAG retrieval'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this thread is currently active'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When thread was closed (user started new or idle timeout)'
+    )
+
+    class Meta:
+        db_table = 'landscape"."landscaper_chat_thread'
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['project']),
+            models.Index(fields=['project', 'page_context']),
+            models.Index(fields=['project', 'is_active']),
+            models.Index(fields=['project', '-updated_at']),
+        ]
+        verbose_name = 'Chat Thread'
+        verbose_name_plural = 'Chat Threads'
+
+    def __str__(self):
+        title = self.title or f"Thread in {self.page_context}"
+        return f"{self.project.project_name} - {title}"
+
+
+class ThreadMessage(models.Model):
+    """
+    Individual chat message within a Landscaper thread.
+
+    Replaces the original ChatMessage model for thread-based conversations.
+
+    Maps to landscape.landscaper_thread_message table.
+    """
+
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    thread = models.ForeignKey(
+        ChatThread,
+        on_delete=models.CASCADE,
+        db_column='thread_id',
+        related_name='messages'
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        help_text='Message sender: user or assistant'
+    )
+    content = models.TextField(
+        help_text='Message content'
+    )
+    metadata = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Additional data: tool calls, sources, mutation proposals, etc.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'landscape"."landscaper_thread_message'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['thread']),
+            models.Index(fields=['thread', 'created_at']),
+        ]
+        verbose_name = 'Thread Message'
+        verbose_name_plural = 'Thread Messages'
+
+    def __str__(self):
+        preview = self.content[:50] + '...' if len(self.content) > 50 else self.content
+        return f"{self.role}: {preview}"
+
+
+class ChatEmbedding(models.Model):
+    """
+    Vector embedding for chat messages enabling cross-thread RAG retrieval.
+
+    Stores embeddings from OpenAI text-embedding-3-small for semantic search
+    across all project conversations.
+
+    Maps to landscape.landscaper_chat_embedding table.
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    message = models.ForeignKey(
+        ThreadMessage,
+        on_delete=models.CASCADE,
+        db_column='message_id',
+        related_name='embeddings'
+    )
+    thread = models.ForeignKey(
+        ChatThread,
+        on_delete=models.CASCADE,
+        db_column='thread_id',
+        related_name='message_embeddings'
+    )
+    project_id = models.IntegerField(
+        help_text='Denormalized project_id for faster queries'
+    )
+    # Note: The embedding field is a pgvector type, handled via raw SQL
+    # Django doesn't have native pgvector support, so we use a placeholder
+    # and handle the actual vector operations in raw SQL queries
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'landscape"."landscaper_chat_embedding'
+        indexes = [
+            models.Index(fields=['project_id']),
+            models.Index(fields=['thread']),
+        ]
+        verbose_name = 'Chat Embedding'
+        verbose_name_plural = 'Chat Embeddings'
+
+    def __str__(self):
+        return f"Embedding for message {self.message_id}"
+
+
+# =============================================================================
+# Legacy Chat Models (Preserved for backward compatibility)
+# =============================================================================
 
 
 class ChatMessage(models.Model):

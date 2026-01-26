@@ -202,33 +202,38 @@ def _get_income_approach_data(project_id: int) -> dict:
             })
 
         # If no opex data, try the hierarchical chart of accounts
+        # Gracefully handle missing tables
         if not opex_items:
-            cursor.execute("""
-                SELECT
-                    cc.category_name as category,
-                    cc.account_number,
-                    COALESCE(f.annual_amount, 0) +
-                    COALESCE(f.unit_amount * %s, 0) +
-                    COALESCE(f.amount_per_sf * %s, 0) as annual_amount
-                FROM landscape.core_unit_cost_category cc
-                LEFT JOIN landscape.tbl_operating_expense_fact f
-                    ON f.category_id = cc.category_id AND f.project_id = %s
-                WHERE cc.account_number >= '5100' AND cc.account_number < '5900'
-                ORDER BY cc.account_number
-            """, [unit_count, total_sf, project_id])
-            coa_rows = cursor.fetchall()
+            try:
+                cursor.execute("""
+                    SELECT
+                        cc.category_name as category,
+                        cc.account_number,
+                        COALESCE(f.annual_amount, 0) +
+                        COALESCE(f.unit_amount * %s, 0) +
+                        COALESCE(f.amount_per_sf * %s, 0) as annual_amount
+                    FROM landscape.core_unit_cost_category cc
+                    LEFT JOIN landscape.tbl_operating_expense_fact f
+                        ON f.category_id = cc.category_id AND f.project_id = %s
+                    WHERE cc.account_number >= '5100' AND cc.account_number < '5900'
+                    ORDER BY cc.account_number
+                """, [unit_count, total_sf, project_id])
+                coa_rows = cursor.fetchall()
 
-            for row in coa_rows:
-                amount = decimal_or_zero(row[2])
-                if amount > 0:
-                    total_opex += amount
-                    opex_items.append({
-                        'category': row[0],
-                        'expense_type': row[1],
-                        'annual_amount': float(amount),
-                        'per_unit': float(amount / unit_count) if unit_count > 0 else 0,
-                        'per_sf': float(amount / Decimal(str(total_sf))) if total_sf > 0 else 0,
-                    })
+                for row in coa_rows:
+                    amount = decimal_or_zero(row[2])
+                    if amount > 0:
+                        total_opex += amount
+                        opex_items.append({
+                            'category': row[0],
+                            'expense_type': row[1],
+                            'annual_amount': float(amount),
+                            'per_unit': float(amount / unit_count) if unit_count > 0 else 0,
+                            'per_sf': float(amount / Decimal(str(total_sf))) if total_sf > 0 else 0,
+                        })
+            except Exception:
+                # Table doesn't exist - continue without opex data
+                pass
 
     # =========================================================================
     # ASSUMPTIONS - Aggregated from multiple tables via service
@@ -480,10 +485,22 @@ def income_approach_dcf(request, project_id: int):
     """
     GET /api/valuation/income-approach-data/{project_id}/dcf/
 
-    Returns DCF analysis with multi-period cash flows.
-    (Phase 2 - placeholder for now)
+    Returns DCF analysis with:
+    - Annual cash flow projections (NOI by year)
+    - Terminal value calculation
+    - Key metrics (IRR, NPV, Present Value)
+    - 2D sensitivity matrix (discount rate × exit cap rate)
+
+    Cash flows start from current (in-place) rents and grow by
+    income_growth_rate annually. Expenses grow by expense_growth_rate.
     """
-    return Response({
-        'message': 'DCF analysis coming in Phase 2',
-        'project_id': project_id,
-    })
+    from .services.dcf_calculation_service import DCFCalculationService
+
+    # Verify project exists
+    project = get_object_or_404(Project, project_id=project_id)
+
+    # Calculate DCF
+    dcf_service = DCFCalculationService(project_id)
+    result = dcf_service.calculate()
+
+    return Response(result)

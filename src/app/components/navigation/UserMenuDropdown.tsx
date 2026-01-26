@@ -2,7 +2,9 @@
 
 import React, { useRef, useState } from 'react';
 import Link from 'next/link';
-import { UserCircle2, LogOut, User, Shield } from 'lucide-react';
+import { LogOut, User, Shield } from 'lucide-react';
+import CIcon from '@coreui/icons-react';
+import { cilUser } from '@coreui/icons';
 import { useOutsideClick } from '@/app/hooks/useOutsideClick';
 import { useAuth } from '@/contexts/AuthContext';
 import { Z_INDEX } from './constants';
@@ -27,13 +29,11 @@ export default function UserMenuDropdown() {
 
   const closeMenu = () => setIsOpen(false);
 
-  // Get user initials for avatar
-  const getUserInitials = () => {
-    if (!user) return '?';
-    if (user.first_name && user.last_name) {
-      return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
-    }
-    return user.username[0].toUpperCase();
+  // Get display name for the button
+  const getDisplayName = () => {
+    if (!user) return 'Sign In';
+    if (user.first_name) return user.first_name;
+    return user.username;
   };
 
   return (
@@ -41,29 +41,24 @@ export default function UserMenuDropdown() {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="rounded-full border p-2 transition-colors"
-        style={{
-          borderColor: 'var(--nav-border)',
-          color: 'var(--nav-text)',
-          backgroundColor: 'transparent',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        }}
         aria-haspopup="true"
         aria-expanded={isOpen}
         aria-label="User menu"
+        className="d-flex align-items-center gap-2 px-3 py-2 rounded font-medium text-sm transition-colors"
+        style={{
+          backgroundColor: '#6366F1',
+          color: '#FFFFFF',
+          border: 'none',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#4F46E5';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#6366F1';
+        }}
       >
-        {isAuthenticated && user ? (
-          <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center text-xs font-medium text-white">
-            {getUserInitials()}
-          </div>
-        ) : (
-          <UserCircle2 className="h-5 w-5" />
-        )}
+        <CIcon icon={cilUser} />
+        {getDisplayName()}
       </button>
 
       {isOpen && (
@@ -179,7 +174,7 @@ export default function UserMenuDropdown() {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <UserCircle2 className="h-4 w-4" />
+                <CIcon icon={cilUser} className="h-4 w-4" />
                 Create Account
               </Link>
             </div>

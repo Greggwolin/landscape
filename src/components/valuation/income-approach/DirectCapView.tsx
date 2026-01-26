@@ -22,6 +22,10 @@ import {
 } from '@/types/income-approach';
 import SensitivityMatrix from './SensitivityMatrix';
 
+interface ExtendedDirectCapViewProps extends DirectCapViewProps {
+  onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
+}
+
 export function DirectCapView({
   calculation,
   value,
@@ -33,7 +37,8 @@ export function DirectCapView({
   keyMetrics,
   selectedBasis,
   allTiles,
-}: DirectCapViewProps) {
+  onMethodChange,
+}: ExtendedDirectCapViewProps) {
   const { unit_count: unitCount, total_sf: totalSf } = propertySummary;
   // Use these for single-column display fallback
   void rentRollItems; // Used by single-column table (not multi-column)
@@ -79,14 +84,14 @@ export function DirectCapView({
           Direct Capitalization
         </button>
         <button
-          className="px-4 py-2 text-sm font-medium rounded-lg opacity-50 cursor-not-allowed"
+          type="button"
+          onClick={() => onMethodChange?.('dcf')}
+          className="px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
           style={{
             backgroundColor: 'var(--cui-tertiary-bg)',
             color: 'var(--cui-secondary-color)',
             border: '1px solid var(--cui-border-color)',
           }}
-          disabled
-          title="Coming in Phase 2"
         >
           DCF Analysis
         </button>

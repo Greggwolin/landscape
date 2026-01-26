@@ -4,6 +4,7 @@ import React, { ReactNode } from 'react';
 
 interface SectionCardProps {
   title: string;
+  subtitle?: string;
   children: ReactNode;
   controls?: ReactNode;
   className?: string;
@@ -19,6 +20,7 @@ interface SectionCardProps {
  */
 export function SectionCard({
   title,
+  subtitle,
   children,
   controls,
   className = '',
@@ -29,7 +31,10 @@ export function SectionCard({
   return (
     <div className={`ops-card ${expansionClass} ${className}`}>
       <div className="ops-section-header">
-        <h3 className="ops-section-title">{title}</h3>
+        <h3 className="ops-section-title">
+          {title}
+          {subtitle && <span className="ops-section-subtitle">{subtitle}</span>}
+        </h3>
         {controls && (
           <div className="ops-section-controls">
             {controls}

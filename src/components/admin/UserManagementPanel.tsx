@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/toast';
 import {
@@ -396,6 +396,7 @@ export default function UserManagementPanel() {
         }}
         user={selectedUser}
         onSubmit={handleUpdateUser}
+        onSetPassword={handleSetPassword}
         isLoading={modalLoading}
       />
 
@@ -434,13 +435,187 @@ interface BaseModalProps {
   isLoading?: boolean;
 }
 
+const modalStyle = {
+  backgroundColor: 'var(--cui-tertiary-bg)',
+  borderColor: 'var(--cui-border-color)',
+  color: 'var(--cui-body-color)',
+};
+const inputStyle = {
+  backgroundColor: 'var(--cui-secondary-bg)',
+  borderColor: 'var(--cui-border-color)',
+  color: 'var(--cui-body-color)',
+};
+const inputClass = "w-full px-3 py-2 border rounded-lg placeholder-gray-400 focus:outline-none";
+const secondaryTextStyle = { color: 'var(--cui-secondary-color)' };
+const dangerTextStyle = { color: 'var(--cui-danger)' };
+const errorStyle = {
+  backgroundColor: 'color-mix(in srgb, var(--cui-danger) 15%, var(--cui-body-bg))',
+  borderColor: 'var(--cui-danger)',
+  color: 'var(--cui-danger)',
+};
+
+interface UserFormModalProps extends BaseModalProps {
+  title: string;
+  description: string;
+  submitLabel: string;
+  initialData: CreateUserData;
+  passwordRequired: boolean;
+  onSubmit: (data: CreateUserData) => Promise<void>;
+}
+
+function UserFormModal({
+  isOpen,
+  onClose,
+  isLoading,
+  title,
+  description,
+  submitLabel,
+  initialData,
+  passwordRequired,
+  onSubmit,
+}: UserFormModalProps) {
+  const [formData, setFormData] = useState<CreateUserData>(initialData);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(initialData);
+      setError(null);
+    }
+  }, [isOpen, initialData]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const password = formData.password || '';
+    const passwordConfirm = formData.password_confirm || '';
+
+    if (passwordRequired || password || passwordConfirm) {
+      if (!password || !passwordConfirm) {
+        setError('Password and confirmation are required');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        return;
+      }
+    }
+
+    try {
+      await onSubmit(formData);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save user');
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="border max-w-lg max-h-[90vh] overflow-y-auto" style={modalStyle}>
+        <DialogHeader>
+          <DialogTitle style={{ color: 'var(--cui-body-color)' }}>{title}</DialogTitle>
+          <DialogDescription style={secondaryTextStyle}>{description}</DialogDescription>
+        </DialogHeader>
+
+        {error && <div className="p-3 border rounded text-sm" style={errorStyle}>{error}</div>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>First Name</label>
+              <input type="text" name="first_name" value={formData.first_name || ''} onChange={handleChange} className={inputClass} style={inputStyle} placeholder="John" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Last Name</label>
+              <input type="text" name="last_name" value={formData.last_name || ''} onChange={handleChange} className={inputClass} style={inputStyle} placeholder="Doe" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Username <span style={dangerTextStyle}>*</span></label>
+            <input type="text" name="username" value={formData.username} onChange={handleChange} required className={inputClass} style={inputStyle} placeholder="johndoe" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Email <span style={dangerTextStyle}>*</span></label>
+            <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputClass} style={inputStyle} placeholder="john@example.com" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Role <span style={dangerTextStyle}>*</span></label>
+            <select name="role" value={formData.role} onChange={handleChange} required className={inputClass} style={inputStyle}>
+              <option value="admin">Admin</option>
+              <option value="alpha_tester">Alpha Tester</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Company</label>
+              <input type="text" name="company" value={formData.company || ''} onChange={handleChange} className={inputClass} style={inputStyle} placeholder="Company Inc." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Phone</label>
+              <input type="tel" name="phone" value={formData.phone || ''} onChange={handleChange} className={inputClass} style={inputStyle} placeholder="(555) 123-4567" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Password <span style={dangerTextStyle}>*</span></label>
+              <input type="password" name="password" value={formData.password} onChange={handleChange} required={passwordRequired} minLength={8} className={inputClass} style={inputStyle} placeholder="Min 8 characters" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Confirm Password <span style={dangerTextStyle}>*</span></label>
+              <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} required={passwordRequired} minLength={8} className={inputClass} style={inputStyle} placeholder="Repeat password" />
+            </div>
+          </div>
+
+          <div className="flex gap-6 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="is_active" checked={formData.is_active || false} onChange={handleChange} className="w-4 h-4 rounded" style={{ accentColor: 'var(--cui-primary)' }} />
+              <span className="text-sm" style={secondaryTextStyle}>Active</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="is_staff" checked={formData.is_staff || false} onChange={handleChange} className="w-4 h-4 rounded" style={{ accentColor: 'var(--cui-primary)' }} />
+              <span className="text-sm" style={secondaryTextStyle}>Admin</span>
+            </label>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm transition hover:opacity-80" style={secondaryTextStyle}>Cancel</button>
+            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90" style={{ backgroundColor: 'var(--cui-primary)', color: 'white' }}>
+              {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
+              {submitLabel}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Add User Modal
 interface AddUserModalProps extends BaseModalProps {
   onSubmit: (data: CreateUserData) => Promise<void>;
 }
 
-function AddUserModal({ isOpen, onClose, onSubmit, isLoading }: AddUserModalProps) {
-  const [formData, setFormData] = useState<CreateUserData>({
+export function AddUserModal({ isOpen, onClose, onSubmit, isLoading }: AddUserModalProps) {
+  const initialData = useMemo<CreateUserData>(() => ({
     username: '',
     email: '',
     password: '',
@@ -451,137 +626,21 @@ function AddUserModal({ isOpen, onClose, onSubmit, isLoading }: AddUserModalProp
     phone: '',
     is_active: true,
     is_staff: false,
-    role: 'user',
-  });
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        username: '',
-        email: '',
-        password: '',
-        password_confirm: '',
-        first_name: '',
-        last_name: '',
-        company: '',
-        phone: '',
-        is_active: true,
-        is_staff: false,
-        role: 'user',
-      });
-      setError(null);
-    }
-  }, [isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (formData.password !== formData.password_confirm) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
-    try {
-      await onSubmit(formData);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create user');
-    }
-  };
-
-  const inputClass = "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
+    role: 'alpha_tester',
+  }), []);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-white">Add New User</DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Create a new user account. All required fields are marked with *.
-          </DialogDescription>
-        </DialogHeader>
-
-        {error && (
-          <div className="p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">First Name</label>
-              <input type="text" name="first_name" value={formData.first_name} onChange={handleChange} className={inputClass} placeholder="John" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Last Name</label>
-              <input type="text" name="last_name" value={formData.last_name} onChange={handleChange} className={inputClass} placeholder="Doe" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Username <span className="text-red-400">*</span></label>
-            <input type="text" name="username" value={formData.username} onChange={handleChange} required className={inputClass} placeholder="johndoe" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email <span className="text-red-400">*</span></label>
-            <input type="email" name="email" value={formData.email} onChange={handleChange} required className={inputClass} placeholder="john@example.com" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Company</label>
-              <input type="text" name="company" value={formData.company} onChange={handleChange} className={inputClass} placeholder="Company Inc." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
-              <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className={inputClass} placeholder="(555) 123-4567" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Password <span className="text-red-400">*</span></label>
-              <input type="password" name="password" value={formData.password} onChange={handleChange} required minLength={8} className={inputClass} placeholder="Min 8 characters" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Confirm Password <span className="text-red-400">*</span></label>
-              <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} required minLength={8} className={inputClass} placeholder="Repeat password" />
-            </div>
-          </div>
-
-          <div className="flex gap-6 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleChange} className="w-4 h-4 rounded border-gray-600 text-blue-500" />
-              <span className="text-sm text-gray-300">Active</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="is_staff" checked={formData.is_staff} onChange={handleChange} className="w-4 h-4 rounded border-gray-600 text-blue-500" />
-              <span className="text-sm text-gray-300">Admin</span>
-            </label>
-          </div>
-
-          <DialogFooter className="pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition">Cancel</button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2">
-              {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
-              Create User
-            </button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <UserFormModal
+      isOpen={isOpen}
+      onClose={onClose}
+      isLoading={isLoading}
+      title="Add New User"
+      description="Create a new user account. All required fields are marked with *."
+      submitLabel="Create User"
+      initialData={initialData}
+      passwordRequired
+      onSubmit={onSubmit}
+    />
   );
 }
 
@@ -589,123 +648,50 @@ function AddUserModal({ isOpen, onClose, onSubmit, isLoading }: AddUserModalProp
 interface EditUserModalProps extends BaseModalProps {
   user: AdminUser | null;
   onSubmit: (userId: number, data: UpdateUserData) => Promise<void>;
+  onSetPassword: (userId: number, data: SetPasswordData) => Promise<void>;
 }
 
-function EditUserModal({ isOpen, onClose, user, onSubmit, isLoading }: EditUserModalProps) {
-  const [formData, setFormData] = useState<UpdateUserData>({});
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        username: user.username,
-        email: user.email,
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        company: user.company || '',
-        phone: user.phone || '',
-        is_active: user.is_active,
-        is_staff: user.is_staff,
-        role: user.role,
-      });
-      setError(null);
-    }
-  }, [user]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setError(null);
-
-    try {
-      await onSubmit(user.id, formData);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
-    }
-  };
-
+export function EditUserModal({ isOpen, onClose, user, onSubmit, onSetPassword, isLoading }: EditUserModalProps) {
   if (!user) return null;
 
-  const inputClass = "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const initialData = useMemo<CreateUserData>(() => ({
+    username: user.username,
+    email: user.email,
+    password: '',
+    password_confirm: '',
+    first_name: user.first_name || '',
+    last_name: user.last_name || '',
+    company: user.company || '',
+    phone: user.phone || '',
+    is_active: user.is_active,
+    is_staff: user.is_staff,
+    role: user.role,
+  }), [user]);
+
+  const handleSubmit = async (data: CreateUserData) => {
+    const { password, password_confirm, ...updateData } = data;
+    await onSubmit(user.id, updateData);
+
+    if (password || password_confirm) {
+      await onSetPassword(user.id, {
+        password: password || '',
+        password_confirm: password_confirm || '',
+      });
+    }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-white">Edit User</DialogTitle>
-          <DialogDescription className="text-gray-400">Update user details for {user.username}</DialogDescription>
-        </DialogHeader>
-
-        {error && <div className="p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">First Name</label>
-              <input type="text" name="first_name" value={formData.first_name || ''} onChange={handleChange} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Last Name</label>
-              <input type="text" name="last_name" value={formData.last_name || ''} onChange={handleChange} className={inputClass} />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
-            <input type="text" value={user.username} disabled className="w-full px-3 py-2 bg-gray-600 border border-gray-600 rounded-lg text-gray-400 cursor-not-allowed" />
-            <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
-            <input type="email" name="email" value={formData.email || ''} onChange={handleChange} className={inputClass} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Company</label>
-              <input type="text" name="company" value={formData.company || ''} onChange={handleChange} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
-              <input type="tel" name="phone" value={formData.phone || ''} onChange={handleChange} className={inputClass} />
-            </div>
-          </div>
-
-          <div className="flex gap-6 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="is_active" checked={formData.is_active || false} onChange={handleChange} className="w-4 h-4 rounded border-gray-600 text-blue-500" />
-              <span className="text-sm text-gray-300">Active</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="is_staff" checked={formData.is_staff || false} onChange={handleChange} className="w-4 h-4 rounded border-gray-600 text-blue-500" />
-              <span className="text-sm text-gray-300">Admin</span>
-            </label>
-          </div>
-
-          <div className="pt-2 border-t border-gray-700">
-            <p className="text-xs text-gray-500">
-              Created: {new Date(user.created_at).toLocaleString()}
-              {user.last_login && <> | Last login: {new Date(user.last_login).toLocaleString()}</>}
-            </p>
-          </div>
-
-          <DialogFooter className="pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition">Cancel</button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2">
-              {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
-              Save Changes
-            </button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <UserFormModal
+      isOpen={isOpen}
+      onClose={onClose}
+      isLoading={isLoading}
+      title="Edit User"
+      description={`Update user details for ${user.username}`}
+      submitLabel="Save Changes"
+      initialData={initialData}
+      passwordRequired={false}
+      onSubmit={handleSubmit}
+    />
   );
 }
 
@@ -715,7 +701,7 @@ interface ResetPasswordModalProps extends BaseModalProps {
   onSubmit: (userId: number, data: SetPasswordData) => Promise<void>;
 }
 
-function ResetPasswordModal({ isOpen, onClose, user, onSubmit, isLoading }: ResetPasswordModalProps) {
+export function ResetPasswordModal({ isOpen, onClose, user, onSubmit, isLoading }: ResetPasswordModalProps) {
   const [formData, setFormData] = useState<SetPasswordData>({ password: '', password_confirm: '' });
   const [error, setError] = useState<string | null>(null);
 
@@ -756,32 +742,30 @@ function ResetPasswordModal({ isOpen, onClose, user, onSubmit, isLoading }: Rese
 
   if (!user) return null;
 
-  const inputClass = "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
+      <DialogContent className="border max-w-md" style={modalStyle}>
         <DialogHeader>
-          <DialogTitle className="text-white">Reset Password</DialogTitle>
-          <DialogDescription className="text-gray-400">Set a new password for <span className="text-white font-medium">{user.username}</span></DialogDescription>
+          <DialogTitle style={{ color: 'var(--cui-body-color)' }}>Reset Password</DialogTitle>
+          <DialogDescription style={secondaryTextStyle}>Set a new password for <span style={{ color: 'var(--cui-body-color)', fontWeight: 500 }}>{user.username}</span></DialogDescription>
         </DialogHeader>
 
-        {error && <div className="p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">{error}</div>}
+        {error && <div className="p-3 border rounded text-sm" style={errorStyle}>{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">New Password <span className="text-red-400">*</span></label>
-            <input type="password" name="password" value={formData.password} onChange={handleChange} required minLength={8} className={inputClass} placeholder="Min 8 characters" autoFocus />
+            <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>New Password <span style={dangerTextStyle}>*</span></label>
+            <input type="password" name="password" value={formData.password} onChange={handleChange} required minLength={8} className={inputClass} style={inputStyle} placeholder="Min 8 characters" autoFocus />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Confirm Password <span className="text-red-400">*</span></label>
-            <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} required minLength={8} className={inputClass} placeholder="Repeat password" />
+            <label className="block text-sm font-medium mb-1" style={secondaryTextStyle}>Confirm Password <span style={dangerTextStyle}>*</span></label>
+            <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} required minLength={8} className={inputClass} style={inputStyle} placeholder="Repeat password" />
           </div>
 
           <DialogFooter className="pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition">Cancel</button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm transition hover:opacity-80" style={secondaryTextStyle}>Cancel</button>
+            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90" style={{ backgroundColor: 'var(--cui-primary)', color: 'white' }}>
               {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
               Reset Password
             </button>
@@ -798,7 +782,7 @@ interface DeleteUserModalProps extends BaseModalProps {
   onConfirm: (userId: number) => Promise<void>;
 }
 
-function DeleteUserModal({ isOpen, onClose, user, onConfirm, isLoading }: DeleteUserModalProps) {
+export function DeleteUserModal({ isOpen, onClose, user, onConfirm, isLoading }: DeleteUserModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -821,38 +805,38 @@ function DeleteUserModal({ isOpen, onClose, user, onConfirm, isLoading }: Delete
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
+      <DialogContent className="border max-w-md" style={modalStyle}>
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <DialogTitle className="flex items-center gap-2" style={{ color: 'var(--cui-body-color)' }}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={dangerTextStyle}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             Delete User
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Are you sure you want to delete <span className="text-white font-medium">{user.username}</span>? This action cannot be undone.
+          <DialogDescription style={secondaryTextStyle}>
+            Are you sure you want to delete <span style={{ color: 'var(--cui-body-color)', fontWeight: 500 }}>{user.username}</span>? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
 
-        {error && <div className="p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">{error}</div>}
+        {error && <div className="p-3 border rounded text-sm" style={errorStyle}>{error}</div>}
 
-        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700">
+        <div className="rounded-lg p-4 border" style={{ backgroundColor: 'var(--cui-secondary-bg)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium" style={{ backgroundColor: 'var(--cui-primary)', color: 'white' }}>
               {user.first_name?.[0] || user.username[0].toUpperCase()}
             </div>
             <div>
-              <p className="text-white font-medium">
+              <p className="font-medium" style={{ color: 'var(--cui-body-color)' }}>
                 {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
               </p>
-              <p className="text-sm text-gray-400">{user.email}</p>
+              <p className="text-sm" style={secondaryTextStyle}>{user.email}</p>
             </div>
           </div>
         </div>
 
         <DialogFooter className="pt-4">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition">Cancel</button>
-          <button type="button" onClick={handleConfirm} disabled={isLoading} className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm transition hover:opacity-80" style={secondaryTextStyle}>Cancel</button>
+          <button type="button" onClick={handleConfirm} disabled={isLoading} className="px-4 py-2 rounded-lg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90" style={{ backgroundColor: 'var(--cui-danger)', color: 'white' }}>
             {isLoading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
             Delete User
           </button>

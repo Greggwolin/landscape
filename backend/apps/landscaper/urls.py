@@ -12,6 +12,9 @@ from .views import (
     ConfirmMutationView,
     RejectMutationView,
     ConfirmBatchView,
+    # Thread-based chat views
+    ChatThreadViewSet,
+    ThreadMessageViewSet,
 )
 
 # Project-scoped endpoints
@@ -164,5 +167,51 @@ urlpatterns = [
         'landscaper/mutations/batch/<str:batch_id>/confirm/',
         ConfirmBatchView.as_view(),
         name='confirm-batch'
+    ),
+
+    # ========================================================================
+    # Thread-based Chat Endpoints (New Thread System)
+    # ========================================================================
+
+    # Thread CRUD
+    path(
+        'landscaper/threads/',
+        ChatThreadViewSet.as_view({
+            'get': 'list',
+            'post': 'create',
+        }),
+        name='landscaper-threads'
+    ),
+    path(
+        'landscaper/threads/new/',
+        ChatThreadViewSet.as_view({
+            'post': 'start_new',
+        }),
+        name='landscaper-threads-new'
+    ),
+    path(
+        'landscaper/threads/<uuid:pk>/',
+        ChatThreadViewSet.as_view({
+            'get': 'retrieve',
+            'patch': 'partial_update',
+        }),
+        name='landscaper-thread-detail'
+    ),
+    path(
+        'landscaper/threads/<uuid:pk>/close/',
+        ChatThreadViewSet.as_view({
+            'post': 'close',
+        }),
+        name='landscaper-thread-close'
+    ),
+
+    # Thread messages
+    path(
+        'landscaper/threads/<uuid:thread_id>/messages/',
+        ThreadMessageViewSet.as_view({
+            'get': 'list',
+            'post': 'create',
+        }),
+        name='landscaper-thread-messages'
     ),
 ]

@@ -1,6 +1,13 @@
 // /app/api/projects/route.ts
+//
+// This route proxies to Django for authenticated project listing,
+// falling back to direct DB query for unauthenticated requests.
+// Django implements role-based filtering (alpha_testers see only their projects).
+//
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+
+const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
 
 type RawProjectRow = {
   project_id: number
@@ -157,10 +164,56 @@ export async function GET(request: NextRequest) {
   const propertyTypeFilter = searchParams.get('property_type')
   const includeInactiveParam = searchParams.get('include_inactive')
   const includeInactive = includeInactiveParam === null || includeInactiveParam === 'true'
+
+  // Check for Authorization header - if present, proxy to Django for user-scoped filtering
+  const authHeader = request.headers.get('Authorization')
+
+  if (authHeader) {
+    // Proxy to Django backend for authenticated, role-based filtering
+    try {
+      console.log('Proxying to Django with auth...')
+      const djangoResponse = await fetch(`${DJANGO_API_BASE}/api/projects/`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+      })
+
+      if (!djangoResponse.ok) {
+        console.error('Django returned error:', djangoResponse.status)
+        // Fall through to direct DB query on Django error
+      } else {
+        const djangoData = await djangoResponse.json()
+
+        // Django returns { results: [...] } or just [...]
+        const projects = Array.isArray(djangoData) ? djangoData : (djangoData.results || [])
+
+        // Normalize and filter
+        const normalized = projects.map((project: RawProjectRow) => ({
+          ...project,
+          project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
+          is_active: project.is_active ?? true,
+          analysis_mode: project.analysis_mode ?? 'napkin',
+        }))
+
+        const filtered = propertyTypeFilter
+          ? normalized.filter((project: RawProjectRow) => project.project_type_code === propertyTypeFilter.toUpperCase())
+          : normalized
+
+        console.log(`Django returned ${filtered.length} projects for authenticated user`)
+        return NextResponse.json(filtered)
+      }
+    } catch (djangoError) {
+      console.error('Django proxy error:', djangoError)
+      // Fall through to direct DB query
+    }
+  }
+
+  // Unauthenticated fallback: direct DB query (returns all projects)
   let rows: RawProjectRow[]
 
   try {
-    console.log('Querying landscape.tbl_project...')
+    console.log('Querying landscape.tbl_project directly (no auth)...')
     rows = await queryProjects(includeInactive)
 
     const hasCarney = rows.some(
@@ -185,7 +238,7 @@ export async function GET(request: NextRequest) {
       ? normalized.filter((project) => project.project_type_code === propertyTypeFilter.toUpperCase())
       : normalized
 
-    console.log('Found projects:', filtered)
+    console.log('Found projects:', filtered.length)
     return NextResponse.json(filtered)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)

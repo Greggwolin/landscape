@@ -480,14 +480,15 @@ export default function DmsLandscaperPanel({
   return (
     <div
       {...getRootProps()}
-      className="relative rounded-xl border border-dashed border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3"
+      className="relative border border-dashed border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3"
+      style={{ borderRadius: 'var(--cui-card-border-radius)' }}
     >
       <input {...getInputProps()} />
       {isDragActive && (
         <div
           className="absolute inset-0 flex flex-col items-center justify-center text-center z-10"
           style={{
-            borderRadius: '12px',
+            borderRadius: 'var(--cui-card-border-radius)',
             backgroundColor: isDragReject
               ? 'rgba(239, 68, 68, 0.12)'
               : isDragAccept

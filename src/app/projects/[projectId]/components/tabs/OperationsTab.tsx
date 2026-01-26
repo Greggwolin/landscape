@@ -7,16 +7,11 @@ import OpExHierarchy from '@/app/components/OpExHierarchy';
 
 // New Operations components
 import {
-  RentalIncomeSection,
-  VacancyDeductionsSection,
-  OtherIncomeSection,
-  OperatingExpensesSection,
+  OperatingIncomeCard,
   DraggableOpexSection,
-  EGISubtotalBar,
   NOITotalBar,
   SummaryBar,
   OperationsHeader,
-  ValueAddCard,
   LineItemRow
 } from '@/components/operations';
 import '@/styles/operations-tab.css';
@@ -255,7 +250,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
   if (!data || (!rentalIncome?.rows?.length && !operatingExpenses?.rows?.length)) {
     return (
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
-        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+        <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
             <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -311,22 +306,12 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         totalSF={totalSF}
         isSaving={isSaving}
         isDirty={isDirty}
+        valueAddEnabled={valueAddEnabled}
+        onValueAddToggle={handleValueAddToggle}
         onSave={saveAll}
       />
       <CCardBody className="p-0">
         <div className="ops-container">
-          {/* Value-Add Compact Card */}
-          <ValueAddCard
-            isEnabled={valueAddEnabled}
-            state={valueAddState}
-            calculated={valueAddCalculated}
-            stats={unitMixStats}
-            onToggle={handleValueAddToggle}
-            onUpdate={handleValueAddUpdate}
-            isLoading={isValueAddLoading}
-            isSaving={isValueAddSaving}
-          />
-
       {valueAddError && (
         <div
           className="rounded-lg px-4 py-2 border flex items-center gap-2"
@@ -358,62 +343,26 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         </div>
       )}
 
-      {/* Section 1: Rental Income - Read-only (from rent roll) */}
-      {rentalRows.length > 0 && (
-        <RentalIncomeSection
-          rows={rentalRows}
-          unitCount={unitCount}
-          availableScenarios={availableScenarios}
-          preferredScenario={preferredScenario}
-          valueAddEnabled={valueAddEnabled}
-          rentPremiumPct={valueAddState.rentPremiumPct}
-          hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
-          onUpdateRow={handleUpdateRow('rental_income')}
-        />
-      )}
-
-      {/* Section 2: Vacancy & Deductions */}
-      {vacancyRows.length > 0 && (
-        <VacancyDeductionsSection
-          rows={vacancyRows}
-          grossPotentialRent={grossPotentialRent}
-          availableScenarios={availableScenarios}
-          preferredScenario={preferredScenario}
-          valueAddEnabled={valueAddEnabled}
-          hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
-          onUpdateRow={handleUpdateRow('vacancy_deductions')}
-        />
-      )}
-
-      {/* Section 3: Other Income */}
-      {otherRows.length > 0 && (
-        <OtherIncomeSection
-          rows={otherRows}
-          unitCount={unitCount}
-          availableScenarios={availableScenarios}
-          preferredScenario={preferredScenario}
-          valueAddEnabled={valueAddEnabled}
-          onUpdateRow={handleUpdateRow('other_income')}
-          onToggleExpand={handleToggleExpand('other_income')}
-        />
-      )}
-
-      {/* EGI Subtotal */}
-      <EGISubtotalBar
-        asIsEGI={totals?.effective_gross_income || 0}
-        postRenoEGI={totals?.effective_gross_income || 0} // TODO: Calculate post-reno EGI
+      {/* Unified Operating Income Card (P&L style) */}
+      <OperatingIncomeCard
+        rentalRows={rentalRows}
+        vacancyRows={vacancyRows}
+        otherIncomeRows={otherRows}
+        grossPotentialRent={grossPotentialRent}
+        effectiveGrossIncome={totals?.effective_gross_income || 0}
+        totalSF={totalSF}
+        hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
         valueAddEnabled={valueAddEnabled}
-        availableScenarios={availableScenarios}
+        onUpdateVacancy={handleUpdateRow('vacancy_deductions')}
+        onUpdateOtherIncome={handleUpdateRow('other_income')}
       />
 
-      {/* Section 4: Operating Expenses - Always draggable for category reassignment */}
+      {/* Operating Expenses - Draggable for category reassignment */}
       {opexRows.length > 0 && (
         <DraggableOpexSection
           rows={opexRows}
           unitCount={unitCount}
           totalSF={totalSF}
-          availableScenarios={availableScenarios}
-          preferredScenario={preferredScenario}
           valueAddEnabled={valueAddEnabled}
           onUpdateRow={handleUpdateRow('operating_expenses')}
           onToggleExpand={handleToggleExpand('operating_expenses')}

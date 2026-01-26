@@ -13,10 +13,13 @@ import type {
   IncomeApproachAssumptions,
   NOIBasis,
   IncomeApproachUpdatePayload,
+  DCFAnalysisData,
 } from '@/types/income-approach';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const DEBOUNCE_DELAY = 300; // ms
+
+export type ValuationMethod = 'direct_cap' | 'dcf';
 
 interface UseIncomeApproachReturn {
   data: IncomeApproachData | null;
@@ -25,10 +28,17 @@ interface UseIncomeApproachReturn {
   error: string | null;
   selectedBasis: NOIBasis;
 
+  // DCF
+  dcfData: DCFAnalysisData | null;
+  isDCFLoading: boolean;
+  activeMethod: ValuationMethod;
+
   // Actions
   setSelectedBasis: (basis: NOIBasis) => void;
   updateAssumption: (field: keyof IncomeApproachAssumptions, value: number | string) => void;
   reload: () => Promise<void>;
+  setActiveMethod: (method: ValuationMethod) => void;
+  fetchDCF: () => Promise<void>;
 }
 
 export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
@@ -37,6 +47,11 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedBasis, setSelectedBasisState] = useState<NOIBasis>('f12_market');
+
+  // DCF state
+  const [dcfData, setDCFData] = useState<DCFAnalysisData | null>(null);
+  const [isDCFLoading, setIsDCFLoading] = useState(false);
+  const [activeMethod, setActiveMethodState] = useState<ValuationMethod>('direct_cap');
 
   // Pending updates for debouncing
   const pendingUpdates = useRef<IncomeApproachUpdatePayload>({});
@@ -170,7 +185,47 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     }
     pendingUpdates.current = {};
     await fetchData();
-  }, [fetchData]);
+    // Also refresh DCF if it was loaded
+    if (dcfData) {
+      await fetchDCF();
+    }
+  }, [fetchData, dcfData]);
+
+  // Fetch DCF data
+  const fetchDCF = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      setIsDCFLoading(true);
+
+      const response = await fetch(
+        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch DCF data: ${response.statusText}`);
+      }
+
+      const result: DCFAnalysisData = await response.json();
+      setDCFData(result);
+    } catch (err) {
+      console.error('Error fetching DCF data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load DCF data');
+    } finally {
+      setIsDCFLoading(false);
+    }
+  }, [projectId]);
+
+  // Set active method (and fetch DCF if switching to DCF)
+  const setActiveMethod = useCallback(
+    (method: ValuationMethod) => {
+      setActiveMethodState(method);
+      if (method === 'dcf' && !dcfData && !isDCFLoading) {
+        fetchDCF();
+      }
+    },
+    [dcfData, isDCFLoading, fetchDCF]
+  );
 
   // Initial fetch
   useEffect(() => {
@@ -186,6 +241,16 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     };
   }, []);
 
+  // Refetch DCF when assumptions change (after save completes)
+  const prevIsSaving = useRef(isSaving);
+  useEffect(() => {
+    // When save completes (isSaving goes from true to false), refetch DCF if it's loaded
+    if (prevIsSaving.current && !isSaving && dcfData) {
+      fetchDCF();
+    }
+    prevIsSaving.current = isSaving;
+  }, [isSaving, dcfData, fetchDCF]);
+
   return {
     data,
     isLoading,
@@ -195,6 +260,12 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     setSelectedBasis,
     updateAssumption,
     reload,
+    // DCF
+    dcfData,
+    isDCFLoading,
+    activeMethod,
+    setActiveMethod,
+    fetchDCF,
   };
 }
 

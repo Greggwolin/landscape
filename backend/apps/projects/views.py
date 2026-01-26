@@ -38,10 +38,39 @@ class ProjectViewSet(viewsets.ModelViewSet):
     - PUT /api/projects/:id/ - Update a project
     - PATCH /api/projects/:id/ - Partial update
     - DELETE /api/projects/:id/ - Delete a project
+
+    Project visibility:
+    - Admins see all projects
+    - Alpha testers see only their own projects (created_by = current user)
     """
 
     queryset = Project.objects.all()
     permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get_queryset(self):
+        """
+        Filter projects based on user role.
+
+        - admin role or is_staff: See all projects
+        - alpha_tester role: See only projects they created
+        - Default: See only own projects
+        """
+        user = self.request.user
+
+        # Unauthenticated users see nothing
+        if not user.is_authenticated:
+            return Project.objects.none()
+
+        # Admin users see all projects
+        if getattr(user, 'role', None) == 'admin' or user.is_staff:
+            return Project.objects.all()
+
+        # Alpha testers see only their own projects
+        if getattr(user, 'role', None) == 'alpha_tester':
+            return Project.objects.filter(created_by=user)
+
+        # Default: own projects only
+        return Project.objects.filter(created_by=user)
 
     def get_serializer_class(self):
         """Use lightweight serializer for list, full serializer for detail."""

@@ -259,7 +259,8 @@ export function IssueReporterDialog({
         />
         <Dialog.Content
           data-issue-reporter-ignore="true"
-          className="fixed inset-x-4 bottom-12 z-[200] mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl transition data-[state=open]:animate-slide-up sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
+          className="fixed inset-x-4 bottom-12 z-[200] mx-auto w-full max-w-md border border-slate-200 bg-white shadow-2xl transition data-[state=open]:animate-slide-up sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
+          style={{ borderRadius: 'var(--cui-card-border-radius)' }}
         >
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <Dialog.Title className="text-lg font-semibold text-slate-900">Report an Issue / Idea</Dialog.Title>

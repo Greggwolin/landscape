@@ -933,3 +933,367 @@ class ConfirmBatchView(APIView):
                 'success': False,
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# Thread-based Chat Views (New Thread System)
+# =============================================================================
+
+class ChatThreadViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for chat threads.
+
+    Endpoints:
+    - GET /api/landscaper/threads/?project_id=X&page_context=Y - List threads
+    - POST /api/landscaper/threads/ - Create new thread
+    - GET /api/landscaper/threads/{id}/ - Get thread with messages
+    - PATCH /api/landscaper/threads/{id}/ - Update thread title
+    - POST /api/landscaper/threads/{id}/close/ - Close thread
+    """
+
+    from .models import ChatThread
+    from .serializers import (
+        ChatThreadSerializer,
+        ChatThreadDetailSerializer,
+        ChatThreadCreateSerializer,
+        ChatThreadUpdateSerializer,
+    )
+
+    queryset = ChatThread.objects.all()
+    serializer_class = ChatThreadSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter threads based on query params."""
+        from .models import ChatThread
+
+        queryset = ChatThread.objects.all()
+
+        # Filter by project_id (required for list)
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        # Filter by page_context
+        page_context = self.request.query_params.get('page_context')
+        if page_context:
+            queryset = queryset.filter(page_context=page_context)
+
+        # Filter by active status
+        include_closed = self.request.query_params.get('include_closed', 'false').lower() == 'true'
+        if not include_closed:
+            queryset = queryset.filter(is_active=True)
+
+        return queryset.order_by('-updated_at')
+
+    def list(self, request, *args, **kwargs):
+        """GET list of threads for a project."""
+        from .serializers import ChatThreadSerializer
+
+        project_id = request.query_params.get('project_id')
+        if not project_id:
+            return Response({
+                'success': False,
+                'error': 'project_id query parameter is required',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset()
+        serializer = ChatThreadSerializer(queryset, many=True)
+
+        return Response({
+            'success': True,
+            'threads': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    def retrieve(self, request, *args, **kwargs):
+        """GET single thread with messages."""
+        from .serializers import ChatThreadDetailSerializer
+
+        instance = self.get_object()
+        serializer = ChatThreadDetailSerializer(instance)
+
+        return Response({
+            'success': True,
+            'thread': serializer.data,
+        })
+
+    def create(self, request, *args, **kwargs):
+        """POST create new thread (or get existing active one)."""
+        from .services.thread_service import ThreadService
+        from .serializers import ChatThreadSerializer
+
+        project_id = request.data.get('project_id')
+        page_context = request.data.get('page_context')
+
+        if not project_id or not page_context:
+            return Response({
+                'success': False,
+                'error': 'project_id and page_context are required',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Get or create active thread for this context
+            thread = ThreadService.get_or_create_active_thread(
+                project_id=int(project_id),
+                page_context=page_context,
+                subtab_context=request.data.get('subtab_context')
+            )
+
+            return Response({
+                'success': True,
+                'thread': ChatThreadSerializer(thread).data,
+                'created': thread.messages.count() == 0,  # True if newly created
+            }, status=status.HTTP_201_CREATED if thread.messages.count() == 0 else status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def partial_update(self, request, *args, **kwargs):
+        """PATCH update thread title."""
+        from .serializers import ChatThreadSerializer, ChatThreadUpdateSerializer
+
+        instance = self.get_object()
+        serializer = ChatThreadUpdateSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({
+            'success': True,
+            'thread': ChatThreadSerializer(instance).data,
+        })
+
+    @action(detail=True, methods=['post'])
+    def close(self, request, pk=None):
+        """POST close a thread and generate summary."""
+        from .services.thread_service import ThreadService
+        from .serializers import ChatThreadSerializer
+
+        try:
+            thread = ThreadService.close_thread(pk, generate_summary=True)
+            if thread:
+                return Response({
+                    'success': True,
+                    'thread': ChatThreadSerializer(thread).data,
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Thread not found',
+                }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='new')
+    def start_new(self, request):
+        """POST start a new thread (closes existing active thread first)."""
+        from .services.thread_service import ThreadService
+        from .serializers import ChatThreadSerializer
+
+        project_id = request.data.get('project_id')
+        page_context = request.data.get('page_context')
+
+        if not project_id or not page_context:
+            return Response({
+                'success': False,
+                'error': 'project_id and page_context are required',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            thread = ThreadService.start_new_thread(
+                project_id=int(project_id),
+                page_context=page_context,
+                subtab_context=request.data.get('subtab_context')
+            )
+
+            return Response({
+                'success': True,
+                'thread': ChatThreadSerializer(thread).data,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ThreadMessageViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for thread messages.
+
+    Endpoints:
+    - GET /api/landscaper/threads/{thread_id}/messages/ - List messages
+    - POST /api/landscaper/threads/{thread_id}/messages/ - Send message
+    """
+
+    from .models import ThreadMessage
+    from .serializers import ThreadMessageSerializer, ThreadMessageCreateSerializer
+
+    queryset = ThreadMessage.objects.all()
+    serializer_class = ThreadMessageSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """Filter messages by thread_id from URL."""
+        from .models import ThreadMessage
+
+        thread_id = self.kwargs.get('thread_id')
+        if thread_id:
+            return ThreadMessage.objects.filter(
+                thread_id=thread_id
+            ).order_by('created_at')
+        return ThreadMessage.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        """GET messages for a thread."""
+        from .serializers import ThreadMessageSerializer
+
+        queryset = self.get_queryset()
+        serializer = ThreadMessageSerializer(queryset, many=True)
+
+        return Response({
+            'success': True,
+            'messages': serializer.data,
+            'count': len(serializer.data),
+        })
+
+    def create(self, request, *args, **kwargs):
+        """
+        POST send a message and get AI response.
+
+        Request body:
+        {
+            "content": "User message text"
+        }
+
+        Response:
+        {
+            "success": true,
+            "user_message": {...},
+            "assistant_message": {...}
+        }
+        """
+        from .models import ChatThread, ThreadMessage
+        from .serializers import ThreadMessageSerializer
+        from .ai_handler import get_landscaper_response
+        from .tool_executor import execute_tool
+        from .services.thread_service import ThreadService
+        from .services.embedding_service import EmbeddingService
+        from apps.projects.models import Project
+
+        thread_id = self.kwargs.get('thread_id')
+
+        try:
+            # Get thread
+            thread = ChatThread.objects.get(id=thread_id)
+
+            # Create user message
+            user_message = ThreadMessage.objects.create(
+                thread=thread,
+                role='user',
+                content=request.data.get('content', ''),
+            )
+
+            # Get message history for context
+            messages = list(thread.messages.order_by('created_at')[:50])
+            message_history = [
+                {'role': msg.role, 'content': msg.content}
+                for msg in messages
+            ]
+
+            # Get project context
+            project = Project.objects.get(project_id=thread.project_id)
+            project_context = {
+                'project_id': project.project_id,
+                'project_name': project.project_name,
+                'project_type': project.project_type or 'Unknown',
+                'project_details': {
+                    'address': getattr(project, 'address', None),
+                    'city': getattr(project, 'city', None),
+                    'state': getattr(project, 'state', None),
+                    'county': getattr(project, 'county', None),
+                    'zip_code': getattr(project, 'zip_code', None),
+                    'total_acres': getattr(project, 'total_acres', None),
+                    'total_lots': getattr(project, 'total_lots', None),
+                }
+            }
+
+            # Get past conversation context for RAG
+            chat_context = EmbeddingService.get_thread_context_for_rag(
+                query=request.data.get('content', ''),
+                project_id=thread.project_id,
+                current_thread_id=thread.id,
+                max_results=3
+            )
+
+            # Create tool executor bound to this project
+            def tool_executor_fn(tool_name, tool_input, project_id=None):
+                return execute_tool(tool_name, tool_input, project_id or project.project_id)
+
+            # Generate AI response
+            ai_response = get_landscaper_response(
+                message_history,
+                project_context,
+                tool_executor=tool_executor_fn,
+                additional_context=chat_context if chat_context else None
+            )
+
+            # Build metadata
+            assistant_metadata = ai_response.get('metadata', {})
+            if ai_response.get('tool_calls'):
+                assistant_metadata['tool_calls'] = ai_response['tool_calls']
+            if ai_response.get('field_updates'):
+                assistant_metadata['field_updates'] = ai_response['field_updates']
+
+            # Create assistant message
+            assistant_message = ThreadMessage.objects.create(
+                thread=thread,
+                role='assistant',
+                content=ai_response['content'],
+                metadata=assistant_metadata,
+            )
+
+            # Embed messages for future RAG (async would be better, but sync for now)
+            try:
+                EmbeddingService.embed_message(user_message)
+                EmbeddingService.embed_message(assistant_message)
+            except Exception as e:
+                logger.warning(f"Failed to embed messages: {e}")
+
+            # Generate title after first exchange if needed
+            if thread.messages.count() == 2 and not thread.title:
+                try:
+                    ThreadService.maybe_generate_title_async(thread.id)
+                except Exception as e:
+                    logger.warning(f"Failed to generate title: {e}")
+
+            # Return response
+            response_data = {
+                'success': True,
+                'user_message': ThreadMessageSerializer(user_message).data,
+                'assistant_message': ThreadMessageSerializer(assistant_message).data,
+            }
+
+            if ai_response.get('field_updates'):
+                response_data['field_updates'] = ai_response['field_updates']
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except ChatThread.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Thread not found',
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(f"Error in thread message creation: {e}")
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

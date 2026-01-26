@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ChatMessage } from '@/hooks/useLandscaper';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -25,17 +26,23 @@ export function ChatMessageBubble({
     [];
   const hasProposals = proposals.length > 0;
 
+  // Process assistant responses to remove markdown and thinking narration
+  const displayContent = useMemo(() => {
+    if (isUser) return message.content;
+    return processLandscaperResponse(message.content);
+  }, [message.content, isUser]);
+
   return (
     <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
       {/* Main message bubble */}
       <div
-        className="max-w-[80%] rounded-2xl px-4 py-3"
+        className={`rounded-2xl px-4 py-3 ${isUser ? 'max-w-[80%]' : 'max-w-full'}`}
         style={{
           backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
           color: isUser ? 'white' : 'var(--cui-body-color)',
         }}
       >
-        <div className="whitespace-pre-wrap">{message.content}</div>
+        <div className="whitespace-pre-wrap">{displayContent}</div>
 
         {!isUser && message.metadata?.sources && message.metadata.sources.length > 0 && (
           <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>

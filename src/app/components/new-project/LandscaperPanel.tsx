@@ -469,9 +469,12 @@ const LandscaperPanel = ({
   }
 
   return (
-    <div className={`flex h-full flex-col rounded-xl border ${
-      isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'
-    }`}>
+    <div
+      className={`flex h-full flex-col border ${
+        isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'
+      }`}
+      style={{ borderRadius: 'var(--cui-card-border-radius)' }}
+    >
       {/* Header */}
       <div className={`flex items-center gap-2 border-b px-4 py-3 ${
         isDark ? 'border-slate-700' : 'border-slate-200'

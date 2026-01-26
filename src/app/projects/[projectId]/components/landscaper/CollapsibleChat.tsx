@@ -38,9 +38,10 @@ export function CollapsibleChat({
 
   return (
     <div
-      className="h-full flex flex-col rounded-xl shadow-lg overflow-hidden"
+      className="h-full flex flex-col shadow-lg overflow-hidden"
       style={{
         backgroundColor: 'var(--surface-card)',
+        borderRadius: 'var(--cui-card-border-radius)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         flex: 1,
         minWidth: '280px',

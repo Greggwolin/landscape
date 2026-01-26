@@ -23,6 +23,7 @@ export interface MarkerData {
   id: string;
   coordinates: [number, number];
   color?: string;
+  stroke?: string; // Optional stroke color for outline
   label?: string;
   popup?: string; // HTML content for popup
   tooltip?: string; // alias for popup
@@ -370,8 +371,11 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
             // Regular pushpin for comparables
             el.style.width = '30px';
             el.style.height = '30px';
+            const fillColor = m.color || '#2d8cf0';
+            const strokeColor = m.stroke || 'none';
+            const strokeWidth = m.stroke ? '1.5' : '0';
             el.innerHTML = `
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="${m.color || '#2d8cf0'}" xmlns="http://www.w3.org/2000/svg">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
               </svg>
             `;

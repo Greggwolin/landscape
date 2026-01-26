@@ -163,8 +163,7 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
     // ========================================
     // Position 3: Budget (Land) / Operations (Income)
     // Land: budget, schedule, sales, draws
-    // Income: rent-roll, expenses (OperationsTab has working content)
-    // Note: NOI removed - not in main branch, NOI is shown at bottom of OperationsTab
+    // Income: Single unified page (no subtabs) - shows P&L view with all sections
     // ========================================
     {
       id: isIncome ? 'operations' : 'budget',
@@ -173,10 +172,7 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
         : { primary: 'Development', secondary: 'Sales' },
       color: TILE_COLORS.devOps,
       subTabs: isIncome
-        ? [
-            { id: 'rent-roll', label: 'Rent Roll' },
-            { id: 'expenses', label: 'Expenses' },
-          ]
+        ? [] // Single page - no subtabs
         : [
             { id: 'budget', label: 'Budget' },
             { id: 'schedule', label: 'Schedule' },

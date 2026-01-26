@@ -39,7 +39,7 @@ export function AgentModal({ isOpen, onClose, title, subtitle, children }: Agent
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
     >
       {/* Modal Container - Full screen with padding */}
-      <div className="flex-1 flex flex-col m-4 rounded-xl overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col m-4 overflow-hidden bg-background" style={{ borderRadius: 'var(--cui-card-border-radius)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>

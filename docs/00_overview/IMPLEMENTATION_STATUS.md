@@ -9,7 +9,9 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Location Intelligence System (January 26, 2026)**
+### 🆕 **Latest Update: Multi-Feature Release (January 26, 2026)**
+
+**A. Location Intelligence System**
 
 Implemented comprehensive location intelligence with Census demographics and map visualization:
 
@@ -19,6 +21,34 @@ Implemented comprehensive location intelligence with Census demographics and map
 - ✅ **React Map Flyout** - MapLibre GL with Turf.js ring visualization, layer toggles, user points
 - ✅ **Management Command** - `load_block_groups --states=06,04` for data ingestion
 - 📁 **Location:** See `docs/09_session_notes/2026-01-26-location-intelligence-implementation.md`
+
+**B. Landscaper Thread System**
+
+Thread-based chat organization for Landscaper AI conversations:
+
+- ✅ **Thread Models** - ChatThread, ThreadMessage, ChatEmbedding with page context scoping
+- ✅ **Auto-Generated Titles** - Claude Haiku generates 3-5 word titles from conversations
+- ✅ **RAG Summaries** - Thread summaries for cross-thread retrieval
+- ✅ **Thread API** - CRUD endpoints for threads and messages
+- 📁 **Location:** See `docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md`
+
+**C. Auth Middleware & Route Protection**
+
+Cookie-based authentication for Next.js middleware:
+
+- ✅ **Middleware Protection** - Routes redirect to login if not authenticated
+- ✅ **Cookie Sync** - `auth_token_exists` cookie synced with localStorage JWT
+- ✅ **Public Routes** - Login, register, API, static assets excluded
+- 📁 **Location:** See `docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md`
+
+**D. DCF Valuation Implementation**
+
+Discounted Cash Flow analysis added to Income Approach:
+
+- ✅ **DCF Service** - 10-year cash flow projection with exit value
+- ✅ **DCF View** - New DCFView component with IRR, equity multiple
+- ✅ **Method Toggle** - Switch between Direct Cap and DCF in Value Tiles
+- 📁 **Location:** See `docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md`
 
 ### Previous Update: Operations & Income Approach Data Flow Fix (January 17, 2026)
 

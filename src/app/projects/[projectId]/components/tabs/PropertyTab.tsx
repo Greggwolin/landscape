@@ -6,6 +6,9 @@ import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { PhysicalDescription } from '../property';
 import { formatNumber, formatCurrency, formatDecimal } from '@/utils/formatNumber';
 import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-react';
+import { CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@coreui/react';
+import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
+import { useCallback, useRef } from 'react';
 
 interface Project {
   project_id: number;
@@ -327,6 +330,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [showFieldChooser, setShowFieldChooser] = useState(false);
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [hasCustomizedColumns, setHasCustomizedColumns] = useState(false);
+  const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
+  const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
+  const propertyListRef = useRef<HTMLDivElement>(null);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -504,6 +510,29 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const collapseAll = () => {
     setExpandedProperties(new Set());
   };
+
+  // Handle click from chart - scroll to property in listing
+  const handlePropertyClick = useCallback((propertyName: string) => {
+    // First expand the property
+    setExpandedProperties(prev => new Set(prev).add(propertyName));
+
+    // Set highlight effect
+    setHighlightedProperty(propertyName);
+    setTimeout(() => setHighlightedProperty(null), 2000);
+
+    // Scroll to property after a brief delay for DOM update
+    setTimeout(() => {
+      const element = document.getElementById(`property-${propertyName.replace(/\s+/g, '-')}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }, []);
+
+  // Handle color assignments from chart
+  const handleColorsAssigned = useCallback((colors: PropertyColorMap) => {
+    setPropertyColors(colors);
+  }, []);
 
   // Load real data from database
   useEffect(() => {
@@ -907,7 +936,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
     return (
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
-        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+        <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
             <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -942,7 +971,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   if (units.length === 0 && floorPlans.length === 0) {
     return (
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
-        <div className="rounded-xl shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+        <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
             <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -973,156 +1002,148 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // Render content based on activeTab (controlled by folder tabs)
   const renderDetailsContent = () => (
     <div className="space-y-4">
-      {/* Physical Description - Property Attributes Panel */}
-      <PhysicalDescription projectId={projectId} />
-
-      {/* Floor Plan Matrix - Full Width */}
-      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-        <div className="border-b" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Floor Plan Matrix</h3>
-              <div className="flex items-center gap-2 px-2 py-1 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
-                <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                </svg>
-                <span className="text-blue-300 font-medium">Aggregates from Units</span>
-              </div>
+      {/* Side-by-side: Physical Description (40%) + Floor Plan Matrix (60%) */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Left Column - Physical Description */}
+        <div className="w-full lg:w-2/5 flex-shrink-0">
+          <div
+            className="shadow-lg h-full overflow-hidden"
+            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+          >
+            <div
+              className="border-b px-3 py-2"
+              style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}
+            >
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                Physical Description
+              </h3>
             </div>
-            <div className="flex items-center gap-4 text-xs">
-              <div className="text-gray-400">
-                <span className="text-gray-500">Total Units:</span> <span className="text-white font-semibold">{formatNumber(totalUnits)}</span>
-              </div>
-              <div className="text-gray-400">
-                <span className="text-gray-500">Avg Current:</span> <span className="text-white font-semibold">{formatCurrency(avgCurrentRent)}</span>
-              </div>
-              <div className="text-gray-400">
-                <span className="text-gray-500">Avg Market:</span> <span className="text-white font-semibold">{formatCurrency(avgMarketRent)}</span>
-              </div>
+            <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
+              <PhysicalDescription projectId={projectId} compact />
             </div>
           </div>
         </div>
-        <div className="p-4" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-          <div>
+
+        {/* Right Column - Floor Plan Matrix */}
+        <div className="w-full lg:w-3/5">
+          <div
+            className="shadow-lg overflow-hidden"
+            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+          >
+            <div
+              className="border-b px-3 py-2"
+              style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                    Floor Plan Matrix
+                  </h3>
+                  <div className="flex items-center gap-2 px-2 py-0.5 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
+                    <span className="text-blue-300 font-medium">Aggregates from Units</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>
+                    Total: <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>{formatNumber(totalUnits)}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="p-3">
               <table className="w-full text-sm">
                 <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
                   <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Plan</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Units</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Current</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Market</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Variance</th>
-                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
+                    <th className="text-left px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Plan</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Units</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Current</th>
+                    <th className="text-center px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {floorPlansWithAI.map((plan, index) => {
                     const editing = isPlanEditing(plan.id);
                     const draft = editing ? planEditDraft! : plan;
-                    const variance = draft.marketRent - draft.currentRent;
-                    const variancePct = draft.currentRent > 0 ? ((variance / draft.currentRent) * 100).toFixed(1) : '0.0';
 
                     return (
                       <tr key={plan.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2">
                           {editing ? (
                             <input
                               type="text"
-                              className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white"
+                              className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
                               value={draft.name}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, name: e.target.value} : null)}
                             />
                           ) : (
-                            <span className="text-white font-semibold">{plan.name}</span>
+                            <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>{plan.name}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <input
                               type="number"
-                              className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                              className="w-12 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
                               value={draft.bedrooms}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, bedrooms: Number(e.target.value)} : null)}
                             />
                           ) : (
-                            <span className="text-gray-300">{formatNumber(plan.bedrooms)}</span>
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.bedrooms)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <input
                               type="number"
                               step="0.5"
-                              className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                              className="w-12 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
                               value={draft.bathrooms}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, bathrooms: Number(e.target.value)} : null)}
                             />
                           ) : (
-                            <span className="text-gray-300">{formatNumber(plan.bathrooms)}</span>
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.bathrooms)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <input
                               type="number"
-                              className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                              className="w-16 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
                               value={draft.sqft}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, sqft: Number(e.target.value)} : null)}
                             />
                           ) : (
-                            <span className="text-gray-300">{formatNumber(plan.sqft)}</span>
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.sqft)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <input
                               type="number"
-                              className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                              className="w-14 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
                               value={draft.unitCount}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, unitCount: Number(e.target.value)} : null)}
                             />
                           ) : (
-                            <span className="text-gray-300">{formatNumber(plan.unitCount)}</span>
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.unitCount)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <input
                               type="number"
-                              className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                              className="w-20 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
                               value={draft.currentRent}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, currentRent: Number(e.target.value)} : null)}
                             />
                           ) : (
-                            <span className="text-gray-300">{formatCurrency(plan.currentRent)}</span>
+                            <span style={{ color: 'var(--cui-body-color)', fontWeight: 500 }}>{formatCurrency(plan.currentRent)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-center">
-                          {editing ? (
-                            <input
-                              type="number"
-                              className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
-                              value={draft.marketRent}
-                              onChange={(e) => setPlanEditDraft(d => d ? {...d, marketRent: Number(e.target.value)} : null)}
-                            />
-                          ) : (
-                            <span className="text-white font-medium">
-                              {formatCurrency(plan.marketRent)}
-                              {getAIIndicator(plan.marketRent, plan.aiEstimate, plan.compCount || 0, plan.matchType || 'none')}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
-                            variance > 0 ? 'bg-green-900 text-green-300' : variance < 0 ? 'bg-red-900 text-red-300' : 'bg-gray-700 text-gray-300'
-                          }`}>
-                            {variance >= 0 ? '+' : '-'}${Math.abs(variance).toLocaleString()} ({variancePct}%)
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           {editing ? (
                             <div className="flex items-center gap-1 justify-center">
                               <button
@@ -1140,7 +1161,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                             </div>
                           ) : (
                             <button
-                              className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                              className="px-2 py-1 text-xs rounded hover:bg-gray-600"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
                               onClick={() => handlePlanEditStart(plan)}
                             >
                               Edit
@@ -1153,32 +1175,34 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Landscaper Analysis Box */}
-            <div className="border-t pt-4" style={{ borderColor: 'var(--cui-border-color)' }}>
-              <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
-                      <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {comparables.length > 0 ? `Based on ${comparables.length} comp units from ${comparablesByProperty.length} properties` : ''}
-                      </span>
-                    </div>
-                    <LandscaperInsights
-                      floorPlans={floorPlansWithAI}
-                      comparables={comparables}
-                      comparablesByProperty={comparablesByProperty}
-                    />
-                  </div>
-                </div>
-              </div>
+      {/* Landscaper Analysis - Full Width Below */}
+      <div
+        className="rounded-lg p-4"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
+              </span>
             </div>
+            <LandscaperInsights
+              floorPlans={floorPlansWithAI}
+              comparables={comparables}
+              comparablesByProperty={comparablesByProperty}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1186,8 +1210,22 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
   const renderMarketContent = () => (
     <div className="space-y-4">
+      {/* Competitive Market Rentals Chart */}
+      {comparables.length > 0 && (
+        <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: 'var(--cui-card-bg)', borderRadius: '8px' }}>
+          <h4 style={{ color: 'var(--cui-body-color)', marginBottom: '12px' }}>Competitive Market Rentals</h4>
+          <CompetitiveMarketCharts
+            comparables={comparables}
+            floorPlans={floorPlans}
+            subjectPropertyName={project.project_name}
+            onPropertyClick={handlePropertyClick}
+            onColorsAssigned={handleColorsAssigned}
+          />
+        </div>
+      )}
+
       {/* Comparable Rentals with Map */}
-      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
             <div className="flex items-center gap-3">
               <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
@@ -1218,6 +1256,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
                 tabId="property"
                 rentalComparables={comparables}
+                comparableColors={propertyColors}
               />
             </div>
 
@@ -1231,8 +1270,18 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               ) : (
                 comparablesByProperty.map((property, propIdx) => {
                   const isExpanded = expandedProperties.has(property.propertyName);
+                  const isHighlighted = highlightedProperty === property.propertyName;
+                  const propertyColor = propertyColors[property.propertyName];
                   return (
-                    <div key={property.propertyName} className="border border-gray-700 rounded-lg overflow-hidden">
+                    <div
+                      key={property.propertyName}
+                      id={`property-${property.propertyName.replace(/\s+/g, '-')}`}
+                      className="border rounded-lg overflow-hidden transition-all duration-300"
+                      style={{
+                        borderColor: isHighlighted ? propertyColor || '#3b82f6' : '#374151',
+                        boxShadow: isHighlighted ? `0 0 0 2px ${propertyColor || '#3b82f6'}40` : 'none',
+                      }}
+                    >
                       {/* Property Header - Clickable */}
                       <button
                         onClick={() => toggleProperty(property.propertyName)}
@@ -1244,6 +1293,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                             <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                           ) : (
                             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          )}
+                          {/* Color dot */}
+                          {propertyColor && (
+                            <span
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: propertyColor }}
+                            />
                           )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -1331,7 +1387,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const renderRentRollContent = () => (
     <div className="space-y-4">
       {/* Detailed Rent Roll Table */}
-      <div className="rounded-xl shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">

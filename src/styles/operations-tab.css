@@ -35,6 +35,48 @@
   gap: 12px;
 }
 
+.ops-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.va-toggle-compact {
+  position: relative;
+  width: 2rem;
+  height: 1.125rem;
+  background: var(--cui-border-color);
+  border: none;
+  border-radius: 0.5625rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.va-toggle-compact.on {
+  background: var(--cui-primary);
+}
+
+.va-toggle-compact .va-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.875rem;
+  height: 0.875rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.va-toggle-compact.on .va-toggle-slider {
+  transform: translateX(0.875rem);
+}
+
+.va-toggle-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cui-body-color);
+}
+
 .ops-save-button {
   padding: 0.375rem 0.875rem;
   background: var(--cui-primary);
@@ -136,6 +178,74 @@
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
+.ops-income-card {
+  width: var(--ops-grid-total, fit-content);
+}
+
+.ops-income-card .ops-table {
+  width: auto;
+  table-layout: auto;
+}
+
+.ops-income-card .ops-table.ops-grid {
+  table-layout: fixed;
+}
+
+/* Remove tree connectors from income card child rows */
+.ops-income-card .ops-child-row td:first-child::before {
+  content: none;
+}
+
+.ops-income-card .ops-child-row td:first-child {
+  padding-left: 1rem;
+}
+
+/* Operating Expenses Card - compact style matching income card */
+.ops-expense-card {
+  width: var(--ops-grid-total, fit-content);
+}
+
+.ops-expense-card .ops-table {
+  width: auto;
+  table-layout: auto;
+}
+
+.ops-expense-card .ops-table.ops-grid {
+  table-layout: fixed;
+}
+
+/* Remove tree connectors from expense card child rows */
+.ops-expense-card .ops-child-row td:first-child::before {
+  content: none;
+}
+
+.ops-expense-card .ops-child-row td:first-child {
+  padding-left: 1rem;
+}
+
+/* Subtle drag handle styling */
+.ops-expense-card .draggable-opex-row {
+  cursor: grab;
+}
+
+.ops-expense-card .draggable-opex-row:active {
+  cursor: grabbing;
+}
+
+.ops-expense-card .draggable-opex-row.dragging {
+  opacity: 0.5;
+  background: var(--cui-tertiary-bg);
+}
+
+/* Drop target highlighting */
+.ops-expense-card .droppable-parent-row.drop-target-active {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.ops-expense-card .droppable-parent-row.drop-target-available {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
 .ops-section-header {
   display: flex;
   justify-content: space-between;
@@ -150,6 +260,15 @@
   font-weight: 600;
   color: var(--cui-body-color);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-section-subtitle {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--cui-secondary-color);
 }
 
 .ops-section-controls {
@@ -243,6 +362,42 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem; /* 14px - matches text-sm */
+}
+
+/* Shared column widths for aligned income/expense tables */
+.ops-table.ops-grid {
+  table-layout: fixed;
+  width: auto;
+}
+
+.ops-table.ops-grid {
+  --ops-col-label: 200px;
+  --ops-col-units: 60px;
+  --ops-col-current: 85px;
+  --ops-col-annual: 110px;
+  --ops-col-psf: 60px;
+  --ops-col-loss: 95px;
+  --ops-col-post: 95px;
+  --ops-col-reno: 110px;
+  --ops-grid-total: calc(
+    var(--ops-col-label) +
+    var(--ops-col-units) +
+    var(--ops-col-current) +
+    var(--ops-col-annual) +
+    var(--ops-col-psf) +
+    var(--ops-col-loss) +
+    var(--ops-col-post) +
+    var(--ops-col-reno)
+  );
+}
+
+.ops-table.ops-grid {
+  width: var(--ops-grid-total);
+}
+
+.ops-table.ops-grid th:not(:first-child),
+.ops-table.ops-grid td:not(:first-child) {
+  white-space: nowrap;
 }
 
 /* Column Headers */
@@ -402,10 +557,12 @@
 .ops-input {
   display: inline-flex;
   justify-content: flex-end;
-  width: 6rem;
-  padding: 0.25rem 0.5rem;
+  align-items: center;
+  width: 5rem;
+  height: 1.625rem;
+  padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-align: right;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -432,6 +589,55 @@
 /* Calculated (Display Only) */
 .ops-calc {
   color: var(--cui-secondary-color);
+}
+
+.ops-loss-to-lease {
+  color: #d97706; /* amber-600 - works in both light and dark mode */
+  font-weight: normal;
+}
+
+/* Compact input for vacancy/credit loss rows */
+.ops-input-compact {
+  height: 1.5rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.8125rem;
+}
+
+/* Align vacancy input boxes to the left edge of the column */
+.ops-input-cell {
+  padding-left: 0;
+  padding-right: 0.25rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.ops-input-cell .ops-input {
+  width: 100%;
+  justify-content: flex-end;
+  text-align: right;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  margin-left: 0;
+}
+
+/* Vacancy values - red in light mode, standard color in dark mode */
+.ops-vacancy-value {
+  color: var(--cui-body-color);
+}
+
+@media (prefers-color-scheme: light) {
+  .ops-vacancy-value {
+    color: var(--cui-danger);
+  }
+}
+
+/* Also handle CoreUI's dark mode class */
+[data-coreui-theme="dark"] .ops-vacancy-value {
+  color: var(--cui-body-color);
+}
+
+[data-coreui-theme="light"] .ops-vacancy-value {
+  color: var(--cui-danger);
 }
 
 /* =============================================================================

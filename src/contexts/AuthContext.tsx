@@ -173,16 +173,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Try refresh token
             const refreshed = await refreshToken();
             if (!refreshed) {
-              // Clear invalid tokens
+              // Clear invalid tokens and cookie
               localStorage.removeItem('auth_tokens');
+              document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
               setTokens(null);
               setUser(null);
+            } else {
+              // Refresh succeeded, ensure cookie is set
+              document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';
             }
+          } else {
+            // Auth restored successfully, ensure cookie is set
+            document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';
           }
         } catch (error) {
           console.error('Error initializing auth:', error);
           localStorage.removeItem('auth_tokens');
+          document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
         }
+      } else {
+        // No stored tokens, ensure cookie is cleared
+        document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
       }
       setIsLoading(false);
     };
@@ -209,6 +220,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user);
     setTokens(result.tokens);
     localStorage.setItem('auth_tokens', JSON.stringify(result.tokens));
+    // Set cookie for middleware auth check
+    document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';
     router.push('/dashboard');
   };
 
@@ -238,6 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user);
     setTokens(result.tokens);
     localStorage.setItem('auth_tokens', JSON.stringify(result.tokens));
+    // Set cookie for middleware auth check
+    document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';
     router.push('/dashboard');
   };
 
@@ -254,8 +269,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTokens(null);
     localStorage.removeItem('auth_tokens');
-    router.push('/login');
-  }, [tokens, authFetch, router]);
+    // Clear auth cookie for middleware - use multiple methods to ensure it's cleared
+    document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
+    document.cookie = 'auth_token_exists=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+    // Force navigation to login
+    window.location.href = '/login';
+  }, [tokens, authFetch]);
 
   // Update profile
   const updateProfile = async (data: Partial<User>) => {

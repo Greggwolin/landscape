@@ -24,14 +24,19 @@ export interface RentalComparable {
   asking_rent: number;
 }
 
+export interface ComparableColorMap {
+  [propertyName: string]: string;
+}
+
 export interface ProjectTabMapProps {
   projectId: string;
   styleUrl: string;
   tabId?: string; // Optional identifier for which tab this map is on (e.g., 'project', 'property')
   rentalComparables?: RentalComparable[]; // Optional rental comparables to display as markers
+  comparableColors?: ComparableColorMap; // Optional color mapping for comparable markers
 }
 
-export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [] }: ProjectTabMapProps) {
+export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {} }: ProjectTabMapProps) {
   const { data, error, isLoading, mutate } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
   const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
@@ -78,16 +83,18 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
       base.push({ id: 'pending', coordinates: pendingLocation, color: '#f97316', label: 'New Location' });
     }
 
-    // Add rental comparable markers
+    // Add rental comparable markers with property-specific colors
     rentalComparables.forEach((comp, index) => {
       if (comp.latitude && comp.longitude) {
+        const markerColor = comparableColors[comp.property_name] || '#10b981';
         base.push({
           id: `comp-${comp.comparable_id}`,
           coordinates: [comp.longitude, comp.latitude] as [number, number],
-          color: '#10b981', // Green for comparables
+          color: markerColor,
+          stroke: '#000000', // Black outline
           label: `${index + 1}`,
           popup: `<div style="padding: 12px; min-width: 180px;">
-            <div style="font-weight: 600; color: #10b981; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
+            <div style="font-weight: 600; color: ${markerColor}; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
             ${comp.address ? `<div style="font-size: 0.85em; color: #9ca3af; margin-bottom: 2px;">${comp.address}</div>` : ''}
             <div style="font-size: 0.85em; color: #d1d5db;">${comp.bedrooms}BR/${comp.bathrooms}BA · ${comp.avg_sqft?.toLocaleString()} SF</div>
             <div style="font-size: 0.95em; font-weight: 600; color: #f9fafb; margin-top: 6px;">$${Math.round(comp.asking_rent || 0).toLocaleString()}/mo</div>
@@ -99,7 +106,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
 
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables]);
+  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables, comparableColors]);
 
   const lines = useMemo(
     () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),

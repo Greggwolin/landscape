@@ -3,7 +3,111 @@ Serializers for Landscaper AI models.
 """
 
 from rest_framework import serializers
-from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
+from .models import (
+    ChatMessage,
+    LandscaperAdvice,
+    ActivityItem,
+    ExtractionMapping,
+    ExtractionLog,
+    ChatThread,
+    ThreadMessage,
+    ChatEmbedding,
+)
+
+
+# =============================================================================
+# Thread-based Chat Serializers
+# =============================================================================
+
+class ThreadMessageSerializer(serializers.ModelSerializer):
+    """Serializer for ThreadMessage model."""
+
+    messageId = serializers.UUIDField(source='id', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = ThreadMessage
+        fields = [
+            'messageId',
+            'role',
+            'content',
+            'metadata',
+            'createdAt',
+        ]
+        read_only_fields = ['messageId', 'createdAt']
+
+
+class ThreadMessageCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating thread messages."""
+
+    class Meta:
+        model = ThreadMessage
+        fields = ['thread', 'role', 'content', 'metadata']
+
+
+class ChatThreadSerializer(serializers.ModelSerializer):
+    """Serializer for ChatThread model."""
+
+    threadId = serializers.UUIDField(source='id', read_only=True)
+    projectId = serializers.IntegerField(source='project_id', read_only=True)
+    pageContext = serializers.CharField(source='page_context')
+    subtabContext = serializers.CharField(source='subtab_context', allow_null=True, required=False)
+    isActive = serializers.BooleanField(source='is_active', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    closedAt = serializers.DateTimeField(source='closed_at', read_only=True, allow_null=True)
+    messageCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatThread
+        fields = [
+            'threadId',
+            'projectId',
+            'pageContext',
+            'subtabContext',
+            'title',
+            'summary',
+            'isActive',
+            'createdAt',
+            'updatedAt',
+            'closedAt',
+            'messageCount',
+        ]
+        read_only_fields = ['threadId', 'projectId', 'isActive', 'createdAt', 'updatedAt', 'closedAt', 'messageCount']
+
+    def get_messageCount(self, obj):
+        """Return the number of messages in this thread."""
+        return obj.messages.count()
+
+
+class ChatThreadDetailSerializer(ChatThreadSerializer):
+    """Serializer for ChatThread with messages included."""
+
+    messages = ThreadMessageSerializer(many=True, read_only=True)
+
+    class Meta(ChatThreadSerializer.Meta):
+        fields = ChatThreadSerializer.Meta.fields + ['messages']
+
+
+class ChatThreadCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating chat threads."""
+
+    class Meta:
+        model = ChatThread
+        fields = ['project', 'page_context', 'subtab_context', 'title']
+
+
+class ChatThreadUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating chat thread (title only for now)."""
+
+    class Meta:
+        model = ChatThread
+        fields = ['title']
+
+
+# =============================================================================
+# Legacy Chat Serializers (Preserved for backward compatibility)
+# =============================================================================
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):

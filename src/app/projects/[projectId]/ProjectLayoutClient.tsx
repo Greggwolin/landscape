@@ -14,6 +14,7 @@
 'use client';
 
 import React, { Suspense } from 'react';
+import { CCard, CCardBody } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
 import { ProjectSelectorCard } from '@/components/navigation/ProjectSelectorCard';
@@ -59,25 +60,23 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             maxWidth: '450px',
           }}
         >
-          <div
-            style={{
-              backgroundColor: 'var(--cui-card-bg)',
-              borderRadius: '12px',
-              padding: '0.75rem 1rem',
-              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-              marginBottom: '0.75rem',
-            }}
-          >
-            <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
-          </div>
-          <div className="folder-content-placeholder" style={{ flex: 1 }}>
-            <p>Loading...</p>
-          </div>
+          <CCard className="shadow-lg" style={{ marginBottom: '0.75rem' }}>
+            <CCardBody style={{ padding: '0.75rem 1rem' }}>
+              <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
+            </CCardBody>
+          </CCard>
+          <CCard className="shadow-lg" style={{ flex: 1 }}>
+            <CCardBody className="folder-content-placeholder">
+              <p>Loading...</p>
+            </CCardBody>
+          </CCard>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="folder-content-placeholder">
-            <p>Loading project...</p>
-          </div>
+          <CCard className="shadow-lg">
+            <CCardBody className="folder-content-placeholder">
+              <p>Loading project...</p>
+            </CCardBody>
+          </CCard>
         </div>
       </div>
     );
@@ -106,7 +105,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       </div>
 
       {/* Right Content - Folder Tabs + Content (70%) */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <CCard className="flex-1 min-w-0 flex flex-col shadow-lg overflow-hidden">
         {/* Folder Tabs Navigation - replaces the colored tile bar */}
         <FolderTabs
           folders={folderConfig.folders}
@@ -119,7 +118,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         <div className="studio-folder-content">
           {children}
         </div>
-      </div>
+      </CCard>
     </div>
   );
 }
@@ -137,25 +136,23 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
               maxWidth: '450px',
             }}
           >
-            <div
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderRadius: '12px',
-                padding: '0.75rem 1rem',
-                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-                marginBottom: '0.75rem',
-              }}
-            >
-              <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
-            </div>
-            <div className="folder-content-placeholder" style={{ flex: 1 }}>
-              <p>Loading...</p>
-            </div>
+            <CCard className="shadow-lg" style={{ marginBottom: '0.75rem' }}>
+              <CCardBody style={{ padding: '0.75rem 1rem' }}>
+                <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
+              </CCardBody>
+            </CCard>
+            <CCard className="shadow-lg" style={{ flex: 1 }}>
+              <CCardBody className="folder-content-placeholder">
+                <p>Loading...</p>
+              </CCardBody>
+            </CCard>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="folder-content-placeholder">
-              <p>Loading...</p>
-            </div>
+            <CCard className="shadow-lg">
+              <CCardBody className="folder-content-placeholder">
+                <p>Loading...</p>
+              </CCardBody>
+            </CCard>
           </div>
         </div>
       }

@@ -6,12 +6,18 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { SectionCard } from './SectionCard';
 import { DetailSummaryToggle, ViewMode } from './DetailSummaryToggle';
 import { InputCell } from './InputCell';
-import { EvidenceCell } from './EvidenceCell';
-import { GrowthBadge, FeeBadge } from './GrowthBadge';
 import { AddButton } from './AddButton';
 import { LineItemRow, formatCurrency, formatPerSF } from './types';
 
 const DRAG_TYPE = 'opex_item';
+
+const renderCurrency = (value: number | null | undefined) => (
+  value === null || value === undefined ? '' : formatCurrency(value)
+);
+
+const renderPerSFValue = (value: number | null | undefined) => (
+  value === null || value === undefined ? '' : formatPerSF(value)
+);
 
 interface DragItem {
   opex_id: number;
@@ -37,10 +43,7 @@ interface DraggableExpenseRowProps {
   unitCount: number;
   totalSF: number;
   valueAddEnabled: boolean;
-  availableScenarios: string[];
-  preferredScenario: string;
-  extraScenarios: string[];
-  evidenceExpanded: boolean;
+  showParentTotals: boolean;
   onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
   onToggleExpand?: (lineItemKey: string) => void;
   onAddItem?: (parentKey?: string) => void;
@@ -51,10 +54,7 @@ function DraggableExpenseRow({
   unitCount,
   totalSF,
   valueAddEnabled,
-  availableScenarios,
-  preferredScenario,
-  extraScenarios,
-  evidenceExpanded,
+  showParentTotals,
   onUpdateRow,
   onToggleExpand,
   onAddItem
@@ -79,13 +79,20 @@ function DraggableExpenseRow({
   const rowPerSF = totalSF > 0 && row.as_is.total
     ? row.as_is.total / totalSF
     : null;
+  const isCollapsed = row.is_expanded === false;
+  // Parent rows show totals regardless of expand state
+  const parentPerUnit = unitCount > 0 && row.as_is.total
+    ? row.as_is.total / unitCount
+    : row.as_is.rate;
+  const parentPerSF = totalSF > 0 && row.as_is.total
+    ? row.as_is.total / totalSF
+    : null;
   const postRenoRowPerUnit = unitCount > 0 && row.post_reno?.total
     ? row.post_reno.total / unitCount
     : row.post_reno?.rate;
-
-  // Parent rows only show totals when collapsed
-  const isCollapsed = row.is_expanded === false;
-  const showParentTotals = isParent && isCollapsed;
+  const parentPostRenoPerUnit = unitCount > 0 && row.post_reno?.total
+    ? row.post_reno.total / unitCount
+    : row.post_reno?.rate;
 
   // Setup drag
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -129,7 +136,7 @@ function DraggableExpenseRow({
         backgroundColor: isUnclassifiedSection ? 'rgba(239, 68, 68, 0.08)' : undefined
       }}
     >
-      <td>
+      <td className="py-1" style={{ whiteSpace: 'nowrap' }}>
         {isParent && (
           <>
             <span
@@ -171,12 +178,12 @@ function DraggableExpenseRow({
           </span>
         )}
       </td>
-      <td className="num">{isPercent ? '—' : (isParent && !isCollapsed ? '' : (unitCount || '—'))}</td>
-      <td className="num">
+      {/* Empty column to align with Units */}
+      <td className="text-right py-1"></td>
+      {/* $/Unit column - aligns with Current in Income card */}
+      <td className="text-right py-1">
         {isParent ? (
-          showParentTotals ? (
-            <span className="ops-calc">{formatCurrency(rowPerUnit)}</span>
-          ) : null
+          showParentTotals ? <span className="ops-calc">{renderCurrency(parentPerUnit)}</span> : null
         ) : isPercent ? (
           <InputCell
             value={row.as_is.rate}
@@ -193,31 +200,21 @@ function DraggableExpenseRow({
           />
         )}
       </td>
-      <td className="num ops-calc">
-        {isPercent ? '—' : (isParent && !isCollapsed ? '' : formatPerSF(rowPerSF))}
+      {/* Annual column */}
+      <td className="text-right py-1 ops-calc font-semibold">
+        {isParent ? (showParentTotals ? renderCurrency(row.as_is.total) : '') : renderCurrency(row.as_is.total)}
       </td>
-      <td className="num ops-calc">
-        {isParent && !isCollapsed ? '' : formatCurrency(row.as_is.total)}
+      {/* $/SF column */}
+      <td className="text-right py-1 ops-calc">
+        {isPercent ? '' : (isParent ? (showParentTotals ? renderPerSFValue(parentPerSF) : '') : renderPerSFValue(rowPerSF))}
       </td>
-      <td className="num">
-        {!isParent && (
-          isPercent ? (
-            <FeeBadge label="% of EGI" />
-          ) : (
-            <GrowthBadge
-              value={row.as_is.growth_rate}
-              type={row.as_is.growth_type || 'global'}
-            />
-          )
-        )}
-      </td>
+      {/* Empty column to align with Loss to Lease */}
+      <td className="text-right py-1"></td>
       {valueAddEnabled && (
         <>
-          <td className="num post-reno">
+          <td className="text-right py-1 post-reno">
             {isParent ? (
-              showParentTotals ? (
-                <span className="ops-calc">{formatCurrency(postRenoRowPerUnit)}</span>
-              ) : null
+              showParentTotals ? <span className="ops-calc">{renderCurrency(parentPostRenoPerUnit)}</span> : null
             ) : isPercent ? (
               <InputCell
                 value={row.post_reno?.rate}
@@ -234,33 +231,11 @@ function DraggableExpenseRow({
               />
             )}
           </td>
-          <td className="num post-reno ops-calc">
-            {isParent && !isCollapsed ? '' : formatCurrency(row.post_reno?.total)}
+          <td className="text-right py-1 post-reno ops-calc font-semibold">
+            {isParent ? (showParentTotals ? renderCurrency(row.post_reno?.total) : '') : renderCurrency(row.post_reno?.total)}
           </td>
         </>
       )}
-      {availableScenarios.length > 0 && (
-        <td className="num evidence ops-evidence-group">
-          <EvidenceCell
-            value={isPercent
-              ? row.evidence[preferredScenario]?.rate
-              : row.evidence[preferredScenario]?.per_unit
-            }
-            format={isPercent ? 'percent' : 'per_unit'}
-          />
-        </td>
-      )}
-      {evidenceExpanded && extraScenarios.map(scenario => (
-        <td key={scenario} className="num evidence ops-evidence-extra">
-          <EvidenceCell
-            value={isPercent
-              ? row.evidence[scenario]?.rate
-              : row.evidence[scenario]?.per_unit
-            }
-            format={isPercent ? 'percent' : 'per_unit'}
-          />
-        </td>
-      ))}
     </tr>
   );
 }
@@ -270,10 +245,7 @@ interface DroppableParentRowProps {
   unitCount: number;
   totalSF: number;
   valueAddEnabled: boolean;
-  availableScenarios: string[];
-  preferredScenario: string;
-  extraScenarios: string[];
-  evidenceExpanded: boolean;
+  showParentTotals: boolean;
   onDrop: (item: DragItem, targetCategory: string) => void;
   onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
   onToggleExpand?: (lineItemKey: string) => void;
@@ -285,10 +257,7 @@ function DroppableParentRow({
   unitCount,
   totalSF,
   valueAddEnabled,
-  availableScenarios,
-  preferredScenario,
-  extraScenarios,
-  evidenceExpanded,
+  showParentTotals,
   onDrop,
   onUpdateRow,
   onToggleExpand,
@@ -319,7 +288,10 @@ function DroppableParentRow({
   const rowPerUnit = unitCount > 0 && row.as_is.total
     ? row.as_is.total / unitCount
     : row.as_is.rate;
-  const postRenoRowPerUnit = unitCount > 0 && row.post_reno?.total
+  const rowPerSF = totalSF > 0 && row.as_is.total
+    ? row.as_is.total / totalSF
+    : null;
+  const rowPostRenoPerUnit = unitCount > 0 && row.post_reno?.total
     ? row.post_reno.total / unitCount
     : row.post_reno?.rate;
 
@@ -347,7 +319,7 @@ function DroppableParentRow({
         transition: 'background-color 0.2s ease'
       }}
     >
-      <td>
+      <td className="py-1" style={{ whiteSpace: 'nowrap' }}>
         <span
           className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
           onClick={() => onToggleExpand?.(row.line_item_key)}
@@ -384,37 +356,32 @@ function DroppableParentRow({
           />
         )}
       </td>
-      <td className="num">{isCollapsed ? unitCount || '—' : ''}</td>
-      <td className="num">
-        {isCollapsed ? (
-          <span className="ops-calc">{formatCurrency(rowPerUnit)}</span>
-        ) : null}
+      {/* Empty column to align with Units */}
+      <td className="text-right py-1"></td>
+      {/* $/Unit column */}
+      <td className="text-right py-1">
+        {showParentTotals ? <span className="ops-calc">{renderCurrency(rowPerUnit)}</span> : null}
       </td>
-      <td className="num ops-calc">
-        {isCollapsed ? formatPerSF(row.as_is.total && totalSF ? row.as_is.total / totalSF : null) : ''}
+      {/* Annual column */}
+      <td className="text-right py-1 ops-calc font-semibold">
+        {showParentTotals ? renderCurrency(row.as_is.total) : ''}
       </td>
-      <td className="num ops-calc">
-        {isCollapsed ? formatCurrency(row.as_is.total) : ''}
+      {/* $/SF column */}
+      <td className="text-right py-1 ops-calc">
+        {showParentTotals ? renderPerSFValue(rowPerSF) : ''}
       </td>
-      <td className="num"></td>
+      {/* Empty column to align with Loss to Lease */}
+      <td className="text-right py-1"></td>
       {valueAddEnabled && (
         <>
-          <td className="num post-reno">
-            {isCollapsed ? (
-              <span className="ops-calc">{formatCurrency(postRenoRowPerUnit)}</span>
-            ) : null}
+          <td className="text-right py-1 post-reno">
+            {showParentTotals ? <span className="ops-calc">{renderCurrency(rowPostRenoPerUnit)}</span> : null}
           </td>
-          <td className="num post-reno ops-calc">
-            {isCollapsed ? formatCurrency(row.post_reno?.total) : ''}
+          <td className="text-right py-1 post-reno ops-calc font-semibold">
+            {showParentTotals ? renderCurrency(row.post_reno?.total) : ''}
           </td>
         </>
       )}
-      {availableScenarios.length > 0 && (
-        <td className="num evidence ops-evidence-group"></td>
-      )}
-      {evidenceExpanded && extraScenarios.map(scenario => (
-        <td key={scenario} className="num evidence ops-evidence-extra"></td>
-      ))}
     </tr>
   );
 }
@@ -423,8 +390,6 @@ interface DraggableOpexSectionProps {
   rows: LineItemRow[];
   unitCount: number;
   totalSF: number;
-  availableScenarios: string[];
-  preferredScenario: string;
   valueAddEnabled: boolean;
   onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
   onAddItem?: (parentKey?: string) => void;
@@ -436,8 +401,6 @@ function DraggableOpexSectionInner({
   rows,
   unitCount,
   totalSF,
-  availableScenarios,
-  preferredScenario,
   valueAddEnabled,
   onUpdateRow,
   onAddItem,
@@ -445,7 +408,6 @@ function DraggableOpexSectionInner({
   onCategoryChange
 }: DraggableOpexSectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
-  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const [savingItem, setSavingItem] = useState<number | null>(null);
 
   // Calculate totals recursively
@@ -470,12 +432,7 @@ function DraggableOpexSectionInner({
 
   const totals = sumRowsRecursive(rows);
   const asIsPerUnit = unitCount > 0 ? totals.as_is_total / unitCount : 0;
-  const postRenoPerUnit = unitCount > 0 ? totals.post_reno_total / unitCount : 0;
   const asIsPerSF = totalSF > 0 ? totals.as_is_total / totalSF : 0;
-  const postRenoPerSF = totalSF > 0 ? totals.post_reno_total / totalSF : 0;
-
-  const hasExtraScenarios = availableScenarios.length > 1;
-  const extraScenarios = availableScenarios.filter(s => s !== preferredScenario);
 
   // Flatten hierarchical rows for display with unique keys
   // In summary mode, only show parent categories (collapsed)
@@ -553,45 +510,38 @@ function DraggableOpexSectionInner({
     <SectionCard
       title="Operating Expenses"
       controls={controls}
-      evidenceExpanded={evidenceExpanded}
+      className="ops-expense-card"
     >
-      <table className="ops-table">
-        <thead>
-          <tr>
-            <th style={{ width: '18%' }}>Expense Category</th>
-            <th className="num" style={{ width: '6%' }}>Count</th>
-            <th className="num" style={{ width: '9%' }}>$/Unit</th>
-            <th className="num" style={{ width: '7%' }}>$/SF</th>
-            <th className="num" style={{ width: '10%' }}>Total</th>
-            <th className="num" style={{ width: '8%' }}>Growth</th>
+      <table className="ops-table ops-grid">
+        <colgroup>
+          <col style={{ width: 'var(--ops-col-label)' }} />
+          <col style={{ width: 'var(--ops-col-units)' }} />
+          <col style={{ width: 'var(--ops-col-current)' }} />
+          <col style={{ width: 'var(--ops-col-annual)' }} />
+          <col style={{ width: 'var(--ops-col-psf)' }} />
+          <col style={{ width: 'var(--ops-col-loss)' }} />
+          {valueAddEnabled && (
+            <>
+              <col style={{ width: 'var(--ops-col-post)' }} />
+              <col style={{ width: 'var(--ops-col-reno)' }} />
+            </>
+          )}
+        </colgroup>
+        <tbody>
+          <tr className="ops-parent-row">
+            <td className="font-semibold" style={{ whiteSpace: 'nowrap' }}></td>
+            <td className="text-right font-semibold" style={{ whiteSpace: 'nowrap' }}></td>
+            <td className="text-right font-semibold" style={{ whiteSpace: 'nowrap' }}>$/Unit</td>
+            <td className="text-right font-semibold" style={{ whiteSpace: 'nowrap' }}>Annual</td>
+            <td className="text-right font-semibold" style={{ whiteSpace: 'nowrap' }}>$/SF</td>
+            <td className="text-right font-semibold" style={{ whiteSpace: 'nowrap' }}></td>
             {valueAddEnabled && (
               <>
-                <th className="num post-reno" style={{ width: '9%' }}>Post-Reno</th>
-                <th className="num post-reno" style={{ width: '10%' }}>Reno Total</th>
+                <td className="text-right font-semibold post-reno" style={{ whiteSpace: 'nowrap' }}>Post-Reno</td>
+                <td className="text-right font-semibold post-reno" style={{ whiteSpace: 'nowrap' }}>Reno Total</td>
               </>
             )}
-            {availableScenarios.length > 0 && (
-              <th
-                className={`num evidence ops-evidence-group ${evidenceExpanded ? 'expanded' : ''}`}
-                style={{ width: '8%' }}
-                onClick={() => setEvidenceExpanded(!evidenceExpanded)}
-              >
-                {preferredScenario.replace('_', ' ')}
-                {hasExtraScenarios && <span className="chevron">▶</span>}
-              </th>
-            )}
-            {evidenceExpanded && extraScenarios.map(scenario => (
-              <th
-                key={scenario}
-                className="num evidence ops-evidence-extra"
-                style={{ width: '8%' }}
-              >
-                {scenario.replace('_', ' ')}
-              </th>
-            ))}
           </tr>
-        </thead>
-        <tbody>
           {displayRows.map((row) => {
             const isParent = row.is_calculated;
 
@@ -604,10 +554,7 @@ function DraggableOpexSectionInner({
                   unitCount={unitCount}
                   totalSF={totalSF}
                   valueAddEnabled={valueAddEnabled}
-                  availableScenarios={availableScenarios}
-                  preferredScenario={preferredScenario}
-                  extraScenarios={extraScenarios}
-                  evidenceExpanded={evidenceExpanded}
+                  showParentTotals={row.is_expanded === false}
                   onDrop={handleDrop}
                   onUpdateRow={onUpdateRow}
                   onToggleExpand={onToggleExpand}
@@ -624,10 +571,7 @@ function DraggableOpexSectionInner({
                 unitCount={unitCount}
                 totalSF={totalSF}
                 valueAddEnabled={valueAddEnabled}
-                availableScenarios={availableScenarios}
-                preferredScenario={preferredScenario}
-                extraScenarios={extraScenarios}
-                evidenceExpanded={evidenceExpanded}
+                showParentTotals={row.is_calculated && row.is_expanded === false}
                 onUpdateRow={onUpdateRow}
                 onToggleExpand={onToggleExpand}
                 onAddItem={onAddItem}
@@ -638,23 +582,17 @@ function DraggableOpexSectionInner({
           {/* Subtotal Row */}
           <tr className="ops-subtotal-row">
             <td>Total Operating Expenses</td>
-            <td className="num">{unitCount}</td>
-            <td className="num ops-calc">{formatCurrency(asIsPerUnit)}</td>
-            <td className="num ops-calc">{formatPerSF(asIsPerSF)}</td>
-            <td className="num ops-negative">({formatCurrency(totals.as_is_total)})</td>
-            <td className="num"></td>
+            <td className="text-right"></td>
+            <td className="text-right ops-negative">({renderCurrency(asIsPerUnit)})</td>
+            <td className="text-right ops-negative font-semibold">({renderCurrency(totals.as_is_total)})</td>
+            <td className="text-right ops-calc">{renderPerSFValue(asIsPerSF)}</td>
+            <td className="text-right"></td>
             {valueAddEnabled && (
               <>
-                <td className="num post-reno ops-calc">{formatCurrency(postRenoPerUnit)}</td>
-                <td className="num post-reno ops-negative">({formatCurrency(totals.post_reno_total)})</td>
+                <td className="text-right post-reno ops-negative">({renderCurrency(unitCount > 0 ? totals.post_reno_total / unitCount : 0)})</td>
+                <td className="text-right post-reno ops-negative font-semibold">({renderCurrency(totals.post_reno_total)})</td>
               </>
             )}
-            {availableScenarios.length > 0 && (
-              <td className="num evidence ops-evidence-group">—</td>
-            )}
-            {evidenceExpanded && extraScenarios.map(scenario => (
-              <td key={scenario} className="num evidence ops-evidence-extra">—</td>
-            ))}
           </tr>
         </tbody>
       </table>

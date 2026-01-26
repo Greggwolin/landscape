@@ -90,10 +90,12 @@ export function StudioPanel({ projectId, isCollapsed = false, onToggleCollapse }
   if (isCollapsed) {
     return (
       <aside
-        className="h-full flex flex-col items-center py-3 cursor-pointer hover:bg-hover-overlay transition-colors rounded-l-xl"
+        className="h-full flex flex-col items-center py-3 cursor-pointer hover:bg-hover-overlay transition-colors"
         onClick={onToggleCollapse}
         style={{
           backgroundColor: 'var(--surface-card)',
+          borderTopLeftRadius: 'var(--cui-card-border-radius)',
+          borderBottomLeftRadius: 'var(--cui-card-border-radius)',
           borderLeft: '1px solid var(--line-soft)',
           width: '48px',
           minWidth: '48px',
@@ -110,9 +112,10 @@ export function StudioPanel({ projectId, isCollapsed = false, onToggleCollapse }
   return (
     <>
       <aside
-        className="h-full flex flex-col overflow-hidden rounded-xl"
+        className="h-full flex flex-col overflow-hidden"
         style={{
           backgroundColor: 'var(--surface-card)',
+          borderRadius: 'var(--cui-card-border-radius)',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           flex: 1.5,
           minWidth: '250px',

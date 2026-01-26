@@ -242,11 +242,12 @@ export default function NewProjectDropZone({
       {...getRootProps()}
       tabIndex={0}
       className={`
-        relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
+        relative border-2 border-dashed p-8 text-center cursor-pointer
         transition-colors duration-200 outline-none focus:ring-2 focus:ring-blue-400
         ${getBorderClass()}
         ${isActive ? 'cursor-default' : ''}
       `}
+      style={{ borderRadius: 'var(--cui-card-border-radius)' }}
     >
       <input {...getInputProps()} />
 

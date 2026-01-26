@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { LandscaperChat } from './LandscaperChat';
+import { CCard } from '@coreui/react';
+import { LandscaperChatThreaded } from './LandscaperChatThreaded';
 import { ActivityFeed } from './ActivityFeed';
 import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
@@ -597,7 +598,7 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
       {...getRootProps()}
       className="flex flex-col h-full gap-3 relative"
       style={{
-        borderRadius: '12px',
+        borderRadius: 'var(--cui-card-border-radius)',
         border: isDragActive ? '2px dashed var(--cui-primary)' : '1px dashed transparent',
         backgroundColor: isDragActive ? 'var(--cui-tertiary-bg)' : 'transparent',
         transition: 'border-color 0.15s ease, background-color 0.15s ease'
@@ -610,7 +611,7 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
         <div
           className="absolute inset-0 d-flex flex-column align-items-center justify-content-center text-center z-50"
           style={{
-            borderRadius: '12px',
+            borderRadius: 'var(--cui-card-border-radius)',
             backgroundColor: isDragAccept ? 'rgba(34, 197, 94, 0.1)' : isDragReject ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             color: 'var(--cui-body-color)',
             pointerEvents: 'none'
@@ -645,24 +646,23 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
         style={{ cursor: isResizing ? 'row-resize' : 'default' }}
       >
         {/* Landscaper Chat Card */}
-        <div
-          className="flex flex-col min-h-0 rounded-xl shadow-lg overflow-hidden"
+        <CCard
+          className="flex flex-col min-h-0 shadow-lg overflow-hidden"
           style={{
-            backgroundColor: 'var(--cui-card-bg)',
             height: hasMeasuredHeight ? `${chatHeight}px` : undefined,
             flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
           }}
         >
-          <LandscaperChat
+          <LandscaperChatThreaded
             projectId={projectId}
-            activeTab={activeTab}
+            pageContext={activeTab}
             isIngesting={isUploading || uploadThingIsUploading}
             ingestionProgress={uploadProgress}
             ingestionMessage={uploadMessage}
             isExpanded={!isActivityExpanded}
             onToggleExpand={handleActivityToggle}
           />
-        </div>
+        </CCard>
 
         <div
           role="separator"
@@ -688,10 +688,9 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
         </div>
 
         {/* Activity Feed Card */}
-        <div
-          className="rounded-xl shadow-lg overflow-hidden"
+        <CCard
+          className="shadow-lg overflow-hidden"
           style={{
-            backgroundColor: 'var(--cui-card-bg)',
             height: hasMeasuredHeight ? `${activityHeight}px` : undefined,
             flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
           }}
@@ -701,7 +700,7 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
             isExpanded={isActivityExpanded}
             onToggle={handleActivityToggle}
           />
-        </div>
+        </CCard>
       </div>
 
       {/* Extraction Review Modal */}

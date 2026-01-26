@@ -4,14 +4,14 @@
  * ValueTiles Component
  *
  * Displays three Direct Cap valuation perspectives plus DCF in prominent tiles.
- * Tiles: F-12 Current, F-12 Market, Stabilized, (DCF placeholder)
+ * Tiles: F-12 Current, F-12 Market, Stabilized, DCF
  * Clicking a tile selects that NOI basis for detailed view.
  *
- * Session: QK-11 (original), QK-30 (3-basis consolidation)
+ * Session: QK-11 (original), QK-30 (3-basis consolidation), DCF Implementation
  */
 
 import React from 'react';
-import type { ValueTile, ValueTilesProps } from '@/types/income-approach';
+import type { ValueTile, ValueTilesProps, DCFAnalysisData } from '@/types/income-approach';
 import {
   formatCurrencyCompact,
   formatPercent,
@@ -21,16 +21,42 @@ import {
   NOI_BASIS_LABELS,
 } from '@/types/income-approach';
 
+export type ValuationMethod = 'direct_cap' | 'dcf';
+
+export interface ExtendedValueTilesProps extends ValueTilesProps {
+  dcfData?: DCFAnalysisData | null;
+  isDCFLoading?: boolean;
+  activeMethod?: ValuationMethod;
+  onMethodChange?: (method: ValuationMethod) => void;
+}
+
 export function ValueTiles({
   tiles,
   selectedBasis,
   onSelectBasis,
   unitCount,
-}: ValueTilesProps) {
+  dcfData,
+  isDCFLoading,
+  activeMethod = 'direct_cap',
+  onMethodChange,
+}: ExtendedValueTilesProps) {
   // Filter to only show the 3 Direct Cap tiles (in case backend sends more)
   const directCapTiles = tiles.filter(t =>
     t.id === 'f12_current' || t.id === 'f12_market' || t.id === 'stabilized'
   );
+
+  const handleDCFClick = () => {
+    if (onMethodChange) {
+      onMethodChange('dcf');
+    }
+  };
+
+  const handleDirectCapClick = (basisId: string) => {
+    if (onMethodChange) {
+      onMethodChange('direct_cap');
+    }
+    onSelectBasis(basisId as any);
+  };
 
   return (
     <div className="grid grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
@@ -38,31 +64,119 @@ export function ValueTiles({
         <ValueTileCard
           key={tile.id}
           tile={tile}
-          isSelected={tile.id === selectedBasis}
-          onClick={() => onSelectBasis(tile.id)}
+          isSelected={activeMethod === 'direct_cap' && tile.id === selectedBasis}
+          onClick={() => handleDirectCapClick(tile.id)}
           unitCount={unitCount}
         />
       ))}
-      {/* DCF Placeholder Tile - Coming Soon */}
-      <DCFPlaceholderTile />
+      {/* DCF Tile */}
+      <DCFTile
+        dcfData={dcfData}
+        isLoading={isDCFLoading}
+        isSelected={activeMethod === 'dcf'}
+        onClick={handleDCFClick}
+      />
     </div>
   );
 }
 
 /**
- * DCF Placeholder Tile - shows coming soon message
+ * DCF Tile - shows DCF valuation or loading state
  */
-function DCFPlaceholderTile() {
+interface DCFTileProps {
+  dcfData?: DCFAnalysisData | null;
+  isLoading?: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
+  // Loading state
+  if (isLoading) {
+    return (
+      <div
+        className="relative rounded-lg p-4 text-left"
+        style={{
+          backgroundColor: DCF_TILE_COLOR.bg,
+          borderWidth: '1px',
+          borderStyle: 'dashed',
+          borderColor: DCF_TILE_COLOR.border,
+        }}
+      >
+        <div
+          className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
+          style={{ color: DCF_TILE_COLOR.text }}
+        >
+          DCF
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500" />
+          <span style={{ color: 'var(--cui-secondary-color)' }}>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // No data state
+  if (!dcfData) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="relative rounded-lg p-4 text-left transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer"
+        style={{
+          backgroundColor: DCF_TILE_COLOR.bg,
+          borderWidth: '1px',
+          borderStyle: 'dashed',
+          borderColor: DCF_TILE_COLOR.border,
+        }}
+      >
+        <div
+          className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
+          style={{ color: DCF_TILE_COLOR.text }}
+        >
+          DCF
+        </div>
+        <div
+          className="text-lg font-medium mb-1"
+          style={{ color: 'var(--cui-body-color)' }}
+        >
+          Click to Load
+        </div>
+        <div
+          className="text-xs mt-2"
+          style={{ color: 'var(--cui-secondary-color)' }}
+        >
+          Multi-year cash flow analysis
+        </div>
+      </button>
+    );
+  }
+
+  // Active DCF tile with data
+  const { metrics, assumptions } = dcfData;
+
   return (
-    <div
-      className="relative rounded-lg p-4 text-left opacity-60"
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative rounded-lg p-4 text-left transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-2"
       style={{
         backgroundColor: DCF_TILE_COLOR.bg,
-        borderWidth: '1px',
-        borderStyle: 'dashed',
-        borderColor: DCF_TILE_COLOR.border,
+        borderWidth: isSelected ? '3px' : '1px',
+        borderStyle: 'solid',
+        borderColor: isSelected ? DCF_TILE_COLOR.border : 'rgba(255,255,255,0.1)',
+        boxShadow: isSelected ? `0 0 20px ${DCF_TILE_COLOR.border}40` : 'none',
       }}
     >
+      {/* Selected indicator */}
+      {isSelected && (
+        <div
+          className="absolute top-2 right-2 w-2 h-2 rounded-full"
+          style={{ backgroundColor: DCF_TILE_COLOR.border }}
+        />
+      )}
+
       {/* Label */}
       <div
         className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
@@ -71,21 +185,41 @@ function DCFPlaceholderTile() {
         DCF
       </div>
 
-      {/* Coming Soon */}
+      {/* Primary Value - Present Value */}
       <div
-        className="text-lg font-medium mb-1"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        className="text-2xl font-bold mb-1"
+        style={{ color: 'var(--cui-body-color)' }}
       >
-        Coming Soon
+        {formatCurrencyCompact(metrics.present_value)}
       </div>
 
+      {/* IRR */}
       <div
-        className="text-xs mt-2"
+        className="text-sm mb-2"
+        style={{ color: DCF_TILE_COLOR.text }}
+      >
+        {metrics.irr !== null ? `${formatPercent(metrics.irr)} IRR` : '— IRR'}
+      </div>
+
+      {/* Price per Unit */}
+      <div
+        className="text-sm opacity-80"
         style={{ color: 'var(--cui-secondary-color)' }}
       >
-        Multi-year cash flow analysis
+        {metrics.price_per_unit ? formatPerUnit(metrics.price_per_unit) : '—'}
       </div>
-    </div>
+
+      {/* Hold Period */}
+      <div
+        className="text-xs mt-2 pt-2 border-t"
+        style={{
+          color: 'var(--cui-secondary-color)',
+          borderColor: 'rgba(255,255,255,0.1)',
+        }}
+      >
+        {assumptions.hold_period_years}-year hold
+      </div>
+    </button>
   );
 }
 

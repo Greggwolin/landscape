@@ -18,7 +18,7 @@
 .channel-modal .modal-content {
   background: var(--cui-body-bg);
   border: 1px solid var(--cui-border-color);
-  border-radius: 12px;
+  border-radius: var(--cui-card-border-radius);
   overflow: hidden;
 }
 

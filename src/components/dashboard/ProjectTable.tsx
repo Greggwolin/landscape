@@ -66,7 +66,7 @@ export function ProjectTable({ projects, isLoading }: ProjectTableProps) {
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border bg-surface-card">
+      <div className="border border-border bg-surface-card">
         <div className="p-8 text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
           <p className="mt-2 text-sm text-muted">Loading projects...</p>
@@ -77,7 +77,7 @@ export function ProjectTable({ projects, isLoading }: ProjectTableProps) {
 
   if (!projects.length) {
     return (
-      <div className="rounded-xl border border-border bg-surface-card">
+      <div className="border border-border bg-surface-card">
         <div className="p-8 text-center">
           <p className="text-muted">No projects found.</p>
         </div>
@@ -87,7 +87,7 @@ export function ProjectTable({ projects, isLoading }: ProjectTableProps) {
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-surface-card overflow-hidden shadow-sm">
+      <div className="border border-border bg-surface-card overflow-hidden shadow-sm">
         <div className="overflow-x-auto px-0 pb-2">
           <table className="w-full">
             <thead>

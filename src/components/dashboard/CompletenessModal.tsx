@@ -83,7 +83,7 @@ export function CompletenessModal({
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg rounded-xl bg-white shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg bg-white shadow-2xl" style={{ borderRadius: 'var(--cui-card-border-radius)' }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>

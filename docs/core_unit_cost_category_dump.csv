@@ -1,0 +1,231 @@
+category_id,category_name,account_number,parent_id,parent_name,lifecycle_stages,property_types,tags
+1,Sewer,3110,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+2,Water,3120,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+3,Grading / Site Prep,3100,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+4,Concrete,3150,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+5,Paving,3140,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+6,Storm Drain,3130,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+7,Dry Utilities,3160,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+8,Staking,3170,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+9,Testing,3180,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+10,Landscaping,3190,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+11,Permits,3300,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+12,Insurance (Construction),3310,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+13,Contractor,3320,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+14,Sales Tax,3330,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+15,Warranty,3340,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+16,Bonds,3350,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Deposits""]"
+17,Deposits,3360,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Deposits""]"
+18,Other Cost,2600,,,"{Improvements,""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Other""]"
+19,Deposit,3370,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Deposits""]"
+20,Landscape,3200,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+21,Other,2610,,,"{Improvements,""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Other""]"
+22,Walls,3210,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+31,Land Planning,2430,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+32,Engineering Studies,2410,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+33,Environmental Studies,2420,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+34,Submittal Fees (Construction),3450,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+35,Other Consultants (Construction),3620,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+36,Legal Fees,1330,,,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+37,Civil Engineering,2400,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+38,Final Studies,2440,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+39,Submittal Fees (Entitlement),2450,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+40,Other Consultants (Design),2470,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+41,Title & Insurance,1320,,,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Other""]"
+42,Closing Costs,1310,206,Transaction Costs,"{Acquisition,Disposition}","{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+43,Offsite Improvements,3400,256,Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+44,Onsite Improvements,3500,256,Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+45,Landscape Plans,2480,31,Land Planning,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+46,Asset Management,4430,56,Administrative,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+47,Land Cost,1300,196,Acquisition Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+49,Property Taxes & Insurance (Land),4600,,,{Operations},{LAND},[]
+50,HOA & Amenity Operations,4700,,,{Operations},{LAND},[]
+51,Common Area Maintenance,4800,,,{Operations},{LAND},[]
+52,Marketing (Land),4900,,,{Operations},{LAND},[]
+53,Taxes & Insurance,4100,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+54,Utilities,4200,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+55,Repairs & Maintenance,4300,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+56,Administrative,4400,99,Other Operating Expenses,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+57,Marketing,4500,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+58,Property Taxes on Unsold Inventory,4610,49,Property Taxes & Insurance (Land),{Operations},{LAND},[]
+59,Insurance on Unsold Parcels,4620,49,Property Taxes & Insurance (Land),{Operations},{LAND},[]
+60,HOA Management,4710,50,HOA & Amenity Operations,{Operations},{LAND},[]
+61,Amenity Operations,4720,50,HOA & Amenity Operations,{Operations},{LAND},[]
+62,Landscape Maintenance,4810,51,Common Area Maintenance,{Operations},{LAND},[]
+63,Infrastructure Maintenance,4820,51,Common Area Maintenance,{Operations},{LAND},[]
+64,Sales & Marketing,4910,52,Marketing (Land),{Operations},{LAND},[]
+65,Property Taxes,4110,53,Taxes & Insurance,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+66,Insurance,4120,53,Taxes & Insurance,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+67,Water & Sewer,4210,54,Utilities,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+68,Trash Removal,4220,54,Utilities,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+69,Electricity,4230,54,Utilities,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+70,Gas,4240,54,Utilities,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+71,Repairs & Labor,4310,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+72,Maintenance Contracts,4320,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+73,Property Management,4410,56,Administrative,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+74,Professional Fees,4420,56,Administrative,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+75,Advertising,4510,57,Marketing,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+76,Ad Valorem Taxes,4611,58,Property Taxes on Unsold Inventory,{Operations},{LAND},[]
+77,Special Assessments,4612,58,Property Taxes on Unsold Inventory,{Operations},{LAND},[]
+78,Real Estate Taxes,4111,65,Property Taxes,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+79,Direct Assessment Taxes,4112,65,Property Taxes,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+80,Janitorial Services,4321,72,Maintenance Contracts,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+81,Gardening,4322,72,Maintenance Contracts,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+82,Pest Control,4323,72,Maintenance Contracts,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+83,Elevator Maintenance,4324,72,Maintenance Contracts,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+84,Manager Rent Credit (Admin),4421,74,Professional Fees,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+85,Telephone Expense,4422,74,Professional Fees,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+86,Security Service,4423,74,Professional Fees,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+87,Licenses & Permits,4424,74,Professional Fees,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+88,Internet Service,4425,74,Professional Fees,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+89,Payroll & Personnel,4550,99,Other Operating Expenses,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+90,On-Site Manager Salary,4551,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+91,Manager Rent Credit (Payroll),4552,89,Payroll & Personnel,{Operations},{MF},[]
+92,Leasing Staff,4553,89,Payroll & Personnel,{Operations},"{MF,OFF,RET}",[]
+93,Maintenance Staff,4554,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND}",[]
+94,Payroll Taxes,4555,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+95,Employee Benefits,4556,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+96,Reserves,7990,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+97,Replacement Reserves,7991,96,Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+98,Capital Expenditure Reserve,7992,96,Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}",[]
+99,Other Operating Expenses,4000,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+100,Misc R&M,4330,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+101,Landscaping & Grounds,4331,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+102,Pool & Amenity Service,4332,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+179,Financing Costs,6000,,,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+180,Interest Expense,6100,,,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+181,Loan Fees,6200,,,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+182,Debt Service,6300,,,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+183,Construction Interest,6110,180,Interest Expense,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+184,Permanent Loan Interest,6120,180,Interest Expense,{Financing},"{MF,OFF,RET,IND,HTL,MXU}","[""Soft""]"
+185,Mezzanine Interest,6130,180,Interest Expense,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+186,Interest Reserve,6140,180,Interest Expense,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+187,Origination Fee,6210,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+188,Points,6220,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+189,Commitment Fee,6230,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+190,Extension Fee,6240,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+191,Legal (Loan),6250,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+192,Appraisal (Lender),6260,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+193,Title (Loan),6270,181,Loan Fees,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+194,Principal Payments,6310,182,Debt Service,{Financing},"{MF,OFF,RET,IND,HTL,MXU}",[]
+195,Loan Payoff,6320,182,Debt Service,{Financing},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+196,Acquisition Costs,1000,,,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+197,Due Diligence,1100,,,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+198,Phase I Environmental,1110,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+199,Phase II Environmental,1120,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+200,Property Condition Assessment,1130,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU}","[""Soft"", ""Due Diligence""]"
+201,Survey,1140,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+202,Appraisal,1150,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+203,Zoning Report,1160,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+204,Title Search,1170,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+205,Market Study,1180,197,Due Diligence,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Due Diligence""]"
+206,Transaction Costs,1200,,,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+207,Earnest Money,1210,206,Transaction Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Deposits""]"
+208,Escrow Fees,1220,206,Transaction Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+209,Recording Fees,1230,206,Transaction Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+210,Transfer Tax,1240,206,Transaction Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+211,Broker Commission,1250,206,Transaction Costs,{Acquisition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+212,Disposition Costs,5000,,,{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+213,Sales & Marketing (Disposition),5100,,,{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+214,Broker Commission (Sale),5110,213,Sales & Marketing (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+215,Marketing (Sale),5120,213,Sales & Marketing (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+216,Offering Memorandum,5130,213,Sales & Marketing (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU}","[""Soft""]"
+217,Transaction Costs (Disposition),5200,,,{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+218,Legal Fees (Sale),5210,217,Transaction Costs (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+219,Transfer Tax (Sale),5220,217,Transaction Costs (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+220,Escrow Fees (Sale),5230,217,Transaction Costs (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+221,Recording Fees (Sale),5240,217,Transaction Costs (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+222,Prepayment Penalty,5250,217,Transaction Costs (Disposition),{Disposition},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+223,Capital Expenditures,7000,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+224,Structural Reserves,7100,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+225,Roof Reserve,7110,224,Structural Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+226,Foundation Reserve,7120,224,Structural Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+227,Facade/Exterior Reserve,7130,224,Structural Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+228,MEP Reserves,7200,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+229,HVAC Reserve,7210,228,MEP Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+230,Plumbing Reserve,7220,228,MEP Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+231,Electrical Reserve,7230,228,MEP Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+232,Elevator Reserve,7240,228,MEP Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+233,Site Reserves,7300,,,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+234,Parking Lot Reserve,7310,233,Site Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+235,Landscaping Reserve,7320,233,Site Reserves,{Operations},"{MF,OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+236,Signage Reserve,7330,233,Site Reserves,{Operations},"{OFF,RET,IND,HTL,MXU}","[""CapEx""]"
+237,Tenant Improvements,7400,,,{Operations},"{OFF,RET,IND,MXU}","[""CapEx""]"
+238,TI Allowance,7410,237,Tenant Improvements,{Operations},"{OFF,RET,IND,MXU}","[""CapEx""]"
+239,Leasing Commissions Reserve,7420,237,Tenant Improvements,{Operations},"{OFF,RET,IND,MXU}","[""CapEx""]"
+240,Unit Turnover,7500,,,{Operations},{MF},"[""CapEx""]"
+241,Appliance Replacement,7510,240,Unit Turnover,{Operations},{MF},"[""CapEx""]"
+242,Flooring Replacement,7520,240,Unit Turnover,{Operations},{MF},"[""CapEx""]"
+243,Cabinet/Counter Replacement,7530,240,Unit Turnover,{Operations},{MF},"[""CapEx""]"
+244,CAM Recoveries,4850,,,{Operations},"{OFF,RET,IND,MXU}",[]
+245,Base Year Expenses,4851,244,CAM Recoveries,{Operations},"{OFF,RET,IND,MXU}",[]
+246,Expense Stop,4852,244,CAM Recoveries,{Operations},"{OFF,RET,IND,MXU}",[]
+247,Pro Rata Share,4853,244,CAM Recoveries,{Operations},"{OFF,RET,IND,MXU}",[]
+248,Gross Up,4854,244,CAM Recoveries,{Operations},"{OFF,RET,IND,MXU}",[]
+249,Admin Fee (CAM),4855,244,CAM Recoveries,{Operations},"{OFF,RET,IND,MXU}",[]
+250,Hotel Departmental Expenses,4750,,,{Operations},{HTL},[]
+251,Rooms Department,4751,250,Hotel Departmental Expenses,{Operations},{HTL},[]
+252,Food & Beverage,4752,250,Hotel Departmental Expenses,{Operations},{HTL},[]
+253,Franchise Fees,4753,250,Hotel Departmental Expenses,{Operations},{HTL},[]
+254,Reservation Costs,4754,250,Hotel Departmental Expenses,{Operations},{HTL},[]
+255,Planning & Engineering,2000,,,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+256,Improvements,3000,,,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+257,Entitlement Costs,2100,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+258,Planning & Zoning Fees,2110,257,Entitlement Costs,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+259,Engineering & Design,2200,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+260,Surveying,2210,259,Engineering & Design,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+261,Geotechnical,2220,259,Engineering & Design,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+262,Legal,2230,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft"", ""Professional Services""]"
+263,Accounting,2240,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+264,Insurance (Soft),2250,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+265,Marketing & Sales,2260,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+266,Soft Cost Contingency,2270,255,Planning & Engineering,"{""Planning & Engineering""}","{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Soft""]"
+267,Offsite Roads,3410,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+268,Water Main Extension,3420,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+269,Sewer Main Extension,3430,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+270,Offsite Storm Drain,3440,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+271,Electric Extension,3460,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+272,Gas Extension,3470,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+273,Telecom/Fiber,3480,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+274,Traffic Signals,3490,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+275,Other Offsite,3491,43,Offsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+276,Mass Grading,3510,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+277,Erosion Control,3520,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+278,Internal Roads,3530,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+279,Curb & Gutter,3540,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+280,Sidewalks,3550,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+281,Water Distribution,3560,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+282,Sewer Collection,3570,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+283,Storm Drain/Retention,3580,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+284,Street Lights,3590,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+285,Common Area Landscaping,3591,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+286,Irrigation,3592,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+287,Monument Signs/Wayfinding,3593,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+288,Amenity Construction,3594,44,Onsite Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+289,Impact Fees & Exactions,3600,256,Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+290,School Fees,3610,289,Impact Fees & Exactions,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+291,Park Fees,3611,289,Impact Fees & Exactions,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+292,Traffic Fees,3612,289,Impact Fees & Exactions,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+293,Utility Capacity Fees,3613,289,Impact Fees & Exactions,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+294,Building Permits,3614,289,Impact Fees & Exactions,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+295,Hard Cost Contingency,3700,256,Improvements,{Improvements},"{MF,OFF,RET,IND,HTL,MXU,LAND}","[""Hard""]"
+296,Property Insurance,4121,66,Insurance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+297,Liability Insurance,4122,66,Insurance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+298,Flood Insurance,4123,66,Insurance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+299,Gas & Electric,4250,54,Utilities,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+300,Contracted Services,4340,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+301,General Repairs,4341,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+302,HVAC Service,4342,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+303,Plumbing Service,4343,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+304,Electrical Service,4344,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+305,Appliance Repairs & Replacement,4345,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+306,Irrigation Maintenance,4346,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+307,Snow Removal,4347,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+308,Turnover Costs,4348,55,Repairs & Maintenance,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+309,Office Supplies,4431,56,Administrative,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+310,Management Fee,4411,73,Property Management,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+311,Off-Site Management Fee,4412,73,Property Management,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+312,Marketing & Advertising,4511,57,Marketing,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+313,Leasing Commissions,4512,57,Marketing,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+314,Payroll,4557,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]
+315,On-Site Payroll,4558,89,Payroll & Personnel,{Operations},"{MF,OFF,RET,IND,HTL,MXU,LAND}",[]

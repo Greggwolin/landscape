@@ -4120,11 +4120,31 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE_INSTRUCTIONS = """
-RESPONSE STYLE - Be concise:
-- 1-2 sentences for routine updates
-- Don't narrate your thinking or explain what you're checking
-- Just do the task and confirm what you did
-- Only ask questions if truly necessary
+RESPONSE STYLE (CRITICAL - FOLLOW EXACTLY):
+
+1. NO THINKING NARRATION:
+   - NEVER say "Let me check...", "I'll analyze...", "Now I will...", "First, I'll..."
+   - NEVER say "I notice that...", "I can see that...", "Looking at..."
+   - NEVER describe what tools you're using or what you're looking up
+   - Go DIRECTLY to the answer or analysis
+
+2. NO MARKDOWN FORMATTING:
+   - NEVER use ** for bold
+   - NEVER use ## for headers
+   - NEVER use ``` for code blocks
+   - Use plain text with line breaks and indentation only
+   - Responses are displayed as plain text, not rendered markdown
+
+3. BE CONCISE:
+   - 1-2 sentences for routine updates
+   - Just do the task and confirm what you did
+   - Only ask questions if truly necessary
+
+Good: "Unit 213 shows a rent of $1,716, which is 30% below market."
+Bad: "Let me check the rent roll data. I see that Unit 213 has a rent of $1,716."
+
+Good: "Three factors explain the rent gap:\n1. Lease vintage - older leases locked in lower rates\n2. Location - ground floor units rent lower\n3. Size - larger units have lower per-SF rents"
+Bad: "## Analysis\n**I'll analyze** this by looking at three factors..."
 
 Good: "Updated the county to Ventura County based on the Thousand Oaks address."
 Bad: "I need to check the current address first. Let me retrieve that information..."
@@ -4398,7 +4418,8 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 def get_landscaper_response(
     messages: List[Dict[str, str]],
     project_context: Dict[str, Any],
-    tool_executor: Optional[Any] = None
+    tool_executor: Optional[Any] = None,
+    additional_context: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Generate AI response to user message using Claude API with tool use.
@@ -4410,6 +4431,8 @@ def get_landscaper_response(
                          {'project_id': int, 'project_name': str, 'project_type': str,
                           'budget_summary': {...}, 'market_data': {...}, 'project_details': {...}}
         tool_executor: Optional callable to execute tool calls. If None, tools are disabled.
+        additional_context: Optional additional context to inject into system prompt
+                           (e.g., past conversation context for cross-thread RAG)
 
     Returns:
         Dict with:
@@ -4452,6 +4475,11 @@ def get_landscaper_response(
         if uk_context:
             full_system += uk_context
             logger.info("User knowledge context added to system prompt")
+
+    # Add additional context (e.g., past conversation context for cross-thread RAG)
+    if additional_context:
+        full_system += additional_context
+        logger.info("Additional context (chat history RAG) added to system prompt")
 
     # Try Claude API first
     client = _get_anthropic_client()

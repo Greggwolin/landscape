@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { CContainer, CCard, CCardHeader, CCardBody, CBadge } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
-import UserTile from '@/app/components/dashboard/UserTile';
 import DashboardMap from '@/app/components/dashboard/DashboardMap';
 import TriageModal from '@/app/components/dashboard/TriageModal';
+import { ActivityFeed } from '@/components/landscaper/ActivityFeed';
+import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
 import { LandscapeButton } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
 
@@ -23,7 +24,6 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
   MXU: 'Mixed-Use',
   MPC: 'Master Planned Community',
   MULTIFAMILY: 'Multifamily',
-  COMMERCIAL: 'Commercial',
   OFFICE: 'Office',
   RETAIL: 'Retail',
   INDUSTRIAL: 'Industrial',
@@ -42,12 +42,11 @@ const PROPERTY_TYPE_COLORS: Record<string, string> = {
   MXU: 'info',
   MPC: 'primary',
   MULTIFAMILY: 'success',
-  COMMERCIAL: 'info',
   OFFICE: 'warning',
   RETAIL: 'danger',
   INDUSTRIAL: 'secondary',
   HOTEL: 'dark',
-  MIXED_USE: 'primary',
+  MIXED_USE: 'info',
   SUBDIVISION: 'info'
 };
 
@@ -61,12 +60,11 @@ const PROPERTY_TYPE_COLOR_HEX: Record<string, string> = {
   MXU: '#0dcaf0',
   MPC: '#0d6efd',
   MULTIFAMILY: '#198754',
-  COMMERCIAL: '#0dcaf0',
   OFFICE: '#ffc107',
   RETAIL: '#dc3545',
   INDUSTRIAL: '#6c757d',
   HOTEL: '#212529',
-  MIXED_USE: '#0d6efd',
+  MIXED_USE: '#0dcaf0',
   SUBDIVISION: '#0dcaf0'
 };
 
@@ -74,8 +72,8 @@ const PROPERTY_FILTERS: Array<{ key: PropertyFilterKey; label: string; codes: st
   { key: 'ALL', label: 'All Projects', codes: [] },
   { key: 'LAND', label: 'Land Development', codes: ['LAND', 'MPC', 'SUBDIVISION'] },
   { key: 'MF', label: 'Multifamily', codes: ['MF', 'MULTIFAMILY'] },
-  { key: 'COMMERCIAL', label: 'Commercial', codes: ['COMMERCIAL', 'MXU', 'HTL'] },
-  { key: 'RET', label: 'Retail', codes: ['RET'] },
+  { key: 'COMMERCIAL', label: 'Commercial', codes: ['MXU', 'HTL', 'MIXED_USE', 'HOTEL'] },
+  { key: 'RET', label: 'Retail', codes: ['RET', 'RETAIL'] },
   { key: 'OFF', label: 'Office', codes: ['OFF', 'OFFICE'] },
   { key: 'IND', label: 'Industrial', codes: ['IND', 'INDUSTRIAL'] }
 ];
@@ -151,11 +149,13 @@ const getTypeColor = (project: ProjectSummary) => {
 function ProjectAccordion({
   projects,
   selectedProjectId,
-  onProjectClick
+  onProjectClick,
+  onNewProject
 }: {
   projects: ProjectSummary[];
   selectedProjectId: number | null;
   onProjectClick: (project: ProjectSummary) => void;
+  onNewProject: () => void;
 }) {
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -173,9 +173,9 @@ function ProjectAccordion({
       <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold">Projects</span>
-          <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
-            Units
-          </span>
+          <LandscapeButton color="primary" size="sm" onClick={onNewProject}>
+            + New Project
+          </LandscapeButton>
         </div>
       </CCardHeader>
       <CCardBody className="p-0">
@@ -246,7 +246,7 @@ function ProjectCountTiles({
   onFilterChange: (filter: PropertyFilterKey) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div className="grid grid-cols-4 gap-1.5">
       {PROPERTY_FILTERS.map((filter) => {
         const isActive = activeFilter === filter.key || (filter.key === 'ALL' && activeFilter === 'ALL');
         const count =
@@ -258,26 +258,27 @@ function ProjectCountTiles({
         const inactiveBg = `${hexColor}1a`; // ~10% opacity on hex
 
         return (
-          <CCard
+          <button
             key={filter.key}
-          className="cursor-pointer transition-all"
-          onClick={() => onFilterChange(filter.key)}
-          style={{
-            borderColor: isActive ? varColor : hexColor,
-            boxShadow: isActive ? `0 0 0 2px ${hexColor}` : undefined,
-            backgroundColor: isActive ? hexColor : inactiveBg,
-            color: textColor
-          }}
-        >
-            <CCardBody className="text-center py-3" style={{ backgroundColor: 'transparent', color: textColor }}>
-              <div className="text-2xl font-semibold" style={{ color: textColor }}>
+            type="button"
+            className="cursor-pointer transition-all rounded-md px-2 py-1.5 text-center"
+            onClick={() => onFilterChange(filter.key)}
+            style={{
+              border: `1px solid ${isActive ? varColor : hexColor}`,
+              boxShadow: isActive ? `0 0 0 1px ${hexColor}` : undefined,
+              backgroundColor: isActive ? hexColor : inactiveBg,
+              color: textColor
+            }}
+          >
+            <div className="flex items-center justify-center gap-1.5">
+              <span className="text-sm font-semibold" style={{ color: textColor }}>
                 {count}
-              </div>
-              <div className="text-xs mt-1" style={{ color: isActive ? '#f8f9fa' : 'var(--cui-secondary-color)' }}>
+              </span>
+              <span className="text-xs truncate" style={{ color: isActive ? '#f8f9fa' : 'var(--cui-secondary-color)' }}>
                 {filter.label}
-              </div>
-            </CCardBody>
-          </CCard>
+              </span>
+            </div>
+          </button>
         );
       })}
     </div>
@@ -349,23 +350,12 @@ export default function DashboardPage() {
     setSelectedProjectId(projectId);
   };
 
-  const handleLandscaperMessage = (message: string) => {
-    // TODO: Implement AI integration with Landscaper
-    console.log('Message to Landscaper:', message);
-  };
-
   const handleFilterChange = (filter: PropertyFilterKey) => {
     if (filter === 'ALL') {
       setActiveFilter('ALL');
       return;
     }
     setActiveFilter((prev) => (prev === filter ? 'ALL' : filter));
-  };
-
-  // Handle file drop from UserTile - show triage modal first
-  const handleFileDrop = (files: File[]) => {
-    setPendingFiles(files);
-    setIsTriageModalOpen(true);
   };
 
   // Clear pending files when modal closes
@@ -432,30 +422,63 @@ export default function DashboardPage() {
     }
   };
 
-  return (
-    <CContainer fluid className="p-4 space-y-2">
-      <div className="sticky top-0 z-30 pb-1" style={{ backgroundColor: 'transparent' }}>
-        <CCard className="shadow-sm" style={{ borderRadius: 12 }}>
-          <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-lg font-semibold">Projects / Project Locations</div>
-              <LandscapeButton color="primary" size="sm" onClick={() => setIsNewProjectModalOpen(true)}>
-                + New Project
-              </LandscapeButton>
-            </div>
-          </CCardHeader>
-          <CCardBody className="space-y-2">
-            <ProjectCountTiles
-              projects={projects}
-              activeFilter={activeFilter}
-              onFilterChange={handleFilterChange}
-            />
-          </CCardBody>
-        </CCard>
-      </div>
+  const [isActivityExpanded, setActivityExpanded] = useState(true);
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(420px,520px)_1fr]">
-        <div className="space-y-3">
+  return (
+    <CContainer fluid className="space-y-2" style={{ padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
+      {/* Three-column layout: Activity+Landscaper | Projects | Map with Filters */}
+      <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start' }}>
+        {/* Left Column: Activity Feed (top) + Landscaper Chat (bottom) */}
+        <div
+          className="flex-shrink-0 sticky top-0 flex flex-col gap-1"
+          style={{
+            width: '30%',
+            minWidth: '350px',
+            maxWidth: '450px',
+            height: 'calc(100vh - 100px)',
+          }}
+        >
+          {/* Landscaper Chat - Top */}
+          <CCard
+            className="flex-1 shadow-lg overflow-hidden"
+            style={{
+              minHeight: '200px',
+            }}
+          >
+            <LandscaperChat
+              projectId={0}
+              activeTab="dashboard"
+              isExpanded={!isActivityExpanded}
+              onToggleExpand={() => setActivityExpanded(!isActivityExpanded)}
+            />
+          </CCard>
+
+          {/* Activity Feed - Bottom */}
+          <CCard
+            className="shadow-lg overflow-hidden"
+            style={{
+              height: isActivityExpanded ? '45%' : '48px',
+              minHeight: isActivityExpanded ? '200px' : '48px',
+              transition: 'height 0.2s ease',
+            }}
+          >
+            <ActivityFeed
+              projectId={0}
+              isExpanded={isActivityExpanded}
+              onToggle={() => setActivityExpanded(!isActivityExpanded)}
+            />
+          </CCard>
+        </div>
+
+        {/* Middle Column: Projects List */}
+        <div
+          className="flex-shrink-0"
+          style={{
+            width: 'minmax(380px, 480px)',
+            minWidth: '380px',
+            maxWidth: '480px',
+          }}
+        >
           <ProjectAccordion
             projects={filteredProjects}
             selectedProjectId={selectedProjectId}
@@ -463,22 +486,32 @@ export default function DashboardPage() {
               setSelectedProjectId(project.project_id);
               handleProjectClick(project.project_id);
             }}
+            onNewProject={() => setIsNewProjectModalOpen(true)}
           />
-          <UserTile username="Gregg" onSubmit={handleLandscaperMessage} onFileDrop={handleFileDrop} />
         </div>
 
-        <CCard className="h-full">
-          <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-            <span className="text-base font-semibold">Project Locations</span>
-          </CCardHeader>
-          <CCardBody style={{ height: '100%', minHeight: '620px' }}>
-            <DashboardMap
-              projects={filteredProjects}
-              selectedProjectId={selectedProjectId}
-              onProjectSelect={handleProjectSelect}
+        {/* Right Column: Filter Tiles + Map */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
+          {/* Filter Tiles */}
+          <div className="px-1">
+            <ProjectCountTiles
+              projects={projects}
+              activeFilter={activeFilter}
+              onFilterChange={handleFilterChange}
             />
-          </CCardBody>
-        </CCard>
+          </div>
+
+          {/* Map */}
+          <CCard style={{ height: 'calc(100vh - 180px)', minHeight: '400px' }}>
+            <CCardBody style={{ height: '100%', padding: 0 }}>
+              <DashboardMap
+                projects={filteredProjects}
+                selectedProjectId={selectedProjectId}
+                onProjectSelect={handleProjectSelect}
+              />
+            </CCardBody>
+          </CCard>
+        </div>
       </div>
 
       <TriageModal

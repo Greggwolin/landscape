@@ -5,7 +5,7 @@
  * Subtab structure matches the INTERNAL navigation of main branch components:
  *
  * Property (Income): design, market, rent-roll → PropertyTab (controlled by activeTab)
- * Operations (Income): rent-roll, expenses → OperationsTab (shows all sections)
+ * Operations (Income): Single unified P&L page (no subtabs) → OperationsTab
  * Valuation (Income): sales-comparison, cost, income → ValuationTab (has internal tabs)
  *
  * @version 2.2
@@ -156,12 +156,10 @@ function StudioContent({
 
       // ========================================
       // FOLDER 3b: OPERATIONS (Income Property)
-      // Subtabs: rent-roll, expenses
-      // OperationsTab has working content (RentalIncomeSection, etc.)
-      // NOI is displayed at the bottom of OperationsTab, not a separate subtab
+      // Single unified P&L page - no subtabs
+      // Shows Operating Income, Expenses, and NOI in one view
       // ========================================
       case 'operations':
-        // All subtabs route to OperationsTab - it shows all content together
         return <OperationsTab project={project} mode="standard" />;
 
       // ========================================

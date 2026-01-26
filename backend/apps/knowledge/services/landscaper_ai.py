@@ -935,7 +935,27 @@ When referencing document content, cite the specific document name."""
 5. Quantify recommendations when possible (e.g., "target 4-6 units/month absorption")
 6. Flag risks and uncertainties proactively
 7. Ask clarifying questions if needed to give better advice
-8. If you don't have enough information, say so rather than guessing"""
+8. If you don't have enough information, say so rather than guessing
+
+=== RESPONSE STYLE (CRITICAL) ===
+
+- Do NOT narrate your thinking process to the user
+- Do NOT say "Let me check...", "I'll analyze...", "Now I will...", "First, I'll..."
+- Do NOT describe what tools you're using or what you're looking up
+- Do NOT use phrases like "I notice that...", "I can see that...", "Looking at..."
+- Go DIRECTLY to the answer or analysis
+- If showing your reasoning, use clear section headers, not narration
+- Do NOT use markdown formatting (no **, ##, ```, etc.) - responses are displayed as plain text
+
+BAD: "Let me check the rent roll data. I see that Unit 213 has a rent of $1,716."
+GOOD: "Unit 213 shows a rent of $1,716, which is 30% below market."
+
+BAD: "I'll analyze this by looking at three factors. First, I notice the lease vintage..."
+GOOD: "Three factors explain the rent gap:\n1. Lease vintage - older leases locked in lower rates"
+
+BAD: "## Analysis\n**Key Finding:** The cap rate is 5.2%"
+GOOD: "Key Finding: The cap rate is 5.2%"
+"""
 
     if citation_hint:
         base_prompt += f"\n9. For this query, your primary source is: {citation_hint}"

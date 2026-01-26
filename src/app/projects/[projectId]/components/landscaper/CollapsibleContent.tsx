@@ -36,10 +36,11 @@ export function CollapsibleContent({
   if (isCollapsed) {
     return (
       <div
-        className="h-full flex flex-col items-center py-3 cursor-pointer hover:bg-hover-overlay transition-colors rounded-xl"
+        className="h-full flex flex-col items-center py-3 cursor-pointer hover:bg-hover-overlay transition-colors"
         onClick={onToggleCollapse}
         style={{
           backgroundColor: 'var(--surface-card)',
+          borderRadius: 'var(--cui-card-border-radius)',
           width: '48px',
           minWidth: '48px',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
@@ -52,9 +53,10 @@ export function CollapsibleContent({
 
   return (
     <div
-      className="h-full flex flex-col rounded-xl shadow-lg overflow-hidden"
+      className="h-full flex flex-col shadow-lg overflow-hidden"
       style={{
         backgroundColor: 'var(--surface-card)',
+        borderRadius: 'var(--cui-card-border-radius)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         width: '750px',
         minWidth: '750px',

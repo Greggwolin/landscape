@@ -9,14 +9,15 @@ interface OperationsHeaderProps {
   totalSF: number;
   isSaving?: boolean;
   isDirty?: boolean;
+  valueAddEnabled?: boolean;
+  onValueAddToggle?: () => void;
   onSave?: () => void;
 }
 
 /**
  * OperationsHeader - Header bar for Operations tab
  *
- * Shows project name, property pills (units, SF), and save indicator.
- * Value-Add toggle is now integrated into the ValueAddCard component.
+ * Shows project name, Value-Add toggle, property pills (units, SF), and save indicator.
  */
 export function OperationsHeader({
   projectName,
@@ -24,12 +25,26 @@ export function OperationsHeader({
   totalSF,
   isSaving = false,
   isDirty = false,
+  valueAddEnabled = false,
+  onValueAddToggle,
   onSave
 }: OperationsHeaderProps) {
   return (
     <CCardHeader className="ops-header d-flex justify-content-between align-items-center">
       <span className="fw-semibold">Operations · {projectName}</span>
       <div className="ops-header-right">
+        {/* Value-Add Toggle */}
+        <div className="ops-header-toggle">
+          <button
+            type="button"
+            className={`va-toggle-compact ${valueAddEnabled ? 'on' : ''}`}
+            onClick={onValueAddToggle}
+            aria-pressed={valueAddEnabled}
+          >
+            <span className="va-toggle-slider" />
+          </button>
+          <span className="va-toggle-label">Value-Add</span>
+        </div>
         <div className="ops-header-pills">
           <span className="ops-pill">
             Units: <b>{unitCount.toLocaleString()}</b>

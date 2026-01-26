@@ -379,6 +379,7 @@ function AdminUsersContent() {
         }}
         user={selectedUser}
         onSubmit={handleUpdateUser}
+        onSetPassword={handleSetPassword}
         isLoading={modalLoading}
       />
 

@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Landscaper Threads, Auth & DCF (Jan 26, 2026)',
+      path: '/docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md',
+      category: 'AI',
+      description: 'Thread-based Landscaper chat with auto-titles and RAG summaries, cookie-based auth middleware for route protection, DCF valuation in Income Approach',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-01-26'
+    },
+    {
       title: 'Location Intelligence System (Jan 26, 2026)',
       path: '/docs/09_session_notes/2026-01-26-location-intelligence-implementation.md',
       category: 'Technical',

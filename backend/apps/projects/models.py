@@ -6,6 +6,7 @@ Tables are mapped to the landscape schema in Neon PostgreSQL.
 """
 
 from django.db import models
+from django.conf import settings
 
 
 class Project(models.Model):
@@ -72,7 +73,7 @@ class Project(models.Model):
     # Financial Configuration
     calculation_frequency = models.CharField(max_length=20, blank=True, null=True)
     planning_efficiency = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
-    discount_rate_pct = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
+    discount_rate_pct = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     cost_of_capital_pct = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
     market_velocity_annual = models.IntegerField(blank=True, null=True)
     velocity_override_reason = models.TextField(blank=True, null=True)
@@ -125,6 +126,104 @@ class Project(models.Model):
     # Configurable attributes (JSONB columns)
     site_attributes = models.JSONField(default=dict, blank=True)
     improvement_attributes = models.JSONField(default=dict, blank=True)
+
+    # =========================================================================
+    # Property Identification (Physical Description fields)
+    # =========================================================================
+    street_address = models.CharField(max_length=200, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=10, blank=True, null=True)
+    zip_code = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True, default='United States')
+    market = models.CharField(max_length=100, blank=True, null=True)
+    submarket = models.CharField(max_length=100, blank=True, null=True)
+    apn_primary = models.CharField(max_length=50, blank=True, null=True)
+    apn_secondary = models.CharField(max_length=50, blank=True, null=True)
+    ownership_type = models.CharField(max_length=50, blank=True, null=True)
+
+    # =========================================================================
+    # Site Characteristics
+    # =========================================================================
+    lot_size_sf = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    lot_size_acres = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
+    current_zoning = models.CharField(max_length=100, blank=True, null=True)
+    proposed_zoning = models.CharField(max_length=100, blank=True, null=True)
+    flood_zone = models.CharField(max_length=20, blank=True, null=True)
+    topography = models.CharField(max_length=50, blank=True, null=True)
+    general_plan = models.CharField(max_length=100, blank=True, null=True)
+    overlay_zones = models.JSONField(default=list, blank=True)
+
+    # =========================================================================
+    # Building Characteristics
+    # =========================================================================
+    gross_sf = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    total_units = models.IntegerField(blank=True, null=True)
+    year_built = models.IntegerField(blank=True, null=True)
+    stories = models.IntegerField(blank=True, null=True)
+
+    # =========================================================================
+    # Pricing & Valuation
+    # =========================================================================
+    asking_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    acquisition_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    acquisition_date = models.DateField(blank=True, null=True)
+    price_per_unit = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    price_per_sf = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    cap_rate_current = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
+    cap_rate_proforma = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
+
+    # =========================================================================
+    # Current Year Financials
+    # =========================================================================
+    current_gpr = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    current_other_income = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    current_gpi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    current_vacancy_rate = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
+    current_egi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    current_opex = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    current_noi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+
+    # =========================================================================
+    # Proforma Financials
+    # =========================================================================
+    proforma_gpr = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    proforma_other_income = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    proforma_gpi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    proforma_vacancy_rate = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
+    proforma_egi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    proforma_opex = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    proforma_noi = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+
+    # =========================================================================
+    # Walkability Scores
+    # =========================================================================
+    walk_score = models.IntegerField(blank=True, null=True)
+    bike_score = models.IntegerField(blank=True, null=True)
+    transit_score = models.IntegerField(blank=True, null=True)
+
+    # =========================================================================
+    # Additional Project Metadata
+    # =========================================================================
+    listing_brokerage = models.CharField(max_length=200, blank=True, null=True)
+    job_number = models.CharField(max_length=50, blank=True, null=True)
+    version_reference = models.CharField(max_length=50, blank=True, null=True)
+    msa_id = models.IntegerField(blank=True, null=True)
+    dms_template_id = models.BigIntegerField(blank=True, null=True)
+    has_takedown_agreement = models.BooleanField(blank=True, null=True, default=False)
+    active_opex_discriminator = models.CharField(max_length=100, blank=True, null=True, default='default')
+    value_add_enabled = models.BooleanField(blank=True, null=True, default=False)
+    cabinet_id = models.BigIntegerField(blank=True, null=True)
+    project_focus = models.CharField(max_length=50, blank=True, null=True)
+
+    # Ownership - links to user who created/owns this project
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='projects',
+        db_column='created_by_id'
+    )
 
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)

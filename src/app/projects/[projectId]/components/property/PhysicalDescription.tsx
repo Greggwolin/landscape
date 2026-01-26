@@ -13,9 +13,11 @@ import {
   CFormSelect,
 } from '@coreui/react';
 import { formatNumber, formatCurrency } from '@/utils/formatNumber';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PhysicalDescriptionProps {
   projectId: number;
+  compact?: boolean; // When true, uses tighter spacing and no outer card wrapper
 }
 
 interface PropertyData {
@@ -232,10 +234,10 @@ function EditableFieldRow({
 
   return (
     <div
-      className="editable-field-row d-flex justify-content-between align-items-start py-2"
+      className="editable-field-row d-flex justify-content-between align-items-center py-1"
       style={{ gap: '0.5rem' }}
     >
-      <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem', fontWeight: 600, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem', fontWeight: 500, flexShrink: 0 }}>{label}</span>
 
       {isEditing ? (
         <div className="d-flex align-items-center gap-1" style={{ minWidth: '120px', maxWidth: '180px', flexShrink: 0 }}>
@@ -417,7 +419,8 @@ const FIELD_KEY_TO_API: Record<string, string> = {
   transitScore: 'transit_score',
 };
 
-export default function PhysicalDescription({ projectId }: PhysicalDescriptionProps) {
+export default function PhysicalDescription({ projectId, compact = false }: PhysicalDescriptionProps) {
+  const { tokens } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null);
@@ -442,29 +445,56 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
 
       const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
+      // Build payload - may include calculated fields for lot size conversion
+      const payload: Record<string, unknown> = { [apiFieldName]: value };
+
+      // Auto-calculate lot size conversions (1 acre = 43,560 SF)
+      if (fieldKey === 'lotSizeAcres' && typeof value === 'number') {
+        const sfValue = Math.round(value * 43560);
+        payload['lot_size_sf'] = sfValue;
+      } else if (fieldKey === 'lotSizeSF' && typeof value === 'number') {
+        const acresValue = Number((value / 43560).toFixed(4));
+        payload['lot_size_acres'] = acresValue;
+      }
+
       try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (tokens?.access) {
+          headers['Authorization'] = `Bearer ${tokens.access}`;
+        }
+
         const response = await fetch(`${apiUrl}/api/projects/${projectId}/`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ [apiFieldName]: value }),
+          headers,
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
           throw new Error(`Failed to save: ${response.status}`);
         }
 
-        // Update local state
-        setPropertyData((prev) =>
-          prev ? { ...prev, [fieldKey]: value } : prev
-        );
+        // Update local state including calculated fields
+        setPropertyData((prev) => {
+          if (!prev) return prev;
+          const updates: Partial<PropertyData> = { [fieldKey]: value };
+
+          // Auto-update the related lot size field in local state
+          if (fieldKey === 'lotSizeAcres' && typeof value === 'number') {
+            updates.lotSizeSF = Math.round(value * 43560);
+          } else if (fieldKey === 'lotSizeSF' && typeof value === 'number') {
+            updates.lotSizeAcres = Number((value / 43560).toFixed(4));
+          }
+
+          return { ...prev, ...updates };
+        });
       } catch (err) {
         console.error(`[PhysicalDescription] Error saving ${fieldKey}:`, err);
         // Could show a toast notification here
       }
     },
-    [projectId]
+    [projectId, tokens]
   );
 
   useEffect(() => {
@@ -475,9 +505,17 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
 
         let data;
 
+        // Build headers with auth token
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (tokens?.access) {
+          headers['Authorization'] = `Bearer ${tokens.access}`;
+        }
+
         // Try Django API first, fall back to Next.js API
         const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-        const djangoResponse = await fetch(`${djangoUrl}/api/projects/${projectId}/`);
+        const djangoResponse = await fetch(`${djangoUrl}/api/projects/${projectId}/`, { headers });
 
         if (djangoResponse.ok) {
           data = await djangoResponse.json();
@@ -552,7 +590,7 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
     }
 
     fetchData();
-  }, [projectId]);
+  }, [projectId, tokens]);
 
   // Count non-null fields in a section for progress indicator
   const countFilledFields = (fields: (string | number | boolean | null | undefined)[]): number => {
@@ -560,6 +598,14 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
   };
 
   if (loading) {
+    if (compact) {
+      return (
+        <div className="d-flex justify-content-center align-items-center py-4">
+          <CSpinner size="sm" className="me-2" />
+          <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>Loading...</span>
+        </div>
+      );
+    }
     return (
       <CCard className="studio-card">
         <CCardHeader className="studio-card-header">
@@ -574,6 +620,13 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
   }
 
   if (error) {
+    if (compact) {
+      return (
+        <div className="p-3">
+          <div className="text-danger" style={{ fontSize: '0.875rem' }}>{error}</div>
+        </div>
+      );
+    }
     return (
       <CCard className="studio-card">
         <CCardHeader className="studio-card-header">
@@ -717,6 +770,196 @@ export default function PhysicalDescription({ projectId }: PhysicalDescriptionPr
   const filledFields = sections.reduce((sum, s) => sum + countFilledFields(s.fields), 0);
   const completionPct = Math.round((filledFields / totalFields) * 100);
 
+  // Compact mode helper - renders a field in single column layout
+  const renderCompactField = (
+    sectionKey: string,
+    label: string,
+    value: string | number | boolean | null | undefined,
+    fieldKey: string,
+    options?: {
+      format?: 'number' | 'currency' | 'rating' | 'boolean' | 'text';
+      inputType?: 'text' | 'number' | 'select';
+      suffix?: string;
+    }
+  ) => {
+    if (!shouldShowField(sectionKey, value)) {
+      return null;
+    }
+    return (
+      <EditableFieldRow
+        label={label}
+        value={value}
+        fieldKey={fieldKey}
+        onSave={handleFieldSave}
+        format={options?.format}
+        inputType={options?.inputType}
+        suffix={options?.suffix}
+      />
+    );
+  };
+
+  // Compact mode render - accordion sections without outer card
+  if (compact) {
+    return (
+      <div className="physical-description-compact">
+        {/* Section A: Property Identification */}
+        <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Property Identification</span>
+            <SectionProgress
+              filled={countFilledFields(sections[0].fields)}
+              total={sections[0].total}
+              showAll={showAllFields[SECTION_KEYS.PROPERTY_ID] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.PROPERTY_ID)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'Property Name', propertyData.propertyName, 'propertyName')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'Street Address', propertyData.streetAddress, 'streetAddress')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'City', propertyData.city, 'city')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'State', propertyData.state, 'state')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'ZIP', propertyData.zipCode, 'zipCode')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'Market (MSA)', propertyData.market, 'market')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'Submarket', propertyData.submarket, 'submarket')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'County', propertyData.county, 'county')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'APN (Primary)', propertyData.apnPrimary, 'apnPrimary')}
+            {renderCompactField(SECTION_KEYS.PROPERTY_ID, 'APN (Secondary)', propertyData.apnSecondary, 'apnSecondary')}
+          </div>
+        </div>
+
+        {/* Section B: Site Characteristics */}
+        <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Site Characteristics</span>
+            <SectionProgress
+              filled={countFilledFields(sections[1].fields)}
+              total={sections[1].total}
+              showAll={showAllFields[SECTION_KEYS.SITE] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.SITE)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.SITE, 'Lot Size (Acres)', propertyData.lotSizeAcres, 'lotSizeAcres', { format: 'number', inputType: 'number', suffix: ' ac' })}
+            {renderCompactField(SECTION_KEYS.SITE, 'Lot Size (SF)', propertyData.lotSizeSF, 'lotSizeSF', { format: 'number', inputType: 'number', suffix: ' SF' })}
+            {renderCompactField(SECTION_KEYS.SITE, 'Current Zoning', propertyData.currentZoning, 'currentZoning')}
+            {renderCompactField(SECTION_KEYS.SITE, 'Proposed Zoning', propertyData.proposedZoning, 'proposedZoning')}
+            {renderCompactField(SECTION_KEYS.SITE, 'Flood Zone', propertyData.floodZone, 'floodZone')}
+            {renderCompactField(SECTION_KEYS.SITE, 'Topography', propertyData.topography, 'topography')}
+            {renderCompactField(SECTION_KEYS.SITE, 'Site Shape', propertyData.siteShape, 'siteShape')}
+            {(showAllFields[SECTION_KEYS.SITE] || isPopulated(propertyData.siteUtilityRating) || isPopulated(propertyData.locationRating) || isPopulated(propertyData.accessRating) || isPopulated(propertyData.visibilityRating)) && (
+              <>
+                {renderCompactField(SECTION_KEYS.SITE, 'Site Utility', propertyData.siteUtilityRating, 'siteUtilityRating', { format: 'rating' })}
+                {renderCompactField(SECTION_KEYS.SITE, 'Location Rating', propertyData.locationRating, 'locationRating', { format: 'rating' })}
+                {renderCompactField(SECTION_KEYS.SITE, 'Access Rating', propertyData.accessRating, 'accessRating', { format: 'rating' })}
+                {renderCompactField(SECTION_KEYS.SITE, 'Visibility Rating', propertyData.visibilityRating, 'visibilityRating', { format: 'rating' })}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Section C: Building Characteristics */}
+        <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Building Characteristics</span>
+            <SectionProgress
+              filled={countFilledFields(sections[2].fields)}
+              total={sections[2].total}
+              showAll={showAllFields[SECTION_KEYS.BUILDING] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.BUILDING)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Total Units', propertyData.totalUnits, 'totalUnits', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Buildings', propertyData.buildingCount, 'buildingCount', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Net Rentable SF', propertyData.netRentableArea, 'netRentableArea', { format: 'number', inputType: 'number', suffix: ' SF' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Gross Building SF', propertyData.grossSF, 'grossSF', { format: 'number', inputType: 'number', suffix: ' SF' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Stories', propertyData.stories, 'stories', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Year Built', propertyData.yearBuilt, 'yearBuilt', { inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Construction Type', propertyData.constructionType, 'constructionType')}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Construction Class', propertyData.constructionClass, 'constructionClass')}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Building Class', propertyData.propertyClass, 'propertyClass')}
+            {renderCompactField(SECTION_KEYS.BUILDING, 'Land:Building Ratio', propertyData.landToBuildingRatio, 'landToBuildingRatio', { format: 'number', inputType: 'number', suffix: ':1' })}
+          </div>
+        </div>
+
+        {/* Section D: Parking & Access */}
+        <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Parking & Access</span>
+            <SectionProgress
+              filled={countFilledFields(sections[3].fields)}
+              total={sections[3].total}
+              showAll={showAllFields[SECTION_KEYS.PARKING] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.PARKING)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.PARKING, 'Total Parking Spaces', propertyData.parkingSpaces, 'parkingSpaces', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.PARKING, 'Parking Ratio', propertyData.parkingRatio, 'parkingRatio', { format: 'number', inputType: 'number', suffix: ' spaces/unit' })}
+            {renderCompactField(SECTION_KEYS.PARKING, 'Parking Type', propertyData.parkingType, 'parkingType')}
+          </div>
+        </div>
+
+        {/* Section E: Condition & Quality */}
+        <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Condition & Quality</span>
+            <SectionProgress
+              filled={countFilledFields(sections[4].fields)}
+              total={sections[4].total}
+              showAll={showAllFields[SECTION_KEYS.CONDITION] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.CONDITION)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.CONDITION, 'Effective Age', propertyData.effectiveAge, 'effectiveAge', { format: 'number', inputType: 'number', suffix: ' years' })}
+            {renderCompactField(SECTION_KEYS.CONDITION, 'Remaining Economic Life', propertyData.remainingEconomicLife, 'remainingEconomicLife', { format: 'number', inputType: 'number', suffix: ' years' })}
+            {renderCompactField(SECTION_KEYS.CONDITION, 'Total Economic Life', propertyData.totalEconomicLife, 'totalEconomicLife', { format: 'number', inputType: 'number', suffix: ' years' })}
+            {renderCompactField(SECTION_KEYS.CONDITION, 'Condition Rating', propertyData.conditionRating, 'conditionRating', { format: 'rating' })}
+            {renderCompactField(SECTION_KEYS.CONDITION, 'Quality Rating', propertyData.qualityRating, 'qualityRating', { format: 'rating' })}
+          </div>
+        </div>
+
+        {/* Section F: Walkability Scores */}
+        <div>
+          <div
+            className="d-flex justify-content-between align-items-center"
+            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Walkability Scores</span>
+            <SectionProgress
+              filled={countFilledFields(sections[5].fields)}
+              total={sections[5].total}
+              showAll={showAllFields[SECTION_KEYS.LOCATION] || false}
+              onToggle={() => toggleShowAll(SECTION_KEYS.LOCATION)}
+            />
+          </div>
+          <div style={{ padding: '0.25rem 0.5rem' }}>
+            {renderCompactField(SECTION_KEYS.LOCATION, 'Walk Score', propertyData.walkScore, 'walkScore', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.LOCATION, 'Bike Score', propertyData.bikeScore, 'bikeScore', { format: 'number', inputType: 'number' })}
+            {renderCompactField(SECTION_KEYS.LOCATION, 'Transit Score', propertyData.transitScore, 'transitScore', { format: 'number', inputType: 'number' })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard (non-compact) mode render
   return (
     <CCard className="studio-card physical-description">
       <CCardHeader className="studio-card-header d-flex justify-content-between align-items-center">

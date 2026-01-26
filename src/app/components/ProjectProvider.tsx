@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { fetchJson } from '@/lib/fetchJson'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ProjectSummary {
   project_id: number
@@ -42,13 +42,45 @@ interface ProjectContextValue {
   error?: Error
 }
 
-const fetcher = (url: string) => fetchJson<ProjectSummary[]>(url)
+/**
+ * Fetcher that includes auth token for user-scoped project filtering.
+ * Token is passed via the key to ensure SWR refetches when auth changes.
+ */
+const fetcher = async ([url, accessToken]: [string, string | null]): Promise<ProjectSummary[]> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`
+  }
+
+  const response = await fetch(url, { headers })
+  const raw = await response.text()
+
+  if (!response.ok) {
+    const preview = raw.slice(0, 200)
+    throw new Error(`Request failed with ${response.status}: ${preview}`)
+  }
+
+  try {
+    return JSON.parse(raw) as ProjectSummary[]
+  } catch {
+    throw new Error('Received non-JSON response from server')
+  }
+}
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { tokens, isLoading: authLoading } = useAuth()
+
+  // Use token in key so SWR refetches when auth changes (login/logout)
+  // Wait for auth to initialize before fetching
+  const swrKey = authLoading ? null : ['/api/projects', tokens?.access || null] as [string, string | null]
+
   const { data, error, isLoading, mutate } = useSWR<ProjectSummary[]>(
-    '/api/projects',
+    swrKey,
     fetcher,
     { revalidateOnFocus: false }
   )
@@ -101,16 +133,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void mutate(undefined, { revalidate: true })
   }, [mutate])
 
+  // Combined loading state includes both auth initialization and data fetching
+  const combinedLoading = authLoading || isLoading
+
   const value = useMemo<ProjectContextValue>(() => ({
     projects: Array.isArray(data) ? data : [],
     activeProjectId,
     activeProject,
     selectProject,
     refreshProjects,
-    isLoading,
-    isReady: !isLoading && !error,
+    isLoading: combinedLoading,
+    isReady: !combinedLoading && !error,
     error: error as Error | undefined,
-  }), [data, activeProjectId, activeProject, selectProject, refreshProjects, isLoading, error])
+  }), [data, activeProjectId, activeProject, selectProject, refreshProjects, combinedLoading, error])
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>
 }

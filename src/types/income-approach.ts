@@ -335,3 +335,128 @@ export const DCF_TILE_COLOR = {
   border: '#7C3AED',
   text: '#c4b5fd',
 };
+
+// ============================================================================
+// DCF TYPES
+// ============================================================================
+
+/**
+ * DCF Cash Flow Period - one year of projected cash flows
+ */
+export interface DCFCashFlowPeriod {
+  year: number;
+  gpr: number;
+  vacancy_loss: number;
+  credit_loss: number;
+  other_income: number;
+  egi: number;
+  base_opex: number;
+  management_fee: number;
+  replacement_reserves: number;
+  total_opex: number;
+  noi: number;
+  pv_factor: number;
+  pv_noi: number;
+}
+
+/**
+ * DCF Exit Analysis - terminal value calculation
+ */
+export interface DCFExitAnalysis {
+  terminal_noi: number;
+  exit_value: number;
+  selling_costs: number;
+  net_reversion: number;
+  pv_reversion: number;
+}
+
+/**
+ * DCF Metrics - key return metrics
+ */
+export interface DCFMetrics {
+  present_value: number;
+  irr: number | null;
+  npv: number | null;
+  equity_multiple: number | null;
+  price_per_unit: number | null;
+  price_per_sf: number | null;
+}
+
+/**
+ * DCF Property Summary - base data used for projections
+ */
+export interface DCFPropertySummary {
+  unit_count: number;
+  total_sf: number;
+  current_annual_rent: number;
+  base_opex: number;
+}
+
+/**
+ * DCF Assumptions - input parameters for DCF calculation
+ */
+export interface DCFAssumptions {
+  hold_period_years: number;
+  discount_rate: number;
+  terminal_cap_rate: number;
+  selling_costs_pct: number;
+  income_growth_rate: number;
+  expense_growth_rate: number;
+  vacancy_rate: number;
+  credit_loss_rate: number;
+  management_fee_pct: number;
+  replacement_reserves_per_unit: number;
+}
+
+/**
+ * DCF Sensitivity Row - one row of the 2D sensitivity matrix
+ */
+export interface DCFSensitivityRow {
+  discount_rate: number;
+  exit_cap_rates: number[];
+  values: number[];
+  is_base_discount: boolean;
+}
+
+/**
+ * Full DCF Analysis Response from API
+ */
+export interface DCFAnalysisData {
+  project_id: number;
+  assumptions: DCFAssumptions;
+  property_summary: DCFPropertySummary;
+  projections: DCFCashFlowPeriod[];
+  exit_analysis: DCFExitAnalysis;
+  metrics: DCFMetrics;
+  sensitivity_matrix: DCFSensitivityRow[];
+}
+
+/**
+ * DCF Value Tile - for display in ValueTiles component
+ */
+export interface DCFValueTile {
+  id: 'dcf';
+  label: string;
+  present_value: number;
+  irr: number | null;
+  equity_multiple: number | null;
+  price_per_unit: number | null;
+  hold_period_years: number;
+}
+
+// ============================================================================
+// DCF COMPONENT PROPS
+// ============================================================================
+
+export interface DCFViewProps {
+  data: DCFAnalysisData;
+  propertySummary: PropertySummary;
+  isLoading?: boolean;
+}
+
+export interface DCFSensitivityMatrixProps {
+  data: DCFSensitivityRow[];
+  selectedDiscountRate: number;
+  selectedExitCapRate: number;
+  unitCount: number;
+}

@@ -4,9 +4,9 @@
  * Displays the three approaches to value: Sales Comparison, Cost, Income.
  * Fully controlled component - activeTab is managed by parent via URL params.
  *
- * @version 2.0
+ * @version 2.1
  * @created 2026-01-23
- * @updated 2026-01-23 - Refactored to be fully controlled (no internal tab state)
+ * @updated 2026-01-25 - Wired up Income Approach with actual components
  */
 
 'use client';
@@ -16,6 +16,7 @@ import { CCard, CCardBody } from '@coreui/react';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from '../../valuation/components/SalesComparisonApproach';
+import { IncomeApproachContent } from './IncomeApproachContent';
 
 interface ValuationTabProps {
   project: any;
@@ -162,20 +163,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
       )}
 
       {normalizedTab === 'income' && (
-        <CCard>
-          <CCardBody className="text-center py-20">
-            <div className="text-6xl mb-4">💰</div>
-            <h3
-              className="font-bold mb-2"
-              style={{ fontSize: '1.25rem', color: 'var(--cui-body-color)' }}
-            >
-              Income Approach
-            </h3>
-            <p style={{ fontSize: '0.9375rem', color: 'var(--cui-secondary-color)' }}>
-              Coming in Phase 2
-            </p>
-          </CCardBody>
-        </CCard>
+        <IncomeApproachContent projectId={projectId} />
       )}
 
       {normalizedTab === 'reconciliation' && (

@@ -13,6 +13,7 @@
 
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface ProjectSelectorCardProps {
@@ -37,33 +38,20 @@ export function ProjectSelectorCard({ projectId }: ProjectSelectorCardProps) {
   };
 
   return (
-    <div
-      className="project-selector-card"
-      style={{
-        backgroundColor: 'var(--cui-card-bg)',
-        borderRadius: '12px',
-        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-        marginBottom: '0.5rem',
-        overflow: 'hidden',
-      }}
+    <CCard
+      className="project-selector-card shadow-lg"
+      style={{ marginBottom: '0.5rem' }}
     >
-      {/* Header - matches Landscaper header */}
-      <div
-        className="flex items-center gap-2 border-b"
-        style={{
-          padding: '0.5rem 1rem',
-          borderColor: 'var(--cui-border-color)',
-          backgroundColor: 'var(--surface-card-header, var(--cui-tertiary-bg))',
-        }}
+      <CCardHeader
+        className="flex items-center gap-2"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
       >
         <span className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '0.9rem' }}>
           Active Project
         </span>
-      </div>
+      </CCardHeader>
 
-      {/* Body */}
-      <div style={{ padding: '0.75rem 1rem' }}>
-        {/* Project selector dropdown */}
+      <CCardBody style={{ padding: '0.75rem 1rem' }}>
         <select
           value={project.project_id}
           onChange={(e) => handleProjectChange(Number(e.target.value))}
@@ -84,7 +72,7 @@ export function ProjectSelectorCard({ projectId }: ProjectSelectorCardProps) {
             </option>
           ))}
         </select>
-      </div>
-    </div>
+      </CCardBody>
+    </CCard>
   );
 }

@@ -20,9 +20,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  border-radius: 12px 12px 0 0;
   overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 /* ==========================================================================
@@ -469,7 +467,7 @@
   }
 
   .folder-tabs-container {
-    border-radius: 0;
+    /* Border radius handled by parent CCard */
   }
 
   .folder-tabs-row1 {

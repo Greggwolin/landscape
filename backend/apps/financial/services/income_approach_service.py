@@ -69,39 +69,58 @@ class IncomeApproachDataService:
     def get_dcf_parameters(self) -> Dict[str, Any]:
         """
         Pull DCF params from tbl_cre_dcf_analysis.
-        Falls back to tbl_project_assumption for exit cap rate.
+        Falls back to tbl_project_assumption for exit cap rate, then defaults.
+        Gracefully handles missing tables.
         """
         with connection.cursor() as cursor:
-            # Try tbl_cre_dcf_analysis first (via cre_property)
-            cursor.execute("""
-                SELECT
-                    dcf.hold_period_years,
-                    dcf.discount_rate,
-                    dcf.terminal_cap_rate,
-                    dcf.selling_costs_pct
-                FROM landscape.tbl_cre_dcf_analysis dcf
-                JOIN landscape.tbl_cre_property cp ON cp.cre_property_id = dcf.cre_property_id
-                WHERE cp.project_id = %s
-                ORDER BY dcf.created_at DESC
-                LIMIT 1
-            """, [self.project_id])
-            row = cursor.fetchone()
+            # Check if tbl_cre_dcf_analysis exists before querying
+            try:
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'landscape'
+                        AND table_name = 'tbl_cre_dcf_analysis'
+                    )
+                """)
+                table_exists = cursor.fetchone()[0]
 
-            if row:
-                return {
-                    'hold_period_years': row[0] or self.DEFAULTS['hold_period_years'],
-                    'discount_rate': self._decimal_to_float(row[1], self.DEFAULTS['discount_rate']),
-                    'terminal_cap_rate': self._decimal_to_float(row[2], self.DEFAULTS['terminal_cap_rate']),
-                    'selling_costs_pct': self._decimal_to_float(row[3], self.DEFAULTS['selling_costs_pct']),
-                }
+                if table_exists:
+                    # Try tbl_cre_dcf_analysis first (via cre_property)
+                    cursor.execute("""
+                        SELECT
+                            dcf.hold_period_years,
+                            dcf.discount_rate,
+                            dcf.terminal_cap_rate,
+                            dcf.selling_costs_pct
+                        FROM landscape.tbl_cre_dcf_analysis dcf
+                        JOIN landscape.tbl_cre_property cp ON cp.cre_property_id = dcf.cre_property_id
+                        WHERE cp.project_id = %s
+                        ORDER BY dcf.created_at DESC
+                        LIMIT 1
+                    """, [self.project_id])
+                    row = cursor.fetchone()
+
+                    if row:
+                        return {
+                            'hold_period_years': row[0] or self.DEFAULTS['hold_period_years'],
+                            'discount_rate': self._decimal_to_float(row[1], self.DEFAULTS['discount_rate']),
+                            'terminal_cap_rate': self._decimal_to_float(row[2], self.DEFAULTS['terminal_cap_rate']),
+                            'selling_costs_pct': self._decimal_to_float(row[3], self.DEFAULTS['selling_costs_pct']),
+                        }
+            except Exception:
+                # Table doesn't exist or query failed - fall through to defaults
+                pass
 
             # Fallback to project assumptions for exit cap rate
-            cursor.execute("""
-                SELECT assumption_value
-                FROM landscape.tbl_project_assumption
-                WHERE project_id = %s AND assumption_key = 'cap_rate_exit'
-            """, [self.project_id])
-            exit_cap_row = cursor.fetchone()
+            try:
+                cursor.execute("""
+                    SELECT assumption_value
+                    FROM landscape.tbl_project_assumption
+                    WHERE project_id = %s AND assumption_key = 'cap_rate_exit'
+                """, [self.project_id])
+                exit_cap_row = cursor.fetchone()
+            except Exception:
+                exit_cap_row = None
 
             return {
                 'hold_period_years': self.DEFAULTS['hold_period_years'],
@@ -220,19 +239,23 @@ class IncomeApproachDataService:
                         value, self.DEFAULTS['replacement_reserves_per_unit']
                     )
 
-            # Also check tbl_debt_facility for replacement reserves
-            cursor.execute("""
-                SELECT replacement_reserve_per_unit
-                FROM landscape.tbl_debt_facility
-                WHERE project_id = %s AND replacement_reserve_per_unit IS NOT NULL
-                LIMIT 1
-            """, [self.project_id])
-            facility_row = cursor.fetchone()
+            # Also check tbl_debt_facility for replacement reserves (if table exists)
+            try:
+                cursor.execute("""
+                    SELECT replacement_reserve_per_unit
+                    FROM landscape.tbl_debt_facility
+                    WHERE project_id = %s AND replacement_reserve_per_unit IS NOT NULL
+                    LIMIT 1
+                """, [self.project_id])
+                facility_row = cursor.fetchone()
 
-            if facility_row and facility_row[0]:
-                result['replacement_reserves_per_unit'] = self._decimal_to_float(
-                    facility_row[0], result['replacement_reserves_per_unit']
-                )
+                if facility_row and facility_row[0]:
+                    result['replacement_reserves_per_unit'] = self._decimal_to_float(
+                        facility_row[0], result['replacement_reserves_per_unit']
+                    )
+            except Exception:
+                # Table doesn't exist - skip
+                pass
 
             return result
 
@@ -344,8 +367,32 @@ class IncomeApproachDataService:
         """
         Update DCF parameters in tbl_cre_dcf_analysis.
         Creates record if it doesn't exist.
+        Falls back to storing in tbl_project_assumption if tables don't exist.
         """
         with connection.cursor() as cursor:
+            # Check if the required tables exist
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'landscape'
+                    AND table_name = 'tbl_cre_property'
+                )
+            """)
+            tables_exist = cursor.fetchone()[0]
+
+            if not tables_exist:
+                # Fall back to storing DCF params in project assumptions
+                assumption_mapping = {
+                    'hold_period_years': 'dcf_hold_period_years',
+                    'discount_rate': 'dcf_discount_rate',
+                    'terminal_cap_rate': 'cap_rate_exit',
+                    'selling_costs_pct': 'dcf_selling_costs_pct',
+                }
+                for key, assumption_key in assumption_mapping.items():
+                    if key in updates:
+                        self.update_project_assumption(assumption_key, updates[key])
+                return True
+
             # Find or create cre_property for this project
             cursor.execute("""
                 SELECT cre_property_id

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useIssueReporter } from '@/components/IssueReporter';
+import { useAuth } from '@/contexts/AuthContext';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
 import CIcon from '@coreui/icons-react';
@@ -17,11 +18,10 @@ import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
  * Renders the primary navigation bar with:
  * - Logo (left)
  * - Global links: Dashboard, Documents (right-aligned)
- * - Landscaper AI button
- * - Sandbox dropdown
- * - User menu
- * - Settings button (opens AdminModal)
  * - Theme toggle
+ * - Bug report button (admin users only)
+ * - Settings button (opens AdminModal)
+ * - User menu (far right)
  *
  * Height: 58px
  * Background: var(--nav-bg)
@@ -34,15 +34,10 @@ interface TopNavigationBarProps {
 export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
   const [showBugHint, setShowBugHint] = React.useState(false);
-  const [mode, setMode] = React.useState<'analyst' | 'developer'>('analyst');
   const logoSrc = '/logo-invert.png';
-
-  const toggleMode = () => {
-    setMode(prev => prev === 'analyst' ? 'developer' : 'analyst');
-    // TODO: Persist mode preference to localStorage or user settings
-  };
 
   const navHoverHandlers = (isActive = false) => ({
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
@@ -114,40 +109,6 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               </Link>
             ))}
 
-            {/* Dropdowns */}
-            <UserMenuDropdown />
-
-            {/* Mode Toggle (Analyst/Developer) */}
-            <button
-              type="button"
-              onClick={toggleMode}
-              className="rounded-full px-3 py-2 text-sm font-medium transition-colors"
-              style={{
-                color: 'var(--nav-text)',
-                backgroundColor: 'transparent',
-              }}
-              {...navHoverHandlers()}
-              aria-label="Toggle Analyst/Developer mode"
-              title={`Switch to ${mode === 'analyst' ? 'Developer' : 'Analyst'} mode`}
-            >
-              {mode === 'analyst' ? 'Analyst' : 'Developer'}
-            </button>
-
-            {/* Settings Button */}
-            <button
-              type="button"
-              onClick={onSettingsClick}
-              className="rounded-full p-2 transition-colors"
-              style={{
-                color: 'var(--nav-text)',
-                backgroundColor: 'transparent',
-              }}
-              {...navHoverHandlers()}
-              aria-label="Open settings"
-            >
-              <CIcon icon={cilSettings} size="lg" />
-            </button>
-
             {/* Theme Toggle */}
             <button
               type="button"
@@ -164,37 +125,60 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               {theme === 'light' ? 'Dark' : 'Light'}
             </button>
 
-            {/* Bug/Issues Icon Button */}
-            <div className="relative flex flex-col items-end">
-              <button
-                type="button"
-                data-issue-reporter-ignore="true"
-                onClick={handleBugButtonClick}
-                className="rounded-full p-2 transition-colors"
-                style={{ color: hasTargetContext ? 'var(--nav-text)' : 'var(--nav-border)' }}
-                {...navHoverHandlers()}
-                aria-label={
-                  hasTargetContext
-                    ? `Report a bug for ${lastTargetLabel ?? 'the selected element'}`
-                    : 'Click any UI element first, then tap the bug icon'
-                }
-                title={
-                  hasTargetContext
-                    ? 'Report a bug for the last element you interacted with'
-                    : 'Click the target element first, then tap this icon'
-                }
-              >
-                <CIcon icon={cilBug} size="lg" />
-              </button>
-              {!hasTargetContext && showBugHint && (
-                <div
+            {/* Bug/Issues Icon Button - Admin Only */}
+            {user?.is_staff && (
+              <div className="relative flex flex-col items-end">
+                <button
+                  type="button"
                   data-issue-reporter-ignore="true"
-                  className="absolute right-0 top-full mt-2 rounded-md bg-slate-800 px-3 py-1 text-xs font-medium text-white shadow-lg"
+                  onClick={handleBugButtonClick}
+                  className="rounded-full p-2 transition-colors"
+                  style={{ color: hasTargetContext ? 'var(--nav-text)' : 'var(--nav-border)' }}
+                  {...navHoverHandlers()}
+                  aria-label={
+                    hasTargetContext
+                      ? `Report a bug for ${lastTargetLabel ?? 'the selected element'}`
+                      : 'Click any UI element first, then tap the bug icon'
+                  }
+                  title={
+                    hasTargetContext
+                      ? 'Report a bug for the last element you interacted with'
+                      : 'Click the target element first, then tap this icon'
+                  }
                 >
-                  Click a UI element first, then tap the bug icon.
-                </div>
-              )}
-            </div>
+                  <CIcon icon={cilBug} size="lg" />
+                </button>
+                {!hasTargetContext && showBugHint && (
+                  <div
+                    data-issue-reporter-ignore="true"
+                    className="absolute right-0 top-full mt-2 rounded-md bg-slate-800 px-3 py-1 text-xs font-medium text-white shadow-lg"
+                  >
+                    Click a UI element first, then tap the bug icon.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settings Button */}
+            <button
+              type="button"
+              onClick={onSettingsClick}
+              className="rounded-full p-2 transition-colors"
+              style={{
+                color: 'var(--nav-text)',
+                backgroundColor: 'transparent',
+              }}
+              {...navHoverHandlers()}
+              aria-label="Open settings"
+            >
+              <CIcon icon={cilSettings} size="lg" />
+            </button>
+
+            {/* Divider */}
+            <div className="h-6 w-px mx-1" style={{ backgroundColor: 'var(--nav-border)' }} />
+
+            {/* User Menu - Far Right */}
+            <UserMenuDropdown />
           </div>
         </div>
       </header>

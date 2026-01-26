@@ -49,4 +49,5 @@ urlpatterns = [
     path("api/knowledge/", include('apps.knowledge.urls')),  # Knowledge/extraction system
     path("api/", include('apps.contacts.urls')),  # Cabinet/Contact management
     path("api/", include('apps.feedback.urls')),  # Tester feedback system
+    path("api/v1/location-intelligence/", include('apps.location_intelligence.urls')),  # Location Intelligence
 ]
