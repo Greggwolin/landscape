@@ -50,6 +50,16 @@ Discounted Cash Flow analysis added to Income Approach:
 - ✅ **Method Toggle** - Switch between Direct Cap and DCF in Value Tiles
 - 📁 **Location:** See `docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md`
 
+**E. Operating Statement Unified Table**
+
+Unified Operating Income + Operating Expenses into a single aligned Operating Statement table:
+
+- ✅ **Single Grid Layout** - Shared 8-column grid across income, vacancy, and expenses
+- ✅ **Drag-and-Drop Preserved** - Expense children remain draggable for recategorization
+- ✅ **Value-Add Columns** - Post-Reno/Reno Total hidden via visibility when disabled
+- ✅ **Detail/Summary Toggle** - Expense section expansion retained
+- 📁 **Location:** See `docs/00_overview/status/OPERATING_STATEMENT_UNIFIED_TABLE_COMPLETE_26-01-26.md`
+
 ### Previous Update: Operations & Income Approach Data Flow Fix (January 17, 2026)
 
 Major refactoring to establish single source of truth for financial data across tabs:
@@ -105,6 +115,13 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 ## Current State Snapshot (2026-01-26)
 
 ### 🆕 Latest Updates
+
+**January 26, 2026** - Operating Statement Unified Table:
+- ✅ **Single Table** - Operating Income + Expenses merged into one grid
+- ✅ **Aligned Columns** - Label/Units/Current/Annual/$/SF/Loss to Lease/Post-Reno/Reno Total
+- ✅ **Expense Dragging** - Drag/drop retained within OpEx section
+- ✅ **Value-Add Columns** - Post-Reno columns hidden when disabled
+- 📁 **Files:** See `docs/00_overview/status/OPERATING_STATEMENT_UNIFIED_TABLE_COMPLETE_26-01-26.md`
 
 **January 17, 2026** - Operations & Income Approach Data Flow Fix:
 - ✅ **Data Flow Architecture** - Property Tab → Operations Tab → Income Approach (single source of truth)

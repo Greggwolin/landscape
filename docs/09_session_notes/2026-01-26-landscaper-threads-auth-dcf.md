@@ -8,7 +8,7 @@
 
 ## Summary
 
-Multiple feature implementations completed: (1) Thread-based chat system for Landscaper AI with auto-generated titles and RAG summaries, (2) Auth middleware for route protection using cookie-based token detection, (3) DCF valuation analysis added to Income Approach tab.
+Multiple feature implementations completed: (1) Thread-based chat system for Landscaper AI with auto-generated titles and RAG summaries, (2) Auth middleware for route protection using cookie-based token detection, (3) DCF valuation analysis added to Income Approach tab, (4) Operating Statement unified table for the Operations tab with aligned columns and preserved drag-and-drop.
 
 ## Major Accomplishments
 
@@ -86,6 +86,23 @@ Added Discounted Cash Flow analysis to the Income Approach tab.
 - IRR and equity multiple display
 - Toggle between Direct Cap and DCF methods
 
+### 4. Operating Statement Unified Table ✅
+
+Merged Operating Income and Operating Expenses into a single grid-based Operating Statement.
+
+**Highlights:**
+- Single 8-column grid for consistent alignment across all rows
+- Value-Add columns hidden via visibility when disabled (no reflow)
+- Expense drag-and-drop preserved for recategorization
+- Detail/Summary toggle retained for expense section
+- Unified section headers and totals (EGI, Total OpEx, NOI)
+
+**Frontend Files:**
+- `src/components/operations/OperatingStatement.tsx` (new unified component)
+- `src/app/projects/[projectId]/components/tabs/OperationsTab.tsx` (wired unified table)
+- `src/components/operations/OperationsHeader.tsx` (header title)
+- `src/styles/operations-tab.css` (grid + row styling)
+
 ## Files Modified
 
 ### Backend
@@ -104,6 +121,10 @@ Added Discounted Cash Flow analysis to the Income Approach tab.
 - `src/components/valuation/income-approach/ValueTiles.tsx` - DCF tile
 - `src/hooks/useIncomeApproach.ts` - DCF hook methods
 - `src/types/income-approach.ts` - DCF types
+- `src/components/operations/OperatingStatement.tsx` - Unified Operating Statement table
+- `src/app/projects/[projectId]/components/tabs/OperationsTab.tsx` - Operating Statement integration
+- `src/components/operations/OperationsHeader.tsx` - Header title update
+- `src/styles/operations-tab.css` - Grid + row styling updates
 
 ### New Files Created
 - `backend/apps/landscaper/services/thread_service.py`
@@ -114,6 +135,7 @@ Added Discounted Cash Flow analysis to the Income Approach tab.
 - `src/hooks/useLandscaperThreads.ts`
 - `src/components/valuation/income-approach/DCFView.tsx`
 - `src/app/login/LoginForm.tsx`
+- `src/components/operations/OperatingStatement.tsx`
 
 ## Technical Notes
 

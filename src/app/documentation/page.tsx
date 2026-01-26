@@ -39,6 +39,14 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2026-01-26'
     },
     {
+      title: 'Operating Statement Unified Table (Jan 26, 2026)',
+      path: '/docs/00_overview/status/OPERATING_STATEMENT_UNIFIED_TABLE_COMPLETE_26-01-26.md',
+      category: 'Component',
+      description: 'Unified Operating Income + Expenses into a single aligned grid with drag-and-drop OpEx, value-add columns, and shared totals (EGI/NOI).',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-26'
+    },
+    {
       title: 'Documentation Update (Jan 18, 2026)',
       path: '/docs/09_session_notes/2026-01-18-documentation-update.md',
       category: 'Status',
