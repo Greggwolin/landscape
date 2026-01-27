@@ -1,6 +1,6 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-26
-**Version:** 2.8
+**Last Updated:** 2026-01-27
+**Version:** 2.9
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence)
 
 ---
@@ -9,7 +9,20 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Multi-Feature Release (January 26, 2026)**
+### 🆕 **Latest Update: Operating Expense Inline Editing (January 27, 2026)**
+
+**Operating Expense Category Inline Editing**
+
+Added inline editing capability for operating expense line items in the Operations Tab:
+
+- ✅ **ItemNameEditor Component** - Native dropdown using CoreUI `CFormSelect`
+- ✅ **Double-Click to Edit** - Click expense item names to open category picker
+- ✅ **Account Number Format** - Shows `4110 — Property Taxes` format matching app styling
+- ✅ **useOpexCategories Hook** - SWR-based category fetching by parent
+- ✅ **PATCH API** - `/api/projects/{id}/opex/{id}` for category updates
+- 📁 **Location:** See `docs/09_session_notes/2026-01-27-opex-inline-editing.md`
+
+### Previous Update: Multi-Feature Release (January 26, 2026)
 
 **A. Location Intelligence System**
 
@@ -112,9 +125,17 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-01-26)
+## Current State Snapshot (2026-01-27)
 
 ### 🆕 Latest Updates
+
+**January 27, 2026** - Operating Expense Inline Editing:
+- ✅ **ItemNameEditor** - CoreUI CFormSelect dropdown for category selection
+- ✅ **Double-Click UX** - Double-click expense child row labels to edit
+- ✅ **Account Number Format** - `4110 — Property Taxes` matches app styling
+- ✅ **useOpexCategories Hook** - SWR-based data fetching by parent category
+- ✅ **PATCH Endpoint** - Single expense updates via `/api/projects/{id}/opex/{id}`
+- 📁 **Files:** See `docs/09_session_notes/2026-01-27-opex-inline-editing.md`
 
 **January 26, 2026** - Operating Statement Unified Table:
 - ✅ **Single Table** - Operating Income + Expenses merged into one grid

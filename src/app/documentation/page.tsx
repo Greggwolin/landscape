@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'OpEx Inline Editing (Jan 27, 2026)',
+      path: '/docs/09_session_notes/2026-01-27-opex-inline-editing.md',
+      category: 'Component',
+      description: 'Double-click inline editing for operating expense category reassignment - CoreUI CFormSelect dropdown, useOpexCategories hook, PATCH API endpoint',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-27'
+    },
+    {
       title: 'Landscaper Threads, Auth & DCF (Jan 26, 2026)',
       path: '/docs/09_session_notes/2026-01-26-landscaper-threads-auth-dcf.md',
       category: 'AI',
@@ -266,9 +274,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Operations & Income Approach data flow fix (Jan 17)',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), OpEx inline editing (Jan 27)',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-01-18'
+      lastModified: '2026-01-27'
     },
     {
       title: 'CRE Implementation Summary',
