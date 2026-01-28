@@ -6,13 +6,24 @@ API views for narrative versioning, comments, and track changes.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import transaction
 
-from .models import NarrativeVersion, NarrativeComment, NarrativeChange
+from apps.containers.models import Container
+
+from .models import (
+    NarrativeVersion,
+    NarrativeComment,
+    NarrativeChange,
+    LandComparable,
+    LandCompAdjustment,
+    ContainerCostMetadata,
+    CostApproachDepreciation,
+)
 from .serializers import (
     NarrativeVersionSerializer,
     NarrativeVersionListSerializer,
@@ -20,6 +31,10 @@ from .serializers import (
     NarrativeCommentSerializer,
     NarrativeChangeSerializer,
     AcceptChangesSerializer,
+    LandComparableSerializer,
+    LandCompAdjustmentSerializer,
+    ContainerCostMetadataSerializer,
+    CostApproachDepreciationSerializer,
 )
 
 
@@ -198,6 +213,146 @@ class ProjectNarrativeVersionsView(APIView):
             'count': versions.count(),
             'results': serializer.data
         })
+
+
+class ProjectLandComparablesView(APIView):
+    """List and create land comparables scoped to a project."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get(self, request, project_id):
+        queryset = LandComparable.objects.filter(project_id=project_id).order_by('comp_number', 'land_comparable_id')
+        serializer = LandComparableSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, project_id):
+        data = request.data.copy()
+        data['project_id'] = project_id
+        serializer = LandComparableSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class LandComparableDetailView(APIView):
+    """Retrieve, update, or delete a single land comparable."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get_object(self, project_id, comp_id):
+        return get_object_or_404(LandComparable, land_comparable_id=comp_id, project_id=project_id)
+
+    def get(self, request, project_id, comp_id):
+        comparable = self.get_object(project_id, comp_id)
+        serializer = LandComparableSerializer(comparable)
+        return Response(serializer.data)
+
+    def patch(self, request, project_id, comp_id):
+        comparable = self.get_object(project_id, comp_id)
+        serializer = LandComparableSerializer(comparable, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, project_id, comp_id):
+        comparable = self.get_object(project_id, comp_id)
+        comparable.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LandComparableAdjustmentsView(APIView):
+    """List and create adjustments for a land comparable."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get(self, request, project_id, comp_id):
+        comparable = get_object_or_404(LandComparable, land_comparable_id=comp_id, project_id=project_id)
+        adjustments = comparable.adjustments.order_by('-created_at')
+        serializer = LandCompAdjustmentSerializer(adjustments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, project_id, comp_id):
+        get_object_or_404(LandComparable, land_comparable_id=comp_id, project_id=project_id)
+        data = request.data.copy()
+        data['land_comparable'] = comp_id
+        serializer = LandCompAdjustmentSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class LandComparableAdjustmentDetailView(APIView):
+    """Retrieve, update, or delete a specific adjustment."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get_object(self, project_id, comp_id, adj_id):
+        return get_object_or_404(
+            LandCompAdjustment,
+            adjustment_id=adj_id,
+            land_comparable_id=comp_id,
+            land_comparable__project_id=project_id
+        )
+
+    def get(self, request, project_id, comp_id, adj_id):
+        adjustment = self.get_object(project_id, comp_id, adj_id)
+        serializer = LandCompAdjustmentSerializer(adjustment)
+        return Response(serializer.data)
+
+    def patch(self, request, project_id, comp_id, adj_id):
+        adjustment = self.get_object(project_id, comp_id, adj_id)
+        serializer = LandCompAdjustmentSerializer(adjustment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, project_id, comp_id, adj_id):
+        adjustment = self.get_object(project_id, comp_id, adj_id)
+        adjustment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ContainerCostMetadataView(APIView):
+    """Retrieve or upsert cost metadata for a container."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get(self, request, container_id):
+        container = get_object_or_404(Container, pk=container_id)
+        metadata = ContainerCostMetadata.objects.filter(container=container).first()
+        if not metadata:
+            return Response({'detail': 'No metadata found'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ContainerCostMetadataSerializer(metadata)
+        return Response(serializer.data)
+
+    def put(self, request, container_id):
+        container = get_object_or_404(Container, pk=container_id)
+        metadata = ContainerCostMetadata.objects.filter(container=container).first()
+        data = request.data.copy()
+        data['container'] = container_id
+        serializer = ContainerCostMetadataSerializer(metadata, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class ProjectDepreciationView(APIView):
+    """Project-level depreciation data used by the Cost Approach."""
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get(self, request, project_id):
+        depreciation = CostApproachDepreciation.objects.filter(project_id=project_id).first()
+        if not depreciation:
+            return Response({'detail': 'Depreciation record not found'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = CostApproachDepreciationSerializer(depreciation)
+        return Response(serializer.data)
+
+    def put(self, request, project_id):
+        depreciation = CostApproachDepreciation.objects.filter(project_id=project_id).first()
+        serializer = CostApproachDepreciationSerializer(
+            depreciation,
+            data=request.data,
+            partial=True,
+            context={'project_id': project_id}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class NarrativeCommentViewSet(viewsets.ModelViewSet):

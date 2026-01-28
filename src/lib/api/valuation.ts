@@ -12,7 +12,15 @@ import type {
   SalesCompAdjustmentForm,
   AIAdjustmentSuggestion,
   CostApproach,
+  CostApproachDepreciationForm,
+  CostApproachDepreciationRecord,
+  ContainerCostMetadata,
+  ContainerCostMetadataForm,
   IncomeApproach,
+  LandComparable,
+  LandComparableForm,
+  LandCompAdjustment,
+  LandCompAdjustmentForm,
   ValuationReconciliation,
   ValuationReconciliationForm,
   ValuationSummary,
@@ -262,6 +270,277 @@ export async function saveCostApproach(
 
     return response.json();
   }
+}
+
+// ============================================================================
+// LAND COMPARABLES API
+// ============================================================================
+
+export async function getLandComparables(projectId: number): Promise<LandComparable[]> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch land comparables: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function createLandComparable(
+  projectId: number,
+  data: LandComparableForm
+): Promise<LandComparable> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to create land comparable: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
+}
+
+export async function updateLandComparable(
+  projectId: number,
+  compId: number,
+  data: LandComparableForm
+): Promise<LandComparable> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to update land comparable: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteLandComparable(projectId: number, compId: number): Promise<void> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete land comparable: ${response.statusText}`);
+  }
+}
+
+export async function getLandComparableAdjustments(
+  projectId: number,
+  compId: number
+): Promise<LandCompAdjustment[]> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch land comp adjustments: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function createLandComparableAdjustment(
+  projectId: number,
+  compId: number,
+  data: LandCompAdjustmentForm
+): Promise<LandCompAdjustment> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to save adjustment: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
+}
+
+export async function updateLandComparableAdjustment(
+  projectId: number,
+  compId: number,
+  adjustmentId: number,
+  data: LandCompAdjustmentForm
+): Promise<LandCompAdjustment> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/${adjustmentId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to update adjustment: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteLandComparableAdjustment(
+  projectId: number,
+  compId: number,
+  adjustmentId: number
+): Promise<void> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/${adjustmentId}/`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete adjustment: ${response.statusText}`);
+  }
+}
+
+// ============================================================================
+// CONTAINER COST METADATA
+// ============================================================================
+
+export async function getContainerCostMetadata(containerId: number): Promise<ContainerCostMetadata> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/containers/${containerId}/cost-metadata/`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch cost metadata: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function saveContainerCostMetadata(
+  containerId: number,
+  data: ContainerCostMetadataForm
+): Promise<ContainerCostMetadata> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/containers/${containerId}/cost-metadata/`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to save cost metadata: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// DEPRECIATION API
+// ============================================================================
+
+export async function getProjectDepreciation(
+  projectId: number
+): Promise<CostApproachDepreciationRecord | null> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/depreciation/`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch depreciation: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function saveProjectDepreciation(
+  projectId: number,
+  data: CostApproachDepreciationForm
+): Promise<CostApproachDepreciationRecord> {
+  const response = await fetch(
+    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/depreciation/`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Failed to save depreciation: ${JSON.stringify(errorData)}`);
+  }
+
+  return response.json();
 }
 
 // ============================================================================

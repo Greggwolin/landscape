@@ -6,16 +6,22 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import type { SalesComparable, SalesComparableForm, ValuationReconciliation } from '@/types/valuation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SalesComparable, ValuationReconciliation } from '@/types/valuation';
 import { ComparablesGrid } from './ComparablesGrid';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
 // LandscaperChatPanel removed - redundant with main Landscaper panel which has tab-aware context
 import { ComparablesMap } from './ComparablesMap';
 import ValuationSalesCompMap from '@/components/map/ValuationSalesCompMap';
 import { LandscapeButton } from '@/components/ui/landscape';
-import { SalesComparableModal } from './SalesComparableModal';
-import { createSalesComparable, updateSalesComparable, deleteSalesComparable } from '@/lib/api/valuation';
+import { AddComparableModal } from '@/components/valuation/AddComparableModal';
+import { buildSubjectLocationFromProject } from '@/lib/valuation/subjectLocation';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+import {
+  createSalesComparable,
+  deleteSalesComparable,
+  updateSalesComparable,
+} from '@/lib/api/valuation';
 
 interface SalesComparisonApproachProps {
   projectId: number;
@@ -32,12 +38,15 @@ export function SalesComparisonApproach({
   onRefresh,
   mode = 'multifamily'
 }: SalesComparisonApproachProps) {
-  const [selectedComp, setSelectedComp] = useState<SalesComparable | null>(null);
   const [mapHeight, setMapHeight] = useState<string>('800px');
   const [showModal, setShowModal] = useState(false);
   const [editingComp, setEditingComp] = useState<SalesComparable | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-
+  const { activeProject } = useProjectContext();
+  const subjectLocation = useMemo(
+    () => buildSubjectLocationFromProject(activeProject),
+    [activeProject]
+  );
   // Measure the grid height and set map to match
   useEffect(() => {
     const updateMapHeight = () => {
@@ -85,20 +94,27 @@ export function SalesComparisonApproach({
   };
 
   const handleAddComp = () => {
+    console.log('AddComparableModal trigger from SalesComparisonApproach');
     setEditingComp(null);
     setShowModal(true);
   };
 
-  const handleSaveComp = async (data: SalesComparableForm) => {
-    if (editingComp) {
-      // Update existing
-      await updateSalesComparable(editingComp.comparable_id, data);
-    } else {
-      // Create new
-      await createSalesComparable(data);
-    }
-    onRefresh?.();
-  };
+  const handleSaveComp = useCallback(
+    async (formData: Record<string, unknown>) => {
+      try {
+        if (editingComp?.id) {
+          await updateSalesComparable(editingComp.id, formData);
+        } else {
+          await createSalesComparable(formData);
+        }
+        onRefresh?.();
+      } catch (error) {
+        console.error('Failed to save comparable:', error);
+        alert(`Failed to save comparable: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    },
+    [editingComp, onRefresh]
+  );
 
   const handleCloseModal = () => {
     setShowModal(false);
@@ -110,23 +126,16 @@ export function SalesComparisonApproach({
   // If 5 or fewer comps: Map goes in sidebar (right side)
   const showMapAbove = comparables.length > 5;
 
-  // Subject property location (Chadron Ave - hardcoded for now, should come from project data)
-  const subjectProperty = {
-    latitude: 33.9164,
-    longitude: -118.3525,
-    name: '14105 Chadron Ave'
-  };
-
   return (
     <div className="space-y-6">
-      {/* Sales Comparable Modal */}
-      <SalesComparableModal
-        visible={showModal}
-        comparable={editingComp}
-        projectId={projectId}
-        mode={mode}
+      <AddComparableModal
+        isOpen={showModal}
         onClose={handleCloseModal}
         onSave={handleSaveComp}
+        projectId={projectId}
+        compType="improved"
+        subjectLocation={subjectLocation}
+        existingComp={editingComp ?? undefined}
       />
 
       {/* Map Above Grid (when more than 5 comps) */}

@@ -15,6 +15,7 @@ import Navigation from '@/app/components/Navigation';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from './components/SalesComparisonApproach';
+import { CostApproachTab } from './components/CostApproach/CostApproachTab';
 
 type Tab = 'sales-comparison' | 'cost' | 'income';
 
@@ -52,7 +53,7 @@ export default function ValuationPage() {
 
   const tabs: { id: Tab; label: string; enabled: boolean; isLink?: boolean }[] = [
     { id: 'sales-comparison', label: 'Sales Comparison', enabled: true },
-    { id: 'cost', label: 'Cost Approach', enabled: false },
+    { id: 'cost', label: 'Cost Approach', enabled: true },
     { id: 'income', label: 'Income Approach', enabled: true, isLink: true }
   ];
 
@@ -248,27 +249,7 @@ export default function ValuationPage() {
                 )}
 
                 {activeTab === 'cost' && (
-                  <div
-                    className="text-center py-20 rounded-lg border"
-                    style={{
-                      backgroundColor: 'var(--cui-card-bg)',
-                      borderColor: 'var(--cui-border-color)'
-                    }}
-                  >
-                    <div className="text-6xl mb-4">🏗️</div>
-                    <h3
-                      className="text-xl font-bold mb-2"
-                      style={{ color: 'var(--cui-body-color)' }}
-                    >
-                      Cost Approach
-                    </h3>
-                    <p
-                      className="text-sm"
-                      style={{ color: 'var(--cui-secondary-color)' }}
-                    >
-                      Coming in Phase 2
-                    </p>
-                  </div>
+                  <CostApproachTab projectId={projectId} />
                 )}
 
                 {activeTab === 'income' && (

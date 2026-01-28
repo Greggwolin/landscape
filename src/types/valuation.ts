@@ -181,6 +181,131 @@ export interface CostApproach {
   updated_at: string;
 }
 
+export interface LandComparable {
+  land_comparable_id: number;
+  project_id: number;
+  comp_number: number | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  sale_date: string | null;
+  sale_price: number | null;
+  land_area_sf: number | null;
+  land_area_acres: number | null;
+  price_per_sf: number | null;
+  price_per_acre: number | null;
+  zoning: string | null;
+  source: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LandComparableForm {
+  comp_number?: number | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  sale_date?: string | null;
+  sale_price?: number | null;
+  land_area_sf?: number | null;
+  zoning?: string | null;
+  source?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
+}
+
+export interface LandCompAdjustment {
+  adjustment_id: number;
+  land_comparable: number;
+  adjustment_type: 'location' | 'size' | 'condition' | 'zoning' | 'other';
+  adjustment_pct: number | null;
+  adjustment_amount: number | null;
+  justification: string | null;
+  created_at: string;
+}
+
+export interface LandCompAdjustmentForm {
+  adjustment_type: 'location' | 'size' | 'condition' | 'zoning' | 'other';
+  adjustment_pct?: number | null;
+  adjustment_amount?: number | null;
+  justification?: string | null;
+}
+
+export interface ContainerCostMetadata {
+  cost_metadata_id: number;
+  container: number;
+  cost_source: string | null;
+  source_section: string | null;
+  source_page: string | null;
+  cost_date: string | null;
+  construction_class: string | null;
+  quality: string | null;
+  num_stories: number;
+  base_cost_per_sf: number | null;
+  height_per_story_factor: number;
+  perimeter_factor: number;
+  current_cost_multiplier: number;
+  local_area_multiplier: number;
+  indirect_cost_pct: number;
+  entrepreneurial_profit_pct: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContainerCostMetadataForm {
+  cost_source?: string | null;
+  source_section?: string | null;
+  source_page?: string | null;
+  cost_date?: string | null;
+  construction_class?: string | null;
+  quality?: string | null;
+  num_stories?: number;
+  base_cost_per_sf?: number | null;
+  height_per_story_factor?: number;
+  perimeter_factor?: number;
+  current_cost_multiplier?: number;
+  local_area_multiplier?: number;
+  indirect_cost_pct?: number;
+  entrepreneurial_profit_pct?: number;
+}
+
+export interface CostApproachDepreciationRecord {
+  depreciation_id: number;
+  project_id: number;
+  physical_curable: number;
+  physical_incurable_short: number;
+  physical_incurable_long: number;
+  functional_curable: number;
+  functional_incurable: number;
+  external_obsolescence: number;
+  effective_age_years: number | null;
+  remaining_life_years: number | null;
+  depreciation_method: 'age-life' | 'breakdown' | 'market_extraction' | 'other' | null;
+  notes: string | null;
+  total_depreciation: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostApproachDepreciationForm {
+  physical_curable?: number;
+  physical_incurable_short?: number;
+  physical_incurable_long?: number;
+  functional_curable?: number;
+  functional_incurable?: number;
+  external_obsolescence?: number;
+  effective_age_years?: number | null;
+  remaining_life_years?: number | null;
+  depreciation_method?: 'age-life' | 'breakdown' | 'market_extraction' | 'other';
+  notes?: string | null;
+}
+
 // ============================================================================
 // INCOME APPROACH
 // ============================================================================
