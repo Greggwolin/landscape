@@ -1,0 +1,150 @@
+/**
+ * Resizable Panel Styles
+ *
+ * Styles for the Studio resizable split layout:
+ * - Splitter hover/active states
+ * - Collapsed Landscaper strip
+ * - Toggle button states
+ * - Smooth transitions
+ *
+ * All colors use CoreUI CSS variables for theme compatibility.
+ *
+ * @version 1.0
+ * @created 2026-01-28
+ */
+
+/* ==========================================================================
+   Studio Layout Container
+   ========================================================================== */
+
+.studio-layout-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   Resizable Splitter
+   ========================================================================== */
+
+.studio-resizable-splitter {
+  position: relative;
+  z-index: 10;
+  touch-action: none;
+}
+
+.studio-resizable-splitter:hover {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.studio-resizable-splitter:hover .studio-splitter-handle {
+  background-color: var(--cui-primary);
+  height: 64px;
+}
+
+.studio-resizable-splitter:active {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.studio-resizable-splitter:active .studio-splitter-handle {
+  background-color: var(--cui-primary);
+  height: 80px;
+}
+
+/* ==========================================================================
+   Collapsed Landscaper Strip
+   ========================================================================== */
+
+.collapsed-landscaper-strip {
+  border: 1px solid var(--cui-border-color);
+}
+
+/* ==========================================================================
+   Project Bar Toggle Button
+   ========================================================================== */
+
+.studio-collapse-toggle:hover {
+  background-color: var(--cui-tertiary-bg) !important;
+  color: var(--cui-body-color) !important;
+  border-color: var(--cui-primary) !important;
+}
+
+.studio-collapse-toggle:active {
+  background-color: var(--cui-secondary-bg) !important;
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+
+.studio-loading-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--cui-card-bg);
+  border-radius: var(--cui-card-border-radius);
+  border: 1px solid var(--cui-border-color);
+}
+
+.studio-loading-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--cui-card-bg);
+  border-radius: var(--cui-card-border-radius);
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-secondary-color);
+}
+
+.studio-project-bar-placeholder {
+  height: 52px;
+  margin-bottom: 0.5rem;
+  background-color: var(--cui-tertiary-bg);
+  border-radius: var(--cui-card-border-radius);
+}
+
+/* ==========================================================================
+   Landscaper Panel Container
+   ========================================================================== */
+
+.studio-landscaper-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   Content Card
+   ========================================================================== */
+
+.studio-content-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .studio-landscaper-panel {
+    min-width: 56px !important;
+    max-width: 280px !important;
+  }
+}
+
+/* ==========================================================================
+   Dark Mode Enhancements
+   ========================================================================== */
+
+/* CoreUI handles dark mode via CSS variables, but we can add subtle enhancements */
+[data-coreui-theme="dark"] .studio-resizable-splitter:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-coreui-theme="dark"] .collapsed-landscaper-strip button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}

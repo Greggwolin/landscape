@@ -1,15 +1,16 @@
 'use client';
 
 import React, { ChangeEvent, useEffect, useState } from 'react';
-import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CTooltip } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop, cilChartPie } from '@coreui/icons';
 import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/market-intel';
 import ContactsSection from '@/components/projects/contacts/ContactsSection';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
+import { LocationMapFlyout } from '@/components/location-intelligence';
 
 interface Project {
   project_id: number;
@@ -199,6 +200,7 @@ export default function ProjectTab({
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
   const [financialSummaryExpanded, setFinancialSummaryExpanded] = useState(false);
   const [contactsExpanded, setContactsExpanded] = useState(true);
+  const [showLocationIntel, setShowLocationIntel] = useState(false);
 
   const addressFields: (keyof Project)[] = ['street_address', 'city', 'county', 'state', 'zip_code'];
 
@@ -408,20 +410,95 @@ export default function ProjectTab({
     return editedProject[field] !== undefined ? editedProject[field] : project[field];
   };
 
-  const renderMapCard = () => (
-    <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
-      <CCardHeader className="fw-semibold" style={{ padding: '0.5rem 1rem', minHeight: '44px', fontSize: '0.875rem', lineHeight: 1 }}>Map - 3D Oblique View</CCardHeader>
-      <CCardBody style={{ padding: '12px', flex: 1 }}>
-        <div style={{ height: '100%' }}>
-          <ProjectTabMap
+  const renderMapCard = () => {
+    const hasCoordinates = project.location_lat != null && project.location_lon != null;
+    const lat = typeof project.location_lat === 'string' ? parseFloat(project.location_lat) : project.location_lat;
+    const lon = typeof project.location_lon === 'string' ? parseFloat(project.location_lon) : project.location_lon;
+
+    return (
+      <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
+        <CCardHeader
+          className="d-flex align-items-center justify-content-between"
+          style={{ padding: '0.5rem 1rem', minHeight: '44px', fontSize: '0.875rem', lineHeight: 1 }}
+        >
+          <span className="fw-semibold">Map - 3D Oblique View</span>
+          <CTooltip content="Location Intelligence">
+            <CButton
+              color="primary"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLocationIntel(true)}
+              className="p-1"
+              style={{ lineHeight: 1 }}
+            >
+              <CIcon icon={cilChartPie} size="sm" />
+            </CButton>
+          </CTooltip>
+        </CCardHeader>
+        <CCardBody style={{ padding: '12px', flex: 1 }}>
+          <div style={{ height: '100%' }}>
+            <ProjectTabMap
+              projectId={String(project.project_id)}
+              styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+              tabId="project"
+            />
+          </div>
+        </CCardBody>
+
+        {/* Location Intelligence Flyout */}
+        {showLocationIntel && hasCoordinates && (
+          <LocationMapFlyout
             projectId={String(project.project_id)}
-            styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-            tabId="project"
+            center={[lon!, lat!]}
+            isOpen={showLocationIntel}
+            onClose={() => setShowLocationIntel(false)}
+            onPointAdded={(point) => {
+              console.log('Point added:', point);
+            }}
           />
-        </div>
-      </CCardBody>
-    </CCard>
-  );
+        )}
+
+        {/* No coordinates message */}
+        {showLocationIntel && !hasCoordinates && (
+          <div
+            className="location-intel-no-coords"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1050,
+            }}
+            onClick={() => setShowLocationIntel(false)}
+          >
+            <div
+              style={{
+                background: 'var(--cui-body-bg)',
+                padding: '24px',
+                borderRadius: '8px',
+                maxWidth: '400px',
+                textAlign: 'center',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h4 style={{ marginBottom: '12px', color: 'var(--cui-body-color)' }}>Location Required</h4>
+              <p style={{ marginBottom: '16px', color: 'var(--cui-secondary-color)' }}>
+                Set a project location using the map pin tool before viewing Location Intelligence.
+              </p>
+              <CButton color="primary" onClick={() => setShowLocationIntel(false)}>
+                OK
+              </CButton>
+            </div>
+          </div>
+        )}
+      </CCard>
+    );
+  };
 
   const renderLocationCard = () => (
     <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>

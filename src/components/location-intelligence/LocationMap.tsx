@@ -29,7 +29,13 @@ export function LocationMap({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const onMapClickRef = useRef(onMapClick);
   const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Keep the callback ref up to date
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
 
   // Initialize map
   useEffect(() => {
@@ -85,10 +91,10 @@ export function LocationMap({
       setMapLoaded(true);
     });
 
-    // Handle map clicks
+    // Handle map clicks - use ref to get current callback
     map.current.on('click', (e) => {
-      if (onMapClick) {
-        onMapClick([e.lngLat.lng, e.lngLat.lat]);
+      if (onMapClickRef.current) {
+        onMapClickRef.current([e.lngLat.lng, e.lngLat.lat]);
       }
     });
 
@@ -255,6 +261,18 @@ export function LocationMap({
       );
     }
   }, [mapLoaded, layers.satellite]);
+
+  // Resize map when container changes (e.g., flyout opens)
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Trigger resize after a short delay to let layout settle
+    const resizeTimeout = setTimeout(() => {
+      map.current?.resize();
+    }, 100);
+
+    return () => clearTimeout(resizeTimeout);
+  }, [mapLoaded]);
 
   return (
     <div className="location-map-container">

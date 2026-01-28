@@ -43,6 +43,9 @@
 
   /* Validation Report */
   --validation-unit-price-color: #000;
+
+  /* Tiles & Navigation - Landscaper Icon Fill */
+  --landscaper-icon-color: #080A0C;
 }
 
 /* v1.0 · Dark header contrast fix — keep near other CoreUI var bridges */
@@ -110,6 +113,8 @@
   --cui-card-bg: var(--surface-card);
   --filter-icon-color: #ffffff;
   --validation-unit-price-color: #07FF8A;
+  /* Tiles & Navigation - Landscaper Icon Fill */
+  --landscaper-icon-color: #FFFFFF;
 }
 
 /* Dark mode button overrides - direct rules, not variables */
@@ -689,4 +694,18 @@ thead th,
 
 .dark-theme .text-gray-500 {
   color: #6b7280 !important;
+}
+
+/* ==========================================================================
+   TILES & NAVIGATION - Landscaper Icon
+   Light mode: #080A0C (near-black), Dark mode: #FFFFFF (white)
+   Apply to parent element - icon uses currentColor for fill
+   ========================================================================== */
+
+.landscaper-icon-themed {
+  color: var(--landscaper-icon-color);
+}
+
+.landscaper-icon-themed svg {
+  fill: var(--landscaper-icon-color);
 }

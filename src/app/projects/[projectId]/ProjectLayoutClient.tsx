@@ -1,31 +1,44 @@
 /**
  * ProjectLayoutClient
  *
- * Two-column layout with ARGUS-style folder tab navigation:
- * - Left column (30%, min 350px, max 450px): Project selector + Landscaper panel
- * - Right column (70%): Folder tabs + content area
+ * Resizable split-panel layout with ARGUS-style folder tab navigation:
+ * - Full-width project bar at top (project selector + collapse toggle)
+ * - Left panel: Resizable Landscaper (collapses to icon strip)
+ * - Right panel: Folder tabs + content area
+ * - Draggable splitter between panels with auto-collapse behavior
  *
  * URL pattern: /projects/[projectId]?folder=valuation&tab=sales
  *
- * @version 2.3
- * @updated 2026-01-23 - Moved project selector into left column above Landscaper
+ * @version 3.0
+ * @updated 2026-01-28 - Resizable split layout with collapsible Landscaper
  */
 
 'use client';
 
 import React, { Suspense } from 'react';
-import { CCard, CCardBody } from '@coreui/react';
+import { CCard } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
-import { ProjectSelectorCard } from '@/components/navigation/ProjectSelectorCard';
+import { StudioProjectBar } from '@/components/studio/StudioProjectBar';
+import { CollapsedLandscaperStrip } from '@/components/studio/CollapsedLandscaperStrip';
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
+import { useResizablePanel } from '@/hooks/useResizablePanel';
 import '@/styles/folder-tabs.css';
+import '@/styles/resizable-panel.css';
 
 interface ProjectLayoutClientProps {
   projectId: number;
   children: React.ReactNode;
 }
+
+// Resizable splitter constants
+const DEFAULT_LANDSCAPER_WIDTH = 320;
+const MIN_LANDSCAPER_WIDTH = 280;
+const MAX_WIDTH_PERCENT = 50;
+const COLLAPSE_THRESHOLD = 100;
+const COLLAPSED_WIDTH = 56;
+const SPLITTER_WIDTH = 6;
 
 function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientProps) {
   const { projects, activeProject, isLoading } = useProjectContext();
@@ -44,6 +57,22 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     propertyType: currentProject?.project_type_code,
   });
 
+  // Resizable panel state
+  const {
+    width: landscaperWidth,
+    isCollapsed,
+    isResizing,
+    toggleCollapsed,
+    handleResizeStart,
+    containerRef,
+  } = useResizablePanel({
+    defaultWidth: DEFAULT_LANDSCAPER_WIDTH,
+    minWidth: MIN_LANDSCAPER_WIDTH,
+    maxWidthPercent: MAX_WIDTH_PERCENT,
+    collapseThreshold: COLLAPSE_THRESHOLD,
+    collapsedWidth: COLLAPSED_WIDTH,
+  });
+
   // Handle folder/tab navigation
   const handleNavigate = (folder: string, tab: string) => {
     setFolderTab(folder, tab);
@@ -51,74 +80,126 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start', padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
-        <div
-          className="flex-shrink-0 sticky top-0 flex flex-col"
-          style={{
-            width: '30%',
-            minWidth: '350px',
-            maxWidth: '450px',
-          }}
-        >
-          <CCard className="shadow-lg" style={{ marginBottom: '0.75rem' }}>
-            <CCardBody style={{ padding: '0.75rem 1rem' }}>
-              <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
-            </CCardBody>
-          </CCard>
-          <CCard className="shadow-lg" style={{ flex: 1 }}>
-            <CCardBody className="folder-content-placeholder">
-              <p>Loading...</p>
-            </CCardBody>
-          </CCard>
-        </div>
-        <div className="flex-1 min-w-0">
-          <CCard className="shadow-lg">
-            <CCardBody className="folder-content-placeholder">
-              <p>Loading project...</p>
-            </CCardBody>
-          </CCard>
+      <div className="studio-layout-container">
+        <div className="studio-project-bar-placeholder" />
+        <div className="studio-split-container">
+          <div className="studio-loading-panel" style={{ width: DEFAULT_LANDSCAPER_WIDTH }}>
+            <p style={{ color: 'var(--cui-secondary-color)' }}>Loading...</p>
+          </div>
+          <div className="studio-loading-content">
+            <p>Loading project...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start', padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
-      {/* Left Panel - Project Selector + Landscaper (30%) */}
+    <div
+      ref={containerRef}
+      className="studio-layout-container"
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        flex: 1,
+        minHeight: 0,
+        width: '100%',
+        padding: '0.5rem',
+        gap: 0,
+      }}
+    >
+      {/* Left Panel - Landscaper (resizable or collapsed) - full height */}
       <div
-        key={`left-panel-${currentFolder}`}
-        className="flex-shrink-0 sticky top-0 flex flex-col"
+        className="studio-landscaper-panel"
         style={{
-          width: '30%',
-          minWidth: '350px',
-          maxWidth: '450px',
-          height: 'calc(100vh - 100px)',
+          width: landscaperWidth,
+          minWidth: isCollapsed ? COLLAPSED_WIDTH : MIN_LANDSCAPER_WIDTH,
+          maxWidth: isCollapsed ? COLLAPSED_WIDTH : `${MAX_WIDTH_PERCENT}%`,
+          flexShrink: 0,
+          height: 'calc(100vh - 80px)',
+          transition: isResizing ? 'none' : 'width 0.2s ease',
         }}
       >
-        {/* Project Selector Card */}
-        <ProjectSelectorCard projectId={projectId} />
-
-        {/* Landscaper Panel */}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        {isCollapsed ? (
+          <CollapsedLandscaperStrip onExpand={toggleCollapsed} />
+        ) : (
           <LandscaperPanel projectId={projectId} activeTab={currentFolder} />
-        </div>
+        )}
       </div>
 
-      {/* Right Content - Folder Tabs + Content (70%) */}
-      <CCard className="flex-1 min-w-0 flex flex-col shadow-lg overflow-hidden">
-        {/* Folder Tabs Navigation - replaces the colored tile bar */}
-        <FolderTabs
-          folders={folderConfig.folders}
-          currentFolder={currentFolder}
-          currentTab={currentTab}
-          onNavigate={handleNavigate}
+      {/* Resizable Splitter - always visible when not collapsed */}
+      {!isCollapsed && (
+        <div
+          className="studio-resizable-splitter"
+          onPointerDown={handleResizeStart}
+          style={{
+            width: '12px',
+            cursor: 'col-resize',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            className="studio-splitter-handle"
+            style={{
+              width: '2px',
+              height: '48px',
+              borderRadius: '1px',
+              backgroundColor: 'var(--cui-border-color)',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Right Column - Project Bar + Folder Tabs + Content */}
+      <div
+        className="studio-right-column"
+        style={{
+          flex: '1 1 0%',
+          minWidth: '400px',
+          display: 'flex',
+          flexDirection: 'column',
+          marginLeft: isCollapsed ? '0.5rem' : '0',
+          transition: isResizing ? 'none' : 'margin-left 0.2s ease',
+          gap: '0.25rem',
+        }}
+      >
+        {/* Project Bar - above folder tabs */}
+        <StudioProjectBar
+          projectId={projectId}
+          isLandscaperCollapsed={isCollapsed}
+          onToggleLandscaper={toggleCollapsed}
         />
 
-        {/* Content Area */}
-        <div className="studio-folder-content">
-          {children}
-        </div>
-      </CCard>
+        {/* Content Card - Folder Tabs + Content */}
+        <CCard
+          className="studio-content-card shadow-lg"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Folder Tabs Navigation */}
+          <FolderTabs
+            folders={folderConfig.folders}
+            currentFolder={currentFolder}
+            currentTab={currentTab}
+            onNavigate={handleNavigate}
+          />
+
+          {/* Content Area */}
+          <div className="studio-folder-content">
+            {children}
+          </div>
+        </CCard>
+      </div>
     </div>
   );
 }
@@ -127,32 +208,52 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
   return (
     <Suspense
       fallback={
-        <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start', padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
+        <div
+          className="studio-layout-container"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            padding: '0.25rem 0.5rem 0.5rem 0.25rem',
+          }}
+        >
           <div
-            className="flex-shrink-0 sticky top-0 flex flex-col"
             style={{
-              width: '30%',
-              minWidth: '350px',
-              maxWidth: '450px',
+              height: '52px',
+              marginBottom: '0.5rem',
+              backgroundColor: 'var(--cui-tertiary-bg)',
+              borderRadius: 'var(--cui-card-border-radius)',
+            }}
+          />
+          <div
+            style={{
+              display: 'flex',
+              flex: 1,
+              minHeight: 0,
+              gap: '0.5rem',
             }}
           >
-            <CCard className="shadow-lg" style={{ marginBottom: '0.75rem' }}>
-              <CCardBody style={{ padding: '0.75rem 1rem' }}>
-                <p style={{ color: 'var(--cui-secondary-color)', margin: 0 }}>Loading...</p>
-              </CCardBody>
-            </CCard>
-            <CCard className="shadow-lg" style={{ flex: 1 }}>
-              <CCardBody className="folder-content-placeholder">
-                <p>Loading...</p>
-              </CCardBody>
-            </CCard>
-          </div>
-          <div className="flex-1 min-w-0">
-            <CCard className="shadow-lg">
-              <CCardBody className="folder-content-placeholder">
-                <p>Loading...</p>
-              </CCardBody>
-            </CCard>
+            <div
+              style={{
+                width: DEFAULT_LANDSCAPER_WIDTH,
+                flexShrink: 0,
+                backgroundColor: 'var(--cui-card-bg)',
+                borderRadius: 'var(--cui-card-border-radius)',
+              }}
+            />
+            <div
+              style={{
+                flex: 1,
+                backgroundColor: 'var(--cui-card-bg)',
+                borderRadius: 'var(--cui-card-border-radius)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <p style={{ color: 'var(--cui-secondary-color)' }}>Loading...</p>
+            </div>
           </div>
         </div>
       }

@@ -34,4 +34,30 @@ urlpatterns = [
         views.get_stats,
         name="location-intelligence-stats"
     ),
+
+    # POIs from OpenStreetMap
+    path(
+        "pois/",
+        views.get_pois,
+        name="location-intelligence-pois"
+    ),
+
+    # Reverse geocoding
+    path(
+        "reverse-geocode/",
+        views.get_reverse_geocode,
+        name="location-intelligence-reverse-geocode"
+    ),
+
+    # User map points
+    path(
+        "points/",
+        views.user_points_list,
+        name="location-intelligence-points"
+    ),
+    path(
+        "points/<uuid:point_id>/",
+        views.user_point_detail,
+        name="location-intelligence-point-detail"
+    ),
 ]

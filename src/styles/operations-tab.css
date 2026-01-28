@@ -366,7 +366,7 @@
 .ops-statement-grid {
   display: grid;
   grid-template-columns:
-    minmax(180px, 1fr)
+    200px
     minmax(60px, 70px)
     minmax(90px, 100px)
     minmax(100px, 120px)
@@ -399,11 +399,12 @@
   background: var(--surface-card-header);
   font-weight: 600;
   color: #111111;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
   border-bottom: 1px solid var(--cui-border-color);
 }
 
 .ops-section-cell {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -411,11 +412,95 @@
   background: var(--cui-tertiary-bg);
   font-weight: 600;
   border-bottom: 1px solid var(--cui-border-color);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.ops-section-fill {
+  background: var(--cui-tertiary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
 }
 
 .ops-expense-header .ops-section-cell {
-  background: var(--surface-card-header);
+  background: #f0f1f2;
   color: #111111;
+}
+
+.ops-section-controls-cell {
+  background: #f0f1f2;
+}
+
+.ops-section-controls-cell .ops-section-controls {
+  justify-content: flex-end;
+}
+
+.ops-section-subtitle-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ops-section-subtle {
+  color: var(--cui-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ops-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.ops-section-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: help;
+}
+
+.ops-section-tooltip {
+  position: absolute;
+  bottom: -0.25rem;
+  left: 0;
+  transform: translateY(100%);
+  background: #111;
+  color: #fff;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.25rem;
+  font-size: 0.55rem;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10;
+}
+
+.ops-section-label:hover .ops-section-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(110%);
+}
+
+.ops-section-note::after {
+  content: attr(data-note);
+}
+
+.ops-income-header .ops-cell,
+.ops-vacancy-header .ops-cell {
+  background: #f7f7fb;
+}
+
+.ops-income-header .ops-section-fill,
+.ops-vacancy-header .ops-section-fill {
+  background: #f7f7fb;
+}
+
+.ops-expense-header .ops-section-fill {
+  background: #f0f1f2;
 }
 
 .ops-section-subtle {
@@ -1647,4 +1732,197 @@
 .animate-spin {
   display: inline-block;
   animation: spin 1s linear infinite;
+}
+.ops-section-fill {
+  background: var(--surface-card-header);
+}
+
+.ops-section-controls-cell {
+  background: var(--surface-card-header);
+}
+
+/* =============================================================================
+   ROW SELECTION STYLES
+   ============================================================================= */
+
+/* Selected row highlight */
+.ops-row-selected > .ops-cell {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+}
+
+.ops-row-selected:hover > .ops-cell {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+}
+
+/* Category action buttons container */
+.ops-category-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.75rem;
+}
+
+/* Action buttons (+ and -) */
+.ops-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  padding: 0;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  background: var(--cui-card-bg);
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ops-action-btn:hover {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+  background: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.08);
+}
+
+.ops-action-add:hover {
+  border-color: var(--cui-success);
+  color: var(--cui-success);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.ops-action-delete:hover {
+  border-color: var(--cui-danger);
+  color: var(--cui-danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* =============================================================================
+   INLINE ADD ROW STYLES
+   ============================================================================= */
+
+.ops-add-row > .ops-cell {
+  background-color: rgba(34, 197, 94, 0.06);
+  border-bottom: 1px dashed var(--cui-border-color);
+}
+
+.ops-add-cell {
+  display: flex;
+  align-items: center;
+  padding-left: 1rem !important;
+}
+
+.ops-add-select {
+  width: 100%;
+  max-width: 200px;
+  height: 1.625rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.8125rem;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  color: var(--cui-body-color);
+  cursor: pointer;
+  outline: none;
+}
+
+.ops-add-select:focus {
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 2px rgba(var(--cui-primary-rgb, 56, 178, 172), 0.2);
+}
+
+.ops-add-input {
+  width: 100%;
+  max-width: 200px;
+  height: 1.625rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.8125rem;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  color: var(--cui-body-color);
+  outline: none;
+}
+
+.ops-add-input:focus {
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 2px rgba(var(--cui-primary-rgb, 56, 178, 172), 0.2);
+}
+
+.ops-add-input::placeholder {
+  color: var(--cui-secondary-color);
+  opacity: 0.7;
+}
+
+/* Add row action buttons */
+.ops-add-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.ops-add-save-btn {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--cui-success);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ops-add-save-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.ops-add-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ops-add-cancel-btn {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ops-add-cancel-btn:hover {
+  border-color: var(--cui-body-color);
+  color: var(--cui-body-color);
+}
+
+/* Loading text for category fetch */
+.ops-loading-text {
+  color: var(--cui-secondary-color);
+  font-style: italic;
+  font-size: 0.8125rem;
+}
+
+/* =============================================================================
+   INLINE ITEM NAME EDITOR
+   ============================================================================= */
+
+/* Editable cell indicator (for double-click hint) */
+.ops-editable-label {
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 0.25rem;
+  transition: background-color 0.15s ease;
+}
+
+.ops-editable-label:hover {
+  background-color: var(--cui-tertiary-bg);
+}
+
+/* Active edit state on row */
+.ops-row-editing > .ops-cell {
+  background-color: rgba(var(--cui-primary-rgb, 56, 178, 172), 0.04);
 }

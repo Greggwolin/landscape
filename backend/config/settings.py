@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "apps.contacts",  # Cabinet/Contact management system
     "apps.feedback",  # Tester feedback system
     "apps.location_intelligence",  # Location Intelligence (ring demographics, POIs)
+    "apps.valuation",  # Valuation approaches (Sales Comparison, Cost Approach)
 ]
 
 MIDDLEWARE = [

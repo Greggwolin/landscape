@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { DetailSummaryToggle, ViewMode } from './DetailSummaryToggle';
 import { InputCell } from './InputCell';
-import { AddButton } from './AddButton';
+import { ItemNameEditor } from './ItemNameEditor';
 import { LineItemRow, formatCurrency, formatPercent, formatPerSF } from './types';
-import { LockClosedIcon } from '@heroicons/react/20/solid';
+import { LockClosedIcon, PlusIcon, MinusIcon } from '@heroicons/react/20/solid';
 
 const DRAG_TYPE = 'opex_item';
 
@@ -16,6 +16,20 @@ interface DragItem {
   label: string;
   line_item_key: string;
   source_category: string;
+}
+
+interface CategoryOption {
+  category_id: number;
+  category_name: string;
+  has_children: boolean;
+}
+
+interface NewExpenseRow {
+  tempId: string;
+  parentCategory: string;
+  expense_category: string;
+  unit_amount: number | null;
+  post_reno_unit_amount: number | null;
 }
 
 const renderCurrency = (value: number | null | undefined) => (
@@ -39,40 +53,51 @@ interface OperatingStatementProps {
   postRenoNOI: number;
   valueAddEnabled: boolean;
   hasDetailedRentRoll: boolean;
+  projectId: number;
   onUpdateVacancy?: (lineItemKey: string, field: string, value: number | null) => void;
   onUpdateOtherIncome?: (lineItemKey: string, field: string, value: number | null) => void;
   onUpdateOpex?: (lineItemKey: string, field: string, value: number | null) => void;
   onToggleExpand?: (lineItemKey: string) => void;
   onCategoryChange?: (opexId: number, newCategory: string, label: string) => Promise<void>;
-  onAddItem?: (parentKey?: string) => void;
+  onAddExpense?: (expense: {
+    expense_category: string;
+    parent_category: string;
+    unit_amount: number | null;
+  }) => Promise<void>;
+  onDeleteExpenses?: (opexIds: number[]) => Promise<void>;
+  /** Callback for inline item name changes (double-click edit) */
+  onItemNameChange?: (opexId: number, categoryId: number, categoryName: string) => Promise<void>;
 }
 
-interface DraggableExpenseRowProps {
+interface SelectableExpenseRowProps {
   row: LineItemRow & { _uniqueKey: string };
   unitCount: number;
   totalSF: number;
   valueAddEnabled: boolean;
-  showParentTotals: boolean;
+  isSelected: boolean;
+  isEditingName: boolean;
+  onSelect: (opexId: number, event: React.MouseEvent) => void;
   onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
-  onToggleExpand?: (lineItemKey: string) => void;
-  onAddItem?: (parentKey?: string) => void;
+  onStartEditName: (opexId: number) => void;
+  onSaveItemName: (opexId: number, categoryId: number, categoryName: string) => void;
+  onCancelEditName: () => void;
 }
 
-function DraggableExpenseRow({
+function SelectableExpenseRow({
   row,
   unitCount,
   totalSF,
   valueAddEnabled,
-  showParentTotals,
+  isSelected,
+  isEditingName,
+  onSelect,
   onUpdateRow,
-  onToggleExpand,
-  onAddItem
-}: DraggableExpenseRowProps) {
+  onStartEditName,
+  onSaveItemName,
+  onCancelEditName
+}: SelectableExpenseRowProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const isParent = row.is_calculated;
-  const isDraggable = row.is_draggable && !isParent;
-  const isUnclassifiedSection = row.is_unclassified_section;
-  const isCollapsed = row.is_expanded === false;
+  const isDraggable = row.is_draggable;
 
   const isPercentageBased = (r: LineItemRow) => {
     return r.is_percentage || r.calculation_base === 'egi';
@@ -87,17 +112,7 @@ function DraggableExpenseRow({
     ? row.as_is.total / totalSF
     : null;
 
-  const parentPerUnit = unitCount > 0 && row.as_is.total
-    ? row.as_is.total / unitCount
-    : row.as_is.rate;
-  const parentPerSF = totalSF > 0 && row.as_is.total
-    ? row.as_is.total / totalSF
-    : null;
-
   const postRenoRowPerUnit = unitCount > 0 && row.post_reno?.total
-    ? row.post_reno.total / unitCount
-    : row.post_reno?.rate;
-  const parentPostRenoPerUnit = unitCount > 0 && row.post_reno?.total
     ? row.post_reno.total / unitCount
     : row.post_reno?.rate;
 
@@ -109,20 +124,42 @@ function DraggableExpenseRow({
       line_item_key: row.line_item_key,
       source_category: row.parent_category || 'unclassified'
     } as DragItem,
-    canDrag: isDraggable,
+    canDrag: isDraggable && !isEditingName,
     collect: (monitor) => ({
       isDragging: monitor.isDragging()
     })
-  }), [row.opex_id, row.label, row.line_item_key, row.parent_category, isDraggable]);
+  }), [row.opex_id, row.label, row.line_item_key, row.parent_category, isDraggable, isEditingName]);
 
-  if (isDraggable) {
+  if (isDraggable && !isEditingName) {
     drag(ref);
   }
 
-  let rowClass = `ops-row ${isParent ? 'ops-parent-row' : 'ops-child-row'}`;
+  let rowClass = 'ops-row ops-child-row';
   if (isDraggable) rowClass += ' draggable-opex-row';
   if (isDragging) rowClass += ' dragging';
-  if (isUnclassifiedSection) rowClass += ' unclassified-section';
+  if (isSelected) rowClass += ' ops-row-selected';
+  if (isEditingName) rowClass += ' ops-row-editing';
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't select if we're editing
+    if (isEditingName) return;
+    if (row.opex_id) {
+      onSelect(row.opex_id, e);
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (row.opex_id && isDraggable) {
+      onStartEditName(row.opex_id);
+    }
+  };
+
+  const handleSaveItemName = (categoryId: number, categoryName: string) => {
+    if (row.opex_id) {
+      onSaveItemName(row.opex_id, categoryId, categoryName);
+    }
+  };
 
   return (
     <div
@@ -130,51 +167,39 @@ function DraggableExpenseRow({
       className={rowClass}
       style={{
         opacity: isDragging ? 0.5 : 1,
-        cursor: isDraggable ? 'grab' : 'default'
+        cursor: isEditingName ? 'default' : isDraggable ? 'grab' : 'pointer'
       }}
+      onClick={handleClick}
     >
       <div className="ops-cell">
-        {isParent && (
-          <>
-            {isUnclassifiedSection && (
-              <span className="unclassified-badge">
-                NEEDS REVIEW
-              </span>
-            )}
-            <span className="ops-parent-label">
-              {row.label}
-              <span
-                className={`ops-expand-icon ${isCollapsed ? 'collapsed' : ''}`}
-                onClick={() => onToggleExpand?.(row.line_item_key)}
-              >
-                ▼
-              </span>
-            </span>
-            {onAddItem && (
-              <AddButton
-                label="Add"
-                onClick={() => onAddItem(row.line_item_key)}
-                inline
-              />
-            )}
-          </>
-        )}
-        {!isParent && (
+        {isEditingName ? (
+          <ItemNameEditor
+            currentCategoryId={row.category_id || null}
+            parentCategory={row.parent_category || 'other'}
+            currentLabel={row.label}
+            onSave={handleSaveItemName}
+            onCancel={onCancelEditName}
+          />
+        ) : (
           <span className="ops-label-inline">
             {isDraggable && (
               <span className="ops-drag-handle" title="Drag to categorize">
                 ⋮⋮
               </span>
             )}
-            {row.label}
+            <span
+              className={isDraggable ? 'ops-editable-label' : ''}
+              onDoubleClick={handleDoubleClick}
+              title={isDraggable ? 'Double-click to edit' : undefined}
+            >
+              {row.label}
+            </span>
           </span>
         )}
       </div>
       <div className="ops-cell num"></div>
       <div className="ops-cell num">
-        {isParent ? (
-          showParentTotals ? <span className="ops-calc">{renderCurrency(parentPerUnit)}</span> : null
-        ) : isPercent ? (
+        {isPercent ? (
           <InputCell
             value={row.as_is.rate}
             variant="as-is"
@@ -191,17 +216,15 @@ function DraggableExpenseRow({
         )}
       </div>
       <div className="ops-cell num ops-calc">
-        {isParent ? (showParentTotals ? renderCurrency(row.as_is.total) : '') : renderCurrency(row.as_is.total)}
+        {renderCurrency(row.as_is.total)}
       </div>
       <div className="ops-cell num ops-calc">
-        {isPercent ? '' : (isParent ? (showParentTotals ? renderPerSF(parentPerSF) : '') : renderPerSF(rowPerSF))}
+        {isPercent ? '' : renderPerSF(rowPerSF)}
       </div>
       <div className="ops-cell num"></div>
       <div className="ops-cell num ops-col-post">
         {valueAddEnabled ? (
-          isParent ? (
-            showParentTotals ? <span className="ops-calc">{renderCurrency(parentPostRenoPerUnit)}</span> : null
-          ) : isPercent ? (
+          isPercent ? (
             <InputCell
               value={row.post_reno?.rate}
               variant="post-reno"
@@ -219,9 +242,7 @@ function DraggableExpenseRow({
         ) : null}
       </div>
       <div className="ops-cell num ops-calc ops-col-reno">
-        {valueAddEnabled
-          ? (isParent ? (showParentTotals ? renderCurrency(row.post_reno?.total) : '') : renderCurrency(row.post_reno?.total))
-          : null}
+        {valueAddEnabled ? renderCurrency(row.post_reno?.total) : null}
       </div>
     </div>
   );
@@ -233,10 +254,11 @@ interface DroppableParentRowProps {
   totalSF: number;
   valueAddEnabled: boolean;
   showParentTotals: boolean;
+  hasSelectedChildren: boolean;
   onDrop: (item: DragItem, targetCategory: string) => void;
-  onUpdateRow: (lineItemKey: string, field: string, value: number | null) => void;
   onToggleExpand?: (lineItemKey: string) => void;
-  onAddItem?: (parentKey?: string) => void;
+  onAddClick: () => void;
+  onDeleteClick: () => void;
 }
 
 function DroppableParentRow({
@@ -245,10 +267,11 @@ function DroppableParentRow({
   totalSF,
   valueAddEnabled,
   showParentTotals,
+  hasSelectedChildren,
   onDrop,
-  onUpdateRow,
   onToggleExpand,
-  onAddItem
+  onAddClick,
+  onDeleteClick
 }: DroppableParentRowProps) {
   const targetCategory = row.parent_category || 'unclassified';
   const isUnclassifiedSection = row.is_unclassified_section;
@@ -301,12 +324,25 @@ function DroppableParentRow({
           </span>
         </span>
         {isOver && canDrop && <span className="ops-drop-hint">Drop here</span>}
-        {onAddItem && (
-          <AddButton
-            label="Add"
-            onClick={() => onAddItem(row.line_item_key)}
-            inline
-          />
+        {hasSelectedChildren && (
+          <div className="ops-category-actions">
+            <button
+              type="button"
+              className="ops-action-btn ops-action-add"
+              onClick={(e) => { e.stopPropagation(); onAddClick(); }}
+              title="Add expense item"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              className="ops-action-btn ops-action-delete"
+              onClick={(e) => { e.stopPropagation(); onDeleteClick(); }}
+              title="Delete selected items"
+            >
+              <MinusIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
       <div className="ops-cell num"></div>
@@ -330,6 +366,146 @@ function DroppableParentRow({
   );
 }
 
+interface InlineAddRowProps {
+  parentCategory: string;
+  unitCount: number;
+  totalSF: number;
+  valueAddEnabled: boolean;
+  categoryOptions: CategoryOption[];
+  isLoadingCategories: boolean;
+  onSave: (expense: { expense_category: string; unit_amount: number | null }) => void;
+  onCancel: () => void;
+}
+
+function InlineAddRow({
+  parentCategory,
+  unitCount,
+  totalSF,
+  valueAddEnabled,
+  categoryOptions,
+  isLoadingCategories,
+  onSave,
+  onCancel
+}: InlineAddRowProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [customName, setCustomName] = useState<string>('');
+  const [unitAmount, setUnitAmount] = useState<number | null>(null);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Focus the select/input when mounted
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const annualTotal = unitAmount && unitCount > 0 ? unitAmount * unitCount : null;
+  const perSF = annualTotal && totalSF > 0 ? annualTotal / totalSF : null;
+
+  const handleSave = () => {
+    const expenseName = showCustomInput ? customName.trim() : selectedCategory;
+    if (!expenseName) return;
+    onSave({
+      expense_category: expenseName,
+      unit_amount: unitAmount
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      onCancel();
+    }
+  };
+
+  const hasSubcategories = categoryOptions.length > 0;
+
+  return (
+    <div className="ops-row ops-child-row ops-add-row">
+      <div className="ops-cell ops-add-cell">
+        {isLoadingCategories ? (
+          <span className="ops-loading-text">Loading...</span>
+        ) : hasSubcategories && !showCustomInput ? (
+          <select
+            ref={inputRef as React.RefObject<HTMLSelectElement>}
+            className="ops-add-select"
+            value={selectedCategory}
+            onChange={(e) => {
+              if (e.target.value === '__custom__') {
+                setShowCustomInput(true);
+                setSelectedCategory('');
+              } else {
+                setSelectedCategory(e.target.value);
+              }
+            }}
+            onKeyDown={handleKeyDown}
+          >
+            <option value="">Select expense type...</option>
+            {categoryOptions.map(opt => (
+              <option key={opt.category_id} value={opt.category_name}>
+                {opt.category_name}
+              </option>
+            ))}
+            <option value="__custom__">+ Add custom...</option>
+          </select>
+        ) : (
+          <input
+            ref={inputRef}
+            type="text"
+            className="ops-add-input"
+            placeholder="Enter expense name..."
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        )}
+      </div>
+      <div className="ops-cell num"></div>
+      <div className="ops-cell num">
+        <InputCell
+          value={unitAmount}
+          variant="as-is"
+          format="currency"
+          onChange={setUnitAmount}
+        />
+      </div>
+      <div className="ops-cell num ops-calc">
+        {renderCurrency(annualTotal)}
+      </div>
+      <div className="ops-cell num ops-calc">
+        {renderPerSF(perSF)}
+      </div>
+      <div className="ops-cell num">
+        <div className="ops-add-actions">
+          <button
+            type="button"
+            className="ops-add-save-btn"
+            onClick={handleSave}
+            disabled={!(showCustomInput ? customName.trim() : selectedCategory)}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="ops-add-cancel-btn"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div className="ops-cell num ops-col-post">
+        {valueAddEnabled ? '—' : null}
+      </div>
+      <div className="ops-cell num ops-calc ops-col-reno">
+        {valueAddEnabled ? '—' : null}
+      </div>
+    </div>
+  );
+}
+
 export function OperatingStatement({
   rentalRows,
   vacancyRows,
@@ -343,15 +519,188 @@ export function OperatingStatement({
   postRenoNOI,
   valueAddEnabled,
   hasDetailedRentRoll,
+  projectId,
   onUpdateVacancy,
   onUpdateOtherIncome,
   onUpdateOpex,
   onToggleExpand,
   onCategoryChange,
-  onAddItem
+  onAddExpense,
+  onDeleteExpenses,
+  onItemNameChange
 }: OperatingStatementProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [savingItem, setSavingItem] = useState<number | null>(null);
+
+  // Selection state
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [lastClickedRow, setLastClickedRow] = useState<number | null>(null);
+
+  // Add row state
+  const [addingToCategory, setAddingToCategory] = useState<string | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+
+  // Inline item name edit state
+  const [editingItemNameOpexId, setEditingItemNameOpexId] = useState<number | null>(null);
+
+  // Fetch subcategories when adding to a category
+  useEffect(() => {
+    if (!addingToCategory) {
+      setCategoryOptions([]);
+      return;
+    }
+
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true);
+      try {
+        const response = await fetch(`/api/opex/categories?include_all=true`);
+        if (response.ok) {
+          const data = await response.json();
+          // Filter to relevant expense categories
+          setCategoryOptions(data.categories || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, [addingToCategory]);
+
+  // Get all child opex_ids for a parent category
+  const getChildOpexIds = useCallback((parentCategory: string): number[] => {
+    const ids: number[] = [];
+    const findChildren = (rows: LineItemRow[]) => {
+      rows.forEach(row => {
+        if (row.parent_category === parentCategory && row.opex_id && !row.is_calculated) {
+          ids.push(row.opex_id);
+        }
+        if (row.children) {
+          findChildren(row.children);
+        }
+      });
+    };
+    findChildren(opexRows);
+    return ids;
+  }, [opexRows]);
+
+  // Handle row selection
+  const handleRowSelect = useCallback((opexId: number, parentCategory: string, event: React.MouseEvent) => {
+    // If clicking in different category, clear previous selections and select new row
+    if (selectedCategory && selectedCategory !== parentCategory) {
+      setSelectedRows(new Set([opexId]));
+      setSelectedCategory(parentCategory);
+      setLastClickedRow(opexId);
+      return;
+    }
+
+    if (event.shiftKey && lastClickedRow !== null) {
+      // Range select: select all rows between lastClicked and current
+      const categoryIds = getChildOpexIds(parentCategory);
+      const lastIndex = categoryIds.indexOf(lastClickedRow);
+      const currentIndex = categoryIds.indexOf(opexId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const rangeIds = categoryIds.slice(start, end + 1);
+
+        setSelectedRows(prev => {
+          const next = new Set(prev);
+          rangeIds.forEach(id => next.add(id));
+          return next;
+        });
+      }
+    } else {
+      // Toggle selection
+      setSelectedRows(prev => {
+        const next = new Set(prev);
+        if (next.has(opexId)) {
+          next.delete(opexId);
+        } else {
+          next.add(opexId);
+        }
+        return next;
+      });
+    }
+
+    setLastClickedRow(opexId);
+    setSelectedCategory(parentCategory);
+  }, [selectedCategory, lastClickedRow, getChildOpexIds]);
+
+  // Handle add button click
+  const handleAddClick = useCallback((parentCategory: string) => {
+    setAddingToCategory(parentCategory);
+  }, []);
+
+  // Handle delete button click
+  const handleDeleteClick = useCallback(async () => {
+    if (selectedRows.size === 0 || !onDeleteExpenses) return;
+
+    // Confirm deletion for multiple rows
+    if (selectedRows.size > 1) {
+      const confirmed = window.confirm(
+        `Delete ${selectedRows.size} expense items?`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      await onDeleteExpenses(Array.from(selectedRows));
+      setSelectedRows(new Set());
+      setSelectedCategory(null);
+    } catch (error) {
+      console.error('Failed to delete expenses:', error);
+    }
+  }, [selectedRows, onDeleteExpenses]);
+
+  // Handle save new expense
+  const handleSaveNewExpense = useCallback(async (expense: { expense_category: string; unit_amount: number | null }) => {
+    if (!addingToCategory || !onAddExpense) return;
+
+    try {
+      await onAddExpense({
+        expense_category: expense.expense_category,
+        parent_category: addingToCategory,
+        unit_amount: expense.unit_amount
+      });
+      setAddingToCategory(null);
+    } catch (error) {
+      console.error('Failed to add expense:', error);
+    }
+  }, [addingToCategory, onAddExpense]);
+
+  // Handle starting item name edit (double-click)
+  const handleStartEditItemName = useCallback((opexId: number) => {
+    setEditingItemNameOpexId(opexId);
+    // Clear selection when entering edit mode
+    setSelectedRows(new Set());
+  }, []);
+
+  // Handle saving item name change
+  const handleSaveItemName = useCallback(async (opexId: number, categoryId: number, categoryName: string) => {
+    setEditingItemNameOpexId(null);
+
+    if (onItemNameChange) {
+      setSavingItem(opexId);
+      try {
+        await onItemNameChange(opexId, categoryId, categoryName);
+      } catch (error) {
+        console.error('Failed to update item name:', error);
+      } finally {
+        setSavingItem(null);
+      }
+    }
+  }, [onItemNameChange]);
+
+  // Handle canceling item name edit
+  const handleCancelEditItemName = useCallback(() => {
+    setEditingItemNameOpexId(null);
+  }, []);
 
   const sumRowsRecursive = (items: LineItemRow[]): { as_is_total: number; post_reno_total: number } => {
     return items.reduce(
@@ -376,6 +725,8 @@ export function OperatingStatement({
   const opexPerUnit = unitCount > 0 ? expenseTotals.as_is_total / unitCount : 0;
   const opexPerSF = totalSF > 0 ? expenseTotals.as_is_total / totalSF : 0;
   const opexPostRenoPerUnit = unitCount > 0 ? expenseTotals.post_reno_total / unitCount : 0;
+  const netPerUnit = unitCount > 0 ? asIsNOI / unitCount : 0;
+  const netPerSF = totalSF > 0 ? asIsNOI / totalSF : 0;
 
   const rentalTotals = rentalRows.reduce(
     (acc, row) => {
@@ -398,6 +749,7 @@ export function OperatingStatement({
     (acc, row) => acc + (row.as_is.total || 0),
     0
   );
+  const potentialGrossIncome = rentalTotals.annual + otherIncomeTotal;
 
   const handleDrop = useCallback(async (item: DragItem, targetCategory: string) => {
     if (!onCategoryChange || !item.opex_id) return;
@@ -433,7 +785,11 @@ export function OperatingStatement({
   };
 
   const displayOpexRows = flattenRows(opexRows);
-  const sourceLabel = hasDetailedRentRoll ? 'from Rent Roll' : 'from Floor Plan Matrix';
+
+  // Check if a category has selected children
+  const categoryHasSelectedChildren = (parentCategory: string): boolean => {
+    return selectedCategory === parentCategory && selectedRows.size > 0;
+  };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -450,11 +806,24 @@ export function OperatingStatement({
             <div className="ops-cell ops-header-cell num ops-col-reno">Reno Total</div>
           </div>
 
-          <div className="ops-row ops-section-row">
+          <div className="ops-row ops-section-row ops-income-header">
             <div className="ops-cell ops-section-cell">
-              <span>Rental Income</span>
-              <span className="ops-section-subtle">{sourceLabel}</span>
+              <div className="ops-section-heading">
+                <span className="ops-section-label">
+                  Rental Income
+                  <span className="ops-section-tooltip">
+                    {hasDetailedRentRoll ? 'from Rent Roll' : 'from Floor Plan Matrix'}
+                  </span>
+                </span>
+              </div>
             </div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill ops-col-post"></div>
+            <div className="ops-cell ops-section-fill ops-col-reno"></div>
           </div>
 
           {rentalRows.map((row) => {
@@ -486,6 +855,13 @@ export function OperatingStatement({
                 <div className="ops-cell ops-section-cell">
                   <span>Other Income</span>
                 </div>
+                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill ops-col-post"></div>
+                <div className="ops-cell ops-section-fill ops-col-reno"></div>
               </div>
 
               <div className="ops-row ops-parent-row">
@@ -548,10 +924,28 @@ export function OperatingStatement({
             </>
           )}
 
-          <div className="ops-row ops-section-row">
+          <div className="ops-row ops-egi-row">
+            <div className="ops-cell font-bold">Potential Rental Income</div>
+            <div className="ops-cell num font-semibold">{rentalTotals.count}</div>
+            <div className="ops-cell num font-semibold">—</div>
+            <div className="ops-cell num font-bold ops-positive">{formatCurrency(potentialGrossIncome)}</div>
+            <div className="ops-cell num font-semibold">—</div>
+            <div className="ops-cell num ops-loss-to-lease">{rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}</div>
+            <div className="ops-cell num ops-col-post">{valueAddEnabled ? '—' : null}</div>
+            <div className="ops-cell num ops-col-reno">{valueAddEnabled ? '—' : null}</div>
+          </div>
+
+          <div className="ops-row ops-section-row ops-vacancy-header">
             <div className="ops-cell ops-section-cell">
               <span>Less: Vacancy &amp; Deductions</span>
             </div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill ops-col-post"></div>
+            <div className="ops-cell ops-section-fill ops-col-reno"></div>
           </div>
 
           {vacancyRows.map((row) => {
@@ -630,44 +1024,71 @@ export function OperatingStatement({
 
           <div className="ops-row ops-section-row ops-expense-header">
             <div className="ops-cell ops-section-cell">
-              <span>Operating Expenses</span>
+              <span>Expenses and Reserves</span>
+            </div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-controls-cell">
               <div className="ops-section-controls">
-                <span className="ops-section-hint">Drag items to recategorize</span>
+                <span className="ops-section-hint">Click rows to select, drag to recategorize</span>
                 <DetailSummaryToggle value={viewMode} onChange={setViewMode} />
               </div>
             </div>
+            <div className="ops-cell ops-section-fill ops-col-post"></div>
+            <div className="ops-cell ops-section-fill ops-col-reno"></div>
           </div>
 
           {displayOpexRows.map((row) => {
             const isParent = row.is_calculated;
+            const parentCategory = row.parent_category || 'unclassified';
+
             if (isParent) {
               return (
-                <DroppableParentRow
-                  key={row._uniqueKey}
-                  row={row}
-                  unitCount={unitCount}
-                  totalSF={totalSF}
-                  valueAddEnabled={valueAddEnabled}
-                  showParentTotals={row.is_expanded === false}
-                  onDrop={handleDrop}
-                  onUpdateRow={onUpdateOpex || (() => undefined)}
-                  onToggleExpand={onToggleExpand}
-                  onAddItem={onAddItem}
-                />
+                <React.Fragment key={row._uniqueKey}>
+                  <DroppableParentRow
+                    row={row}
+                    unitCount={unitCount}
+                    totalSF={totalSF}
+                    valueAddEnabled={valueAddEnabled}
+                    showParentTotals={row.is_expanded === false}
+                    hasSelectedChildren={categoryHasSelectedChildren(parentCategory)}
+                    onDrop={handleDrop}
+                    onToggleExpand={onToggleExpand}
+                    onAddClick={() => handleAddClick(parentCategory)}
+                    onDeleteClick={handleDeleteClick}
+                  />
+                  {addingToCategory === parentCategory && row.is_expanded !== false && (
+                    <InlineAddRow
+                      parentCategory={parentCategory}
+                      unitCount={unitCount}
+                      totalSF={totalSF}
+                      valueAddEnabled={valueAddEnabled}
+                      categoryOptions={categoryOptions}
+                      isLoadingCategories={isLoadingCategories}
+                      onSave={handleSaveNewExpense}
+                      onCancel={() => setAddingToCategory(null)}
+                    />
+                  )}
+                </React.Fragment>
               );
             }
 
             return (
-              <DraggableExpenseRow
+              <SelectableExpenseRow
                 key={row._uniqueKey}
                 row={row}
                 unitCount={unitCount}
                 totalSF={totalSF}
                 valueAddEnabled={valueAddEnabled}
-                showParentTotals={row.is_calculated && row.is_expanded === false}
+                isSelected={row.opex_id ? selectedRows.has(row.opex_id) : false}
+                isEditingName={row.opex_id === editingItemNameOpexId}
+                onSelect={(opexId, event) => handleRowSelect(opexId, parentCategory, event)}
                 onUpdateRow={onUpdateOpex || (() => undefined)}
-                onToggleExpand={onToggleExpand}
-                onAddItem={onAddItem}
+                onStartEditName={handleStartEditItemName}
+                onSaveItemName={handleSaveItemName}
+                onCancelEditName={handleCancelEditItemName}
               />
             );
           })}
@@ -686,9 +1107,9 @@ export function OperatingStatement({
           <div className="ops-row ops-noi-row">
             <div className="ops-cell font-bold">Net Operating Income</div>
             <div className="ops-cell num"></div>
-            <div className="ops-cell num"></div>
+            <div className="ops-cell num">{formatCurrency(netPerUnit)}</div>
             <div className="ops-cell num font-bold">{formatCurrency(asIsNOI)}</div>
-            <div className="ops-cell num"></div>
+            <div className="ops-cell num">{formatPerSF(netPerSF)}</div>
             <div className="ops-cell num"></div>
             <div className="ops-cell num ops-col-post"></div>
             <div className="ops-cell num ops-col-reno">{valueAddEnabled ? formatCurrency(postRenoNOI) : null}</div>

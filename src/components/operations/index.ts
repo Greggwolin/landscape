@@ -11,6 +11,8 @@ export * from './types';
 export { InputCell } from './InputCell';
 export type { InputCellVariant, InputCellFormat } from './InputCell';
 
+export { ItemNameEditor } from './ItemNameEditor';
+
 export { EvidenceCell } from './EvidenceCell';
 export type { EvidenceCellFormat } from './EvidenceCell';
 

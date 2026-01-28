@@ -67,7 +67,8 @@ export const formatDemographicValue = (
     case 'decimal':
       return value.toFixed(1);
     case 'percent':
-      return `${(value * 100).toFixed(1)}%`;
+      // Value is already a percentage (e.g., 44.22), not a decimal (0.4422)
+      return `${value.toFixed(1)}%`;
     default:
       return String(value);
   }

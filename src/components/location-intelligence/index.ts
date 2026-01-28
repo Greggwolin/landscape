@@ -15,8 +15,8 @@ export { MapLayerToggle } from './MapLayerToggle';
 export { AddPointPopover } from './AddPointPopover';
 
 // Hooks
-export { useDemographics } from './useDemographics';
-export { useReverseGeocode } from './useReverseGeocode';
+export { useDemographics } from './hooks/useDemographics';
+export { useReverseGeocode } from './hooks/useReverseGeocode';
 
 // Types
 export type {

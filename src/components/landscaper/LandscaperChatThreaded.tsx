@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
 import CIcon from '@coreui/icons-react';
-import { cilChevronBottom, cilChevronTop, cilOptions, cilPencil, cilCheck, cilX } from '@coreui/icons';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
+import { cilChevronBottom, cilChevronTop, cilOptions } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
@@ -50,8 +50,6 @@ export function LandscaperChatThreaded({
 }: LandscaperChatThreadedProps) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userHasSentMessage = useRef(false);
@@ -171,24 +169,6 @@ export function LandscaperChatThreaded({
     });
   };
 
-  const handleStartTitleEdit = () => {
-    setEditTitle(activeThread?.title || '');
-    setIsEditingTitle(true);
-  };
-
-  const handleSaveTitleEdit = () => {
-    if (activeThread && editTitle.trim()) {
-      updateThreadTitle(activeThread.threadId, editTitle.trim());
-    }
-    setIsEditingTitle(false);
-    setEditTitle('');
-  };
-
-  const handleCancelTitleEdit = () => {
-    setIsEditingTitle(false);
-    setEditTitle('');
-  };
-
   const handleSelectThread = (threadId: string) => {
     selectThread(threadId);
     setShowThreadList(false);
@@ -198,8 +178,6 @@ export function LandscaperChatThreaded({
     startNewThread();
     setShowThreadList(false);
   };
-
-  const threadTitle = activeThread?.title || 'New conversation';
 
   return (
     <div className="flex h-full flex-col">
@@ -212,62 +190,18 @@ export function LandscaperChatThreaded({
           backgroundColor: 'var(--surface-card-header)',
         }}
       >
-        <Image src="/landscaper-icon.png" alt="Landscaper icon" width={20} height={20} />
+        <LandscaperIcon style={{ width: '32px', height: '32px', color: 'var(--landscaper-icon-color)' }} />
 
-        {/* Thread title (editable) */}
-        <div className="flex-1 min-w-0">
-          {isEditingTitle ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveTitleEdit();
-                  if (e.key === 'Escape') handleCancelTitleEdit();
-                }}
-                className="flex-1 px-2 py-1 text-sm rounded border"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-body-bg)',
-                  color: 'var(--cui-body-color)',
-                }}
-                autoFocus
-              />
-              <button
-                onClick={handleSaveTitleEdit}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <CIcon icon={cilCheck} size="sm" style={{ color: 'var(--cui-success)' }} />
-              </button>
-              <button
-                onClick={handleCancelTitleEdit}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <CIcon icon={cilX} size="sm" style={{ color: 'var(--cui-danger)' }} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <span
-                className="font-semibold truncate"
-                style={{ color: 'var(--cui-body-color)', fontSize: '0.9rem' }}
-                title={threadTitle}
-              >
-                {isThreadLoading ? 'Loading...' : threadTitle}
-              </span>
-              {activeThread && (
-                <button
-                  onClick={handleStartTitleEdit}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 opacity-60 hover:opacity-100"
-                  title="Edit title"
-                >
-                  <CIcon icon={cilPencil} size="xs" style={{ color: 'var(--cui-secondary-color)' }} />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Panel title - static "Landscaper" */}
+        <span
+          className="font-semibold"
+          style={{ color: 'var(--cui-body-color)', fontSize: '0.9rem' }}
+        >
+          Landscaper
+        </span>
+
+        {/* Spacer */}
+        <div className="flex-1" />
 
         {/* Context indicator */}
         {!isIngesting && (

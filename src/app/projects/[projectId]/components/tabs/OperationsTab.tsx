@@ -175,6 +175,85 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     }
   };
 
+  // Handle adding a new expense
+  const handleAddExpense = async (expense: {
+    expense_category: string;
+    parent_category: string;
+    unit_amount: number | null;
+  }) => {
+    try {
+      const response = await fetch('/api/opex/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: project.project_id,
+          expense_category: expense.expense_category,
+          parent_category: expense.parent_category,
+          unit_amount: expense.unit_amount,
+          annual_amount: expense.unit_amount && unitCount > 0 ? expense.unit_amount * unitCount : null
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add expense');
+      }
+
+      // Reload data to reflect the change
+      reload();
+    } catch (error) {
+      console.error('Failed to add expense:', error);
+      throw error;
+    }
+  };
+
+  // Handle deleting expenses
+  const handleDeleteExpenses = async (opexIds: number[]) => {
+    try {
+      const response = await fetch('/api/opex/bulk-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: opexIds })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete expenses');
+      }
+
+      // Reload data to reflect the change
+      reload();
+    } catch (error) {
+      console.error('Failed to delete expenses:', error);
+      throw error;
+    }
+  };
+
+  // Handle inline item name change (double-click edit)
+  const handleItemNameChange = async (opexId: number, categoryId: number, categoryName: string) => {
+    try {
+      const response = await fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_id: categoryId,
+          expense_category: categoryName
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update item name');
+      }
+
+      // Reload data to reflect the change
+      reload();
+    } catch (error) {
+      console.error('Failed to update item name:', error);
+      throw error;
+    }
+  };
+
   // Land projects use OpExHierarchy
   if (isLand) {
     return (
@@ -355,11 +434,15 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         postRenoNOI={totals?.post_reno_noi || 0}
         valueAddEnabled={valueAddEnabled}
         hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
+        projectId={project.project_id}
         onUpdateVacancy={handleUpdateRow('vacancy_deductions')}
         onUpdateOtherIncome={handleUpdateRow('other_income')}
         onUpdateOpex={handleUpdateRow('operating_expenses')}
         onToggleExpand={handleToggleExpand('operating_expenses')}
         onCategoryChange={handleCategoryChange}
+        onAddExpense={handleAddExpense}
+        onDeleteExpenses={handleDeleteExpenses}
+        onItemNameChange={handleItemNameChange}
       />
 
       {/* Sticky Summary Bar */}

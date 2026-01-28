@@ -9,8 +9,8 @@
 import React, { useState, useCallback } from 'react';
 import type { LocationMapFlyoutProps, UserMapPoint, LayerVisibility } from './types';
 import { DEFAULT_LAYER_VISIBILITY } from './constants';
-import { useDemographics } from './useDemographics';
-import { useReverseGeocode } from './useReverseGeocode';
+import { useDemographics } from './hooks/useDemographics';
+import { useReverseGeocode } from './hooks/useReverseGeocode';
 import { LocationMap } from './LocationMap';
 import { DemographicsPanel } from './DemographicsPanel';
 import { MapLayerToggle } from './MapLayerToggle';
@@ -89,11 +89,8 @@ export function LocationMapFlyout({
   if (!isOpen) return null;
 
   return (
-    <div className="location-map-flyout-overlay" onClick={onClose}>
-      <div
-        className="location-map-flyout"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="location-map-flyout-overlay">
+      <div className="location-map-flyout">
         {/* Header */}
         <div className="flyout-header">
           <div className="flyout-title-group">

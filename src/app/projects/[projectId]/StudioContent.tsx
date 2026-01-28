@@ -29,6 +29,7 @@ import ValuationTab from './components/tabs/ValuationTab';
 import ReportsTab from './components/tabs/ReportsTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import CapitalizationTab from './components/tabs/CapitalizationTab';
+import { MapTab } from '@/components/map-tab';
 
 interface Project {
   project_id: number;
@@ -219,6 +220,13 @@ function StudioContent({
           default:
             return <DocumentsTab project={project} />;
         }
+
+      // ========================================
+      // FOLDER 8: MAP
+      // Unified spatial hub - no subtabs
+      // ========================================
+      case 'map':
+        return <MapTab project={project} />;
 
       // ========================================
       // DEFAULT FALLBACK

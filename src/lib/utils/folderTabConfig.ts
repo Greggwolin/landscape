@@ -245,6 +245,17 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
         { id: 'extractions', label: 'Extractions' },
       ],
     },
+
+    // ========================================
+    // Position 8: Map
+    // Unified spatial hub - no subtabs
+    // ========================================
+    {
+      id: 'map',
+      label: 'Map',
+      color: TILE_COLORS.map,
+      subTabs: [], // Single page - no subtabs
+    },
   ];
 
   return { folders };

@@ -53,6 +53,7 @@ export const TILE_COLORS = {
   capital: '#9b59b6',     // Purple (Capitalization)
   reports: '#6b7785',     // Gray
   documents: '#272d35',   // Dark Gray
+  map: '#14b8a6',         // Teal (Map/GIS)
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -219,6 +220,16 @@ export function createTileConfig(projectType: string | undefined): TileConfig[] 
         { id: 'all', label: 'All Documents', route: '/documents' },
         { id: 'extractions', label: 'Extractions', route: '/documents/extractions' },
       ],
+    },
+
+    // Position 8: Map
+    {
+      id: 'map',
+      label: 'Map',
+      background: TILE_COLORS.map,
+      route: '',
+      tabKey: 'map',
+      subtabs: [],  // No subtabs for now
     },
   ];
 }
