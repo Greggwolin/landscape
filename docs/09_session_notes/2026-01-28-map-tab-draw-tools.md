@@ -166,6 +166,56 @@ curl "http://localhost:8000/api/v1/map/features/42/"
 - [x] Edit tool allows selection
 - [x] Layer panel shows feature count
 
+## Additional Session Work
+
+### 8. Documentation Update Script ✅
+
+Created executable bash script for cross-AI documentation updates:
+
+**File**: `scripts/update-docs.sh`
+
+The `/update-docs` slash command only works in Claude Code. This script provides the same functionality for any AI assistant (Codex, etc.) or manual use:
+
+```bash
+./scripts/update-docs.sh
+```
+
+Features:
+- Scans for today's session notes
+- Lists recent git activity (commits, uncommitted changes)
+- Shows recently modified documentation files
+- Reports key file status with modification dates
+- Counts documentation center tiles
+- Provides summary checklist for updates
+
+### 9. Documentation Updates ✅
+
+Updated the following documentation files:
+
+1. **IMPLEMENTATION_STATUS.md**
+   - Bumped version to 3.0
+   - Added Map Tab Draw Tools Phase 3 as latest update
+   - Updated status line to include Map Draw Tools
+
+2. **Documentation Center** (`src/app/documentation/page.tsx`)
+   - Added new tile for Map Tab Draw Tools (Jan 28, 2026)
+   - Updated Financial Engine Status tile date to 2026-01-28
+
+## Git Activity
+
+### Commits Made This Session:
+
+1. `79a1880` - feat: implement Map Tab Phase 3 - Draw Tools Integration
+   - 23 files changed, 4,806 insertions, 53 deletions
+   - New components: MapTab, MapCanvas, FeatureModal, DrawToolbar, LayerPanel
+   - New hooks: useMapDraw, useMapFeatures
+   - Django endpoints for map features
+   - Documentation updates
+
+### Files Not Yet Committed:
+- `scripts/update-docs.sh` (new)
+- Various valuation and location-intelligence changes (from other work)
+
 ## Next Steps
 
 1. **Edit existing features** - Click saved feature to edit label/category
