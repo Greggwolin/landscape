@@ -50,4 +50,6 @@ urlpatterns = [
     path("api/", include('apps.contacts.urls')),  # Cabinet/Contact management
     path("api/", include('apps.feedback.urls')),  # Tester feedback system
     path("api/v1/location-intelligence/", include('apps.location_intelligence.urls')),  # Location Intelligence
+    path("api/v1/map/", include('apps.location_intelligence.urls_map')),  # Map features (draw tools)
+    path("api/", include('apps.valuation.urls')),  # Valuation approaches
 ]

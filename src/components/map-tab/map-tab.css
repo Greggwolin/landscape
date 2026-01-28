@@ -1,0 +1,658 @@
+/**
+ * Map Tab Styles
+ *
+ * Unified spatial hub styling
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Main Layout
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab {
+  display: flex;
+  /* Fill remaining viewport height below tab bar */
+  height: calc(100vh - var(--cui-header-height, 56px) - 120px);
+  min-height: 500px;
+  background: var(--cui-body-bg, #121218);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Sidebar (Layer Panel + Tools)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--cui-card-bg, #1a1a24);
+  border-right: 1px solid var(--cui-border-color, #2d2d3a);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Layer Panel
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.layer-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.layer-panel-header {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color, #9ca3af);
+  border-bottom: 1px solid var(--cui-border-color, #2d2d3a);
+}
+
+.layer-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* Layer Group */
+.layer-group {
+  margin-bottom: 4px;
+}
+
+.layer-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: var(--cui-body-color, #e5e5e5);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: left;
+}
+
+.layer-group-header:hover {
+  background: var(--cui-tertiary-bg, #252530);
+}
+
+.layer-group-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  color: var(--cui-secondary-color, #9ca3af);
+}
+
+.layer-group-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.layer-group-label {
+  flex: 1;
+}
+
+/* Layer Items */
+.layer-group-items {
+  padding-left: 24px;
+}
+
+.layer-item {
+  padding: 4px 16px 4px 8px;
+}
+
+.layer-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.layer-item-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--cui-primary, #5c6bc0);
+  cursor: pointer;
+}
+
+.layer-item-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.layer-item-name {
+  flex: 1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.layer-item-name:hover {
+  color: var(--cui-primary, #5c6bc0);
+  text-decoration: underline;
+}
+
+.layer-item-count {
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 11px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Draw Tools Section
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-tools {
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+  padding: 12px;
+}
+
+.map-tab-tools-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 8px;
+}
+
+.draw-toolbar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.draw-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 40px;
+  height: 44px;
+  padding: 4px;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  color: var(--cui-body-color, #e5e5e5);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.draw-tool-btn:hover {
+  background: var(--cui-secondary-bg, #2d2d3a);
+  border-color: var(--cui-primary, #5c6bc0);
+}
+
+.draw-tool-btn.active {
+  background: var(--cui-primary, #5c6bc0);
+  border-color: var(--cui-primary, #5c6bc0);
+  color: #fff;
+}
+
+.draw-tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.draw-tool-label {
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Map Content Area
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0; /* Critical for flex children to shrink properly */
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Map Canvas
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-canvas-container {
+  flex: 1;
+  position: relative;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-canvas-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--cui-body-bg, #121218);
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 14px;
+}
+
+.map-canvas-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--cui-border-color, #2d2d3a);
+  border-top-color: var(--cui-primary, #5c6bc0);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Bottom Toolbar
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--cui-card-bg, #1a1a24);
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+}
+
+.map-tab-basemap-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-tab-basemap-selector label {
+  font-size: 12px;
+  color: var(--cui-secondary-color, #9ca3af);
+}
+
+.map-tab-basemap-selector select {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 4px;
+  color: var(--cui-body-color, #e5e5e5);
+  cursor: pointer;
+}
+
+.map-tab-basemap-selector select:hover {
+  border-color: var(--cui-primary, #5c6bc0);
+}
+
+.map-tab-search {
+  flex: 1;
+  max-width: 300px;
+}
+
+.map-tab-search-input {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 4px;
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.map-tab-search-input:focus {
+  outline: none;
+  border-color: var(--cui-primary, #5c6bc0);
+}
+
+.map-tab-search-input::placeholder {
+  color: var(--cui-secondary-color, #9ca3af);
+}
+
+.map-tab-export-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 4px;
+  color: var(--cui-body-color, #e5e5e5);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.map-tab-export-btn:hover {
+  background: var(--cui-secondary-bg, #2d2d3a);
+  border-color: var(--cui-primary, #5c6bc0);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MapLibre Overrides
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.maplibregl-ctrl-group {
+  background: var(--cui-card-bg, #1a1a24) !important;
+  border: 1px solid var(--cui-border-color, #2d2d3a) !important;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+  border-color: var(--cui-border-color, #2d2d3a) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: var(--cui-tertiary-bg, #252530) !important;
+}
+
+.maplibregl-ctrl-group button span {
+  filter: invert(0.8);
+}
+
+.maplibregl-ctrl-scale {
+  background: var(--cui-card-bg, #1a1a24) !important;
+  border-color: var(--cui-border-color, #2d2d3a) !important;
+  color: var(--cui-body-color, #e5e5e5) !important;
+  font-size: 10px !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Demographics Panel (at bottom of map area)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-demographics-panel {
+  flex-shrink: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+  background: var(--cui-card-bg, #1a1a24);
+}
+
+.map-tab-demographics-panel .demographics-panel {
+  padding: 12px 16px;
+}
+
+.map-tab-demographics-panel .demographics-panel h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin: 0 0 12px 0;
+}
+
+.map-tab-demographics-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 13px;
+}
+
+.map-tab-demographics-error {
+  padding: 12px 16px;
+  color: var(--cui-danger, #dc3545);
+  font-size: 13px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature Modal (for adding points, lines, polygons)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.feature-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.feature-modal {
+  background: var(--cui-card-bg, #1a1a24);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.feature-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--cui-border-color, #2d2d3a);
+}
+
+.feature-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.feature-modal-close {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--cui-secondary-color, #9ca3af);
+  transition: color 0.15s;
+}
+
+.feature-modal-close:hover {
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.feature-modal form {
+  padding: 20px;
+}
+
+.feature-modal-field {
+  margin-bottom: 16px;
+}
+
+.feature-modal-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 6px;
+}
+
+.feature-modal-field input,
+.feature-modal-field select,
+.feature-modal-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.feature-modal-field input:focus,
+.feature-modal-field select:focus,
+.feature-modal-field textarea:focus {
+  outline: none;
+  border-color: var(--cui-primary, #5c6bc0);
+}
+
+.feature-modal-field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.feature-modal-coords {
+  padding: 8px 12px;
+  background: var(--cui-tertiary-bg, #252530);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 20px;
+}
+
+.feature-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.feature-modal-actions .btn-cancel {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  color: var(--cui-body-color, #e5e5e5);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.feature-modal-actions .btn-cancel:hover {
+  background: var(--cui-tertiary-bg, #252530);
+}
+
+.feature-modal-actions .btn-save {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--cui-primary, #5c6bc0);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.feature-modal-actions .btn-save:hover:not(:disabled) {
+  background: var(--cui-primary-hover, #4a5ab9);
+}
+
+.feature-modal-actions .btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Toast Notification
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  background: var(--cui-card-bg, #1a1a24);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  color: var(--cui-body-color, #e5e5e5);
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 1200;
+  animation: toast-fade-in 0.2s ease-out;
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Live Measurement Overlay
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-measurement-overlay {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--cui-primary, #5c6bc0);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature Modal Measurements Display
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.feature-modal-measurements {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--cui-tertiary-bg, #252530);
+  border-radius: 6px;
+  border-left: 3px solid var(--cui-primary, #5c6bc0);
+}
+
+.feature-modal-measurement {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.feature-modal-measurement + .feature-modal-measurement {
+  margin-top: 6px;
+}
+
+.feature-modal-measurement .measurement-label {
+  color: var(--cui-secondary-color, #9ca3af);
+  min-width: 70px;
+}
+
+.feature-modal-measurement .measurement-value {
+  color: var(--cui-body-color, #e5e5e5);
+  font-weight: 500;
+}
+
+.feature-modal-measurement .measurement-secondary {
+  color: var(--cui-secondary-color, #9ca3af);
+  font-weight: 400;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Mapbox Draw Overrides (dark theme)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.mapbox-gl-draw_ctrl-draw-btn {
+  display: none !important; /* We use our own toolbar */
+}
