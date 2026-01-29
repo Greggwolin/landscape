@@ -87,64 +87,72 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
   const [timeScale, setTimeScale] = useState<TimeScale>('annual');
   const [costGranularity, setCostGranularity] = useState<CostGranularity>('summary');
 
-  // Filter state
-  const [selectedAreaIds, setSelectedAreaIds] = useState<number[]>([]);
-  const [selectedPhaseIds, setSelectedPhaseIds] = useState<number[]>([]);
+  // Filter state - track which items are EXCLUDED (deselected)
+  // Empty arrays mean "all selected" (default state)
+  const [excludedAreaIds, setExcludedAreaIds] = useState<number[]>([]);
+  const [excludedPhaseIds, setExcludedPhaseIds] = useState<number[]>([]);
 
   // Fetch containers (areas/phases) for filter
   const { areas, phases: containerPhases, isLoading: containersLoading } = useContainers({ projectId });
   const { labels } = useProjectConfig(projectId);
 
-  // Filter handlers
+  // Filter handlers - toggle exclusion
   const handleAreaSelect = useCallback((areaId: number) => {
-    setSelectedAreaIds(prev => {
-      if (prev.includes(areaId)) {
+    setExcludedAreaIds(prev => {
+      const isCurrentlyExcluded = prev.includes(areaId);
+      if (isCurrentlyExcluded) {
+        // Re-select: remove from exclusions, also re-select all phases in this area
+        const phasesInArea = containerPhases.filter(p => p.parent_id === areaId).map(p => p.division_id);
+        setExcludedPhaseIds(prevPhases => prevPhases.filter(id => !phasesInArea.includes(id)));
         return prev.filter(id => id !== areaId);
+      } else {
+        // Deselect: add to exclusions, also exclude all phases in this area
+        const phasesInArea = containerPhases.filter(p => p.parent_id === areaId).map(p => p.division_id);
+        setExcludedPhaseIds(prevPhases => [...new Set([...prevPhases, ...phasesInArea])]);
+        return [...prev, areaId];
       }
-      return [...prev, areaId];
     });
-    // Clear phase selections when area changes
-    setSelectedPhaseIds([]);
-  }, []);
+  }, [containerPhases]);
 
   const handlePhaseSelect = useCallback((phaseId: number) => {
-    setSelectedPhaseIds(prev => {
+    setExcludedPhaseIds(prev => {
       if (prev.includes(phaseId)) {
+        // Re-select: remove from exclusions
         return prev.filter(id => id !== phaseId);
       }
+      // Deselect: add to exclusions
       return [...prev, phaseId];
     });
   }, []);
 
-  const handleClearFilters = useCallback(() => {
-    setSelectedAreaIds([]);
-    setSelectedPhaseIds([]);
+  const handleSelectAll = useCallback(() => {
+    // Select all = clear all exclusions
+    setExcludedAreaIds([]);
+    setExcludedPhaseIds([]);
   }, []);
 
-  // Filter phases shown in tiles by selected areas
-  const filteredContainerPhases = useMemo(() => {
-    if (selectedAreaIds.length === 0) return containerPhases;
-    return containerPhases.filter(phase => selectedAreaIds.includes(phase.parent_id!));
-  }, [containerPhases, selectedAreaIds]);
+  // Filter phases shown in tiles - show all phases, not filtered by area selection
+  const filteredContainerPhases = containerPhases;
 
-  const hasFilters = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
+  // Check if any filters are applied (anything is deselected)
+  const hasFilters = excludedAreaIds.length > 0 || excludedPhaseIds.length > 0;
 
   // Determine which container IDs to pass to the API
   // This controls which phases' data is aggregated into the totals
   const containerIdsForApi = useMemo(() => {
-    // If specific phases are selected, use those
-    if (selectedPhaseIds.length > 0) {
-      return selectedPhaseIds;
+    // Get phases that are NOT excluded
+    const activePhaseIds = containerPhases
+      .filter(p => !excludedPhaseIds.includes(p.division_id) && !excludedAreaIds.includes(p.parent_id!))
+      .map(p => p.division_id);
+
+    // If all phases are selected, return undefined (fetch all)
+    if (activePhaseIds.length === containerPhases.length) {
+      return undefined;
     }
-    // If areas are selected but no phases, get all phases in those areas
-    if (selectedAreaIds.length > 0) {
-      return containerPhases
-        .filter(p => selectedAreaIds.includes(p.parent_id!))
-        .map(p => p.division_id);
-    }
-    // No filter - return undefined to fetch all
-    return undefined;
-  }, [selectedPhaseIds, selectedAreaIds, containerPhases]);
+
+    // Return only selected phase IDs
+    return activePhaseIds.length > 0 ? activePhaseIds : undefined;
+  }, [excludedPhaseIds, excludedAreaIds, containerPhases]);
 
   // Fetch cash flow data with container filter
   const { data, error, isLoading } = useSWR<CashFlowResponse>(
@@ -209,7 +217,7 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
       <CollapsibleSection
         title={`${labels.level1LabelPlural} / ${labels.level2LabelPlural}`}
         itemCount={1}
-        defaultExpanded={false}
+        defaultExpanded={true}
         headerActions={
           hasFilters && (
             <CBadge
@@ -217,10 +225,10 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
               className="cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                handleClearFilters();
+                handleSelectAll();
               }}
             >
-              Clear Filters
+              Select All
             </CBadge>
           )
         }
@@ -238,7 +246,7 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
                 <div className="text-muted text-sm">No {labels.level1LabelPlural.toLowerCase()} defined</div>
               ) : (
                 areas.map((area, index) => {
-                  const isSelected = selectedAreaIds.includes(area.division_id);
+                  const isSelected = !excludedAreaIds.includes(area.division_id);
                   const cleanName = area.name.replace(/\bArea\b/gi, '').replace(/\s{2,}/g, ' ').trim();
                   const areaColor = getAreaColor(index);
                   return (
@@ -271,11 +279,12 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
                 <div className="text-muted text-sm">Loading...</div>
               ) : filteredContainerPhases.length === 0 ? (
                 <div className="text-muted text-sm">
-                  No {labels.level2LabelPlural.toLowerCase()} {selectedAreaIds.length > 0 ? `in selected ${labels.level1LabelPlural.toLowerCase()}` : 'defined'}
+                  No {labels.level2LabelPlural.toLowerCase()} defined
                 </div>
               ) : (
                 filteredContainerPhases.map(phase => {
-                  const isSelected = selectedPhaseIds.includes(phase.division_id);
+                  // Phase is selected if neither the phase nor its parent area is excluded
+                  const isSelected = !excludedPhaseIds.includes(phase.division_id) && !excludedAreaIds.includes(phase.parent_id!);
                   // Find the parent area's index to get matching color
                   const parentIndex = areas.findIndex(a => a.division_id === phase.parent_id);
                   const phaseColor = getAreaColor(parentIndex >= 0 ? parentIndex : 0);
