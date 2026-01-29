@@ -9,7 +9,21 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Sales Comparison UI Refinements (January 29, 2026)**
+### 🆕 **Latest Update: Assumptions Panel Styling (January 29, 2026)**
+
+**CRE Income Approach Assumptions Panel Refinements**
+
+Comprehensive styling update to the Assumptions Panel for Income Approach valuation:
+
+- ✅ **Shaded Section Headers** - Income, Expenses, Capitalization, DCF headers with full-width backgrounds
+- ✅ **Compact Panel Width** - Reduced by 20% (24% width, 260-320px)
+- ✅ **Units Inside Inputs** - All values show units inside box (`3.00%`, `$300`, `10 yrs`)
+- ✅ **Removed Lock Icons** - Calculated values (GPR, OpEx) display as plain text
+- ✅ **Updated Labels** - "Method" dropdown, "Reserves/Unit/Yr" label
+- ✅ **All Accordions Open** - DCF Parameters now expanded by default
+- 📁 **Location:** See `docs/09_session_notes/2026-01-29-assumptions-panel-styling.md`
+
+### Previous Update: Sales Comparison UI Refinements (January 29, 2026)
 
 **Flat Excel-style Editable Cells for Sales Comparison Grid**
 
