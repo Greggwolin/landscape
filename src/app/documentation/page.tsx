@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Sales Comparison UI Refinements (Jan 29, 2026)',
+      path: '/docs/09_session_notes/2026-01-29-sales-comparison-ui-refinements.md',
+      category: 'Component',
+      description: 'Flat Excel-style editable cells for Sales Comparison grid - removed pill styling, consistent header backgrounds, increased font size (13px)',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-29'
+    },
+    {
       title: 'Map Tab Draw Tools Phase 3 (Jan 28, 2026)',
       path: '/docs/09_session_notes/2026-01-28-map-tab-draw-tools.md',
       category: 'Component',
@@ -282,9 +290,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Map Tab Draw Tools (Jan 28)',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Sales Comparison UI (Jan 29)',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-01-28'
+      lastModified: '2026-01-29'
     },
     {
       title: 'CRE Implementation Summary',

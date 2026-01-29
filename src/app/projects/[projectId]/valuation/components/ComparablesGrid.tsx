@@ -102,12 +102,12 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
     if (Math.abs(num) >= 1_000_000) {
-      return `${(num / 1_000_000).toFixed(2)}M`;
+      return `$${(num / 1_000_000).toFixed(2)}M`;
     }
     if (Math.abs(num) >= 1_000) {
-      return `${(num / 1_000).toFixed(2)}K`;
+      return `$${(num / 1_000).toFixed(2)}K`;
     }
-    return num.toFixed(2);
+    return `$${num.toFixed(2)}`;
   };
 
   const formatPricePerUnitValue = (value: number | null | undefined) => {
@@ -115,19 +115,19 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
     if (Math.abs(num) >= 1_000_000) {
-      return `${(num / 1_000_000).toFixed(2)}M`;
+      return `$${(num / 1_000_000).toFixed(2)}M`;
     }
     if (Math.abs(num) >= 1_000) {
-      return `${Math.round(num / 1_000)}K`;
+      return `$${Math.round(num / 1_000)}K`;
     }
-    return num.toFixed(2);
+    return `$${num.toFixed(2)}`;
   };
 
   const formatPricePerSquareFootValue = (value: number | null | undefined) => {
     if (value == null) return '';
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
-    return num.toFixed(2);
+    return `${Math.round(num)}`;
   };
 
   const formatNumberWithCommas = (value: number | null | undefined) => {
@@ -135,6 +135,28 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
     return Math.round(num).toLocaleString();
+  };
+
+  const formatYearValue = (value: number | null | undefined) => {
+    if (value == null) return '';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return Math.round(num).toString();
+  };
+
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: '2-digit'
+  });
+
+  const formatDateLabel = (value: string | null | undefined) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    const parts = dateFormatter.formatToParts(parsed);
+    const month = parts.find(part => part.type === 'month')?.value ?? '';
+    const year = parts.find(part => part.type === 'year')?.value ?? '';
+    return month && year ? `${month}-${year}` : `${month}${year}`;
   };
 
   // Get current adjustment for a specific comparable and adjustment type
@@ -180,7 +202,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
       case 'city':
         return comp.city || '';
       case 'sale_date':
-        return comp.sale_date || '';
+        return formatDateLabel(comp.sale_date);
       case 'sale_price':
         return formatSalePriceValue(comp.sale_price);
       case 'price_per_unit':
@@ -196,7 +218,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
       case 'cap_rate':
         return formatDecimalPercentage(comp.cap_rate);
       case 'year_built':
-        return formatNumberWithCommas(comp.year_built);
+        return formatYearValue(comp.year_built);
       default:
         return '';
     }
@@ -352,11 +374,16 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
         step={step}
         value={getFieldDisplayValue(comp, field)}
         placeholder={placeholder}
-        className="w-full px-2 py-1 text-xs text-center rounded border"
+        className="w-full px-2 py-1 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{
-          borderColor: 'var(--cui-border-color)',
-          backgroundColor: 'var(--cui-body-bg)',
-          color: 'var(--cui-body-color)'
+          color: 'var(--cui-body-color)',
+          outline: 'none',
+          boxShadow: 'none',
+          border: 'none',
+          borderWidth: 0,
+          borderRadius: 0,
+          backgroundColor: 'transparent',
+          fontSize: '13px'
         }}
         onChange={(event) => {
           setPendingFieldValue(comp.comparable_id, field, event.target.value);
@@ -431,6 +458,16 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     }
   };
 
+  const adjustmentsCollapsed = !openSections.transaction && !openSections.property;
+
+  const formatTotalAdjustment = (value: number | null | undefined) => {
+    if (value == null) return '';
+    const pct = value * 100;
+    if (!Number.isFinite(pct)) return '';
+    const formatted = pct.toFixed(0);
+    return `${pct > 0 ? '+' : ''}${formatted}%`;
+  };
+
   const toggleSection = (sectionKey: AdjustmentSectionKey) => {
     setOpenSections(prev => ({
       ...prev,
@@ -472,7 +509,8 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
   };
 
   return (
-    <div className="space-y-4">
+    <>
+      <div className="space-y-4 comparables-grid">
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
         <>
@@ -617,7 +655,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               <col style={{ width: '220px', minWidth: '220px' }} />
               {comparables.map(comp => (
                 <React.Fragment key={`colgroup-${comp.comparable_id}`}>
-                  <col style={{ width: '170px', minWidth: '170px' }} />
+                  <col style={{ width: '128px', minWidth: '128px' }} />
                 </React.Fragment>
               ))}
             </colgroup>
@@ -993,7 +1031,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
               {comparables.map(comp => (
-                <col key={`adj-col-${comp.comparable_id}`} style={{ width: '170px', minWidth: '170px' }} />
+                <col key={`adj-col-${comp.comparable_id}`} style={{ width: '128px', minWidth: '128px' }} />
               ))}
             </colgroup>
 
@@ -1001,7 +1039,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               <tr
                 className="border-b"
                 style={{
-                  backgroundColor: 'var(--cui-tertiary-bg)',
+                  backgroundColor: '#F0F1F2',
                   borderColor: 'var(--cui-border-color)'
                 }}
               >
@@ -1009,7 +1047,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   className="py-2 px-4 font-semibold sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-tertiary-bg)'
+                    backgroundColor: '#F0F1F2'
                   }}
                 >
                   Adjustments
@@ -1018,8 +1056,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   <td
                     key={`adj-header-${comp.comparable_id}`}
                     className="border-l"
-                    style={{ borderColor: 'var(--cui-border-color)' }}
-                  />
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      backgroundColor: '#F0F1F2'
+                    }}
+                  >
+                    {adjustmentsCollapsed && (
+                      <div className="text-xs font-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {formatTotalAdjustment(comp.total_adjustment_pct)}
+                      </div>
+                    )}
+                  </td>
                 ))}
               </tr>
             </thead>
@@ -1029,13 +1076,13 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 <React.Fragment key={`section-${section.key}`}>
                   <tr
                     className="border-b"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
+                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: '#F7F7FB' }}
                   >
                     <td
                       className="py-2 px-4 font-semibold sticky left-0 z-10"
                       style={{
                         color: 'var(--cui-body-color)',
-                        backgroundColor: 'var(--cui-card-bg)'
+                        backgroundColor: '#F7F7FB'
                       }}
                     >
                       <button
@@ -1134,6 +1181,57 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
           </table>
         </div>
       </div>
-    </div>
+      </div>
+      <style jsx global>{`
+        .comparables-grid input,
+        .comparables-grid input[type="text"],
+        .comparables-grid input[type="number"] {
+          border: none !important;
+          border-width: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          outline: none !important;
+          background-color: transparent !important;
+          background-clip: border-box !important;
+          background-image: none !important;
+          filter: none !important;
+          -webkit-appearance: none !important;
+          -moz-appearance: none !important;
+          appearance: none !important;
+          --cui-focus-ring: transparent !important;
+          --cui-input-border-color: transparent !important;
+          --cui-input-box-shadow: none !important;
+        }
+        .comparables-grid input::before,
+        .comparables-grid input::after,
+        .comparables-grid td::before,
+        .comparables-grid td::after {
+          box-shadow: none !important;
+          border: none !important;
+          background: transparent !important;
+        }
+        .comparables-grid td,
+        .comparables-grid td:focus-within,
+        .comparables-grid td:focus,
+        .comparables-grid td:hover {
+          box-shadow: none !important;
+          outline: none !important;
+          background-clip: border-box !important;
+          background-image: none !important;
+          filter: none !important;
+        }
+        .comparables-grid input:hover,
+        .comparables-grid input:focus,
+        .comparables-grid input:focus-visible,
+        .comparables-grid input:active {
+          border: none !important;
+          border-width: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          outline: none !important;
+          background-color: transparent !important;
+        }
+      `}</style>
+    </>
   );
 }

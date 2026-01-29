@@ -1,9 +1,3 @@
-/**
- * AdjustmentCell Component
- *
- * Renders the final input column for a single adjustment row.
- */
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -22,31 +16,50 @@ export function AdjustmentCell({
   currentAdjustment,
   onFinalChange
 }: AdjustmentCellProps) {
+  const formatDisplayValue = (value: number | null | undefined) => {
+    if (value == null) return '';
+    return `${(value * 100).toFixed(0)}%`;
+  };
+
+  const stripNonNumeric = (value: string) => value.replace(/[^0-9.\-]/g, '');
+
   const [finalValue, setFinalValue] = useState<string>(
-    currentAdjustment?.user_adjustment_pct
-      ? (currentAdjustment.user_adjustment_pct * 100).toFixed(0)
-      : ''
+    formatDisplayValue(currentAdjustment?.user_adjustment_pct ?? null)
   );
 
   useEffect(() => {
     if (currentAdjustment?.user_adjustment_pct != null) {
-      setFinalValue((currentAdjustment.user_adjustment_pct * 100).toFixed(0));
+      setFinalValue(formatDisplayValue(currentAdjustment.user_adjustment_pct));
     } else {
       setFinalValue('');
     }
   }, [currentAdjustment?.user_adjustment_pct]);
 
-  const handleFinalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setFinalValue(newValue);
+  const handleFinalInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = stripNonNumeric(event.target.value);
+    setFinalValue(cleaned);
 
-    if (newValue === '' || newValue === '-') {
+    if (cleaned === '' || cleaned === '-') {
       onFinalChange(comparableId, adjustmentType, null);
-    } else {
-      const numValue = parseFloat(newValue) / 100;
-      if (!isNaN(numValue)) {
-        onFinalChange(comparableId, adjustmentType, numValue);
-      }
+      return;
+    }
+
+    const numValue = parseFloat(cleaned);
+    if (!isNaN(numValue)) {
+      onFinalChange(comparableId, adjustmentType, numValue / 100);
+    }
+  };
+
+  const handleBlur = () => {
+    const cleaned = stripNonNumeric(finalValue);
+    if (cleaned === '' || cleaned === '-') {
+      setFinalValue('');
+      onFinalChange(comparableId, adjustmentType, null);
+      return;
+    }
+    const numValue = parseFloat(cleaned);
+    if (!isNaN(numValue)) {
+      setFinalValue(`${numValue}%`);
     }
   };
 
@@ -62,13 +75,18 @@ export function AdjustmentCell({
         type="text"
         value={finalValue}
         onChange={handleFinalInputChange}
+        onBlur={handleBlur}
         placeholder="-"
-        className="w-full px-1 py-0.5 text-xs text-center rounded border"
+        className="w-full px-1 py-0.5 text-xs text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{
-          backgroundColor: 'var(--cui-body-bg)',
-          borderColor: 'var(--cui-border-color)',
+          backgroundColor: 'transparent',
+          border: 'none',
+          borderWidth: 0,
+          borderRadius: 0,
           color: 'var(--cui-body-color)',
-          fontSize: '11px'
+          fontSize: '13px',
+          outline: 'none',
+          boxShadow: 'none'
         }}
       />
     </td>
