@@ -31,7 +31,8 @@ const CATEGORIES: BenchmarkCategory[] = [
 ];
 
 export default function BenchmarksPanel() {
-  const [selectedCategory, setSelectedCategory] = useState<BenchmarkCategory | null>(null);
+  // Track multiple open categories instead of single selection
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [benchmarks, setBenchmarks] = useState<Record<string, Benchmark[]>>({});
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export default function BenchmarksPanel() {
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
   const [absorptionCount, setAbsorptionCount] = useState(0);
   const [totalCostLineItems, setTotalCostLineItems] = useState(0);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(60);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // Reduced from 60 to 30
   const [isDragging, setIsDragging] = useState(false);
   const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
 
@@ -131,8 +132,17 @@ export default function BenchmarksPanel() {
     }
   }
 
-  const handleCategorySelect = (category: BenchmarkCategory) => {
-    setSelectedCategory(category);
+  // Toggle category open/closed (allows multiple open at once)
+  const toggleCategory = (category: BenchmarkCategory) => {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category.key)) {
+        next.delete(category.key);
+      } else {
+        next.add(category.key);
+      }
+      return next;
+    });
   };
 
   const handleAddBenchmark = (category: BenchmarkCategory) => {
@@ -178,9 +188,9 @@ export default function BenchmarksPanel() {
                 key={category.key}
                 category={categoryWithCount}
                 sets={growthRateSets}
-                isExpanded={selectedCategory?.key === category.key}
+                isExpanded={openCategories.has(category.key)}
                 loading={loading}
-                onToggle={() => handleCategorySelect(category)}
+                onToggle={() => toggleCategory(category)}
                 onRefresh={loadData}
               />
             );
@@ -192,8 +202,8 @@ export default function BenchmarksPanel() {
               key={category.key}
               category={categoryWithCount}
               benchmarks={categoryBenchmarks}
-              isExpanded={selectedCategory?.key === category.key}
-              onToggle={() => handleCategorySelect(category)}
+              isExpanded={openCategories.has(category.key)}
+              onToggle={() => toggleCategory(category)}
               onBenchmarkClick={(benchmark) => console.log('Benchmark clicked:', benchmark)}
               onAddNew={() => handleAddBenchmark(category)}
               onRefresh={loadData}
