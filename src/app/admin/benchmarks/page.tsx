@@ -37,8 +37,8 @@ const CATEGORIES: BenchmarkCategory[] = [
 ];
 
 export default function GlobalBenchmarksPage() {
-  // State
-  const [selectedCategory, setSelectedCategory] = useState<BenchmarkCategory | null>(null);
+  // State - use Set for multiple open accordions
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [benchmarks, setBenchmarks] = useState<Record<string, Benchmark[]>>({});
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,9 +48,22 @@ export default function GlobalBenchmarksPage() {
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
   const [absorptionCount, setAbsorptionCount] = useState(0);
   const [totalCostLineItems, setTotalCostLineItems] = useState(0);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(60); // Percentage
+  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // Percentage - reduced from 60%
   const [isDragging, setIsDragging] = useState(false);
   const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
+
+  // Toggle accordion open/close - allows multiple open
+  const toggleCategory = (categoryKey: string) => {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryKey)) {
+        next.delete(categoryKey);
+      } else {
+        next.add(categoryKey);
+      }
+      return next;
+    });
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -218,7 +231,7 @@ export default function GlobalBenchmarksPage() {
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
       const newWidth = (e.clientX / window.innerWidth) * 100;
-      const minWidthPx = 600;
+      const minWidthPx = 300; // Reduced from 600
       const minWidthPercent = (minWidthPx / window.innerWidth) * 100;
       // Constrain between minWidth and 80%
       if (newWidth >= minWidthPercent && newWidth <= 80) {
@@ -293,7 +306,7 @@ export default function GlobalBenchmarksPage() {
           {/* Left Panel - Accordion */}
           <div
             className="overflow-y-auto border-r border-line-soft"
-            style={{ width: `${leftPanelWidth}%`, minWidth: '600px' }}
+            style={{ width: `${leftPanelWidth}%`, minWidth: '300px' }}
           >
             {loading ? (
               <div className="p-8 text-center text-text-secondary">
@@ -307,14 +320,10 @@ export default function GlobalBenchmarksPage() {
                       key={category.key}
                       category={category}
                       sets={growthRateSets}
-                      isExpanded={selectedCategory?.key === category.key}
+                      isExpanded={openCategories.has(category.key)}
                       loading={loading}
                       selectedSetId={selectedTile?.kind === 'growth_rate' ? selectedTile.set.set_id : null}
-                      onToggle={() =>
-                        setSelectedCategory(
-                          selectedCategory?.key === category.key ? null : category
-                        )
-                      }
+                      onToggle={() => toggleCategory(category.key)}
                       onRefresh={loadData}
                       onSelectSet={handleGrowthRateSelect}
                     />
@@ -322,13 +331,11 @@ export default function GlobalBenchmarksPage() {
                 }
 
                 if (category.key === 'absorption') {
-                  const isExpanded = selectedCategory?.key === category.key;
+                  const isExpanded = openCategories.has(category.key);
                   return (
                     <div key={category.key} className="border-b border-line-soft">
                       <button
-                        onClick={() =>
-                          setSelectedCategory(isExpanded ? null : category)
-                        }
+                        onClick={() => toggleCategory(category.key)}
                         className="flex w-full items-center justify-between px-4 py-3 text-left text-text-primary transition-colors hover:bg-surface-card/80"
                         style={{ backgroundColor: 'var(--surface-card-header)' }}
                       >
@@ -366,12 +373,8 @@ export default function GlobalBenchmarksPage() {
                     key={category.key}
                     category={category}
                     benchmarks={benchmarks[category.key] || []}
-                    isExpanded={selectedCategory?.key === category.key}
-                    onToggle={() =>
-                      setSelectedCategory(
-                        selectedCategory?.key === category.key ? null : category
-                      )
-                    }
+                    isExpanded={openCategories.has(category.key)}
+                    onToggle={() => toggleCategory(category.key)}
                     onBenchmarkClick={(benchmark) => handleBenchmarkSelect(category, benchmark)}
                     onAddNew={() => {
                       setAddingToCategory(category);
@@ -387,7 +390,7 @@ export default function GlobalBenchmarksPage() {
           {/* Resizer */}
           <div
             className={`absolute top-0 bottom-0 w-1 cursor-col-resize transition-colors ${isDragging ? 'bg-brand-primary' : 'bg-line-soft'} hover:bg-line-strong`}
-            style={{ left: `max(${leftPanelWidth}%, 600px)` }}
+            style={{ left: `max(${leftPanelWidth}%, 300px)` }}
             onMouseDown={handleMouseDown}
           >
             <div className="pointer-events-none absolute left-1/2 top-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line-strong" />

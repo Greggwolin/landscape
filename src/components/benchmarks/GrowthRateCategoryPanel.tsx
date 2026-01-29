@@ -12,7 +12,8 @@ import type {
   BenchmarkCategory,
   GrowthRateSet,
   GrowthRateStep,
-  GrowthRateStepInput
+  GrowthRateStepInput,
+  GrowthRateCardType
 } from '@/types/benchmarks';
 import {
   flexRender,
@@ -46,6 +47,7 @@ type StepForm = {
 type PreparedPayload = {
   name: string;
   steps: GrowthRateStepInput[];
+  card_type?: GrowthRateCardType;
 };
 
 export default function GrowthRateCategoryPanel({
@@ -235,6 +237,7 @@ function GrowthRateListItem({
         initialFlatRate={initialFlatRate}
         initialSteps={initialSteps}
         initialIsGlobal={set.is_global}
+        initialCardType={(set.card_type as GrowthRateCardType) || 'custom'}
         onCancel={() => {
           setIsEditing(false);
           setApiError(null);
@@ -368,12 +371,13 @@ interface GrowthRateFormProps {
   initialFlatRate?: number;
   initialSteps?: StepForm[];
   initialIsGlobal?: boolean;
+  initialCardType?: GrowthRateCardType;
   existingSets?: GrowthRateSet[];
   apiError?: string | null;
   setApiError?: (message: string | null) => void;
   onCancel: () => void;
   onSuccess: () => void;
-  onSubmit: (payload: PreparedPayload & { is_global?: boolean }) => Promise<void>;
+  onSubmit: (payload: PreparedPayload & { is_global?: boolean; card_type?: GrowthRateCardType }) => Promise<void>;
 }
 
 function GrowthRateForm({
@@ -383,6 +387,7 @@ function GrowthRateForm({
   initialFlatRate,
   initialSteps,
   initialIsGlobal = false,
+  initialCardType = 'custom',
   existingSets,
   apiError,
   setApiError,
@@ -399,6 +404,7 @@ function GrowthRateForm({
     initialSteps && initialSteps.length > 0 ? initialSteps : createDefaultSteps()
   );
   const [isGlobal, setIsGlobal] = useState(initialIsGlobal);
+  const [cardType, setCardType] = useState<GrowthRateCardType>(initialCardType);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<GrowthRateSet | null>(null);
@@ -485,7 +491,8 @@ function GrowthRateForm({
             thru_period: 'E'
           }
         ],
-        is_global: isGlobal
+        is_global: isGlobal,
+        card_type: cardType
       };
       await persist(payload);
       return;
@@ -500,7 +507,8 @@ function GrowthRateForm({
     const payload = {
       name: name.trim(),
       steps: serializeSteps(steps),
-      is_global: isGlobal
+      is_global: isGlobal,
+      card_type: cardType
     };
     await persist(payload);
   };
@@ -593,6 +601,46 @@ function GrowthRateForm({
               />
             </div>
           )}
+        </div>
+
+        {/* Type Selector */}
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-semibold text-text-secondary">Type</span>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="cardType"
+                value="revenue"
+                checked={cardType === 'revenue'}
+                onChange={() => setCardType('revenue')}
+                className="w-4 h-4 accent-brand-primary"
+              />
+              <span className="text-sm text-text-primary">Revenue</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="cardType"
+                value="cost"
+                checked={cardType === 'cost'}
+                onChange={() => setCardType('cost')}
+                className="w-4 h-4 accent-brand-primary"
+              />
+              <span className="text-sm text-text-primary">Cost</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="cardType"
+                value="custom"
+                checked={cardType === 'custom'}
+                onChange={() => setCardType('custom')}
+                className="w-4 h-4 accent-brand-primary"
+              />
+              <span className="text-sm text-text-primary">Both</span>
+            </label>
+          </div>
         </div>
 
         {rateType === 'stepped' && (

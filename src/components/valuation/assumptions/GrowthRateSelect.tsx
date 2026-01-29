@@ -71,10 +71,16 @@ export function GrowthRateSelect({
             .replace(/Global/gi, '')
             .trim();
 
-          // Format: "Name (rate%)" or just "Name" if no rate
-          const rateStr = set.default_rate !== null && set.default_rate !== undefined
-            ? ` (${(Number(set.default_rate) * 100).toFixed(1)}%)`
-            : '';
+          // Format rate string: single rate "(3.0%)" or multi-step "(3%, 4%, 2%)"
+          let rateStr = '';
+          const stepRates = (set as any).step_rates as number[] | undefined;
+          if (stepRates && stepRates.length > 1) {
+            // Multi-step: show comma-separated rates
+            rateStr = ` (${stepRates.map((r) => `${(r * 100).toFixed(0)}%`).join(', ')})`;
+          } else if (set.default_rate !== null && set.default_rate !== undefined) {
+            // Single step: show single rate
+            rateStr = ` (${(Number(set.default_rate) * 100).toFixed(1)}%)`;
+          }
 
           return (
             <option key={set.set_id} value={set.set_id}>

@@ -425,10 +425,13 @@ export interface GrowthRateStep {
   created_at?: string;
 }
 
+export type GrowthRateCardType = 'revenue' | 'cost' | 'custom';
+
 export interface CreateGrowthRateSet {
   name: string;
   description?: string;
   geography?: string;
+  card_type?: GrowthRateCardType;
   steps: GrowthRateStepInput[];
 }
 

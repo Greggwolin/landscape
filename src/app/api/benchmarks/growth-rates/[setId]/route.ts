@@ -54,11 +54,12 @@ export async function PUT(
     await sql`BEGIN`;
 
     try {
-      // Update growth rate set name
-      console.log('PUT /api/benchmarks/growth-rates/[setId] - Updating set name');
+      // Update growth rate set name and card_type
+      console.log('PUT /api/benchmarks/growth-rates/[setId] - Updating set name and card_type');
+      const cardType = body.card_type || 'custom';
       await sql`
         UPDATE landscape.core_fin_growth_rate_sets
-        SET set_name = ${body.name}, updated_at = NOW()
+        SET set_name = ${body.name}, card_type = ${cardType}, updated_at = NOW()
         WHERE set_id = ${setId}
       `;
 

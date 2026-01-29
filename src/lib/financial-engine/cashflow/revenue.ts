@@ -82,7 +82,6 @@ export async function fetchProjectParcels(
   let query;
 
   if (containerIds && containerIds.length > 0) {
-    console.log(`Filtering parcels by containerIds (division_ids):`, containerIds);
     // containerIds are division_ids from tbl_division (tier 2 = phases)
     // We need to join through tbl_phase to match parcel.phase_id
     query = sql<ParcelRow>`
@@ -374,42 +373,23 @@ export async function calculateParcelSale(
       totalDeductions = grossRevenue * deductionRatio;
       netRevenue = grossRevenue - totalDeductions;
 
-      console.log(
-        `[DCF] Applied price growth to parcel ${parcel.parcel_code}: ` +
-        `rate=${(dcfPriceGrowthRate * 100).toFixed(2)}%, period=${parcel.sale_period}, ` +
-        `escalation=${escalationFactor.toFixed(4)}, baseGross=${baseGross.toFixed(0)}, ` +
-        `newGross=${grossRevenue.toFixed(0)}`
-      );
-    } else {
-      console.log(
-        `Using precalculated proceeds for parcel ${parcel.parcel_code}: ` +
-        `Gross=${grossRevenue.toFixed(0)}, Net=${netRevenue.toFixed(0)}`
-      );
+      // Debug logging removed for performance - uncomment if needed:
+      // console.log(`[DCF] Applied price growth to parcel ${parcel.parcel_code}: rate=${(dcfPriceGrowthRate * 100).toFixed(2)}%`);
     }
 
-    // We still need pricing for some metadata
-    const pricingResult = await lookupParcelPricing(
-      projectId,
-      parcel.type_code || '',
-      parcel.product_code || undefined
-    );
-
-    const pricing = pricingResult.found && pricingResult.pricing
-      ? pricingResult.pricing
-      : {
-          parcelId: parcel.parcel_id,
-          typeCode: parcel.type_code || '',
-          productCode: parcel.product_code || '',
-          pricePerUnit: 0,
-          unitOfMeasure: 'EA',
-          growthRate: 0,
-        };
-
-    pricing.parcelId = parcel.parcel_id;
-    pricing.lotWidth = parcel.lot_width || undefined;
-    pricing.lotArea = parcel.lot_area || undefined;
-    pricing.acres = parcel.acres_gross || undefined;
-    pricing.units = parcel.units_total || undefined;
+    // Construct pricing metadata from parcel data (skip DB lookup for performance)
+    const pricing: ParcelPricing = {
+      parcelId: parcel.parcel_id,
+      typeCode: parcel.type_code || '',
+      productCode: parcel.product_code || '',
+      pricePerUnit: 0, // Not needed for precalculated proceeds
+      unitOfMeasure: parcel.price_uom || 'EA',
+      growthRate: 0, // Not used - DCF rates take precedence
+      lotWidth: parcel.lot_width || undefined,
+      lotArea: parcel.lot_area || undefined,
+      acres: parcel.acres_gross || undefined,
+      units: parcel.units_total || undefined,
+    };
 
     // Use actual subdivision costs from database (improvement_offset_total)
     // Only include for $/FF parcels - other UOMs track improvement offsets separately
@@ -429,11 +409,7 @@ export async function calculateParcelSale(
       const costEscalation = Math.pow(1 + dcfCostInflationRate, monthsFromStart / 12);
       const baseSubdivisionCosts = subdivisionCosts;
       subdivisionCosts = baseSubdivisionCosts * costEscalation;
-      console.log(
-        `[DCF] Applied cost inflation to subdivision costs for ${parcel.parcel_code}: ` +
-        `rate=${(dcfCostInflationRate * 100).toFixed(2)}%, escalation=${costEscalation.toFixed(4)}, ` +
-        `base=${baseSubdivisionCosts.toFixed(0)}, inflated=${subdivisionCosts.toFixed(0)}`
-      );
+      // Debug logging removed for performance
     }
 
     // Estimate commissions and closing costs (these are already in totalDeductions)
@@ -515,12 +491,7 @@ export async function calculateParcelSale(
     : pricing.growthRate;
   const escalationFactor = Math.pow(1 + effectiveGrowthRate, saleMonthsFromStart / 12);
 
-  if (dcfPriceGrowthRate && dcfPriceGrowthRate > 0) {
-    console.log(
-      `[DCF Fallback] Using DCF growth rate ${(dcfPriceGrowthRate * 100).toFixed(2)}% ` +
-      `for parcel ${parcel.parcel_code} (overriding embedded rate ${(pricing.growthRate * 100).toFixed(2)}%)`
-    );
-  }
+  // Debug logging removed for performance
 
   // Apply escalation
   const grossRevenue = baseRevenue * escalationFactor;
@@ -637,9 +608,7 @@ export async function generateAbsorptionSchedule(
   costInflationRate?: number
 ): Promise<AbsorptionSchedule> {
   // Fetch all parcels with sales
-  console.log(`Fetching parcels for project ${projectId} with containerIds:`, containerIds);
   const parcels = await fetchProjectParcels(projectId, containerIds);
-  console.log(`Found ${parcels.length} parcels`);
 
   if (parcels.length === 0) {
     return {

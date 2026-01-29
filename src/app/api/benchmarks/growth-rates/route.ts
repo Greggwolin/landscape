@@ -143,13 +143,10 @@ export async function POST(request: NextRequest) {
     const body: CreateGrowthRateSet = await request.json();
     console.log('POST /api/benchmarks/growth-rates - Body received:', body);
 
-    const anchorResult = await sql`
-      SELECT 0 AS project_id, 'custom' AS card_type
-    `;
-
-    const projectId = anchorResult[0]?.project_id ?? 0;
-    const cardType = anchorResult[0]?.card_type ?? 'custom';
-    console.log('POST /api/benchmarks/growth-rates - Using project_id:', projectId, 'card_type:', cardType);
+    const projectId = 0; // Global benchmarks have no project
+    // Use card_type from request body, default to 'custom' for backward compatibility
+    const cardType = body.card_type || 'custom';
+    console.log('POST /api/benchmarks/growth-rates - Using project_id:', projectId, 'card_type:', cardType, '(from body:', body.card_type, ')');
 
     // Validate required fields
     if (!body.name || !body.steps || body.steps.length === 0) {

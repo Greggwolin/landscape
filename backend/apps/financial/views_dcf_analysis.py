@@ -103,7 +103,12 @@ class GrowthRateSetsView(APIView):
                         WHERE st.set_id = grs.set_id
                         ORDER BY st.step_number ASC
                         LIMIT 1
-                    ) as default_rate
+                    ) as default_rate,
+                    (
+                        SELECT COUNT(*)
+                        FROM landscape.core_fin_growth_rate_steps st
+                        WHERE st.set_id = grs.set_id
+                    ) as step_count
                 FROM landscape.core_fin_growth_rate_sets grs
                 WHERE 1=1
             """
@@ -129,6 +134,18 @@ class GrowthRateSetsView(APIView):
 
         # Convert to list of dicts
         sets = [dict(zip(columns, row)) for row in rows]
+
+        # For sets with multiple steps, fetch all step rates for display
+        for s in sets:
+            if s.get('step_count', 0) > 1:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT rate
+                        FROM landscape.core_fin_growth_rate_steps
+                        WHERE set_id = %s
+                        ORDER BY step_number ASC
+                    """, [s['set_id']])
+                    s['step_rates'] = [float(row[0]) for row in cursor.fetchall()]
 
         return Response(sets)
 
@@ -175,7 +192,7 @@ class GrowthRateSetDetailView(APIView):
                     step_id,
                     step_number,
                     from_period,
-                    to_period,
+                    thru_period,
                     rate
                 FROM landscape.core_fin_growth_rate_steps
                 WHERE set_id = %s

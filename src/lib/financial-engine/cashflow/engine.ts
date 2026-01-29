@@ -129,7 +129,6 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
   let startDate: Date;
   if (project.analysis_start_date) {
     const rawDate = project.analysis_start_date;
-    console.log(`[CashFlow] Raw analysis_start_date type: ${typeof rawDate}, value: ${rawDate}`);
 
     // Handle Date object, string, or other formats from database
     if (rawDate instanceof Date) {
@@ -154,7 +153,6 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
   } else {
     startDate = new Date(2025, 0, 1, 12, 0, 0); // Jan 1, 2025 at noon local time
   }
-  console.log(`[CashFlow] Using startDate: ${startDate.toISOString()}`);
 
   // PRIORITY 1: Try to get inflation rates from DCF assumptions (tbl_dcf_analysis)
   let costInflationRate: number | undefined;
@@ -167,11 +165,9 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
     // Check for set_id to determine if rate was explicitly configured (even if 0%)
     if (dcfAssumptions.costInflationSetId !== null && dcfAssumptions.costInflationSetId !== undefined) {
       costInflationRate = dcfAssumptions.costInflationRate;
-      console.log(`[CashFlow] Using DCF cost inflation rate: ${(costInflationRate * 100).toFixed(2)}% (set_id=${dcfAssumptions.costInflationSetId})`);
     }
     if (dcfAssumptions.priceGrowthSetId !== null && dcfAssumptions.priceGrowthSetId !== undefined) {
       priceGrowthRate = dcfAssumptions.priceGrowthRate;
-      console.log(`[CashFlow] Using DCF price growth rate: ${(priceGrowthRate * 100).toFixed(2)}% (set_id=${dcfAssumptions.priceGrowthSetId})`);
     }
   }
 
@@ -194,7 +190,6 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
       `;
       if (inflationResult.length > 0 && inflationResult[0].current_rate !== null) {
         costInflationRate = Number(inflationResult[0].current_rate);
-        console.log(`[CashFlow] Using project settings cost inflation rate: ${(costInflationRate * 100).toFixed(2)}%`);
       }
     } catch (err) {
       console.warn('Could not fetch cost inflation rate from project settings:', err);
@@ -268,8 +263,6 @@ async function determineRequiredPeriods(
   // Return the maximum of the two, or default to 96 months
   const requiredPeriods = Math.max(maxBudgetPeriod, maxSalePeriod, 1);
 
-  console.log(`Determined required periods: ${requiredPeriods} (budget: ${maxBudgetPeriod}, sales: ${maxSalePeriod})`);
-
   return requiredPeriods;
 }
 
@@ -308,15 +301,12 @@ export async function generateCashFlow(
   let periods = generatePeriods(projectConfig.startDate, endDate, 'month');
   const totalPeriods = periods.length;
 
-  console.log(`Generated ${totalPeriods} periods from ${projectConfig.startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-
   // Step 3: Aggregate periods if requested
   if (periodType !== 'month' && periods[0]?.periodType === 'month') {
     periods = aggregatePeriods(periods, periodType);
   }
 
   // Step 4: Generate cost schedule (with project-level inflation rate)
-  console.log(`Generating cost schedule for project ${projectId} with inflation rate: ${projectConfig.costInflationRate ?? 'none'}...`);
   const costSchedule = await generateCostSchedule(
     projectId,
     totalPeriods,
@@ -325,10 +315,6 @@ export async function generateCashFlow(
   );
 
   // Step 5: Generate revenue schedule
-  console.log(`Generating revenue schedule for project ${projectId}...`);
-  if (projectConfig.priceGrowthRate) {
-    console.log(`  Using DCF price growth rate: ${(projectConfig.priceGrowthRate * 100).toFixed(2)}%`);
-  }
   const absorptionSchedule = await generateAbsorptionSchedule(
     projectId,
     projectConfig.startDate,
