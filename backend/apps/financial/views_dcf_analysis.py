@@ -87,33 +87,41 @@ class GrowthRateSetsView(APIView):
         project_id = request.query_params.get('project_id')
 
         # Build query using raw SQL since we don't have a Django model for this table
+        # Include default_rate from first step for dropdown display
         with connection.cursor() as cursor:
             query = """
                 SELECT
-                    set_id,
-                    set_name,
-                    card_type,
-                    COALESCE(is_global, false) as is_global,
-                    COALESCE(is_default, false) as is_default,
-                    project_id
-                FROM landscape.core_fin_growth_rate_sets
+                    grs.set_id,
+                    grs.set_name,
+                    grs.card_type,
+                    COALESCE(grs.is_global, false) as is_global,
+                    COALESCE(grs.is_default, false) as is_default,
+                    grs.project_id,
+                    (
+                        SELECT st.rate
+                        FROM landscape.core_fin_growth_rate_steps st
+                        WHERE st.set_id = grs.set_id
+                        ORDER BY st.step_number ASC
+                        LIMIT 1
+                    ) as default_rate
+                FROM landscape.core_fin_growth_rate_sets grs
                 WHERE 1=1
             """
             params = []
 
             # Filter: global OR project-specific
             if project_id:
-                query += " AND (COALESCE(is_global, false) = true OR project_id = %s)"
+                query += " AND (COALESCE(grs.is_global, false) = true OR grs.project_id = %s)"
                 params.append(int(project_id))
             else:
-                query += " AND COALESCE(is_global, false) = true"
+                query += " AND COALESCE(grs.is_global, false) = true"
 
             # Filter by card_type (include 'custom' as well)
             if card_type:
-                query += " AND (card_type = %s OR card_type = 'custom')"
+                query += " AND (grs.card_type = %s OR grs.card_type = 'custom')"
                 params.append(card_type)
 
-            query += " ORDER BY is_global DESC, set_name ASC"
+            query += " ORDER BY grs.is_global DESC, grs.set_name ASC"
 
             cursor.execute(query, params)
             columns = [col[0] for col in cursor.description]

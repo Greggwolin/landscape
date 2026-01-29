@@ -8,5 +8,8 @@
 
 export { DcfParametersSection } from './DcfParametersSection';
 export { GrowthRateSelect } from './GrowthRateSelect';
+export { LandDevInflationSection } from './LandDevInflationSection';
+
+// Deprecated: Use LandDevInflationSection instead
 export { LandDevRevenueSection } from './LandDevRevenueSection';
 export { LandDevCostsSection } from './LandDevCostsSection';

@@ -8,6 +8,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { mutate as swrMutate } from 'swr';
 import type {
   DcfAnalysis,
   DcfAnalysisResponse,
@@ -70,6 +71,16 @@ export function useUpdateDcfAnalysis(projectId: number) {
     onSuccess: (data) => {
       // Update cache with new data
       queryClient.setQueryData(['dcf-analysis', projectId], data);
+
+      // Invalidate React Query cash-flow queries
+      queryClient.invalidateQueries({ queryKey: ['cash-flow', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['cashflow', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-cashflow', projectId] });
+
+      // Invalidate SWR cash-flow queries (CashFlowAnalysisTab uses SWR)
+      // This ensures price growth and cost inflation changes are reflected
+      swrMutate(`/api/projects/${projectId}/cash-flow/generate`);
+      swrMutate(`/api/projects/${projectId}/cash-flow/summary`);
     },
   });
 }

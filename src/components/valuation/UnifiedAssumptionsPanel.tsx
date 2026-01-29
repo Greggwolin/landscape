@@ -24,8 +24,7 @@ import type { PropertyType } from '@/types/dcf-analysis';
 import { useDcfAnalysisWithAutoSave } from '@/hooks/useDcfAnalysis';
 import {
   DcfParametersSection,
-  LandDevRevenueSection,
-  LandDevCostsSection,
+  LandDevInflationSection,
 } from './assumptions';
 
 // ============================================================================
@@ -96,13 +95,7 @@ export function UnifiedAssumptionsPanel({
         ) : isLandDev ? (
           // Land Development Sections
           <>
-            <LandDevRevenueSection
-              data={dcfData}
-              onChange={updateDcfField}
-              projectId={projectId}
-              defaultOpen={true}
-            />
-            <LandDevCostsSection
+            <LandDevInflationSection
               data={dcfData}
               onChange={updateDcfField}
               projectId={projectId}

@@ -106,14 +106,16 @@ export function DcfParametersSection({
             max={0.30}
           />
 
-          {/* Exit Cap Rate */}
-          <PercentInput
-            label="Exit Cap Rate"
-            value={data?.exit_cap_rate}
-            onChange={(v) => onChange('exit_cap_rate', v)}
-            min={0.01}
-            max={0.20}
-          />
+          {/* Exit Cap Rate (CRE only - Land Dev doesn't use cap rates) */}
+          {isCre && (
+            <PercentInput
+              label="Exit Cap Rate"
+              value={data?.exit_cap_rate}
+              onChange={(v) => onChange('exit_cap_rate', v)}
+              min={0.01}
+              max={0.20}
+            />
+          )}
 
           {/* Sensitivity Interval (CRE only) */}
           {isCre && (

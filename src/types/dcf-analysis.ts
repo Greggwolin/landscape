@@ -65,6 +65,7 @@ export interface GrowthRateSet {
   is_global: boolean;
   is_default: boolean;
   project_id?: number | null;
+  default_rate?: number | null;  // First step rate for display in dropdowns
 }
 
 export interface GrowthRateStep {

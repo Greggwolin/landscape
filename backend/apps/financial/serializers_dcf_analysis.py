@@ -118,6 +118,7 @@ class DcfAnalysisSerializer(serializers.ModelSerializer):
 class GrowthRateSetSerializer(serializers.Serializer):
     """
     Serializer for growth rate sets (read-only, no Django model).
+    Includes default_rate for display in dropdowns.
     """
     set_id = serializers.IntegerField()
     set_name = serializers.CharField()
@@ -125,6 +126,7 @@ class GrowthRateSetSerializer(serializers.Serializer):
     is_global = serializers.BooleanField()
     is_default = serializers.BooleanField()
     project_id = serializers.IntegerField(allow_null=True, required=False)
+    default_rate = serializers.DecimalField(max_digits=6, decimal_places=4, allow_null=True, required=False)
 
 
 class GrowthRateStepSerializer(serializers.Serializer):

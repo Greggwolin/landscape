@@ -324,11 +324,19 @@ export async function fetchSaleBenchmarks(
 
 /**
  * Calculate revenue for a single parcel sale
+ *
+ * @param parcel - Parcel data row
+ * @param projectStartDate - Project analysis start date
+ * @param projectId - Project ID
+ * @param dcfPriceGrowthRate - Optional DCF price growth rate (annual, decimal e.g. 0.03 for 3%)
+ * @param dcfCostInflationRate - Optional DCF cost inflation rate (annual, decimal e.g. 0.03 for 3%)
  */
 export async function calculateParcelSale(
   parcel: ParcelRow,
   projectStartDate: Date,
-  projectId: number
+  projectId: number,
+  dcfPriceGrowthRate?: number,
+  dcfCostInflationRate?: number
 ): Promise<ParcelSale | null> {
   // Skip parcels without sale period or without any quantifiable dimension
   if (!parcel.sale_period) {
@@ -342,16 +350,42 @@ export async function calculateParcelSale(
   // CHECK 1: Use precalculated proceeds if available
   if (parcel.net_sale_proceeds !== null && parcel.gross_parcel_price !== null) {
     // IMPORTANT: PostgreSQL returns numeric/decimal as strings - must cast to Number
-    const grossRevenue = Number(parcel.gross_parcel_price);
-    const netRevenue = Number(parcel.net_sale_proceeds);
-    const totalDeductions = parcel.total_transaction_costs
+    let grossRevenue = Number(parcel.gross_parcel_price);
+    let netRevenue = Number(parcel.net_sale_proceeds);
+    let totalDeductions = parcel.total_transaction_costs
       ? Number(parcel.total_transaction_costs)
       : (grossRevenue - netRevenue);
 
-    console.log(
-      `Using precalculated proceeds for parcel ${parcel.parcel_code}: ` +
-      `Gross=${grossRevenue}, Net=${netRevenue}`
-    );
+    // Apply DCF price growth if set
+    // Price growth applies to the Gross Sale Price [Finished] (base lot price)
+    // Formula: annual rate compounded monthly = (1 + rate)^(months/12)
+    let escalationFactor = 1.0;
+    if (dcfPriceGrowthRate && dcfPriceGrowthRate > 0 && parcel.sale_period) {
+      const monthsFromStart = parcel.sale_period - 1; // Period 1 = month 0
+      escalationFactor = Math.pow(1 + dcfPriceGrowthRate, monthsFromStart / 12);
+
+      // Apply escalation to gross revenue
+      const baseGross = grossRevenue;
+      grossRevenue = baseGross * escalationFactor;
+
+      // Recalculate net revenue: Gross - Transaction Costs
+      // Transaction costs scale proportionally with gross revenue
+      const deductionRatio = totalDeductions / baseGross;
+      totalDeductions = grossRevenue * deductionRatio;
+      netRevenue = grossRevenue - totalDeductions;
+
+      console.log(
+        `[DCF] Applied price growth to parcel ${parcel.parcel_code}: ` +
+        `rate=${(dcfPriceGrowthRate * 100).toFixed(2)}%, period=${parcel.sale_period}, ` +
+        `escalation=${escalationFactor.toFixed(4)}, baseGross=${baseGross.toFixed(0)}, ` +
+        `newGross=${grossRevenue.toFixed(0)}`
+      );
+    } else {
+      console.log(
+        `Using precalculated proceeds for parcel ${parcel.parcel_code}: ` +
+        `Gross=${grossRevenue.toFixed(0)}, Net=${netRevenue.toFixed(0)}`
+      );
+    }
 
     // We still need pricing for some metadata
     const pricingResult = await lookupParcelPricing(
@@ -384,9 +418,23 @@ export async function calculateParcelSale(
       return uom.replace('$/', '').toUpperCase();
     };
     const uom = normalizeUom(parcel.price_uom);
-    const subdivisionCosts = uom === 'FF' && parcel.improvement_offset_total
+    let subdivisionCosts = uom === 'FF' && parcel.improvement_offset_total
       ? Number(parcel.improvement_offset_total)
       : 0;
+
+    // Apply DCF cost inflation to improvement offset (subdivision costs)
+    // Formula: annual rate compounded monthly = (1 + rate)^(months/12)
+    if (dcfCostInflationRate && dcfCostInflationRate > 0 && subdivisionCosts > 0 && parcel.sale_period) {
+      const monthsFromStart = parcel.sale_period - 1;
+      const costEscalation = Math.pow(1 + dcfCostInflationRate, monthsFromStart / 12);
+      const baseSubdivisionCosts = subdivisionCosts;
+      subdivisionCosts = baseSubdivisionCosts * costEscalation;
+      console.log(
+        `[DCF] Applied cost inflation to subdivision costs for ${parcel.parcel_code}: ` +
+        `rate=${(dcfCostInflationRate * 100).toFixed(2)}%, escalation=${costEscalation.toFixed(4)}, ` +
+        `base=${baseSubdivisionCosts.toFixed(0)}, inflated=${subdivisionCosts.toFixed(0)}`
+      );
+    }
 
     // Estimate commissions and closing costs (these are already in totalDeductions)
     // We estimate them for display purposes only
@@ -395,14 +443,19 @@ export async function calculateParcelSale(
     const commissions = grossRevenue * commissionRate;
     const closingCosts = grossRevenue * closingCostRate;
 
+    // Track the base revenue (before escalation) for reporting
+    const baseRevenue = escalationFactor !== 1.0
+      ? grossRevenue / escalationFactor
+      : grossRevenue;
+
     return {
       parcelId: parcel.parcel_id,
       parcelCode: parcel.parcel_code,
       containerId: parcel.phase_id || undefined,  // Use phase_id for phase grouping
       salePeriod: parcel.sale_period,
       pricing,
-      baseRevenue: grossRevenue,
-      escalationFactor: 1.0,
+      baseRevenue,
+      escalationFactor,
       grossRevenue,
       commissionRate,
       commissions,
@@ -454,10 +507,20 @@ export async function calculateParcelSale(
   }
 
   // Calculate escalation factor based on sale period
-  // Assumption: Period 1 = Month 1 from project start
+  // Priority: DCF price growth rate > embedded pricing.growthRate
+  // Formula: annual rate compounded monthly = (1 + rate)^(months/12)
   const saleMonthsFromStart = parcel.sale_period - 1;
-  const saleYearsFromStart = saleMonthsFromStart / 12;
-  const escalationFactor = Math.pow(1 + pricing.growthRate, saleYearsFromStart);
+  const effectiveGrowthRate = (dcfPriceGrowthRate && dcfPriceGrowthRate > 0)
+    ? dcfPriceGrowthRate
+    : pricing.growthRate;
+  const escalationFactor = Math.pow(1 + effectiveGrowthRate, saleMonthsFromStart / 12);
+
+  if (dcfPriceGrowthRate && dcfPriceGrowthRate > 0) {
+    console.log(
+      `[DCF Fallback] Using DCF growth rate ${(dcfPriceGrowthRate * 100).toFixed(2)}% ` +
+      `for parcel ${parcel.parcel_code} (overriding embedded rate ${(pricing.growthRate * 100).toFixed(2)}%)`
+    );
+  }
 
   // Apply escalation
   const grossRevenue = baseRevenue * escalationFactor;
@@ -559,11 +622,19 @@ function calculateBaseRevenue(parcel: ParcelRow, pricing: ParcelPricing): number
 
 /**
  * Generate complete absorption schedule for a project
+ *
+ * @param projectId - Project ID
+ * @param projectStartDate - Project analysis start date
+ * @param containerIds - Optional container IDs to filter by
+ * @param priceGrowthRate - Optional DCF price growth rate (annual, decimal e.g. 0.03 for 3%)
+ * @param costInflationRate - Optional DCF cost inflation rate (annual, decimal e.g. 0.03 for 3%)
  */
 export async function generateAbsorptionSchedule(
   projectId: number,
   projectStartDate: Date,
-  containerIds?: number[]
+  containerIds?: number[],
+  priceGrowthRate?: number,
+  costInflationRate?: number
 ): Promise<AbsorptionSchedule> {
   // Fetch all parcels with sales
   console.log(`Fetching parcels for project ${projectId} with containerIds:`, containerIds);
@@ -589,7 +660,13 @@ export async function generateAbsorptionSchedule(
   // Calculate sales for each parcel
   const parcelSales: ParcelSale[] = [];
   for (const parcel of parcels) {
-    const sale = await calculateParcelSale(parcel, projectStartDate, projectId);
+    const sale = await calculateParcelSale(
+      parcel,
+      projectStartDate,
+      projectId,
+      priceGrowthRate,
+      costInflationRate
+    );
     if (sale) {
       parcelSales.push(sale);
     }

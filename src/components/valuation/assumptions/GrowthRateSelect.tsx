@@ -12,7 +12,7 @@
 import React from 'react';
 import { useGrowthRateSets } from '@/hooks/useDcfAnalysis';
 
-const INPUT_WIDTH = 'w-[100px]';
+const INPUT_WIDTH = 'w-[140px]';
 const INPUT_CLASSES = 'px-1.5 py-0.5 text-right text-xs rounded';
 
 interface GrowthRateSelectProps {
@@ -32,7 +32,10 @@ export function GrowthRateSelect({
   projectId,
   tooltip,
 }: GrowthRateSelectProps) {
-  const { data: sets, isLoading } = useGrowthRateSets(cardType, projectId);
+  const { data: sets, isLoading, error } = useGrowthRateSets(cardType, projectId);
+
+  // Debug logging
+  console.log(`[GrowthRateSelect] ${label}: cardType=${cardType}, projectId=${projectId}, sets=`, sets, 'error=', error);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -60,12 +63,25 @@ export function GrowthRateSelect({
         }}
       >
         <option value="">Select...</option>
-        {sets?.map((set) => (
-          <option key={set.set_id} value={set.set_id}>
-            {set.set_name}
-            {set.is_global ? ' (Global)' : ''}
-          </option>
-        ))}
+        {sets?.map((set) => {
+          // Clean up set name (remove special chars and Global suffix)
+          const cleanName = set.set_name
+            .replace(/¥G/g, '')
+            .replace(/\(G\)/g, '')
+            .replace(/Global/gi, '')
+            .trim();
+
+          // Format: "Name (rate%)" or just "Name" if no rate
+          const rateStr = set.default_rate !== null && set.default_rate !== undefined
+            ? ` (${(Number(set.default_rate) * 100).toFixed(1)}%)`
+            : '';
+
+          return (
+            <option key={set.set_id} value={set.set_id}>
+              {cleanName}{rateStr}
+            </option>
+          );
+        })}
       </select>
     </div>
   );

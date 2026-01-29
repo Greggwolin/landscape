@@ -38,6 +38,55 @@ import {
 } from './metrics';
 
 // ============================================================================
+// DCF ASSUMPTIONS (from tbl_dcf_analysis)
+// ============================================================================
+
+interface DcfAssumptions {
+  projectId: number;
+  discountRate: number;
+  priceGrowthRate: number;      // Annual rate (decimal, e.g., 0.03 for 3%)
+  costInflationRate: number;    // Annual rate (decimal, e.g., 0.03 for 3%)
+  sellingCostsPct: number;      // As decimal (e.g., 0.03 for 3%)
+  priceGrowthSetId?: number | null;
+  costInflationSetId?: number | null;
+}
+
+/**
+ * Fetch DCF assumptions from tbl_dcf_analysis.
+ * Returns null if no DCF record exists.
+ */
+async function fetchDcfAssumptions(projectId: number): Promise<DcfAssumptions | null> {
+  const djangoApiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+  try {
+    const response = await fetch(
+      `${djangoApiUrl}/api/valuation/dcf-analysis/${projectId}/`,
+      { cache: 'no-store' }
+    );
+
+    if (!response.ok) {
+      console.log(`[CashFlow] No DCF assumptions for project ${projectId}, using fallbacks`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    return {
+      projectId,
+      discountRate: parseFloat(data.discount_rate) || 0,
+      priceGrowthRate: parseFloat(data.price_growth_rate) || 0,
+      costInflationRate: parseFloat(data.cost_inflation_rate) || 0,
+      sellingCostsPct: parseFloat(data.selling_costs_pct) || 0,
+      priceGrowthSetId: data.price_growth_set_id,
+      costInflationSetId: data.cost_inflation_set_id,
+    };
+  } catch (err) {
+    console.warn(`[CashFlow] Error fetching DCF assumptions for project ${projectId}:`, err);
+    return null;
+  }
+}
+
+// ============================================================================
 // PROJECT CONFIGURATION
 // ============================================================================
 
@@ -48,6 +97,7 @@ interface ProjectConfig {
   durationMonths: number;
   periodCount: number;
   costInflationRate?: number; // Project-level cost inflation rate (decimal, e.g., 0.03 for 3%)
+  priceGrowthRate?: number;   // Price growth rate from DCF (decimal, e.g., 0.03 for 3%)
 }
 
 /**
@@ -106,28 +156,49 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
   }
   console.log(`[CashFlow] Using startDate: ${startDate.toISOString()}`);
 
-  // Fetch project-level cost inflation rate from growth rate settings
+  // PRIORITY 1: Try to get inflation rates from DCF assumptions (tbl_dcf_analysis)
   let costInflationRate: number | undefined;
-  try {
-    const inflationResult = await sql<{
-      current_rate: number | null;
-    }>`
-      SELECT
-        CASE
-          WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
-          ELSE MAX(CASE WHEN st.step_number = 1 THEN st.rate END)
-        END AS current_rate
-      FROM landscape.tbl_project_settings ps
-      JOIN landscape.core_fin_growth_rate_sets grs ON ps.cost_inflation_set_id = grs.set_id
-      LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = grs.set_id
-      WHERE ps.project_id = ${projectId}
-      GROUP BY grs.set_id
-    `;
-    if (inflationResult.length > 0 && inflationResult[0].current_rate !== null) {
-      costInflationRate = Number(inflationResult[0].current_rate);
+  let priceGrowthRate: number | undefined;
+
+  const dcfAssumptions = await fetchDcfAssumptions(projectId);
+
+  if (dcfAssumptions) {
+    // Use DCF assumptions as primary source
+    // Check for set_id to determine if rate was explicitly configured (even if 0%)
+    if (dcfAssumptions.costInflationSetId !== null && dcfAssumptions.costInflationSetId !== undefined) {
+      costInflationRate = dcfAssumptions.costInflationRate;
+      console.log(`[CashFlow] Using DCF cost inflation rate: ${(costInflationRate * 100).toFixed(2)}% (set_id=${dcfAssumptions.costInflationSetId})`);
     }
-  } catch (err) {
-    console.warn('Could not fetch cost inflation rate:', err);
+    if (dcfAssumptions.priceGrowthSetId !== null && dcfAssumptions.priceGrowthSetId !== undefined) {
+      priceGrowthRate = dcfAssumptions.priceGrowthRate;
+      console.log(`[CashFlow] Using DCF price growth rate: ${(priceGrowthRate * 100).toFixed(2)}% (set_id=${dcfAssumptions.priceGrowthSetId})`);
+    }
+  }
+
+  // PRIORITY 2: Fallback to tbl_project_settings if DCF doesn't have cost inflation
+  if (costInflationRate === undefined) {
+    try {
+      const inflationResult = await sql<{
+        current_rate: number | null;
+      }>`
+        SELECT
+          CASE
+            WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
+            ELSE MAX(CASE WHEN st.step_number = 1 THEN st.rate END)
+          END AS current_rate
+        FROM landscape.tbl_project_settings ps
+        JOIN landscape.core_fin_growth_rate_sets grs ON ps.cost_inflation_set_id = grs.set_id
+        LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = grs.set_id
+        WHERE ps.project_id = ${projectId}
+        GROUP BY grs.set_id
+      `;
+      if (inflationResult.length > 0 && inflationResult[0].current_rate !== null) {
+        costInflationRate = Number(inflationResult[0].current_rate);
+        console.log(`[CashFlow] Using project settings cost inflation rate: ${(costInflationRate * 100).toFixed(2)}%`);
+      }
+    } catch (err) {
+      console.warn('Could not fetch cost inflation rate from project settings:', err);
+    }
   }
 
   return {
@@ -137,6 +208,7 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
     durationMonths: 0, // Will be determined dynamically
     periodCount: 0, // Will be determined dynamically
     costInflationRate,
+    priceGrowthRate,
   };
 }
 
@@ -254,10 +326,15 @@ export async function generateCashFlow(
 
   // Step 5: Generate revenue schedule
   console.log(`Generating revenue schedule for project ${projectId}...`);
+  if (projectConfig.priceGrowthRate) {
+    console.log(`  Using DCF price growth rate: ${(projectConfig.priceGrowthRate * 100).toFixed(2)}%`);
+  }
   const absorptionSchedule = await generateAbsorptionSchedule(
     projectId,
     projectConfig.startDate,
-    containerIds
+    containerIds,
+    projectConfig.priceGrowthRate,
+    projectConfig.costInflationRate
   );
 
   const revenuePeriodValues = absorptionToPeriodValues(
