@@ -877,3 +877,199 @@ class PropertyAttributeDef(models.Model):
         for attr in attrs:
             grouped[attr.subcategory or 'general'].append(attr)
         return dict(grouped)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DCF Analysis (Unified for CRE and Land Development)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class DcfAnalysis(models.Model):
+    """
+    Unified DCF analysis parameters for both CRE and Land Development projects.
+
+    Maps to landscape.tbl_dcf_analysis
+
+    property_type discriminator determines which fields are relevant:
+    - cre: Uses income/expense growth, cap rates, vacancy assumptions
+    - land_dev: Uses price/cost inflation, bulk sale parameters
+
+    Use get_or_create_for_project() to ensure a record exists with defaults.
+    """
+
+    PROPERTY_TYPE_CHOICES = [
+        ('cre', 'Commercial Real Estate'),
+        ('land_dev', 'Land Development'),
+    ]
+
+    CAP_RATE_METHOD_CHOICES = [
+        ('comp_sales', 'Comparable Sales'),
+        ('band', 'Band of Investment'),
+        ('survey', 'Investor Survey'),
+        ('direct_entry', 'Direct Entry'),
+    ]
+
+    dcf_analysis_id = models.BigAutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='dcf_analyses'
+    )
+
+    # Property type discriminator
+    property_type = models.CharField(
+        max_length=20,
+        choices=PROPERTY_TYPE_CHOICES,
+        help_text='Property type: land_dev (from LAND project_type_code) or cre (all other types)'
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # COMMON FIELDS (both property types)
+    # ─────────────────────────────────────────────────────────────────────────
+    hold_period_years = models.IntegerField(null=True, blank=True)
+    discount_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, null=True, blank=True,
+        help_text='Discount rate for DCF NPV calculation (decimal, e.g., 0.085 = 8.5%)'
+    )
+    exit_cap_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, null=True, blank=True,
+        help_text='Terminal/exit cap rate for reversion value (decimal, e.g., 0.06 = 6%)'
+    )
+    selling_costs_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Selling costs as decimal (e.g., 0.02 = 2%)'
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CRE-SPECIFIC FIELDS
+    # ─────────────────────────────────────────────────────────────────────────
+    going_in_cap_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, null=True, blank=True,
+        help_text='Going-in cap rate for direct capitalization'
+    )
+    cap_rate_method = models.CharField(
+        max_length=20, choices=CAP_RATE_METHOD_CHOICES, null=True, blank=True
+    )
+    sensitivity_interval = models.DecimalField(
+        max_digits=6, decimal_places=4, null=True, blank=True,
+        help_text='Interval for sensitivity matrix (e.g., 0.005 = 50 bps)'
+    )
+    vacancy_rate = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    stabilized_vacancy = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    credit_loss = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    management_fee_pct = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    reserves_per_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # Growth rate set FKs for CRE
+    income_growth_set_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='FK to core_fin_growth_rate_sets for CRE income growth (rent escalation)'
+    )
+    expense_growth_set_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='FK to core_fin_growth_rate_sets for CRE expense growth (OpEx inflation)'
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LAND DEV-SPECIFIC FIELDS
+    # ─────────────────────────────────────────────────────────────────────────
+    price_growth_set_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='FK to core_fin_growth_rate_sets for Land Dev price appreciation'
+    )
+    cost_inflation_set_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='FK to core_fin_growth_rate_sets for Land Dev development cost inflation'
+    )
+
+    # Bulk sale / exit assumptions
+    bulk_sale_enabled = models.BooleanField(
+        default=False,
+        help_text='Land Dev: Whether to model bulk sale of remaining inventory at exit'
+    )
+    bulk_sale_period = models.IntegerField(
+        null=True, blank=True,
+        help_text='Period number for bulk sale exit'
+    )
+    bulk_sale_discount_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Land Dev: Discount applied to remaining inventory in bulk sale (decimal)'
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # AUDIT FIELDS
+    # ─────────────────────────────────────────────────────────────────────────
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_dcf_analysis'
+        unique_together = [['project', 'property_type']]
+        verbose_name = 'DCF Analysis'
+        verbose_name_plural = 'DCF Analyses'
+
+    def __str__(self):
+        return f"DCF Analysis for {self.project} ({self.property_type})"
+
+    @classmethod
+    def get_property_type_for_project(cls, project):
+        """
+        Determine the property_type based on project_type_code.
+
+        Args:
+            project: Project instance
+
+        Returns:
+            'land_dev' if project_type_code is 'LAND', otherwise 'cre'
+        """
+        return 'land_dev' if project.project_type_code == 'LAND' else 'cre'
+
+    @classmethod
+    def get_or_create_for_project(cls, project):
+        """
+        Get or create DCF analysis for a project.
+
+        Creates with sensible defaults if no record exists.
+        property_type is automatically determined from project.project_type_code.
+
+        Args:
+            project: Project instance
+
+        Returns:
+            Tuple of (DcfAnalysis instance, created boolean)
+        """
+        property_type = cls.get_property_type_for_project(project)
+
+        defaults = {
+            # Common defaults
+            'hold_period_years': 10,
+            'discount_rate': 0.10,  # 10%
+            'exit_cap_rate': 0.06,  # 6%
+            'selling_costs_pct': 0.02,  # 2%
+        }
+
+        if property_type == 'cre':
+            defaults.update({
+                'going_in_cap_rate': 0.055,  # 5.5%
+                'cap_rate_method': 'comp_sales',
+                'sensitivity_interval': 0.005,  # 50 bps
+                'vacancy_rate': 0.05,  # 5%
+                'stabilized_vacancy': 0.05,
+                'credit_loss': 0.01,  # 1%
+                'management_fee_pct': 0.03,  # 3%
+                'reserves_per_unit': 300,
+            })
+        else:
+            # Land Dev defaults
+            defaults.update({
+                'bulk_sale_enabled': False,
+                'bulk_sale_discount_pct': 0.15,  # 15%
+            })
+
+        return cls.objects.get_or_create(
+            project=project,
+            property_type=property_type,
+            defaults=defaults
+        )

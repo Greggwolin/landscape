@@ -1,0 +1,90 @@
+'use client';
+
+/**
+ * Land Dev Costs Section
+ *
+ * Cost assumptions for Land Development projects:
+ * - Cost Inflation Set (dropdown linked to core_fin_growth_rate_sets)
+ *
+ * Session: QK-28
+ */
+
+import React, { useState } from 'react';
+import type { DcfAnalysis } from '@/types/dcf-analysis';
+import { GrowthRateSelect } from './GrowthRateSelect';
+
+// ============================================================================
+// CHEVRON ICON
+// ============================================================================
+
+function ChevronIcon({ isOpen }: { isOpen: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+interface LandDevCostsSectionProps {
+  data?: DcfAnalysis;
+  onChange: (field: keyof DcfAnalysis, value: number | null) => void;
+  projectId: number;
+  defaultOpen?: boolean;
+}
+
+export function LandDevCostsSection({
+  data,
+  onChange,
+  projectId,
+  defaultOpen = true,
+}: LandDevCostsSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      {/* Section Header */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full d-flex justify-content-between align-items-center text-left"
+        style={{
+          background: 'var(--cui-tertiary-bg)',
+          padding: '0.5rem 0.75rem',
+          borderRadius: 0,
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+          Costs
+        </span>
+        <ChevronIcon isOpen={isOpen} />
+      </button>
+
+      {/* Content */}
+      {isOpen && (
+        <div className="pt-2 px-3 pb-2 space-y-2">
+          {/* Cost Inflation Rate Set */}
+          <GrowthRateSelect
+            label="Cost Inflation"
+            value={data?.cost_inflation_set_id}
+            onChange={(v) => onChange('cost_inflation_set_id', v)}
+            cardType="cost"
+            projectId={projectId}
+            tooltip="Development cost inflation rate"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default LandDevCostsSection;

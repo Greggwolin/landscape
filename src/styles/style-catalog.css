@@ -1,0 +1,557 @@
+/**
+ * Style Catalog Styles
+ *
+ * Styles for the dynamic canonical styles admin panel.
+ * Uses CoreUI+ variables for consistency.
+ *
+ * @version 2.0
+ * @updated 2026-01-28
+ */
+
+/* ==========================================================================
+   MAIN CONTAINER
+   ========================================================================== */
+
+.style-catalog {
+  padding: 1.5rem;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  min-height: 100%;
+}
+
+.style-catalog-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.style-catalog-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  color: var(--cui-emphasis-color);
+}
+
+.style-catalog-subtitle {
+  font-size: 0.875rem;
+  color: var(--cui-secondary-color);
+  margin: 0;
+}
+
+.style-catalog-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  background: rgba(var(--cui-success-rgb), 0.15);
+  color: var(--cui-success);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.75rem;
+}
+
+.style-catalog-live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--cui-success);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ==========================================================================
+   SECTIONS
+   ========================================================================== */
+
+.style-catalog-section {
+  margin-bottom: 2rem;
+}
+
+.style-catalog-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.style-catalog-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--cui-emphasis-color);
+}
+
+.style-catalog-section-count {
+  font-size: 0.75rem;
+  color: var(--cui-tertiary-color);
+  background: var(--cui-tertiary-bg);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+/* ==========================================================================
+   COLOR SWATCH GRID
+   ========================================================================== */
+
+.color-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* Compact grid for categories with many items */
+.color-swatch-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+/* ==========================================================================
+   COLOR SWATCH CARD
+   ========================================================================== */
+
+.color-swatch-card {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--cui-card-bg);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.color-swatch-card:hover {
+  border-color: var(--cui-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.color-swatch-preview {
+  height: 72px;
+  width: 100%;
+  position: relative;
+}
+
+/* Checkerboard pattern for transparent colors */
+.color-swatch-preview--transparent {
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+.color-swatch-info {
+  padding: 0.75rem;
+}
+
+.color-swatch-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  color: var(--cui-body-color);
+}
+
+.color-swatch-variable {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.color-swatch-variable code {
+  font-size: 0.6875rem;
+  color: var(--cui-secondary-color);
+  background: var(--cui-tertiary-bg);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.color-swatch-variable:hover code {
+  background: var(--cui-primary);
+  color: #fff;
+}
+
+.copy-feedback {
+  font-size: 0.625rem;
+  color: var(--cui-success);
+  font-weight: 600;
+}
+
+.color-swatch-hex {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.color-swatch-hex code {
+  font-size: 0.6875rem;
+  color: var(--cui-tertiary-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.color-swatch-hex:hover code {
+  color: var(--cui-primary);
+}
+
+.color-swatch-description {
+  font-size: 0.6875rem;
+  color: var(--cui-tertiary-color);
+  margin-top: 0.375rem;
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   COMPACT SWATCH (for inline/small displays)
+   ========================================================================== */
+
+.color-swatch-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  background: var(--cui-tertiary-bg);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.color-swatch-compact:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.color-swatch-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.color-swatch-compact-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cui-body-color);
+}
+
+/* ==========================================================================
+   VIEW TOGGLES
+   ========================================================================== */
+
+.style-catalog-view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.style-catalog-view-btn {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.375rem;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.style-catalog-view-btn:hover {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+}
+
+.style-catalog-view-btn--active {
+  background: var(--cui-primary);
+  border-color: var(--cui-primary);
+  color: #fff;
+}
+
+/* ==========================================================================
+   SEARCH/FILTER
+   ========================================================================== */
+
+.style-catalog-search {
+  margin-bottom: 1.5rem;
+}
+
+.style-catalog-search-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+}
+
+.style-catalog-search-input:focus {
+  outline: none;
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 3px rgba(var(--cui-primary-rgb), 0.15);
+}
+
+.style-catalog-search-input::placeholder {
+  color: var(--cui-tertiary-color);
+}
+
+/* ==========================================================================
+   COMPONENT EXAMPLES
+   ========================================================================== */
+
+.component-example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.component-example-card {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--cui-card-bg);
+}
+
+.component-example-preview {
+  padding: 1.5rem;
+  background: var(--cui-tertiary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+}
+
+.component-example-info {
+  padding: 0.75rem;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.component-example-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.component-example-class {
+  font-size: 0.6875rem;
+  color: var(--cui-secondary-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   TYPOGRAPHY SAMPLES
+   ========================================================================== */
+
+.typography-sample {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.5rem;
+}
+
+.typography-sample-label {
+  font-size: 0.6875rem;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   SPACING SAMPLES
+   ========================================================================== */
+
+.spacing-sample-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.spacing-sample {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spacing-sample-box {
+  background: var(--cui-primary);
+  border-radius: 0.25rem;
+}
+
+.spacing-sample-label {
+  font-size: 0.6875rem;
+  color: var(--cui-secondary-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   TABLE FORMAT STYLES
+   ========================================================================== */
+
+.style-catalog-table {
+  font-size: 0.8125rem;
+  margin-bottom: 0;
+}
+
+.style-catalog-table th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color);
+  background: var(--cui-tertiary-bg);
+  white-space: nowrap;
+}
+
+.style-catalog-table td {
+  vertical-align: middle;
+}
+
+.style-catalog-table code {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: var(--cui-tertiary-bg);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  color: var(--cui-body-color);
+}
+
+/* Inline swatch for table cells */
+.color-swatch-inline {
+  width: 60px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--cui-border-color);
+}
+
+/* Copy button styling for table cells */
+.color-table-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.color-table-copy-btn:hover code {
+  background: var(--cui-primary);
+  color: #fff;
+}
+
+.color-table-copy-btn .copy-feedback {
+  font-size: 0.625rem;
+  color: var(--cui-success);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   ACCORDION STYLES
+   ========================================================================== */
+
+.style-catalog-accordion {
+  margin-bottom: 1.5rem;
+}
+
+.style-catalog-accordion .accordion-item {
+  border-color: var(--cui-border-color);
+  background: var(--cui-card-bg);
+}
+
+.style-catalog-accordion .accordion-header {
+  background: var(--cui-card-bg);
+}
+
+.style-catalog-accordion .accordion-button {
+  background: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  font-size: 0.9375rem;
+  padding: 0.875rem 1rem;
+}
+
+.style-catalog-accordion .accordion-button:not(.collapsed) {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  box-shadow: none;
+}
+
+.style-catalog-accordion .accordion-button:focus {
+  box-shadow: none;
+  border-color: var(--cui-primary);
+}
+
+.style-catalog-accordion .accordion-body {
+  padding: 0;
+  background: var(--cui-body-bg);
+}
+
+.style-catalog-accordion .accordion-body .style-catalog-table {
+  border: none;
+  margin: 0;
+}
+
+.style-catalog-accordion .accordion-body .style-catalog-table th:first-child,
+.style-catalog-accordion .accordion-body .style-catalog-table td:first-child {
+  padding-left: 1rem;
+}
+
+.style-catalog-accordion .accordion-body .style-catalog-table th:last-child,
+.style-catalog-accordion .accordion-body .style-catalog-table td:last-child {
+  padding-right: 1rem;
+}
+
+/* ==========================================================================
+   DARK MODE ADJUSTMENTS
+   ========================================================================== */
+
+[data-coreui-theme="dark"] .color-swatch-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-coreui-theme="dark"] .color-swatch-dot {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-coreui-theme="dark"] .color-swatch-inline {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .style-catalog {
+    padding: 1rem;
+  }
+
+  .color-swatch-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .style-catalog-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

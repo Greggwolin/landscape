@@ -9,7 +9,7 @@
  * - Capitalization Parameters
  * - DCF Parameters
  *
- * Session: QK-11, QK-22 (fixed CCollapse rendering issue)
+ * Session: QK-11, QK-22 (fixed CCollapse rendering issue), QX (formatting restore)
  */
 
 import React, { useState, useCallback } from 'react';
@@ -30,18 +30,9 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
   );
 }
 
-// Lock icon for pulled values
-function LockIcon() {
-  return (
-    <svg className="w-3 h-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-      <path
-        fillRule="evenodd"
-        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
+// Consistent input width for alignment
+const INPUT_WIDTH = 'w-24';
+const SELECT_WIDTH = 'w-[7.75rem]'; // 10% wider than w-28 for dropdown
 
 export function AssumptionsPanel({
   assumptions,
@@ -54,7 +45,7 @@ export function AssumptionsPanel({
     income: true,
     expenses: true,
     capitalization: true,
-    dcf: false,
+    dcf: true,
   });
 
   // Define hooks before any conditional returns
@@ -82,36 +73,41 @@ export function AssumptionsPanel({
 
   return (
     <div
-      className="h-full overflow-y-auto pr-2"
+      className="h-full overflow-y-auto"
       style={{ backgroundColor: 'var(--cui-card-bg)' }}
     >
-      <div className="p-4">
+      {/* Main header - shaded background #F0F1F2, compact height */}
+      <div
+        className="px-4 py-2 flex items-center justify-between"
+        style={{ backgroundColor: '#F0F1F2' }}
+      >
         <h2
-          className="text-lg font-semibold mb-4"
-          style={{ color: 'var(--cui-body-color)' }}
+          className="text-sm font-semibold"
+          style={{ color: '#1a1a1a' }}
         >
           Assumptions
         </h2>
-
         {/* Saving indicator */}
         {isSaving && (
           <div
-            className="text-xs mb-3 flex items-center gap-2"
+            className="text-xs flex items-center gap-1"
             style={{ color: 'var(--cui-primary)' }}
           >
             <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            Saving...
           </div>
         )}
+      </div>
 
+      {/* Sections - no horizontal padding so headers span full width */}
+      <div className="pb-4">
         {/* Income Section */}
         <AccordionSection
           title="Income"
           isOpen={openSections.income}
           onToggle={() => toggleSection('income')}
         >
-          <div className="space-y-3">
-            {/* GPR - Pulled from rent roll */}
+          <div className="space-y-2">
+            {/* GPR - Pulled from rent roll - NO lock icon */}
             <ReadOnlyField
               label="Gross Potential Rent"
               value={formatCurrency(rentRoll.forward_gpr)}
@@ -171,8 +167,8 @@ export function AssumptionsPanel({
           isOpen={openSections.expenses}
           onToggle={() => toggleSection('expenses')}
         >
-          <div className="space-y-3">
-            {/* OpEx - Pulled */}
+          <div className="space-y-2">
+            {/* OpEx - Pulled - NO lock icon */}
             <ReadOnlyField
               label="Operating Expenses"
               value={formatCurrency(operatingExpenses.total)}
@@ -189,12 +185,11 @@ export function AssumptionsPanel({
               tooltip="% of Effective Gross Income"
             />
 
-            {/* Replacement Reserves */}
+            {/* Replacement Reserves - label includes /Yr, value is just $X */}
             <CurrencyInput
-              label="Reserves/Unit"
+              label="Reserves/Unit/Yr"
               value={assumptions.replacement_reserves_per_unit}
               onChange={(v) => onAssumptionChange('replacement_reserves_per_unit', v)}
-              suffix="/unit/year"
             />
 
             {/* Expense Growth */}
@@ -215,7 +210,7 @@ export function AssumptionsPanel({
           isOpen={openSections.capitalization}
           onToggle={() => toggleSection('capitalization')}
         >
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Cap Rate */}
             <PercentInput
               label="Going-In Cap Rate"
@@ -223,19 +218,17 @@ export function AssumptionsPanel({
               onChange={(v) => onAssumptionChange('selected_cap_rate', v)}
               min={0.01}
               max={0.15}
-              step={0.0025}
             />
 
-            {/* Cap Rate Method */}
+            {/* Method - shortened label and options */}
             <SelectInput
-              label="Cap Rate Method"
+              label="Method"
               value={assumptions.market_cap_rate_method}
               onChange={(v) => onAssumptionChange('market_cap_rate_method', v)}
               options={[
-                { value: 'comp_sales', label: 'Comparable Sales' },
-                { value: 'band_investment', label: 'Band of Investment' },
-                { value: 'investor_survey', label: 'Investor Survey' },
-                { value: 'other', label: 'Other' },
+                { value: 'comp_sales', label: 'Comp Sales' },
+                { value: 'band_investment', label: 'Band' },
+                { value: 'investor_survey', label: 'Survey' },
               ]}
             />
 
@@ -246,7 +239,6 @@ export function AssumptionsPanel({
               onChange={(v) => onAssumptionChange('cap_rate_interval', v)}
               min={0.0025}
               max={0.01}
-              step={0.0025}
               tooltip="Interval for sensitivity matrix"
             />
           </div>
@@ -258,15 +250,15 @@ export function AssumptionsPanel({
           isOpen={openSections.dcf}
           onToggle={() => toggleSection('dcf')}
         >
-          <div className="space-y-3">
-            {/* Hold Period */}
+          <div className="space-y-2">
+            {/* Hold Period - "yrs" inside box */}
             <NumberInput
               label="Hold Period"
               value={assumptions.hold_period_years}
               onChange={(v) => onAssumptionChange('hold_period_years', v)}
               min={1}
               max={30}
-              suffix="years"
+              suffix="yrs"
             />
 
             {/* Discount Rate */}
@@ -294,7 +286,6 @@ export function AssumptionsPanel({
               onChange={(v) => onAssumptionChange('discount_rate_interval', v)}
               min={0.0025}
               max={0.01}
-              step={0.0025}
               tooltip="For sensitivity matrix"
             />
 
@@ -327,24 +318,23 @@ interface AccordionSectionProps {
 
 function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectionProps) {
   return (
-    <div
-      className="mb-3 rounded-lg overflow-hidden"
-      style={{
-        backgroundColor: 'var(--cui-tertiary-bg)',
-        border: '1px solid var(--cui-border-color)',
-      }}
-    >
+    <div>
+      {/* Section header - shaded background spanning full width */}
       <button
         onClick={onToggle}
-        className="w-full px-3 py-2 flex items-center justify-between text-left"
-        style={{ color: 'var(--cui-body-color)' }}
+        className="w-full px-4 py-2 flex items-center justify-between text-left focus:outline-none"
+        style={{
+          color: 'var(--cui-body-color)',
+          background: 'var(--cui-tertiary-bg)',
+          border: 'none',
+        }}
       >
-        <span className="font-medium text-sm">{title}</span>
+        <span className="font-semibold text-sm">{title}</span>
         <ChevronIcon isOpen={isOpen} />
       </button>
       {/* QK-22: Replaced CCollapse with simple conditional - CCollapse had CSS conflicts */}
       {isOpen && (
-        <div className="px-3 pb-3">{children}</div>
+        <div className="px-4 pt-2 pb-3 space-y-2">{children}</div>
       )}
     </div>
   );
@@ -360,19 +350,19 @@ interface ReadOnlyFieldProps {
   tooltip?: string;
 }
 
+// ReadOnlyField - NO lock icon, just plain text aligned with inputs
 function ReadOnlyField({ label, value, tooltip }: ReadOnlyFieldProps) {
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs flex items-center gap-1"
+        className="text-xs"
         style={{ color: 'var(--cui-secondary-color)' }}
         title={tooltip}
       >
-        <LockIcon />
         {label}
       </label>
       <span
-        className="text-sm font-medium"
+        className={`${INPUT_WIDTH} text-right text-sm font-medium`}
         style={{ color: 'var(--cui-body-color)' }}
       >
         {value}
@@ -387,21 +377,19 @@ interface PercentInputProps {
   onChange: (value: number) => void;
   min?: number;
   max?: number;
-  step?: number;
   tooltip?: string;
 }
 
+// PercentInput - % INSIDE the input box
 function PercentInput({
   label,
   value,
   onChange,
   min = 0,
   max = 1,
-  step = 0.0025,
   tooltip,
 }: PercentInputProps) {
   const safeValue = value ?? 0;
-  // Use local state for editing to allow intermediate values
   const [localValue, setLocalValue] = useState((safeValue * 100).toFixed(2));
   const [isFocused, setIsFocused] = useState(false);
 
@@ -413,22 +401,25 @@ function PercentInput({
   }, [safeValue, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalValue(e.target.value);
+    // Strip % and non-numeric chars except decimal and minus
+    const rawValue = e.target.value.replace(/[^0-9.-]/g, '');
+    setLocalValue(rawValue);
   };
 
   const handleBlur = () => {
     setIsFocused(false);
     const numValue = parseFloat(localValue) / 100;
     if (!isNaN(numValue)) {
-      // Clamp to valid range
       const clampedValue = Math.max(min, Math.min(max, numValue));
       onChange(clampedValue);
       setLocalValue((clampedValue * 100).toFixed(2));
     } else {
-      // Reset to current value if invalid
       setLocalValue((safeValue * 100).toFixed(2));
     }
   };
+
+  // Show % inside box when not focused
+  const displayValue = isFocused ? localValue : `${localValue}%`;
 
   return (
     <div className="flex items-center justify-between">
@@ -439,30 +430,19 @@ function PercentInput({
       >
         {label}
       </label>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          value={localValue}
-          onChange={handleChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={handleBlur}
-          step={step * 100}
-          min={min * 100}
-          max={max * 100}
-          className="w-16 px-2 py-1 text-right text-sm rounded"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            color: 'var(--cui-body-color)',
-            border: '1px solid var(--cui-border-color)',
-          }}
-        />
-        <span
-          className="text-xs"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          %
-        </span>
-      </div>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={handleBlur}
+        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        style={{
+          backgroundColor: 'var(--cui-body-bg)',
+          color: 'var(--cui-body-color)',
+          border: '1px solid rgba(255,255,255,0.15)',
+        }}
+      />
     </div>
   );
 }
@@ -471,10 +451,10 @@ interface CurrencyInputProps {
   label: string;
   value: number;
   onChange: (value: number) => void;
-  suffix?: string;
 }
 
-function CurrencyInput({ label, value, onChange, suffix }: CurrencyInputProps) {
+// CurrencyInput - $ INSIDE the input box
+function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
   const safeValue = value ?? 0;
   const [localValue, setLocalValue] = useState(String(safeValue));
   const [isFocused, setIsFocused] = useState(false);
@@ -487,7 +467,9 @@ function CurrencyInput({ label, value, onChange, suffix }: CurrencyInputProps) {
   }, [safeValue, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalValue(e.target.value);
+    // Strip $ and non-numeric chars except decimal
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '');
+    setLocalValue(rawValue);
   };
 
   const handleBlur = () => {
@@ -501,6 +483,9 @@ function CurrencyInput({ label, value, onChange, suffix }: CurrencyInputProps) {
     }
   };
 
+  // Show $ inside box when not focused
+  const displayValue = isFocused ? localValue : `$${localValue}`;
+
   return (
     <div className="flex items-center justify-between">
       <label
@@ -509,36 +494,19 @@ function CurrencyInput({ label, value, onChange, suffix }: CurrencyInputProps) {
       >
         {label}
       </label>
-      <div className="flex items-center gap-1">
-        <span
-          className="text-xs"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          $
-        </span>
-        <input
-          type="number"
-          value={localValue}
-          onChange={handleChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={handleBlur}
-          min={0}
-          className="w-20 px-2 py-1 text-right text-sm rounded"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            color: 'var(--cui-body-color)',
-            border: '1px solid var(--cui-border-color)',
-          }}
-        />
-        {suffix && (
-          <span
-            className="text-xs"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            {suffix}
-          </span>
-        )}
-      </div>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={handleBlur}
+        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        style={{
+          backgroundColor: 'var(--cui-body-bg)',
+          color: 'var(--cui-body-color)',
+          border: '1px solid rgba(255,255,255,0.15)',
+        }}
+      />
     </div>
   );
 }
@@ -552,6 +520,7 @@ interface NumberInputProps {
   suffix?: string;
 }
 
+// NumberInput - suffix INSIDE the input box (e.g., "10 yrs")
 function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: NumberInputProps) {
   const safeValue = value ?? 0;
   const [localValue, setLocalValue] = useState(String(safeValue));
@@ -565,7 +534,9 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
   }, [safeValue, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalValue(e.target.value);
+    // Strip non-numeric chars
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    setLocalValue(rawValue);
   };
 
   const handleBlur = () => {
@@ -580,6 +551,9 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
     }
   };
 
+  // Show suffix inside box when not focused (e.g., "10 yrs")
+  const displayValue = isFocused ? localValue : (suffix ? `${localValue} ${suffix}` : localValue);
+
   return (
     <div className="flex items-center justify-between">
       <label
@@ -588,31 +562,19 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
       >
         {label}
       </label>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          value={localValue}
-          onChange={handleChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={handleBlur}
-          min={min}
-          max={max}
-          className="w-16 px-2 py-1 text-right text-sm rounded"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            color: 'var(--cui-body-color)',
-            border: '1px solid var(--cui-border-color)',
-          }}
-        />
-        {suffix && (
-          <span
-            className="text-xs"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            {suffix}
-          </span>
-        )}
-      </div>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={handleBlur}
+        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        style={{
+          backgroundColor: 'var(--cui-body-bg)',
+          color: 'var(--cui-body-color)',
+          border: '1px solid rgba(255,255,255,0.15)',
+        }}
+      />
     </div>
   );
 }
@@ -638,11 +600,12 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
       <select
         value={safeValue}
         onChange={(e) => onChange(e.target.value)}
-        className="px-2 py-1 text-sm rounded"
+        className={`${SELECT_WIDTH} px-2 py-1 text-sm rounded`}
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          border: '1px solid var(--cui-border-color)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          cursor: 'pointer',
         }}
       >
         {options.map((opt) => (

@@ -18,6 +18,7 @@
 import { memo } from 'react';
 import { ExportButton } from '@/components/admin';
 import { CashFlowAnalysisTab } from '@/components/analysis/cashflow';
+import { UnifiedAssumptionsPanel } from '@/components/valuation/UnifiedAssumptionsPanel';
 
 interface FeasibilityTabProps {
   project: {
@@ -105,12 +106,22 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
     switch (activeTab) {
       case 'cashflow':
         return (
-          <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="mb-0">Cash Flow Analysis</h2>
-              <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
+          <div className="d-flex" style={{ gap: '1rem' }}>
+            {/* Left: Assumptions Panel */}
+            <div style={{ width: '280px', flexShrink: 0 }}>
+              <UnifiedAssumptionsPanel
+                projectId={projectId}
+                propertyType="land_dev"
+              />
             </div>
-            <CashFlowAnalysisTab projectId={projectId} />
+            {/* Right: Cash Flow Analysis */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h2 className="mb-0">Cash Flow Analysis</h2>
+                <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
+              </div>
+              <CashFlowAnalysisTab projectId={projectId} />
+            </div>
           </div>
         );
 
@@ -191,12 +202,22 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
       default:
         // Default to cashflow
         return (
-          <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="mb-0">Cash Flow Analysis</h2>
-              <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
+          <div className="d-flex" style={{ gap: '1rem' }}>
+            {/* Left: Assumptions Panel */}
+            <div style={{ width: '280px', flexShrink: 0 }}>
+              <UnifiedAssumptionsPanel
+                projectId={projectId}
+                propertyType="land_dev"
+              />
             </div>
-            <CashFlowAnalysisTab projectId={projectId} />
+            {/* Right: Cash Flow Analysis */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h2 className="mb-0">Cash Flow Analysis</h2>
+                <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
+              </div>
+              <CashFlowAnalysisTab projectId={projectId} />
+            </div>
           </div>
         );
     }
