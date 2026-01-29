@@ -114,13 +114,12 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
                 propertyType="land_dev"
               />
             </div>
-            {/* Right: Cash Flow Analysis */}
+            {/* Right: Cash Flow Analysis - title removed, export button moved inside */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="mb-0">Cash Flow Analysis</h2>
-                <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
-              </div>
-              <CashFlowAnalysisTab projectId={projectId} />
+              <CashFlowAnalysisTab
+                projectId={projectId}
+                exportButton={<ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />}
+              />
             </div>
           </div>
         );
@@ -210,13 +209,12 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
                 propertyType="land_dev"
               />
             </div>
-            {/* Right: Cash Flow Analysis */}
+            {/* Right: Cash Flow Analysis - title removed, export button moved inside */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="mb-0">Cash Flow Analysis</h2>
-                <ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />
-              </div>
-              <CashFlowAnalysisTab projectId={projectId} />
+              <CashFlowAnalysisTab
+                projectId={projectId}
+                exportButton={<ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />}
+              />
             </div>
           </div>
         );
