@@ -42,7 +42,7 @@ export default function BenchmarksPanel() {
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
   const [absorptionCount, setAbsorptionCount] = useState(0);
   const [totalCostLineItems, setTotalCostLineItems] = useState(0);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // Reduced from 60 to 30
+  const [leftPanelWidth, setLeftPanelWidth] = useState(40); // Adjusted to 40%
   const [isDragging, setIsDragging] = useState(false);
   const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
 

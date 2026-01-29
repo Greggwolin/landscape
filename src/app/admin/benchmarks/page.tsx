@@ -48,7 +48,7 @@ export default function GlobalBenchmarksPage() {
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
   const [absorptionCount, setAbsorptionCount] = useState(0);
   const [totalCostLineItems, setTotalCostLineItems] = useState(0);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // Percentage - reduced from 60%
+  const [leftPanelWidth, setLeftPanelWidth] = useState(40); // Percentage - adjusted to 40%
   const [isDragging, setIsDragging] = useState(false);
   const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
 

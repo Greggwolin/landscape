@@ -274,7 +274,11 @@ function GrowthRateListItem({
       onKeyDown={handleRowKeyDown}
     >
       <div className="flex items-center w-full">
-        <div className="flex-1 text-sm font-medium text-text-primary">{set.set_name}</div>
+        <div className="flex-1 text-sm font-medium text-text-primary">
+          {set.card_type === 'revenue' && <span className="text-text-secondary">Revenue: </span>}
+          {set.card_type === 'cost' && <span className="text-text-secondary">Cost: </span>}
+          {set.set_name}
+        </div>
         <div className="w-10 flex justify-center">
           <ScopeIcon size={16} className="text-text-secondary" />
         </div>
