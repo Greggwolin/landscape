@@ -907,3 +907,116 @@ The codebase is well-documented, tested, and ready for the next phase of develop
 **Complete System (through Step 8):** ~16-18 weeks total
 
 🎉 **Landscape DMS is ready for production deployment or continued development!**
+
+---
+
+## 🧪 ALPHA TESTING GUIDE
+
+**Version:** 1.0
+**Updated:** 2026-01-30
+**Purpose:** Documentation for Alpha testers and Landscaper AI context
+
+---
+
+### Alpha Help Content
+
+**Page Purpose:** Upload, organize, search, and extract data from project documents. Provides a unified document management interface for all project-related files.
+
+**What You Can Do:**
+
+- Upload documents via drag-and-drop (PDF, images, Excel, Word)
+- Tag documents with freeform tags (autocomplete suggests popular tags)
+- Search full document text with Meilisearch or PostgreSQL fallback
+- Browse documents by type filters (Offering Memo, Rent Roll, T12, etc.)
+- Preview uploaded PDF files
+- Edit document metadata (description, date, parties, dollar amount)
+- Delete documents (single or multi-select)
+- View documents organized by project
+
+**What's Coming Soon:**
+
+- AI-powered data extraction to auto-populate project fields
+- Document version history and comparison
+- Folder security and access controls (Step 8)
+- OCR for scanned documents
+- Bulk document actions
+
+**Tips:**
+
+- Use descriptive tags to make documents easier to find later
+- The doc_type field drives filter organization - choose carefully
+- Upload documents before entering data manually - AI extraction can help
+- Click any document row to see/edit its profile in the right panel
+- Use the search bar for full-text search within document contents
+
+---
+
+### Landscaper Context
+
+**Can Help With:**
+
+- Finding specific documents by name or content
+- Explaining document types and their purposes
+- Describing what data can be extracted from each document type
+- Navigating the DMS interface
+- Explaining tag organization best practices
+
+**Should Deflect:**
+
+- "Extract data from my rent roll" → "Document extraction is in beta. Upload your rent roll to the Documents tab, and I can help you review any extracted data once processing completes."
+- "Import my entire folder of documents" → "Bulk folder import is coming soon. Currently, you can drag and drop multiple files into the upload area."
+- "Who has access to this document?" → "Document-level permissions are planned for Step 8. Currently, all project team members can view all project documents."
+- "Show me previous versions" → "Version history is planned for a future release. The current system stores only the latest version."
+
+---
+
+### Alpha Tester Notes
+
+**Test Focus Areas:**
+
+- Document upload works reliably for various file types
+- Tag autocomplete suggests relevant tags
+- Search returns expected results
+- Filter navigation functions correctly
+- Document preview loads for PDFs
+- Profile editing saves correctly
+- Multi-select delete works
+
+**Known Limitations:**
+
+- Maximum file size: 50MB per document
+- OCR not available for scanned PDFs (text-based PDFs only)
+- No version history - uploading same filename overwrites
+- Extraction requires manual review and validation
+- Search index may take up to 15 minutes to update for new documents
+- Folder security not yet implemented (all team members see all docs)
+
+---
+
+### Technical Details for Developers
+
+**Key Components:**
+
+- `src/components/dms/DMSView.tsx` - Main unified interface
+- `src/components/dms/filters/AccordionFilters.tsx` - Filter panels
+- `src/components/dms/profile/ProfileForm.tsx` - Metadata editor
+- `src/components/dms/profile/TagInput.tsx` - Tag autocomplete
+- `src/components/dms/upload/Dropzone.tsx` - File upload
+
+**API Endpoints:**
+
+- `POST /api/dms/docs` - Create document
+- `PATCH /api/dms/docs/:id` - Update profile
+- `DELETE /api/dms/docs/:id` - Delete document
+- `POST /api/dms/search` - Full-text search
+- `GET /api/dms/tags/suggest` - Tag autocomplete
+
+**Database Tables:**
+
+- `core_doc` - Main document registry
+- `core_doc_text` - Full-text content storage
+- `core_doc_folder` - Folder hierarchy (Step 8)
+
+---
+
+*Last Updated: 2026-01-30*

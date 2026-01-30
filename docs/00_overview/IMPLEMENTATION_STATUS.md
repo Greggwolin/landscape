@@ -1442,6 +1442,747 @@ console.log(result.metrics.npv);
 
 ---
 
-*Last Updated: 2025-10-21*
-*Next Review: Upon Python Migration Phase 2 completion*
+## 🧪 ALPHA TESTING GUIDE
+
+**Version:** 1.0
+**Updated:** 2026-01-30
+**Purpose:** Documentation for Alpha testers and Landscaper AI context
+
+This section provides page-by-page guidance for Alpha testing, including what works, what's coming soon, and how to use each feature effectively.
+
+---
+
+### Navigation Structure
+
+Landscape uses a **folder tab navigation** system with 8 main folders:
+
+| # | Folder | MF/Income | Land Dev | Description |
+|---|--------|-----------|----------|-------------|
+| 1 | Home | Project | Project | Dashboard with KPIs |
+| 2 | Property | Details, Market, Rent Roll | Market, Land Use, Parcels | Physical property info |
+| 3 | Operations/Budget | Operations (unified P&L) | Budget, Schedule, Sales, Draws | Financial operations |
+| 4 | Valuation | Sales Comp, Cost, Income | Feasibility, Cash Flow, Returns, Sensitivity | Value analysis |
+| 5 | Capital | Equity, Debt | Equity, Debt | Capital structure |
+| 6 | Reports | Summary, Export | Summary, Export | Generated outputs |
+| 7 | Documents | All, Extractions | All, Extractions | Document management |
+| 8 | Map | Unified spatial hub | Unified spatial hub | GIS and mapping |
+
+---
+
+### Multifamily (MF) Workspace Pages
+
+#### 1. Project Home
+
+**Page Purpose:** Central dashboard showing project KPIs, recent activity, and quick navigation to key areas.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- View project summary and key metrics
+- See recent activity feed
+- Navigate to any workspace section via folder tabs
+- Access Landscaper AI assistant panel (right side)
+
+**What's Coming Soon:**
+- Customizable dashboard widgets
+- Project comparison views
+- Notification center integration
+
+**Tips:**
+- The activity feed shows recent changes made by you and team members
+- Use the Landscaper panel to ask questions about your project data
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining project metrics and KPIs
+- Navigating to specific features
+- General questions about the property
+
+**Should Deflect:**
+- "Can you export my dashboard?" → "Dashboard export is coming soon. You can export individual reports from the Reports folder."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Activity feed displays recent changes correctly
+- Navigation to all folders works
+- Landscaper responds to basic questions
+
+**Known Limitations:**
+- Dashboard widgets are fixed layout
+- Activity feed limited to 30 days
+
+---
+
+#### 2. Property Tab (Details, Market, Rent Roll)
+
+**Page Purpose:** Comprehensive property information including physical description, market context, and unit-level rent roll data.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Details:** Enter property physical characteristics (units, SF, year built)
+- **Market:** View and configure market assumptions
+- **Rent Roll:** Full inline editing of unit inventory with DVL auto-fill
+
+**What's Coming Soon:**
+- AI-powered rent roll extraction from uploaded documents
+- Market comps auto-population from external data sources
+- Unit mix optimization suggestions
+
+**Tips:**
+- When entering rent roll, select a Unit Type first - beds, baths, and SF will auto-fill
+- Double-click any cell to edit; changes save automatically
+- Use the Rent Roll bulk import for large properties
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining rent roll metrics (loss-to-lease, occupancy)
+- Calculating rent PSF, rent per unit averages
+- Analyzing vacancy patterns
+
+**Should Deflect:**
+- "Can you import my rent roll PDF?" → "Document extraction is in beta. Please manually enter data or use CSV import for now."
+- "Pull comps from CoStar" → "External data integration is coming soon. You can manually add market comps."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Rent roll inline editing saves correctly
+- DVL auto-fill populates beds/baths/SF
+- Unit type management works
+
+**Known Limitations:**
+- Maximum 500 units per property for optimal performance
+- Document extraction requires manual review
+
+---
+
+#### 3. Operations Tab
+
+**Page Purpose:** Unified operating statement showing rental income, vacancy deductions, and operating expenses in a single P&L view.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- View rental income from rent roll (read-only, flows from Property tab)
+- Edit vacancy assumptions (physical, economic, concessions)
+- Manage operating expenses with drag-and-drop categorization
+- Toggle between detail and summary views
+- Edit expense items inline by double-clicking
+
+**What's Coming Soon:**
+- Historical T12 import from documents
+- Expense benchmarking against market data
+- OpEx variance analysis
+
+**Tips:**
+- Rental income shows a lock icon - edit in the Rent Roll to change
+- Drag expense items between categories to reorganize
+- Click the chevron to expand/collapse sections
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Calculating NOI and expense ratios
+- Explaining vacancy assumptions
+- Analyzing expense line items
+
+**Should Deflect:**
+- "Import my T12 operating statement" → "T12 extraction is in development. Please manually enter historical data for now."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Data flows correctly from Rent Roll to Operations
+- Drag-and-drop categorization persists
+- Detail/summary toggle works
+
+**Known Limitations:**
+- Read-only rental income (change via Rent Roll)
+- No T12 import yet
+
+---
+
+#### 4. Valuation Tab (Sales Comparison, Cost, Income Approach)
+
+**Page Purpose:** Three approaches to value for comprehensive property valuation - Sales Comparison, Cost Approach, and Income Approach (DCF).
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Sales Comparison:** Add comparable sales, adjust for differences, reconcile value
+- **Cost Approach:** Enter land value, replacement cost, depreciation
+- **Income Approach:** Run Direct Cap and DCF analysis with 3 NOI bases (F-12 Current, F-12 Market, Stabilized)
+
+**What's Coming Soon:**
+- Auto-populated comps from market data
+- Sensitivity analysis grids
+- Value reconciliation wizard
+
+**Tips:**
+- Income Approach flows data from Operations tab
+- Use the Assumptions panel to adjust cap rates and DCF parameters
+- Toggle NOI basis columns to compare scenarios
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining valuation methodologies
+- Calculating cap rates and IRR
+- Analyzing DCF assumptions
+
+**Should Deflect:**
+- "Pull comps automatically" → "Automated comp population is coming soon. Please add comps manually."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Value calculations are mathematically correct
+- Income Approach ties to Operations data
+- Assumptions panel updates values in real-time
+
+**Known Limitations:**
+- No automated comp sourcing
+- Sensitivity analysis not yet implemented
+
+---
+
+#### 5. Capitalization Tab (Equity, Debt)
+
+**Page Purpose:** Capital structure configuration including equity partners, debt facilities, and waterfall distributions.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Equity:** Configure partner splits, promote structures, preferred returns
+- **Debt:** Enter loan terms, amortization, draw schedules
+
+**What's Coming Soon:**
+- Waterfall visualization charts
+- Multi-tier promote calculator
+- Debt comparison tool
+
+**Tips:**
+- Waterfall calculations update automatically when you change partner terms
+- Use the equity multiple calculator to model different scenarios
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining waterfall mechanics
+- Calculating equity returns and promotes
+- Comparing debt structures
+
+**Should Deflect:**
+- "Generate a term sheet" → "Term sheet generation is coming soon. You can export capital structure data from Reports."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Waterfall calculations are correct
+- Partner percentages sum to 100%
+- Debt amortization calculates correctly
+
+**Known Limitations:**
+- Maximum 10 equity partners
+- Complex tiered waterfalls may need manual verification
+
+---
+
+#### 6. Reports Tab
+
+**Page Purpose:** Generate and export project reports and summaries.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Summary:** View consolidated project metrics
+- **Export:** Generate PDF/Excel reports (coming soon)
+
+**What's Coming Soon:**
+- PDF report generation
+- Excel export with formatting
+- Custom report builder
+
+**Tips:**
+- Use browser print function as a workaround for PDF export
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining report metrics
+- Summarizing project data
+
+**Should Deflect:**
+- "Export to PDF" → "PDF export is coming soon. Use browser print (Ctrl/Cmd+P) as a workaround."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Summary metrics match other tabs
+- No calculation discrepancies
+
+**Known Limitations:**
+- Export functionality not yet implemented
+
+---
+
+#### 7. Documents Tab
+
+**Page Purpose:** Upload, organize, and extract data from project documents.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- Upload documents (PDF, images, Excel)
+- Tag and categorize documents
+- Browse by document type filters
+- Preview uploaded files
+
+**What's Coming Soon:**
+- AI-powered data extraction to populate fields
+- Document comparison
+- Version history
+
+**Tips:**
+- Use tags to organize documents by type (offering memo, rent roll, T12, etc.)
+- The extraction feature is in beta - review extracted data carefully
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Finding uploaded documents
+- Explaining document categories
+- Describing extraction capabilities
+
+**Should Deflect:**
+- "Extract data from my OM" → "Document extraction is in beta. I can help you understand the extracted data once you upload and process it."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Document upload works reliably
+- Tags persist correctly
+- Filter navigation functions
+
+**Known Limitations:**
+- Maximum file size 50MB
+- Extraction requires manual review
+
+---
+
+#### 8. Map Tab
+
+**Page Purpose:** Unified spatial hub for GIS visualization, drawing tools, and location intelligence.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- View property location on map
+- Draw polygons, lines, points for measurement
+- View demographic ring data
+- Toggle map layers (satellite, parcels, etc.)
+
+**What's Coming Soon:**
+- Comparable property mapping
+- Drive time analysis
+- Custom data layers
+
+**Tips:**
+- Use draw tools to measure distances and areas
+- Demographic data shows population within 1/3/5 mile rings
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining demographic data
+- Calculating distances and areas
+- Describing location characteristics
+
+**Should Deflect:**
+- "Show me competitors on the map" → "Competitor mapping is coming soon for multifamily properties."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Draw tools create accurate measurements
+- Map layers toggle correctly
+- Demographics load for property location
+
+**Known Limitations:**
+- Demographics available for US locations only
+- Some rural areas may have limited data
+
+---
+
+### Land Development Workspace Pages
+
+#### 1. Project Home
+
+**Page Purpose:** Central dashboard showing development project KPIs, timeline status, and quick navigation.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- View project summary and key metrics
+- See phase/area breakdown
+- Navigate to any workspace section via folder tabs
+- Access Landscaper AI assistant panel
+
+**What's Coming Soon:**
+- Gantt chart timeline view
+- Critical path alerts
+- Milestone tracking
+
+**Tips:**
+- The activity feed shows recent budget and planning changes
+- Use Landscaper to ask about development costs and timelines
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining development metrics
+- Navigating project sections
+- Summarizing phase status
+
+**Should Deflect:**
+- "Show me the critical path" → "Critical path analysis is coming soon. You can view phase dependencies in the Budget > Schedule tab."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- KPIs calculate correctly
+- Navigation works to all folders
+
+**Known Limitations:**
+- Dashboard layout is fixed
+- No Gantt visualization yet
+
+---
+
+#### 2. Property Tab (Market, Land Use, Parcels)
+
+**Page Purpose:** Define the physical development - land use categories, lot/parcel inventory, and market positioning.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Market:** Configure market assumptions and pricing
+- **Land Use:** Define product types (lot widths, home types)
+- **Parcels:** View and manage parcel inventory (coming soon)
+
+**What's Coming Soon:**
+- Parcel mapping with GIS overlay
+- Land use optimization tools
+- Zoning compliance checker
+
+**Tips:**
+- Define land use categories before entering parcel data
+- Lot widths drive pricing calculations throughout the model
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining land use categories
+- Calculating lot yields
+- Analyzing product mix
+
+**Should Deflect:**
+- "Import my parcel data from GIS" → "GIS import is coming soon. Please enter parcel data manually."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Land use categories save correctly
+- Market assumptions flow to calculations
+
+**Known Limitations:**
+- Parcels tab is placeholder
+- No GIS integration yet
+
+---
+
+#### 3. Budget Tab (Budget, Schedule, Sales, Draws)
+
+**Page Purpose:** Comprehensive development budget with cost categories, scheduling, sales absorption, and draw management.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Budget:** Enter development costs by category (site work, vertical, soft costs)
+- **Schedule:** View timeline (coming soon)
+- **Sales:** Configure absorption schedule and lot pricing
+- **Draws:** Track construction draws (coming soon)
+
+**What's Coming Soon:**
+- Interactive Gantt scheduler
+- Draw request workflow
+- Cost tracking actuals vs budget
+
+**Tips:**
+- Use the complexity mode (Napkin/Standard/Detail) to show/hide fields
+- Budget items can have dependencies - set timing based on other items
+- Sales tab ties to your land use product mix
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining budget categories
+- Calculating cost per lot/SF
+- Analyzing contingency levels
+
+**Should Deflect:**
+- "Import from my spreadsheet" → "Excel import is coming soon. Use the budget grid for data entry."
+- "Show me the Gantt chart" → "Gantt visualization is in development. The Schedule tab will show timeline once available."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Budget calculations are correct
+- Category hierarchy works
+- Sales absorption calculates correctly
+
+**Known Limitations:**
+- Schedule tab is placeholder
+- Draws tab is placeholder
+- No Excel import
+
+---
+
+#### 4. Feasibility Tab (Feasibility, Cash Flow, Returns, Sensitivity)
+
+**Page Purpose:** Development feasibility analysis including residual land value, cash flow projections, and return metrics.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Feasibility:** Calculate residual land value
+- **Cash Flow:** View monthly cash flow projections
+- **Returns:** See IRR, equity multiple, profit margin
+- **Sensitivity:** Run what-if scenarios (coming soon)
+
+**What's Coming Soon:**
+- Monte Carlo simulation
+- Tornado charts
+- Scenario comparison
+
+**Tips:**
+- Cash flow pulls from Budget and Sales tabs
+- Returns update automatically when you change assumptions
+- Use filters to view cash flow by village/phase
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining return metrics (IRR, EM)
+- Analyzing cash flow timing
+- Calculating residual land value
+
+**Should Deflect:**
+- "Run a Monte Carlo" → "Monte Carlo simulation is coming soon. You can manually test scenarios by adjusting assumptions."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- IRR calculation matches Excel
+- Cash flow timing is correct
+- Returns tie to budget/sales data
+
+**Known Limitations:**
+- Sensitivity tab is placeholder
+- No Monte Carlo yet
+
+---
+
+#### 5. Capitalization Tab (Equity, Debt)
+
+**Page Purpose:** Development capital structure including equity partners, construction loans, and mezzanine financing.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Equity:** Configure partner splits and promote structures
+- **Debt:** Enter construction loan terms
+
+**What's Coming Soon:**
+- Multi-tranche debt modeling
+- Letter of credit tracking
+- Interest reserve calculations
+
+**Tips:**
+- Construction loan draws tie to budget schedule
+- Waterfall calculates based on project returns
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining development waterfalls
+- Calculating promote distributions
+- Analyzing debt capacity
+
+**Should Deflect:**
+- "Calculate my interest reserve" → "Automatic interest reserve calculation is coming soon. You can estimate manually based on draw schedule."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Loan calculations are correct
+- Waterfall distributes properly
+
+**Known Limitations:**
+- Single loan facility only
+- Interest reserve manual
+
+---
+
+#### 6. Reports Tab
+
+**Page Purpose:** Generate development pro forma reports and exports.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- **Summary:** View consolidated project metrics
+- **Export:** Generate reports (coming soon)
+
+**What's Coming Soon:**
+- Development pro forma PDF
+- Bank presentation package
+- Excel model export
+
+**Tips:**
+- Use browser print for interim report needs
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining report metrics
+- Summarizing project data
+
+**Should Deflect:**
+- "Export my pro forma" → "Pro forma export is coming soon. Use browser print (Ctrl/Cmd+P) for now."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Summary metrics are accurate
+
+**Known Limitations:**
+- Export not implemented
+
+---
+
+#### 7. Documents Tab
+
+**Page Purpose:** Upload and manage development documents (contracts, plans, permits).
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- Upload documents (PDF, images, Excel)
+- Tag and categorize documents
+- Browse by document type
+
+**What's Coming Soon:**
+- Contract extraction
+- Plan sheet indexing
+- Permit tracking
+
+**Tips:**
+- Use tags like "entitlement", "engineering", "legal" to organize
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Finding documents
+- Explaining categories
+
+**Should Deflect:**
+- "Extract data from my contract" → "Contract extraction is coming soon for development documents."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Upload works reliably
+- Tags persist
+
+**Known Limitations:**
+- No extraction for land dev documents yet
+
+---
+
+#### 8. Map Tab
+
+**Page Purpose:** GIS visualization for development site, parcels, and surrounding area.
+
+**Alpha Help Content:**
+
+**What You Can Do:**
+- View site boundaries on map
+- Draw measurement lines and polygons
+- View demographic data
+- Toggle satellite/parcel layers
+
+**What's Coming Soon:**
+- Parcel overlay with development areas
+- Competitor subdivision mapping
+- Zoning visualization
+
+**Tips:**
+- Use polygon tool to measure site areas
+- Demographics show population and household data
+
+**Landscaper Context:**
+
+**Can Help With:**
+- Explaining demographics
+- Calculating site areas
+- Describing location
+
+**Should Deflect:**
+- "Show my parcels on the map" → "Parcel mapping integration is coming soon. You can manually draw boundaries."
+
+**Alpha Tester Notes:**
+
+**Test Focus Areas:**
+- Measurement tools work
+- Demographics load
+
+**Known Limitations:**
+- No parcel overlay yet
+- US demographics only
+
+---
+
+### General Landscaper Guidelines
+
+**Landscaper Should Always:**
+1. Reference specific page locations when answering questions
+2. Acknowledge when features are not yet implemented
+3. Suggest workarounds for missing functionality
+4. Guide users to the correct tab for their task
+
+**Landscaper Should Never:**
+1. Promise features that don't exist
+2. Attempt to modify data through chat (use UI instead)
+3. Provide specific numbers without citing their source
+4. Ignore data quality issues in user's project
+
+**Common Deflection Patterns:**
+
+| User Request | Landscaper Response |
+|--------------|---------------------|
+| "Import my Excel" | "Excel import is coming soon. Please use the grid interface to enter data, or let me know if you need help with specific values." |
+| "Export to PDF" | "PDF export is in development. You can use browser print (Ctrl/Cmd+P) as a workaround for now." |
+| "Pull market data" | "Automated market data integration is planned. Currently, you can manually enter market assumptions." |
+| "Extract from my document" | "Document extraction is in beta. Upload your document to the Documents tab and I can help you review the extracted data." |
+| "Show me analytics" | "Which metrics are you interested in? I can explain any numbers you see in the current tabs." |
+
+---
+
+*Last Updated: 2026-01-30*
+*Next Review: Upon Alpha Testing completion*
 *Maintained by: Engineering Team*

@@ -518,4 +518,116 @@ if (response.ok) {
 
 ---
 
+## 🧪 ALPHA TESTING GUIDE
+
+**Version:** 1.0
+**Updated:** 2026-01-30
+**Purpose:** Documentation for Alpha testers and Landscaper AI context
+
+---
+
+### Alpha Help Content
+
+**Page Purpose:** Global Benchmarks Library provides market intelligence data for real estate analysis, including transaction costs, growth rates, absorption velocity, unit costs, and contingency standards.
+
+**What You Can Do:**
+
+- View and manage Transaction Costs (closing costs, title, legal, broker fees)
+- Create and edit Growth Rate schedules (flat or stepped rates)
+- Add Contingency Standards (percentage-based)
+- Manage Absorption Velocity data (lots per month by market)
+- Configure Unit Costs ($/SF, $/FF, $/CY by category)
+- Use built-in benchmarks or create custom user-defined benchmarks
+
+**What's Coming Soon:**
+
+- Market Timing benchmarks
+- Land Use Pricing standards
+- Commission Structures
+- Operating Cost benchmarks
+- Capital Stack standards
+- Debt Term standards
+- Bulk import for all categories
+- Benchmark templates and presets
+
+**Tips:**
+
+- Built-in benchmarks (no blue "u" indicator) are protected and cannot be deleted
+- User-defined benchmarks show a blue "u" indicator
+- Growth rates can be flat (single percentage) or stepped (varying by period)
+- Use the inline form to add new benchmarks without navigating away
+
+---
+
+### Landscaper Context
+
+**Can Help With:**
+
+- Explaining benchmark categories and their uses
+- Suggesting appropriate benchmark values for your market
+- Calculating effective rates from stepped schedules
+- Comparing your assumptions to industry standards
+
+**Should Deflect:**
+
+- "Apply these benchmarks to my project" → "Benchmark application to projects is coming soon. Currently, you can reference benchmark values when entering data in your project."
+- "Import benchmarks from Excel" → "Bulk import is planned for a future release. Please add benchmarks individually through the admin interface."
+- "Show me historical benchmark trends" → "Historical trending is on the roadmap. Current benchmarks show point-in-time values."
+
+---
+
+### Alpha Tester Notes
+
+**Test Focus Areas:**
+
+- Transaction cost CRUD operations (create, edit, delete)
+- Growth rate stepped schedule editing
+- Contingency percentage validation (0-100 range)
+- Absorption velocity data entry
+- User-defined vs built-in benchmark sorting
+- Delete confirmation dialogs
+
+**Known Limitations:**
+
+- No bulk import functionality yet
+- Contingency edit/display in list view pending
+- "% of what" (basis) field not yet functional for transaction costs
+- No project usage tracking (cannot prevent deleting referenced benchmarks)
+- User authentication hardcoded (user ID = 1)
+- No audit trail for benchmark changes
+
+---
+
+### Technical Details for Developers
+
+**UI Location:** `/admin/benchmarks`
+
+**Key Components:**
+
+- `src/components/admin/BenchmarkAccordion.tsx` - Generic accordion for registry benchmarks
+- `src/components/admin/GrowthRateCategoryPanel.tsx` - Growth rates with stepped schedules
+- `src/components/admin/AbsorptionVelocityPanel.tsx` - Absorption data with bulk import
+
+**API Endpoints:**
+
+- `POST/GET /api/benchmarks` - Create/List all benchmarks
+- `PATCH/DELETE /api/benchmarks/[id]` - Update/Delete benchmark
+- `POST/GET/PUT/DELETE /api/benchmarks/growth-rates` - Growth rate CRUD
+- `POST/GET/PATCH/DELETE /api/benchmarks/absorption-velocity` - Absorption CRUD
+
+**Database Tables:**
+
+- `tbl_global_benchmark_registry` - Parent registry
+- `tbl_benchmark_transaction_cost` - Transaction costs
+- `tbl_benchmark_unit_cost` - Unit costs
+- `tbl_benchmark_contingency` - Contingency percentages
+- `tbl_benchmark_growth_rate_set` / `_step` - Growth rates
+- `tbl_benchmark_absorption_velocity` - Absorption data
+
+---
+
+*Last Updated: 2026-01-30*
+
+---
+
 **End of Implementation Status Document**
