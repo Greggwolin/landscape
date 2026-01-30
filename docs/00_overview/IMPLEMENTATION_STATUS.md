@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-29
-**Version:** 3.1
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI)
+**Last Updated:** 2026-01-30
+**Version:** 3.2
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements)
 
 ---
 
@@ -9,7 +9,22 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Assumptions Panel Styling (January 29, 2026)**
+### 🆕 **Latest Update: Cash Flow UI, Growth Rates, and DCF Improvements (January 30, 2026)**
+
+**Multi-Feature Enhancement Release**
+
+Comprehensive improvements across Cash Flow Analysis, Growth Rate selectors, and DCF calculations:
+
+- ✅ **Cash Flow UI Overhaul** - Removed redundant title, moved export button, colorized filter buttons
+- ✅ **Villages/Phases Defaults** - Accordion open by default, all selections active on load
+- ✅ **Growth Rate Type Prefixes** - Income/Expense/Cap Rate labels for clarity
+- ✅ **Panel Width Adjustment** - Assumptions panel increased to 40% width
+- ✅ **DCF Parameters Enhancement** - New ResultsSection component, improved controls
+- ✅ **MapTab GIS Updates** - New LeafletGISView component, extended map controls
+- ✅ **Landscaper AI Tools** - Enhanced ai_handler.py and tool_executor.py (+542 lines)
+- 📁 **Location:** See `docs/09_session_notes/2026-01-30-cashflow-growth-dcf-improvements.md`
+
+### Previous Update: Assumptions Panel Styling (January 29, 2026)
 
 **CRE Income Approach Assumptions Panel Refinements**
 

@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Cash Flow, Growth Rates & DCF Improvements (Jan 30, 2026)',
+      path: '/docs/09_session_notes/2026-01-30-cashflow-growth-dcf-improvements.md',
+      category: 'Component',
+      description: 'Cash Flow UI overhaul (colorized filters, export repositioning), Growth Rate type prefixes, DCF ResultsSection component, MapTab GIS enhancements, Landscaper AI tool expansion',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-30'
+    },
+    {
+      title: 'Assumptions Panel Styling (Jan 29, 2026)',
+      path: '/docs/09_session_notes/2026-01-29-assumptions-panel-styling.md',
+      category: 'Component',
+      description: 'Shaded section headers, compact panel width (24%), units inside inputs, removed lock icons, all accordions open by default',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-01-29'
+    },
+    {
       title: 'Sales Comparison UI Refinements (Jan 29, 2026)',
       path: '/docs/09_session_notes/2026-01-29-sales-comparison-ui-refinements.md',
       category: 'Component',
@@ -290,9 +306,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Sales Comparison UI (Jan 29)',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Cash Flow UI, DCF enhancements (Jan 30)',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-01-29'
+      lastModified: '2026-01-30'
     },
     {
       title: 'CRE Implementation Summary',
