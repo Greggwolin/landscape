@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { CCard, CCardHeader, CCardBody } from '@coreui/react';
-import { ExportButton } from '@/components/admin';
+import CapitalizationLayout from '../../capitalization/layout';
+import EquityPage from '../../capitalization/equity/page';
+import DebtPage from '../../capitalization/debt/page';
 
 interface Project {
   project_id: number;
@@ -10,24 +11,34 @@ interface Project {
 }
 
 interface CapitalizationTabProps {
-  project: Project;
+  project?: Project;
+  activeSubTab?: 'equity' | 'debt';
+  setFolderTab?: (folder: string, tab?: string) => void;
 }
 
-export default function CapitalizationTab({ project }: CapitalizationTabProps) {
+export default function CapitalizationTab({
+  activeSubTab = 'equity',
+  setFolderTab,
+}: CapitalizationTabProps) {
+  const currentSubTab = ['equity', 'debt'].includes(activeSubTab)
+    ? activeSubTab
+    : 'equity';
+
+  const handleSubTabChange = (tabId: string) => {
+    setFolderTab?.('capital', tabId);
+  };
+
+  const renderContent =
+    currentSubTab === 'debt' ? <DebtPage /> : <EquityPage />;
+
   return (
-    <CCard>
-      <CCardHeader className="d-flex justify-content-between align-items-center">
-        <span>Capitalization</span>
-        <ExportButton tabName="Capitalization" projectId={project.project_id.toString()} />
-      </CCardHeader>
-      <CCardBody>
-        <div className="text-center py-8">
-          <h5>Capitalization Tab - Coming Soon</h5>
-          <p className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
-            This tab will display capital stack, waterfall structures, and investment returns for {project.project_name}.
-          </p>
-        </div>
-      </CCardBody>
-    </CCard>
+    <CapitalizationLayout
+      subNavOverrides={{
+        activeSubTab: currentSubTab,
+        ...(setFolderTab ? { onSubTabChange: handleSubTabChange } : {}),
+      }}
+    >
+      {renderContent}
+    </CapitalizationLayout>
   );
 }

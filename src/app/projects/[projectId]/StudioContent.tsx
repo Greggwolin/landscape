@@ -43,6 +43,7 @@ interface StudioContentProps {
   project: Project;
   currentFolder: string;
   currentTab: string;
+  setFolderTab: (folder: string, tab?: string) => void;
 }
 
 /**
@@ -100,6 +101,7 @@ function StudioContent({
   project,
   currentFolder,
   currentTab,
+  setFolderTab,
 }: StudioContentProps) {
   // Route based on folder and tab combination
   const renderContent = () => {
@@ -186,11 +188,29 @@ function StudioContent({
       case 'capital':
         switch (currentTab) {
           case 'equity':
-            return <CapitalizationTab project={project} />;
+            return (
+              <CapitalizationTab
+                project={project}
+                activeSubTab={currentTab}
+                setFolderTab={setFolderTab}
+              />
+            );
           case 'debt':
-            return <ComingSoon folder="capital" tab="debt" icon="🏦" />;
+            return (
+              <CapitalizationTab
+                project={project}
+                activeSubTab={currentTab}
+                setFolderTab={setFolderTab}
+              />
+            );
           default:
-            return <CapitalizationTab project={project} />;
+            return (
+              <CapitalizationTab
+                project={project}
+                activeSubTab={currentTab}
+                setFolderTab={setFolderTab}
+              />
+            );
         }
 
       // ========================================

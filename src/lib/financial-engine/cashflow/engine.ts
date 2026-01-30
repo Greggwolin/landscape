@@ -98,6 +98,7 @@ interface ProjectConfig {
   periodCount: number;
   costInflationRate?: number; // Project-level cost inflation rate (decimal, e.g., 0.03 for 3%)
   priceGrowthRate?: number;   // Price growth rate from DCF (decimal, e.g., 0.03 for 3%)
+  discountRate?: number;      // Discount rate from DCF (decimal, e.g., 0.18 for 18%)
 }
 
 /**
@@ -157,6 +158,7 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
   // PRIORITY 1: Try to get inflation rates from DCF assumptions (tbl_dcf_analysis)
   let costInflationRate: number | undefined;
   let priceGrowthRate: number | undefined;
+  let discountRate: number | undefined;
 
   const dcfAssumptions = await fetchDcfAssumptions(projectId);
 
@@ -168,6 +170,10 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
     }
     if (dcfAssumptions.priceGrowthSetId !== null && dcfAssumptions.priceGrowthSetId !== undefined) {
       priceGrowthRate = dcfAssumptions.priceGrowthRate;
+    }
+    // Always use discount rate from DCF assumptions if present
+    if (dcfAssumptions.discountRate !== undefined && dcfAssumptions.discountRate > 0) {
+      discountRate = dcfAssumptions.discountRate;
     }
   }
 
@@ -204,6 +210,7 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
     periodCount: 0, // Will be determined dynamically
     costInflationRate,
     priceGrowthRate,
+    discountRate,
   };
 }
 
@@ -282,13 +289,16 @@ export async function generateCashFlow(
   const {
     projectId,
     periodType = 'month',
-    discountRate,
+    discountRate: optionsDiscountRate,
     includeFinancing = false,
     containerIds,
   } = options;
 
   // Step 1: Load project configuration
   const projectConfig = await fetchProjectConfig(projectId);
+
+  // Use discount rate from options, or fallback to DCF assumptions
+  const discountRate = optionsDiscountRate ?? projectConfig.discountRate;
 
   // Step 2: Determine required periods and generate them dynamically
   const requiredPeriods = await determineRequiredPeriods(projectId, containerIds);
@@ -680,9 +690,20 @@ function calculateSummaryMetrics(
     totalCosts
   );
 
-  // Build net cash flow array
-  const netCashFlowByPeriod = buildNetCashFlowArray(sections, periods.length);
+  // Build net cash flow array using only cost items + net revenue (avoids double-counting gross/deductions)
+  const netCashFlowByPeriod = buildNetCashFlowArray(
+    sections,
+    periods.length,
+    (lineItem) =>
+      lineItem.category === 'cost' ||
+      (lineItem.category === 'revenue' && lineItem.subcategory === 'Net Revenue')
+  );
   const cashFlowArray = extractCashFlows(netCashFlowByPeriod);
+  const logFlag = (process.env.CASH_FLOW_DEBUG ?? '').toLowerCase();
+  const shouldLogCashFlows = logFlag === 'true' || logFlag === '1';
+  if (shouldLogCashFlows) {
+    logCashFlowComparisons(periods, netCashFlowByPeriod);
+  }
 
   // Calculate IRR
   let irr: number | undefined;
@@ -744,7 +765,8 @@ function calculateSummaryMetrics(
  */
 function buildNetCashFlowArray(
   sections: CashFlowSection[],
-  periodCount: number
+  periodCount: number,
+  lineFilter: (lineItem: CashFlowLineItem) => boolean = () => true
 ): PeriodValue[] {
   const periodMap = new Map<number, number>();
 
@@ -756,6 +778,9 @@ function buildNetCashFlowArray(
   // Sum all line items across all sections
   for (const section of sections) {
     for (const lineItem of section.lineItems) {
+      if (!lineFilter(lineItem)) {
+        continue;
+      }
       for (const periodValue of lineItem.periods) {
         const current = periodMap.get(periodValue.periodSequence) || 0;
         periodMap.set(periodValue.periodSequence, current + periodValue.amount);
@@ -790,6 +815,33 @@ function calculateCumulativeArray(periodValues: PeriodValue[]): number[] {
   }
 
   return cumulative;
+}
+
+function logCashFlowComparisons(
+  periods: CalculationPeriod[],
+  periodValues: PeriodValue[]
+) {
+  const monthlyData = periodValues.map((pv) => ({
+    periodSequence: pv.periodSequence,
+    label: periods[pv.periodIndex]?.label ?? `Period ${pv.periodSequence}`,
+    amount: pv.amount,
+  }));
+
+  const annualMap = new Map<number, number>();
+
+  periodValues.forEach((pv) => {
+    const period = periods[pv.periodIndex];
+    if (!period) return;
+    const year = period.startDate.getFullYear();
+    annualMap.set(year, (annualMap.get(year) || 0) + pv.amount);
+  });
+
+  const annualData = Array.from(annualMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([year, amount]) => ({ year, amount }));
+
+  console.log('[CashFlow][DEBUG] Monthly net cash flows:', monthlyData);
+  console.log('[CashFlow][DEBUG] Annual net cash flows:', annualData);
 }
 
 /**

@@ -34,9 +34,6 @@ export function GrowthRateSelect({
 }: GrowthRateSelectProps) {
   const { data: sets, isLoading, error } = useGrowthRateSets(cardType, projectId);
 
-  // Debug logging
-  console.log(`[GrowthRateSelect] ${label}: cardType=${cardType}, projectId=${projectId}, sets=`, sets, 'error=', error);
-
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     onChange(val ? parseInt(val, 10) : null);

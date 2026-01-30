@@ -1,5 +1,7 @@
 /* MapLibre GL CSS - must be first */
 @import 'maplibre-gl/dist/maplibre-gl.css';
+/* Leaflet base styles for the GIS page */
+@import 'leaflet/dist/leaflet.css';
 @import '../styles/tokens.css';
 @import '../styles/component-patterns.css';
 @import '../styles/folder-tabs.css';

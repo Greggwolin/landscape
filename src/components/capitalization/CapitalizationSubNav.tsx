@@ -6,6 +6,8 @@ import { CNav, CNavItem, CNavLink } from '@coreui/react';
 
 interface CapitalizationSubNavProps {
   projectId: number;
+  activeSubTab?: string;
+  onSubTabChange?: (tabId: string) => void;
 }
 
 interface SubTab {
@@ -25,7 +27,11 @@ interface SubTab {
  * - Equity: Equity structure, waterfall, distributions
  * - Developer Operations: Developer fees, overhead, operating costs
  */
-export default function CapitalizationSubNav({ projectId }: CapitalizationSubNavProps) {
+export default function CapitalizationSubNav({
+  projectId,
+  activeSubTab: activeSubTabOverride,
+  onSubTabChange,
+}: CapitalizationSubNavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -36,13 +42,19 @@ export default function CapitalizationSubNav({ projectId }: CapitalizationSubNav
   ], [projectId]);
 
   // Determine active sub-tab from pathname
-  const activeSubTab = useMemo(() => {
-    const match = subTabs.find(tab => pathname.startsWith(tab.path));
+  const derivedActiveSubTab = useMemo(() => {
+    const match = subTabs.find((tab) => pathname.startsWith(tab.path));
     return match?.id || 'debt';
   }, [pathname, subTabs]);
 
-  const handleSubTabChange = (path: string) => {
-    router.push(path);
+  const activeSubTab = activeSubTabOverride || derivedActiveSubTab;
+
+  const handleSubTabChange = (tab: SubTab) => {
+    if (onSubTabChange) {
+      onSubTabChange(tab.id);
+      return;
+    }
+    router.push(tab.path);
   };
 
   return (
@@ -59,7 +71,7 @@ export default function CapitalizationSubNav({ projectId }: CapitalizationSubNav
           <CNavItem key={tab.id}>
             <CNavLink
               active={activeSubTab === tab.id}
-              onClick={() => handleSubTabChange(tab.path)}
+              onClick={() => handleSubTabChange(tab)}
               style={{ cursor: 'pointer' }}
             >
               {tab.label}
@@ -70,3 +82,8 @@ export default function CapitalizationSubNav({ projectId }: CapitalizationSubNav
     </div>
   );
 }
+
+export type CapitalizationSubNavOverride = {
+  activeSubTab?: string;
+  onSubTabChange?: (tabId: string) => void;
+};

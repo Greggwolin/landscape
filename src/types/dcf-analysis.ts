@@ -15,6 +15,8 @@ export type PropertyType = 'cre' | 'land_dev';
 
 export type CapRateMethod = 'comp_sales' | 'band' | 'survey' | 'direct_entry';
 
+export type BulkSalePeriodType = 'year' | 'quarter' | 'month' | 'none';
+
 // ============================================================================
 // DCF ANALYSIS
 // ============================================================================
@@ -47,6 +49,7 @@ export interface DcfAnalysis {
   cost_inflation_set_id?: number | null;
   bulk_sale_enabled?: boolean;
   bulk_sale_period?: number | null;
+  bulk_sale_period_type?: BulkSalePeriodType | null;
   bulk_sale_discount_pct?: number | null;
 
   // Audit

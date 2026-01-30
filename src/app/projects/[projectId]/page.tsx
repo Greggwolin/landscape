@@ -29,7 +29,7 @@ function ProjectPageInner() {
     projects.find((p) => p.project_id === projectId) || activeProject;
 
   // Get folder navigation state
-  const { currentFolder, currentTab } = useFolderNavigation({
+  const { currentFolder, currentTab, setFolderTab } = useFolderNavigation({
     propertyType: currentProject?.project_type_code,
   });
 
@@ -59,6 +59,7 @@ function ProjectPageInner() {
       project={currentProject}
       currentFolder={currentFolder}
       currentTab={currentTab}
+      setFolderTab={setFolderTab}
     />
   );
 }

@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { DcfAnalysis, PropertyType } from '@/types/dcf-analysis';
+import type { DcfAnalysis, PropertyType, BulkSalePeriodType } from '@/types/dcf-analysis';
 
 // ============================================================================
 // CONSTANTS
@@ -49,7 +49,7 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 
 interface DcfParametersSectionProps {
   data?: DcfAnalysis;
-  onChange: (field: keyof DcfAnalysis, value: number | null) => void;
+  onChange: (field: keyof DcfAnalysis, value: number | string | boolean | null) => void;
   propertyType: PropertyType;
   defaultOpen?: boolean;
 }
@@ -63,6 +63,19 @@ export function DcfParametersSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const isCre = propertyType === 'cre';
+  const isLandDev = propertyType === 'land_dev';
+
+  // For Land Dev: derive period type from data, default to 'year'
+  const bulkSalePeriodType: BulkSalePeriodType = data?.bulk_sale_period_type ?? 'year';
+
+  const handlePeriodTypeChange = (newType: BulkSalePeriodType) => {
+    onChange('bulk_sale_period_type', newType);
+    onChange('bulk_sale_enabled', newType !== 'none');
+    // Reset period value when type changes
+    if (newType === 'none') {
+      onChange('bulk_sale_period', null);
+    }
+  };
 
   return (
     <div>
@@ -87,15 +100,27 @@ export function DcfParametersSection({
       {/* Content */}
       {isOpen && (
         <div className="pt-2 px-3 pb-2 space-y-2">
-          {/* Hold Period */}
-          <NumberInput
-            label="Hold Period"
-            value={data?.hold_period_years}
-            onChange={(v) => onChange('hold_period_years', v)}
-            min={1}
-            max={30}
-            suffix="yrs"
-          />
+          {/* CRE: Hold Period (years) */}
+          {isCre && (
+            <NumberInput
+              label="Hold Period"
+              value={data?.hold_period_years}
+              onChange={(v) => onChange('hold_period_years', v)}
+              min={1}
+              max={30}
+              suffix="yrs"
+            />
+          )}
+
+          {/* Land Dev: Bulk Sale at (with period type selector) */}
+          {isLandDev && (
+            <BulkSaleInput
+              periodType={bulkSalePeriodType}
+              periodValue={data?.bulk_sale_period}
+              onPeriodTypeChange={handlePeriodTypeChange}
+              onPeriodValueChange={(v) => onChange('bulk_sale_period', v)}
+            />
+          )}
 
           {/* Discount Rate */}
           <PercentInput
@@ -285,6 +310,109 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
           border: '1px solid var(--cui-border-color)',
         }}
       />
+    </div>
+  );
+}
+
+// ============================================================================
+// BULK SALE INPUT
+// ============================================================================
+
+interface BulkSaleInputProps {
+  periodType: BulkSalePeriodType;
+  periodValue: number | null | undefined;
+  onPeriodTypeChange: (type: BulkSalePeriodType) => void;
+  onPeriodValueChange: (value: number | null) => void;
+}
+
+function BulkSaleInput({
+  periodType,
+  periodValue,
+  onPeriodTypeChange,
+  onPeriodValueChange,
+}: BulkSaleInputProps) {
+  const safeValue = periodValue ?? 5;
+  const [localValue, setLocalValue] = useState(String(safeValue));
+  const [isFocused, setIsFocused] = useState(false);
+
+  const isDisabled = periodType === 'none';
+
+  // Get max value based on period type
+  const getMaxValue = () => {
+    switch (periodType) {
+      case 'year': return 30;
+      case 'quarter': return 120;
+      case 'month': return 360;
+      default: return 30;
+    }
+  };
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(safeValue));
+    }
+  }, [safeValue, isFocused]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    setLocalValue(rawValue);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const numValue = parseInt(localValue, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+      const clampedValue = Math.max(1, Math.min(getMaxValue(), numValue));
+      onPeriodValueChange(clampedValue);
+      setLocalValue(String(clampedValue));
+    } else {
+      setLocalValue(String(safeValue));
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between">
+      <label
+        className="text-xs whitespace-nowrap"
+        style={{ color: 'var(--cui-secondary-color)' }}
+        title="When to trigger bulk sale of remaining inventory"
+      >
+        Bulk Sale at
+      </label>
+      <div className="flex items-center gap-1">
+        <select
+          value={periodType}
+          onChange={(e) => onPeriodTypeChange(e.target.value as BulkSalePeriodType)}
+          className="px-1 py-0.5 text-xs rounded"
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            color: 'var(--cui-body-color)',
+            border: '1px solid var(--cui-border-color)',
+            width: '70px',
+          }}
+        >
+          <option value="year">Year</option>
+          <option value="quarter">Quarter</option>
+          <option value="month">Month</option>
+          <option value="none">None</option>
+        </select>
+        <input
+          type="text"
+          value={isDisabled ? '' : (isFocused ? localValue : localValue)}
+          onChange={handleChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={handleBlur}
+          disabled={isDisabled}
+          placeholder={isDisabled ? '-' : ''}
+          className="px-1.5 py-0.5 text-right text-xs rounded"
+          style={{
+            backgroundColor: isDisabled ? 'var(--cui-tertiary-bg)' : 'var(--cui-body-bg)',
+            color: isDisabled ? 'var(--cui-secondary-color)' : 'var(--cui-body-color)',
+            border: '1px solid var(--cui-border-color)',
+            width: '50px',
+          }}
+        />
+      </div>
     </div>
   );
 }

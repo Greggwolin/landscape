@@ -25,7 +25,9 @@ import { useDcfAnalysisWithAutoSave } from '@/hooks/useDcfAnalysis';
 import {
   DcfParametersSection,
   LandDevInflationSection,
+  ResultsSection,
 } from './assumptions';
+import type { CashFlowSummary } from './assumptions';
 
 // ============================================================================
 // TYPES
@@ -34,6 +36,9 @@ import {
 interface UnifiedAssumptionsPanelProps {
   projectId: number;
   propertyType: PropertyType;
+
+  // Cash flow summary for Results section
+  cashFlowSummary?: CashFlowSummary;
 
   // For CRE: Pass through to existing sections
   // (These are optional - only used when CRE delegates to existing panel)
@@ -51,6 +56,7 @@ interface UnifiedAssumptionsPanelProps {
 export function UnifiedAssumptionsPanel({
   projectId,
   propertyType,
+  cashFlowSummary,
 }: UnifiedAssumptionsPanelProps) {
   // DCF analysis data from tbl_dcf_analysis
   const {
@@ -107,6 +113,10 @@ export function UnifiedAssumptionsPanel({
               propertyType={propertyType}
               defaultOpen={true}
             />
+            <ResultsSection
+              summary={cashFlowSummary}
+              defaultOpen={true}
+            />
           </>
         ) : (
           // CRE: Only show DCF Parameters section here
@@ -129,8 +139,20 @@ export function UnifiedAssumptionsPanel({
  * Standalone panel for Land Dev projects.
  * Full implementation with all sections.
  */
-export function LandDevAssumptionsPanel({ projectId }: { projectId: number }) {
-  return <UnifiedAssumptionsPanel projectId={projectId} propertyType="land_dev" />;
+export function LandDevAssumptionsPanel({
+  projectId,
+  cashFlowSummary,
+}: {
+  projectId: number;
+  cashFlowSummary?: CashFlowSummary;
+}) {
+  return (
+    <UnifiedAssumptionsPanel
+      projectId={projectId}
+      propertyType="land_dev"
+      cashFlowSummary={cashFlowSummary}
+    />
+  );
 }
 
 /**

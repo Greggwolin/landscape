@@ -367,6 +367,78 @@ like setting city, state, and county together, or updating multiple assumptions.
         }
     },
     {
+        "name": "get_cashflow_results",
+        "description": """Read the authoritative cash flow / DCF assumptions and results exactly as they appear in the Valuation > Cashflow UI.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "Project ID to fetch cash flow/DCF results for."
+                }
+            },
+            "required": ["project_id"]
+        }
+    },
+    {
+        "name": "compute_cashflow_expression",
+        "description": """Evaluate a safe math expression against cached cash flow results. Support only +, -, *, /, %, min, max, abs, and parentheses with values coming from the get_cashflow_results payload.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Math expression that references cash flow values (e.g., 'npv / abs(peakEquity)')."
+                },
+                "context": {
+                    "type": "object",
+                    "description": "Payload returned by get_cashflow_results."
+                }
+            },
+            "required": ["expression", "context"]
+        }
+    },
+    {
+        "name": "update_cashflow_assumption",
+        "description": """Update a cashflow/DCF assumption with two-phase confirmation flow.
+
+IMPORTANT: This tool uses a preview-then-confirm pattern:
+1. First call WITHOUT confirm=true to preview the change (no write happens)
+2. Then call WITH confirm=true to apply the change after user confirmation
+
+Writable fields: discount_rate, selling_costs_pct, hold_period_years, exit_cap_rate,
+bulk_sale_period, bulk_sale_discount_pct, sensitivity_interval, going_in_cap_rate,
+vacancy_rate, stabilized_vacancy, credit_loss, management_fee_pct, reserves_per_unit.
+
+Writes to tbl_dcf_analysis (the source of truth for Cashflow UI).""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "Project ID"
+                },
+                "field": {
+                    "type": "string",
+                    "description": "Field to update (e.g., discount_rate, selling_costs_pct)"
+                },
+                "new_value": {
+                    "type": "number",
+                    "description": "New value to set (decimal for rates, e.g., 0.15 for 15%)"
+                },
+                "confirm": {
+                    "type": "boolean",
+                    "description": "Set to true to execute the write. Omit or set false to preview only."
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the change (required when confirm=true)"
+                }
+            },
+            "required": ["project_id", "field", "new_value"]
+        }
+    },
+    {
         "name": "get_project_fields",
         "description": """Retrieve current values of specific project fields to check before updating.
 Use this to verify current state before making changes.""",
@@ -4190,6 +4262,26 @@ FIELD UPDATES:
 - If unsure about a field name, use get_field_schema to find the correct field
 - Check is_editable before updating - don't attempt to update calculated fields (NOI, IRR)
 - For fields with valid_values, only use allowed values
+
+ASSUMPTION UPDATES (CRITICAL - FOLLOW THIS FLOW):
+When a user asks to change/update/set a cashflow or DCF assumption (discount_rate, selling_costs_pct, etc.):
+1. FIRST call update_cashflow_assumption WITHOUT confirm=true to get a preview
+2. Show the user what will change: "I can update [field] from [old] to [new]. Should I proceed?"
+3. ONLY if user confirms, call update_cashflow_assumption WITH confirm=true AND a reason
+4. Report the verified result from the response
+5. ALWAYS add: "Refresh the page to see the updated value in the UI."
+
+NEVER report a change as complete without calling the tool with confirm=true.
+NEVER assume a write succeeded - always check the response action='updated'.
+
+NOTE: The UI caches data for performance. After a successful write, remind the user
+to refresh their browser to see the change reflected in the input fields.
+
+Example flow:
+  User: "Change the discount rate to 15%"
+  You: [call tool with confirm=false] "I can update discount_rate from 0.18 to 0.15. Should I proceed?"
+  User: "Yes"
+  You: [call tool with confirm=true] "Done. Discount rate updated to 15%. NPV is now $47.7M. Refresh the page to see the updated value in the UI."
 
 SCHEMA AWARENESS:
 You have access to a complete field catalog via get_field_schema. Common field mappings:

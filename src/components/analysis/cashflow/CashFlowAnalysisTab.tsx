@@ -8,7 +8,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { CCard, CCardBody, CCardHeader, CSpinner, CAlert, CBadge } from '@coreui/react';
 import useSWR from 'swr';
 import TimeScaleSelector from './TimeScaleSelector';
@@ -42,10 +42,17 @@ function getAreaColor(index: number) {
   return AREA_COLORS[index % AREA_COLORS.length];
 }
 
+interface CashFlowSummaryData {
+  summary: CashFlowSchedule['summary'];
+  discountRate?: number;
+}
+
 interface Props {
   projectId: number;
   /** Optional export button to render in controls row */
   exportButton?: React.ReactNode;
+  /** Callback when cash flow summary is available */
+  onSummaryChange?: (data: CashFlowSummaryData | null) => void;
 }
 
 interface CashFlowResponse {
@@ -82,7 +89,7 @@ async function fetchCashFlow(url: string, options: FetchOptions = {}): Promise<C
   return res.json();
 }
 
-export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) {
+export default function CashFlowAnalysisTab({ projectId, exportButton, onSummaryChange }: Props) {
   // Controls state - defaults: Annual time, Summary grouping
   const [timeScale, setTimeScale] = useState<TimeScale>('annual');
   const [costGranularity, setCostGranularity] = useState<CostGranularity>('summary');
@@ -172,6 +179,20 @@ export default function CashFlowAnalysisTab({ projectId, exportButton }: Props) 
     if (!data?.data) return null;
     return transformCashFlow(data.data, timeScale, costGranularity);
   }, [data?.data, timeScale, costGranularity]);
+
+  // Report summary to parent when it changes
+  useEffect(() => {
+    if (onSummaryChange) {
+      if (data?.data?.summary) {
+        onSummaryChange({
+          summary: data.data.summary,
+          discountRate: data.data.discountRate,
+        });
+      } else {
+        onSummaryChange(null);
+      }
+    }
+  }, [data?.data?.summary, data?.data?.discountRate, onSummaryChange]);
 
   // Loading state
   if (isLoading) {

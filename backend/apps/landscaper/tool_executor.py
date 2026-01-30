@@ -10,11 +10,17 @@ Architecture:
 - execute_tool() dispatches to registered handlers
 """
 
+import ast
 import json
 import logging
+import math
+import operator
+import os
 from functools import wraps
 from typing import Dict, Any, List, Optional, Callable
 from decimal import Decimal, InvalidOperation
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 from django.db import connection
 from django.utils import timezone
 from .opex_mapping import OPEX_ACCOUNT_MAPPING
@@ -1844,6 +1850,450 @@ def _log_assumption_activity(
         )
     except Exception as e:
         logger.error(f"Failed to log assumption activity: {e}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cashflow Tool Suite Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+CASHFLOW_RESULT_KEYS = [
+    'irr',
+    'npv',
+    'equityMultiple',
+    'peakEquity',
+    'paybackPeriod',
+    'totalCashIn',
+    'totalCashOut',
+    'netCashFlow',
+    'cumulativeCashFlow',
+]
+
+ALLOWED_CASHFLOW_FUNCTIONS = {
+    'abs': abs,
+    'min': min,
+    'max': max,
+}
+
+ASSUMPTION_FIELD_TYPES = {
+    'discount_rate': 'decimal',
+    'selling_costs_pct': 'decimal',
+    'hold_period_years': 'integer',
+    'exit_cap_rate': 'decimal',
+    'bulk_sale_period': 'integer',
+    'bulk_sale_discount_pct': 'decimal',
+    'sensitivity_interval': 'decimal',
+    'going_in_cap_rate': 'decimal',
+    'vacancy_rate': 'decimal',
+    'stabilized_vacancy': 'decimal',
+    'credit_loss': 'decimal',
+    'management_fee_pct': 'decimal',
+    'reserves_per_unit': 'decimal',
+}
+
+
+def _get_cashflow_api_base_url() -> str:
+    return os.environ.get('LANDSCAPER_CASHFLOW_API_BASE_URL', 'http://localhost:3000').rstrip('/')
+
+
+def _fetch_cashflow_schedule(project_id: int) -> Dict[str, Any]:
+    url = f"{_get_cashflow_api_base_url()}/api/projects/{project_id}/cash-flow/generate"
+    payload = {
+        "periodType": "month",
+        "includeFinancing": False,
+    }
+
+    request_payload = urllib_request.Request(
+        url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/json'},
+        method='POST'
+    )
+
+    try:
+        with urllib_request.urlopen(request_payload, timeout=30) as response:
+            body = response.read().decode('utf-8')
+            result = json.loads(body)
+    except HTTPError as err:
+        raise RuntimeError(f"Cashflow API returned HTTP {err.code}: {err.reason}")
+    except URLError as err:
+        raise RuntimeError(f"Cashflow API unreachable: {err.reason}")
+
+    if not result.get('success'):
+        raise RuntimeError(result.get('error') or 'Cashflow API returned an error')
+
+    data = result.get('data')
+    if not data:
+        raise RuntimeError('Cashflow API did not return schedule data')
+
+    return data
+
+
+def _filter_numeric_assumptions(values: Dict[str, Any]) -> Dict[str, Any]:
+    filtered: Dict[str, Any] = {}
+    for key, value in values.items():
+        if key in {'project_id', 'property_type'} or value is None:
+            continue
+        if isinstance(value, bool):
+            filtered[key] = int(value)
+        elif isinstance(value, (int, float)):
+            filtered[key] = value
+        elif isinstance(value, Decimal):
+            filtered[key] = float(value)
+    return filtered
+
+
+def _build_cashflow_assumptions(project_id: int) -> Dict[str, Any]:
+    from apps.financial.services.dcf_assumptions_service import DcfAssumptionsService
+
+    service = DcfAssumptionsService(project_id)
+    return _filter_numeric_assumptions(service.get_all_assumptions())
+
+
+def _build_cashflow_results_payload(project_id: int) -> Dict[str, Any]:
+    schedule = _fetch_cashflow_schedule(project_id)
+    summary = schedule.get('summary') or {}
+
+    results: Dict[str, Any] = {}
+    for key in CASHFLOW_RESULT_KEYS:
+        if key in summary:
+            results[key] = summary[key]
+
+    payload = {
+        'assumptions': _build_cashflow_assumptions(project_id),
+        'results': results,
+        'summary': summary,
+        'calculated_at': schedule.get('generatedAt') or schedule.get('calculatedAt'),
+        'scenario_id': schedule.get('scenarioId') or schedule.get('scenario_id'),
+    }
+    return payload
+
+
+def _flatten_expression_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    context = {
+        'assumptions': payload.get('assumptions', {}),
+        'results': payload.get('results', {}),
+        'summary': payload.get('summary', {}),
+    }
+
+    for key, value in context['results'].items():
+        context[key] = value
+
+    for key, value in context['summary'].items():
+        context[f"summary_{key}"] = value
+
+    for key, value in context['assumptions'].items():
+        context[f"assumptions_{key}"] = value
+
+    context.update(ALLOWED_CASHFLOW_FUNCTIONS)
+    return context
+
+
+def _evaluate_expression(expression: str, variables: Dict[str, Any]) -> Any:
+    tree = ast.parse(expression, mode='eval')
+
+    class _ExpressionEvaluator(ast.NodeVisitor):
+        def __init__(self, vars_map: Dict[str, Any]):
+            self._vars = vars_map
+
+        def visit(self, node: ast.AST) -> Any:
+            method = f'visit_{node.__class__.__name__}'
+            visitor = getattr(self, method, None)
+            if visitor is None:
+                raise ValueError(f"Unsupported expression element: {node.__class__.__name__}")
+            return visitor(node)
+
+        def visit_BinOp(self, node: ast.BinOp) -> Any:
+            left = self.visit(node.left)
+            right = self.visit(node.right)
+            op_func = {
+                ast.Add: operator.add,
+                ast.Sub: operator.sub,
+                ast.Mult: operator.mul,
+                ast.Div: operator.truediv,
+                ast.Mod: operator.mod,
+            }.get(type(node.op))
+            if op_func is None:
+                raise ValueError(f"Operator {node.op.__class__.__name__} not allowed")
+            return op_func(left, right)
+
+        def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
+            operand = self.visit(node.operand)
+            if isinstance(node.op, ast.USub):
+                return -operand
+            if isinstance(node.op, ast.UAdd):
+                return operand
+            raise ValueError(f"Unary operator {node.op.__class__.__name__} not allowed")
+
+        def visit_Call(self, node: ast.Call) -> Any:
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("Only simple function calls are allowed")
+            func = ALLOWED_CASHFLOW_FUNCTIONS.get(node.func.id)
+            if func is None:
+                raise ValueError(f"Function {node.func.id} is not supported")
+            args = [self.visit(arg) for arg in node.args]
+            return func(*args)
+
+        def visit_Name(self, node: ast.Name) -> Any:
+            if node.id not in self._vars:
+                raise ValueError(f"Unknown identifier: {node.id}")
+            return self._vars[node.id]
+
+        def visit_Attribute(self, node: ast.Attribute) -> Any:
+            value = self.visit(node.value)
+            attr = node.attr
+            if isinstance(value, dict):
+                if attr in value:
+                    return value[attr]
+                raise ValueError(f"Attribute {attr} not found in context")
+            return getattr(value, attr)
+
+        def visit_Subscript(self, node: ast.Subscript) -> Any:
+            target = self.visit(node.value)
+            slice_node = node.slice
+            index = self.visit(slice_node.value) if getattr(slice_node, 'value', None) is not None else self.visit(slice_node)
+            return target[index]
+
+        def visit_Constant(self, node: ast.Constant) -> Any:
+            if isinstance(node.value, (int, float)):
+                return node.value
+            raise ValueError("Only numeric constants are allowed")
+
+        def visit_Num(self, node: ast.Num) -> Any:
+            return node.n
+
+        def generic_visit(self, node: ast.AST) -> Any:
+            raise ValueError(f"Unsupported expression element: {node.__class__.__name__}")
+
+    evaluator = _ExpressionEvaluator(variables)
+    return evaluator.visit(tree.body)
+
+
+def _values_match(existing: Optional[Any], provided: Any, value_type: str) -> bool:
+    if provided is None:
+        return existing is None
+
+    if value_type == 'integer':
+        current = int(existing) if existing is not None else 0
+        return current == int(provided)
+
+    try:
+        current = float(existing) if existing is not None else 0.0
+        candidate = float(provided)
+    except (TypeError, ValueError):
+        return False
+
+    return math.isclose(current, candidate, rel_tol=1e-9, abs_tol=1e-9)
+
+
+def _coerce_assumption_value(value: Any, value_type: str) -> Any:
+    if value_type == 'integer':
+        return int(value)
+    return Decimal(str(value))
+
+
+def _log_cashflow_assumption_update(
+    project_id: int,
+    field: str,
+    old_value: Any,
+    new_value: Any,
+    reason: str
+) -> None:
+    _log_field_update_activity(project_id, 'tbl_dcf_analysis', field, old_value, new_value, reason)
+
+
+def _build_cashflow_proposal(field: str, current_value: Any, proposed_value: Any, reason: str) -> Dict[str, Any]:
+    summary_value = float(current_value) if current_value is not None else 0.0
+    return {
+        'success': True,
+        'proposal': {
+            'tool': 'update_cashflow_assumption',
+            'field': field,
+            'current_value': summary_value,
+            'proposed_value': proposed_value,
+            'reason': reason,
+        }
+    }
+
+
+def _assemble_cashflow_results_payload(project_id: int) -> Dict[str, Any]:
+    return _build_cashflow_results_payload(project_id)
+
+
+@register_tool('get_cashflow_results')
+def handle_get_cashflow_results(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Read-only tool returning canonical cash flow/DCF results."""
+    target_project = tool_input.get('project_id') or project_id
+    try:
+        payload = _assemble_cashflow_results_payload(target_project)
+        return {'success': True, 'data': payload}
+    except Exception as err:
+        logger.error(f"Failed to fetch cashflow results for project {target_project}: {err}")
+        return {'success': False, 'error': str(err)}
+
+
+@register_tool('compute_cashflow_expression')
+def handle_compute_cashflow_expression(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Pure compute tool for safe math on cashflow values."""
+    expression = tool_input.get('expression')
+    context = tool_input.get('context')
+
+    if not expression:
+        return {'success': False, 'error': 'Expression is required'}
+    if not isinstance(context, dict):
+        return {'success': False, 'error': 'Context must be the result of get_cashflow_results'}
+
+    try:
+        variables = _flatten_expression_context(context)
+        value = _evaluate_expression(expression, variables)
+        return {'success': True, 'value': value}
+    except Exception as err:
+        logger.error(f"Expression evaluation failed for project {project_id}: {err}")
+        return {'success': False, 'error': str(err)}
+
+
+@register_tool('update_cashflow_assumption', is_mutation=True)
+def handle_update_cashflow_assumption(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Update a single DCF/cashflow assumption with two-phase confirmation flow.
+
+    Phase 1 (confirm=false or omitted): Returns a preview of the change without writing.
+    Phase 2 (confirm=true): Executes the write, verifies it, and returns updated results.
+
+    Writes to tbl_dcf_analysis which is the source of truth for the Cashflow UI.
+    """
+    field = tool_input.get('field')
+    reason = (tool_input.get('reason') or '').strip()
+    new_value = tool_input.get('new_value')
+    confirm = tool_input.get('confirm', False)
+
+    # Validate field is writable
+    if not field or field not in ASSUMPTION_FIELD_TYPES:
+        writable_fields = list(ASSUMPTION_FIELD_TYPES.keys())
+        return {
+            'success': False,
+            'error': f"Field '{field}' is not writable. Writable fields: {writable_fields}"
+        }
+
+    if new_value is None:
+        return {'success': False, 'error': 'new_value is required'}
+
+    try:
+        from apps.projects.models import Project
+        from apps.financial.models_valuation import DcfAnalysis
+    except ImportError as exc:
+        logger.error(f"Failed to import financial models: {exc}")
+        return {'success': False, 'error': 'Configuration error loading financial models'}
+
+    # Get project and DCF analysis record
+    try:
+        project = Project.objects.get(pk=project_id)
+        dcf_analysis, _ = DcfAnalysis.get_or_create_for_project(project)
+    except Project.DoesNotExist:
+        return {'success': False, 'error': f"Project {project_id} not found"}
+    except Exception as err:
+        logger.error(f"Failed to load DCF analysis for project {project_id}: {err}")
+        return {'success': False, 'error': str(err)}
+
+    value_type = ASSUMPTION_FIELD_TYPES[field]
+    current_value = getattr(dcf_analysis, field)
+    current_value_float = float(current_value) if current_value is not None else 0.0
+
+    # Phase 1: Preview only (no write)
+    if not confirm:
+        return {
+            'success': True,
+            'action': 'preview',
+            'message': f"Ready to update {field} from {current_value_float} to {new_value}. Call again with confirm=true to apply.",
+            'preview': {
+                'field': field,
+                'current_value': current_value_float,
+                'new_value': new_value,
+                'requires_confirmation': True
+            }
+        }
+
+    # Phase 2: Confirmed write
+    if not reason:
+        return {'success': False, 'error': 'Reason is required when confirm=true'}
+
+    try:
+        coerced = _coerce_assumption_value(new_value, value_type)
+    except (TypeError, ValueError, InvalidOperation) as err:
+        logger.error(f"Invalid value for {field}: {err}")
+        return {'success': False, 'error': f"Invalid value for {field}: {err}"}
+
+    # Execute the write
+    setattr(dcf_analysis, field, coerced)
+    try:
+        dcf_analysis.save(update_fields=[field, 'updated_at'])
+    except Exception as err:
+        logger.error(f"Failed to save {field} for project {project_id}: {err}")
+        return {'success': False, 'error': f"Database write failed: {err}"}
+
+    # VERIFY the write by re-reading
+    try:
+        dcf_analysis.refresh_from_db(fields=[field])
+        verified_value = getattr(dcf_analysis, field)
+        verified_value_float = float(verified_value) if verified_value is not None else 0.0
+
+        if not _values_match(verified_value, new_value, value_type):
+            logger.error(f"Write verification failed for {field}: expected {new_value}, got {verified_value}")
+            return {
+                'success': False,
+                'error': f"Write verification failed. Expected {new_value}, got {verified_value_float}."
+            }
+    except Exception as err:
+        logger.error(f"Failed to verify write for {field}: {err}")
+        return {'success': False, 'error': f"Write verification failed: {err}"}
+
+    # Log the change
+    _log_cashflow_assumption_update(project_id, field, current_value, new_value, reason)
+
+    # Get fresh cashflow results
+    try:
+        updated_payload = _assemble_cashflow_results_payload(project_id)
+    except Exception as err:
+        logger.error(f"Failed to recalc cashflow after updating {field}: {err}")
+        # Write succeeded but recalc failed - still report success with warning
+        return {
+            'success': True,
+            'action': 'updated',
+            'warning': f"Assumption updated but cashflow recalc failed: {err}",
+            'change': {
+                'field': field,
+                'old_value': current_value_float,
+                'new_value': verified_value_float,
+                'reason': reason
+            },
+            'recalculated_results': None,
+            'ui_hint': 'Refresh the page to see the updated value in the UI input fields.'
+        }
+
+    return {
+        'success': True,
+        'action': 'updated',
+        'change': {
+            'field': field,
+            'old_value': current_value_float,
+            'new_value': verified_value_float,
+            'reason': reason
+        },
+        'recalculated_results': updated_payload,
+        'ui_hint': 'Refresh the page to see the updated value in the UI input fields.'
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

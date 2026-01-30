@@ -110,6 +110,8 @@ export interface Project {
   project_type_code?: string;
   location_lat?: number | string | null;
   location_lon?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   [key: string]: unknown;
 }
 

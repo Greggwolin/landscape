@@ -1,30 +1,24 @@
 'use client'
 
-import React from 'react'
-import GISMap from '../components/MapLibre/GISMap'
+import { LeafletGISView } from '@/components/map-tab/LeafletGISView'
 
 export default function MapDebugPage() {
-  const handleParcelSelect = (features: Record<string, unknown>[]) => {
-    console.log('Selected parcels:', features)
-    alert(`Selected ${features.length} parcels. Check console for details.`)
-  }
-
   return (
-    <div className="h-screen bg-gray-900">
-      <div className="absolute top-4 left-4 z-10 bg-gray-800 text-white p-4 rounded-lg shadow-lg">
-        <h1 className="text-lg font-bold mb-2">🗺️ Pinal County Parcel Test</h1>
-        <p className="text-sm text-gray-300 mb-1">• Zoom to level 10+ to load parcels</p>
-        <p className="text-sm text-gray-300 mb-1">• Red lines = tax parcels</p>
-        <p className="text-sm text-gray-300 mb-1">• Click parcels to select (turn green)</p>
-        <p className="text-sm text-yellow-300">• Check browser title for debug info</p>
-      </div>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 py-10 px-4">
+        <header className="space-y-2">
+          <p className="text-sm uppercase tracking-[0.3em] text-gray-400">GIS / Map page</p>
+          <h1 className="text-3xl font-semibold">Leaflet GIS overview (schema-backed)</h1>
+          <p className="text-gray-300">
+            Geometry comes directly from PostGIS artifacts defined in{' '}
+            <code>docs/schema/landscape_rich_schema_2026-01-29.json</code> (e.g.,{' '}
+            <code>vw_map_plan_parcels.geom</code>, <code>gis_project_boundary.geom</code>, and{' '}
+            <code>gis_tax_parcel_ref.geom</code>) and is rendered without any reprojection.
+          </p>
+        </header>
 
-      <GISMap
-        projectId={7}
-        mode="parcel-select"
-        onParcelSelect={handleParcelSelect}
-        className="w-full h-full"
-      />
+        <LeafletGISView projectId={7} />
+      </div>
     </div>
   )
 }

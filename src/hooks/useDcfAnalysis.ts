@@ -53,6 +53,8 @@ export function useUpdateDcfAnalysis(projectId: number) {
 
   return useMutation({
     mutationFn: async (data: DcfAnalysisUpdatePayload): Promise<DcfAnalysis> => {
+      console.log('[useDcfAnalysis] Updating DCF analysis:', { projectId, data });
+
       const response = await fetch(
         `${DJANGO_API_URL}/api/valuation/dcf-analysis/${projectId}/`,
         {
@@ -63,12 +65,20 @@ export function useUpdateDcfAnalysis(projectId: number) {
           body: JSON.stringify(data),
         }
       );
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[useDcfAnalysis] Update failed:', response.status, errorText);
         throw new Error(`Failed to update DCF analysis: ${response.statusText}`);
       }
-      return response.json();
+
+      const result = await response.json();
+      console.log('[useDcfAnalysis] Update successful:', result);
+      return result;
     },
     onSuccess: (data) => {
+      console.log('[useDcfAnalysis] Mutation success, invalidating caches');
+
       // Update cache with new data
       queryClient.setQueryData(['dcf-analysis', projectId], data);
 
@@ -81,6 +91,9 @@ export function useUpdateDcfAnalysis(projectId: number) {
       // This ensures price growth and cost inflation changes are reflected
       swrMutate(`/api/projects/${projectId}/cash-flow/generate`);
       swrMutate(`/api/projects/${projectId}/cash-flow/summary`);
+    },
+    onError: (error) => {
+      console.error('[useDcfAnalysis] Mutation error:', error);
     },
   });
 }
@@ -148,6 +161,7 @@ export function useDcfAnalysisWithAutoSave(projectId: number) {
   const updateMutation = useUpdateDcfAnalysis(projectId);
 
   const updateField = (field: keyof DcfAnalysis, value: number | string | boolean | null) => {
+    console.log('[useDcfAnalysisWithAutoSave] updateField called:', { field, value });
     updateMutation.mutate({ [field]: value } as DcfAnalysisUpdatePayload);
   };
 
@@ -155,7 +169,7 @@ export function useDcfAnalysisWithAutoSave(projectId: number) {
     data,
     isLoading,
     isSaving: updateMutation.isPending,
-    error: error?.message || null,
+    error: error?.message || updateMutation.error?.message || null,
     updateField,
     reload: refetch,
   };

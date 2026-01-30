@@ -15,10 +15,11 @@
 
 'use client';
 
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { ExportButton } from '@/components/admin';
 import { CashFlowAnalysisTab } from '@/components/analysis/cashflow';
 import { UnifiedAssumptionsPanel } from '@/components/valuation/UnifiedAssumptionsPanel';
+import type { CashFlowSummary } from '@/components/valuation/assumptions';
 
 interface FeasibilityTabProps {
   project: {
@@ -34,6 +35,23 @@ interface FeasibilityTabProps {
 function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps) {
   const projectId = project.project_id;
   const isLandDevelopment = project.project_type_code === 'LAND';
+
+  // Cash flow summary state for Results section in Assumptions panel
+  const [cashFlowSummary, setCashFlowSummary] = useState<CashFlowSummary | null>(null);
+
+  const handleSummaryChange = useCallback((data: { summary: any; discountRate?: number } | null) => {
+    if (data?.summary) {
+      setCashFlowSummary({
+        grossProfit: data.summary.grossProfit,
+        irr: data.summary.irr,
+        peakEquity: data.summary.peakEquity,
+        npv: data.summary.npv,
+        discountRate: data.discountRate,
+      });
+    } else {
+      setCashFlowSummary(null);
+    }
+  }, []);
 
   // Show message for non-land development projects
   if (!isLandDevelopment) {
@@ -112,6 +130,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <UnifiedAssumptionsPanel
                 projectId={projectId}
                 propertyType="land_dev"
+                cashFlowSummary={cashFlowSummary ?? undefined}
               />
             </div>
             {/* Right: Cash Flow Analysis - title removed, export button moved inside */}
@@ -119,6 +138,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <CashFlowAnalysisTab
                 projectId={projectId}
                 exportButton={<ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />}
+                onSummaryChange={handleSummaryChange}
               />
             </div>
           </div>
@@ -207,6 +227,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <UnifiedAssumptionsPanel
                 projectId={projectId}
                 propertyType="land_dev"
+                cashFlowSummary={cashFlowSummary ?? undefined}
               />
             </div>
             {/* Right: Cash Flow Analysis - title removed, export button moved inside */}
@@ -214,6 +235,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <CashFlowAnalysisTab
                 projectId={projectId}
                 exportButton={<ExportButton tabName="Feasibility-CashFlow" projectId={projectId.toString()} />}
+                onSummaryChange={handleSummaryChange}
               />
             </div>
           </div>

@@ -3,13 +3,19 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import { CCard, CCardHeader, CCardBody } from '@coreui/react';
-import CapitalizationSubNav from '@/components/capitalization/CapitalizationSubNav';
+import CapitalizationSubNav, {
+  type CapitalizationSubNavOverride,
+} from '@/components/capitalization/CapitalizationSubNav';
 
 interface CapitalizationLayoutProps {
   children: React.ReactNode;
+  subNavOverrides?: CapitalizationSubNavOverride;
 }
 
-export default function CapitalizationLayout({ children }: CapitalizationLayoutProps) {
+export default function CapitalizationLayout({
+  children,
+  subNavOverrides,
+}: CapitalizationLayoutProps) {
   const params = useParams();
   const projectId = parseInt(params.projectId as string);
 
@@ -19,7 +25,11 @@ export default function CapitalizationLayout({ children }: CapitalizationLayoutP
         <CCardHeader>
           <span>Capital Structure</span>
         </CCardHeader>
-        <CapitalizationSubNav projectId={projectId} />
+        <CapitalizationSubNav
+          projectId={projectId}
+          activeSubTab={subNavOverrides?.activeSubTab}
+          onSubTabChange={subNavOverrides?.onSubTabChange}
+        />
         <CCardBody>
           {children}
         </CCardBody>
