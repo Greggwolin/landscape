@@ -1,0 +1,161 @@
+/* Alpha Assistant Flyout Panel */
+
+.alpha-flyout {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  background: var(--cui-body-bg);
+  border-left: 1px solid var(--cui-border-color);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+  z-index: 1040;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 300ms ease-in-out;
+}
+
+.alpha-flyout.open {
+  transform: translateX(0);
+}
+
+/* Header */
+.alpha-flyout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  flex-shrink: 0;
+}
+
+/* Section Tabs */
+.alpha-flyout-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  flex-shrink: 0;
+}
+
+.alpha-tab {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--cui-body-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  border-bottom: 2px solid transparent;
+}
+
+.alpha-tab:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.alpha-tab.active {
+  color: var(--cui-primary);
+  border-bottom-color: var(--cui-primary);
+}
+
+/* Content Area */
+.alpha-flyout-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  min-height: 0;
+}
+
+/* Feedback Form in flyout */
+.alpha-flyout .alpha-feedback-form {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.alpha-flyout .alpha-feedback-form textarea {
+  flex: 1;
+  min-height: 150px;
+  resize: none;
+}
+
+/* Help content styling for flyout */
+.alpha-flyout .help-content {
+  font-size: 0.9rem;
+}
+
+.alpha-flyout .help-content h5 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.alpha-flyout .help-content h6 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.alpha-flyout .help-content ul {
+  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.alpha-flyout .help-content li {
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+
+/* Chat styling adjustments for flyout */
+.alpha-flyout .alpha-chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.alpha-flyout .alpha-chat .chat-messages {
+  flex: 1;
+  max-height: none;
+  min-height: 200px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+  padding: 0.5rem;
+  background: var(--cui-tertiary-bg);
+}
+
+.alpha-flyout .alpha-chat .chat-message {
+  font-size: 0.875rem;
+}
+
+/* Dark mode adjustments */
+[data-coreui-theme="dark"] .alpha-flyout {
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive - full width on mobile */
+@media (max-width: 768px) {
+  .alpha-flyout {
+    width: 100%;
+  }
+}
+
+/* Page content compression when flyout is open */
+.project-content-compressed {
+  margin-right: 380px;
+  transition: margin-right 300ms ease-in-out;
+}
+
+.project-content-normal {
+  margin-right: 0;
+  transition: margin-right 300ms ease-in-out;
+}
+
+@media (max-width: 768px) {
+  .project-content-compressed {
+    margin-right: 0;
+  }
+}

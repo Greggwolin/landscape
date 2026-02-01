@@ -42,6 +42,9 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     activeMethod,
     setActiveMethod,
     fetchDCF,
+    // Monthly DCF (for CashFlowGrid with time scale toggle)
+    monthlyDcfData,
+    isMonthlyDCFLoading,
   } = useIncomeApproach(projectId);
 
   // Get selected tile's calculation
@@ -178,8 +181,9 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
             <DCFView
               data={dcfData!}
               propertySummary={data.property_summary}
-              isLoading={isDCFLoading}
+              isLoading={isDCFLoading || isMonthlyDCFLoading}
               onMethodChange={setActiveMethod}
+              monthlyData={monthlyDcfData}
             />
           )}
         </div>

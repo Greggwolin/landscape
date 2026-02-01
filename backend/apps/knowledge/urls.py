@@ -3,7 +3,7 @@ Knowledge API URLs
 """
 
 from django.urls import path
-from .views import session_views, extraction_views, status_views, chat_views, platform_knowledge_views, benchmark_views
+from .views import session_views, extraction_views, status_views, chat_views, platform_knowledge_views, benchmark_views, alpha_views
 
 urlpatterns = [
     # Session management
@@ -63,8 +63,10 @@ urlpatterns = [
     path('platform/analyze/', platform_knowledge_views.analyze_platform_document, name='platform_knowledge_analyze'),
     path('platform/ingest/', platform_knowledge_views.ingest_platform_document, name='platform_knowledge_ingest'),
     path('platform/query/', platform_knowledge_views.query_platform_knowledge, name='platform_knowledge_query'),
+    path('platform/alpha-help/', alpha_views.AlphaHelpView.as_view(), name='alpha_help'),
     path('platform/<str:document_key>/chat/', platform_knowledge_views.chat_with_document, name='platform_knowledge_chat'),
     path('platform/<str:document_key>/', platform_knowledge_views.update_platform_knowledge, name='platform_knowledge_update'),
+    path('alpha/feedback/', alpha_views.AlphaFeedbackView.as_view(), name='alpha_feedback'),
 
     # Benchmark endpoints (IREM, BOMA, NAA structured data)
     path('benchmarks/expense/', benchmark_views.get_expense_benchmark, name='benchmark_expense'),

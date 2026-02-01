@@ -80,26 +80,46 @@ export default function SaleTransactionDetails({
 
   return (
     <div
-      className="sale-transaction-details"
+      className="sale-transaction-details rounded border overflow-hidden"
       style={{
-        background: 'var(--cui-card-bg)',
-        border: '1px solid var(--cui-border-color)',
-        borderRadius: '0.375rem',
-        marginTop: '1rem',
+        backgroundColor: 'var(--surface-bg)',
+        borderColor: 'var(--cui-border-color)',
       }}
     >
       <div
-        className="d-flex justify-content-between align-items-center p-3"
-        style={{ cursor: 'pointer', borderBottom: isExpanded ? '1px solid var(--cui-border-color)' : 'none' }}
+        className="px-4 py-2 flex items-center justify-between"
+        style={{
+          cursor: 'pointer',
+          backgroundColor: 'var(--surface-card-header)',
+        }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <h5 className="mb-0">
-          {isExpanded ? '▼' : '▶'} Sale Transaction Details ({filteredSales.length} sale{filteredSales.length !== 1 ? 's' : ''})
-        </h5>
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          className="flex items-center gap-2 transition-opacity hover:opacity-70"
+        >
+          {/* Chevron Icon - matches CollapsibleSection */}
+          <svg
+            className="w-4 h-4 transition-transform"
+            style={{
+              color: 'var(--cui-secondary-color)',
+              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
+            }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+            Sale Transaction Details ({filteredSales.length} sale{filteredSales.length !== 1 ? 's' : ''})
+          </h3>
+        </button>
       </div>
 
       {isExpanded && (
-        <div className="p-3">
+        <div className="border-t px-4 py-3" style={{ borderColor: 'var(--cui-border-color)' }}>
           {isLoadingNames ? (
             <div className="text-center py-5 text-muted">
               Loading sale transaction data...

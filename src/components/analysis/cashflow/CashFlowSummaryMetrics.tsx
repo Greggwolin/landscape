@@ -114,20 +114,124 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
 
   return (
     <CRow className="g-3">
-      <CCol xs={6} md={4} lg={2}>
-        <MetricCard
-          label="Gross Revenue"
-          value={formatCurrency(summary.totalGrossRevenue)}
-          sublabel="Before deductions"
-        />
-      </CCol>
-      <CCol xs={6} md={4} lg={2}>
-        <MetricCard
-          label="Net Revenue"
-          value={formatCurrency(summary.totalNetRevenue)}
-          valueColor="var(--cui-success)"
-          sublabel={`Less ${formatCurrency(summary.totalRevenueDeductions)}`}
-        />
+      {/* Revenue Breakdown Card */}
+      <CCol xs={12} md={6} lg={3}>
+        <CCard
+          className="h-100"
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            borderColor: 'var(--cui-border-color)',
+          }}
+        >
+          <CCardBody className="p-3">
+            {/* Gross Revenue */}
+            <div className="d-flex justify-content-between mb-2">
+              <span
+                className="text-uppercase"
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  color: 'var(--cui-secondary-color)',
+                }}
+              >
+                Gross Revenue
+              </span>
+              <span
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: 'var(--cui-body-color)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {formatCurrency(summary.totalGrossRevenue)}
+              </span>
+            </div>
+
+            {/* Less: Subdivision Costs */}
+            {summary.totalSubdivisionCosts > 0 && (
+              <div className="d-flex justify-content-between mb-1" style={{ paddingLeft: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                  Less: Subdivision Costs
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--cui-danger)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  ({formatCurrency(summary.totalSubdivisionCosts)})
+                </span>
+              </div>
+            )}
+
+            {/* Less: Commissions */}
+            {summary.totalCommissions > 0 && (
+              <div className="d-flex justify-content-between mb-1" style={{ paddingLeft: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                  Less: Commissions
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--cui-danger)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  ({formatCurrency(summary.totalCommissions)})
+                </span>
+              </div>
+            )}
+
+            {/* Less: Transaction Costs */}
+            {summary.totalTransactionCosts > 0 && (
+              <div className="d-flex justify-content-between mb-2" style={{ paddingLeft: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                  Less: Transaction Costs
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--cui-danger)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  ({formatCurrency(summary.totalTransactionCosts)})
+                </span>
+              </div>
+            )}
+
+            {/* Net Revenue */}
+            <div
+              className="d-flex justify-content-between pt-2"
+              style={{ borderTop: '1px solid var(--cui-border-color)' }}
+            >
+              <span
+                className="text-uppercase"
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  color: 'var(--cui-secondary-color)',
+                }}
+              >
+                Net Revenue
+              </span>
+              <span
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: 'var(--cui-success)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {formatCurrency(summary.totalNetRevenue)}
+              </span>
+            </div>
+          </CCardBody>
+        </CCard>
       </CCol>
       <CCol xs={6} md={4} lg={2}>
         <MetricCard

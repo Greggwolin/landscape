@@ -11,6 +11,12 @@ from typing import Dict, List, Any, Optional
 import anthropic
 from decouple import config
 
+from .tool_registry import (
+    get_tools_for_page,
+    normalize_page_context,
+    should_include_extraction_tools,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +90,63 @@ METHODOLOGY_TASK_TYPES = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Alpha Help Integration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Triggers for "how-to" questions about platform usage
+ALPHA_HELP_TRIGGERS = {
+    # Direct questions
+    'how do i', 'how can i', 'how to', 'where do i', 'where can i',
+    'what does', 'what is the', 'can i', 'is there a',
+    'show me how', 'help me', 'i need help',
+
+    # Feature questions
+    'upload', 'export', 'import', 'download',
+    'save', 'delete', 'edit', 'add', 'create', 'update',
+
+    # Navigation
+    'find', 'navigate', 'go to', 'get to', 'access',
+    'tab', 'page', 'section', 'panel', 'menu',
+
+    # Feature status
+    'coming soon', 'not working', 'broken', 'missing',
+    'available', 'supported', 'implemented',
+}
+
+# Page names that map to section_path filtering
+PAGE_NAME_MAP = {
+    # MF workspace
+    'property': 'property',
+    'rent roll': 'property',
+    'operations': 'operations',
+    'valuation': 'valuation',
+    'income approach': 'valuation',
+    'capitalization': 'capitalization',
+    'capital': 'capitalization',
+    'reports': 'reports',
+    'documents': 'documents',
+    'dms': 'documents',
+    'map': 'map',
+
+    # Land dev workspace
+    'budget': 'budget',
+    'schedule': 'budget',
+    'sales': 'budget',
+    'feasibility': 'feasibility',
+    'cash flow': 'feasibility',
+    'returns': 'feasibility',
+    'land use': 'land_use',
+    'parcels': 'land_use',
+
+    # General
+    'benchmarks': 'benchmarks',
+    'landscaper': 'landscaper',
+    'dashboard': 'project_home',
+    'home': 'project_home',
+}
+
+
 def _needs_platform_knowledge(message: str, task_type: Optional[str] = None) -> bool:
     """
     Detect if message or task requires appraisal methodology knowledge.
@@ -110,6 +173,173 @@ def _needs_platform_knowledge(message: str, task_type: Optional[str] = None) -> 
         return True
 
     return False
+
+
+def _needs_alpha_help(message: str, page_context: Optional[str] = None) -> bool:
+    """
+    Detect if message is asking about platform usage/features.
+
+    Returns True if user is asking "how-to" questions about the platform,
+    asking about feature availability, or navigating the interface.
+    """
+    message_lower = message.lower()
+
+    # Check for help-related triggers
+    if any(trigger in message_lower for trigger in ALPHA_HELP_TRIGGERS):
+        return True
+
+    # If page_context is provided and user asks about "this", assume platform help
+    if page_context and any(word in message_lower for word in ['this', 'here', 'current']):
+        return True
+
+    return False
+
+
+def _detect_page_from_message(message: str) -> Optional[str]:
+    """
+    Detect which page/tab the user is asking about based on message content.
+
+    Returns page name for section_path filtering, or None if no specific page detected.
+    """
+    message_lower = message.lower()
+
+    for phrase, page_name in PAGE_NAME_MAP.items():
+        if phrase in message_lower:
+            return page_name
+
+    return None
+
+
+def _get_alpha_help_context(
+    query: str,
+    property_type: Optional[str] = None,
+    page_context: Optional[str] = None,
+    max_chunks: int = 5,
+    category: str = 'alpha_docs'
+) -> str:
+    """
+    Retrieve relevant Alpha help content and format for system prompt injection.
+
+    Uses section_path filtering to find relevant platform documentation.
+    Format: {property_type}/{page_name}/{content_type}/{section_title}
+
+    Args:
+        query: User's question
+        property_type: MF or LAND (derived from project type)
+        page_context: Current UI page (e.g., 'cashflow', 'property')
+        max_chunks: Maximum chunks to return
+
+    Returns:
+        Formatted context string, or empty string if no relevant content found.
+    """
+    try:
+        from django.db import connection
+        from apps.knowledge.services.embedding_service import generate_embedding
+
+        # Generate query embedding
+        query_embedding = generate_embedding(query)
+        if not query_embedding:
+            logger.warning("Failed to generate embedding for Alpha help query")
+            return ""
+
+        embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+
+        # Build section_path filter conditions
+        path_filters = []
+        filter_params = []
+
+        # Map project type to Alpha doc property type
+        prop_type_map = {
+            'mf': 'MF',
+            'multifamily': 'MF',
+            'land': 'LAND_DEV',
+            'land_dev': 'LAND_DEV',
+        }
+        alpha_prop_type = prop_type_map.get(property_type.lower(), None) if property_type else None
+
+        # Filter by property type in section_path
+        if alpha_prop_type:
+            path_filters.append("(c.section_path LIKE %s OR c.section_path LIKE 'BOTH/%%')")
+            filter_params.append(f"{alpha_prop_type}/%")
+
+        # Detect page from message content or use provided page_context
+        detected_page = _detect_page_from_message(query) or page_context
+        if detected_page:
+            path_filters.append("c.section_path LIKE %s")
+            filter_params.append(f"%/{detected_page}/%")
+
+        # Build WHERE clause
+        where_conditions = ["pk.knowledge_domain = 'alpha_help'", "pk.is_active = TRUE", "c.embedding IS NOT NULL"]
+        if path_filters:
+            where_conditions.append(f"({' OR '.join(path_filters)})")
+        if category:
+            where_conditions.append("c.category = %s")
+            filter_params.append(category)
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Lower similarity threshold for Alpha docs (shorter, more specific content)
+        max_distance = 0.45  # 0.55 similarity threshold
+
+        sql = f"""
+            SELECT
+                c.content,
+                c.section_path,
+                pk.title AS document_title,
+                ch.chapter_title AS section_title,
+                c.metadata,
+                (c.embedding <=> %s::vector) AS distance
+            FROM landscape.tbl_platform_knowledge_chunks c
+            JOIN landscape.tbl_platform_knowledge pk ON c.document_id = pk.id
+            LEFT JOIN landscape.tbl_platform_knowledge_chapters ch ON c.chapter_id = ch.id
+            WHERE {where_clause}
+                AND (c.embedding <=> %s::vector) < %s
+            ORDER BY distance ASC
+            LIMIT %s
+        """
+
+        # Build params: embedding, filter_params, embedding, max_distance, limit
+        full_params = [embedding_str] + filter_params + [embedding_str, max_distance, max_chunks]
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql, full_params)
+            rows = cursor.fetchall()
+
+        if not rows:
+            logger.info(f"[ALPHA_HELP] No relevant Alpha help content found for: {query[:50]}...")
+            return ""
+
+        # Format chunks for system prompt
+        context_parts = [
+            "\n<alpha_help_context>",
+            "The following platform documentation helps answer this question:\n"
+        ]
+
+        for row in rows:
+            content, section_path, doc_title, section_title, chunk_meta = row[:5]
+            # Parse section_path: {property_type}/{page_name}/{content_type}/{section_title}
+            path_parts = section_path.split('/') if section_path else []
+            content_type = path_parts[2] if len(path_parts) > 2 else 'help'
+            chunk_meta = chunk_meta or {}
+            meta_parts = []
+            if chunk_meta.get('property_type'):
+                meta_parts.append(chunk_meta['property_type'])
+            if chunk_meta.get('page_name'):
+                meta_parts.append(chunk_meta['page_name'])
+            meta_hint = f" ({' / '.join(meta_parts)})" if meta_parts else ""
+
+            context_parts.append(f"[{section_title or 'Alpha Help'}{meta_hint} - {content_type}]")
+            context_parts.append(content)
+            context_parts.append("")
+
+        context_parts.append("</alpha_help_context>")
+
+        logger.info(f"[ALPHA_HELP] Retrieved {len(rows)} chunks for query: {query[:50]}...")
+        return "\n".join(context_parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to retrieve Alpha help content: {e}")
+        return ""
 
 
 def _get_platform_knowledge_context(
@@ -400,11 +630,9 @@ like setting city, state, and county together, or updating multiple assumptions.
     },
     {
         "name": "update_cashflow_assumption",
-        "description": """Update a cashflow/DCF assumption with two-phase confirmation flow.
+        "description": """Update a cashflow/DCF assumption. Writes directly to the database.
 
-IMPORTANT: This tool uses a preview-then-confirm pattern:
-1. First call WITHOUT confirm=true to preview the change (no write happens)
-2. Then call WITH confirm=true to apply the change after user confirmation
+IMPORTANT: Always set confirm=true to execute the write. The user's request IS the confirmation.
 
 Writable fields: discount_rate, selling_costs_pct, hold_period_years, exit_cap_rate,
 bulk_sale_period, bulk_sale_discount_pct, sensitivity_interval, going_in_cap_rate,
@@ -428,14 +656,14 @@ Writes to tbl_dcf_analysis (the source of truth for Cashflow UI).""",
                 },
                 "confirm": {
                     "type": "boolean",
-                    "description": "Set to true to execute the write. Omit or set false to preview only."
+                    "description": "ALWAYS set to true. The user's request is the confirmation."
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Reason for the change (required when confirm=true)"
+                    "description": "Brief reason for the change (e.g., 'User requested')"
                 }
             },
-            "required": ["project_id", "field", "new_value"]
+            "required": ["project_id", "field", "new_value", "confirm", "reason"]
         }
     },
     {
@@ -4187,9 +4415,67 @@ except ImportError:
     pass  # Property attribute tools not available
 
 
+# Alpha Assistant feedback tool
+ALPHA_FEEDBACK_TOOL = {
+    "name": "log_alpha_feedback",
+    "description": """Log user feedback about a bug, issue, or suggestion from the Alpha Assistant chat.
+Use this when the user confirms they want to submit feedback or when they report something that sounds like a bug.
+
+Examples of when to use:
+- User says "yes, please log that" after you offer to capture feedback
+- User reports "the tiles are showing $0" or similar bug reports
+- User requests a feature that doesn't exist
+- User expresses confusion about how something works""",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "feedback_type": {
+                "type": "string",
+                "enum": ["bug", "suggestion", "question", "confusion"],
+                "description": "The type of feedback being logged"
+            },
+            "summary": {
+                "type": "string",
+                "description": "Brief summary of the issue or suggestion (1-2 sentences)"
+            },
+            "user_quote": {
+                "type": "string",
+                "description": "The user's original message describing the issue (for context)"
+            },
+            "page_context": {
+                "type": "string",
+                "description": "Which page/feature the feedback relates to (if known)"
+            }
+        },
+        "required": ["feedback_type", "summary"]
+    }
+}
+
+LANDSCAPER_TOOLS.append(ALPHA_FEEDBACK_TOOL)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # System Prompts by Project Type
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def get_tools_for_context(page_context: Optional[str] = None) -> List[Dict]:
+    """
+    Legacy helper for backend services that still rely on the old context enum.
+    """
+    effective_context = normalize_page_context(page_context, subtab_context=None)
+    tool_names = get_tools_for_page(effective_context)
+    filtered_tools = [
+        tool for tool in LANDSCAPER_TOOLS
+        if tool.get("name") in tool_names
+    ]
+
+    logger.info(
+        f"[AI_HANDLER] LEGACY_FILTER page_context='{page_context}' -> "
+        f"{len(filtered_tools)} tools (mapped to '{effective_context}')"
+    )
+
+    return filtered_tools
 
 BASE_INSTRUCTIONS = """
 RESPONSE STYLE (CRITICAL - FOLLOW EXACTLY):
@@ -4263,25 +4549,24 @@ FIELD UPDATES:
 - Check is_editable before updating - don't attempt to update calculated fields (NOI, IRR)
 - For fields with valid_values, only use allowed values
 
-ASSUMPTION UPDATES (CRITICAL - FOLLOW THIS FLOW):
+ASSUMPTION UPDATES (DIRECT WRITE - NO CONFIRMATION NEEDED):
 When a user asks to change/update/set a cashflow or DCF assumption (discount_rate, selling_costs_pct, etc.):
-1. FIRST call update_cashflow_assumption WITHOUT confirm=true to get a preview
-2. Show the user what will change: "I can update [field] from [old] to [new]. Should I proceed?"
-3. ONLY if user confirms, call update_cashflow_assumption WITH confirm=true AND a reason
-4. Report the verified result from the response
-5. ALWAYS add: "Refresh the page to see the updated value in the UI."
+1. Call update_cashflow_assumption with confirm=true and reason="User requested"
+2. The user's request IS the confirmation - no need to ask again
+3. Check the tool response has action='updated' before reporting success
+4. Report the change - the UI will auto-refresh to show the new value
 
-NEVER report a change as complete without calling the tool with confirm=true.
-NEVER assume a write succeeded - always check the response action='updated'.
+IMPORTANT:
+- Always set confirm=true - the user asking for the change IS their confirmation
+- Always include a reason (e.g., "User requested")
+- Check for action='updated' in response to verify the write succeeded
+- If action is NOT 'updated', tell the user the update failed
 
-NOTE: The UI caches data for performance. After a successful write, remind the user
-to refresh their browser to see the change reflected in the input fields.
-
-Example flow:
+Example:
   User: "Change the discount rate to 15%"
-  You: [call tool with confirm=false] "I can update discount_rate from 0.18 to 0.15. Should I proceed?"
-  User: "Yes"
-  You: [call tool with confirm=true] "Done. Discount rate updated to 15%. NPV is now $47.7M. Refresh the page to see the updated value in the UI."
+  You: [TOOL CALL: update_cashflow_assumption with field="discount_rate", new_value=0.15, confirm=true, reason="User requested"]
+       Response: action='updated', old=0.18, new=0.15
+       "Done. Discount rate updated from 18% to 15%. NPV is now $47.7M."
 
 SCHEMA AWARENESS:
 You have access to a complete field catalog via get_field_schema. Common field mappings:
@@ -4298,6 +4583,62 @@ ANALYSIS RESPONSES:
 - Format currency as $X,XXX and percentages as X.X%
 - Keep under 200 words unless detailed analysis is requested
 """
+
+
+# =============================================================================
+# ALPHA ASSISTANT CONTEXT
+# =============================================================================
+
+ALPHA_ASSISTANT_PROMPT_ADDITION = """
+
+## ALPHA ASSISTANT CONTEXT
+
+You are currently in the Alpha Assistant help panel. Users here are alpha testers who may be:
+- Asking how to use features
+- Reporting bugs or unexpected behavior
+- Suggesting improvements
+- Asking general questions about the platform
+
+### CRITICAL BEHAVIOR RULES:
+
+1. **When users report something that sounds like a bug:**
+   - Acknowledge it directly: "That sounds like a bug" or "That doesn't seem right"
+   - Do NOT give long explanations about why you can't see data
+   - Do NOT speculate about multiple possible causes
+   - Offer to capture it as feedback: "Would you like me to log this as feedback for the team?"
+   - Keep your response to 2-3 sentences max
+
+2. **When users ask how to do something:**
+   - Give direct, actionable instructions
+   - If you don't know, say "I'm not sure about that specific feature yet"
+   - Suggest they submit feedback if the feature seems missing
+
+3. **When users ask about features that don't exist:**
+   - Be honest: "That feature isn't available yet"
+   - Don't over-explain or apologize excessively
+
+4. **General tone:**
+   - Be concise - this is a help panel, not a conversation
+   - Be helpful - acknowledge their issue, don't deflect
+   - Be honest - if something sounds broken, say so
+
+### EXAMPLE RESPONSES:
+
+User: "Why don't the Village tiles show expense totals? They all show $0."
+
+GOOD response:
+"That sounds like a bug - the tiles should display the expense totals for each village. Would you like me to log this as feedback so the team can investigate?"
+
+BAD response:
+"I don't have visibility into the Village and Phase expense tiles you're referencing from my current project data view. The financial summary tables and expense breakdowns aren't displayed in the data I can access. This could be happening for several common reasons: 1) The expense data might not be allocated to specific villages yet..."
+
+### REMEMBER:
+- You have LIMITED tools in Alpha Assistant context
+- Don't pretend to diagnose things you can't see
+- Acknowledge → Offer feedback → Move on
+- Use the log_alpha_feedback tool when users confirm they want to submit feedback
+"""
+
 
 SYSTEM_PROMPTS = {
     'land_development': f"""You are Landscaper, an AI assistant specialized in land development real estate analysis.
@@ -4511,7 +4852,9 @@ def get_landscaper_response(
     messages: List[Dict[str, str]],
     project_context: Dict[str, Any],
     tool_executor: Optional[Any] = None,
-    additional_context: Optional[str] = None
+    additional_context: Optional[str] = None,
+    page_context: Optional[str] = None,
+    is_admin: bool = False
 ) -> Dict[str, Any]:
     """
     Generate AI response to user message using Claude API with tool use.
@@ -4525,6 +4868,10 @@ def get_landscaper_response(
         tool_executor: Optional callable to execute tool calls. If None, tools are disabled.
         additional_context: Optional additional context to inject into system prompt
                            (e.g., past conversation context for cross-thread RAG)
+        page_context: Optional UI context for tool filtering (e.g., 'mf_valuation').
+                      If provided, only tools relevant to that context will be available.
+        is_admin: Whether the caller is an admin/operator (grants admin tool access).
+                      This improves reliability by reducing the tool count Claude sees.
 
     Returns:
         Dict with:
@@ -4552,6 +4899,18 @@ def get_landscaper_response(
             full_system += pk_context
             logger.info("Platform knowledge context added to system prompt")
 
+    # Add Alpha help context if user is asking about platform usage/features
+    if last_user_message and _needs_alpha_help(last_user_message, page_context):
+        alpha_context = _get_alpha_help_context(
+            query=last_user_message,
+            property_type=project_type,
+            page_context=page_context,
+            max_chunks=5
+        )
+        if alpha_context:
+            full_system += alpha_context
+            logger.info("Alpha help context added to system prompt")
+
     # Add user knowledge if query benefits from past experience
     user_id = project_context.get('user_id')
     if last_user_message and user_id and _needs_user_knowledge(last_user_message):
@@ -4572,6 +4931,11 @@ def get_landscaper_response(
     if additional_context:
         full_system += additional_context
         logger.info("Additional context (chat history RAG) added to system prompt")
+
+    # Add Alpha Assistant behavioral guidance when in that context
+    if page_context and page_context.lower() == "alpha_assistant":
+        full_system += ALPHA_ASSISTANT_PROMPT_ADDITION
+        logger.info("Alpha Assistant behavioral guidance added to system prompt")
 
     # Try Claude API first
     client = _get_anthropic_client()
@@ -4598,17 +4962,42 @@ def get_landscaper_response(
             'messages': claude_messages
         }
 
-        if tool_executor:
-            api_kwargs['tools'] = LANDSCAPER_TOOLS
+        normalized_context = normalize_page_context(
+            page_context,
+            project_type_code=project_context.get('project_type_code'),
+            project_type=project_context.get('project_type')
+        )
 
+        if tool_executor:
+            include_extraction = should_include_extraction_tools(last_user_message or "")
+            available_tool_names = get_tools_for_page(
+                page_context=normalized_context,
+                include_extraction=include_extraction,
+                is_admin=is_admin
+            )
+            filtered_tools = [
+                tool for tool in LANDSCAPER_TOOLS
+                if tool.get('name') in available_tool_names
+            ]
+            api_kwargs['tools'] = filtered_tools
+            logger.info(
+                f"[TOOL_FILTER] Page: {page_context!r} -> {normalized_context}, "
+                f"Tools: {len(filtered_tools)}/{len(LANDSCAPER_TOOLS)}, "
+                f"Extraction: {include_extraction}"
+            )
+
+        logger.info(f"[AI_HANDLER] Calling Claude with {len(claude_messages)} messages, last message: {claude_messages[-1]['content'][:100] if claude_messages else 'none'}...")
         response = client.messages.create(**api_kwargs)
 
         # Process response with potential tool use loop
         field_updates = []
         tool_calls_made = []
+        tool_executions = []  # Track full tool execution details for frontend events
         final_content = ""
         total_input_tokens = response.usage.input_tokens
         total_output_tokens = response.usage.output_tokens
+
+        logger.info(f"[AI_HANDLER] Initial response stop_reason={response.stop_reason}, tool_executor={'present' if tool_executor else 'None'}")
 
         # Handle tool use loop
         while response.stop_reason == "tool_use" and tool_executor:
@@ -4627,7 +5016,7 @@ def get_landscaper_response(
                 tool_input = tool_block.input
                 tool_id = tool_block.id
 
-                logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+                logger.info(f"[AI_HANDLER] Executing tool: {tool_name} with input: {tool_input}")
                 tool_calls_made.append({
                     'tool': tool_name,
                     'input': tool_input
@@ -4665,11 +5054,29 @@ def get_landscaper_response(
                                 'total': result.get('total', result.get('created', 0) + result.get('updated', 0)),
                                 'summary': result.get('summary', '')
                             })
+                    elif tool_name == 'update_cashflow_assumption':
+                        # Track DCF/cashflow assumption updates for auto-refresh
+                        if result.get('success') and result.get('action') == 'updated':
+                            field_updates.append({
+                                'tool': tool_name,
+                                'type': 'dcf_analysis',
+                                'success': True,
+                                'change': result.get('change', {}),
+                                'updated': 1,
+                            })
 
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tool_id,
                         "content": str(result)
+                    })
+
+                    # Track tool execution for frontend mutation events
+                    tool_executions.append({
+                        'tool': tool_name,
+                        'success': result.get('success', False),
+                        'is_proposal': False,
+                        'result': result
                     })
                 except Exception as e:
                     logger.error(f"Tool execution error: {e}")
@@ -4678,6 +5085,12 @@ def get_landscaper_response(
                         "tool_use_id": tool_id,
                         "content": f"Error executing tool: {str(e)}",
                         "is_error": True
+                    })
+                    tool_executions.append({
+                        'tool': tool_name,
+                        'success': False,
+                        'is_proposal': False,
+                        'error': str(e)
                     })
 
             # Continue conversation with tool results
@@ -4712,6 +5125,7 @@ def get_landscaper_response(
                 'output_tokens': total_output_tokens,
                 'stop_reason': response.stop_reason,
                 'system_prompt_category': project_type or 'default',
+                'tool_executions': tool_executions,  # For frontend mutation events
             },
             'tool_calls': tool_calls_made,
             'field_updates': field_updates

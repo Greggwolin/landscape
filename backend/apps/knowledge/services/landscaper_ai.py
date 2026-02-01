@@ -38,7 +38,7 @@ from .project_context import get_project_context
 from .entity_fact_retriever import get_entity_fact_context
 
 # Import tool definitions and executor from landscaper app
-from apps.landscaper.ai_handler import LANDSCAPER_TOOLS
+from apps.landscaper.ai_handler import LANDSCAPER_TOOLS, get_tools_for_context
 from apps.landscaper.tool_executor import execute_tool
 
 # Import analysis type config model
@@ -234,7 +234,8 @@ def get_landscaper_response(
     max_context_chunks: int = 5,
     db_context: Optional[Dict[str, Any]] = None,
     rag_context: Optional[Dict[str, Any]] = None,
-    active_tab: str = 'home'
+    active_tab: str = 'home',
+    page_context: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Get RAG-enhanced response from Landscaper AI.
@@ -244,6 +245,8 @@ def get_landscaper_response(
         project_id: Current project ID
         conversation_history: Optional prior messages (if not provided, fetched from DB)
         max_context_chunks: Max document chunks to include
+        page_context: Optional UI context for tool filtering (e.g., 'cashflow', 'budget').
+                      If provided, only tools relevant to that context will be available.
 
     Returns:
         Dict with 'content', 'metadata', 'context_used'
@@ -353,6 +356,12 @@ If per-unit or per-SF amounts are listed, include per_unit and per_sf."""
         # Generate a source message ID for linking proposals to this chat message
         source_message_id = f"msg_{uuid.uuid4().hex[:12]}"
 
+        # Get context-aware tools (if page_context is provided)
+        # Fall back to active_tab if page_context not explicitly set
+        effective_context = page_context or active_tab
+        tools = get_tools_for_context(effective_context)
+        print(f"[AI_TIMING] Using {len(tools)} tools for page_context='{effective_context}'")
+
         # Initial API call with tools
         t0 = time.time()
         print("[AI_TIMING] Starting initial Claude API call...")
@@ -361,7 +370,7 @@ If per-unit or per-SF amounts are listed, include per_unit and per_sf."""
             max_tokens=4000,
             system=system_prompt,
             messages=messages,
-            tools=LANDSCAPER_TOOLS
+            tools=tools
         )
         print(f"[AI_TIMING] Initial Claude API call: {time.time() - t0:.2f}s (stop_reason: {response.stop_reason}, tokens: {response.usage.input_tokens} in / {response.usage.output_tokens} out)")
 
@@ -510,7 +519,7 @@ If per-unit or per-SF amounts are listed, include per_unit and per_sf."""
                 max_tokens=4000,  # Increased for tool calls with lots of data
                 system=system_prompt,
                 messages=messages,
-                tools=LANDSCAPER_TOOLS
+                tools=tools  # Use context-filtered tools
             )
             print(f"[AI_TIMING] Claude API call iteration {iteration}: {time.time() - api_call_start:.2f}s (stop_reason: {response.stop_reason}, tokens: {response.usage.input_tokens} in / {response.usage.output_tokens} out)")
             print(f"[AI_TIMING] Total iteration {iteration} time: {time.time() - iteration_start:.2f}s")
@@ -604,7 +613,7 @@ Call {target_tool} with all the extracted comps now."""
                 max_tokens=8000,
                 system=continuation_system,
                 messages=continuation_messages,
-                tools=LANDSCAPER_TOOLS
+                tools=tools  # Use context-filtered tools
             )
 
             # Process any additional tool calls from the continuation
@@ -656,7 +665,7 @@ Call {target_tool} with all the extracted comps now."""
                     max_tokens=2000,
                     system="You are a data extraction assistant.",
                     messages=continuation_messages,
-                    tools=LANDSCAPER_TOOLS
+                    tools=tools  # Use context-filtered tools
                 )
 
         # Extract final text response

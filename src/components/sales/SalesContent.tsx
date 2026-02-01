@@ -14,11 +14,11 @@ import PhaseTiles from './PhaseTiles';
 import ParcelSalesTable from './ParcelSalesTable';
 import PricingTable from './PricingTable';
 import SaleTransactionDetails from './SaleTransactionDetails';
-import ModeSelector from '@/components/budget/ModeSelector';
 import { useContainers } from '@/hooks/useContainers';
 import { usePhaseStats, useParcelsWithSales } from '@/hooks/useSalesAbsorption';
 import { usePreference } from '@/hooks/useUserPreferences';
 import type { BudgetMode } from '@/components/budget/ModeSelector';
+import { ExportButton } from '@/components/admin';
 
 // Sales mode uses the same type as Budget mode for consistency
 export type SalesMode = BudgetMode;
@@ -29,7 +29,7 @@ interface Props {
 
 export default function SalesContent({ projectId }: Props) {
   // Mode state with database persistence via usePreference hook
-  const [mode, setMode] = usePreference<SalesMode>({
+  const [mode] = usePreference<SalesMode>({
     key: 'sales.mode',
     defaultValue: 'napkin',
     scopeType: 'project',
@@ -78,6 +78,16 @@ export default function SalesContent({ projectId }: Props) {
 
   const hasFilters = selectedAreaIds.length > 0 || selectedPhaseIds.length > 0;
 
+  const renderExportButton = () => (
+    <span className="sales-export-button">
+      <ExportButton
+        tabName="Sales & Absorption"
+        projectId={projectId.toString()}
+        size="sm"
+      />
+    </span>
+  );
+
   // Compute combined phase filters: selected phases + all phases from selected areas
   // Note: We need to map container IDs to phase_ids (used by /api/phases endpoint)
   const combinedPhaseFilters = useMemo(() => {
@@ -103,19 +113,20 @@ export default function SalesContent({ projectId }: Props) {
 
   return (
     <div
-      className="p-4 space-y-4 min-h-screen"
-      style={{ backgroundColor: 'var(--cui-body-bg)' }}
+      className="space-y-4 w-full max-w-full"
+      style={{ backgroundColor: 'var(--surface-bg)' }}
     >
-      {/* Mode Selector */}
-      <div className="mb-3">
-        <ModeSelector activeMode={mode} onModeChange={setMode} />
-      </div>
-
       {/* Annual Inventory Gauge */}
       <CollapsibleSection
         title="Annual Inventory Gauge"
         itemCount={1}
-        defaultExpanded={true}
+        defaultExpanded={false}
+        locked
+        headerActions={
+          <span className="text-xs font-semibold uppercase tracking-wide text-red-600">
+            Coming in Beta
+          </span>
+        }
       >
         <div className="p-4">
           <AnnualInventoryGauge projectId={projectId} />
@@ -123,7 +134,7 @@ export default function SalesContent({ projectId }: Props) {
       </CollapsibleSection>
 
       {/* Areas/Phases and Land Use Pricing - Side by Side */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-4 w-full">
         {/* Left Column: Areas and Phases (wider) */}
         <div className="col-span-7">
           <CollapsibleSection
@@ -131,18 +142,21 @@ export default function SalesContent({ projectId }: Props) {
             itemCount={1}
             defaultExpanded={true}
             headerActions={
-              hasFilters && (
-                <CBadge
-                  color="secondary"
-                  className="cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClearFilters();
-                  }}
-                >
-                  Clear Filters
-                </CBadge>
-              )
+              <>
+                {hasFilters && (
+                  <CBadge
+                    color="secondary"
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearFilters();
+                    }}
+                  >
+                    Clear Filters
+                  </CBadge>
+                )}
+                {renderExportButton()}
+              </>
             }
           >
             <div className="p-4 space-y-4">
@@ -173,7 +187,7 @@ export default function SalesContent({ projectId }: Props) {
         </div>
 
         {/* Right Column: Land Use Pricing (narrower) */}
-        <div className="col-span-5" style={{ maxWidth: '720px' }}>
+        <div className="col-span-5 w-full">
           <CollapsibleSection
             title={
               hasFilters
@@ -182,6 +196,7 @@ export default function SalesContent({ projectId }: Props) {
             }
             itemCount={1}
             defaultExpanded={true}
+            headerActions={renderExportButton()}
           >
             <div className="p-4">
               <PricingTable
@@ -203,6 +218,7 @@ export default function SalesContent({ projectId }: Props) {
         }
         itemCount={1}
         defaultExpanded={true}
+        headerActions={renderExportButton()}
       >
         <div className="p-4">
           <ParcelSalesTable

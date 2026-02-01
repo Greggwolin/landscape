@@ -17,10 +17,11 @@ echo "🚀 Starting Django backend..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Start Django in background
+# Start Django in background (logs to backend/logs/django.log)
 cd backend
+mkdir -p logs
 source venv/bin/activate
-python manage.py runserver 8000 > /dev/null 2>&1 &
+python manage.py runserver 8000 >> logs/django.log 2>&1 &
 
 echo "✅ Django running on http://localhost:8000"
 echo ""

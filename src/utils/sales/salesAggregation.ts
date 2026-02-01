@@ -16,10 +16,12 @@ export interface SaleTransaction {
   frontFeet: number | null;
   residentialRevenue: number;
   commercialRevenue: number;
-  totalRevenue: number;
+  totalRevenue: number;           // = gross_parcel_price (before deductions)
+  improvementOffset: number;      // = subdivision costs (on-site improvements)
+  grossSaleProceeds: number;      // = totalRevenue - improvementOffset
   commissions: number;
   closingCosts: number;
-  netProceeds: number;
+  netProceeds: number;            // = grossSaleProceeds - commissions - closingCosts
   // Parcel attribution for hover tooltips
   revenueAttribution: {
     residential: string[]; // Parcel codes
@@ -72,35 +74,73 @@ export function groupParcelsBySaleDate(
         !residentialTypes.includes(p.type_code) && !residentialTypes.includes(p.density_code)
       );
 
-      // Calculate revenue by type
-      // Residential: units * value_per_unit
-      // Commercial: acres * value_per_unit (or gross_value if available)
-      const residentialRevenue = residentialParcels.reduce((sum, p) => {
-        if (p.gross_value) return sum + p.gross_value;
-        if (p.current_value_per_unit && p.units) {
-          return sum + (p.current_value_per_unit * p.units);
-        }
-        return sum;
-      }, 0);
+      // Check if we have sale assumption data (source of truth from tbl_parcel_sale_assumptions)
+      const hasSaleAssumptions = parcels.some(p => p.sale_gross_parcel_price != null);
 
-      const commercialRevenue = commercialParcels.reduce((sum, p) => {
-        if (p.gross_value) return sum + p.gross_value;
-        if (p.current_value_per_unit && p.acres) {
-          return sum + (p.current_value_per_unit * p.acres);
-        }
-        return sum;
-      }, 0);
+      let residentialRevenue: number;
+      let commercialRevenue: number;
+      let totalRevenue: number;
+      let improvementOffset: number;
+      let grossSaleProceeds: number;
+      let commissions: number;
+      let closingCosts: number;
+      let netProceeds: number;
 
-      const totalRevenue = residentialRevenue + commercialRevenue;
+      if (hasSaleAssumptions) {
+        // USE SALE ASSUMPTIONS (source of truth) - base values, no DCF escalation
+        // This matches what's stored in the database
+        residentialRevenue = residentialParcels.reduce((sum, p) => {
+          return sum + (p.sale_gross_parcel_price || 0);
+        }, 0);
 
-      // Calculate deductions
-      // TODO: Pull from project assumptions in future phase
-      const commissionRate = 0.03; // 3% hardcoded for Phase 3
-      const closingCostRate = 0.02; // 2% hardcoded for Phase 3
+        commercialRevenue = commercialParcels.reduce((sum, p) => {
+          return sum + (p.sale_gross_parcel_price || 0);
+        }, 0);
 
-      const commissions = totalRevenue * commissionRate;
-      const closingCosts = totalRevenue * closingCostRate;
-      const netProceeds = totalRevenue - commissions - closingCosts;
+        totalRevenue = parcels.reduce((sum, p) => sum + (p.sale_gross_parcel_price || 0), 0);
+
+        // Improvement offset (subdivision/on-site costs)
+        improvementOffset = parcels.reduce((sum, p) => sum + (p.sale_improvement_offset || 0), 0);
+
+        // Gross sale proceeds = gross price - improvement offset
+        grossSaleProceeds = parcels.reduce((sum, p) => sum + (p.sale_gross_proceeds || 0), 0);
+
+        // Use actual commission and closing cost amounts from sale assumptions
+        commissions = parcels.reduce((sum, p) => sum + (p.sale_commission_amount || 0), 0);
+        closingCosts = parcels.reduce((sum, p) => sum + (p.sale_closing_cost_amount || 0), 0);
+
+        // Net proceeds from sale assumptions (gross_sale_proceeds - transaction_costs)
+        netProceeds = parcels.reduce((sum, p) => sum + (p.net_proceeds || 0), 0);
+      } else {
+        // FALLBACK: Calculate from pricing (legacy behavior when no sale assumptions exist)
+        residentialRevenue = residentialParcels.reduce((sum, p) => {
+          if (p.gross_value) return sum + p.gross_value;
+          if (p.current_value_per_unit && p.units) {
+            return sum + (p.current_value_per_unit * p.units);
+          }
+          return sum;
+        }, 0);
+
+        commercialRevenue = commercialParcels.reduce((sum, p) => {
+          if (p.gross_value) return sum + p.gross_value;
+          if (p.current_value_per_unit && p.acres) {
+            return sum + (p.current_value_per_unit * p.acres);
+          }
+          return sum;
+        }, 0);
+
+        totalRevenue = residentialRevenue + commercialRevenue;
+        improvementOffset = 0; // Not available in legacy mode
+        grossSaleProceeds = totalRevenue; // Same as total when no improvement offset
+
+        // Calculate deductions with hardcoded rates (legacy)
+        const commissionRate = 0.03; // 3%
+        const closingCostRate = 0.02; // 2%
+
+        commissions = totalRevenue * commissionRate;
+        closingCosts = totalRevenue * closingCostRate;
+        netProceeds = totalRevenue - commissions - closingCosts;
+      }
 
       return {
         saleDate: date,
@@ -112,6 +152,8 @@ export function groupParcelsBySaleDate(
         residentialRevenue,
         commercialRevenue,
         totalRevenue,
+        improvementOffset,
+        grossSaleProceeds,
         commissions,
         closingCosts,
         netProceeds,
@@ -139,16 +181,16 @@ export function generateAutoLabel(sale: SaleTransaction): string {
   const types = new Set(sale.parcels.map(p => p.type_code));
 
   if (phases.size === 1 && [...phases][0]) {
-    return `${[...phases][0]} Sale`;
+    return `Sale ${[...phases][0]}`;
   }
 
   if (areas.size === 1) {
-    return `Area ${[...areas][0]} Sale`;
+    return `Sale Area ${[...areas][0]}`;
   }
 
   if (types.size === 1) {
-    return `${[...types][0]} Sale`;
+    return `Sale ${[...types][0]}`;
   }
 
-  return `Mixed Transaction (${phases.size} phase${phases.size !== 1 ? 's' : ''})`;
+  return `Multi-Phase Sale (${phases.size} phases)`;
 }

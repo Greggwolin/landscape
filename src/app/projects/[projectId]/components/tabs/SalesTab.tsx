@@ -2,8 +2,6 @@
 
 import React from 'react';
 import SalesContent from '@/components/sales/SalesContent';
-import { CCard, CCardBody, CCardHeader } from '@coreui/react';
-import { ExportButton } from '@/components/admin';
 
 interface Project {
   project_id: number;
@@ -73,14 +71,8 @@ export default function SalesTab({ project }: SalesTabProps) {
   }
 
   return (
-    <CCard>
-      <CCardHeader className="d-flex justify-content-between align-items-center">
-        <span>Sales & Absorption</span>
-        <ExportButton tabName="Sales & Absorption" projectId={project.project_id.toString()} />
-      </CCardHeader>
-      <CCardBody>
-        <SalesContent projectId={project.project_id} />
-      </CCardBody>
-    </CCard>
+    <div className="sales-tab-content">
+      <SalesContent projectId={project.project_id} />
+    </div>
   );
 }

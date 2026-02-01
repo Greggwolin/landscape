@@ -8,6 +8,7 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
   defaultExpanded?: boolean;
   headerActions?: React.ReactNode;
+  locked?: boolean;
 }
 
 export default function CollapsibleSection({
@@ -15,19 +16,36 @@ export default function CollapsibleSection({
   itemCount,
   children,
   defaultExpanded,
-  headerActions
+  headerActions,
+  locked,
 }: CollapsibleSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(
-    defaultExpanded !== undefined ? defaultExpanded : itemCount > 0
-  );
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (locked) {
+      return false;
+    }
+
+    if (defaultExpanded !== undefined) {
+      return defaultExpanded;
+    }
+
+    return itemCount > 0;
+  });
+
+  const toggleSection = () => {
+    if (locked) return;
+    setIsExpanded((prev) => !prev);
+  };
 
   return (
-    <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+    <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)' }}>
       {/* Header */}
       <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: 'var(--surface-card-header)' }}>
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+          type="button"
+          onClick={toggleSection}
+          aria-expanded={isExpanded}
+          disabled={locked}
+          className={`flex items-center gap-2 transition-opacity ${locked ? 'cursor-not-allowed opacity-60' : 'hover:opacity-70'}`}
         >
           {/* Chevron Icon */}
           <svg

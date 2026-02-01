@@ -129,10 +129,12 @@ class WaterfallEngine:
             if i > 0:
                 prior_date = self.cash_flows[i - 1].date
             else:
-                # First period: prior_date is START of month (day 1)
-                # This matches Excel where the initial contribution happens at beginning
-                # of period and accrues through the period end date
-                prior_date = cf.date.replace(day=1)
+                # First period: prior_date equals current date to prevent accrual
+                # Pref should NOT accrue in Period 1 because capital hasn't been
+                # outstanding for a full period yet. This matches standard waterfall
+                # convention: capital contributed at period start doesn't earn pref
+                # until the NEXT period.
+                prior_date = cf.date
             cumulative_cash_flow += cf.amount
 
             period_result = self._process_period(

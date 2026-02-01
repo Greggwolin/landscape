@@ -111,26 +111,42 @@ class IncomeApproachDataService:
                 # Table doesn't exist or query failed - fall through to defaults
                 pass
 
-            # Fallback to project assumptions for exit cap rate
+            # Fallback to project assumptions for DCF parameters
+            # Keys match what update_dcf_parameters saves when tbl_cre_property doesn't exist
             try:
                 cursor.execute("""
-                    SELECT assumption_value
+                    SELECT assumption_key, assumption_value
                     FROM landscape.tbl_project_assumption
-                    WHERE project_id = %s AND assumption_key = 'cap_rate_exit'
+                    WHERE project_id = %s AND assumption_key IN (
+                        'dcf_hold_period_years',
+                        'dcf_discount_rate',
+                        'cap_rate_exit',
+                        'dcf_selling_costs_pct'
+                    )
                 """, [self.project_id])
-                exit_cap_row = cursor.fetchone()
+                assumption_rows = cursor.fetchall()
             except Exception:
-                exit_cap_row = None
+                assumption_rows = []
 
-            return {
+            # Build result from found assumptions or defaults
+            result = {
                 'hold_period_years': self.DEFAULTS['hold_period_years'],
                 'discount_rate': self.DEFAULTS['discount_rate'],
-                'terminal_cap_rate': self._decimal_to_float(
-                    exit_cap_row[0] if exit_cap_row else None,
-                    self.DEFAULTS['terminal_cap_rate']
-                ),
+                'terminal_cap_rate': self.DEFAULTS['terminal_cap_rate'],
                 'selling_costs_pct': self.DEFAULTS['selling_costs_pct'],
             }
+
+            for key, value in assumption_rows:
+                if key == 'dcf_hold_period_years':
+                    result['hold_period_years'] = int(value) if value else self.DEFAULTS['hold_period_years']
+                elif key == 'dcf_discount_rate':
+                    result['discount_rate'] = self._decimal_to_float(value, self.DEFAULTS['discount_rate'])
+                elif key == 'cap_rate_exit':
+                    result['terminal_cap_rate'] = self._decimal_to_float(value, self.DEFAULTS['terminal_cap_rate'])
+                elif key == 'dcf_selling_costs_pct':
+                    result['selling_costs_pct'] = self._decimal_to_float(value, self.DEFAULTS['selling_costs_pct'])
+
+            return result
 
     def get_vacancy_assumptions(self) -> Dict[str, Any]:
         """

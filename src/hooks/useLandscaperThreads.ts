@@ -95,6 +95,7 @@ const TOOL_TABLE_MAP: Record<string, string[]> = {
   update_sales_comps: ['sales_comps'],
   update_project_field: ['project'],
   bulk_update_fields: ['project'],
+  update_cashflow_assumption: ['dcf_analysis', 'cashflow'],  // DCF/Cashflow assumptions
 };
 
 /**
@@ -361,7 +362,10 @@ export function useLandscaperThreads({
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: message }),
+            body: JSON.stringify({
+              content: message,
+              page_context: pageContext,  // Pass for context-aware tool filtering
+            }),
           }
         );
 

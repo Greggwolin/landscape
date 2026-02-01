@@ -11,19 +11,14 @@ import {
   CModalFooter,
   CModalHeader,
   CModalTitle,
-  CNav,
-  CNavItem,
-  CNavLink,
 } from '@coreui/react';
-import ModeSelector, { type BudgetMode } from './ModeSelector';
+import { type BudgetMode } from './ModeSelector';
 import BudgetDataGrid from './BudgetDataGrid';
-import TimelineChart from './custom/TimelineChart';
 import FiltersAccordion from './FiltersAccordion';
 import { useBudgetData } from './hooks/useBudgetData';
 import type { BudgetItem } from './ColumnDefinitions';
 import BudgetItemModalV2, { type BudgetItemFormValues } from './BudgetItemModalV2';
-import TimelineTab from './TimelineTab';
-import SalesContent from '@/components/sales/SalesContent';
+// Removed: TimelineTab and SalesContent imports - tabs removed
 import QuickAddCategoryModal from './QuickAddCategoryModal';
 import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
@@ -37,7 +32,7 @@ interface Props {
   scopeFilter?: string; // Optional scope filter (e.g., "Planning & Engineering", "Development")
 }
 
-type SubTab = 'grid' | 'timeline' | 'sales';
+// Removed: SubTab type and tab navigation - now showing grid directly
 
 // Helper to check if project is Land Development type
 function isLandDevelopmentProject(projectTypeCode?: string): boolean {
@@ -49,7 +44,7 @@ function isLandDevelopmentProject(projectTypeCode?: string): boolean {
 }
 
 export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState<SubTab>('grid');
+  // Removed: activeSubTab state - now showing grid directly
 
   // Mode state with database persistence via usePreference hook
   const [mode, setMode] = usePreference<BudgetMode>({
@@ -61,7 +56,6 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
   });
 
   const [selected, setSelected] = useState<BudgetItem | undefined>();
-  const [showGantt, setShowGantt] = useState(false);
   const [projectTypeCode, setProjectTypeCode] = useState<string | undefined>(undefined);
 
   const filterStorageKey = `budget_filters_${projectId}`;
@@ -179,16 +173,6 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
   // Quick-add category modal state
   const [quickAddCategoryOpen, setQuickAddCategoryOpen] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<BudgetCategory[]>([]);
-
-  // Check if any items have dates (to determine if Gantt should be available)
-  const hasDateData = data.some(
-    (item) => item.start_date || item.end_date || item.start_period || item.periods_to_complete
-  );
-
-  // Mode change handler
-  const handleModeChange = (newMode: BudgetMode) => {
-    setMode(newMode);
-  };
 
   const handleProjectLevelToggle = (value: boolean) => {
     setIncludeProjectLevel(value);
@@ -484,129 +468,59 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
           </div>
         )}
 
-        {/* Sub-tab Navigation */}
-        <CNav variant="tabs" className="mb-4">
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'grid'}
-              onClick={() => setActiveSubTab('grid')}
-              style={{ cursor: 'pointer' }}
-            >
-              Budget Grid
-            </CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'timeline'}
-              onClick={() => setActiveSubTab('timeline')}
-              style={{ cursor: 'pointer' }}
-            >
-              Timeline View
-            </CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink
-              active={activeSubTab === 'sales'}
-              onClick={() => setActiveSubTab('sales')}
-              style={{ cursor: 'pointer' }}
-            >
-              Sales
-            </CNavLink>
-          </CNavItem>
-        </CNav>
+        {/* Incomplete Categories Reminder */}
+        <IncompleteCategoriesReminder projectId={projectId} className="mb-3" />
 
-        {/* Tab Content */}
-        {activeSubTab === 'grid' && (
-          <>
-            {/* Incomplete Categories Reminder */}
-            <IncompleteCategoriesReminder projectId={projectId} className="mb-3" />
+        {/* Filters Accordion */}
+        <div className="mb-3">
+          <FiltersAccordion
+            projectId={projectId}
+            selectedAreaIds={selectedAreaIds}
+            selectedPhaseIds={selectedPhaseIds}
+            onAreaSelect={handleAreaSelect}
+            onPhaseSelect={handlePhaseSelect}
+            onClearFilters={handleClearFilters}
+            includeProjectLevel={includeProjectLevel}
+            projectLevelItemCount={projectLevelCount}
+            onProjectLevelToggle={handleProjectLevelToggle}
+          />
+        </div>
 
-            {/* Filters Accordion */}
-            <div className="mb-3">
-              <FiltersAccordion
-                projectId={projectId}
-                selectedAreaIds={selectedAreaIds}
-                selectedPhaseIds={selectedPhaseIds}
-                onAreaSelect={handleAreaSelect}
-                onPhaseSelect={handlePhaseSelect}
-                onClearFilters={handleClearFilters}
-                includeProjectLevel={includeProjectLevel}
-                projectLevelItemCount={projectLevelCount}
-                onProjectLevelToggle={handleProjectLevelToggle}
-              />
-            </div>
+        {/* Action buttons - right aligned */}
+        <div className="d-flex justify-content-end align-items-center mb-3 gap-2">
+          <CButton
+            color="secondary"
+            variant="outline"
+            size="sm"
+            onClick={() => setQuickAddCategoryOpen(true)}
+          >
+            + Quick Add Category
+          </CButton>
+          <CButton color="primary" size="sm" onClick={openCreateModal}>
+            + Add Item
+          </CButton>
+        </div>
 
-            <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-              <ModeSelector activeMode={mode} onModeChange={handleModeChange} />
-              <div className="d-flex gap-2 align-items-center">
-                {hasDateData && (
-                  <div className="form-check form-switch">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="ganttToggle"
-                      checked={showGantt}
-                      onChange={(e) => setShowGantt(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <label
-                      className="form-check-label text-secondary small"
-                      htmlFor="ganttToggle"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      Timeline
-                    </label>
-                  </div>
-                )}
-                <CButton
-                  color="secondary"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setQuickAddCategoryOpen(true)}
-                >
-                  + Quick Add Category
-                </CButton>
-                <CButton color="primary" size="sm" onClick={openCreateModal}>
-                  + Add Item
-                </CButton>
-              </div>
-            </div>
-            <div className="row g-3">
-              <div className={
-                hasDateData && showGantt ? 'col-lg-9' : 'col-12'
-              }>
-                <BudgetDataGrid
-                  data={data}
-                  mode={mode}
-                  projectId={projectId}
-                  selectedItem={selected}
-                  onRowSelect={setSelected}
-                  onInlineCommit={handleInlineCommit}
-                  onOpenModal={mode === 'napkin' ? undefined : openEditModal}
-                  projectTypeCode={projectTypeCode}
-                  onRequestRowAdd={handleAddFromRow}
-                  onRequestRowDelete={handleRequestDelete}
-                  onRequestGroupAdd={handleGroupAdd}
-                  hasFrontFeet={hasFrontFeet}
-                  costInflationRate={costInflationRate}
-                />
-              </div>
-              {hasDateData && showGantt && (
-                <div className="col-lg-3">
-                  <div className="mb-3">
-                    <TimelineChart data={data} selectedItem={selected} onItemSelect={setSelected} />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="small text-secondary mt-2">
-              Showing {data.length} budget item{data.length !== 1 ? 's' : ''}
-            </div>
-          </>
-        )}
+        {/* Budget Grid - always full width now */}
+        <BudgetDataGrid
+          data={data}
+          mode={mode}
+          projectId={projectId}
+          selectedItem={selected}
+          onRowSelect={setSelected}
+          onInlineCommit={handleInlineCommit}
+          onOpenModal={mode === 'napkin' ? undefined : openEditModal}
+          projectTypeCode={projectTypeCode}
+          onRequestRowAdd={handleAddFromRow}
+          onRequestRowDelete={handleRequestDelete}
+          onRequestGroupAdd={handleGroupAdd}
+          hasFrontFeet={hasFrontFeet}
+          costInflationRate={costInflationRate}
+        />
 
-        {activeSubTab === 'timeline' && <TimelineTab projectId={projectId} />}
-        {activeSubTab === 'sales' && <SalesContent projectId={projectId} />}
+        <div className="small text-secondary mt-2">
+          Showing {data.length} budget item{data.length !== 1 ? 's' : ''}
+        </div>
       </CCardBody>
 
       <BudgetItemModalV2

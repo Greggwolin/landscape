@@ -61,6 +61,7 @@ export async function POST(
       message: body.message || body.content,
       clientRequestId: body.clientRequestId || body.client_request_id || crypto.randomUUID(),
       active_tab: body.activeTab || 'home',  // snake_case for Python backend
+      page_context: body.pageContext || body.page_context || body.activeTab || null,  // For context-aware tool filtering
     };
 
     const response = await fetch(

@@ -3,19 +3,22 @@
 /**
  * DCFView Component
  *
- * Displays DCF (Discounted Cash Flow) analysis results including:
- * - Cash flow projection table (year-by-year)
+ * Displays DCF (Discounted Cash Flow) analysis results using the shared CashFlowGrid.
+ * Supports monthly/quarterly/annual/overall time scale toggle.
+ *
+ * Features:
+ * - Cash flow projection grid with time scale selector
  * - Exit analysis summary
  * - Valuation metrics (PV, IRR)
  * - 2D sensitivity matrix (discount rate × exit cap rate)
  *
- * Session: DCF Implementation
+ * Session: DCF Implementation / MF DCF Unification
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { CashFlowGrid, TimeScale } from '@/components/analysis/shared';
 import type {
   DCFViewProps,
-  DCFCashFlowPeriod,
   DCFSensitivityRow,
 } from '@/types/income-approach';
 import {
@@ -26,13 +29,31 @@ import {
   formatPerSF,
   DCF_TILE_COLOR,
 } from '@/types/income-approach';
+import {
+  aggregateMFCashFlow,
+  formatMFDcfValue,
+  type MFDcfMonthlyApiResponse,
+} from './mfCashFlowTransform';
 
 interface ExtendedDCFViewProps extends DCFViewProps {
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
+  monthlyData?: MFDcfMonthlyApiResponse | null;
 }
 
-export function DCFView({ data, propertySummary, isLoading, onMethodChange }: ExtendedDCFViewProps) {
-  const [showAllYears, setShowAllYears] = useState(false);
+export function DCFView({
+  data,
+  propertySummary,
+  isLoading,
+  onMethodChange,
+  monthlyData,
+}: ExtendedDCFViewProps) {
+  const [timeScale, setTimeScale] = useState<TimeScale>('annual');
+
+  // Transform monthly data for grid display
+  const gridData = useMemo(() => {
+    if (!monthlyData) return null;
+    return aggregateMFCashFlow(monthlyData, timeScale);
+  }, [monthlyData, timeScale]);
 
   if (isLoading) {
     return (
@@ -54,13 +75,6 @@ export function DCFView({ data, propertySummary, isLoading, onMethodChange }: Ex
   }
 
   const { projections, exit_analysis, metrics, sensitivity_matrix, assumptions } = data;
-
-  // Show first 3, last 2, or all years
-  const displayedProjections = showAllYears
-    ? projections
-    : projections.length <= 5
-      ? projections
-      : [...projections.slice(0, 3), null, ...projections.slice(-2)];
 
   return (
     <div className="space-y-6">
@@ -98,104 +112,25 @@ export function DCFView({ data, propertySummary, isLoading, onMethodChange }: Ex
         </span>
       </div>
 
-      {/* Cash Flow Projection Table */}
-      <div
-        className="rounded-lg overflow-hidden"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          border: '1px solid var(--cui-border-color)',
-        }}
-      >
-        <div
-          className="px-4 py-3 border-b flex items-center justify-between"
-          style={{ borderColor: 'var(--cui-border-color)' }}
-        >
-          <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-            Cash Flow Projections
-          </h3>
-          {projections.length > 5 && (
-            <button
-              onClick={() => setShowAllYears(!showAllYears)}
-              className="text-sm px-2 py-1 rounded"
-              style={{
-                color: DCF_TILE_COLOR.text,
-                backgroundColor: DCF_TILE_COLOR.bg,
-              }}
-            >
-              {showAllYears ? 'Show Summary' : `Show All ${projections.length} Years`}
-            </button>
-          )}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-                <th className="px-3 py-2 text-left" style={{ color: 'var(--cui-secondary-color)' }}>Year</th>
-                <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>GPR</th>
-                <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>Vacancy</th>
-                <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>EGI</th>
-                <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>OpEx</th>
-                <th className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>NOI</th>
-                <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>PV Factor</th>
-                <th className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>PV of NOI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedProjections.map((period, idx) => {
-                if (period === null) {
-                  return (
-                    <tr key="ellipsis" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                      <td colSpan={8} className="px-3 py-2 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
-                        ...
-                      </td>
-                    </tr>
-                  );
-                }
-                return (
-                  <CashFlowRow key={period.year} period={period} isLast={period.year === projections.length} />
-                );
-              })}
-              {/* Exit row */}
-              <tr
-                style={{
-                  borderTop: '2px solid var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-tertiary-bg)',
-                }}
-              >
-                <td className="px-3 py-2 font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                  Exit (Yr {projections.length})
-                </td>
-                <td colSpan={4} className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
-                  Terminal NOI: {formatCurrencyCompact(exit_analysis.terminal_noi)}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                  {formatCurrencyCompact(exit_analysis.net_reversion)}
-                </td>
-                <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
-                  {(1 / Math.pow(1 + assumptions.discount_rate, projections.length)).toFixed(4)}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>
-                  {formatCurrencyCompact(exit_analysis.pv_reversion)}
-                </td>
-              </tr>
-              {/* Total row */}
-              <tr
-                style={{
-                  borderTop: '2px solid var(--cui-border-color)',
-                  backgroundColor: DCF_TILE_COLOR.bg,
-                }}
-              >
-                <td colSpan={7} className="px-3 py-3 font-bold text-right" style={{ color: 'var(--cui-body-color)' }}>
-                  PRESENT VALUE
-                </td>
-                <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: DCF_TILE_COLOR.text }}>
-                  {formatCurrency(metrics.present_value)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Cash Flow Grid (if monthly data available) OR Legacy Table */}
+      {gridData ? (
+        <CashFlowGrid
+          periods={gridData.periods}
+          sections={gridData.sections}
+          timeScale={timeScale}
+          onTimeScaleChange={setTimeScale}
+          showTimeScaleToggle={true}
+          formatValue={formatMFDcfValue}
+          title="Cash Flow Projections"
+        />
+      ) : (
+        <LegacyCashFlowTable
+          projections={projections}
+          exit_analysis={exit_analysis}
+          assumptions={assumptions}
+          metrics={metrics}
+        />
+      )}
 
       {/* Exit Analysis + Valuation Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -302,9 +237,133 @@ export function DCFView({ data, propertySummary, isLoading, onMethodChange }: Ex
 }
 
 /**
- * Cash flow row component
+ * Legacy cash flow table (used when monthly data not available)
  */
-function CashFlowRow({ period, isLast }: { period: DCFCashFlowPeriod; isLast: boolean }) {
+function LegacyCashFlowTable({
+  projections,
+  exit_analysis,
+  assumptions,
+  metrics,
+}: {
+  projections: any[];
+  exit_analysis: any;
+  assumptions: any;
+  metrics: any;
+}) {
+  const [showAllYears, setShowAllYears] = useState(false);
+
+  // Show first 3, last 2, or all years
+  const displayedProjections = showAllYears
+    ? projections
+    : projections.length <= 5
+      ? projections
+      : [...projections.slice(0, 3), null, ...projections.slice(-2)];
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        border: '1px solid var(--cui-border-color)',
+      }}
+    >
+      <div
+        className="px-4 py-3 border-b flex items-center justify-between"
+        style={{ borderColor: 'var(--cui-border-color)' }}
+      >
+        <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+          Cash Flow Projections
+        </h3>
+        {projections.length > 5 && (
+          <button
+            onClick={() => setShowAllYears(!showAllYears)}
+            className="text-sm px-2 py-1 rounded"
+            style={{
+              color: DCF_TILE_COLOR.text,
+              backgroundColor: DCF_TILE_COLOR.bg,
+            }}
+          >
+            {showAllYears ? 'Show Summary' : `Show All ${projections.length} Years`}
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
+          <thead>
+            <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+              <th className="px-3 py-2 text-left" style={{ color: 'var(--cui-secondary-color)' }}>Year</th>
+              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>GPR</th>
+              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>Vacancy</th>
+              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>EGI</th>
+              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>OpEx</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>NOI</th>
+              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>PV Factor</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>PV of NOI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayedProjections.map((period, idx) => {
+              if (period === null) {
+                return (
+                  <tr key="ellipsis" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                    <td colSpan={8} className="px-3 py-2 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+                      ...
+                    </td>
+                  </tr>
+                );
+              }
+              return (
+                <LegacyCashFlowRow key={period.year} period={period} isLast={period.year === projections.length} />
+              );
+            })}
+            {/* Exit row */}
+            <tr
+              style={{
+                borderTop: '2px solid var(--cui-border-color)',
+                backgroundColor: 'var(--cui-tertiary-bg)',
+              }}
+            >
+              <td className="px-3 py-2 font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                Exit (Yr {projections.length})
+              </td>
+              <td colSpan={4} className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+                Terminal NOI: {formatCurrencyCompact(exit_analysis.terminal_noi)}
+              </td>
+              <td className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                {formatCurrencyCompact(exit_analysis.net_reversion)}
+              </td>
+              <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+                {(1 / Math.pow(1 + assumptions.discount_rate, projections.length)).toFixed(4)}
+              </td>
+              <td className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>
+                {formatCurrencyCompact(exit_analysis.pv_reversion)}
+              </td>
+            </tr>
+            {/* Total row */}
+            <tr
+              style={{
+                borderTop: '2px solid var(--cui-border-color)',
+                backgroundColor: DCF_TILE_COLOR.bg,
+              }}
+            >
+              <td colSpan={7} className="px-3 py-3 font-bold text-right" style={{ color: 'var(--cui-body-color)' }}>
+                PRESENT VALUE
+              </td>
+              <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: DCF_TILE_COLOR.text }}>
+                {formatCurrency(metrics.present_value)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Legacy cash flow row component
+ */
+function LegacyCashFlowRow({ period, isLast }: { period: any; isLast: boolean }) {
   return (
     <tr
       style={{

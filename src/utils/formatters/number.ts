@@ -15,10 +15,16 @@ export const formatNumber = (
 
 export const formatMoney = (
   v: number | null | undefined,
-  opts?: Intl.NumberFormatOptions
+  optsOrDecimals?: Intl.NumberFormatOptions | number
 ): string => {
   if (v == null) return '';
   if (v === 0) return '—'; // Render zero as dash
+
+  // Allow passing a number as shorthand for maximumFractionDigits
+  const opts: Intl.NumberFormatOptions = typeof optsOrDecimals === 'number'
+    ? { maximumFractionDigits: optsOrDecimals, minimumFractionDigits: optsOrDecimals }
+    : optsOrDecimals || {};
+
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: 'USD',

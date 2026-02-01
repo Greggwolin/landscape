@@ -41,12 +41,14 @@ from .views_income_approach import (
     income_approach_data,
     update_income_approach_assumptions,
     income_approach_dcf,
+    income_approach_dcf_monthly,
 )
 from .views_dcf_analysis import (
     DcfAnalysisView,
     GrowthRateSetsView,
     GrowthRateSetDetailView,
 )
+from .views_land_dev_cashflow import LandDevCashFlowView
 
 router = DefaultRouter()
 
@@ -94,11 +96,15 @@ urlpatterns = [
     path('valuation/income-approach-data/<int:project_id>/', income_approach_data, name='income-approach-data'),
     path('valuation/income-approach-data/<int:project_id>/update/', update_income_approach_assumptions, name='income-approach-update'),
     path('valuation/income-approach-data/<int:project_id>/dcf/', income_approach_dcf, name='income-approach-dcf'),
+    path('valuation/income-approach-data/<int:project_id>/dcf/monthly/', income_approach_dcf_monthly, name='income-approach-dcf-monthly'),
 
     # DCF Analysis endpoints (unified for CRE and Land Dev)
     path('valuation/dcf-analysis/<int:project_id>/', DcfAnalysisView.as_view(), name='dcf-analysis'),
     path('growth-rate-sets/', GrowthRateSetsView.as_view(), name='growth-rate-sets'),
     path('growth-rate-sets/<int:set_id>/', GrowthRateSetDetailView.as_view(), name='growth-rate-set-detail'),
+
+    # Land Development Cash Flow endpoint
+    path('projects/<int:project_id>/cash-flow/calculate/', LandDevCashFlowView.as_view(), name='land-dev-cashflow'),
 
     # Router URLs (ViewSets)
     path('', include(router.urls)),

@@ -5,6 +5,7 @@ Main URL routing for the Django REST API.
 """
 from django.contrib import admin
 from django.urls import path, include
+from apps.knowledge.views import alpha_views
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -51,5 +52,6 @@ urlpatterns = [
     path("api/", include('apps.feedback.urls')),  # Tester feedback system
     path("api/v1/location-intelligence/", include('apps.location_intelligence.urls')),  # Location Intelligence
     path("api/v1/map/", include('apps.location_intelligence.urls_map')),  # Map features (draw tools)
+    path("api/alpha/feedback/", alpha_views.AlphaFeedbackView.as_view(), name='alpha_feedback'),
     path("api/", include('apps.valuation.urls')),  # Valuation approaches
 ]

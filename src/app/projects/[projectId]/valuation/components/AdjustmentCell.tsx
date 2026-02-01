@@ -65,7 +65,7 @@ export function AdjustmentCell({
 
   return (
     <td
-      className="py-1 px-2 text-center border-l"
+      className="py-1 px-4 text-center border-l"
       style={{
         borderColor: 'var(--cui-border-color)',
         whiteSpace: 'nowrap'
@@ -77,16 +77,18 @@ export function AdjustmentCell({
         onChange={handleFinalInputChange}
         onBlur={handleBlur}
         placeholder="-"
-        className="w-full px-1 py-0.5 text-xs text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+        className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{
-          backgroundColor: 'transparent',
+          color: 'var(--cui-body-color)',
+          outline: 'none',
+          boxShadow: 'none',
           border: 'none',
           borderWidth: 0,
           borderRadius: 0,
-          color: 'var(--cui-body-color)',
+          backgroundColor: 'transparent',
           fontSize: '13px',
-          outline: 'none',
-          boxShadow: 'none'
+          lineHeight: '1.2',
+          minHeight: '20px'
         }}
       />
     </td>

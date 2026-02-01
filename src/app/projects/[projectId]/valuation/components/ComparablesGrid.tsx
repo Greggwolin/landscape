@@ -338,11 +338,11 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
       case 'sale_date':
         return comp.sale_date || '';
       case 'sale_price':
-        return comp.sale_price != null ? comp.sale_price.toFixed(2) : '';
+        return comp.sale_price != null ? Number(comp.sale_price).toFixed(2) : '';
       case 'price_per_unit':
-        return comp.price_per_unit != null ? comp.price_per_unit.toFixed(2) : '';
+        return comp.price_per_unit != null ? Number(comp.price_per_unit).toFixed(2) : '';
       case 'price_per_sf':
-        return comp.price_per_sf != null ? comp.price_per_sf.toFixed(2) : '';
+        return comp.price_per_sf != null ? Number(comp.price_per_sf).toFixed(2) : '';
       case 'units':
         return comp.units != null ? comp.units.toString() : '';
       case 'building_sf':
@@ -374,7 +374,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
         step={step}
         value={getFieldDisplayValue(comp, field)}
         placeholder={placeholder}
-        className="w-full px-2 py-1 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+        className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{
           color: 'var(--cui-body-color)',
           outline: 'none',
@@ -383,7 +383,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
           borderWidth: 0,
           borderRadius: 0,
           backgroundColor: 'transparent',
-          fontSize: '13px'
+          fontSize: '13px',
+          lineHeight: '1.2',
+          height: '18px'
         }}
         onChange={(event) => {
           setPendingFieldValue(comp.comparable_id, field, event.target.value);
@@ -670,10 +672,10 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 }}
               >
                 <th
-                  className="text-left py-3 px-4 font-semibold sticky left-0 z-10"
+                  className="text-left py-1 px-2 font-semibold sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-tertiary-bg)'
+                    backgroundColor: '#F0F1F2'
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -695,7 +697,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 {comparables.map((comp, idx) => (
                   <th
                     key={`comp-header-${comp.comparable_id}`}
-                    className="text-center py-3 px-4 font-semibold border-l"
+                    className="text-center py-1 px-2 font-semibold border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)'
@@ -752,7 +754,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Location - Distance and Bearing */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -761,9 +763,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   Location
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`loc-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l text-sm"
+                    className="py-1 px-4 text-center border-l text-sm"
                     style={{
                       color: 'var(--cui-secondary-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -778,7 +780,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Date */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -787,9 +789,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   Date
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`date-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l"
+                    className="py-1 px-4 text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -807,7 +809,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Sale Price */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -816,9 +818,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   Sale Price
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`price-${comp.comparable_id}`}
-                    className="py-2 px-4 font-medium text-center border-l"
+                    className="py-1 px-4 font-medium text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -837,7 +839,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Price/Unit (or Price/Acre for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -846,9 +848,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Price/Unit')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`ppu-${comp.comparable_id}`}
-                    className="py-2 px-4 font-medium text-center border-l"
+                    className="py-1 px-4 font-medium text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -867,7 +869,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Price/SF (or Price/Front Foot for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -876,9 +878,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Price/SF')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`psf-${comp.comparable_id}`}
-                    className="py-2 px-4 font-medium text-center border-l"
+                    className="py-1 px-4 font-medium text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -897,7 +899,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Units (or Acres for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -906,9 +908,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Units')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`units-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l"
+                    className="py-1 px-4 text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -927,7 +929,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Building SF (or Zoning for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -936,9 +938,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Building SF')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`bsf-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l"
+                    className="py-1 px-4 text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -957,7 +959,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Cap Rate (or Entitlements for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -966,9 +968,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Cap Rate')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`cap-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l"
+                    className="py-1 px-4 text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',
@@ -987,7 +989,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               {/* Year Built (or Utilities for land) */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
-                  className="py-2 px-4 font-medium sticky left-0 z-10"
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-secondary-color)',
                     backgroundColor: 'var(--cui-card-bg)'
@@ -996,9 +998,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   {getFieldLabel('Year Built')}
                 </td>
                 {comparables.map(comp => (
-                  <td
+                <td
                     key={`year-${comp.comparable_id}`}
-                    className="py-2 px-4 text-center border-l"
+                    className="py-1 px-4 text-center border-l"
                     style={{
                       color: 'var(--cui-body-color)',
                       borderColor: 'var(--cui-border-color)',

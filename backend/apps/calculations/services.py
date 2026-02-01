@@ -77,35 +77,21 @@ class CalculationService:
         return rows
 
     @staticmethod
-    def _fetch_cashflows_from_ts_engine(project_id: int):
+    def _fetch_cashflows_from_django_service(project_id: int):
         """
-        Fetch cash flows from the TypeScript cash flow engine API.
-
-        The TypeScript engine at /api/projects/[projectId]/cash-flow/generate
-        is the authoritative source that produces the correct totals
-        ($144.7M costs, $299.8M revenue for project 9).
+        Fetch cash flows from the Django LandDevCashFlowService.
 
         Returns list of (period_id, period_date, net_cash_flow) tuples.
         Net cash flow is negative for costs (contributions) and positive for revenue (distributions).
         """
-        import urllib.request
-        import json
         from datetime import datetime
         from collections import defaultdict
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
 
         try:
-            # Call the TypeScript cash flow API
-            url = f'http://localhost:3000/api/projects/{project_id}/cash-flow/generate'
-            req = urllib.request.Request(
-                url,
-                data=json.dumps({}).encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
-                method='POST'
-            )
-            with urllib.request.urlopen(req, timeout=30) as response:
-                data = json.loads(response.read().decode('utf-8'))
+            service = LandDevCashFlowService(project_id)
+            cf_data = service.calculate()
 
-            cf_data = data.get('data', {})
             summary = cf_data.get('summary', {})
             periods = cf_data.get('periods', [])
             sections = cf_data.get('sections', [])
@@ -113,7 +99,7 @@ class CalculationService:
             # Validate totals
             total_costs = summary.get('totalCosts', 0)
             total_net_revenue = summary.get('totalNetRevenue', 0)
-            print(f"[waterfall] TS engine: costs=${total_costs:,.2f}, net_revenue=${total_net_revenue:,.2f}")
+            print(f"[waterfall] Django engine: costs=${total_costs:,.2f}, net_revenue=${total_net_revenue:,.2f}")
 
             if not periods:
                 return []
@@ -121,14 +107,15 @@ class CalculationService:
             # Parse the sections to get per-period costs and revenue
             # Cost sections: Development Costs, Planning & Engineering, Land Acquisition
             # Revenue section: NET REVENUE (to avoid double-counting gross + deductions)
-            cost_section_names = {'Development Costs', 'Planning & Engineering', 'Land Acquisition'}
-            revenue_section_names = {'NET REVENUE'}
+            # Note: Django service returns uppercase section names (e.g., 'DEVELOPMENT COSTS')
+            cost_section_names = {'development costs', 'planning & engineering', 'land acquisition'}
+            revenue_section_names = {'net revenue'}
 
             period_costs = defaultdict(float)
             period_revenue = defaultdict(float)
 
             for section in sections:
-                sname = section.get('sectionName', '')
+                sname = section.get('sectionName', '').lower()
                 is_cost = sname in cost_section_names
                 is_revenue = sname in revenue_section_names
 
@@ -146,7 +133,7 @@ class CalculationService:
                             if is_revenue:
                                 period_revenue[ps] += abs(amt)
 
-            # Get period dates from TypeScript response
+            # Get period dates from response
             period_dates = {}
             for p in periods:
                 ps = p.get('periodSequence', 0)
@@ -193,7 +180,7 @@ class CalculationService:
 
         except Exception as e:
             import traceback
-            print(f"[waterfall] Error fetching from TS engine: {e}")
+            print(f"[waterfall] Error fetching from Django service: {e}")
             traceback.print_exc()
             return []
 
@@ -659,9 +646,9 @@ class CalculationService:
                     'gp_split_pct': float(row[5]) if row[5] else 10,
                 })
 
-            # Fetch cash flows from the TypeScript engine (authoritative source)
+            # Fetch cash flows from Django LandDevCashFlowService (authoritative source)
             # Uses pre-computed allocations from tbl_budget_timing + parcel sales
-            cf_rows = CalculationService._fetch_cashflows_from_ts_engine(project_id)
+            cf_rows = CalculationService._fetch_cashflows_from_django_service(project_id)
 
             if not cf_rows:
                 # Fallback to pre-populated summary table if exists

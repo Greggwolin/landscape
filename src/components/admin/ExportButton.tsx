@@ -10,6 +10,7 @@ import type { ReportTemplate } from '@/hooks/useReports';
 interface ExportButtonProps {
   tabName: string;
   projectId: string;
+  size?: 'sm' | 'lg';
 }
 
 /**
@@ -19,11 +20,12 @@ interface ExportButtonProps {
  * Always visible - shows dropdown of available report templates OR "Create Template" option.
  * Handles report generation and download.
  */
-export default function ExportButton({ tabName, projectId }: ExportButtonProps) {
+export default function ExportButton({ tabName, projectId, size }: ExportButtonProps) {
   const { data: templates, isLoading } = useReportTemplatesForTab(tabName);
   const generateReport = useGenerateReport();
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const sizeClass = size ? `btn-${size}` : '';
 
   const handleExport = async (template: ReportTemplate) => {
     setGeneratingId(template.id);
@@ -80,18 +82,19 @@ export default function ExportButton({ tabName, projectId }: ExportButtonProps) 
     return (
       <>
         <CDropdown variant="btn-group">
-          <LandscapeButton
-            variant="outline-primary"
-            onClick={() => handleExport(template)}
-            disabled={isGenerating || isLoading}
-          >
-            {isGenerating ? 'Generating...' : `Export ${template.output_format.toUpperCase()}`}
-          </LandscapeButton>
-          <CDropdownToggle
-            split
-            className="btn btn-outline-primary"
-            disabled={isLoading || !!generatingId}
-          />
+        <LandscapeButton
+          variant="outline-primary"
+          onClick={() => handleExport(template)}
+          disabled={isGenerating || isLoading}
+          size={size}
+        >
+          {isGenerating ? 'Generating...' : `Export ${template.output_format.toUpperCase()}`}
+        </LandscapeButton>
+        <CDropdownToggle
+          split
+          className={`btn btn-outline-primary ${sizeClass}`.trim()}
+          disabled={isLoading || !!generatingId}
+        />
           <CDropdownMenu>
             <CDropdownItem onClick={handleCreateTemplate}>
               <span className="me-2">➕</span>
@@ -116,7 +119,7 @@ export default function ExportButton({ tabName, projectId }: ExportButtonProps) 
     <>
       <CDropdown variant="btn-group">
         <CDropdownToggle
-          className="btn btn-outline-primary"
+          className={`btn btn-outline-primary ${sizeClass}`.trim()}
           disabled={isLoading || !!generatingId}
         >
           {generatingId ? 'Generating...' : 'Export Report'}

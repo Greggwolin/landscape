@@ -54,11 +54,35 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
     }
   };
 
+  // Format parcel codes: render as multi-line with 4 parcels per row
+  const renderParcelList = (parcels: typeof sale.parcels) => {
+    const codes = parcels.map(p => p.parcel_code);
+    if (codes.length <= 4) {
+      return <span>{codes.join(', ')}</span>;
+    }
+    // Group into rows of 4
+    const rows: string[][] = [];
+    for (let i = 0; i < codes.length; i += 4) {
+      rows.push(codes.slice(i, i + 4));
+    }
+    return (
+      <>
+        {rows.map((row, idx) => (
+          <div key={idx} style={{ textAlign: 'right' }}>
+            {row.join(', ')}{idx < rows.length - 1 ? ',' : ''}
+          </div>
+        ))}
+      </>
+    );
+  };
+
   return (
     <div
       className="transaction-column"
       style={{
-        minWidth: '240px',
+        flex: '0 0 calc(33.333% - 0.75rem)',
+        minWidth: '300px',
+        maxWidth: 'calc(33.333% - 0.75rem)',
         background: 'var(--cui-card-bg)',
         border: '1px solid var(--cui-border-color)',
         borderRadius: '0.375rem',
@@ -67,8 +91,8 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
     >
       {/* Header */}
       <div className="mb-3">
-        <h6 className="text-primary mb-1">{formatDate(sale.saleDate)}</h6>
         <div className="d-flex align-items-center gap-2">
+          <h6 className="text-primary mb-0">{formatDate(sale.saleDate)}</h6>
           {editingName ? (
             <>
               <input
@@ -76,6 +100,7 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
                 value={saleName}
                 onChange={(e) => setSaleName(e.target.value)}
                 className="form-control form-control-sm"
+                style={{ width: '120px' }}
                 placeholder="Name this sale..."
                 disabled={isSaving}
               />
@@ -103,48 +128,53 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
             <>
               <span className="text-muted small">{saleName}</span>
               <button
-                className="btn btn-sm btn-ghost-secondary"
+                className="btn btn-sm btn-ghost-secondary p-0"
                 onClick={() => setEditingName(true)}
                 aria-label="Edit sale name"
+                style={{ lineHeight: 1 }}
               >
                 ✏️
               </button>
             </>
           )}
+          <CBadge color="secondary" style={{ marginLeft: 'auto' }}>
+            {sale.parcels.length} parcel{sale.parcels.length !== 1 ? 's' : ''}
+          </CBadge>
         </div>
-        <CBadge color="secondary" className="mt-1">
-          {sale.parcels.length} parcel{sale.parcels.length !== 1 ? 's' : ''}
-        </CBadge>
       </div>
 
-      {/* Physical Summary */}
+      {/* Physical Summary - Inline layout */}
       <div className="mb-3">
-        <div className="small text-muted mb-1">Parcels:</div>
-        <div className="small" style={{ maxHeight: '60px', overflow: 'auto' }}>
-          {sale.parcels.map(p => p.parcel_code).join(', ')}
+        <div className="d-flex justify-content-between small mb-1">
+          <span className="text-muted" style={{ alignSelf: 'flex-start' }}>Parcels:</span>
+          <div style={{ textAlign: 'right', maxWidth: '180px' }}>
+            {renderParcelList(sale.parcels)}
+          </div>
         </div>
 
-        <div className="small text-muted mt-2 mb-1">Gross Acres:</div>
-        <div className="small">{sale.grossAcres.toFixed(2)}</div>
+        <div className="d-flex justify-content-between small mb-1">
+          <span className="text-muted">Gross Acres:</span>
+          <span>{sale.grossAcres.toFixed(2)}</span>
+        </div>
 
         {sale.units && sale.units > 0 && (
-          <>
-            <div className="small text-muted mt-2 mb-1">Units:</div>
-            <div className="small">{sale.units.toLocaleString()}</div>
-          </>
+          <div className="d-flex justify-content-between small mb-1">
+            <span className="text-muted">Units:</span>
+            <span>{sale.units.toLocaleString()}</span>
+          </div>
         )}
 
         {sale.frontFeet && sale.frontFeet > 0 && (
-          <>
-            <div className="small text-muted mt-2 mb-1">Front Feet:</div>
-            <div className="small">{sale.frontFeet.toLocaleString()}</div>
-          </>
+          <div className="d-flex justify-content-between small mb-1">
+            <span className="text-muted">Front Feet:</span>
+            <span>{sale.frontFeet.toLocaleString()}</span>
+          </div>
         )}
       </div>
 
       {/* Revenue Breakdown */}
       <div className="mb-3">
-        <div className="fw-medium mb-2">Gross Retail Revenue</div>
+        <div className="fw-medium mb-2">Gross Parcel Price</div>
 
         {sale.residentialRevenue > 0 && (
           <div
@@ -153,7 +183,7 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
             title={`Parcels: ${sale.revenueAttribution.residential.join(', ')}`}
           >
             <span className="text-muted">Residential Land:</span>
-            <span className="text-success">{formatMoney(sale.residentialRevenue, 0)}</span>
+            <span>{formatMoney(sale.residentialRevenue, 0)}</span>
           </div>
         )}
 
@@ -164,26 +194,38 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
             title={`Parcels: ${sale.revenueAttribution.commercial.join(', ')}`}
           >
             <span className="text-muted">Commercial Revenue:</span>
-            <span className="text-success">{formatMoney(sale.commercialRevenue, 0)}</span>
+            <span>{formatMoney(sale.commercialRevenue, 0)}</span>
           </div>
         )}
 
         <div className="d-flex justify-content-between small fw-medium border-top pt-1 mt-1">
-          <span>Total:</span>
-          <span className="text-success">{formatMoney(sale.totalRevenue, 0)}</span>
+          <span>Total Gross Price:</span>
+          <span>{formatMoney(sale.totalRevenue, 0)}</span>
         </div>
       </div>
 
-      {/* Deductions */}
+      {/* Deductions - Order matches Cash Flow report: Commissions, Transaction Costs, Subdivision */}
       <div className="mb-3">
-        <div className="d-flex justify-content-between small mb-1">
-          <span className="text-muted">Less: Commissions (3%):</span>
-          <span className="text-danger">({formatMoney(sale.commissions, 0)})</span>
-        </div>
-        <div className="d-flex justify-content-between small mb-1">
-          <span className="text-muted">Less: Closing Cost (2%):</span>
-          <span className="text-danger">({formatMoney(sale.closingCosts, 0)})</span>
-        </div>
+        {sale.commissions > 0 && (
+          <div className="d-flex justify-content-between small mb-1">
+            <span className="text-muted">Less: Commissions:</span>
+            <span className="text-danger">({formatMoney(sale.commissions, 0)})</span>
+          </div>
+        )}
+
+        {sale.closingCosts > 0 && (
+          <div className="d-flex justify-content-between small mb-1">
+            <span className="text-muted">Less: Transaction Costs:</span>
+            <span className="text-danger">({formatMoney(sale.closingCosts, 0)})</span>
+          </div>
+        )}
+
+        {sale.improvementOffset > 0 && (
+          <div className="d-flex justify-content-between small mb-1">
+            <span className="text-muted">Less: Subdivision Costs:</span>
+            <span className="text-danger">({formatMoney(sale.improvementOffset, 0)})</span>
+          </div>
+        )}
       </div>
 
       {/* Net Result */}
@@ -192,7 +234,7 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
         style={{ background: 'var(--cui-tertiary-bg)', padding: '0.5rem', margin: '0 -1rem -1rem', borderRadius: '0 0 0.375rem 0.375rem' }}
       >
         <div className="d-flex justify-content-between align-items-center px-3">
-          <span className="fw-medium">Gross Sale Revenue:</span>
+          <span className="fw-medium">Net Sale Proceeds:</span>
           <span className="text-success fw-bold fs-6">
             {formatMoney(sale.netProceeds, 0)}
           </span>

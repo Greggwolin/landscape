@@ -422,8 +422,13 @@ export default function CashFlowTable({ schedule }: Props) {
               {/* REVENUE */}
               <SectionLabel label="REVENUE" colSpan={colCount} />
               {(() => {
-                // Determine if Subdivision Costs will be shown (non-zero deductions)
-                const hasDeductions = revenueDeductionsSection && revenueDeductionsSection.sectionTotal !== 0;
+                // Get individual deduction line items (Commissions, Transaction Costs, Subdivision Costs)
+                const deductionItems = revenueDeductionsSection?.lineItems || [];
+                const commissionsItem = deductionItems.find(item => item.description === 'Commissions');
+                const transactionCostsItem = deductionItems.find(item => item.description === 'Transaction Costs');
+                const subdivisionCostsItem = deductionItems.find(item => item.description === 'Subdivision Costs');
+                const hasAnyDeductions = deductionItems.length > 0;
+
                 return (
                   <>
                     {grossRevenueSection && (
@@ -433,14 +438,32 @@ export default function CashFlowTable({ schedule }: Props) {
                         total={grossRevenueSection.sectionTotal}
                         hideTotal={overallMode}
                         indent
-                        bottomBorder={!hasDeductions}
+                        bottomBorder={!hasAnyDeductions}
                       />
                     )}
-                    {hasDeductions && (
+                    {commissionsItem && commissionsItem.values && (
                       <DataRow
-                        label="Subdivision Costs"
-                        values={revenueDeductionsSection!.subtotals}
-                        total={revenueDeductionsSection!.sectionTotal}
+                        label="Less: Commissions"
+                        values={commissionsItem.values}
+                        total={commissionsItem.total}
+                        hideTotal={overallMode}
+                        indent
+                      />
+                    )}
+                    {transactionCostsItem && transactionCostsItem.values && (
+                      <DataRow
+                        label="Less: Transaction Costs"
+                        values={transactionCostsItem.values}
+                        total={transactionCostsItem.total}
+                        hideTotal={overallMode}
+                        indent
+                      />
+                    )}
+                    {subdivisionCostsItem && subdivisionCostsItem.values && (
+                      <DataRow
+                        label="Less: Subdivision Costs"
+                        values={subdivisionCostsItem.values}
+                        total={subdivisionCostsItem.total}
                         hideTotal={overallMode}
                         indent
                         bottomBorder={true}

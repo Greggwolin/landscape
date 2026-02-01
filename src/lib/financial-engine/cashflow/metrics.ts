@@ -21,16 +21,16 @@ import type {
  * Calculate Internal Rate of Return using Newton-Raphson method
  *
  * @param cashFlows - Array of period cash flows (negatives are outflows)
- * @param guess - Initial guess for IRR (default 0.1 = 10%)
+ * @param guess - Initial guess for IRR (default: auto-calculated based on cash flows)
  * @param maxIterations - Maximum iterations before giving up (default 100)
- * @param tolerance - Convergence tolerance (default 0.0001)
+ * @param tolerance - Convergence tolerance for rate change (default 1e-7)
  * @returns IRR calculation result with convergence details
  */
 export function calculateIRR(
   cashFlows: number[],
-  guess: number = 0.1,
+  guess?: number,
   maxIterations: number = 100,
-  tolerance: number = 0.0001
+  tolerance: number = 1e-7
 ): IRRCalculationResult {
   if (cashFlows.length < 2) {
     return {
@@ -54,6 +54,48 @@ export function calculateIRR(
     };
   }
 
+  // Calculate a smart initial guess if not provided
+  // Use a simple return-based estimate: (total returns / total investment)^(1/periods) - 1
+  let initialGuess = guess;
+  if (initialGuess === undefined) {
+    const totalInflows = cashFlows.reduce((sum, cf) => cf > 0 ? sum + cf : sum, 0);
+    const totalOutflows = cashFlows.reduce((sum, cf) => cf < 0 ? sum + Math.abs(cf) : sum, 0);
+    if (totalOutflows > 0 && cashFlows.length > 1) {
+      // Simple approximation: periodic rate that would achieve the observed return
+      const totalReturn = totalInflows / totalOutflows;
+      initialGuess = Math.pow(totalReturn, 1 / (cashFlows.length - 1)) - 1;
+      // Clamp to reasonable range
+      initialGuess = Math.max(-0.5, Math.min(0.5, initialGuess));
+    } else {
+      initialGuess = 0.01; // Default to 1% if can't calculate
+    }
+  }
+
+  // Try Newton-Raphson with the initial guess
+  let result = tryNewtonRaphson(cashFlows, initialGuess, maxIterations, tolerance);
+
+  // If didn't converge, try a few other starting points
+  if (!result.converged) {
+    const alternativeGuesses = [0.001, 0.01, 0.05, -0.01, 0.1];
+    for (const altGuess of alternativeGuesses) {
+      if (altGuess === initialGuess) continue;
+      result = tryNewtonRaphson(cashFlows, altGuess, maxIterations, tolerance);
+      if (result.converged) break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Internal Newton-Raphson iteration
+ */
+function tryNewtonRaphson(
+  cashFlows: number[],
+  guess: number,
+  maxIterations: number,
+  tolerance: number
+): IRRCalculationResult {
   let rate = guess;
   let iterations = 0;
 
@@ -62,23 +104,26 @@ export function calculateIRR(
 
     const { npv, dnpv } = npvAndDerivative(cashFlows, rate);
 
-    // Check convergence
-    if (Math.abs(npv) < tolerance) {
-      return {
-        irr: rate,
-        iterations,
-        converged: true,
-        npvAtIRR: npv,
-      };
-    }
-
     // Avoid division by zero
     if (Math.abs(dnpv) < 1e-10) {
       break;
     }
 
     // Newton-Raphson iteration
-    rate = rate - npv / dnpv;
+    const newRate = rate - npv / dnpv;
+
+    // Check convergence based on rate change (not absolute NPV)
+    // This handles large cash flow values where NPV may never reach a tiny absolute value
+    if (Math.abs(newRate - rate) < tolerance) {
+      return {
+        irr: newRate,
+        iterations,
+        converged: true,
+        npvAtIRR: npv,
+      };
+    }
+
+    rate = newRate;
 
     // Prevent unrealistic rates
     if (rate < -0.99 || rate > 10.0) {

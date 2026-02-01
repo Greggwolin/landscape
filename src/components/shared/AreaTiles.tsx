@@ -76,14 +76,14 @@ export default function AreaTiles({
     return proceedsMap
   }, [areas, phases, parcelDataset])
 
-  const gridClass = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2';
+  const gridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3';
 
   if (isLoading) {
     return (
       <div className={gridClass}>
-        {[...Array(4)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="animate-pulse">
-            <div className="h-36 bg-gray-200 rounded border-2"></div>
+            <div className="h-40 bg-gray-200 rounded border-2"></div>
           </div>
         ))}
       </div>
@@ -126,7 +126,7 @@ export default function AreaTiles({
             className={`planning-tile text-center ${isSelected ? 'planning-tile-active' : ''}`}
             onClick={() => onAreaSelect(area.division_id)}
           >
-            <div className="planning-tile-header mb-3">
+            <div className="planning-tile-header mb-3 truncate whitespace-nowrap">
               {labels.level1Label} {displayName}
             </div>
 

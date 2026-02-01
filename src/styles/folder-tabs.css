@@ -381,7 +381,53 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--cui-spacer-3, 1rem);
-  background-color: var(--cui-body-bg);
+  background-color: var(--surface-bg);
+}
+
+/* Sales tab - use white background throughout */
+.studio-folder-content[data-subtab="sales"] {
+  background-color: var(--surface-bg) !important;
+  padding: 0.75rem !important;
+}
+
+.studio-folder-content[data-subtab="sales"] .app-content {
+  width: 100%;
+  margin: 0;
+}
+
+/* Override light-theme page grey for studio layout */
+.light-theme .studio-layout-container {
+  background-color: var(--surface-bg) !important;
+}
+
+/* Budget folder with sales subtab - override card grey background */
+.studio-right-column[data-folder="budget"] .studio-content-card,
+.studio-right-column[data-folder="budget"] .studio-content-card.card,
+.studio-right-column[data-folder="budget"] .card.studio-content-card {
+  background-color: var(--surface-bg) !important;
+  background: var(--surface-bg) !important;
+}
+
+.studio-folder-content[data-subtab="sales"] .sales-tab-content {
+  width: 100%;
+}
+
+.sales-export-button {
+  display: inline-flex;
+}
+
+.sales-export-button .btn {
+  font-size: 0.75rem !important;
+  padding: 0.2rem 0.75rem !important;
+  min-height: 32px !important;
+}
+
+.sales-tab-content {
+  background-color: var(--surface-bg);
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
 /* ==========================================================================

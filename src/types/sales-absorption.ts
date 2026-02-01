@@ -139,6 +139,13 @@ export interface ParcelWithSale {
   has_custom_overrides?: boolean;
   sale_event?: ParcelSaleEvent;
   absorption_velocity?: number;
+  // Sale assumption values from tbl_parcel_sale_assumptions (source of truth for revenue)
+  sale_gross_parcel_price?: number | null;      // Gross price before improvement offset
+  sale_improvement_offset?: number | null;       // Subdivision/improvement costs deducted
+  sale_gross_proceeds?: number | null;           // gross_parcel_price - improvement_offset
+  sale_commission_amount?: number | null;        // Commission from sale assumptions
+  sale_closing_cost_amount?: number | null;      // Closing costs from sale assumptions
+  sale_total_transaction_costs?: number | null;  // Total transaction costs
 }
 
 export interface SalePhaseBenchmarks {

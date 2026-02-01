@@ -11,6 +11,7 @@ import { ExtractionReviewModal } from './ExtractionReviewModal';
 interface LandscaperPanelProps {
   projectId: number;
   activeTab?: string;
+  pageContext?: string;
 }
 
 interface UploadResult {
@@ -55,7 +56,11 @@ interface ExtractionResult {
   };
 }
 
-export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPanelProps) {
+export function LandscaperPanel({
+  projectId,
+  activeTab = 'home',
+  pageContext,
+}: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
   const [isActivityExpanded, setActivityExpanded] = useState(true);
   const [expandedSplitRatio, setExpandedSplitRatio] = useState(0.25);
@@ -655,7 +660,7 @@ export function LandscaperPanel({ projectId, activeTab = 'home' }: LandscaperPan
         >
           <LandscaperChatThreaded
             projectId={projectId}
-            pageContext={activeTab}
+            pageContext={pageContext || activeTab}
             isIngesting={isUploading || uploadThingIsUploading}
             ingestionProgress={uploadProgress}
             ingestionMessage={uploadMessage}

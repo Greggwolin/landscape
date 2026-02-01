@@ -1,20 +1,155 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import '@/styles/style-catalog.css';
+import { colorRegistry } from '@/config/colorRegistry';
+import { getResolvedColor } from '@/utils/cssVariables';
 
 const DEFAULT_PATH = 'docs/design-system/style-catalog.md';
 
-interface StyleCatalogContentProps {
-  filePath?: string;
-  title?: string;
-  showTitle?: boolean;
-}
+type PaletteVariantType = 'dark' | 'base' | 'fill' | 'bg' | 'bgSubtle' | 'text' | 'border' | 'alias';
 
-interface MarkdownResponse {
-  success: boolean;
-  content?: string;
-  error?: string;
-}
+type PaletteEntry = {
+  token: string;
+  type: PaletteVariantType;
+  shortLabel: string;
+};
+
+type PaletteFamily = {
+  label: string;
+  entries: PaletteEntry[];
+};
+
+const paletteFamilies: PaletteFamily[] = [
+  {
+    label: 'Primary (Blue)',
+    entries: [
+      { token: '--cui-primary-dark', type: 'dark', shortLabel: 'Dark Companion' },
+      { token: '--cui-primary-ramp-01', type: 'fill', shortLabel: 'Ramp 01' },
+      { token: '--cui-primary-ramp-02', type: 'fill', shortLabel: 'Ramp 02' },
+      { token: '--cui-primary', type: 'base', shortLabel: 'Base' },
+      { token: '--cui-primary-ramp-04', type: 'fill', shortLabel: 'Ramp 04' },
+      { token: '--cui-primary-ramp-05', type: 'fill', shortLabel: 'Ramp 05' },
+      { token: '--cui-primary-bg', type: 'bg', shortLabel: 'BG' },
+      { token: '--cui-primary-bg-subtle', type: 'bgSubtle', shortLabel: 'BG subtle' },
+      { token: '--cui-primary-text', type: 'text', shortLabel: 'Text' },
+      { token: '--cui-primary-border-subtle', type: 'border', shortLabel: 'Border' },
+      { token: '--cui-primary-color', type: 'alias', shortLabel: 'Alias' },
+    ],
+  },
+  {
+    label: 'Primary Surface (Dark Blue)',
+    entries: [
+      { token: '--cui-primary-surface-01', type: 'fill', shortLabel: 'Surface 01' },
+      { token: '--cui-primary-surface-02', type: 'fill', shortLabel: 'Surface 02' },
+      { token: '--cui-primary-surface-03', type: 'fill', shortLabel: 'Surface 03' },
+      { token: '--cui-primary-surface-04', type: 'fill', shortLabel: 'Surface 04' },
+      { token: '--cui-primary-surface-05', type: 'fill', shortLabel: 'Surface 05' },
+    ],
+  },
+  {
+    label: 'Secondary (Slate)',
+    entries: [
+      { token: '--cui-secondary-dark', type: 'dark', shortLabel: 'Dark' },
+      { token: '--cui-secondary', type: 'base', shortLabel: 'Base' },
+    ],
+  },
+  {
+    label: 'Success (Green)',
+    entries: [
+      { token: '--cui-success-dark', type: 'dark', shortLabel: 'Dark' },
+      { token: '--cui-success', type: 'base', shortLabel: 'Base' },
+      { token: '--cui-success-bg', type: 'bg', shortLabel: 'BG' },
+      { token: '--cui-success-color', type: 'alias', shortLabel: 'Alias' },
+    ],
+  },
+  {
+    label: 'Danger (Red)',
+    entries: [
+      { token: '--cui-danger-dark', type: 'dark', shortLabel: 'Danger Dark' },
+      { token: '--cui-danger-ramp-01', type: 'fill', shortLabel: 'Ramp 01' },
+      { token: '--cui-danger-ramp-02', type: 'fill', shortLabel: 'Ramp 02' },
+      { token: '--cui-danger', type: 'base', shortLabel: 'Base' },
+      { token: '--cui-danger-ramp-04', type: 'fill', shortLabel: 'Ramp 04' },
+      { token: '--cui-danger-bg', type: 'bg', shortLabel: 'BG' },
+      { token: '--cui-danger-border-subtle', type: 'border', shortLabel: 'Border' },
+      { token: '--cui-danger-text', type: 'text', shortLabel: 'Text' },
+      { token: '--cui-danger-color', type: 'alias', shortLabel: 'Alias' },
+    ],
+  },
+  {
+    label: 'Warning (Yellow)',
+    entries: [
+      { token: '--cui-warning-dark', type: 'dark', shortLabel: 'Dark' },
+      { token: '--cui-warning', type: 'base', shortLabel: 'Base' },
+      { token: '--cui-warning-bg', type: 'bg', shortLabel: 'BG' },
+    ],
+  },
+  {
+    label: 'Info (Purple)',
+    entries: [
+      { token: '--cui-info-dark', type: 'dark', shortLabel: 'Dark' },
+      { token: '--cui-info', type: 'base', shortLabel: 'Base' },
+    ],
+  },
+  {
+    label: 'Neutrals',
+    entries: [
+      { token: '--cui-surface-900', type: 'dark', shortLabel: 'Surface 900' },
+      { token: '--cui-surface-800', type: 'base', shortLabel: 'Surface 800' },
+      { token: '--cui-surface-700', type: 'bg', shortLabel: 'Surface 700' },
+      { token: '--cui-dark-bg-subtle', type: 'bgSubtle', shortLabel: 'Dark BG' },
+      { token: '--cui-light-bg-subtle', type: 'bgSubtle', shortLabel: 'Light BG' },
+    ],
+  },
+];
+
+const rampTypes: PaletteVariantType[] = ['dark', 'base', 'fill', 'bg', 'bgSubtle'];
+const utilityTypes: PaletteVariantType[] = ['text', 'border', 'alias'];
+
+const getSwatchStyle = (type: PaletteVariantType, resolved: string) => {
+  switch (type) {
+    case 'dark':
+    case 'base':
+    case 'fill':
+      return {
+        backgroundColor: resolved,
+        color: '#ffffff',
+        border: 'none'
+      };
+    case 'bg':
+    case 'bgSubtle':
+      return {
+        backgroundColor: resolved,
+        color: 'var(--cui-body-color)',
+        border: 'none'
+      };
+    case 'text':
+      return {
+        backgroundColor: 'var(--cui-body-bg)',
+        color: 'var(--cui-body-color)',
+        border: '1px solid var(--cui-border-color)'
+      };
+    case 'border':
+      return {
+        backgroundColor: 'var(--cui-body-bg)',
+        border: `1px solid ${resolved}`,
+        color: 'var(--cui-body-color)'
+      };
+    case 'alias':
+      return {
+        backgroundColor: 'var(--cui-card-bg)',
+        border: `1px dashed ${resolved}`,
+        color: 'var(--cui-body-color)'
+      };
+    default:
+      return {
+        backgroundColor: 'transparent',
+        color: 'var(--cui-body-color)',
+        border: '1px solid var(--cui-border-color)'
+      };
+  }
+};
 
 const renderMarkdown = (markdown: string) => {
   const lines = markdown.split('\n');
@@ -135,31 +270,60 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
   title = 'Style Catalog',
   showTitle = true
 }) => {
-  const [content, setContent] = useState<string>('');
+  const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => new Set([
-    'component',
-    'swatch',
-    'used',
-    'background',
-    'text',
-    'border',
-    'hover',
-    'active',
-    'dark'
-  ]));
-  const contentRef = React.useRef<HTMLDivElement>(null);
+  const [resolvedColors, setResolvedColors] = useState<Record<string, string>>({});
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+
+  const renderedMarkdown = useMemo(() => renderMarkdown(content), [content]);
+  const colorMap = useMemo(() => {
+    const map: Record<string, typeof colorRegistry[0]> = {};
+    colorRegistry.forEach((color) => {
+      map[color.variable] = color;
+    });
+    return map;
+  }, []);
+
+  const paletteTokenCount = useMemo(() => {
+    const tokenSet = new Set<string>();
+    paletteFamilies.forEach((family) => {
+      family.entries.forEach((entry) => tokenSet.add(entry.token));
+    });
+    return tokenSet.size;
+  }, []);
+  const lastSyncedText = lastSynced ? lastSynced.toLocaleString() : 'syncing…';
+
+  const refreshResolved = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const next: Record<string, string> = {};
+    colorRegistry.forEach((color) => {
+      next[color.variable] = getResolvedColor(color.variable) || color.lightValue;
+    });
+    setResolvedColors(next);
+    setLastSynced(new Date());
+  }, []);
+
+  useEffect(() => {
+    refreshResolved();
+    if (typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(refreshResolved);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-coreui-theme']
+    });
+    return () => observer.disconnect();
+  }, [refreshResolved]);
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchMarkdown = async () => {
+      if (!filePath) return;
       setLoading(true);
       setError(null);
       try {
         const response = await fetch(`/api/markdown?path=${encodeURIComponent(filePath)}`);
-        const data = (await response.json()) as MarkdownResponse;
+        const data = (await response.json()) as { success: boolean; content?: string; error?: string };
         if (!response.ok || !data.success) {
           throw new Error(data.error || response.statusText);
         }
@@ -183,89 +347,181 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
     };
   }, [filePath]);
 
-  const rendered = useMemo(() => renderMarkdown(content), [content]);
+  const [focusedVariant, setFocusedVariant] = useState<string | null>(null);
 
-  useEffect(() => {
-    const root = contentRef.current;
-    if (!root) return;
-    const cells = root.querySelectorAll<HTMLElement>('[data-col]');
-    cells.forEach((cell) => {
-      const col = cell.dataset.col;
-      if (!col) return;
-      cell.style.display = visibleColumns.has(col) ? '' : 'none';
-    });
-  }, [visibleColumns, rendered]);
+  const renderPaletteSwatch = (familyLabel: string, entry: PaletteEntry) => {
+    const definition = colorMap[entry.token];
+    if (!definition) return null;
 
-  const toggleColumn = (key: string) => {
-    setVisibleColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
+    const resolved = resolvedColors[entry.token] || definition.lightValue;
+    const tokenDisplay = definition.variable;
+    const humanName = definition.name || entry.shortLabel;
+    const usageNote = definition.description || '—';
+    const resolvedDisplay = resolved || '—';
+    const sampleTextColor = entry.type === 'text' ? resolved : definition.textVariable || 'var(--cui-body-color)';
+
+    const key = `${familyLabel}-${entry.token}`;
+    const isOpen = focusedVariant === key;
+    const swatchStyle = getSwatchStyle(entry.type, resolved);
+
+    return (
+      <div key={key} style={{ marginBottom: '0.75rem' }}>
+        <button
+          type="button"
+          onClick={() => setFocusedVariant(isOpen ? null : key)}
+          style={{
+            width: '100%',
+            borderRadius: '10px',
+            padding: '0.75rem 0.875rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            minHeight: '48px',
+            gap: '0.5rem',
+            textTransform: 'none',
+            ...swatchStyle
+          }}
+        >
+          <span style={{ color: swatchStyle.color, letterSpacing: '0.05em' }}>{entry.shortLabel}</span>
+          <span style={{ fontSize: '0.75rem', opacity: 0.75, color: 'var(--cui-secondary-color)' }}>
+            {isOpen ? 'Hide info' : 'Show info'}
+          </span>
+        </button>
+        {isOpen && (
+          <div
+            style={{
+              borderLeft: '3px solid var(--cui-border-color)',
+              padding: '10px 14px',
+              background: 'var(--cui-card-bg)',
+              marginTop: '4px'
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 600 }}>{humanName}</p>
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: '0.75rem',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                color: 'var(--cui-secondary-color)'
+              }}
+            >
+              {tokenDisplay}
+            </p>
+            <p style={{ margin: '8px 0 4px', fontWeight: 600 }}>{resolvedDisplay}</p>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--cui-secondary-color)' }}>
+              {usageNote}
+            </p>
+            <div
+              style={{
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                color: sampleTextColor,
+                marginTop: '8px'
+              }}
+            >
+              The quick brown fox
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPaletteFamily = (family: PaletteFamily) => {
+    const rampEntries = rampTypes.flatMap((type) =>
+      family.entries.filter((entry) => entry.type === type)
+    );
+    const utilityEntries = utilityTypes.flatMap((type) =>
+      family.entries.filter((entry) => entry.type === type)
+    );
+
+    return (
+      <div
+        key={family.label}
+        style={{
+          minWidth: '220px',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: '10px',
+          padding: '16px',
+          background: 'var(--cui-card-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem'
+        }}
+      >
+        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{family.label}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {rampEntries.map((entry) => renderPaletteSwatch(family.label, entry))}
+        </div>
+        {utilityEntries.length > 0 && (
+          <div
+            style={{
+              borderTop: '1px solid var(--cui-border-color)',
+              paddingTop: '0.75rem'
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.65rem',
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: 'var(--cui-secondary-color)',
+                marginBottom: '0.5rem'
+              }}
+            >
+              Utilities
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {utilityEntries.map((entry) => renderPaletteSwatch(family.label, entry))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: 'var(--cui-body-bg)',
-        color: 'var(--cui-body-color)',
-        border: '1px solid var(--cui-border-color)',
-        borderRadius: '12px',
-        padding: '20px'
-      }}
-    >
+    <div className="style-catalog">
       {showTitle && (
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{title}</div>
-          <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
-            Canonical Styles (read-only)
+        <div className="style-catalog-header">
+          <div>
+            <h1 className="style-catalog-title">{title}</h1>
+            <p className="style-catalog-subtitle">
+              Canonical palette + component styles driven directly from CoreUI’s theme.
+              <span className="style-catalog-live-badge">
+                Last synced from colorRegistry ({lastSynced ? lastSyncedText : 'syncing…'})
+              </span>
+            </p>
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-        {[
-          { key: 'component', label: 'Component' },
-          { key: 'swatch', label: 'Swatch' },
-          { key: 'used', label: 'Used for' },
-          { key: 'background', label: 'Background' },
-          { key: 'text', label: 'Text' },
-          { key: 'border', label: 'Border' },
-          { key: 'hover', label: 'Hover' },
-          { key: 'active', label: 'Active' },
-          { key: 'dark', label: 'Dark theme' },
-        ].map((col) => {
-          const active = visibleColumns.has(col.key);
-          return (
-            <button
-              key={col.key}
-              type="button"
-              onClick={() => toggleColumn(col.key)}
-              className="btn btn-sm"
-              style={{
-                backgroundColor: active ? 'var(--cui-primary)' : 'transparent',
-                color: active ? '#fff' : 'var(--cui-body-color)',
-                borderColor: active ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                borderWidth: 1,
-                borderStyle: 'solid',
-                borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: '0.75rem'
-              }}
-            >
-              {col.label}
-            </button>
-          );
-        })}
-      </div>
-      {loading && <div style={{ color: 'var(--cui-secondary-color)' }}>Loading style catalog...</div>}
-      {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
-      {!loading && !error && (
-        <div ref={contentRef} dangerouslySetInnerHTML={{ __html: rendered }} />
-      )}
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Color Palette — Overview</h2>
+          <span className="style-catalog-section-count">{paletteTokenCount} tokens</span>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
+          {paletteFamilies.map((family) => renderPaletteFamily(family))}
+        </div>
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Component Styles</h2>
+        </div>
+        <div>
+          {loading && (
+            <div style={{ color: 'var(--cui-secondary-color)' }}>Loading style catalog...</div>
+          )}
+          {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
+          {!loading && !error && (
+            <div dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+          )}
+        </div>
+      </section>
     </div>
   );
 };

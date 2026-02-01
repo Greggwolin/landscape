@@ -529,7 +529,13 @@ def parcels_with_sales(request: Request, project_id: int):
             pricing.price_per_unit as base_price_per_unit,
             pricing.growth_rate,
             pricing.created_at as pricing_effective_date,
-            -- Add net proceeds from saved assumptions
+            -- Add sale assumption values from tbl_parcel_sale_assumptions (source of truth)
+            psa.gross_parcel_price as sale_gross_parcel_price,
+            psa.improvement_offset_total as sale_improvement_offset,
+            psa.gross_sale_proceeds as sale_gross_proceeds,
+            psa.commission_amount as sale_commission_amount,
+            psa.closing_cost_amount as sale_closing_cost_amount,
+            psa.total_transaction_costs as sale_total_transaction_costs,
             psa.net_sale_proceeds as net_proceeds
         FROM landscape.tbl_parcel p
         LEFT JOIN landscape.tbl_area a ON a.area_id = p.area_id

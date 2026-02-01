@@ -72,7 +72,8 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
         Request body:
         {
             "content": "User message text",
-            "user": user_id (optional)
+            "user": user_id (optional),
+            "page_context": "cashflow" (optional - for context-aware tool filtering)
         }
 
         Response:
@@ -110,6 +111,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 'project_id': project.project_id,
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
+                'project_type_code': project.project_type_code,
                 'project_details': {
                     'address': getattr(project, 'address', None),
                     'city': getattr(project, 'city', None),
@@ -125,11 +127,15 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             def tool_executor_fn(tool_name, tool_input, project_id=None):
                 return execute_tool(tool_name, tool_input, project_id or project.project_id)
 
+            # Get page context for context-aware tool filtering
+            page_context = request.data.get('page_context')
+
             # Generate AI response with tool support
             ai_response = get_landscaper_response(
                 message_history,
                 project_context,
-                tool_executor=tool_executor_fn
+                tool_executor=tool_executor_fn,
+                page_context=page_context
             )
 
             # Include tool calls and field updates in metadata
@@ -1170,7 +1176,8 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
 
         Request body:
         {
-            "content": "User message text"
+            "content": "User message text",
+            "page_context": "cashflow" (optional - for context-aware tool filtering)
         }
 
         Response:
@@ -1189,6 +1196,7 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
         from apps.projects.models import Project
 
         thread_id = self.kwargs.get('thread_id')
+        page_context = request.data.get('page_context')
 
         try:
             # Get thread
@@ -1214,6 +1222,7 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 'project_id': project.project_id,
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
+                'project_type_code': project.project_type_code,
                 'project_details': {
                     'address': getattr(project, 'address', None),
                     'city': getattr(project, 'city', None),
@@ -1237,12 +1246,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             def tool_executor_fn(tool_name, tool_input, project_id=None):
                 return execute_tool(tool_name, tool_input, project_id or project.project_id)
 
-            # Generate AI response
+            # Generate AI response with context-aware tool filtering
             ai_response = get_landscaper_response(
                 message_history,
                 project_context,
                 tool_executor=tool_executor_fn,
-                additional_context=chat_context if chat_context else None
+                additional_context=chat_context if chat_context else None,
+                page_context=page_context
             )
 
             # Build metadata

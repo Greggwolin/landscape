@@ -28,12 +28,25 @@ interface LandscaperChatThreadedProps {
 function getPageContextHint(context: string): string {
   const hints: Record<string, string> = {
     home: 'Project Overview',
+    mf_home: 'Project Overview',
+    land_home: 'Project Overview',
     property: 'Property Details & Site',
+    mf_property: 'Property Details & Site',
+    land_planning: 'Planning & Land Use',
     operations: 'Rent Roll & Operating Expenses',
-    feasibility: 'Returns & Feasibility Analysis',
+    mf_operations: 'Rent Roll & Operating Expenses',
+    valuation: 'Returns & Feasibility Analysis',
+    mf_valuation: 'Returns & Feasibility Analysis',
+    land_valuation: 'Feasibility & Market Analysis',
     capitalization: 'Capital Structure & Financing',
+    mf_capitalization: 'Capital Structure & Financing',
+    land_capitalization: 'Capital Markets & Waterfall',
+    land_budget: 'Budget & Costs',
+    land_schedule: 'Absorption & Schedule',
     reports: 'Reports & Analytics',
     documents: 'Document Management',
+    map: 'Map & Spatial Insights',
+    alpha_assistant: 'Platform Help',
   };
   return hints[context] || 'General';
 }

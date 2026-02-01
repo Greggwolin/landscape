@@ -96,6 +96,7 @@ class PlatformKnowledgeRetriever:
         property_type: Optional[str] = None,
         knowledge_domain: Optional[str] = None,
         applies_to: Optional[str] = None,
+        category: Optional[str] = None,
         max_chunks: int = 10,
         similarity_threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
@@ -179,6 +180,14 @@ class PlatformKnowledgeRetriever:
             filters.append("ch.applies_to @> %s::jsonb")
             filter_params.append(f'["{applies_to}"]')
 
+        if category:
+            filters.append("c.category = %s")
+            filter_params.append(category)
+
+        if category:
+            filters.append("c.category = %s")
+            filter_params.append(category)
+
         where_clause = " AND ".join(filters)
 
         sql = f"""
@@ -200,7 +209,7 @@ class PlatformKnowledgeRetriever:
                 ch.property_types AS chapter_property_types,
                 ch.applies_to,
                 (c.embedding <=> %s::vector) AS distance
-            FROM landscape.tbl_platform_knowledge_chunks c
+        FROM landscape.tbl_platform_knowledge_chunks c
             JOIN landscape.tbl_platform_knowledge pk ON c.document_id = pk.id
             LEFT JOIN landscape.tbl_platform_knowledge_chapters ch ON c.chapter_id = ch.id
             WHERE {where_clause}
@@ -232,6 +241,7 @@ class PlatformKnowledgeRetriever:
                     'content': row_dict['content'],
                     'content_type': row_dict['content_type'],
                     'similarity': round(similarity, 4),
+                    'category': row_dict.get('category'),
                     'source': {
                         'document_key': row_dict['document_key'],
                         'document_title': row_dict['document_title'],
@@ -249,7 +259,8 @@ class PlatformKnowledgeRetriever:
                         'applies_to': row_dict['applies_to'] or [],
                         'token_count': row_dict['token_count'],
                         'filtered_by_document': doc_filter_applied
-                    }
+                    },
+                    'chunk_metadata': row_dict.get('metadata') or {}
                 })
 
             if doc_filter_applied:
@@ -263,7 +274,7 @@ class PlatformKnowledgeRetriever:
                 # Recursive call without document filtering
                 return self._retrieve_full_corpus(
                     query_embedding, embedding_str, max_distance, max_chunks,
-                    property_type, knowledge_domain, applies_to, filter_params
+                    property_type, knowledge_domain, applies_to, category=category
                 )
 
             return results
@@ -281,7 +292,7 @@ class PlatformKnowledgeRetriever:
         property_type: Optional[str],
         knowledge_domain: Optional[str],
         applies_to: Optional[str],
-        base_filter_params: List[Any]
+        category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Fallback to full corpus search without document filtering."""
         filters = ["pk.is_active = TRUE", "c.embedding IS NOT NULL"]
@@ -325,6 +336,8 @@ class PlatformKnowledgeRetriever:
                 ch.topics,
                 ch.property_types AS chapter_property_types,
                 ch.applies_to,
+                c.category,
+                c.metadata,
                 (c.embedding <=> %s::vector) AS distance
             FROM landscape.tbl_platform_knowledge_chunks c
             JOIN landscape.tbl_platform_knowledge pk ON c.document_id = pk.id
@@ -352,6 +365,7 @@ class PlatformKnowledgeRetriever:
                     'content': row_dict['content'],
                     'content_type': row_dict['content_type'],
                     'similarity': round(similarity, 4),
+                    'category': row_dict.get('category'),
                     'source': {
                         'document_key': row_dict['document_key'],
                         'document_title': row_dict['document_title'],
@@ -369,7 +383,8 @@ class PlatformKnowledgeRetriever:
                         'applies_to': row_dict['applies_to'] or [],
                         'token_count': row_dict['token_count'],
                         'filtered_by_document': False
-                    }
+                    },
+                    'chunk_metadata': row_dict.get('metadata') or {}
                 })
 
             logger.info(f"[RETRIEVAL] Fallback full corpus search: {len(results)} chunks")

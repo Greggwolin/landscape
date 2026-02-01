@@ -103,6 +103,7 @@ def _send_message(request, project_id: int) -> JsonResponse:
         user_message = data.get('message', '').strip()
         client_request_id = data.get('clientRequestId') or data.get('client_request_id')
         active_tab = data.get('active_tab', 'home')  # Tab context for focused responses
+        page_context = data.get('page_context')  # For context-aware tool filtering
 
         logger.info("[TIMING] Processing message for project %s: %.50s...", project_id, user_message)
         print(f"[TIMING] Processing message for project {project_id}: {user_message[:50]}...")
@@ -166,7 +167,8 @@ def _send_message(request, project_id: int) -> JsonResponse:
             conversation_history=conversation_history,
             db_context=db_context,
             rag_context=rag_context,
-            active_tab=active_tab
+            active_tab=active_tab,
+            page_context=page_context  # Pass for context-aware tool filtering
         )
         timings['ai_response'] = time.time() - t0
         print(f"[TIMING] get_landscaper_response: {timings['ai_response']:.2f}s")

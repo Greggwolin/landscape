@@ -5,6 +5,8 @@ import { mutate } from 'swr';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProjectInflationSettings, InflationSelection } from '@/hooks/useInflationSettings';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface Props {
   projectId: number;
 }
@@ -95,8 +97,8 @@ export function InflationRateDisplay({ projectId }: Props) {
         mutate(`/api/projects/${projectId}/pricing-assumptions`);
         // Refresh validation report (uses closing costs affected by inflation)
         mutate(`/api/projects/${projectId}/validation-report`);
-        // Refresh cash flow analysis
-        mutate(`/api/projects/${projectId}/cash-flow/generate`);
+        // Refresh cash flow analysis (Django endpoint)
+        mutate(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`);
       } catch (recalcErr) {
         console.error('Failed to recalculate sales after inflation change:', recalcErr);
       }

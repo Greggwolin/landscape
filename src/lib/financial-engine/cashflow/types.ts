@@ -226,6 +226,11 @@ export interface CashFlowSummary {
   totalRevenueDeductions: number;
   totalNetRevenue: number;
 
+  // Revenue deduction breakdown (for P&L display)
+  totalSubdivisionCosts: number;
+  totalCommissions: number;
+  totalTransactionCosts: number;  // Closing costs, legal, title insurance, etc.
+
   // Cost summary
   totalCosts: number;
   costsByCategory: {

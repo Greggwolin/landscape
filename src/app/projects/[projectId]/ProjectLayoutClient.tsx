@@ -15,12 +15,13 @@
 
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { CCard } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
 import { StudioProjectBar } from '@/components/studio/StudioProjectBar';
 import { CollapsedLandscaperStrip } from '@/components/studio/CollapsedLandscaperStrip';
+import { AlphaAssistantFlyout } from '@/components/alpha';
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
@@ -77,6 +78,10 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   const handleNavigate = (folder: string, tab: string) => {
     setFolderTab(folder, tab);
   };
+
+  // Alpha Assistant flyout state
+  const [isAlphaFlyoutOpen, setIsAlphaFlyoutOpen] = useState(false);
+  const pageContext = `${currentFolder}/${currentTab}`;
 
   if (isLoading) {
     return (
@@ -157,6 +162,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       {/* Right Column - Project Bar + Folder Tabs + Content */}
       <div
         className="studio-right-column"
+        data-folder={currentFolder}
         style={{
           flex: '1 1 0%',
           minWidth: '400px',
@@ -172,6 +178,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           projectId={projectId}
           isLandscaperCollapsed={isCollapsed}
           onToggleLandscaper={toggleCollapsed}
+          onAlphaAssistantClick={() => setIsAlphaFlyoutOpen(true)}
         />
 
         {/* Content Card - Folder Tabs + Content */}
@@ -184,6 +191,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            // Use white background for sales tab to avoid grey card bg
+            ...(currentTab === 'sales' && { backgroundColor: 'var(--surface-bg)' }),
           }}
         >
           {/* Folder Tabs Navigation */}
@@ -195,11 +204,19 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           />
 
           {/* Content Area */}
-          <div className="studio-folder-content">
+          <div className="studio-folder-content" data-subtab={currentTab}>
             {children}
           </div>
         </CCard>
       </div>
+
+      {/* Alpha Assistant Flyout */}
+      <AlphaAssistantFlyout
+        isOpen={isAlphaFlyoutOpen}
+        onClose={() => setIsAlphaFlyoutOpen(false)}
+        pageContext={pageContext}
+        projectId={projectId}
+      />
     </div>
   );
 }

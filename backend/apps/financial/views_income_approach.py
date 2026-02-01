@@ -504,3 +504,33 @@ def income_approach_dcf(request, project_id: int):
     result = dcf_service.calculate()
 
     return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def income_approach_dcf_monthly(request, project_id: int):
+    """
+    GET /api/valuation/income-approach-data/{project_id}/dcf/monthly/
+
+    Returns DCF analysis with monthly cash flow projections.
+    Frontend aggregates to quarterly/annual as needed for display.
+
+    Uses calendar dates (Jan 2026, Feb 2026...) based on project's
+    analysis_start_date rather than abstract periods.
+
+    Returns:
+    - Monthly cash flow projections (GPR, EGI, NOI per month)
+    - Exit analysis (terminal value, reversion)
+    - Key metrics (IRR, NPV, Present Value)
+    - 2D sensitivity matrix (discount rate × exit cap rate)
+    """
+    from .services.dcf_calculation_service import DCFCalculationService
+
+    # Verify project exists
+    project = get_object_or_404(Project, project_id=project_id)
+
+    # Calculate monthly DCF
+    dcf_service = DCFCalculationService(project_id)
+    result = dcf_service.calculate_monthly()
+
+    return Response(result)

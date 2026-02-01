@@ -398,7 +398,9 @@ export async function generateCashFlow(
     grossRevenue: number;
     netRevenue: number;
     subdivisionCosts: number;
-    periodValues: Map<number, { gross: number; net: number; subdivision: number }>;
+    commissions: number;
+    transactionCosts: number;
+    periodValues: Map<number, { gross: number; net: number; subdivision: number; commissions: number; transactionCosts: number }>;
   }>();
 
   for (const periodSale of absorptionSchedule.periodSales) {
@@ -412,6 +414,8 @@ export async function generateCashFlow(
           grossRevenue: 0,
           netRevenue: 0,
           subdivisionCosts: 0,
+          commissions: 0,
+          transactionCosts: 0,
           periodValues: new Map(),
         });
       }
@@ -420,16 +424,20 @@ export async function generateCashFlow(
       containerData.grossRevenue += parcel.grossRevenue;
       containerData.netRevenue += parcel.netRevenue;
       containerData.subdivisionCosts += parcel.subdivisionCosts;
+      containerData.commissions += parcel.commissions;
+      containerData.transactionCosts += parcel.closingCosts; // closingCosts = transaction costs
 
       // Add to period values
       const periodIdx = periodSale.periodIndex;
       if (!containerData.periodValues.has(periodIdx)) {
-        containerData.periodValues.set(periodIdx, { gross: 0, net: 0, subdivision: 0 });
+        containerData.periodValues.set(periodIdx, { gross: 0, net: 0, subdivision: 0, commissions: 0, transactionCosts: 0 });
       }
       const pv = containerData.periodValues.get(periodIdx)!;
       pv.gross += parcel.grossRevenue;
       pv.net += parcel.netRevenue;
       pv.subdivision += parcel.subdivisionCosts;
+      pv.commissions += parcel.commissions;
+      pv.transactionCosts += parcel.closingCosts;
     }
   }
 
@@ -488,79 +496,132 @@ export async function generateCashFlow(
     sortOrder: sortOrder++,
   });
 
-  // Revenue Deductions = Subdivision Costs ONLY
-  // Commissions and closing costs are already deducted in net_sale_proceeds
-  const subdivisionCosts = absorptionSchedule.totalSubdivisionCosts;
+  // Revenue Deductions: Commissions, Transaction Costs, and Subdivision Costs
+  const totalCommissionsAmt = absorptionSchedule.totalCommissions || 0;
+  const totalTransactionCostsAmt = absorptionSchedule.totalClosingCosts || 0;
+  const subdivisionCosts = absorptionSchedule.totalSubdivisionCosts || 0;
+  const totalAllDeductions = totalCommissionsAmt + totalTransactionCostsAmt + subdivisionCosts;
 
-  // Create period values for subdivision costs proportional to gross revenue
-  const deductionPeriods: PeriodValue[] = [];
-  if (subdivisionCosts > 0 && absorptionSchedule.totalGrossRevenue > 0) {
-    for (const grossPeriod of revenuePeriodValues.grossRevenue) {
-      const proportion = grossPeriod.amount / absorptionSchedule.totalGrossRevenue;
-      deductionPeriods.push({
-        periodIndex: grossPeriod.periodIndex,
-        periodSequence: grossPeriod.periodSequence,
-        amount: -(subdivisionCosts * proportion), // negative because it's a deduction
+  // Create period values for each deduction type
+  const commissionPeriods: PeriodValue[] = [];
+  const transactionCostPeriods: PeriodValue[] = [];
+  const subdivisionPeriods: PeriodValue[] = [];
+  const totalDeductionPeriods: PeriodValue[] = [];
+
+  // Aggregate period values across all containers
+  const periodDeductionTotals = new Map<number, { commissions: number; transactionCosts: number; subdivision: number }>();
+  for (const [, data] of revenueByContainer) {
+    for (const [periodIdx, values] of data.periodValues) {
+      if (!periodDeductionTotals.has(periodIdx)) {
+        periodDeductionTotals.set(periodIdx, { commissions: 0, transactionCosts: 0, subdivision: 0 });
+      }
+      const totals = periodDeductionTotals.get(periodIdx)!;
+      totals.commissions += values.commissions;
+      totals.transactionCosts += values.transactionCosts;
+      totals.subdivision += values.subdivision;
+    }
+  }
+
+  // Convert to period arrays
+  const sortedPeriods = Array.from(periodDeductionTotals.entries()).sort((a, b) => a[0] - b[0]);
+  for (const [periodIdx, totals] of sortedPeriods) {
+    if (totals.commissions > 0) {
+      commissionPeriods.push({
+        periodIndex: periodIdx,
+        periodSequence: periodIdx + 1,
+        amount: -totals.commissions,
         source: 'calculated',
       });
     }
-  }
-
-  // Create deduction line items by container
-  const deductionLineItems: CashFlowLineItem[] = [];
-  for (const [containerId, data] of revenueByContainer) {
-    if (data.subdivisionCosts > 0) {
-      const periods: PeriodValue[] = [];
-      for (const [periodIdx, values] of data.periodValues) {
-        if (values.subdivision > 0) {
-          periods.push({
-            periodIndex: periodIdx,
-            periodSequence: periodIdx + 1,
-            amount: -values.subdivision, // negative because it's a deduction
-            source: 'calculated',
-          });
-        }
-      }
-      periods.sort((a, b) => a.periodIndex - b.periodIndex);
-
-      deductionLineItems.push({
-        lineId: `revenue-deduction-${containerId ?? 'project'}`,
-        category: 'revenue',
-        subcategory: 'Revenue Deductions',
-        description: data.containerLabel || 'Project Level',
-        containerId: data.containerId,
-        containerLabel: data.containerLabel,
-        periods,
-        total: -data.subdivisionCosts,
-        sourceType: 'calculated',
+    if (totals.transactionCosts > 0) {
+      transactionCostPeriods.push({
+        periodIndex: periodIdx,
+        periodSequence: periodIdx + 1,
+        amount: -totals.transactionCosts,
+        source: 'calculated',
       });
     }
+    if (totals.subdivision > 0) {
+      subdivisionPeriods.push({
+        periodIndex: periodIdx,
+        periodSequence: periodIdx + 1,
+        amount: -totals.subdivision,
+        source: 'calculated',
+      });
+    }
+    totalDeductionPeriods.push({
+      periodIndex: periodIdx,
+      periodSequence: periodIdx + 1,
+      amount: -(totals.commissions + totals.transactionCosts + totals.subdivision),
+      source: 'calculated',
+    });
   }
 
-  // Sort by container label
-  deductionLineItems.sort((a, b) => (a.containerLabel || '').localeCompare(b.containerLabel || ''));
+  // Create deduction line items (summary rows, not by container)
+  const deductionLineItems: CashFlowLineItem[] = [];
+
+  // Commissions line item
+  if (totalCommissionsAmt > 0) {
+    deductionLineItems.push({
+      lineId: 'revenue-deduction-commissions',
+      category: 'revenue',
+      subcategory: 'Revenue Deductions',
+      description: 'Commissions',
+      periods: commissionPeriods,
+      total: -totalCommissionsAmt,
+      sourceType: 'calculated',
+    });
+  }
+
+  // Transaction Costs line item
+  if (totalTransactionCostsAmt > 0) {
+    deductionLineItems.push({
+      lineId: 'revenue-deduction-transaction-costs',
+      category: 'revenue',
+      subcategory: 'Revenue Deductions',
+      description: 'Transaction Costs',
+      periods: transactionCostPeriods,
+      total: -totalTransactionCostsAmt,
+      sourceType: 'calculated',
+    });
+  }
+
+  // Subdivision Costs line item
+  if (subdivisionCosts > 0) {
+    deductionLineItems.push({
+      lineId: 'revenue-deduction-subdivision',
+      category: 'revenue',
+      subcategory: 'Revenue Deductions',
+      description: 'Subdivision Costs',
+      periods: subdivisionPeriods,
+      total: -subdivisionCosts,
+      sourceType: 'calculated',
+    });
+  }
 
   sections.push({
     sectionId: 'revenue-deductions',
     sectionName: 'REVENUE DEDUCTIONS',
     lineItems: deductionLineItems,
-    subtotals: deductionPeriods,
-    sectionTotal: -subdivisionCosts,
+    subtotals: totalDeductionPeriods,
+    sectionTotal: -totalAllDeductions,
     sortOrder: sortOrder++,
   });
 
-  // Net Revenue = Gross Revenue - Subdivision Costs
-  const netRevenue = absorptionSchedule.totalGrossRevenue - subdivisionCosts;
+  // Net Revenue = Gross Revenue - All Deductions (Commissions + Transaction Costs + Subdivision)
+  const netRevenue = absorptionSchedule.totalGrossRevenue - totalAllDeductions;
 
-  // Create period values for net revenue (gross - subdivision costs per period)
+  // Create period values for net revenue (gross - all deductions per period)
   const netRevenuePeriods: PeriodValue[] = [];
-  for (let i = 0; i < revenuePeriodValues.grossRevenue.length; i++) {
-    const grossPeriod = revenuePeriodValues.grossRevenue[i];
-    const deductionPeriod = deductionPeriods[i];
+  for (const grossPeriod of revenuePeriodValues.grossRevenue) {
+    const deductionTotal = periodDeductionTotals.get(grossPeriod.periodIndex);
+    const totalDeduction = deductionTotal
+      ? deductionTotal.commissions + deductionTotal.transactionCosts + deductionTotal.subdivision
+      : 0;
     netRevenuePeriods.push({
       periodIndex: grossPeriod.periodIndex,
       periodSequence: grossPeriod.periodSequence,
-      amount: grossPeriod.amount + (deductionPeriod?.amount || 0), // deduction is already negative
+      amount: grossPeriod.amount - totalDeduction,
       source: 'calculated',
     });
   }
@@ -570,15 +631,19 @@ export async function generateCashFlow(
   for (const [containerId, data] of revenueByContainer) {
     const periods: PeriodValue[] = [];
     for (const [periodIdx, values] of data.periodValues) {
+      // Net = gross - all deductions (commissions + transaction costs + subdivision)
+      const netAmount = values.gross - values.commissions - values.transactionCosts - values.subdivision;
       periods.push({
         periodIndex: periodIdx,
         periodSequence: periodIdx + 1,
-        amount: values.gross - values.subdivision, // net = gross - subdivision costs
+        amount: netAmount,
         source: 'calculated',
       });
     }
     periods.sort((a, b) => a.periodIndex - b.periodIndex);
 
+    // Total net = gross - all deductions
+    const totalNet = data.grossRevenue - data.commissions - data.transactionCosts - data.subdivisionCosts;
     netRevenueLineItems.push({
       lineId: `revenue-net-${containerId ?? 'project'}`,
       category: 'revenue',
@@ -587,7 +652,7 @@ export async function generateCashFlow(
       containerId: data.containerId,
       containerLabel: data.containerLabel,
       periods,
-      total: data.grossRevenue - data.subdivisionCosts,
+      total: totalNet,
       sourceType: 'calculated',
     });
   }
@@ -647,9 +712,15 @@ function calculateSummaryMetrics(
 ): CashFlowSummary {
   // Revenue summary
   const totalGrossRevenue = absorptionSchedule.totalGrossRevenue;
-  // Revenue Deductions = Subdivision Costs ONLY
-  const totalRevenueDeductions = absorptionSchedule.totalSubdivisionCosts;
-  // Net Revenue = Gross Revenue - Subdivision Costs
+  // Revenue deduction breakdown
+  const totalSubdivisionCosts = absorptionSchedule.totalSubdivisionCosts || 0;
+  const totalCommissions = absorptionSchedule.totalCommissions || 0;
+  const totalClosingCosts = absorptionSchedule.totalClosingCosts || 0;
+  // Transaction costs = closing costs (legal, title insurance, etc. are included in closing costs)
+  const totalTransactionCosts = totalClosingCosts;
+  // Total Deductions = Subdivision + Commissions + Transaction Costs
+  const totalRevenueDeductions = totalSubdivisionCosts + totalCommissions + totalTransactionCosts;
+  // Net Revenue = Gross Revenue - All Deductions
   const totalNetRevenue = totalGrossRevenue - totalRevenueDeductions;
 
   // Cost summary by category
@@ -705,15 +776,18 @@ function calculateSummaryMetrics(
     logCashFlowComparisons(periods, netCashFlowByPeriod);
   }
 
-  // Calculate IRR
+  // Calculate IRR on ANNUAL aggregates to match Excel methodology
+  // Excel calculates IRR on annual cash flows, not monthly with compounding annualization
   let irr: number | undefined;
   let npv: number | undefined;
 
   try {
-    const irrResult = calculateIRR(cashFlowArray);
+    // Aggregate monthly cash flows to annual for IRR calculation
+    const annualCashFlows = aggregateCashFlowsToAnnual(netCashFlowByPeriod, periods);
+    const irrResult = calculateIRR(annualCashFlows);
     if (irrResult.converged) {
-      // Annualize if monthly periods
-      irr = annualizeIRR(irrResult.irr, periods[0]?.periodType || 'month');
+      // Already annual - no annualization needed
+      irr = irrResult.irr;
     }
   } catch (error) {
     console.warn('IRR calculation failed:', error);
@@ -743,6 +817,10 @@ function calculateSummaryMetrics(
     totalGrossRevenue,
     totalRevenueDeductions,
     totalNetRevenue,
+    // Revenue deduction breakdown
+    totalSubdivisionCosts,
+    totalCommissions,
+    totalTransactionCosts,
     totalCosts,
     costsByCategory,
     grossProfit,
@@ -842,6 +920,30 @@ function logCashFlowComparisons(
 
   console.log('[CashFlow][DEBUG] Monthly net cash flows:', monthlyData);
   console.log('[CashFlow][DEBUG] Annual net cash flows:', annualData);
+}
+
+/**
+ * Aggregate monthly cash flows to annual for IRR calculation
+ * This matches Excel's methodology of calculating IRR on annual totals
+ */
+function aggregateCashFlowsToAnnual(
+  periodValues: PeriodValue[],
+  periods: CalculationPeriod[]
+): number[] {
+  // Group cash flows by year
+  const yearlyTotals = new Map<number, number>();
+
+  for (const pv of periodValues) {
+    const period = periods[pv.periodIndex];
+    if (!period) continue;
+
+    const year = period.startDate.getFullYear();
+    yearlyTotals.set(year, (yearlyTotals.get(year) || 0) + pv.amount);
+  }
+
+  // Convert to sorted array
+  const sortedYears = Array.from(yearlyTotals.keys()).sort((a, b) => a - b);
+  return sortedYears.map((year) => yearlyTotals.get(year) || 0);
 }
 
 /**

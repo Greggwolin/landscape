@@ -50,6 +50,12 @@ interface ParcelRow {
   total_transaction_costs: number | null;
   improvement_offset_total: number | null;
   price_uom: string | null;
+  // Actual transaction cost breakdown from tbl_parcel_sale_assumptions
+  commission_amount: number | null;
+  // Transaction costs = legal + closing + title insurance
+  legal_amount: number | null;
+  closing_cost_amount: number | null;
+  title_insurance_amount: number | null;
 }
 
 interface PricingRow {
@@ -106,7 +112,11 @@ export async function fetchProjectParcels(
         psa.net_sale_proceeds,
         psa.total_transaction_costs,
         psa.improvement_offset_total,
-        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom
+        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom,
+        psa.commission_amount,
+        psa.legal_amount,
+        psa.closing_cost_amount,
+        psa.title_insurance_amount
       FROM landscape.tbl_parcel p
       LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
       LEFT JOIN LATERAL (
@@ -152,7 +162,11 @@ export async function fetchProjectParcels(
         psa.net_sale_proceeds,
         psa.total_transaction_costs,
         psa.improvement_offset_total,
-        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom
+        COALESCE(psa.price_uom, lup.unit_of_measure) AS price_uom,
+        psa.commission_amount,
+        psa.legal_amount,
+        psa.closing_cost_amount,
+        psa.title_insurance_amount
       FROM landscape.tbl_parcel p
       LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
       LEFT JOIN LATERAL (
@@ -347,35 +361,19 @@ export async function calculateParcelSale(
   }
 
   // CHECK 1: Use precalculated proceeds if available
+  // NOTE: These values from tbl_parcel_sale_assumptions ALREADY include price escalation
+  // (calculated using land_use_pricing.growth_rate at the time the sale assumption was saved).
+  // We do NOT apply additional DCF escalation here to avoid double-counting.
   if (parcel.net_sale_proceeds !== null && parcel.gross_parcel_price !== null) {
     // IMPORTANT: PostgreSQL returns numeric/decimal as strings - must cast to Number
-    let grossRevenue = Number(parcel.gross_parcel_price);
-    let netRevenue = Number(parcel.net_sale_proceeds);
-    let totalDeductions = parcel.total_transaction_costs
+    const grossRevenue = Number(parcel.gross_parcel_price);
+    const netRevenue = Number(parcel.net_sale_proceeds);
+    const totalDeductions = parcel.total_transaction_costs
       ? Number(parcel.total_transaction_costs)
       : (grossRevenue - netRevenue);
 
-    // Apply DCF price growth if set
-    // Price growth applies to the Gross Sale Price [Finished] (base lot price)
-    // Formula: annual rate compounded monthly = (1 + rate)^(months/12)
-    let escalationFactor = 1.0;
-    if (dcfPriceGrowthRate && dcfPriceGrowthRate > 0 && parcel.sale_period) {
-      const monthsFromStart = parcel.sale_period - 1; // Period 1 = month 0
-      escalationFactor = Math.pow(1 + dcfPriceGrowthRate, monthsFromStart / 12);
-
-      // Apply escalation to gross revenue
-      const baseGross = grossRevenue;
-      grossRevenue = baseGross * escalationFactor;
-
-      // Recalculate net revenue: Gross - Transaction Costs
-      // Transaction costs scale proportionally with gross revenue
-      const deductionRatio = totalDeductions / baseGross;
-      totalDeductions = grossRevenue * deductionRatio;
-      netRevenue = grossRevenue - totalDeductions;
-
-      // Debug logging removed for performance - uncomment if needed:
-      // console.log(`[DCF] Applied price growth to parcel ${parcel.parcel_code}: rate=${(dcfPriceGrowthRate * 100).toFixed(2)}%`);
-    }
+    // Escalation factor is 1.0 (no additional escalation needed - values already escalated)
+    const escalationFactor = 1.0;
 
     // Construct pricing metadata from parcel data (skip DB lookup for performance)
     const pricing: ParcelPricing = {
@@ -392,32 +390,32 @@ export async function calculateParcelSale(
     };
 
     // Use actual subdivision costs from database (improvement_offset_total)
-    // Only include for $/FF parcels - other UOMs track improvement offsets separately
+    // NOTE: These values are ALREADY inflated (calculated with cost_inflation_rate when saved).
+    // We do NOT apply additional DCF cost inflation to avoid double-counting.
     const normalizeUom = (uom: string | null): string => {
       if (!uom) return 'EA';
       return uom.replace('$/', '').toUpperCase();
     };
     const uom = normalizeUom(parcel.price_uom);
-    let subdivisionCosts = uom === 'FF' && parcel.improvement_offset_total
+    const subdivisionCosts = uom === 'FF' && parcel.improvement_offset_total
       ? Number(parcel.improvement_offset_total)
       : 0;
 
-    // Apply DCF cost inflation to improvement offset (subdivision costs)
-    // Formula: annual rate compounded monthly = (1 + rate)^(months/12)
-    if (dcfCostInflationRate && dcfCostInflationRate > 0 && subdivisionCosts > 0 && parcel.sale_period) {
-      const monthsFromStart = parcel.sale_period - 1;
-      const costEscalation = Math.pow(1 + dcfCostInflationRate, monthsFromStart / 12);
-      const baseSubdivisionCosts = subdivisionCosts;
-      subdivisionCosts = baseSubdivisionCosts * costEscalation;
-      // Debug logging removed for performance
-    }
+    // Use ACTUAL commissions from tbl_parcel_sale_assumptions
+    const commissions = parcel.commission_amount !== null
+      ? Number(parcel.commission_amount)
+      : 0;
 
-    // Estimate commissions and closing costs (these are already in totalDeductions)
-    // We estimate them for display purposes only
-    const commissionRate = 0.03;
-    const closingCostRate = 0.0057;
-    const commissions = grossRevenue * commissionRate;
-    const closingCosts = grossRevenue * closingCostRate;
+    // Transaction Costs = Legal + Closing Costs + Title Insurance
+    // These are the real values from tbl_parcel_sale_assumptions
+    const legalAmount = parcel.legal_amount !== null ? Number(parcel.legal_amount) : 0;
+    const closingCostAmount = parcel.closing_cost_amount !== null ? Number(parcel.closing_cost_amount) : 0;
+    const titleInsuranceAmount = parcel.title_insurance_amount !== null ? Number(parcel.title_insurance_amount) : 0;
+    const closingCosts = legalAmount + closingCostAmount + titleInsuranceAmount;
+
+    // Calculate rates for display purposes (reverse-engineering from amounts)
+    const commissionRate = grossRevenue > 0 ? commissions / grossRevenue : 0;
+    const closingCostRate = grossRevenue > 0 ? closingCosts / grossRevenue : 0;
 
     // Track the base revenue (before escalation) for reporting
     const baseRevenue = escalationFactor !== 1.0

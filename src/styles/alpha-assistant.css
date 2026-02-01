@@ -1,0 +1,100 @@
+/* Alpha Assistant Modal */
+.alpha-assistant-modal .modal-dialog {
+  max-width: 900px;
+}
+
+.alpha-assistant-modal .modal-body {
+  padding: var(--cui-modal-padding);
+}
+
+.alpha-assistant-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.help-panel {
+  background: var(--cui-tertiary-bg);
+  border-radius: var(--cui-border-radius);
+  padding: 1rem;
+  height: 100%;
+  min-height: 350px;
+}
+
+.chat-panel {
+  background: var(--cui-body-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+  padding: 1rem;
+  height: 100%;
+  min-height: 350px;
+}
+
+.chat-messages {
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+  padding: 0.5rem;
+  background: var(--cui-tertiary-bg);
+}
+
+.chat-message {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.feedback-section {
+  background: var(--cui-tertiary-bg);
+  border-radius: var(--cui-border-radius);
+  padding: 1rem;
+}
+
+.help-content h6 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.help-content ul {
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.help-content li {
+  margin-bottom: 0.25rem;
+}
+
+.alpha-chat .chat-input input {
+  min-height: 0;
+}
+
+.alpha-chat .chat-input .form-control:focus {
+  box-shadow: none;
+}
+
+.studio-folder-tabs-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.studio-folder-tabs-wrapper {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.alpha-assistant-button-wrapper {
+  margin-top: 0.25rem;
+}
+
+.alpha-assistant-trigger-button {
+  white-space: nowrap;
+}
+
+@media (max-width: 991px) {
+  .help-panel,
+  .chat-panel {
+    min-height: 250px;
+  }
+}

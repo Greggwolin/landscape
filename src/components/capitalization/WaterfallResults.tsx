@@ -281,23 +281,23 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
   };
 
   const summaryHeaderCell: React.CSSProperties = {
-    padding: '10px',
+    padding: '4px 10px',
     backgroundColor: '#f8fafc',
     color: 'var(--cui-secondary-color)',
     fontWeight: 600,
     textAlign: 'center',
     border: '1px solid #e5e7eb',
-    height: '44px',
+    height: '32px',
   };
 
   const summaryCell: React.CSSProperties = {
-    padding: '10px',
+    padding: '4px 10px',
     textAlign: 'center',
     border: '1px solid #e5e7eb',
     backgroundColor: '#ffffff',
-    height: '44px',
+    height: '32px',
   };
-  const summaryRowStyle: React.CSSProperties = { height: '44px' };
+  const summaryRowStyle: React.CSSProperties = { height: '32px' };
 
   const formatHurdle = (tierNumber: number): string => {
     const tier = tierDefinitions.find((t) => t.tierNumber === tierNumber);

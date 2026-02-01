@@ -45,20 +45,56 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/**
- * Get display label for page context.
- */
+const CONTEXT_NORMALIZATION: Record<string, string> = {
+  home: 'home',
+  mf_home: 'home',
+  land_home: 'home',
+  property: 'property',
+  mf_property: 'property',
+  land_planning: 'property',
+  operations: 'operations',
+  mf_operations: 'operations',
+  valuation: 'valuation',
+  mf_valuation: 'valuation',
+  land_valuation: 'valuation',
+  feasibility: 'valuation',
+  capitalization: 'capital',
+  capital: 'capital',
+  mf_capitalization: 'capital',
+  land_capitalization: 'capital',
+  budget: 'budget',
+  land_budget: 'budget',
+  schedule: 'schedule',
+  land_schedule: 'schedule',
+  reports: 'reports',
+  documents: 'documents',
+  map: 'map',
+  alpha_assistant: 'alpha_assistant',
+};
+
+const PAGE_CONTEXT_LABELS: Record<string, string> = {
+  home: 'Home',
+  property: 'Property',
+  operations: 'Operations',
+  valuation: 'Valuation',
+  capital: 'Capital',
+  budget: 'Budget',
+  schedule: 'Schedule',
+  reports: 'Reports',
+  documents: 'Documents',
+  map: 'Map',
+  alpha_assistant: 'Assistant',
+};
+
+function normalizeContext(context: string): string {
+  if (!context) return 'home';
+  const key = context.toLowerCase();
+  return CONTEXT_NORMALIZATION[key] || key;
+}
+
 function getPageContextLabel(context: string): string {
-  const labels: Record<string, string> = {
-    home: 'Home',
-    property: 'Property',
-    operations: 'Operations',
-    feasibility: 'Feasibility',
-    capitalization: 'Capital',
-    reports: 'Reports',
-    documents: 'Documents',
-  };
-  return labels[context] || context;
+  const normalized = normalizeContext(context);
+  return PAGE_CONTEXT_LABELS[normalized] || context;
 }
 
 export function ThreadList({
@@ -110,9 +146,10 @@ export function ThreadList({
   }, [editTitle, onUpdateTitle]);
 
   // Filter threads to current page context unless showing all
+  const normalizedCurrentContext = normalizeContext(currentPageContext);
   const filteredThreads = showAllPages
     ? threads
-    : threads.filter((t) => t.pageContext === currentPageContext);
+    : threads.filter((t) => normalizeContext(t.pageContext) === normalizedCurrentContext);
 
   return (
     <div

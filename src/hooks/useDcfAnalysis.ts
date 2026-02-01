@@ -7,6 +7,7 @@
  * Session: QK-28
  */
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mutate as swrMutate } from 'swr';
 import type {
@@ -16,6 +17,11 @@ import type {
   GrowthRateSet,
   GrowthRateSetWithSteps,
 } from '@/types/dcf-analysis';
+import {
+  onMutationComplete,
+  affectsAnyTable,
+  type LandscaperMutationDetail,
+} from '@/lib/events/landscaper-events';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -26,8 +32,40 @@ const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localho
 /**
  * Fetch DCF analysis for a project.
  * Creates with defaults if none exists.
+ * Auto-refreshes when Landscaper updates DCF/cashflow data.
  */
 export function useDcfAnalysis(projectId: number) {
+  const queryClient = useQueryClient();
+
+  // Listen for Landscaper mutations that affect DCF/cashflow data
+  useEffect(() => {
+    if (!projectId) return;
+
+    const unsubscribe = onMutationComplete((detail: LandscaperMutationDetail) => {
+      // Only refresh if this mutation affects our project and DCF/cashflow tables
+      if (
+        detail.projectId === projectId &&
+        affectsAnyTable(detail, ['dcf_analysis', 'cashflow'])
+      ) {
+        console.log('[useDcfAnalysis] Landscaper mutation detected, refreshing DCF data');
+
+        // Invalidate DCF analysis query to trigger refetch
+        queryClient.invalidateQueries({ queryKey: ['dcf-analysis', projectId] });
+
+        // Also invalidate cash-flow queries since assumptions affect calculations
+        queryClient.invalidateQueries({ queryKey: ['cash-flow', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['cashflow', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['project-cashflow', projectId] });
+
+        // Invalidate SWR cash-flow queries (now pointing to Django)
+        swrMutate(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`);
+        swrMutate(`/api/projects/${projectId}/cash-flow/summary`);
+      }
+    });
+
+    return unsubscribe;
+  }, [projectId, queryClient]);
+
   return useQuery({
     queryKey: ['dcf-analysis', projectId],
     queryFn: async (): Promise<DcfAnalysisResponse> => {
@@ -89,7 +127,7 @@ export function useUpdateDcfAnalysis(projectId: number) {
 
       // Invalidate SWR cash-flow queries (CashFlowAnalysisTab uses SWR)
       // This ensures price growth and cost inflation changes are reflected
-      swrMutate(`/api/projects/${projectId}/cash-flow/generate`);
+      swrMutate(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`);
       swrMutate(`/api/projects/${projectId}/cash-flow/summary`);
     },
     onError: (error) => {

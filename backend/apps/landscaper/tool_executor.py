@@ -21,7 +21,7 @@ from typing import Dict, Any, List, Optional, Callable
 from decimal import Decimal, InvalidOperation
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 from .opex_mapping import OPEX_ACCOUNT_MAPPING
 
@@ -1891,39 +1891,25 @@ ASSUMPTION_FIELD_TYPES = {
 }
 
 
-def _get_cashflow_api_base_url() -> str:
-    return os.environ.get('LANDSCAPER_CASHFLOW_API_BASE_URL', 'http://localhost:3000').rstrip('/')
-
-
 def _fetch_cashflow_schedule(project_id: int) -> Dict[str, Any]:
-    url = f"{_get_cashflow_api_base_url()}/api/projects/{project_id}/cash-flow/generate"
-    payload = {
-        "periodType": "month",
-        "includeFinancing": False,
-    }
+    """
+    Fetch cash flow schedule for a Land Dev project.
 
-    request_payload = urllib_request.Request(
-        url,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-        method='POST'
-    )
+    Now calls the Django LandDevCashFlowService directly instead of
+    making an HTTP call to the Next.js API.
+    """
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
 
     try:
-        with urllib_request.urlopen(request_payload, timeout=30) as response:
-            body = response.read().decode('utf-8')
-            result = json.loads(body)
-    except HTTPError as err:
-        raise RuntimeError(f"Cashflow API returned HTTP {err.code}: {err.reason}")
-    except URLError as err:
-        raise RuntimeError(f"Cashflow API unreachable: {err.reason}")
+        service = LandDevCashFlowService(project_id)
+        data = service.calculate()
+    except ValueError as err:
+        raise RuntimeError(f"Cash flow calculation error: {err}")
+    except Exception as err:
+        raise RuntimeError(f"Cash flow calculation failed: {err}")
 
-    if not result.get('success'):
-        raise RuntimeError(result.get('error') or 'Cashflow API returned an error')
-
-    data = result.get('data')
     if not data:
-        raise RuntimeError('Cashflow API did not return schedule data')
+        raise RuntimeError('Cash flow service did not return schedule data')
 
     return data
 
@@ -2179,6 +2165,8 @@ def handle_update_cashflow_assumption(
     new_value = tool_input.get('new_value')
     confirm = tool_input.get('confirm', False)
 
+    logger.info(f"[CASHFLOW_WRITE] Invoked: field={field}, new_value={new_value}, confirm={confirm}, propose_only={propose_only}, project_id={project_id}")
+
     # Validate field is writable
     if not field or field not in ASSUMPTION_FIELD_TYPES:
         writable_fields = list(ASSUMPTION_FIELD_TYPES.keys())
@@ -2213,6 +2201,7 @@ def handle_update_cashflow_assumption(
 
     # Phase 1: Preview only (no write)
     if not confirm:
+        logger.info(f"[CASHFLOW_WRITE] Preview mode - returning preview (confirm={confirm})")
         return {
             'success': True,
             'action': 'preview',
@@ -2235,28 +2224,35 @@ def handle_update_cashflow_assumption(
         logger.error(f"Invalid value for {field}: {err}")
         return {'success': False, 'error': f"Invalid value for {field}: {err}"}
 
-    # Execute the write
-    setattr(dcf_analysis, field, coerced)
+    # Execute the write with explicit transaction
+    logger.info(f"[CASHFLOW_WRITE] Phase 2: Confirmed write - executing. DCF pk={dcf_analysis.pk}, current {field}={current_value}")
     try:
-        dcf_analysis.save(update_fields=[field, 'updated_at'])
+        with transaction.atomic():
+            setattr(dcf_analysis, field, coerced)
+            logger.info(f"[CASHFLOW_WRITE] Set {field} to {coerced} (in memory)")
+            dcf_analysis.save(update_fields=[field, 'updated_at'])
+            logger.info(f"[CASHFLOW_WRITE] save(update_fields=['{field}', 'updated_at']) completed inside transaction")
+        logger.info(f"[CASHFLOW_WRITE] Transaction committed")
     except Exception as err:
-        logger.error(f"Failed to save {field} for project {project_id}: {err}")
+        logger.error(f"[CASHFLOW_WRITE] Failed to save {field} for project {project_id}: {err}")
         return {'success': False, 'error': f"Database write failed: {err}"}
 
-    # VERIFY the write by re-reading
+    # VERIFY the write by re-reading OUTSIDE the transaction (ensures commit happened)
     try:
         dcf_analysis.refresh_from_db(fields=[field])
         verified_value = getattr(dcf_analysis, field)
         verified_value_float = float(verified_value) if verified_value is not None else 0.0
+        logger.info(f"[CASHFLOW_WRITE] After refresh_from_db (outside txn): {field}={verified_value_float}")
 
         if not _values_match(verified_value, new_value, value_type):
-            logger.error(f"Write verification failed for {field}: expected {new_value}, got {verified_value}")
+            logger.error(f"[CASHFLOW_WRITE] VERIFICATION FAILED: expected {new_value}, got {verified_value}")
             return {
                 'success': False,
                 'error': f"Write verification failed. Expected {new_value}, got {verified_value_float}."
             }
+        logger.info(f"[CASHFLOW_WRITE] VERIFICATION PASSED: {field} = {verified_value_float}")
     except Exception as err:
-        logger.error(f"Failed to verify write for {field}: {err}")
+        logger.error(f"[CASHFLOW_WRITE] Failed to verify write for {field}: {err}")
         return {'success': False, 'error': f"Write verification failed: {err}"}
 
     # Log the change
@@ -2279,7 +2275,6 @@ def handle_update_cashflow_assumption(
                 'reason': reason
             },
             'recalculated_results': None,
-            'ui_hint': 'Refresh the page to see the updated value in the UI input fields.'
         }
 
     return {
@@ -2292,7 +2287,6 @@ def handle_update_cashflow_assumption(
             'reason': reason
         },
         'recalculated_results': updated_payload,
-        'ui_hint': 'Refresh the page to see the updated value in the UI input fields.'
     }
 
 
@@ -11554,3 +11548,71 @@ def _register_property_tools():
 
 # Register property tools on module load
 _register_property_tools()
+
+
+# =============================================================================
+# Alpha Feedback Tool
+# =============================================================================
+
+@register_tool('log_alpha_feedback', is_mutation=True)
+def handle_log_alpha_feedback(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = False,
+    source_message_id: Optional[str] = None,
+    user_id: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Log feedback from Alpha Assistant chat to the tbl_alpha_feedback table.
+
+    This allows users to submit bug reports, suggestions, and questions
+    directly from the chat interface.
+    """
+    feedback_type = tool_input.get('feedback_type', 'bug')
+    summary = tool_input.get('summary', '')
+    user_quote = tool_input.get('user_quote', '')
+    page_context = tool_input.get('page_context', 'alpha_assistant_chat')
+
+    if not summary:
+        return {
+            'success': False,
+            'error': 'Summary is required for feedback'
+        }
+
+    # Build notes with additional context
+    notes_parts = []
+    if feedback_type:
+        notes_parts.append(f"Type: {feedback_type}")
+    if user_quote:
+        notes_parts.append(f"User said: {user_quote}")
+    notes = "\n".join(notes_parts) if notes_parts else None
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO landscape.tbl_alpha_feedback
+                (page_context, project_id, user_id, feedback, status, submitted_at, notes)
+                VALUES (%s, %s, %s, %s, 'new', NOW(), %s)
+                RETURNING id
+            """, [page_context, project_id, user_id, summary, notes])
+            feedback_id = cursor.fetchone()[0]
+
+        logger.info(
+            f"[ALPHA_FEEDBACK] Logged feedback #{feedback_id}: "
+            f"type={feedback_type}, project={project_id}, user={user_id}"
+        )
+
+        return {
+            'success': True,
+            'feedback_id': feedback_id,
+            'message': f"Logged as feedback #{feedback_id}. The team will review this.",
+            'action': 'created'
+        }
+
+    except Exception as e:
+        logger.error(f"[ALPHA_FEEDBACK] Failed to log feedback: {e}")
+        return {
+            'success': False,
+            'error': f"Failed to log feedback: {str(e)}"
+        }

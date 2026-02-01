@@ -21,10 +21,12 @@ export default function TransactionGrid({ sales, projectId, onSaveNameOptimistic
 
   return (
     <div
-      className="transaction-grid d-flex gap-4"
+      className="transaction-grid"
       style={{
-        overflowX: 'auto',
-        width: '80%',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        width: '100%',
         paddingBottom: '1rem',
       }}
     >

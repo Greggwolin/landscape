@@ -19,18 +19,75 @@
   /* Primary brand bridge */
   --bs-primary: var(--brand-primary);
   --bs-link-color: var(--brand-primary);
-  --cui-primary: var(--brand-primary);
-  --cui-primary-rgb: 14, 165, 233;
+  --cui-primary-ramp-01: #1f5fbf;
+  --cui-primary-ramp-02: #316bc2;
+  --cui-primary-ramp-03: #4f7fc7;
+  --cui-primary-ramp-04: #6789bb;
+  --cui-primary-ramp-05: #7390bb;
+  --cui-primary: var(--cui-primary-ramp-03);
+  --cui-primary-rgb: 79, 127, 199;
+  --cui-primary-text: #ffffff;
+  --cui-primary-text: #ffffff;
 
-  /* CoreUI semantic colors */
-  --cui-success: #198754;
-  --cui-success-rgb: 25, 135, 84;
-  --cui-warning: #ffc107;
-  --cui-warning-rgb: 255, 193, 7;
-  --cui-danger: #dc3545;
-  --cui-danger-rgb: 220, 53, 69;
-  --cui-info: #0dcaf0;
-  --cui-info-rgb: 13, 202, 240;
+  /* Canonical CoreUI palette (01-color Preview) */
+  --cui-secondary: #6b7785;
+  --cui-secondary-rgb: 107, 119, 133;
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+  --cui-danger-ramp-01: #ae0303;
+  --cui-danger-ramp-02: #d53434;
+  --cui-danger-ramp-03: #e55353;
+  --cui-danger-ramp-04: #ed6565;
+  --cui-danger: var(--cui-danger-ramp-03);
+  --cui-danger-rgb: 229, 83, 83;
+  --cui-danger-text: #ffffff;
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
+  --cui-light: #f8fafc;
+  --cui-dark: #0b1220;
+
+  /* Dark mode companions */
+  --cui-primary-dark: var(--cui-primary-ramp-01);
+  --cui-secondary-dark: #4b5563;
+  --cui-success-dark: #2f855a;
+  --cui-danger-dark: var(--cui-danger-ramp-01);
+  --cui-warning-dark: #b45309;
+  --cui-info-dark: #4c51bf;
+
+  /* Structural neutrals */
+  --cui-surface-900: #0f172a;
+  --cui-surface-800: #1e293b;
+  --cui-surface-700: #334155;
+
+  /* Primary surface ramp (dark structural blue) */
+  --cui-primary-surface-01: #152744;
+  --cui-primary-surface-02: #243a5e;
+  --cui-primary-surface-03: #2c4368;
+  --cui-primary-surface-04: #344b70;
+  --cui-primary-surface-05: #3f567a;
+
+  /* Background variants */
+  --cui-primary-bg: rgba(61, 153, 245, 0.10);
+  --cui-success-bg: rgba(87, 198, 138, 0.10);
+  --cui-danger-bg: rgba(230, 64, 114, 0.10);
+  --cui-warning-bg: rgba(242, 196, 13, 0.10);
+
+  /* Subtle background variants */
+  --cui-primary-bg-subtle: rgba(61, 153, 245, 0.05);
+  --cui-dark-bg-subtle: rgba(33, 38, 49, 0.05);
+  --cui-light-bg-subtle: rgba(243, 244, 247, 1);
+
+  /* Border subtle variants */
+  --cui-primary-border-subtle: rgba(61, 153, 245, 0.30);
+  --cui-danger-border-subtle: rgba(230, 64, 114, 0.30);
+
+  /* Color aliases */
+  --cui-primary-color: var(--cui-primary);
+  --cui-success-color: #57c68a;
+  --cui-danger-color: var(--cui-danger);
+
   --filter-icon-color: var(--cui-body-color);
 
   /* Top Navigation Bridge */
@@ -79,14 +136,18 @@
   --cui-footer-bg: var(--surface-card);
 
   /* CoreUI semantic colors - same in dark mode */
-  --cui-success: #198754;
-  --cui-success-rgb: 25, 135, 84;
-  --cui-warning: #ffc107;
-  --cui-warning-rgb: 255, 193, 7;
-  --cui-danger: #dc3545;
-  --cui-danger-rgb: 220, 53, 69;
-  --cui-info: #0dcaf0;
-  --cui-info-rgb: 13, 202, 240;
+  --cui-primary: var(--cui-primary-ramp-03);
+  --cui-primary-rgb: 79, 127, 199;
+  --cui-primary-text: #ffffff;
+  --cui-success: #57c68a;
+  --cui-success-rgb: 87, 198, 138;
+  --cui-warning: #f2c40d;
+  --cui-warning-rgb: 242, 196, 13;
+  --cui-danger: var(--cui-danger-ramp-03);
+  --cui-danger-rgb: 229, 83, 83;
+  --cui-danger-text: #ffffff;
+  --cui-info: #7a80ec;
+  --cui-info-rgb: 122, 128, 236;
 
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
@@ -101,6 +162,8 @@
   --cui-border-color: var(--line-soft);
   --cui-tertiary-bg: var(--surface-card);
   --cui-secondary-color: var(--text-secondary);
+  --cui-primary-text: #ffffff;
+  --cui-danger-text: #ffffff;
   --cui-card-bg: var(--surface-card);
 }
 
@@ -115,40 +178,42 @@
   --validation-unit-price-color: #07FF8A;
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #FFFFFF;
+  --cui-primary-text: #ffffff;
+  --cui-danger-text: #ffffff;
 }
 
 /* Dark mode button overrides - direct rules, not variables */
 [data-coreui-theme='dark'] .btn-warning {
   background-color: rgba(255, 193, 7, 0.2) !important;
   border-color: #ffc107 !important;
-  color: #ffc107 !important;
+  color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-warning:hover {
   background-color: rgba(255, 193, 7, 0.3) !important;
-  color: #ffc107 !important;
+  color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-success {
   background-color: rgba(25, 135, 84, 0.2) !important;
   border-color: #198754 !important;
-  color: #198754 !important;
+  color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-success:hover {
   background-color: rgba(25, 135, 84, 0.3) !important;
-  color: #198754 !important;
+  color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-danger {
   background-color: rgba(220, 53, 69, 0.2) !important;
   border-color: #dc3545 !important;
-  color: #dc3545 !important;
+  color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-danger:hover {
   background-color: rgba(220, 53, 69, 0.3) !important;
-  color: #dc3545 !important;
+  color: #ffffff !important;
 }
 
 /* Outline buttons get special treatment */
@@ -252,13 +317,15 @@
   --cui-card-cap-bg: var(--surface-card);
 
   /* Primary color - token bridge */
-  --cui-primary: var(--brand-primary);
-  --cui-primary-rgb: 14, 165, 233;
+  --cui-primary: var(--cui-primary-ramp-03);
+  --cui-primary-rgb: 79, 127, 199;
+  --cui-primary-text: #ffffff;
 
   /* Text colors */
   --cui-emphasis-color: var(--text-primary);
   --cui-secondary-color: var(--text-secondary);
   --cui-tertiary-color: color-mix(in srgb, var(--text-secondary) 70%, var(--surface-bg));
+  --cui-danger-text: #ffffff;
 
   /* Forms */
   --cui-input-bg: var(--surface-card);
@@ -288,13 +355,15 @@
   --cui-card-cap-bg: var(--surface-card);
 
   /* Primary color */
-  --cui-primary: var(--brand-primary);
-  --cui-primary-rgb: 14, 165, 233;
+  --cui-primary: var(--cui-primary-ramp-03);
+  --cui-primary-rgb: 79, 127, 199;
+  --cui-primary-text: #ffffff;
 
   /* Text colors */
   --cui-emphasis-color: var(--text-primary);
   --cui-secondary-color: var(--text-secondary);
   --cui-tertiary-color: color-mix(in srgb, var(--text-secondary) 70%, var(--surface-bg));
+  --cui-danger-text: #ffffff;
 
   /* Forms */
   --cui-input-bg: var(--surface-card);
@@ -435,14 +504,211 @@ thead th,
 }
 
 /* Buttons */
+.btn {
+  color: var(--cui-body-color);
+}
+
 .btn-primary {
   background-color: var(--cui-primary);
   border-color: var(--cui-primary);
+  color: #ffffff;
 }
 
 .btn-primary:hover {
-  background-color: color-mix(in srgb, var(--cui-primary) 85%, black);
-  border-color: color-mix(in srgb, var(--cui-primary) 85%, black);
+  background-color: var(--cui-primary-ramp-04);
+  border-color: var(--cui-primary-ramp-04);
+  color: #ffffff;
+}
+
+/* Canonical palette overrides for CoreUI button variables */
+.btn-primary {
+  --cui-btn-color: #ffffff;
+  --cui-btn-bg: var(--cui-primary);
+  --cui-btn-border-color: var(--cui-primary);
+  --cui-btn-hover-color: #ffffff;
+  --cui-btn-hover-bg: var(--cui-primary-ramp-04);
+  --cui-btn-hover-border-color: var(--cui-primary-ramp-04);
+  --cui-btn-focus-shadow-rgb: var(--cui-primary-rgb);
+  --cui-btn-active-color: #ffffff;
+  --cui-btn-active-bg: var(--cui-primary-ramp-02);
+  --cui-btn-active-border-color: var(--cui-primary-ramp-02);
+  --cui-btn-disabled-color: #ffffff;
+  --cui-btn-disabled-bg: var(--cui-primary);
+  --cui-btn-disabled-border-color: var(--cui-primary);
+}
+
+.btn-secondary {
+  --cui-btn-color: #ffffff;
+  --cui-btn-bg: var(--cui-secondary);
+  --cui-btn-border-color: var(--cui-secondary);
+  --cui-btn-hover-color: #ffffff;
+  --cui-btn-hover-bg: color-mix(in srgb, var(--cui-secondary) 92%, #0f172a);
+  --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-secondary) 92%, #0f172a);
+  --cui-btn-focus-shadow-rgb: var(--cui-secondary-rgb);
+  --cui-btn-active-color: #ffffff;
+  --cui-btn-active-bg: var(--cui-secondary-dark);
+  --cui-btn-active-border-color: var(--cui-secondary-dark);
+  --cui-btn-disabled-color: #ffffff;
+  --cui-btn-disabled-bg: var(--cui-secondary);
+  --cui-btn-disabled-border-color: var(--cui-secondary);
+}
+
+.btn-success {
+  --cui-btn-color: #080a0c;
+  --cui-btn-bg: var(--cui-success);
+  --cui-btn-border-color: var(--cui-success);
+  --cui-btn-hover-color: #080a0c;
+  --cui-btn-hover-bg: color-mix(in srgb, var(--cui-success) 92%, #0f172a);
+  --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-success) 92%, #0f172a);
+  --cui-btn-focus-shadow-rgb: var(--cui-success-rgb);
+  --cui-btn-active-color: #080a0c;
+  --cui-btn-active-bg: var(--cui-success-dark);
+  --cui-btn-active-border-color: var(--cui-success-dark);
+  --cui-btn-disabled-color: #080a0c;
+  --cui-btn-disabled-bg: var(--cui-success);
+  --cui-btn-disabled-border-color: var(--cui-success);
+}
+
+.btn-danger {
+  --cui-btn-color: #ffffff;
+  --cui-btn-bg: var(--cui-danger);
+  --cui-btn-border-color: var(--cui-danger);
+  --cui-btn-hover-color: #ffffff;
+  --cui-btn-hover-bg: var(--cui-danger-ramp-04);
+  --cui-btn-hover-border-color: var(--cui-danger-ramp-04);
+  --cui-btn-focus-shadow-rgb: var(--cui-danger-rgb);
+  --cui-btn-active-color: #ffffff;
+  --cui-btn-active-bg: var(--cui-danger-ramp-02);
+  --cui-btn-active-border-color: var(--cui-danger-ramp-02);
+  --cui-btn-disabled-color: #ffffff;
+  --cui-btn-disabled-bg: var(--cui-danger);
+  --cui-btn-disabled-border-color: var(--cui-danger);
+}
+
+.btn-warning {
+  --cui-btn-color: #080a0c;
+  --cui-btn-bg: var(--cui-warning);
+  --cui-btn-border-color: var(--cui-warning);
+  --cui-btn-hover-color: #080a0c;
+  --cui-btn-hover-bg: color-mix(in srgb, var(--cui-warning) 92%, #0f1220);
+  --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-warning) 92%, #0f1220);
+  --cui-btn-focus-shadow-rgb: var(--cui-warning-rgb);
+  --cui-btn-active-color: #080a0c;
+  --cui-btn-active-bg: var(--cui-warning-dark);
+  --cui-btn-active-border-color: var(--cui-warning-dark);
+  --cui-btn-disabled-color: #080a0c;
+  --cui-btn-disabled-bg: var(--cui-warning);
+  --cui-btn-disabled-border-color: var(--cui-warning);
+}
+
+.btn-info {
+  --cui-btn-color: #ffffff;
+  --cui-btn-bg: var(--cui-info);
+  --cui-btn-border-color: var(--cui-info);
+  --cui-btn-hover-color: #ffffff;
+  --cui-btn-hover-bg: color-mix(in srgb, var(--cui-info) 92%, #0f1220);
+  --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-info) 92%, #0f1220);
+  --cui-btn-focus-shadow-rgb: var(--cui-info-rgb);
+  --cui-btn-active-color: #ffffff;
+  --cui-btn-active-bg: var(--cui-info-dark);
+  --cui-btn-active-border-color: var(--cui-info-dark);
+  --cui-btn-disabled-color: #ffffff;
+  --cui-btn-disabled-bg: var(--cui-info);
+  --cui-btn-disabled-border-color: var(--cui-info);
+}
+
+.btn-primary:active,
+.btn-primary:focus-visible {
+  background-color: var(--cui-primary-ramp-02);
+  border-color: var(--cui-primary-ramp-02);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background-color: var(--cui-secondary);
+  border-color: var(--cui-secondary);
+  color: #ffffff;
+}
+
+.btn-secondary:hover {
+  background-color: color-mix(in srgb, var(--cui-secondary) 85%, black);
+  border-color: color-mix(in srgb, var(--cui-secondary) 85%, black);
+  color: #ffffff;
+}
+
+.btn-secondary:active,
+.btn-secondary:focus-visible {
+  color: #ffffff;
+}
+
+.btn-success {
+  background-color: var(--cui-success);
+  border-color: var(--cui-success);
+  color: #ffffff;
+}
+
+.btn-success:hover {
+  background-color: color-mix(in srgb, var(--cui-success) 85%, black);
+  border-color: color-mix(in srgb, var(--cui-success) 85%, black);
+  color: #ffffff;
+}
+
+.btn-success:active,
+.btn-success:focus-visible {
+  color: #ffffff;
+}
+
+.btn-danger {
+  background-color: var(--cui-danger);
+  border-color: var(--cui-danger);
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background-color: var(--cui-danger-ramp-04);
+  border-color: var(--cui-danger-ramp-04);
+  color: #ffffff;
+}
+
+.btn-danger:active,
+.btn-danger:focus-visible {
+  background-color: var(--cui-danger-ramp-02);
+  border-color: var(--cui-danger-ramp-02);
+  color: #ffffff;
+}
+
+.btn-warning {
+  background-color: var(--cui-warning);
+  border-color: var(--cui-warning);
+  color: #ffffff;
+}
+
+.btn-warning:hover {
+  background-color: color-mix(in srgb, var(--cui-warning) 85%, black);
+  border-color: color-mix(in srgb, var(--cui-warning) 85%, black);
+  color: #ffffff;
+}
+
+.btn-warning:active,
+.btn-warning:focus-visible {
+  color: #ffffff;
+}
+
+.btn-info {
+  background-color: var(--cui-info);
+  border-color: var(--cui-info);
+  color: #ffffff;
+}
+
+.btn-info:hover {
+  background-color: color-mix(in srgb, var(--cui-info) 85%, black);
+  border-color: color-mix(in srgb, var(--cui-info) 85%, black);
+  color: #ffffff;
+}
+
+.btn-info:active,
+.btn-info:focus-visible {
+  color: #ffffff;
 }
 
 /* Smooth transitions for theme changes */
@@ -464,181 +730,6 @@ thead th,
 }
 
 /* Background colors - convert dark to light */
-.light-theme .bg-gray-950,
-.light-theme .bg-gray-900,
-.light-theme .bg-gray-800 {
-  background-color: #ffffff !important;
-}
-
-.light-theme .bg-gray-700 {
-  background-color: #f9fafb !important;
-}
-
-.light-theme .bg-gray-600 {
-  background-color: #6366f1 !important;
-  color: #ffffff !important;
-}
-
-.light-theme .bg-gray-900\/60,
-.light-theme .bg-gray-900\/30 {
-  background-color: #f9fafb !important;
-}
-
-/* Border colors - CoreUI Modern style (#dbdfe6 = --cui-gray-300) */
-.light-theme .border-gray-800,
-.light-theme .border-gray-700,
-.light-theme .border-gray-600 {
-  border-color: #dbdfe6 !important;
-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
-}
-
-.light-theme .border-gray-700\/60 {
-  border-color: #dbdfe6 !important;
-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
-}
-
-/* Make all borders CoreUI Modern style with subtle shadow */
-.light-theme .border {
-  border-color: #dbdfe6 !important;
-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
-}
-
-.light-theme .rounded-lg,
-.light-theme .rounded {
-  border-color: #dbdfe6 !important;
-  box-shadow: 0 0.125rem 0.25rem rgba(8, 10, 12, 0.075) !important;
-}
-
-/* Text colors - ensure readability */
-.light-theme .text-white {
-  color: #111827 !important;
-}
-
-/* Royal blue buttons keep white text for contrast */
-.light-theme button.bg-blue-600,
-.light-theme button.bg-blue-700,
-.light-theme .btn.bg-blue-600,
-.light-theme .btn.bg-blue-700,
-.light-theme [role="button"].bg-blue-600,
-.light-theme [role="button"].bg-blue-700,
-.light-theme a.bg-blue-600,
-.light-theme a.bg-blue-700 {
-  color: #ffffff !important;
-}
-
-.light-theme .bg-blue-600.text-white,
-.light-theme .bg-blue-700.text-white {
-  color: #ffffff !important;
-}
-
-.light-theme .text-gray-300 {
-  color: #374151 !important;
-}
-
-.light-theme .text-gray-400 {
-  color: #6b7280 !important;
-}
-
-.light-theme .text-gray-500 {
-  color: #9ca3af !important;
-}
-
-/* Color badges and highlights - maintain readability */
-.light-theme .bg-blue-900\/30,
-.light-theme .bg-blue-900 {
-  background-color: #dbeafe !important;
-}
-
-.light-theme .border-blue-700 {
-  border-color: #3b82f6 !important;
-}
-
-.light-theme .text-blue-300 {
-  color: #2563eb !important;
-  font-weight: 600 !important;
-}
-
-.light-theme .bg-purple-300,
-.light-theme .bg-purple-400 {
-  background-color: #c4b5fd !important;
-  color: #5b21b6 !important;
-}
-
-.light-theme .bg-indigo-500\/20 {
-  background-color: #e0e7ff !important;
-}
-
-.light-theme .bg-yellow-900\/30,
-.light-theme .bg-yellow-900 {
-  background-color: #fef3c7 !important;
-}
-
-.light-theme .border-yellow-700 {
-  border-color: #f59e0b !important;
-}
-
-.light-theme .text-yellow-300 {
-  color: #d97706 !important;
-  font-weight: 600 !important;
-}
-
-.light-theme .bg-red-900\/30,
-.light-theme .bg-red-900 {
-  background-color: #fee2e2 !important;
-}
-
-.light-theme .border-red-700 {
-  border-color: #ef4444 !important;
-}
-
-.light-theme .text-red-300 {
-  color: #dc2626 !important;
-}
-
-.light-theme .bg-green-900\/30,
-.light-theme .bg-green-900 {
-  background-color: #d1fae5 !important;
-}
-
-.light-theme .text-green-400,
-.light-theme .text-green-300 {
-  color: #16a34a !important;
-  font-weight: 600 !important;
-}
-
-.light-theme .text-emerald-300 {
-  color: #059669 !important;
-  font-weight: 700 !important;
-}
-
-.light-theme .text-sky-300 {
-  color: #0284c7 !important;
-  font-weight: 700 !important;
-}
-
-.light-theme .text-amber-300 {
-  color: #d97706 !important;
-  font-weight: 700 !important;
-}
-
-/* Button overrides for light theme */
-.light-theme .bg-blue-600 {
-  background-color: #2563eb !important;
-}
-
-.light-theme .hover\:bg-blue-700:hover {
-  background-color: #1d4ed8 !important;
-}
-
-.light-theme .bg-green-600 {
-  background-color: #16a34a !important;
-}
-
-.light-theme .hover\:bg-green-700:hover {
-  background-color: #15803d !important;
-}
-
-/* Operations page tiles - make them pop with solid background */
 .light-theme [style*="--cui-primary-bg"],
 .light-theme [style*="--cui-success-bg"],
 .light-theme [style*="--cui-info-bg"],

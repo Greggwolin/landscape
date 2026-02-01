@@ -39,7 +39,7 @@ const cellBorder = '1px solid #e5e7eb';
 const inputCellStyle: React.CSSProperties = {
   backgroundColor: '#ffffff',
   border: cellBorder,
-  padding: '6px 10px',
+  padding: '4px 10px',
   textAlign: 'center',
   minWidth: '70px',
 };
@@ -48,7 +48,7 @@ const inputCellStyle: React.CSSProperties = {
 const calcCellStyle: React.CSSProperties = {
   backgroundColor: '#ffffff',
   border: cellBorder,
-  padding: '6px 10px',
+  padding: '4px 10px',
   textAlign: 'center',
   minWidth: '70px',
 };
@@ -69,7 +69,7 @@ const headerCellStyle: React.CSSProperties = {
 
 // Styles for row label cells
 const labelCellStyle: React.CSSProperties = {
-  padding: '10px',
+  padding: '4px 10px',
   textAlign: 'left',
   fontWeight: 500,
   color: 'var(--cui-body-color)',
@@ -104,12 +104,12 @@ const tableStyle: React.CSSProperties = {
 
 const headerRowStyle: React.CSSProperties = {
   backgroundColor: '#f8fafc',
-  height: '44px',
+  height: '32px',
 };
 
 const bodyRowStyle: React.CSSProperties = {
   backgroundColor: '#ffffff',
-  height: '44px',
+  height: '32px',
 };
 
 const formatWithSuffix = (value: number | '' | null | undefined, suffix: string) => {

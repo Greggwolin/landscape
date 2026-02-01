@@ -33,22 +33,22 @@ export interface ColorDefinition {
  */
 export const colorRegistry: ColorDefinition[] = [
   // ============================================
-  // SECTION 1: CoreUI Semantic Colors
+  // Base Colors
   // ============================================
   {
     variable: '--cui-primary',
     name: 'Primary',
-    category: 'CoreUI Semantic',
+    category: 'Base Colors',
     description: 'Primary actions, links, focus states',
     rgbVariable: '--cui-primary-rgb',
     textVariable: '#ffffff',
-    lightValue: '#0ea5e9',
-    darkValue: '#0ea5e9',
+    lightValue: '#4f7fc7',
+    darkValue: '#4f7fc7',
   },
   {
     variable: '--cui-secondary',
     name: 'Secondary',
-    category: 'CoreUI Semantic',
+    category: 'Base Colors',
     description: 'Secondary actions, muted elements',
     rgbVariable: '--cui-secondary-rgb',
     textVariable: '#ffffff',
@@ -58,42 +58,404 @@ export const colorRegistry: ColorDefinition[] = [
   {
     variable: '--cui-success',
     name: 'Success',
-    category: 'CoreUI Semantic',
+    category: 'Base Colors',
     description: 'Positive states, complete, approved',
     rgbVariable: '--cui-success-rgb',
-    textVariable: '#ffffff',
-    lightValue: '#198754',
-    darkValue: '#198754',
+    textVariable: '#080A0C',
+    lightValue: '#57c68a',
+    darkValue: '#57c68a',
   },
   {
     variable: '--cui-danger',
     name: 'Danger',
-    category: 'CoreUI Semantic',
-    description: 'Errors, delete, negative actions',
+    category: 'Base Colors',
+    description: 'Errors, delete, destructive actions',
     rgbVariable: '--cui-danger-rgb',
     textVariable: '#ffffff',
-    lightValue: '#dc3545',
-    darkValue: '#dc3545',
+    lightValue: '#e55353',
+    darkValue: '#e55353',
   },
   {
     variable: '--cui-warning',
     name: 'Warning',
-    category: 'CoreUI Semantic',
-    description: 'Caution, attention needed',
+    category: 'Base Colors',
+    description: 'Warnings, caution states',
     rgbVariable: '--cui-warning-rgb',
-    textVariable: '--cui-dark',
-    lightValue: '#ffc107',
-    darkValue: '#ffc107',
+    textVariable: '#080A0C',
+    lightValue: '#f2c40d',
+    darkValue: '#f2c40d',
   },
   {
     variable: '--cui-info',
     name: 'Info',
-    category: 'CoreUI Semantic',
-    description: 'Informational, neutral highlight',
+    category: 'Base Colors',
+    description: 'Informational highlights',
     rgbVariable: '--cui-info-rgb',
     textVariable: '#ffffff',
-    lightValue: '#0dcaf0',
-    darkValue: '#0dcaf0',
+    lightValue: '#7a80ec',
+    darkValue: '#7a80ec',
+  },
+
+  // ============================================
+  // Primary Variant Ramp
+  // ============================================
+  {
+    variable: '--cui-primary-ramp-01',
+    name: 'Primary Ramp 01',
+    category: 'Primary Variant Ramp',
+    description: 'Darkest primary action accent (buttons/pills).',
+    textVariable: '#ffffff',
+    lightValue: '#1f5fbf',
+    darkValue: '#1f5fbf',
+  },
+  {
+    variable: '--cui-primary-ramp-02',
+    name: 'Primary Ramp 02',
+    category: 'Primary Variant Ramp',
+    description: 'Primary hover/active emphasis.',
+    textVariable: '#ffffff',
+    lightValue: '#316bc2',
+    darkValue: '#316bc2',
+  },
+  {
+    variable: '--cui-primary-ramp-03',
+    name: 'Primary Ramp 03',
+    category: 'Primary Variant Ramp',
+    description: 'Primary base/intermediate shade.',
+    textVariable: '#ffffff',
+    lightValue: '#4f7fc7',
+    darkValue: '#4f7fc7',
+  },
+  {
+    variable: '--cui-primary-ramp-04',
+    name: 'Primary Ramp 04',
+    category: 'Primary Variant Ramp',
+    description: 'Primary hover/active accent.',
+    textVariable: '#ffffff',
+    lightValue: '#6789bb',
+    darkValue: '#6789bb',
+  },
+  {
+    variable: '--cui-primary-ramp-05',
+    name: 'Primary Ramp 05',
+    category: 'Primary Variant Ramp',
+    description: 'Lightest primary accent.',
+    textVariable: '#ffffff',
+    lightValue: '#7390bb',
+    darkValue: '#7390bb',
+  },
+
+  // ============================================
+  // Danger Variant Ramp
+  // ============================================
+  {
+    variable: '--cui-danger-ramp-01',
+    name: 'Danger Ramp 01',
+    category: 'Danger Variant Ramp',
+    description: 'Darkest danger action accent (buttons/pills).',
+    textVariable: '#ffffff',
+    lightValue: '#ae0303',
+    darkValue: '#ae0303',
+  },
+  {
+    variable: '--cui-danger-ramp-02',
+    name: 'Danger Ramp 02',
+    category: 'Danger Variant Ramp',
+    description: 'Danger active emphasis.',
+    textVariable: '#ffffff',
+    lightValue: '#d53434',
+    darkValue: '#d53434',
+  },
+  {
+    variable: '--cui-danger-ramp-03',
+    name: 'Danger Ramp 03',
+    category: 'Danger Variant Ramp',
+    description: 'Danger base/intermediate shade.',
+    textVariable: '#ffffff',
+    lightValue: '#e55353',
+    darkValue: '#e55353',
+  },
+  {
+    variable: '--cui-danger-ramp-04',
+    name: 'Danger Ramp 04',
+    category: 'Danger Variant Ramp',
+    description: 'Danger hover/active accent.',
+    textVariable: '#ffffff',
+    lightValue: '#ed6565',
+    darkValue: '#ed6565',
+  },
+
+  // ============================================
+  // Dark Companions
+  // ============================================
+  {
+    variable: '--cui-primary-dark',
+    name: 'Primary Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode primary emphasis',
+    lightValue: '#1f5fbf',
+    darkValue: '#1f5fbf',
+  },
+  {
+    variable: '--cui-secondary-dark',
+    name: 'Secondary Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode secondary emphasis',
+    lightValue: '#4b5563',
+    darkValue: '#4b5563',
+  },
+  {
+    variable: '--cui-success-dark',
+    name: 'Success Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode success hue',
+    lightValue: '#2f855a',
+    darkValue: '#2f855a',
+  },
+  {
+    variable: '--cui-danger-dark',
+    name: 'Danger Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode danger hue',
+    lightValue: '#ae0303',
+    darkValue: '#ae0303',
+  },
+  {
+    variable: '--cui-warning-dark',
+    name: 'Warning Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode warning hue',
+    lightValue: '#b45309',
+    darkValue: '#b45309',
+  },
+  {
+    variable: '--cui-info-dark',
+    name: 'Info Dark',
+    category: 'Dark Companions',
+    description: 'Dark mode info hue',
+    lightValue: '#4c51bf',
+    darkValue: '#4c51bf',
+  },
+
+  // ============================================
+  // Structural Neutrals
+  // ============================================
+  {
+    variable: '--cui-surface-900',
+    name: 'Surface 900',
+    category: 'Structural Neutrals',
+    description: 'Deepest background (dark mode)',
+    textVariable: '--cui-body-color',
+    lightValue: '#0f172a',
+    darkValue: '#0f172a',
+  },
+  {
+    variable: '--cui-surface-800',
+    name: 'Surface 800',
+    category: 'Structural Neutrals',
+    description: 'Elevated background for dark cards',
+    textVariable: '--cui-body-color',
+    lightValue: '#1e293b',
+    darkValue: '#1e293b',
+  },
+  {
+    variable: '--cui-surface-700',
+    name: 'Surface 700',
+    category: 'Structural Neutrals',
+    description: 'Mid-range dark surfaces',
+    textVariable: '--cui-body-color',
+    lightValue: '#334155',
+    darkValue: '#334155',
+  },
+
+  // ============================================
+  // Primary Surface Ramp
+  // ============================================
+  {
+    variable: '--cui-primary-surface-01',
+    name: 'Primary Surface 01',
+    category: 'Primary Surface Ramp',
+    description: 'Dark structural blue surface.',
+    textVariable: '#ffffff',
+    lightValue: '#152744',
+    darkValue: '#152744',
+  },
+  {
+    variable: '--cui-primary-surface-02',
+    name: 'Primary Surface 02',
+    category: 'Primary Surface Ramp',
+    description: 'Elevated structural blue surface.',
+    textVariable: '#ffffff',
+    lightValue: '#243a5e',
+    darkValue: '#243a5e',
+  },
+  {
+    variable: '--cui-primary-surface-03',
+    name: 'Primary Surface 03',
+    category: 'Primary Surface Ramp',
+    description: 'Mid-tone structural blue.',
+    textVariable: '#ffffff',
+    lightValue: '#2c4368',
+    darkValue: '#2c4368',
+  },
+  {
+    variable: '--cui-primary-surface-04',
+    name: 'Primary Surface 04',
+    category: 'Primary Surface Ramp',
+    description: 'Light structural blue surface.',
+    textVariable: '#ffffff',
+    lightValue: '#344b70',
+    darkValue: '#344b70',
+  },
+  {
+    variable: '--cui-primary-surface-05',
+    name: 'Primary Surface 05',
+    category: 'Primary Surface Ramp',
+    description: 'Lightest structural blue surface.',
+    textVariable: '#ffffff',
+    lightValue: '#3f567a',
+    darkValue: '#3f567a',
+  },
+
+  // ============================================
+  // Background Variants (-bg)
+  // ============================================
+  {
+    variable: '--cui-primary-bg',
+    name: 'Primary BG',
+    category: 'Background Variants',
+    description: 'Primary background tint only — not for text',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(61, 153, 245, 0.10)',
+    darkValue: 'rgba(61, 153, 245, 0.10)',
+  },
+  {
+    variable: '--cui-success-bg',
+    name: 'Success BG',
+    category: 'Background Variants',
+    description: 'Success background tint only — not for text',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(87, 198, 138, 0.10)',
+    darkValue: 'rgba(87, 198, 138, 0.10)',
+  },
+  {
+    variable: '--cui-danger-bg',
+    name: 'Danger BG',
+    category: 'Background Variants',
+    description: 'Danger background tint only — not for text',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(230, 64, 114, 0.10)',
+    darkValue: 'rgba(230, 64, 114, 0.10)',
+  },
+  {
+    variable: '--cui-warning-bg',
+    name: 'Warning BG',
+    category: 'Background Variants',
+    description: 'Warning background tint only — not for text',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(242, 196, 13, 0.10)',
+    darkValue: 'rgba(242, 196, 13, 0.10)',
+  },
+
+  // ============================================
+  // Subtle Background Variants (-bg-subtle)
+  // ============================================
+  {
+    variable: '--cui-primary-bg-subtle',
+    name: 'Primary BG Subtle',
+    category: 'Subtle Background Variants',
+    description: 'Lighter primary reminder background',
+    textVariable: '--cui-primary',
+    lightValue: 'rgba(61, 153, 245, 0.05)',
+    darkValue: 'rgba(61, 153, 245, 0.05)',
+  },
+  {
+    variable: '--cui-dark-bg-subtle',
+    name: 'Dark BG Subtle',
+    category: 'Subtle Background Variants',
+    description: 'Subtle dark surface for depth',
+    textVariable: '#ffffff',
+    lightValue: 'rgba(33, 38, 49, 0.05)',
+    darkValue: 'rgba(33, 38, 49, 0.05)',
+  },
+  {
+    variable: '--cui-light-bg-subtle',
+    name: 'Light BG Subtle',
+    category: 'Subtle Background Variants',
+    description: 'Soft light surface for cards',
+    textVariable: '#0f172a',
+    lightValue: 'rgba(243, 244, 247, 1)',
+    darkValue: 'rgba(243, 244, 247, 1)',
+  },
+
+  // ============================================
+  // Border Subtle Variants (-border-subtle)
+  // ============================================
+  {
+    variable: '--cui-primary-border-subtle',
+    name: 'Primary Border Subtle',
+    category: 'Border Subtle Variants',
+    description: 'Soft primary border tint',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(61, 153, 245, 0.30)',
+    darkValue: 'rgba(61, 153, 245, 0.30)',
+  },
+  {
+    variable: '--cui-danger-border-subtle',
+    name: 'Danger Border Subtle',
+    category: 'Border Subtle Variants',
+    description: 'Soft danger border tint',
+    textVariable: '--cui-body-color',
+    lightValue: 'rgba(230, 64, 114, 0.30)',
+    darkValue: 'rgba(230, 64, 114, 0.30)',
+  },
+
+  // ============================================
+  // Text Variants (-text)
+  // ============================================
+  {
+    variable: '--cui-primary-text',
+    name: 'Primary Text',
+    category: 'Text Variants',
+    description: 'Primary text color — light/dark aware',
+    lightValue: '#2d7acc',
+    darkValue: '#5aabf7',
+  },
+  {
+    variable: '--cui-danger-text',
+    name: 'Danger Text',
+    category: 'Text Variants',
+    description: 'Danger text color — always white',
+    lightValue: '#ffffff',
+    darkValue: '#ffffff',
+  },
+
+  // ============================================
+  // Color Aliases (-color)
+  // ============================================
+  {
+    variable: '--cui-primary-color',
+    name: 'Primary Color Alias',
+    category: 'Color Aliases',
+    description: 'Alias for the primary brand color',
+    lightValue: '#3d99f5',
+    darkValue: '#3d99f5',
+  },
+  {
+    variable: '--cui-success-color',
+    name: 'Success Color Alias',
+    category: 'Color Aliases',
+    description: 'Alias for the success brand color',
+    lightValue: '#57c68a',
+    darkValue: '#57c68a',
+  },
+  {
+    variable: '--cui-danger-color',
+    name: 'Danger Color Alias',
+    category: 'Color Aliases',
+    description: 'Alias for the danger brand color',
+    lightValue: '#e55353',
+    darkValue: '#e55353',
   },
 
   // ============================================
@@ -680,7 +1042,14 @@ export function getColorsByCategory(): Record<string, ColorDefinition[]> {
  * Category display order
  */
 export const categoryOrder = [
-  'CoreUI Semantic',
+  'Base Colors',
+  'Dark Companions',
+  'Structural Neutrals',
+  'Background Variants',
+  'Subtle Background Variants',
+  'Border Subtle Variants',
+  'Text Variants',
+  'Color Aliases',
   'Surfaces',
   'Text',
   'Borders',

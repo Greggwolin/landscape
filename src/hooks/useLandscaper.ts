@@ -76,6 +76,7 @@ const TOOL_TABLE_MAP: Record<string, string[]> = {
   update_sales_comps: ['sales_comps'],
   update_project_field: ['project'],
   bulk_update_fields: ['project'],
+  update_cashflow_assumption: ['dcf_analysis', 'cashflow'],  // DCF/Cashflow assumptions
 };
 
 /**

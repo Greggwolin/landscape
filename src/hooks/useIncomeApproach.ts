@@ -15,6 +15,7 @@ import type {
   IncomeApproachUpdatePayload,
   DCFAnalysisData,
 } from '@/types/income-approach';
+import type { MFDcfMonthlyApiResponse } from '@/components/valuation/income-approach/mfCashFlowTransform';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const DEBOUNCE_DELAY = 300; // ms
@@ -32,6 +33,10 @@ interface UseIncomeApproachReturn {
   dcfData: DCFAnalysisData | null;
   isDCFLoading: boolean;
   activeMethod: ValuationMethod;
+
+  // Monthly DCF (for CashFlowGrid with time scale toggle)
+  monthlyDcfData: MFDcfMonthlyApiResponse | null;
+  isMonthlyDCFLoading: boolean;
 
   // Actions
   setSelectedBasis: (basis: NOIBasis) => void;
@@ -52,6 +57,10 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
   const [dcfData, setDCFData] = useState<DCFAnalysisData | null>(null);
   const [isDCFLoading, setIsDCFLoading] = useState(false);
   const [activeMethod, setActiveMethodState] = useState<ValuationMethod>('direct_cap');
+
+  // Monthly DCF state (for CashFlowGrid with time scale toggle)
+  const [monthlyDcfData, setMonthlyDCFData] = useState<MFDcfMonthlyApiResponse | null>(null);
+  const [isMonthlyDCFLoading, setIsMonthlyDCFLoading] = useState(false);
 
   // Pending updates for debouncing
   const pendingUpdates = useRef<IncomeApproachUpdatePayload>({});
@@ -191,7 +200,7 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     }
   }, [fetchData, dcfData]);
 
-  // Fetch DCF data
+  // Fetch DCF data (annual projections - legacy)
   const fetchDCF = useCallback(async () => {
     if (!projectId) return;
 
@@ -216,15 +225,46 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     }
   }, [projectId]);
 
+  // Fetch monthly DCF data (for CashFlowGrid with time scale toggle)
+  const fetchMonthlyDCF = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      setIsMonthlyDCFLoading(true);
+
+      const response = await fetch(
+        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch monthly DCF data: ${response.statusText}`);
+      }
+
+      const result: MFDcfMonthlyApiResponse = await response.json();
+      setMonthlyDCFData(result);
+    } catch (err) {
+      console.error('Error fetching monthly DCF data:', err);
+      // Don't set error state - fall back to legacy table silently
+    } finally {
+      setIsMonthlyDCFLoading(false);
+    }
+  }, [projectId]);
+
   // Set active method (and fetch DCF if switching to DCF)
   const setActiveMethod = useCallback(
     (method: ValuationMethod) => {
       setActiveMethodState(method);
-      if (method === 'dcf' && !dcfData && !isDCFLoading) {
-        fetchDCF();
+      if (method === 'dcf') {
+        // Fetch both annual (for legacy fallback) and monthly (for new grid)
+        if (!dcfData && !isDCFLoading) {
+          fetchDCF();
+        }
+        if (!monthlyDcfData && !isMonthlyDCFLoading) {
+          fetchMonthlyDCF();
+        }
       }
     },
-    [dcfData, isDCFLoading, fetchDCF]
+    [dcfData, isDCFLoading, fetchDCF, monthlyDcfData, isMonthlyDCFLoading, fetchMonthlyDCF]
   );
 
   // Initial fetch
@@ -245,11 +285,16 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
   const prevIsSaving = useRef(isSaving);
   useEffect(() => {
     // When save completes (isSaving goes from true to false), refetch DCF if it's loaded
-    if (prevIsSaving.current && !isSaving && dcfData) {
-      fetchDCF();
+    if (prevIsSaving.current && !isSaving) {
+      if (dcfData) {
+        fetchDCF();
+      }
+      if (monthlyDcfData) {
+        fetchMonthlyDCF();
+      }
     }
     prevIsSaving.current = isSaving;
-  }, [isSaving, dcfData, fetchDCF]);
+  }, [isSaving, dcfData, fetchDCF, monthlyDcfData, fetchMonthlyDCF]);
 
   return {
     data,
@@ -266,6 +311,9 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     activeMethod,
     setActiveMethod,
     fetchDCF,
+    // Monthly DCF
+    monthlyDcfData,
+    isMonthlyDCFLoading,
   };
 }
 

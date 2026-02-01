@@ -40,6 +40,17 @@ export async function POST(
       }
     );
 
+    // Handle non-JSON responses (e.g., Django HTML error pages)
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Django returned non-JSON response:', text.substring(0, 500));
+      return NextResponse.json(
+        { error: `Django server error (${response.status}). Check Django logs for details.` },
+        { status: response.status || 500 }
+      );
+    }
+
     const data = await response.json();
 
     if (!response.ok) {

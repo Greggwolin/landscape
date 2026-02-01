@@ -568,6 +568,7 @@ class PlatformKnowledge(models.Model):
         MARKET_DATA = 'market_data', 'Market Data'
         LEGAL_REGULATORY = 'legal_regulatory', 'Legal/Regulatory'
         COST_ESTIMATION = 'cost_estimation', 'Cost Estimation'
+        ALPHA_HELP = 'alpha_help', 'Alpha Help'  # Platform documentation for Alpha testers
         OTHER = 'other', 'Other'
 
     document_key = models.CharField(max_length=100, unique=True)
@@ -692,6 +693,17 @@ class PlatformKnowledgeChunk(models.Model):
     page_number = models.IntegerField(blank=True, null=True)
     section_path = models.CharField(max_length=500, blank=True, null=True)
 
+    category = models.CharField(
+        max_length=100,
+        default='general',
+        help_text='High-level classification for ingestion scripts (e.g., alpha_docs)'
+    )
+
+    metadata = models.JSONField(
+        default=dict,
+        help_text='Additional chunk metadata used for filtered retrieval'
+    )
+
     # Embedding stored as JSON array (pgvector handled at SQL level)
     # Raw SQL queries will use the actual vector column
     embedding_model = models.CharField(max_length=100, default='text-embedding-3-small')
@@ -706,7 +718,7 @@ class PlatformKnowledgeChunk(models.Model):
         ordering = ['document', 'chunk_index']
 
     def __str__(self):
-        return f"Chunk {self.chunk_index} - {self.section_path}"
+        return f"Chunk {self.chunk_index} ({self.category}) - {self.section_path}"
 
 
 # =============================================================================

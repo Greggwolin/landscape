@@ -76,9 +76,13 @@ export function aggregateToQuarters(schedule: CashFlowSchedule): AggregatedSched
 
   // Group periods by quarter
   periods.forEach((p, index) => {
-    const date = new Date(p.startDate);
-    const year = date.getFullYear();
-    const quarter = Math.ceil((date.getMonth() + 1) / 3);
+    // Parse date components directly from ISO string to avoid timezone issues
+    const startDateStr = typeof p.startDate === 'string'
+      ? p.startDate
+      : p.startDate.toISOString();
+    const year = parseInt(startDateStr.substring(0, 4), 10);
+    const month = parseInt(startDateStr.substring(5, 7), 10);
+    const quarter = Math.ceil(month / 3);
     const key = `${year}-Q${quarter}`;
 
     if (!quarterMap.has(key)) {
@@ -126,8 +130,13 @@ export function aggregateToYears(schedule: CashFlowSchedule): AggregatedSchedule
 
   // Group periods by year
   periods.forEach((p, index) => {
-    const date = new Date(p.startDate);
-    const year = date.getFullYear();
+    // Parse year directly from ISO string to avoid timezone issues
+    // new Date("2026-01-01") interprets as UTC, which in US timezones
+    // becomes Dec 31, 2025 local time - causing wrong year grouping
+    const startDateStr = typeof p.startDate === 'string'
+      ? p.startDate
+      : p.startDate.toISOString();
+    const year = parseInt(startDateStr.substring(0, 4), 10);
 
     if (!yearMap.has(year)) {
       yearMap.set(year, {
@@ -488,14 +497,16 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
     const isDeductions = section.sectionId === 'revenue-deductions';
     const isNet = section.sectionId === 'revenue-net';
 
-    section.lineItems.forEach((item) => {
+    section.lineItems.forEach((item, itemIdx) => {
       const phaseName = item.containerLabel || 'Project Level';
       const labelSuffix = item.containerId ? `: ${phaseName}` : '';
+      // Use original lineId + container to ensure uniqueness
+      const uniqueSuffix = `${item.containerId ?? 'project'}-${item.lineId || itemIdx}`;
 
       if (isGross) {
         grossRevenueItems.push({
           ...item,
-          lineId: `by-phase-gross-${item.containerId ?? 'project'}`,
+          lineId: `by-phase-gross-${uniqueSuffix}`,
           description: `Gross Revenue${labelSuffix}`,
         });
         grossRevenueTotal += item.total;
@@ -505,7 +516,7 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
       } else if (isDeductions) {
         deductionItems.push({
           ...item,
-          lineId: `by-phase-deduction-${item.containerId ?? 'project'}`,
+          lineId: `by-phase-deduction-${uniqueSuffix}`,
           description: `Subdivision Costs${labelSuffix}`,
         });
         deductionsTotal += item.total;
@@ -515,7 +526,7 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
       } else if (isNet) {
         netRevenueItems.push({
           ...item,
-          lineId: `by-phase-net-${item.containerId ?? 'project'}`,
+          lineId: `by-phase-net-${uniqueSuffix}`,
           description: `Net Revenue${labelSuffix}`,
         });
         netRevenueTotal += item.total;

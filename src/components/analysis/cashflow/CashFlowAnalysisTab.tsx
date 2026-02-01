@@ -26,6 +26,8 @@ import {
 } from '@/lib/financial-engine/cashflow/aggregation';
 import type { CashFlowSchedule } from '@/lib/financial-engine/cashflow/types';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 // Area/Village color palette for filter buttons
 const AREA_COLORS = [
   { bg: '#3b82f6', border: '#2563eb', text: '#ffffff' }, // Blue
@@ -161,13 +163,13 @@ export default function CashFlowAnalysisTab({ projectId, exportButton, onSummary
     return activePhaseIds.length > 0 ? activePhaseIds : undefined;
   }, [excludedPhaseIds, excludedAreaIds, containerPhases]);
 
-  // Fetch cash flow data with container filter
+  // Fetch cash flow data from Django backend with container filter
   const { data, error, isLoading } = useSWR<CashFlowResponse>(
     // Include containerIds in the cache key so data refetches when filter changes
     containerIdsForApi
-      ? [`/api/projects/${projectId}/cash-flow/generate`, containerIdsForApi]
-      : `/api/projects/${projectId}/cash-flow/generate`,
-    () => fetchCashFlow(`/api/projects/${projectId}/cash-flow/generate`, { containerIds: containerIdsForApi }),
+      ? [`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, containerIdsForApi]
+      : `${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`,
+    () => fetchCashFlow(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, { containerIds: containerIdsForApi }),
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,

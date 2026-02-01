@@ -16,8 +16,8 @@
   --ls-grid-cell-padding-y: 4px;
 
   /* Typography */
-  --ls-grid-font-size: 12px;
-  --ls-grid-header-font-size: 11px;
+  --ls-grid-font-size: 14px;
+  --ls-grid-header-font-size: 13px;
   --ls-grid-font-family: system-ui, -apple-system, 'Inter', sans-serif;
 
   /* Colors - Light Mode */
@@ -448,8 +448,8 @@
 
 @media (max-width: 768px) {
   .ls-budget-grid {
-    --ls-grid-font-size: 11px;
-    --ls-grid-header-font-size: 10px;
+    --ls-grid-font-size: 13px;
+    --ls-grid-header-font-size: 12px;
     --ls-grid-cell-padding-x: 6px;
   }
 }
