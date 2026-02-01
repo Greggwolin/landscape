@@ -13,33 +13,45 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CCard } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilChevronDoubleLeft, cilChevronDoubleRight } from '@coreui/icons';
+import { cilChevronDoubleLeft, cilChevronDoubleRight, cilLifeRing } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
 
 interface StudioProjectBarProps {
   projectId: number;
   isLandscaperCollapsed: boolean;
   onToggleLandscaper: () => void;
+  onAlphaAssistantClick?: () => void;
 }
 
 export function StudioProjectBar({
   projectId,
   isLandscaperCollapsed,
   onToggleLandscaper,
+  onAlphaAssistantClick,
 }: StudioProjectBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
   }, [projects, projectId, activeProject]);
 
   const handleProjectChange = (newProjectId: number) => {
+    const targetProject = projects.find((p) => p.project_id === newProjectId);
+    const targetUrl = getProjectSwitchUrl(
+      newProjectId,
+      pathname,
+      targetProject?.project_type_code,
+      searchParams
+    );
     selectProject(newProjectId);
-    router.push(`/projects/${newProjectId}`);
+    router.push(targetUrl);
   };
 
   // Match the Landscaper CCard exactly for consistent border/shadow styling
@@ -118,8 +130,33 @@ export function StudioProjectBar({
         ))}
       </select>
 
-      {/* Right section: Future vitals, completeness chips, etc. */}
+      {/* Spacer */}
       <div style={{ flex: 1 }} />
+
+      {/* Alpha Assistant button - right side */}
+      {onAlphaAssistantClick && (
+        <button
+          onClick={onAlphaAssistantClick}
+          className="alpha-assistant-trigger"
+          title="Alpha Assistant - Help, Chat & Feedback"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.375rem 0.75rem',
+            border: '1px solid var(--cui-border-color)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--cui-body-bg)',
+            color: 'var(--cui-body-color)',
+            cursor: 'pointer',
+            fontSize: '0.8125rem',
+            fontWeight: 500,
+          }}
+        >
+          <CIcon icon={cilLifeRing} size="sm" />
+          <span>Alpha Tester</span>
+        </button>
+      )}
     </CCard>
   );
 }

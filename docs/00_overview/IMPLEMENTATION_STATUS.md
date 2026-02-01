@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-01-30
-**Version:** 3.2
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements)
+**Last Updated:** 2026-02-01
+**Version:** 3.3
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation)
 
 ---
 
@@ -9,7 +9,19 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Cash Flow UI, Growth Rates, and DCF Improvements (January 30, 2026)**
+### 🆕 **Latest Update: Project Switch Tab Preservation (February 1, 2026)**
+
+**Navigation UX Enhancement**
+
+Improved project switching behavior to preserve user context:
+
+- ✅ **Tab Preservation** - Switching projects now maintains the current tab/page instead of going to home
+- ✅ **Dual URL Pattern Support** - Handles both path-based (`/projects/123/budget`) and query-param (`?folder=budget&tab=budget`) routes
+- ✅ **Smart Fallback Logic** - Falls back to home when switching to income property while on Valuation tab
+- ✅ **Utility Functions** - New `extractCurrentTabFromPath()` and `getProjectSwitchUrl()` in folderTabConfig.ts
+- 📁 **Location:** See `docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md`
+
+### Previous Update: Cash Flow UI, Growth Rates, and DCF Improvements (January 30, 2026)
 
 **Multi-Feature Enhancement Release**
 

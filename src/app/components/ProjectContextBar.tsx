@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
 
 /**
  * ProjectContextBar - Project Selector Bar
@@ -24,6 +25,8 @@ interface ProjectContextBarProps {
 export default function ProjectContextBar({ projectId }: ProjectContextBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
@@ -34,8 +37,15 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
   }
 
   const handleProjectChange = (newProjectId: number) => {
+    const targetProject = projects.find((p) => p.project_id === newProjectId);
+    const targetUrl = getProjectSwitchUrl(
+      newProjectId,
+      pathname,
+      targetProject?.project_type_code,
+      searchParams
+    );
     selectProject(newProjectId);
-    router.push(`/projects/${newProjectId}`);
+    router.push(targetUrl);
   };
 
   return (

@@ -175,9 +175,7 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
         ? [] // Single page - no subtabs
         : [
             { id: 'budget', label: 'Budget' },
-            { id: 'schedule', label: 'Schedule' },
             { id: 'sales', label: 'Sales' },
-            { id: 'draws', label: 'Draws' },
           ],
     },
 
@@ -197,7 +195,6 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
             { id: 'income', label: 'Income Approach' },
           ]
         : [
-            { id: 'feasibility', label: 'Feasibility' },
             { id: 'cashflow', label: 'Cash Flow' },
             { id: 'returns', label: 'Returns' },
             { id: 'sensitivity', label: 'Sensitivity' },
@@ -369,4 +366,81 @@ export function isValidFolderTab(
   // If folder has no subtabs, any tab is "valid" (we just show the folder content)
   if (!folder.subTabs.length) return true;
   return folder.subTabs.some((tab) => tab.id === tabId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Project Switch Navigation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts the current tab/path segment from a project URL.
+ * Returns everything after /projects/[projectId]/
+ *
+ * Examples:
+ * - /projects/123/budget → 'budget'
+ * - /projects/123/valuation/income-approach → 'valuation/income-approach'
+ * - /projects/123 → '' (home)
+ */
+export function extractCurrentTabFromPath(pathname: string): string {
+  // Match /projects/{projectId}/{rest}
+  const match = pathname.match(/^\/projects\/\d+\/?(.*)$/);
+  if (!match) return '';
+  return match[1] || '';
+}
+
+/**
+ * Determines the target URL when switching between projects.
+ * Preserves the current tab/page unless:
+ * - Current page is valuation-related AND target project is income property (not land_dev)
+ *
+ * Supports both URL patterns:
+ * 1. Path-based: /projects/123/budget
+ * 2. Query-param based: /projects/123?folder=budget&tab=budget
+ *
+ * @param newProjectId - The project ID to switch to
+ * @param currentPath - Current pathname from usePathname()
+ * @param targetProjectType - The project_type_code of the target project
+ * @param searchParams - Optional URLSearchParams for query-param based navigation
+ * @returns The URL to navigate to
+ */
+export function getProjectSwitchUrl(
+  newProjectId: number,
+  currentPath: string,
+  targetProjectType: string | null | undefined,
+  searchParams?: URLSearchParams | null
+): string {
+  // First check path-based routes
+  const pathTab = extractCurrentTabFromPath(currentPath);
+
+  // Then check query-param based navigation (folder tabs)
+  const folderParam = searchParams?.get('folder') || '';
+  const tabParam = searchParams?.get('tab') || '';
+
+  // Determine if we're on valuation tab (either via path or query param)
+  const isOnValuationTab = pathTab.startsWith('valuation') || folderParam === 'valuation';
+
+  // Check if target project is income property (not land_dev)
+  const targetIsIncomeProperty = isIncomeProperty(targetProjectType || undefined);
+
+  // Fallback to home if on valuation tab AND target is income property
+  if (isOnValuationTab && targetIsIncomeProperty) {
+    return `/projects/${newProjectId}`;
+  }
+
+  // Preserve path-based route if present
+  if (pathTab) {
+    return `/projects/${newProjectId}/${pathTab}`;
+  }
+
+  // Preserve query-param based navigation if present
+  if (folderParam) {
+    const params = new URLSearchParams();
+    params.set('folder', folderParam);
+    if (tabParam) {
+      params.set('tab', tabParam);
+    }
+    return `/projects/${newProjectId}?${params.toString()}`;
+  }
+
+  return `/projects/${newProjectId}`;
 }

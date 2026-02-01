@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import CIcon from '@coreui/icons-react';
 import { cilChevronLeft } from '@coreui/icons';
@@ -11,6 +11,7 @@ import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
+import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
 
 interface ProjectSelectorCardProps {
   projectId: number;
@@ -23,6 +24,8 @@ const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
 export function ProjectSelectorCard({ projectId, onToggleCollapse }: ProjectSelectorCardProps) {
   const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: profile, mutate } = useSWR<ProjectProfile>(
@@ -36,8 +39,15 @@ export function ProjectSelectorCard({ projectId, onToggleCollapse }: ProjectSele
   }, [projects, projectId, activeProject]);
 
   const handleProjectChange = (newProjectId: number) => {
+    const targetProject = projects.find((p) => p.project_id === newProjectId);
+    const targetUrl = getProjectSwitchUrl(
+      newProjectId,
+      pathname,
+      targetProject?.project_type_code,
+      searchParams
+    );
     selectProject(newProjectId);
-    router.push(`/projects/${newProjectId}`);
+    router.push(targetUrl);
   };
 
   const handleEditClick = () => {
