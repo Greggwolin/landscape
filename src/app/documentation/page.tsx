@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Django Cash Flow Consolidation (Feb 1, 2026)',
+      path: '/docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md',
+      category: 'Migration',
+      description: 'Land Dev Cash Flow engine migrated to Django/Python. Waterfall section name fix (UPPERCASE matching), preferred return timing fix (Period 1 accrual), IRR verified at 32.36%',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-02-01'
+    },
+    {
+      title: 'Project Switch Tab Preservation (Feb 1, 2026)',
+      path: '/docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md',
+      category: 'Component',
+      description: 'Navigation UX enhancement - switching projects now preserves current tab/page. Supports both path-based and query-param URL patterns with smart fallback logic',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-01'
+    },
+    {
       title: 'Cash Flow, Growth Rates & DCF Improvements (Jan 30, 2026)',
       path: '/docs/09_session_notes/2026-01-30-cashflow-growth-dcf-improvements.md',
       category: 'Component',

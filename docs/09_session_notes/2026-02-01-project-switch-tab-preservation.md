@@ -98,8 +98,92 @@ export function getProjectSwitchUrl(
 - Files changed: 4
 - Lines added: ~90
 
+---
+
+## Session 2: Cash Flow & Waterfall Django Consolidation
+
+**Duration**: ~2 hours
+**Focus**: Complete Django migration for cash flow and fix waterfall integration
+
+### 3. Rewire Cash Flow Summary to Django ✅
+
+**Problem**: The `/api/projects/{id}/cash-flow/summary` Next.js endpoint was still using the old TypeScript engine.
+
+**Solution**: Updated the Next.js route to proxy to Django's cash flow service:
+
+```typescript
+// Now proxies to Django instead of TypeScript engine
+const djangoUrl = `${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`;
+const djangoResponse = await fetch(djangoUrl, { method: 'GET' });
+```
+
+Also added GET method support to Django's `LandDevCashFlowView`.
+
+### 4. Fix Waterfall Cash Flow Section Name Matching ✅
+
+**Problem**: Waterfall schedule wasn't showing period cash flows for LP/GP distributions.
+
+**Root Cause**: Case-sensitive mismatch in section names:
+- Django returns: `'DEVELOPMENT COSTS'` (UPPERCASE)
+- Waterfall matched: `'Development Costs'` (Mixed case)
+
+**Solution**: Convert to lowercase for matching in `_fetch_cashflows_from_django_service()`:
+
+```python
+cost_section_names = {'development costs', 'planning & engineering', 'land acquisition'}
+revenue_section_names = {'net revenue'}
+
+for section in sections:
+    sname = section.get('sectionName', '').lower()  # Lowercase comparison
+    is_cost = sname in cost_section_names
+```
+
+### 5. Fix Preferred Return Accrual Timing ✅
+
+**Problem**: Pref was accruing in Period 1 when it shouldn't (capital hasn't been outstanding for a full period).
+
+**Root Cause**: In `waterfall/engine.py`, Period 1's `prior_date` was set to start of month, causing accrual calculation.
+
+**Solution**: Set `prior_date = cf.date` for Period 1 so days_between = 0:
+
+```python
+for i, cf in enumerate(self.cash_flows):
+    if i > 0:
+        prior_date = self.cash_flows[i - 1].date
+    else:
+        # First period: prior_date equals current date to prevent accrual
+        prior_date = cf.date
+```
+
+**Result**: Period 1 now shows $0 accrued pref, Period 2 shows correct accrual ($615,957).
+
+## Files Modified (Session 2)
+
+### Files Modified:
+1. **src/app/api/projects/[projectId]/cash-flow/summary/route.ts**
+   - Updated to proxy to Django instead of TypeScript engine
+
+2. **backend/apps/financial/views_land_dev_cashflow.py**
+   - Added GET method handler for summary endpoint
+
+3. **backend/apps/calculations/services.py** (~line 107-120)
+   - Fixed case-sensitive section name matching
+
+4. **services/financial_engine_py/financial_engine/waterfall/engine.py** (~line 128-137)
+   - Fixed pref accrual timing for Period 1
+
+## Git Activity (Session 2)
+
+### Verification Results:
+- Cash flow summary endpoint returns correct data: `peakEquity: $106,028,258.30`, `irr: 32.36%`
+- Waterfall now returns 96 periods with cash flows
+- Period 1 pref accrual: $0 (correct)
+- Period 2 pref accrual: $615,957 (correct)
+
 ## Next Steps
 
 1. Test tab preservation across all folder tabs
 2. Consider adding similar preservation for other navigation contexts (e.g., Dashboard → Project)
 3. Add unit tests for `getProjectSwitchUrl()` function
+4. Complete waterfall UI integration testing
+5. Verify LP/GP distributions calculate correctly across all 96 periods

@@ -9,7 +9,26 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Project Switch Tab Preservation (February 1, 2026)**
+### 🆕 **Latest Update: Django Cash Flow Consolidation (February 1, 2026)**
+
+**Land Dev Cash Flow Engine Migration Complete**
+
+Completed migration of Land Dev Cash Flow calculations from TypeScript to Django/Python:
+
+- ✅ **Cash Flow Summary Proxy** - Next.js `/api/projects/{id}/cash-flow/summary` now proxies to Django
+- ✅ **Waterfall Section Name Fix** - Fixed case-sensitive mismatch (Django returns UPPERCASE section names)
+- ✅ **Preferred Return Timing** - Fixed Period 1 pref accrual (should not accrue until Period 2)
+- ✅ **IRR Verification** - Confirmed 32.36% IRR matches expected calculations
+- ✅ **Peak Equity** - Verified $106,028,258.30 peak equity requirement
+- 📁 **Location:** See `docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md` (Session 2)
+
+**Files Modified:**
+- `src/app/api/projects/[projectId]/cash-flow/summary/route.ts` - Django proxy
+- `backend/apps/financial/views_land_dev_cashflow.py` - GET method support
+- `backend/apps/calculations/services.py` - Lowercase section matching
+- `services/financial_engine_py/financial_engine/waterfall/engine.py` - Pref accrual fix
+
+### Previous Update: Project Switch Tab Preservation (February 1, 2026)
 
 **Navigation UX Enhancement**
 
