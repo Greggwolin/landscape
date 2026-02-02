@@ -19,7 +19,6 @@ import {
   CTableHeaderCell,
   CTableDataCell,
   CSpinner,
-  CBadge,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import {
@@ -37,6 +36,7 @@ import { getContacts } from '@/lib/api/contacts';
 import type { ContactListItem, ContactType, PaginatedResponse } from '@/types/contacts';
 import ContactDetailPanel from '@/components/contacts/ContactDetailPanel';
 import ContactModal from '@/components/contacts/ContactModal';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
   Person: cilUser,
@@ -45,15 +45,6 @@ const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
   Fund: cilMoney,
   Government: cilInstitution,
   Other: cilPeople,
-};
-
-const CONTACT_TYPE_COLORS: Record<ContactType, string> = {
-  Person: 'primary',
-  Company: 'success',
-  Entity: 'warning',
-  Fund: 'info',
-  Government: 'secondary',
-  Other: 'dark',
 };
 
 type FilterType = 'All' | ContactType;
@@ -194,15 +185,13 @@ export default function ContactsPage() {
                   >
                     {option.label}
                     {contactCounts[option.key] !== undefined && (
-                      <CBadge
-                        color={filterType === option.key ? 'light' : 'secondary'}
+                      <SemanticBadge
+                        intent="navigation-meta"
+                        value={filterType === option.key ? 'active' : 'inactive'}
                         className="ms-2"
-                        style={{
-                          color: filterType === option.key ? 'var(--cui-primary)' : undefined
-                        }}
                       >
                         {contactCounts[option.key] || 0}
-                      </CBadge>
+                      </SemanticBadge>
                     )}
                   </CButton>
                 ))}
@@ -256,8 +245,9 @@ export default function ContactsPage() {
                     }
                   >
                     <CTableDataCell>
-                      <CBadge
-                        color={CONTACT_TYPE_COLORS[contact.contact_type]}
+                      <SemanticBadge
+                        intent="category"
+                        value={contact.contact_type.toLowerCase()}
                         className="p-2"
                         title={contact.contact_type}
                       >
@@ -265,7 +255,7 @@ export default function ContactsPage() {
                           icon={CONTACT_TYPE_ICONS[contact.contact_type]}
                           size="sm"
                         />
-                      </CBadge>
+                      </SemanticBadge>
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="fw-semibold">

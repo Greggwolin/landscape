@@ -36,6 +36,7 @@ type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData'
 const ANALYSIS_TYPE_OPTIONS = [
   { value: 'VALUATION', label: 'Valuation', description: 'Market value opinion', icon: '📈' },
   { value: 'INVESTMENT', label: 'Investment', description: 'Acquisition analysis', icon: '💰' },
+  { value: 'VALUE_ADD', label: 'Value-Add', description: 'Acquisition with renovation upside', icon: '🔧' },
   { value: 'DEVELOPMENT', label: 'Development', description: 'Ground-up returns', icon: '🔨' },
   { value: 'FEASIBILITY', label: 'Feasibility', description: 'Go/no-go decision', icon: '✅' }
 ]

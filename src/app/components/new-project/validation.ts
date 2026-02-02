@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { NewProjectFormData } from './types'
 
 // New orthogonal analysis type (what the user is doing)
-const analysisTypeEnum = z.enum(['VALUATION', 'INVESTMENT', 'DEVELOPMENT', 'FEASIBILITY'])
+const analysisTypeEnum = z.enum(['VALUATION', 'INVESTMENT', 'VALUE_ADD', 'DEVELOPMENT', 'FEASIBILITY'])
 // Property category (what the asset is) - cascades to property_subtype
 const propertyCategoryEnum = z.enum(['Land Development', 'Income Property'])
 const developmentTypeEnum = propertyCategoryEnum // backwards compatibility

@@ -22,11 +22,12 @@
  * Analysis Type - What the user is trying to accomplish.
  * Orthogonal to Property Category (what the asset is).
  */
-export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY';
+export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPMENT' | 'FEASIBILITY';
 
 export const ANALYSIS_TYPES: readonly AnalysisType[] = [
   'VALUATION',
   'INVESTMENT',
+  'VALUE_ADD',
   'DEVELOPMENT',
   'FEASIBILITY'
 ] as const;
@@ -34,6 +35,7 @@ export const ANALYSIS_TYPES: readonly AnalysisType[] = [
 export const ANALYSIS_TYPE_LABELS: Record<AnalysisType, string> = {
   'VALUATION': 'Valuation',
   'INVESTMENT': 'Investment',
+  'VALUE_ADD': 'Value-Add',
   'DEVELOPMENT': 'Development',
   'FEASIBILITY': 'Feasibility'
 };
@@ -41,6 +43,7 @@ export const ANALYSIS_TYPE_LABELS: Record<AnalysisType, string> = {
 export const ANALYSIS_TYPE_DESCRIPTIONS: Record<AnalysisType, string> = {
   'VALUATION': 'Market value opinion - USPAP compliant appraisal',
   'INVESTMENT': 'Acquisition underwriting - IRR, returns analysis',
+  'VALUE_ADD': 'Acquisition with renovation/repositioning upside',
   'DEVELOPMENT': 'Ground-up or redevelopment returns',
   'FEASIBILITY': 'Go/no-go binary feasibility analysis'
 };

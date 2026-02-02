@@ -13,6 +13,8 @@ export type { LandscapeButtonProps } from './LandscapeButton';
 
 export { StatusChip, Status } from './StatusChip';
 export type { StatusChipProps, StatusType } from './StatusChip';
+export { SemanticBadge } from './SemanticBadge';
+export type { SemanticBadgeProps, SemanticIntent } from './SemanticBadge';
 
 export { DataTable } from './DataTable';
 export type { DataTableProps, DataTableColumn } from './DataTable';

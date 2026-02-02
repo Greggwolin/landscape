@@ -8,6 +8,7 @@ import {
   MarketCompetitiveProjectProduct,
 } from '@/hooks/useMarketData';
 import { useToast } from '@/components/ui/toast';
+import { SemanticBadge } from '@/components/ui/landscape';
 import { AddCompetitorModal } from './AddCompetitorModal';
 
 interface CompetitiveProjectsPanelProps {
@@ -152,36 +153,6 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
     });
   };
 
-  // Get status badge class
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'selling':
-      case 'Active':
-        return 'bg-success-subtle text-success-emphasis';
-      case 'sold_out':
-        return 'bg-secondary-subtle text-secondary-emphasis';
-      case 'planned':
-        return 'bg-info-subtle text-info-emphasis';
-      default:
-        return 'bg-secondary-subtle text-secondary-emphasis';
-    }
-  };
-
-  // Get data source badge class
-  const getSourceBadgeClass = (source: string) => {
-    switch (source) {
-      case 'zonda':
-      case 'Zonda':
-        return 'bg-primary-subtle text-primary-emphasis';
-      case 'manual':
-        return 'bg-warning-subtle text-warning-emphasis';
-      case 'landscaper_ai':
-        return 'bg-info-subtle text-info-emphasis';
-      default:
-        return 'bg-secondary-subtle text-secondary-emphasis';
-    }
-  };
-
   // Format currency
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null) return '-';
@@ -273,19 +244,17 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
               // For standalone (no master plan), render directly
               if (!isMasterPlan) {
                 return group.competitors.map((comp) => (
-                  <CompetitorRow
-                    key={comp.id}
-                    comp={comp}
-                    isIndented={false}
-                    expandedProducts={expandedProducts}
-                    toggleProducts={toggleProducts}
-                    handleDelete={handleDelete}
-                    deleteCompetitor={deleteCompetitor}
-                    getStatusBadgeClass={getStatusBadgeClass}
-                    getSourceBadgeClass={getSourceBadgeClass}
-                    formatCurrency={formatCurrency}
-                    getSubdivisionName={getSubdivisionName}
-                  />
+                    <CompetitorRow
+                      key={comp.id}
+                      comp={comp}
+                      isIndented={false}
+                      expandedProducts={expandedProducts}
+                      toggleProducts={toggleProducts}
+                      handleDelete={handleDelete}
+                      deleteCompetitor={deleteCompetitor}
+                      formatCurrency={formatCurrency}
+                      getSubdivisionName={getSubdivisionName}
+                    />
                 ));
               }
 
@@ -310,9 +279,14 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
                       <span className="fw-semibold text-truncate" style={{ maxWidth: '260px' }}>
                         {group.masterPlanName}
                       </span>
-                      <span className="badge bg-secondary-subtle text-secondary-emphasis">
+                      <SemanticBadge
+                        intent="navigation-meta"
+                        value="subdivisions"
+                        className="ms-2"
+                        style={{ fontSize: '0.7rem' }}
+                      >
                         {group.competitors.length} subdivisions
-                      </span>
+                      </SemanticBadge>
                     </div>
                     <div className="d-flex gap-3 small text-muted text-nowrap flex-shrink-0">
                       <span><strong>{group.totalUnits}</strong> units</span>
@@ -335,8 +309,6 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
                       toggleProducts={toggleProducts}
                       handleDelete={handleDelete}
                       deleteCompetitor={deleteCompetitor}
-                      getStatusBadgeClass={getStatusBadgeClass}
-                      getSourceBadgeClass={getSourceBadgeClass}
                       formatCurrency={formatCurrency}
                       getSubdivisionName={getSubdivisionName}
                     />
@@ -376,8 +348,6 @@ interface CompetitorRowProps {
   toggleProducts: (id: number) => void;
   handleDelete: (comp: MarketCompetitiveProject) => void;
   deleteCompetitor: ReturnType<typeof useDeleteCompetitor>;
-  getStatusBadgeClass: (status: string) => string;
-  getSourceBadgeClass: (source: string) => string;
   formatCurrency: (value: number | undefined | null) => string;
   getSubdivisionName: (comp: MarketCompetitiveProject) => string;
 }
@@ -396,13 +366,16 @@ function CompetitorRow({
   toggleProducts,
   handleDelete,
   deleteCompetitor,
-  getStatusBadgeClass,
-  getSourceBadgeClass,
   formatCurrency,
   getSubdivisionName,
 }: CompetitorRowProps) {
   const hasProducts = comp.products && comp.products.length > 0;
   const isProductsExpanded = comp.id ? expandedProducts.has(comp.id) : false;
+  const statusValue = comp.status ?? 'unknown';
+  const statusLabel =
+    statusValue === 'selling'
+      ? 'Active'
+      : statusValue.replace(/_/g, ' ');
 
   // Calculate remaining units from products if available
   const unitsRemaining = useMemo(() => {
@@ -461,9 +434,14 @@ function CompetitorRow({
           <div className="d-flex align-items-center gap-2 ms-auto text-nowrap small flex-shrink-0">
             {/* Lot dimensions - show prominently */}
             {lotDimensions && (
-              <span className="badge bg-info-subtle text-info-emphasis" style={{ fontSize: '0.7rem' }}>
+              <SemanticBadge
+                intent="category"
+                value="lot-dimensions"
+                className="me-1"
+                style={{ fontSize: '0.7rem' }}
+              >
                 {lotDimensions}
-              </span>
+              </SemanticBadge>
             )}
             {unitsRemaining && (
               <span className="text-muted">
@@ -485,17 +463,23 @@ function CompetitorRow({
 
         {/* Badges and delete at far right */}
         <div className="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
-          <span className={`badge ${getStatusBadgeClass(comp.status)}`} style={{ fontSize: '0.65rem' }}>
-            {comp.status === 'selling' ? 'Active' : comp.status.replace('_', ' ')}
-          </span>
+          <SemanticBadge
+            intent="status"
+            value={statusValue}
+            style={{ fontSize: '0.65rem' }}
+          >
+            {statusLabel}
+          </SemanticBadge>
           {comp.data_source === 'Zonda' && (
-            <span
-              className="badge bg-purple-subtle text-purple-emphasis"
-              style={{ fontSize: '0.6rem', backgroundColor: 'rgba(147, 51, 234, 0.15)', color: '#7c3aed' }}
+            <SemanticBadge
+              intent="category"
+              value={comp.data_source}
+              className="ms-1"
+              style={{ fontSize: '0.6rem' }}
               title="Zonda data source"
             >
               Z
-            </span>
+            </SemanticBadge>
           )}
           <button
             className="btn btn-sm btn-link p-0 text-danger ms-1"
@@ -548,14 +532,18 @@ function ProductsTable({
           {products.map((prod, idx) => (
             <tr key={prod.id || idx}>
               <td>
-                <span className="badge bg-info-subtle text-info-emphasis">
+                <SemanticBadge
+                  intent="category"
+                  value="lot-dimensions"
+                  style={{ fontSize: '0.7rem' }}
+                >
                   {JSON.stringify({
                     lot_dimensions: prod.lot_dimensions,
                     lotDimensions: prod.lotDimensions,
                     lot_width_ft: prod.lot_width_ft,
                     lotWidthFt: prod.lotWidthFt
                   })}
-                </span>
+                </SemanticBadge>
               </td>
               <td className="text-end">
                 {formatCurrency(prod.price_min)} - {formatCurrency(prod.price_max)}

@@ -2,32 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CBadge,
   CButton,
   CCard,
   CCardBody,
   CCardHeader,
-  CCol,
   CFormInput,
-  CFormLabel,
   CFormSelect,
-  CFormSwitch,
-  CFormTextarea,
-  CModal,
-  CModalBody,
-  CModalFooter,
-  CModalHeader,
-  CModalTitle,
-  CRow,
   CSpinner,
   CTooltip,
 } from '@coreui/react';
-import { cilPencil, cilPlus, cilTrash } from '@coreui/icons';
+import { cilPlus, cilTrash } from '@coreui/icons';
 import CIcon from '@coreui/icons-react';
 import ModeSelector, { type BudgetMode } from '@/components/budget/ModeSelector';
+import { SemanticBadge } from '@/components/ui/landscape';
 import {
   ACQUISITION_EVENT_TYPES,
-  acquisitionEventDebitCreditMap,
   type AcquisitionEvent,
   type AcquisitionEventType,
 } from '@/types/acquisition';
@@ -35,8 +24,12 @@ import { formatMoney } from '@/utils/formatters/number';
 
 interface Props {
   projectId: number;
-  mode: BudgetMode;
-  onModeChange: (mode: BudgetMode) => void;
+  /** Budget mode for column visibility - ignored if showAllFields is true */
+  mode?: BudgetMode;
+  /** Callback when mode changes */
+  onModeChange?: (mode: BudgetMode) => void;
+  /** When true, show all columns and hide mode selector */
+  showAllFields?: boolean;
   onEventsChange?: (events: AcquisitionEvent[]) => void;
 }
 
@@ -58,35 +51,37 @@ const mapRow = (row: any): AcquisitionEvent => ({
   updatedAt: row.updated_at,
 });
 
-const truncate = (value: string | null | undefined, length = 60) => {
+const truncate = (value: string | null | undefined, length = 40) => {
   if (!value) return '';
   return value.length > length ? `${value.slice(0, length)}…` : value;
 };
 
-const emptyFormState = {
-  eventType: 'Deposit' as AcquisitionEventType,
+// New row placeholder ID
+const NEW_ROW_ID = -1;
+
+const emptyNewRow: Partial<AcquisitionEvent> = {
+  eventType: 'Deposit',
   eventDate: '',
   description: '',
-  amount: null as number | null,
+  amount: null,
   isAppliedToPurchase: true,
   goesHardDate: '',
   isConditional: false,
   notes: '',
 };
 
-export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, onEventsChange }: Props) {
+export default function AcquisitionLedgerGrid({ projectId, mode = 'detail', onModeChange, showAllFields = false, onEventsChange }: Props) {
+  // Effective mode: if showAllFields is true, always use 'detail' mode
+  const effectiveMode = showAllFields ? 'detail' : mode;
   const [events, setEvents] = useState<AcquisitionEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [editing, setEditing] = useState<AcquisitionEvent | null>(null);
-  const [form, setForm] = useState<typeof emptyFormState>(emptyFormState);
   const [editingCell, setEditingCell] = useState<{ rowId: number; field: string } | null>(null);
   const [inlineValues, setInlineValues] = useState<Record<number, Partial<AcquisitionEvent>>>({});
-
-  const isDeposit = form.eventType === 'Deposit';
+  const [showNewRow, setShowNewRow] = useState(false);
+  const [newRowValues, setNewRowValues] = useState<Partial<AcquisitionEvent>>(emptyNewRow);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -98,7 +93,6 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
         throw new Error(`Failed to load ledger (${res.status})`);
       }
       const json = await res.json();
-      // Handle DRF paginated response (with results) or plain array
       const data = Array.isArray(json) ? json : (json.results || []);
       const mapped = data.map(mapRow);
       setEvents(mapped);
@@ -114,69 +108,6 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
-
-  const resetForm = () => {
-    setForm(emptyFormState);
-    setEditing(null);
-  };
-
-  const openCreateModal = () => {
-    resetForm();
-    setModalOpen(true);
-  };
-
-  const openEditModal = (row: AcquisitionEvent) => {
-    setEditing(row);
-    setForm({
-      eventType: row.eventType,
-      eventDate: row.eventDate ?? '',
-      description: row.description ?? '',
-      amount: row.amount ?? null,
-      isAppliedToPurchase: row.isAppliedToPurchase ?? true,
-      goesHardDate: row.goesHardDate ?? '',
-      isConditional: row.isConditional ?? false,
-      notes: row.notes ?? '',
-    });
-    setModalOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!form.eventType) return;
-    setSaving(true);
-    const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-    const payload = {
-      event_type: form.eventType,
-      event_date: form.eventDate || null,
-      description: form.description || null,
-      amount: form.amount ?? null,
-      is_applied_to_purchase: form.isAppliedToPurchase,
-      goes_hard_date: form.goesHardDate || null,
-      is_conditional: form.isConditional,
-      notes: form.notes || null,
-    };
-
-    try {
-      const url = editing
-        ? `${apiUrl}/api/projects/${projectId}/acquisition/ledger/${editing.acquisitionId}/`
-        : `${apiUrl}/api/projects/${projectId}/acquisition/ledger/`;
-      const method = editing ? 'PATCH' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        throw new Error(`Save failed (${res.status})`);
-      }
-      await fetchEvents();
-      setModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to save event');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDelete = async (acquisitionId: number) => {
     setDeletingId(acquisitionId);
@@ -202,7 +133,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
     if (!changes) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-    const payload: any = {};
+    const payload: Record<string, unknown> = {};
 
     if (changes.eventType !== undefined) payload.event_type = changes.eventType;
     if (changes.eventDate !== undefined) payload.event_date = changes.eventDate || null;
@@ -235,12 +166,48 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
     }
   };
 
+  const handleCreateNewRow = async () => {
+    if (!newRowValues.eventType) return;
+    setSaving(true);
+    const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    const payload = {
+      event_type: newRowValues.eventType,
+      event_date: newRowValues.eventDate || null,
+      description: newRowValues.description || null,
+      amount: newRowValues.amount ?? null,
+      is_applied_to_purchase: newRowValues.isAppliedToPurchase ?? true,
+      goes_hard_date: newRowValues.goesHardDate || null,
+      is_conditional: newRowValues.isConditional ?? false,
+      notes: newRowValues.notes || null,
+    };
+
+    try {
+      const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        throw new Error(`Create failed (${res.status})`);
+      }
+      await fetchEvents();
+      setNewRowValues(emptyNewRow);
+      setShowNewRow(false);
+      setEditingCell(null);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to create event');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getInlineValue = (row: AcquisitionEvent, field: keyof AcquisitionEvent) => {
     const changes = inlineValues[row.acquisitionId];
     return changes?.[field] !== undefined ? changes[field] : row[field];
   };
 
-  const setInlineValue = (rowId: number, field: keyof AcquisitionEvent, value: any) => {
+  const setInlineValue = (rowId: number, field: keyof AcquisitionEvent, value: unknown) => {
     setInlineValues((prev) => ({
       ...prev,
       [rowId]: {
@@ -258,100 +225,295 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
     setEditingCell(null);
   };
 
-  const saveAndNext = async (rowId: number, field: string, nextField?: string) => {
-    await handleInlineSave(rowId);
-    if (nextField) {
-      setEditingCell({ rowId, field: nextField });
-    } else {
-      setEditingCell(null);
-    }
-  };
-
   const columns = useMemo(() => {
-    // Napkin: Date, Event Type, Description, Amount, Go-Hard, Actions
-    if (mode === 'napkin') {
+    if (effectiveMode === 'napkin') {
       return ['eventDate', 'eventType', 'description', 'amount', 'goesHard', 'actions'];
     }
-
-    // Standard: Date, Event Type, Description, Amount, Applicable, Go-Hard, Notes, Actions
-    if (mode === 'standard') {
+    if (effectiveMode === 'standard') {
       return ['eventDate', 'eventType', 'description', 'amount', 'isAppliedToPurchase', 'goesHard', 'notes', 'actions'];
     }
-
-    // Detail: All fields
     return ['eventDate', 'eventType', 'description', 'amount', 'isAppliedToPurchase', 'goesHard', 'isConditional', 'notes', 'actions'];
-  }, [mode]);
+  }, [effectiveMode]);
 
-  const renderAmountCell = (row: AcquisitionEvent) => {
-    const amountLabel = row.amount !== null && row.amount !== undefined
-      ? formatMoney(row.amount)
+  const handleAddClick = () => {
+    setShowNewRow(true);
+    setNewRowValues(emptyNewRow);
+    // Focus on the first editable field
+    setTimeout(() => {
+      setEditingCell({ rowId: NEW_ROW_ID, field: 'eventType' });
+    }, 50);
+  };
+
+  const renderAmountCell = (amount: number | null | undefined) => {
+    const amountLabel = amount !== null && amount !== undefined
+      ? formatMoney(amount)
       : '—';
+    return (
+      <span className="fw-semibold" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {amountLabel}
+      </span>
+    );
+  };
+
+  // Render a new row for inline creation
+  const renderNewRow = () => {
+    if (!showNewRow) return null;
+    const isEditing = (field: string) => editingCell?.rowId === NEW_ROW_ID && editingCell?.field === field;
+    const isDepositRow = newRowValues.eventType === 'Deposit';
 
     return (
-      <div className="d-flex align-items-center justify-content-end">
-        <span className="fw-semibold tnum" style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {amountLabel}
-        </span>
-      </div>
+      <tr style={{ backgroundColor: 'rgba(var(--cui-primary-rgb), 0.05)' }}>
+        {columns.includes('eventDate') && (
+          <td onClick={() => startEditing(NEW_ROW_ID, 'eventDate')}>
+            {isEditing('eventDate') ? (
+              <CFormInput
+                size="sm"
+                type="date"
+                value={newRowValues.eventDate || ''}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, eventDate: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); startEditing(NEW_ROW_ID, 'eventType'); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="text-muted">{newRowValues.eventDate || 'Date'}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('eventType') && (
+          <td onClick={() => startEditing(NEW_ROW_ID, 'eventType')}>
+            {isEditing('eventType') ? (
+              <CFormSelect
+                size="sm"
+                value={newRowValues.eventType}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, eventType: e.target.value as AcquisitionEventType }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); startEditing(NEW_ROW_ID, 'description'); }
+                }}
+                autoFocus
+              >
+                {ACQUISITION_EVENT_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </CFormSelect>
+            ) : (
+              <span className="fw-semibold">{newRowValues.eventType}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('description') && (
+          <td onClick={() => startEditing(NEW_ROW_ID, 'description')}>
+            {isEditing('description') ? (
+              <CFormInput
+                size="sm"
+                placeholder="Description"
+                value={newRowValues.description || ''}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, description: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); startEditing(NEW_ROW_ID, 'amount'); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="text-muted">{newRowValues.description || 'Description'}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('amount') && (
+          <td className="text-end" onClick={() => startEditing(NEW_ROW_ID, 'amount')}>
+            {isEditing('amount') ? (
+              <CFormInput
+                size="sm"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={newRowValues.amount ?? ''}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, amount: e.target.value === '' ? null : Number(e.target.value) }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                  if (e.key === 'Enter') { handleCreateNewRow(); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="text-muted">{renderAmountCell(newRowValues.amount)}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('isAppliedToPurchase') && (
+          <td
+            className="text-center"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNewRowValues((prev) => ({ ...prev, isAppliedToPurchase: !prev.isAppliedToPurchase }))}
+          >
+            <SemanticBadge
+              intent="action-state"
+              value={newRowValues.isAppliedToPurchase ? 'yes' : 'no'}
+            />
+          </td>
+        )}
+        {columns.includes('goesHard') && (
+          <td className="text-center" onClick={() => startEditing(NEW_ROW_ID, 'goesHardDate')}>
+            {isEditing('goesHardDate') ? (
+              <CFormInput
+                size="sm"
+                type="date"
+                value={newRowValues.goesHardDate || ''}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, goesHardDate: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="text-muted">{newRowValues.goesHardDate || '—'}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('isConditional') && (
+          <td
+            className="text-center"
+            style={{ cursor: isDepositRow ? 'default' : 'pointer' }}
+            onClick={() => {
+              if (!isDepositRow) {
+                setNewRowValues((prev) => ({ ...prev, isConditional: !prev.isConditional }));
+              }
+            }}
+          >
+            {!isDepositRow ? (
+              <SemanticBadge
+                intent="action-state"
+                value={newRowValues.isConditional ? 'conditional' : 'firm'}
+              />
+            ) : (
+              <span className="text-muted">—</span>
+            )}
+          </td>
+        )}
+        {columns.includes('notes') && (
+          <td onClick={() => startEditing(NEW_ROW_ID, 'notes')}>
+            {isEditing('notes') ? (
+              <CFormInput
+                size="sm"
+                placeholder="Notes"
+                value={newRowValues.notes || ''}
+                onChange={(e) => setNewRowValues((prev) => ({ ...prev, notes: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
+                  if (e.key === 'Enter') { handleCreateNewRow(); }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="text-muted">{truncate(newRowValues.notes, 30) || 'Notes'}</span>
+            )}
+          </td>
+        )}
+        {columns.includes('actions') && (
+          <td className="text-end">
+            <div className="d-flex gap-1 justify-content-end">
+              <CTooltip content="Save">
+                <CButton
+                  size="sm"
+                  color="success"
+                  variant="ghost"
+                  disabled={saving}
+                  onClick={handleCreateNewRow}
+                >
+                  {saving ? <CSpinner size="sm" /> : '✓'}
+                </CButton>
+              </CTooltip>
+              <CTooltip content="Cancel">
+                <CButton
+                  size="sm"
+                  color="secondary"
+                  variant="ghost"
+                  onClick={() => { setShowNewRow(false); setNewRowValues(emptyNewRow); }}
+                >
+                  ✕
+                </CButton>
+              </CTooltip>
+            </div>
+          </td>
+        )}
+      </tr>
     );
   };
 
   return (
     <CCard className="shadow-sm">
       <style>{`
-        .editable-cell {
+        .acq-table { table-layout: fixed; width: 100%; }
+        .acq-table th, .acq-table td {
+          padding: 0.5rem 0.4rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 0.875rem;
+        }
+        .acq-table .editable-cell {
           cursor: pointer;
           transition: background-color 0.15s ease;
         }
-        .editable-cell:hover {
+        .acq-table .editable-cell:hover {
           background-color: rgba(var(--cui-primary-rgb), 0.05);
         }
+        .acq-table input, .acq-table select {
+          font-size: 0.8125rem;
+        }
       `}</style>
-      <CCardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <CCardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
         <div>
-          <h5 className="mb-0">Acquisition Ledger</h5>
-          <small className="text-muted">Click any cell to edit inline • Backed by landscape.tbl_acquisition</small>
+          <h6 className="mb-0">Acquisition Ledger</h6>
+          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Click cells to edit • Backed by landscape.tbl_acquisition</small>
         </div>
         <div className="d-flex align-items-center gap-2">
-          <ModeSelector activeMode={mode} onModeChange={onModeChange} />
-          <CButton color="primary" size="sm" onClick={openCreateModal}>
-            <CIcon icon={cilPlus} className="me-2" /> Add Event
+          {!showAllFields && onModeChange && (
+            <ModeSelector activeMode={effectiveMode} onModeChange={onModeChange} />
+          )}
+          <CButton color="primary" size="sm" onClick={handleAddClick} disabled={showNewRow}>
+            <CIcon icon={cilPlus} size="sm" className="me-1" /> Add
           </CButton>
         </div>
       </CCardHeader>
-      <CCardBody>
-        {error && <div className="alert alert-danger py-2 mb-3">{error}</div>}
+      <CCardBody className="p-0">
+        {error && <div className="alert alert-danger py-2 mx-3 mt-3 mb-0">{error}</div>}
         {loading ? (
-          <div className="d-flex align-items-center text-muted" style={{ minHeight: 160 }}>
+          <div className="d-flex align-items-center text-muted p-4" style={{ minHeight: 120 }}>
             <CSpinner size="sm" className="me-2" /> Loading ledger...
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table table-hover align-middle mb-0 acq-table">
               <thead>
                 <tr>
-                  {columns.includes('eventDate') && <th style={{ minWidth: 120 }}>Date</th>}
-                  {columns.includes('eventType') && <th style={{ minWidth: 140 }}>Event Type</th>}
-                  {columns.includes('description') && <th style={{ minWidth: 220 }}>Event Description</th>}
-                  {columns.includes('amount') && <th className="text-end" style={{ minWidth: 160 }}>Amount</th>}
-                  {columns.includes('isAppliedToPurchase') && <th className="text-center" style={{ minWidth: 110 }}>Applicable</th>}
-                  {columns.includes('goesHard') && <th className="text-center" style={{ minWidth: 130 }}>Go-Hard</th>}
-                  {columns.includes('isConditional') && <th style={{ minWidth: 140 }}>Is Conditional?</th>}
-                  {columns.includes('notes') && <th style={{ minWidth: 220 }}>Notes</th>}
-                  {columns.includes('actions') && <th style={{ width: 90 }} className="text-end">Actions</th>}
+                  {columns.includes('eventDate') && <th style={{ width: '90px' }}>Date</th>}
+                  {columns.includes('eventType') && <th style={{ width: '100px' }}>Type</th>}
+                  {columns.includes('description') && <th style={{ width: 'auto', minWidth: '120px' }}>Description</th>}
+                  {columns.includes('amount') && <th className="text-end" style={{ width: '100px' }}>Amount</th>}
+                  {columns.includes('isAppliedToPurchase') && <th className="text-center" style={{ width: '70px' }}>Apply</th>}
+                  {columns.includes('goesHard') && <th className="text-center" style={{ width: '90px' }}>Go-Hard</th>}
+                  {columns.includes('isConditional') && <th className="text-center" style={{ width: '75px' }}>Cond.</th>}
+                  {columns.includes('notes') && <th style={{ width: 'auto', minWidth: '100px' }}>Notes</th>}
+                  {columns.includes('actions') && <th style={{ width: '60px' }} className="text-end"></th>}
                 </tr>
               </thead>
               <tbody>
-                {events.length === 0 && (
+                {renderNewRow()}
+                {events.length === 0 && !showNewRow && (
                   <tr>
                     <td colSpan={columns.length} className="text-center text-muted py-4">
-                      No acquisition events yet. Add your first event to start the ledger.
+                      No acquisition events yet. Click "Add" to create your first event.
                     </td>
                   </tr>
                 )}
                 {events.map((row) => {
                   const isDepositRow = row.eventType === 'Deposit';
-                  const isEditing = (field: string) => editingCell?.rowId === row.acquisitionId && editingCell?.field === field;
+                  const isEditingField = (field: string) => editingCell?.rowId === row.acquisitionId && editingCell?.field === field;
 
                   return (
                     <tr key={row.acquisitionId}>
@@ -360,7 +522,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                           className="editable-cell"
                           onClick={() => startEditing(row.acquisitionId, 'eventDate')}
                         >
-                          {isEditing('eventDate') ? (
+                          {isEditingField('eventDate') ? (
                             <CFormInput
                               size="sm"
                               type="date"
@@ -383,7 +545,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                           className="fw-semibold editable-cell"
                           onClick={() => startEditing(row.acquisitionId, 'eventType')}
                         >
-                          {isEditing('eventType') ? (
+                          {isEditingField('eventType') ? (
                             <CFormSelect
                               size="sm"
                               value={getInlineValue(row, 'eventType') as string}
@@ -408,8 +570,9 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                         <td
                           className="editable-cell"
                           onClick={() => startEditing(row.acquisitionId, 'description')}
+                          title={(getInlineValue(row, 'description') as string) || ''}
                         >
-                          {isEditing('description') ? (
+                          {isEditingField('description') ? (
                             <CFormInput
                               size="sm"
                               value={(getInlineValue(row, 'description') as string) || ''}
@@ -422,7 +585,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                               autoFocus
                             />
                           ) : (
-                            (getInlineValue(row, 'description') as string) || '—'
+                            truncate(getInlineValue(row, 'description') as string, 30) || '—'
                           )}
                         </td>
                       )}
@@ -431,7 +594,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                           className="text-end editable-cell"
                           onClick={() => startEditing(row.acquisitionId, 'amount')}
                         >
-                          {isEditing('amount') ? (
+                          {isEditingField('amount') ? (
                             <CFormInput
                               size="sm"
                               type="number"
@@ -446,7 +609,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                               autoFocus
                             />
                           ) : (
-                            renderAmountCell(row)
+                            renderAmountCell(getInlineValue(row, 'amount') as number | null)
                           )}
                         </td>
                       )}
@@ -458,9 +621,10 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                             setTimeout(() => handleInlineSave(row.acquisitionId), 100);
                           }}
                         >
-                          <CBadge color={(getInlineValue(row, 'isAppliedToPurchase') as boolean) ? 'primary' : 'secondary'}>
-                            {(getInlineValue(row, 'isAppliedToPurchase') as boolean) ? 'Yes' : 'No'}
-                          </CBadge>
+                          <SemanticBadge
+                            intent="action-state"
+                            value={(getInlineValue(row, 'isAppliedToPurchase') as boolean) ? 'yes' : 'no'}
+                          />
                         </td>
                       )}
                       {columns.includes('goesHard') && (
@@ -468,7 +632,7 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                           className="editable-cell text-center"
                           onClick={() => startEditing(row.acquisitionId, 'goesHardDate')}
                         >
-                          {isEditing('goesHardDate') ? (
+                          {isEditingField('goesHardDate') ? (
                             <CFormInput
                               size="sm"
                               type="date"
@@ -487,11 +651,20 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                         </td>
                       )}
                       {columns.includes('isConditional') && (
-                        <td>
+                        <td
+                          className={`text-center ${!isDepositRow ? 'editable-cell' : ''}`}
+                          onClick={() => {
+                            if (!isDepositRow) {
+                              setInlineValue(row.acquisitionId, 'isConditional', !(getInlineValue(row, 'isConditional') as boolean));
+                              setTimeout(() => handleInlineSave(row.acquisitionId), 100);
+                            }
+                          }}
+                        >
                           {!isDepositRow ? (
-                            <CBadge color={row.isConditional ? 'warning' : 'secondary'}>
-                              {row.isConditional ? 'Conditional' : 'Firm'}
-                            </CBadge>
+                            <SemanticBadge
+                              intent="action-state"
+                              value={(getInlineValue(row, 'isConditional') as boolean) ? 'conditional' : 'firm'}
+                            />
                           ) : (
                             <span className="text-muted">—</span>
                           )}
@@ -501,38 +674,22 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                         <td
                           className="editable-cell"
                           onClick={() => startEditing(row.acquisitionId, 'notes')}
-                          style={{ whiteSpace: mode === 'detail' ? 'pre-wrap' : 'normal' }}
+                          title={(getInlineValue(row, 'notes') as string) || ''}
                         >
-                          {isEditing('notes') ? (
-                            mode === 'detail' ? (
-                              <CFormTextarea
-                                size="sm"
-                                rows={3}
-                                value={(getInlineValue(row, 'notes') as string) || ''}
-                                onChange={(e) => setInlineValue(row.acquisitionId, 'notes', e.target.value)}
-                                onBlur={() => handleInlineSave(row.acquisitionId)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Escape') cancelEditing();
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <CFormInput
-                                size="sm"
-                                value={(getInlineValue(row, 'notes') as string) || ''}
-                                onChange={(e) => setInlineValue(row.acquisitionId, 'notes', e.target.value)}
-                                onBlur={() => handleInlineSave(row.acquisitionId)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleInlineSave(row.acquisitionId);
-                                  if (e.key === 'Escape') cancelEditing();
-                                }}
-                                autoFocus
-                              />
-                            )
+                          {isEditingField('notes') ? (
+                            <CFormInput
+                              size="sm"
+                              value={(getInlineValue(row, 'notes') as string) || ''}
+                              onChange={(e) => setInlineValue(row.acquisitionId, 'notes', e.target.value)}
+                              onBlur={() => handleInlineSave(row.acquisitionId)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleInlineSave(row.acquisitionId);
+                                if (e.key === 'Escape') cancelEditing();
+                              }}
+                              autoFocus
+                            />
                           ) : (
-                            mode === 'detail'
-                              ? ((getInlineValue(row, 'notes') as string) || '—')
-                              : (truncate(getInlineValue(row, 'notes') as string, 80) || '—')
+                            truncate(getInlineValue(row, 'notes') as string, 30) || '—'
                           )}
                         </td>
                       )}
@@ -542,10 +699,11 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
                             <CButton
                               size="sm"
                               color="light"
+                              variant="ghost"
                               disabled={deletingId === row.acquisitionId}
                               onClick={() => handleDelete(row.acquisitionId)}
                             >
-                              {deletingId === row.acquisitionId ? <CSpinner size="sm" /> : <CIcon icon={cilTrash} />}
+                              {deletingId === row.acquisitionId ? <CSpinner size="sm" /> : <CIcon icon={cilTrash} size="sm" />}
                             </CButton>
                           </CTooltip>
                         </td>
@@ -558,106 +716,6 @@ export default function AcquisitionLedgerGrid({ projectId, mode, onModeChange, o
           </div>
         )}
       </CCardBody>
-
-      <CModal visible={modalOpen} onClose={() => setModalOpen(false)} size="lg" backdrop="static">
-        <CModalHeader closeButton>
-          <CModalTitle>{editing ? 'Edit Acquisition Event' : 'Add Acquisition Event'}</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CRow className="gy-3">
-            <CCol md={4}>
-              <CFormLabel>Event Type</CFormLabel>
-              <CFormSelect
-                value={form.eventType}
-                onChange={(e) => setForm((prev) => ({ ...prev, eventType: e.target.value as AcquisitionEventType }))}
-              >
-                {ACQUISITION_EVENT_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-            <CCol md={4}>
-              <CFormLabel>Event Date</CFormLabel>
-              <CFormInput
-                type="date"
-                value={form.eventDate}
-                onChange={(e) => setForm((prev) => ({ ...prev, eventDate: e.target.value }))}
-              />
-            </CCol>
-            <CCol md={4}>
-              <CFormLabel>Amount</CFormLabel>
-              <CFormInput
-                type="number"
-                value={form.amount ?? ''}
-                onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value === '' ? null : Number(e.target.value) }))}
-              />
-            </CCol>
-          </CRow>
-
-          <CRow className="gy-3 mt-1">
-            <CCol md={12}>
-              <CFormLabel>Description</CFormLabel>
-              <CFormInput
-                type="text"
-                value={form.description}
-                placeholder="Describe the acquisition event"
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              />
-            </CCol>
-          </CRow>
-
-          <CRow className="gy-3 mt-1">
-            <CCol md={6}>
-              <CFormLabel>Affects Purchase Price?</CFormLabel>
-              <CFormSwitch
-                id="appliesToPurchase"
-                checked={form.isAppliedToPurchase}
-                onChange={(e) => setForm((prev) => ({ ...prev, isAppliedToPurchase: e.target.checked }))}
-                label="Applies to Purchase Price?"
-              />
-            </CCol>
-            {!isDeposit && (
-              <CCol md={6}>
-                <CFormLabel>Is Conditional?</CFormLabel>
-                <CFormSwitch
-                  id="isConditional"
-                  checked={form.isConditional}
-                  onChange={(e) => setForm((prev) => ({ ...prev, isConditional: e.target.checked }))}
-                  label="This event is conditional"
-                />
-              </CCol>
-            )}
-            <CCol md={6}>
-              <CFormLabel>Goes-Hard Date</CFormLabel>
-              <CFormInput
-                type="date"
-                value={form.goesHardDate}
-                onChange={(e) => setForm((prev) => ({ ...prev, goesHardDate: e.target.value }))}
-              />
-            </CCol>
-          </CRow>
-
-          <CRow className="gy-3 mt-1">
-            <CCol md={12}>
-              <CFormLabel>Notes</CFormLabel>
-              <CFormTextarea
-                rows={mode === 'detail' ? 4 : 2}
-                value={form.notes}
-                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-              />
-            </CCol>
-          </CRow>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSave} disabled={saving}>
-            {saving ? <CSpinner size="sm" className="me-2" /> : null}
-            {editing ? 'Save Changes' : 'Add Event'}
-          </CButton>
-        </CModalFooter>
-      </CModal>
     </CCard>
   );
 }

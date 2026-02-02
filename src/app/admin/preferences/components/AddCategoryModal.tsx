@@ -9,6 +9,7 @@ import type {
 } from '@/types/benchmarks';
 import { createCategory } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface AddCategoryModalProps {
   tags: CategoryTag[];
@@ -218,15 +219,20 @@ export default function AddCategoryModal({
                       {relevantTags.map((tag) => {
                         const isSelected = formData.tags.includes(tag.tag_name);
                         return (
-                          <button
-                            key={tag.tag_id}
-                            type="button"
-                            className={`tag-chip ${isSelected ? 'filled' : 'outline'}`}
-                            onClick={() => toggleTag(tag.tag_name)}
-                            title={tag.description || tag.tag_name}
-                          >
-                            <span className="tag-chip-label">{tag.tag_name}</span>
-                          </button>
+                      <button
+                        key={tag.tag_id}
+                        type="button"
+                        className={`tag-chip ${isSelected ? 'filled' : 'outline'}`}
+                        onClick={() => toggleTag(tag.tag_name)}
+                        title={tag.description || tag.tag_name}
+                      >
+                        <SemanticBadge
+                          intent="user-tag"
+                          value={tag.tag_name}
+                          userTagState={isSelected ? 'filled' : 'outline'}
+                          className="tag-chip-label"
+                        />
+                      </button>
                         );
                       })}
                     </div>

@@ -27,44 +27,59 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    // 1. Get project details
-    // Note: value_add_enabled column may not exist until migration 043 is run
+    // 1. Get project details including analysis_type
     const projectResult = await sql`
       SELECT
         project_id,
         project_name,
-        project_type_code
+        project_type_code,
+        analysis_type,
+        value_add_enabled,
+        active_opex_discriminator
       FROM tbl_project
       WHERE project_id = ${projectIdNum}
     `;
-
-    // Check if value_add_enabled column exists and get its value
-    let valueAddEnabled = false;
-    try {
-      const valueAddResult = await sql`
-        SELECT value_add_enabled FROM tbl_project WHERE project_id = ${projectIdNum}
-      `;
-      valueAddEnabled = valueAddResult[0]?.value_add_enabled || false;
-    } catch {
-      // Column doesn't exist yet, use default
-    }
-    let activeOpexDiscriminator: string | null = null;
-    try {
-      const activeOpexResult = await sql`
-        SELECT active_opex_discriminator FROM tbl_project WHERE project_id = ${projectIdNum}
-      `;
-      activeOpexDiscriminator = activeOpexResult[0]?.active_opex_discriminator || null;
-    } catch {
-      // Column doesn't exist yet, use default
-    }
 
     if (projectResult.length === 0) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
     const project = projectResult[0];
+    const analysisType = project.analysis_type || 'INVESTMENT';
+    const valueAddEnabled = project.value_add_enabled || false;
+    const activeOpexDiscriminator = project.active_opex_discriminator || null;
 
-    // 2. Get unit count and total SF
+    // 2. Fetch vacancy and expense assumptions from tbl_project_assumption
+    const assumptionsResult = await sql`
+      SELECT assumption_key, assumption_value
+      FROM tbl_project_assumption
+      WHERE project_id = ${projectIdNum}
+        AND assumption_key IN (
+          'physical_vacancy_pct',
+          'bad_debt_pct',
+          'concessions_pct',
+          'management_fee_pct',
+          'replacement_reserve_pct'
+        )
+    `;
+
+    // Build assumptions object with defaults
+    const assumptions: Record<string, number> = {
+      physical_vacancy_pct: 0.05,    // Default 5%
+      bad_debt_pct: 0.02,            // Default 2%
+      concessions_pct: 0.01,         // Default 1%
+      management_fee_pct: 0.03,      // Default 3%
+      replacement_reserve_pct: 300   // Default $300/unit
+    };
+
+    assumptionsResult.forEach(row => {
+      const value = parseFloat(row.assumption_value);
+      if (!isNaN(value)) {
+        assumptions[row.assumption_key] = value;
+      }
+    });
+
+    // 3. Get unit count and total SF
     // Priority 1: Get from tbl_project (authoritative)
     const projectSummary = await sql`
       SELECT total_units, gross_sf
@@ -237,14 +252,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     };
 
-    // 5. Get vacancy deductions
-    // Physical vacancy is calculated from rent roll if detailed data exists, otherwise editable
+    // 5. Get vacancy deductions from assumptions
+    // Physical vacancy is calculated from rent roll if detailed data exists, otherwise from assumptions
     const physicalVacancyRate = calculatedPhysicalVacancy !== null
       ? calculatedPhysicalVacancy
-      : 0.05; // Default 5% if no rent roll
+      : assumptions.physical_vacancy_pct;
 
-    const creditLossRate = 0.02; // Default 2%
-    const concessionsRate = 0.01; // Default 1%
+    const creditLossRate = assumptions.bad_debt_pct;
+    const concessionsRate = assumptions.concessions_pct;
 
     const vacancyDeductions = {
       section_type: 'flat' as const,
@@ -537,6 +552,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     };
 
     const mapLegacyOpexRows = async () => {
+      // Filter out management-related expenses since we calculate Management Fee separately
+      // This prevents double-counting extracted management expenses
       const legacyRows = await sql`
         SELECT
           opex_id,
@@ -551,6 +568,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           COALESCE(parent_category, 'unclassified') as parent_category
         FROM tbl_operating_expenses
         WHERE project_id = ${projectIdNum}
+          AND LOWER(COALESCE(expense_type, '')) NOT IN ('management', 'management fee', 'property management')
+          AND LOWER(COALESCE(parent_category, '')) != 'management'
         ORDER BY parent_category, expense_category, updated_at DESC
       `;
 
@@ -761,35 +780,126 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Always use legacy opex rows when they exist - they have parent_category grouping
     // for the drag-and-drop categorization UI
     const legacyRows = await mapLegacyOpexRows();
+
+    // Calculate EGI first (needed for Management Fee calculation)
+    const grossPotentialRent = rentalIncome.section_total.as_is;
+    const grossPotentialRentMarket = rentalIncome.section_total.as_is_market || rentalIncome.section_total.as_is;
+    const netRentalIncome = grossPotentialRent + vacancyDeductions.section_total.as_is;
+    const netRentalIncomeMarket = grossPotentialRentMarket + (vacancyDeductions.section_total.as_is_market || vacancyDeductions.section_total.as_is);
+    const totalOtherIncome = otherIncome.section_total.as_is;
+    const effectiveGrossIncome = netRentalIncome + totalOtherIncome;
+    const effectiveGrossIncomeMarket = netRentalIncomeMarket + totalOtherIncome;
+
+    const postRenoGPR = rentalIncome.section_total.post_reno;
+    const postRenoNRI = postRenoGPR + vacancyDeductions.section_total.post_reno;
+    const postRenoEGI = postRenoNRI + otherIncome.section_total.post_reno;
+
+    // Calculate Management Fee (EGI × management_fee_pct)
+    const managementFeePct = assumptions.management_fee_pct;
+    const managementFeeAsIs = effectiveGrossIncome * managementFeePct;
+    const managementFeeMarket = effectiveGrossIncomeMarket * managementFeePct;
+    const managementFeePostReno = postRenoEGI * managementFeePct;
+
+    // Calculate Replacement Reserves (reserves_per_unit × unit_count)
+    const reservesPerUnit = assumptions.replacement_reserve_pct;
+    const replacementReserves = reservesPerUnit * unitCount;
+
+    // Create calculated expense rows for Management Fee and Replacement Reserves
+    const calculatedExpenseRows = [
+      {
+        line_item_key: 'calculated_management_fee',
+        label: `Management Fee (${(managementFeePct * 100).toFixed(1)}%)`,
+        level: 1,
+        is_calculated: true,
+        is_readonly: true,
+        parent_category: 'management',
+        calculation_base: 'egi',
+        as_is: {
+          rate: managementFeePct,
+          total: managementFeeAsIs
+        },
+        post_reno: {
+          rate: managementFeePct,
+          total: managementFeePostReno
+        },
+        evidence: {},
+        children: []
+      },
+      {
+        line_item_key: 'calculated_replacement_reserves',
+        label: `Replacement Reserves ($${reservesPerUnit.toFixed(0)}/unit)`,
+        level: 1,
+        is_calculated: true,
+        is_readonly: true,
+        parent_category: 'reserves',
+        as_is: {
+          rate: reservesPerUnit,
+          total: replacementReserves
+        },
+        post_reno: {
+          rate: reservesPerUnit,
+          total: replacementReserves
+        },
+        evidence: {},
+        children: []
+      }
+    ];
+
     if (legacyRows.length > 0) {
-      // Use legacy rows for parent_category-based grouping
+      // Add calculated expenses (Management Fee, Replacement Reserves) as a new category
       const legacyTotal = legacyRows.reduce((sum, row) => sum + (row.as_is?.total || 0), 0);
+      const legacyPostRenoTotal = legacyRows.reduce((sum, row) => sum + (row.post_reno?.total || 0), 0);
+
+      // Create the "Management & Reserves" parent category for calculated items
+      const managementReservesCategory = {
+        line_item_key: 'opex_parent_management_reserves',
+        label: 'Management & Reserves',
+        parent_category: 'management_reserves',
+        level: 0,
+        is_calculated: true,
+        is_expanded: true,
+        as_is: {
+          rate: unitCount > 0 ? (managementFeeAsIs + replacementReserves) / unitCount / 12 : null,
+          total: managementFeeAsIs + replacementReserves
+        },
+        post_reno: {
+          rate: unitCount > 0 ? (managementFeePostReno + replacementReserves) / unitCount / 12 : null,
+          total: managementFeePostReno + replacementReserves
+        },
+        evidence: {},
+        children: calculatedExpenseRows
+      };
+
+      // Add the management & reserves category to the expense rows
+      const allOpexRows = [...legacyRows, managementReservesCategory];
+
+      const totalBaseOpex = legacyTotal;
+      const totalCalculatedExpenses = managementFeeAsIs + replacementReserves;
+      const totalOperatingExpenses = totalBaseOpex + totalCalculatedExpenses;
+
+      const totalBaseOpexPostReno = legacyPostRenoTotal;
+      const totalCalculatedExpensesPostReno = managementFeePostReno + replacementReserves;
+      const totalOperatingExpensesPostReno = totalBaseOpexPostReno + totalCalculatedExpensesPostReno;
+
       const operatingExpenses = {
         section_type: 'hierarchical' as const,
-        rows: legacyRows,
+        rows: allOpexRows,
         section_total: {
-          as_is: legacyTotal,
-          post_reno: legacyTotal
+          as_is: totalOperatingExpenses,
+          post_reno: totalOperatingExpensesPostReno
+        },
+        // Expose the calculated components separately for transparency
+        calculated: {
+          management_fee: managementFeeAsIs,
+          management_fee_pct: managementFeePct,
+          replacement_reserves: replacementReserves,
+          reserves_per_unit: reservesPerUnit
         }
       };
 
-      // Recalculate totals with legacy opex
-      // Current rent scenario (F-12 Current)
-      const grossPotentialRent = rentalIncome.section_total.as_is; // Current GPR
-      const grossPotentialRentMarket = rentalIncome.section_total.as_is_market || rentalIncome.section_total.as_is; // Market GPR
-      const netRentalIncome = grossPotentialRent + vacancyDeductions.section_total.as_is;
-      const netRentalIncomeMarket = grossPotentialRentMarket + (vacancyDeductions.section_total.as_is_market || vacancyDeductions.section_total.as_is);
-      const totalOtherIncome = otherIncome.section_total.as_is;
-      const effectiveGrossIncome = netRentalIncome + totalOtherIncome;
-      const effectiveGrossIncomeMarket = netRentalIncomeMarket + totalOtherIncome;
-      const totalOperatingExpenses = operatingExpenses.section_total.as_is;
       const asIsNOI = effectiveGrossIncome - totalOperatingExpenses;
       const marketNOI = effectiveGrossIncomeMarket - totalOperatingExpenses;
-
-      const postRenoGPR = rentalIncome.section_total.post_reno;
-      const postRenoNRI = postRenoGPR + vacancyDeductions.section_total.post_reno;
-      const postRenoEGI = postRenoNRI + otherIncome.section_total.post_reno;
-      const postRenoNOI = postRenoEGI - operatingExpenses.section_total.post_reno;
+      const postRenoNOI = postRenoEGI - totalOperatingExpensesPostReno;
 
       const noiUplift = postRenoNOI - asIsNOI;
       const noiUpliftPercent = asIsNOI !== 0 ? noiUplift / asIsNOI : 0;
@@ -797,6 +907,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({
         project_id: projectIdNum,
         project_type_code: project.project_type_code,
+        analysis_type: analysisType,
         property_summary: {
           unit_count: unitCount,
           total_sf: totalSF,
@@ -805,22 +916,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         value_add_enabled: valueAddEnabled,
         has_detailed_rent_roll: hasDetailedRentRoll,
         calculated_physical_vacancy: calculatedPhysicalVacancy,
+        assumptions: {
+          physical_vacancy_pct: physicalVacancyRate,
+          credit_loss_pct: creditLossRate,
+          concessions_pct: concessionsRate,
+          management_fee_pct: managementFeePct,
+          reserves_per_unit: reservesPerUnit
+        },
         rental_income: rentalIncome,
         vacancy_deductions: vacancyDeductions,
         other_income: otherIncome,
         operating_expenses: operatingExpenses,
         totals: {
-          // Current rent totals (F-12 Current)
           gross_potential_rent: grossPotentialRent,
-          gross_potential_rent_market: grossPotentialRentMarket, // Market GPR (F-12 Market)
+          gross_potential_rent_market: grossPotentialRentMarket,
           net_rental_income: netRentalIncome,
           net_rental_income_market: netRentalIncomeMarket,
           total_other_income: totalOtherIncome,
           effective_gross_income: effectiveGrossIncome,
           effective_gross_income_market: effectiveGrossIncomeMarket,
           total_operating_expenses: totalOperatingExpenses,
-          as_is_noi: asIsNOI, // F-12 Current NOI
-          market_noi: marketNOI, // F-12 Market NOI
+          base_operating_expenses: totalBaseOpex,
+          management_fee: managementFeeAsIs,
+          replacement_reserves: replacementReserves,
+          as_is_noi: asIsNOI,
+          market_noi: marketNOI,
           post_reno_noi: postRenoNOI,
           noi_uplift: noiUplift,
           noi_uplift_percent: noiUpliftPercent
@@ -832,35 +952,121 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Fall back to CoA-based hierarchy if no legacy opex rows exist
     // Calculate section totals from the parent category totals (which sum their leaf children)
-    const sectionAsIsTotal = filteredCategories.reduce((sum, cat) => sum + (cat.as_is?.total || 0), 0);
-    const sectionPostRenoTotal = filteredCategories.reduce((sum, cat) => sum + (cat.post_reno?.total || 0), 0);
+    const coaBaseTotal = filteredCategories.reduce((sum, cat) => sum + (cat.as_is?.total || 0), 0);
+    const coaBasePostRenoTotal = filteredCategories.reduce((sum, cat) => sum + (cat.post_reno?.total || 0), 0);
+
+    // Calculate EGI for this code path (needed for Management Fee)
+    const coaGPR = rentalIncome.section_total.as_is;
+    const coaGPRMarket = rentalIncome.section_total.as_is_market || rentalIncome.section_total.as_is;
+    const coaNRI = coaGPR + vacancyDeductions.section_total.as_is;
+    const coaNRIMarket = coaGPRMarket + (vacancyDeductions.section_total.as_is_market || vacancyDeductions.section_total.as_is);
+    const coaOtherIncome = otherIncome.section_total.as_is;
+    const coaEGI = coaNRI + coaOtherIncome;
+    const coaEGIMarket = coaNRIMarket + coaOtherIncome;
+
+    const coaPostRenoGPR = rentalIncome.section_total.post_reno;
+    const coaPostRenoNRI = coaPostRenoGPR + vacancyDeductions.section_total.post_reno;
+    const coaPostRenoEGI = coaPostRenoNRI + otherIncome.section_total.post_reno;
+
+    // Calculate Management Fee (EGI × management_fee_pct) for CoA path
+    const coaManagementFeePct = assumptions.management_fee_pct;
+    const coaManagementFeeAsIs = coaEGI * coaManagementFeePct;
+    const coaManagementFeeMarket = coaEGIMarket * coaManagementFeePct;
+    const coaManagementFeePostReno = coaPostRenoEGI * coaManagementFeePct;
+
+    // Calculate Replacement Reserves (reserves_per_unit × unit_count) for CoA path
+    const coaReservesPerUnit = assumptions.replacement_reserve_pct;
+    const coaReplacementReserves = coaReservesPerUnit * unitCount;
+
+    // Create calculated expense rows for Management Fee and Replacement Reserves
+    const coaCalculatedExpenseRows = [
+      {
+        line_item_key: 'calculated_management_fee',
+        label: `Management Fee (${(coaManagementFeePct * 100).toFixed(1)}%)`,
+        level: 1,
+        is_calculated: true,
+        is_readonly: true,
+        parent_category: 'management',
+        calculation_base: 'egi',
+        as_is: {
+          rate: coaManagementFeePct,
+          total: coaManagementFeeAsIs
+        },
+        post_reno: {
+          rate: coaManagementFeePct,
+          total: coaManagementFeePostReno
+        },
+        evidence: {},
+        children: []
+      },
+      {
+        line_item_key: 'calculated_replacement_reserves',
+        label: `Replacement Reserves ($${coaReservesPerUnit.toFixed(0)}/unit)`,
+        level: 1,
+        is_calculated: true,
+        is_readonly: true,
+        parent_category: 'reserves',
+        as_is: {
+          rate: coaReservesPerUnit,
+          total: coaReplacementReserves
+        },
+        post_reno: {
+          rate: coaReservesPerUnit,
+          total: coaReplacementReserves
+        },
+        evidence: {},
+        children: []
+      }
+    ];
+
+    // Create the "Management & Reserves" parent category for CoA path
+    const coaManagementReservesCategory = {
+      line_item_key: 'opex_parent_management_reserves',
+      label: 'Management & Reserves',
+      parent_category: 'management_reserves',
+      level: 0,
+      is_calculated: true,
+      is_expanded: true,
+      as_is: {
+        rate: unitCount > 0 ? (coaManagementFeeAsIs + coaReplacementReserves) / unitCount / 12 : null,
+        total: coaManagementFeeAsIs + coaReplacementReserves
+      },
+      post_reno: {
+        rate: unitCount > 0 ? (coaManagementFeePostReno + coaReplacementReserves) / unitCount / 12 : null,
+        total: coaManagementFeePostReno + coaReplacementReserves
+      },
+      evidence: {},
+      children: coaCalculatedExpenseRows
+    };
+
+    // Add calculated expenses to the CoA-based rows
+    const allCoaOpexRows = [...filteredCategories, coaManagementReservesCategory];
+
+    const coaTotalCalculatedExpenses = coaManagementFeeAsIs + coaReplacementReserves;
+    const coaTotalOperatingExpenses = coaBaseTotal + coaTotalCalculatedExpenses;
+    const coaTotalCalculatedExpensesPostReno = coaManagementFeePostReno + coaReplacementReserves;
+    const coaTotalOperatingExpensesPostReno = coaBasePostRenoTotal + coaTotalCalculatedExpensesPostReno;
 
     const operatingExpenses = {
       section_type: 'hierarchical' as const,
-      rows: filteredCategories,
+      rows: allCoaOpexRows,
       section_total: {
-        as_is: sectionAsIsTotal,
-        post_reno: sectionPostRenoTotal
+        as_is: coaTotalOperatingExpenses,
+        post_reno: coaTotalOperatingExpensesPostReno
+      },
+      // Expose the calculated components separately for transparency
+      calculated: {
+        management_fee: coaManagementFeeAsIs,
+        management_fee_pct: coaManagementFeePct,
+        replacement_reserves: coaReplacementReserves,
+        reserves_per_unit: coaReservesPerUnit
       }
     };
 
-    // 8. Calculate totals
-    // Current rent scenario (F-12 Current)
-    const grossPotentialRent = rentalIncome.section_total.as_is; // Current GPR
-    const grossPotentialRentMarket = rentalIncome.section_total.as_is_market || rentalIncome.section_total.as_is; // Market GPR
-    const netRentalIncome = grossPotentialRent + vacancyDeductions.section_total.as_is;
-    const netRentalIncomeMarket = grossPotentialRentMarket + (vacancyDeductions.section_total.as_is_market || vacancyDeductions.section_total.as_is);
-    const totalOtherIncome = otherIncome.section_total.as_is;
-    const effectiveGrossIncome = netRentalIncome + totalOtherIncome;
-    const effectiveGrossIncomeMarket = netRentalIncomeMarket + totalOtherIncome;
-    const totalOperatingExpenses = operatingExpenses.section_total.as_is;
-    const asIsNOI = effectiveGrossIncome - totalOperatingExpenses;
-    const marketNOI = effectiveGrossIncomeMarket - totalOperatingExpenses;
-
-    const postRenoGPR = rentalIncome.section_total.post_reno;
-    const postRenoNRI = postRenoGPR + vacancyDeductions.section_total.post_reno;
-    const postRenoEGI = postRenoNRI + otherIncome.section_total.post_reno;
-    const postRenoNOI = postRenoEGI - operatingExpenses.section_total.post_reno;
+    // 8. Calculate totals with calculated expenses included
+    const asIsNOI = coaEGI - coaTotalOperatingExpenses;
+    const marketNOI = coaEGIMarket - coaTotalOperatingExpenses;
+    const postRenoNOI = coaPostRenoEGI - coaTotalOperatingExpensesPostReno;
 
     const noiUplift = postRenoNOI - asIsNOI;
     const noiUpliftPercent = asIsNOI !== 0 ? noiUplift / asIsNOI : 0;
@@ -868,6 +1074,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       project_id: projectIdNum,
       project_type_code: project.project_type_code,
+      analysis_type: analysisType,
       property_summary: {
         unit_count: unitCount,
         total_sf: totalSF,
@@ -876,20 +1083,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       value_add_enabled: valueAddEnabled,
       has_detailed_rent_roll: hasDetailedRentRoll,
       calculated_physical_vacancy: calculatedPhysicalVacancy,
+      assumptions: {
+        physical_vacancy_pct: physicalVacancyRate,
+        credit_loss_pct: creditLossRate,
+        concessions_pct: concessionsRate,
+        management_fee_pct: coaManagementFeePct,
+        reserves_per_unit: coaReservesPerUnit
+      },
       rental_income: rentalIncome,
       vacancy_deductions: vacancyDeductions,
       other_income: otherIncome,
       operating_expenses: operatingExpenses,
       totals: {
         // Current rent totals (F-12 Current)
-        gross_potential_rent: grossPotentialRent,
-        gross_potential_rent_market: grossPotentialRentMarket, // Market GPR (F-12 Market)
-        net_rental_income: netRentalIncome,
-        net_rental_income_market: netRentalIncomeMarket,
-        total_other_income: totalOtherIncome,
-        effective_gross_income: effectiveGrossIncome,
-        effective_gross_income_market: effectiveGrossIncomeMarket,
-        total_operating_expenses: totalOperatingExpenses,
+        gross_potential_rent: coaGPR,
+        gross_potential_rent_market: coaGPRMarket, // Market GPR (F-12 Market)
+        net_rental_income: coaNRI,
+        net_rental_income_market: coaNRIMarket,
+        total_other_income: coaOtherIncome,
+        effective_gross_income: coaEGI,
+        effective_gross_income_market: coaEGIMarket,
+        total_operating_expenses: coaTotalOperatingExpenses,
+        base_operating_expenses: coaBaseTotal,
+        management_fee: coaManagementFeeAsIs,
+        replacement_reserves: coaReplacementReserves,
         as_is_noi: asIsNOI, // F-12 Current NOI
         market_noi: marketNOI, // F-12 Market NOI
         post_reno_noi: postRenoNOI,

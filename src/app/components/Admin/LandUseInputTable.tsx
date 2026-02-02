@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Save, X, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 // Type definitions
 interface Family {
@@ -829,19 +830,13 @@ const LandUseInputTable: React.FC = () => {
     return null; // Don't show chip if no zoning data
   };
 
-  const renderStatusChip = (status: 'complete' | 'partial' | null, type: 'programming' | 'zoning') => {
-    if (!status) return null; // Don't render chip if no status
-    
-    const statusConfig = {
-      complete: { bg: 'bg-green-900', text: 'text-green-300', label: 'Complete' },
-      partial: { bg: 'bg-yellow-900', text: 'text-yellow-300', label: 'Partial' }
-    };
-    
-    const config = statusConfig[status];
+  const renderStatusChip = (status: 'complete' | 'partial' | null) => {
+    if (!status) return null;
+    const label = status === 'complete' ? 'Complete' : 'Partial';
     return (
-      <span className={`px-2 py-1 rounded text-xs ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
+      <SemanticBadge intent="status" value={status} className="px-2 py-1 rounded text-xs">
+        {label}
+      </SemanticBadge>
     );
   };
 
@@ -1142,7 +1137,7 @@ const LandUseInputTable: React.FC = () => {
                         </select>
                         <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       </div>
-                      {renderStatusChip(getZoningStatus(row.landuse_code), 'zoning')}
+                      {renderStatusChip(getZoningStatus(row.landuse_code))}
                     </div>
                   </td>
 

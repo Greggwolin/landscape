@@ -41,6 +41,8 @@ export interface UseOperationsDataReturn {
   availableScenarios: string[];
   preferredScenario: string;
   valueAddEnabled: boolean;
+  analysisType: string | null;
+  showPostRehab: boolean; // true when analysis_type === 'VALUE_ADD'
 
   // State
   isLoading: boolean;
@@ -451,6 +453,9 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
 
   const availableScenarios = data?.available_scenarios || [];
   const preferredScenario = data?.preferred_scenario || getPreferredScenario(availableScenarios);
+  const analysisType = data?.analysis_type || null;
+  // Show Post-Rehab column when analysis_type is VALUE_ADD
+  const showPostRehab = analysisType === 'VALUE_ADD';
 
   return {
     // Data
@@ -464,6 +469,8 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
     availableScenarios,
     preferredScenario,
     valueAddEnabled: data?.value_add_enabled || false,
+    analysisType,
+    showPostRehab,
 
     // State
     isLoading,

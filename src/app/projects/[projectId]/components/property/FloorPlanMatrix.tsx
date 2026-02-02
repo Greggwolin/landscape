@@ -12,10 +12,10 @@ import {
   CTableHeaderCell,
   CTableDataCell,
   CSpinner,
-  CBadge,
 } from '@coreui/react';
 import { formatCurrency, formatNumber } from '@/utils/formatNumber';
 import { unitTypesAPI, unitsAPI, leasesAPI, UnitType, Unit, Lease } from '@/lib/api/multifamily';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface FloorPlanMatrixProps {
   projectId: number;
@@ -236,12 +236,13 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
       <CCardHeader className="studio-card-header d-flex justify-content-between align-items-center">
         <div className="d-flex align-items-center gap-2">
           <span className="fw-semibold">Floor Plan Matrix</span>
-          <CBadge
-            color={dataSource === 'rent_roll' ? 'success' : 'info'}
+          <SemanticBadge
+            intent="category"
+            value={dataSource}
             style={{ fontSize: '0.7rem' }}
           >
             {dataSource === 'rent_roll' ? 'From Rent Roll' : 'From Unit Types'}
-          </CBadge>
+          </SemanticBadge>
         </div>
         <span style={{ color: 'var(--studio-text-secondary)', fontSize: '0.875rem' }}>
           {totals.totalUnits} units | {formatCurrency(totals.totalMonthlyIncome)}/mo

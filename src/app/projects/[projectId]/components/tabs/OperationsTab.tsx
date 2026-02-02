@@ -46,6 +46,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     availableScenarios,
     preferredScenario,
     valueAddEnabled,
+    showPostRehab,
     isLoading,
     isSaving,
     error,
@@ -383,7 +384,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         totalSF={totalSF}
         isSaving={isSaving}
         isDirty={isDirty}
-        valueAddEnabled={valueAddEnabled}
+        valueAddEnabled={showPostRehab}
         onValueAddToggle={handleValueAddToggle}
         onSave={saveAll}
       />
@@ -432,7 +433,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         effectiveGrossIncome={totals?.effective_gross_income || 0}
         asIsNOI={totals?.as_is_noi || 0}
         postRenoNOI={totals?.post_reno_noi || 0}
-        valueAddEnabled={valueAddEnabled}
+        valueAddEnabled={showPostRehab}
         hasDetailedRentRoll={data?.has_detailed_rent_roll || false}
         projectId={project.project_id}
         onUpdateVacancy={handleUpdateRow('vacancy_deductions')}
@@ -451,7 +452,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         postRenoNOI={totals?.post_reno_noi || 0}
         noiUplift={totals?.noi_uplift || 0}
         noiUpliftPercent={totals?.noi_uplift_percent || 0}
-        valueAddEnabled={valueAddEnabled}
+        valueAddEnabled={showPostRehab}
       />
         </div>
       </CCardBody>

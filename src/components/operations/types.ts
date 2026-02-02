@@ -135,6 +135,7 @@ export interface OperationsTotals {
 export interface OperationsResponse {
   project_id: number;
   project_type_code: string;
+  analysis_type?: string; // VALUATION, INVESTMENT, VALUE_ADD, DEVELOPMENT, FEASIBILITY
   property_summary: PropertySummary;
 
   // Toggle state

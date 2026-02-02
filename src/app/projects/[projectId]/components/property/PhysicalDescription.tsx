@@ -8,12 +8,12 @@ import {
   CSpinner,
   CRow,
   CCol,
-  CBadge,
   CFormInput,
   CFormSelect,
 } from '@coreui/react';
 import { formatNumber, formatCurrency } from '@/utils/formatNumber';
 import { useAuth } from '@/contexts/AuthContext';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface PhysicalDescriptionProps {
   projectId: number;
@@ -965,12 +965,13 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
       <CCardHeader className="studio-card-header d-flex justify-content-between align-items-center">
         <div className="d-flex align-items-center gap-2">
           <span className="fw-semibold">Physical Description</span>
-          <CBadge
-            color={completionPct >= 80 ? 'success' : completionPct >= 50 ? 'warning' : 'secondary'}
+          <SemanticBadge
+            intent="status"
+            value={`physical-complete-${completionPct >= 80 ? 'high' : completionPct >= 50 ? 'medium' : 'low'}`}
             style={{ fontSize: '0.7rem' }}
           >
             {completionPct}% complete
-          </CBadge>
+          </SemanticBadge>
         </div>
         <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
           {filledFields}/{totalFields} fields

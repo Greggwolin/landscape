@@ -12,7 +12,6 @@ import {
   CTableHeaderCell,
   CTableDataCell,
   CSpinner,
-  CBadge,
   CDropdown,
   CDropdownToggle,
   CDropdownMenu,
@@ -20,6 +19,7 @@ import {
 } from '@coreui/react';
 import { Columns } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatNumber';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 // Column definitions for visibility toggle
 const COLUMNS = [
@@ -243,22 +243,6 @@ export default function RentRoll({ projectId }: RentRollProps) {
     }
   };
 
-  // Get status badge color
-  const getStatusBadgeColor = (status: RentRollRow['occupancyStatus']): string => {
-    switch (status) {
-      case 'Occupied':
-        return 'success';
-      case 'Vacant':
-        return 'danger';
-      case 'Notice':
-        return 'warning';
-      case 'Month-to-Month':
-        return 'info';
-      default:
-        return 'secondary';
-    }
-  };
-
   // Render sort indicator
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
@@ -464,9 +448,13 @@ export default function RentRoll({ projectId }: RentRollProps) {
                   )}
                   {isColumnVisible('status') && (
                     <CTableDataCell>
-                      <CBadge color={getStatusBadgeColor(row.occupancyStatus)} style={{ fontSize: '0.7rem' }}>
+                      <SemanticBadge
+                        intent="status"
+                        value={row.occupancyStatus}
+                        style={{ fontSize: '0.7rem' }}
+                      >
                         {row.occupancyStatus}
-                      </CBadge>
+                      </SemanticBadge>
                     </CTableDataCell>
                   )}
                 </CTableRow>

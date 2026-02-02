@@ -64,16 +64,16 @@ export interface UseFolderNavigationReturn {
 export function useFolderNavigation(
   options: UseFolderNavigationOptions = {}
 ): UseFolderNavigationReturn {
-  const { propertyType } = options;
+  const { propertyType, analysisType } = options;
 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Get folder configuration for this property type
+  // Get folder configuration for this property type and analysis type
   const folderConfig = useMemo(
-    () => createFolderConfig(propertyType),
-    [propertyType]
+    () => createFolderConfig(propertyType, analysisType),
+    [propertyType, analysisType]
   );
 
   // Get default values
@@ -88,18 +88,18 @@ export function useFolderNavigation(
     }
 
     // Validate folder exists in config
-    const folder = getFolderById(urlFolder, propertyType);
+    const folder = getFolderById(urlFolder, propertyType, analysisType);
     if (!folder) {
       return defaultFolder;
     }
 
     return urlFolder;
-  }, [searchParams, defaultFolder, propertyType]);
+  }, [searchParams, defaultFolder, propertyType, analysisType]);
 
   // Get default tab for current folder
   const defaultTab = useMemo(
-    () => getDefaultSubTabId(currentFolder, propertyType),
-    [currentFolder, propertyType]
+    () => getDefaultSubTabId(currentFolder, propertyType, analysisType),
+    [currentFolder, propertyType, analysisType]
   );
 
   // Read current tab from URL, validate, and fallback to default
@@ -111,34 +111,34 @@ export function useFolderNavigation(
     }
 
     // Validate tab exists in current folder
-    if (!isValidFolderTab(currentFolder, urlTab, propertyType)) {
+    if (!isValidFolderTab(currentFolder, urlTab, propertyType, analysisType)) {
       return defaultTab;
     }
 
     return urlTab;
-  }, [searchParams, currentFolder, defaultTab, propertyType]);
+  }, [searchParams, currentFolder, defaultTab, propertyType, analysisType]);
 
   // Check if a folder/tab combination is valid
   const isValid = useCallback(
-    (folder: string, tab: string) => isValidFolderTab(folder, tab, propertyType),
-    [propertyType]
+    (folder: string, tab: string) => isValidFolderTab(folder, tab, propertyType, analysisType),
+    [propertyType, analysisType]
   );
 
   // Navigate to a folder/tab combination
   const setFolderTab = useCallback(
     (folder: string, tab?: string) => {
       // Validate folder
-      const folderObj = getFolderById(folder, propertyType);
+      const folderObj = getFolderById(folder, propertyType, analysisType);
       if (!folderObj) {
         console.warn(`Invalid folder: ${folder}`);
         return;
       }
 
       // If tab not provided, use default for this folder
-      const targetTab = tab || getDefaultSubTabId(folder, propertyType);
+      const targetTab = tab || getDefaultSubTabId(folder, propertyType, analysisType);
 
       // Validate tab
-      if (!isValidFolderTab(folder, targetTab, propertyType)) {
+      if (!isValidFolderTab(folder, targetTab, propertyType, analysisType)) {
         console.warn(`Invalid tab: ${targetTab} for folder: ${folder}`);
         return;
       }
@@ -151,7 +151,7 @@ export function useFolderNavigation(
       const newUrl = `${pathname}?${params.toString()}`;
       router.push(newUrl);
     },
-    [pathname, router, propertyType]
+    [pathname, router, propertyType, analysisType]
   );
 
   // Navigate to a specific tab within the current folder

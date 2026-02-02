@@ -2,14 +2,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CContainer, CCard, CCardHeader, CCardBody, CBadge } from '@coreui/react';
+import { CContainer, CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import DashboardMap from '@/app/components/dashboard/DashboardMap';
 import TriageModal from '@/app/components/dashboard/TriageModal';
 import { ActivityFeed } from '@/components/landscaper/ActivityFeed';
 import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
-import { LandscapeButton } from '@/components/ui/landscape';
+import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
 
 type PropertyFilterKey = 'ALL' | 'LAND' | 'MF' | 'COMMERCIAL' | 'RET' | 'OFF' | 'IND';
@@ -206,7 +206,12 @@ function ProjectAccordion({
                   <div>
                     <div className="font-semibold leading-tight">{project.project_name}</div>
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
-                      <CBadge color={getTypeColor(project)}>{getTypeLabel(project)}</CBadge>
+                      <SemanticBadge
+                        intent="category"
+                        value={getTypeLabel(project)}
+                      >
+                        {getTypeLabel(project)}
+                      </SemanticBadge>
                       <span style={{ color: 'var(--cui-secondary-color)' }}>
                         {formatLocation(project)}
                       </span>

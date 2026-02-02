@@ -13,6 +13,7 @@ import {
 import CIcon from '@coreui/icons-react';
 import { cilTrash, cilPencil, cilPlus } from '@coreui/icons';
 import { MEASURE_CATEGORIES, UnitOfMeasure, UnitOfMeasureDraft, normalizeMeasureName } from '@/lib/measures';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 type SaveResult = { ok: boolean; error?: string };
 
@@ -28,23 +29,6 @@ interface UOMRowProps {
   dragHandleListeners?: any;
   dragStyle?: React.CSSProperties;
 }
-
-const contextStyle = (ctx: string) => {
-  const palette: Record<string, { rgbFallback: string; varName: string; colorVar: string }> = {
-    land_pricing: { rgbFallback: '13, 110, 253', varName: '--cui-primary-rgb', colorVar: 'var(--cui-primary)' },
-    budget_cost: { rgbFallback: '25, 135, 84', varName: '--cui-success-rgb', colorVar: 'var(--cui-success)' },
-    budget_qty: { rgbFallback: '13, 202, 240', varName: '--cui-info-rgb', colorVar: 'var(--cui-info)' },
-    absorption: { rgbFallback: '255, 193, 7', varName: '--cui-warning-rgb', colorVar: 'var(--cui-warning)' },
-  };
-  const fallback = { rgbFallback: '108, 117, 125', varName: '--cui-secondary-rgb', colorVar: 'var(--cui-secondary-color)' };
-  const entry = palette[ctx] ?? fallback;
-  const rgb = `var(${entry.varName}, ${entry.rgbFallback})`;
-  return {
-    color: '#fff',
-    backgroundColor: `rgba(${rgb}, 0.36)`,
-    borderColor: `rgba(${rgb}, 0.6)`,
-  };
-};
 
 const formatContextLabel = (ctx: string) =>
   ctx
@@ -166,26 +150,31 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
           )}
         </CTableDataCell>
         <CTableDataCell style={{ width: '160px' }}>
-          <CBadge className="uom-category-badge" style={{ color: '#fff' }}>
+          <SemanticBadge
+            intent="category"
+            value={measure.measure_category}
+            className="uom-category-badge"
+          >
             {MEASURE_CATEGORIES.find((opt) => opt.value === measure.measure_category)?.label ?? measure.measure_category}
-          </CBadge>
+          </SemanticBadge>
         </CTableDataCell>
         <CTableDataCell style={{ width: '200px' }}>
           <div className="d-flex flex-wrap gap-1">
-            {contexts.length === 0 ? (
-              <span className="text-muted small">—</span>
-            ) : (
-              contexts.map((ctx) => (
-                <CBadge
-                  key={ctx}
-                  title={ctx}
-                  className="uom-context-badge"
-                  style={contextStyle(ctx)}
-                >
-                  {formatContextLabel(ctx)}
-                </CBadge>
-              ))
-            )}
+              {contexts.length === 0 ? (
+                <span className="text-muted small">—</span>
+              ) : (
+                contexts.map((ctx) => (
+                  <SemanticBadge
+                    key={ctx}
+                    intent="category"
+                    value={ctx}
+                    title={ctx}
+                    className="uom-context-badge"
+                  >
+                    {formatContextLabel(ctx)}
+                  </SemanticBadge>
+                ))
+              )}
           </div>
         </CTableDataCell>
         <CTableDataCell style={{ width: '160px' }}>
@@ -284,14 +273,15 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
             <span className="text-muted small">—</span>
           ) : (
             contexts.map((ctx) => (
-              <CBadge
+              <SemanticBadge
                 key={ctx}
+                intent="category"
+                value={ctx}
                 title={ctx}
                 className="uom-context-badge"
-                style={contextStyle(ctx)}
               >
                 {formatContextLabel(ctx)}
-              </CBadge>
+              </SemanticBadge>
             ))
           )}
         </div>

@@ -23,11 +23,16 @@ import {
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Analysis type codes used in the application */
+export type AnalysisTypeCode = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPMENT' | 'FEASIBILITY';
+
 export interface SubTab {
   id: string;
   label: string;
   /** Optional: restrict to specific project types */
   projectTypes?: ProjectTypeCategory[];
+  /** Optional: restrict to specific analysis types */
+  analysisTypes?: AnalysisTypeCode[];
 }
 
 export interface FolderTab {
@@ -44,17 +49,30 @@ export interface FolderTabConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: Filter subtabs by project type
+// Helper: Filter subtabs by project type and analysis type
 // ─────────────────────────────────────────────────────────────────────────────
 
 function filterSubtabsByType(
   subtabs: SubTab[],
-  projectType?: string
+  projectType?: string,
+  analysisType?: string
 ): SubTab[] {
   const category = getProjectCategory(projectType);
   return subtabs.filter((tab) => {
-    if (!tab.projectTypes) return true;
-    return tab.projectTypes.includes(category);
+    // Check project type filter
+    if (tab.projectTypes && !tab.projectTypes.includes(category)) {
+      return false;
+    }
+    // Check analysis type filter
+    if (tab.analysisTypes && analysisType) {
+      if (!tab.analysisTypes.includes(analysisType as AnalysisTypeCode)) {
+        return false;
+      }
+    } else if (tab.analysisTypes && !analysisType) {
+      // If tab requires specific analysis types but none provided, hide it
+      return false;
+    }
+    return true;
   });
 }
 
@@ -81,7 +99,7 @@ export function isTwoLineLabel(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Creates the 7-folder configuration based on project type.
+ * Creates the 7-folder configuration based on project type and analysis type.
  * Subtabs match tileConfig.ts from main branch EXACTLY.
  *
  * Position 1: Home (Project Home) - NO subtabs in main
@@ -91,8 +109,11 @@ export function isTwoLineLabel(
  * Position 5: Capital (Capitalization)
  * Position 6: Reports
  * Position 7: Documents
+ *
+ * @param projectType - Project type code (e.g., 'MF', 'LAND')
+ * @param analysisType - Analysis type code (e.g., 'VALUE_ADD', 'INVESTMENT')
  */
-export function createFolderConfig(projectType?: string): FolderTabConfig {
+export function createFolderConfig(projectType?: string, analysisType?: string): FolderTabConfig {
   const isIncome = isIncomeProperty(projectType);
 
   const folders: FolderTab[] = [
@@ -109,8 +130,8 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
 
     // ========================================
     // Position 2: Property
-    // LAND: market, land-use, parcels
-    // INCOME: details, market, rent-roll (matches PropertyTab's internal navigation)
+    // LAND: market, land-use, parcels, acquisition
+    // INCOME: details, acquisition, market, rent-roll, renovation (VALUE_ADD only)
     // ========================================
     {
       id: 'property',
@@ -130,6 +151,11 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
               'hotel',
               'mixed_use',
             ],
+          },
+          // Acquisition - ALL project types (land dev also has acquisition costs)
+          {
+            id: 'acquisition',
+            label: 'Acquisition',
           },
           { id: 'market', label: 'Market' },
           {
@@ -155,8 +181,23 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
             label: 'Parcels',
             projectTypes: ['land_development'],
           },
+          // Renovation - VALUE_ADD analysis type only (income properties)
+          {
+            id: 'renovation',
+            label: 'Renovation',
+            projectTypes: [
+              'multifamily',
+              'office',
+              'retail',
+              'industrial',
+              'hotel',
+              'mixed_use',
+            ],
+            analysisTypes: ['VALUE_ADD'],
+          },
         ],
-        projectType
+        projectType,
+        analysisType
       ),
     },
 
@@ -263,13 +304,13 @@ export function createFolderConfig(projectType?: string): FolderTabConfig {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get folder tab configuration based on property type
+ * Get folder tab configuration based on property type and analysis type
  */
 export function getFolderTabsForPropertyType(
   propertyType?: string,
-  _analysisType?: string
+  analysisType?: string
 ): FolderTabConfig {
-  return createFolderConfig(propertyType);
+  return createFolderConfig(propertyType, analysisType);
 }
 
 /**
@@ -301,9 +342,10 @@ export function isLandDevelopmentProject(
  */
 export function getFolderById(
   folderId: string,
-  projectType?: string
+  projectType?: string,
+  analysisType?: string
 ): FolderTab | undefined {
-  const config = createFolderConfig(projectType);
+  const config = createFolderConfig(projectType, analysisType);
   return config.folders.find((folder) => folder.id === folderId);
 }
 
@@ -324,9 +366,10 @@ export function getDefaultFolderId(): string {
  */
 export function getDefaultSubTabId(
   folderId: string,
-  projectType?: string
+  projectType?: string,
+  analysisType?: string
 ): string {
-  const folder = getFolderById(folderId, projectType);
+  const folder = getFolderById(folderId, projectType, analysisType);
   // If folder has no subtabs (like home), return empty string
   if (!folder?.subTabs.length) return '';
 
@@ -359,9 +402,10 @@ export function getDefaultSubTabId(
 export function isValidFolderTab(
   folderId: string,
   tabId: string,
-  projectType?: string
+  projectType?: string,
+  analysisType?: string
 ): boolean {
-  const folder = getFolderById(folderId, projectType);
+  const folder = getFolderById(folderId, projectType, analysisType);
   if (!folder) return false;
   // If folder has no subtabs, any tab is "valid" (we just show the folder content)
   if (!folder.subTabs.length) return true;

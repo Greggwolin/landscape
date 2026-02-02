@@ -14,7 +14,7 @@ import { fetchJson } from '@/lib/fetchJson'
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
 
 // Analysis type codes
-export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY'
+export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPMENT' | 'FEASIBILITY'
 
 // Analysis type configuration from API
 export interface AnalysisTypeConfig {
@@ -205,6 +205,12 @@ export const ANALYSIS_TYPE_META: Record<AnalysisType, {
     icon: '💰',
     color: 'bg-blue-900 text-blue-200',
   },
+  VALUE_ADD: {
+    label: 'Value-Add',
+    description: 'Acquisition with renovation upside',
+    icon: '🔧',
+    color: 'bg-purple-900 text-purple-200',
+  },
   DEVELOPMENT: {
     label: 'Development',
     description: 'Ground-up or redevelopment returns',
@@ -220,6 +226,6 @@ export const ANALYSIS_TYPE_META: Record<AnalysisType, {
 }
 
 // Export list of valid analysis types
-export const ANALYSIS_TYPES: AnalysisType[] = ['VALUATION', 'INVESTMENT', 'DEVELOPMENT', 'FEASIBILITY']
+export const ANALYSIS_TYPES: AnalysisType[] = ['VALUATION', 'INVESTMENT', 'VALUE_ADD', 'DEVELOPMENT', 'FEASIBILITY']
 
 export default useAnalysisTypeConfig

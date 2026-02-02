@@ -6,7 +6,6 @@ import {
   CCardBody,
   CCardHeader,
   CButton,
-  CBadge,
   CSpinner,
   CTable,
   CTableHead,
@@ -29,6 +28,7 @@ import {
   CDropdownItem,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
+import { SemanticBadge } from '@/components/ui/landscape';
 import { cilCheckCircle, cilXCircle, cilPencil, cilCloudDownload, cilTrash } from '@coreui/icons';
 
 interface ExtractionItem {
@@ -215,20 +215,20 @@ export function ExtractionValidation({ projectId, onExtractionApplied }: Extract
   };
 
   const getConfidenceBadge = (score: number) => {
-    if (score >= 0.8) return <CBadge color="success">High ({Math.round(score * 100)}%)</CBadge>;
-    if (score >= 0.5) return <CBadge color="warning">Med ({Math.round(score * 100)}%)</CBadge>;
-    return <CBadge color="danger">Low ({Math.round(score * 100)}%)</CBadge>;
+    const variant = score >= 0.8 ? 'high' : score >= 0.5 ? 'medium' : 'low';
+    const label = `${variant === 'high' ? 'High' : variant === 'medium' ? 'Med' : 'Low'} (${Math.round(score * 100)}%)`;
+    return (
+      <SemanticBadge intent="confidence" value={`confidence-${variant}`}>
+        {label}
+      </SemanticBadge>
+    );
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'warning',
-      validated: 'info',
-      rejected: 'danger',
-      applied: 'success',
-    };
-    return <CBadge color={colors[status] || 'secondary'}>{status}</CBadge>;
-  };
+  const getStatusBadge = (status: string) => (
+    <SemanticBadge intent="status" value={status}>
+      {status}
+    </SemanticBadge>
+  );
 
   const renderValuePreview = (value: Record<string, unknown>) => {
     const entries = Object.entries(value).slice(0, 3);
@@ -255,9 +255,9 @@ export function ExtractionValidation({ projectId, onExtractionApplied }: Extract
         <div>
           <strong>Data Extractions</strong>
           {pendingCount > 0 && (
-            <CBadge color="warning" className="ms-2">
+            <SemanticBadge intent="status" value="pending" className="ms-2">
               {pendingCount} pending
-            </CBadge>
+            </SemanticBadge>
           )}
         </div>
         <div className="d-flex gap-2">

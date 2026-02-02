@@ -1,0 +1,77 @@
+import React from 'react';
+import { CBadge } from '@coreui/react';
+import type { CBadgeProps } from '@coreui/react';
+import { resolveSemanticVariant, SemanticVariant } from './semanticBadgeTheme';
+
+export type SemanticIntent =
+  | 'status'
+  | 'confidence'
+  | 'category'
+  | 'action-state'
+  | 'navigation-meta'
+  | 'user-tag';
+
+export interface SemanticBadgeProps extends Omit<CBadgeProps, 'color'> {
+  intent: SemanticIntent;
+  value: string;
+  interactive?: boolean;
+  children?: React.ReactNode;
+  userTagState?: 'filled' | 'outline';
+}
+
+const USER_TAG_DARK = 'var(--cui-dark)';
+const USER_TAG_FILL = 'var(--cui-light)';
+const USER_TAG_SELECTED_FILL = 'rgba(var(--cui-dark-rgb, 33, 37, 41), 0.12)';
+
+export function SemanticBadge({
+  intent,
+  value,
+  interactive = false,
+  className,
+  children,
+  userTagState = 'outline',
+  style,
+  ...rest
+}: SemanticBadgeProps) {
+  const cursorClass = interactive ? 'cursor-pointer' : '';
+  const isUserTag = intent === 'user-tag';
+
+  const userTagStyle: React.CSSProperties | undefined = isUserTag
+    ? {
+        borderRadius: '4px',
+        padding: '0.25rem 0.5rem',
+        fontSize: '0.75rem',
+        fontWeight: 500,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: USER_TAG_DARK,
+        color: USER_TAG_DARK,
+        backgroundColor:
+          userTagState === 'filled' ? USER_TAG_SELECTED_FILL : USER_TAG_FILL,
+      }
+    : undefined;
+
+  const variant: SemanticVariant | undefined = isUserTag
+    ? undefined
+    : resolveSemanticVariant(intent, value, interactive);
+
+  return (
+    <CBadge
+      {...rest}
+      color={variant}
+      className={[
+        className,
+        cursorClass,
+        isUserTag ? 'semantic-badge--user-tag' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      data-semantic-intent={intent}
+      data-semantic-value={value}
+      data-user-tag-state={isUserTag ? userTagState : undefined}
+      style={{ ...(userTagStyle ?? {}), ...style }}
+    >
+      {children ?? value}
+    </CBadge>
+  );
+}

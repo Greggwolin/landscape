@@ -56,6 +56,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     folderConfig,
   } = useFolderNavigation({
     propertyType: currentProject?.project_type_code,
+    analysisType: currentProject?.analysis_type,
   });
 
   // Resizable panel state

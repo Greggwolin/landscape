@@ -29,6 +29,8 @@ import ValuationTab from './components/tabs/ValuationTab';
 import ReportsTab from './components/tabs/ReportsTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import CapitalizationTab from './components/tabs/CapitalizationTab';
+import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
+import RenovationSubTab from './components/tabs/RenovationSubTab';
 import { MapTab } from '@/components/map-tab';
 
 interface Project {
@@ -115,12 +117,18 @@ function StudioContent({
 
       // ========================================
       // FOLDER 2: PROPERTY
-      // Land: market, land-use, parcels
-      // Income: details, market, rent-roll (matches PropertyTab's internal navigation)
+      // Land: market, land-use, parcels, acquisition
+      // Income: details, acquisition, market, rent-roll, renovation (VALUE_ADD only)
       // PropertyTab has working content with controlled activeTab prop
       // ========================================
       case 'property':
         switch (currentTab) {
+          // Acquisition sub-tab - ALL project types
+          case 'acquisition':
+            return <AcquisitionSubTab project={project} />;
+          // Renovation sub-tab - VALUE_ADD analysis type only
+          case 'renovation':
+            return <RenovationSubTab project={project} />;
           // Income property subtabs - pass activeTab to PropertyTab (controlled component)
           case 'details':
           case 'market':

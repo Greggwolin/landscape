@@ -243,6 +243,7 @@ class Project(models.Model):
 ANALYSIS_TYPE_CHOICES = [
     ('VALUATION', 'Valuation'),
     ('INVESTMENT', 'Investment'),
+    ('VALUE_ADD', 'Value-Add'),
     ('DEVELOPMENT', 'Development'),
     ('FEASIBILITY', 'Feasibility'),
 ]

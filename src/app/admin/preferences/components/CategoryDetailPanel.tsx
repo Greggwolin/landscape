@@ -9,6 +9,7 @@ import type {
 } from '@/types/benchmarks';
 import { updateCategory, createTag, deleteTag } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface CategoryDetailPanelProps {
   category: UnitCostCategoryReference | null;
@@ -27,16 +28,6 @@ const LIFECYCLE_STAGES: Activity[] = [
   'Operations',
   'Disposition',
   'Financing',
-];
-
-// Tag chip colors matching Operations page filter buttons
-const TAG_COLORS = [
-  '#dc2626', // red-600
-  '#2563eb', // blue-600
-  '#16a34a', // green-600
-  '#ca8a04', // yellow-600
-  '#9333ea', // purple-600
-  '#4b5563', // gray-600
 ];
 
 /**
@@ -761,7 +752,6 @@ export default function CategoryDetailPanel({
             ) : (
               sortedTags.map((tag, index) => {
                 const isAssigned = assignedTagSet.has(tag.tag_name.toLowerCase());
-                const color = TAG_COLORS[index % TAG_COLORS.length];
 
                 return (
                   <button
@@ -771,13 +761,13 @@ export default function CategoryDetailPanel({
                     onClick={() => handleTagChipToggle(tag.tag_name)}
                     disabled={isTagUpdating}
                     aria-pressed={isAssigned}
-                    style={{
-                      backgroundColor: isAssigned ? color : 'transparent',
-                      borderColor: color,
-                      color: isAssigned ? '#fff' : color,
-                    }}
                   >
-                    <span className="tag-chip-label">{tag.tag_name}</span>
+                    <SemanticBadge
+                      intent="user-tag"
+                      value={tag.tag_name}
+                      userTagState={isAssigned ? 'filled' : 'outline'}
+                      className="tag-chip-label"
+                    />
                     <span
                       className="tag-chip-delete"
                       role="button"
