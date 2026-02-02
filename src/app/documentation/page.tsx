@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Property Tab Restructure (Feb 2, 2026)',
+      path: '/docs/09_session_notes/2026-02-02-property-tab-restructure.md',
+      category: 'Component',
+      description: 'Added Acquisition and Renovation sub-tabs to Property folder. Analysis type filtering, inline ledger editing (no modal), editable "Is Conditional" column, optimized column widths',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-02-02'
+    },
+    {
       title: 'Django Cash Flow Consolidation (Feb 1, 2026)',
       path: '/docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md',
       category: 'Migration',
@@ -322,9 +330,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Cash Flow UI, DCF enhancements (Jan 30)',
+      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Property Tab Restructure with Acquisition/Renovation sub-tabs (Feb 2)',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-01-30'
+      lastModified: '2026-02-02'
     },
     {
       title: 'CRE Implementation Summary',

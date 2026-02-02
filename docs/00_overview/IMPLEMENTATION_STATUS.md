@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-01
-**Version:** 3.3
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation)
+**Last Updated:** 2026-02-02
+**Version:** 3.4
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure)
 
 ---
 
@@ -9,7 +9,33 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Django Cash Flow Consolidation (February 1, 2026)**
+### 🆕 **Latest Update: Property Tab Restructure (February 2, 2026)**
+
+**Acquisition & Renovation Sub-Tabs Added to Property Folder**
+
+Restructured the Property folder tab navigation to include new Acquisition and Renovation sub-tabs:
+
+- ✅ **Analysis Type Filtering** - Extended sub-tab system to filter by analysis type (not just project type)
+- ✅ **Acquisition Sub-Tab** - New sub-tab showing Acquisition Ledger Grid (available for ALL project types)
+- ✅ **Renovation Sub-Tab** - New sub-tab for VALUE_ADD analysis type projects only
+- ✅ **Simplified Acquisition UI** - Removed modal, all inputs now inline with editable cells
+- ✅ **Is Conditional Toggle** - Made "Is Conditional" column clickable/editable (like Apply column)
+- ✅ **Optimized Column Widths** - Prevented horizontal scrolling with table-layout: fixed
+- 📁 **Location:** See `docs/09_session_notes/2026-02-02-property-tab-restructure.md`
+
+**Files Created:**
+- `src/app/projects/[projectId]/components/tabs/AcquisitionSubTab.tsx` - Wrapper for ledger grid
+- `src/app/projects/[projectId]/components/tabs/RenovationSubTab.tsx` - VALUE_ADD renovation config
+
+**Files Modified:**
+- `src/lib/utils/folderTabConfig.ts` - Added AnalysisTypeCode, updated filtering
+- `src/hooks/useFolderNavigation.ts` - Now passes analysisType throughout
+- `src/app/projects/[projectId]/page.tsx` - Added analysisType to hook options
+- `src/app/projects/[projectId]/ProjectLayoutClient.tsx` - Added analysisType to hook options
+- `src/app/projects/[projectId]/StudioContent.tsx` - Added routing for new sub-tabs
+- `src/components/acquisition/AcquisitionLedgerGrid.tsx` - Major refactor (removed modal, inline editing)
+
+### Previous Update: Django Cash Flow Consolidation (February 1, 2026)
 
 **Land Dev Cash Flow Engine Migration Complete**
 
@@ -1490,7 +1516,7 @@ Landscape uses a **folder tab navigation** system with 8 main folders:
 | # | Folder | MF/Income | Land Dev | Description |
 |---|--------|-----------|----------|-------------|
 | 1 | Home | Project | Project | Dashboard with KPIs |
-| 2 | Property | Details, Market, Rent Roll | Market, Land Use, Parcels | Physical property info |
+| 2 | Property | Details, Acquisition, Market, Rent Roll, Renovation* | Acquisition, Market, Land Use, Parcels | Physical property info |
 | 3 | Operations/Budget | Operations (unified P&L) | Budget, Schedule, Sales, Draws | Financial operations |
 | 4 | Valuation | Sales Comp, Cost, Income | Feasibility, Cash Flow, Returns, Sensitivity | Value analysis |
 | 5 | Capital | Equity, Debt | Equity, Debt | Capital structure |
