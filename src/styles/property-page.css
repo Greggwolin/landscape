@@ -162,22 +162,39 @@
 
 /* Field row styling */
 .physical-description .field-row,
-.physical-description .editable-field-row {
+.physical-description .editable-field-row,
+.physical-description-compact .editable-field-row {
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 0;
 }
 
-.physical-description .physical-section .row {
-  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.5rem;
+.physical-description .editable-field-row,
+.physical-description-compact .editable-field-row {
+  border-bottom: 1px solid var(--cui-border-color);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0;
 }
 
-.physical-description .physical-section .row:last-of-type {
+/* Hide divider on last row of each section */
+.physical-description .physical-section > div:last-child .editable-field-row:last-child,
+.physical-description [style*="padding"] > .editable-field-row:last-child,
+.physical-description-compact > div > div:last-child > .editable-field-row:last-child {
   border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
+}
+
+/* Compact mode indentation */
+/* Section headers align with "Physical Description" parent header */
+.physical-description-compact > div > .d-flex {
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+/* Line items indented one additional level */
+.physical-description-compact > div > div:last-child {
+  padding-left: 1.25rem !important;
+  padding-right: 0.75rem !important;
 }
 
 /* Editable field hover state */

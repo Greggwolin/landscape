@@ -1018,13 +1018,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
   // Render content based on activeTab (controlled by folder tabs)
   const renderDetailsContent = () => (
-    <div className="space-y-4">
-      {/* Side-by-side: Physical Description (40%) + Floor Plan Matrix (60%) */}
-      <div className="flex flex-col lg:flex-row gap-4">
+    <div>
+      {/* Two-column layout: Physical Description (40%) + Floor Plan Matrix & Landscaper (60%) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
         {/* Left Column - Physical Description */}
-        <div className="w-full lg:w-2/5 flex-shrink-0">
+        <div className="w-full lg:w-[32%] flex-shrink-0">
           <div
-            className="shadow-lg h-full overflow-hidden"
+            className="shadow-lg"
             style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
           >
             <div
@@ -1035,14 +1035,15 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 Physical Description
               </h3>
             </div>
-            <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
+            <div>
               <PhysicalDescription projectId={projectId} compact />
             </div>
           </div>
         </div>
 
-        {/* Right Column - Floor Plan Matrix */}
-        <div className="w-full lg:w-3/5">
+        {/* Right Column - Floor Plan Matrix + Landscaper Analysis */}
+        <div className="w-full lg:w-3/5 space-y-4">
+          {/* Floor Plan Matrix */}
           <div
             className="shadow-lg overflow-hidden"
             style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
@@ -1201,32 +1202,32 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               </table>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Landscaper Analysis - Full Width Below */}
-      <div
-        className="rounded-lg p-4"
-        style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0">
-            <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
-              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
-              </span>
+          {/* Landscaper Analysis - Below Floor Plan Matrix in right column */}
+          <div
+            className="rounded-lg p-4"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
+                  <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                    {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
+                  </span>
+                </div>
+                <LandscaperInsights
+                  floorPlans={floorPlansWithAI}
+                  comparables={comparables}
+                  comparablesByProperty={comparablesByProperty}
+                />
+              </div>
             </div>
-            <LandscaperInsights
-              floorPlans={floorPlansWithAI}
-              comparables={comparables}
-              comparablesByProperty={comparablesByProperty}
-            />
           </div>
         </div>
       </div>
