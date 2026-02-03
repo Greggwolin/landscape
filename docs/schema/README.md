@@ -24,7 +24,7 @@ Each run produces a dated JSON file:
 landscape_rich_schema_YYYY-MM-DD.json
 ```
 
-Example: `landscape_rich_schema_2026-01-12.json`
+Example: `landscape_rich_schema_2026-02-03.json`
 
 ## JSON Structure
 
