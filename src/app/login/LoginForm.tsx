@@ -1,39 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import Link from 'next/link';
+import { FormEvent, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  createLandscaperProfile,
+  fetchLandscaperProfile,
+} from '@/services/landscaperProfile';
 
 export default function LoginForm() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      // Check for redirect param from middleware, then sessionStorage, then default to /dashboard
-      const redirectParam = searchParams.get('redirect');
-      const redirectUrl = redirectParam || sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
-      sessionStorage.removeItem('redirectAfterLogin');
-      router.push(redirectUrl);
+    if (!isLoading && isAuthenticated && !redirecting) {
+      router.push('/dashboard');
     }
-  }, [isLoading, isAuthenticated, router, searchParams]);
+  }, [isLoading, isAuthenticated, redirecting, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!tosAccepted) {
+      setError('Please accept the Terms of Service before logging in.');
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
 
     try {
       await login({ username, password });
-      // Redirect is handled by useEffect above
+      await createLandscaperProfile({ tos_accepted_at: new Date().toISOString() });
+      const profile = await fetchLandscaperProfile();
+      const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
+      setRedirecting(true);
+      router.push(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -41,52 +50,48 @@ export default function LoginForm() {
     }
   };
 
-  // Show loading while checking auth
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  // Don't show login form if already authenticated
-  if (isAuthenticated) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center px-4 overflow-auto">
-      {/* Logo */}
-      <div className="mb-8">
-        <Image
-          src="/logo-invert.png"
-          alt="Landscape"
-          width={280}
-          height={70}
-          className="h-auto w-auto max-w-[280px]"
-          priority
-        />
-      </div>
-
-      {/* Login Card */}
-      <div className="w-full max-w-md">
-        <div className="bg-gray-800 rounded-lg shadow-xl p-8 border border-gray-700">
-          <h2 className="text-2xl font-semibold text-white text-center mb-6">
-            Sign In
+    <div
+      className="min-h-screen flex flex-col md:flex-row"
+      style={{
+        backgroundColor: 'var(--cui-body-bg)',
+        color: 'var(--cui-body-color)',
+      }}
+    >
+      <div
+        className="w-full md:w-2/5 flex flex-col justify-center px-6 py-10"
+        style={{ backgroundColor: 'var(--surface-card)' }}
+      >
+        <div className="flex justify-center mb-6">
+          <Image
+            src="/logo-invert.png"
+            alt="Landscape"
+            width={260}
+            height={70}
+            priority
+          />
+        </div>
+        <div
+          className="rounded-3xl border border-line-soft shadow-2xl p-8"
+          style={{ backgroundColor: 'var(--surface-card-header)' }}
+        >
+          <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Sign in to Alpha
           </h2>
-
           {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">
+            <div
+              className="mb-4 rounded-lg px-4 py-3 text-sm"
+              style={{ backgroundColor: 'var(--chip-soft-costs-bg)', color: 'var(--track-change-deletion)' }}
+            >
               {error}
             </div>
           )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="text-sm font-medium"
+                style={{ color: 'var(--text-primary)' }}
               >
                 Username
               </label>
@@ -95,20 +100,23 @@ export default function LoginForm() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg
-                           text-white placeholder-gray-400 focus:outline-none focus:ring-2
-                           focus:ring-blue-500 focus:border-transparent transition"
+                className="mt-1 w-full rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: 'var(--surface-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--text-primary)',
+                }}
                 placeholder="Enter your username"
                 required
                 autoFocus
                 autoComplete="username"
               />
             </div>
-
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="text-sm font-medium"
+                style={{ color: 'var(--text-primary)' }}
               >
                 Password
               </label>
@@ -117,43 +125,40 @@ export default function LoginForm() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg
-                           text-white placeholder-gray-400 focus:outline-none focus:ring-2
-                           focus:ring-blue-500 focus:border-transparent transition"
+                className="mt-1 w-full rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: 'var(--surface-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--text-primary)',
+                }}
                 placeholder="Enter your password"
                 required
                 autoComplete="current-password"
               />
             </div>
-
             <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center text-gray-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 bg-gray-700 border-gray-600 rounded
-                             text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800 cursor-pointer"
-                />
-                <span className="ml-2">Remember me</span>
-              </label>
+              <div />
               <Link
                 href="/forgot-password"
-                className="text-blue-400 hover:text-blue-300 transition"
+                className="text-xs font-medium"
+                style={{ color: 'var(--cui-primary)' }}
               >
                 Forgot password?
               </Link>
             </div>
-
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800
-                         disabled:cursor-not-allowed text-white font-medium rounded-lg
-                         transition duration-200 flex items-center justify-center"
+              disabled={isSubmitting || !tosAccepted}
+              className="w-full rounded-xl px-4 py-3 font-semibold transition"
+              style={{
+                backgroundColor: isSubmitting || !tosAccepted ? 'var(--line-soft)' : 'var(--cui-primary)',
+                color: 'var(--text-inverse)',
+              }}
             >
               {isSubmitting ? (
-                <>
+                <span className="flex items-center justify-center gap-3">
                   <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    className="h-4 w-4 text-current animate-spin"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -173,30 +178,88 @@ export default function LoginForm() {
                     />
                   </svg>
                   Signing in...
-                </>
+                </span>
               ) : (
                 'Sign In'
               )}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
-              Don&apos;t have an account?{' '}
-              <Link
-                href="/register"
-                className="text-blue-400 hover:text-blue-300 font-medium transition"
-              >
-                Create one
-              </Link>
+          <div className="mt-6 rounded-2xl border p-4 md:hidden" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+            <label className="flex items-center text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
+              <input
+                type="checkbox"
+                checked={tosAccepted}
+                onChange={(e) => setTosAccepted(e.target.checked)}
+                className="h-4 w-4 rounded border"
+                style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
+              />
+              <span>
+                I accept the{' '}
+                <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                  Alpha Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+            <p className="text-xs mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+              These documents explain how Landscape keeps your insights private during onboarding.
             </p>
           </div>
+          <p className="mt-6 text-xs text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+            Need an account?{' '}
+            <Link href="/register" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+              Create one
+            </Link>
+          </p>
         </div>
-
-        {/* Footer */}
-        <p className="mt-8 text-center text-gray-500 text-sm">
-          {new Date().getFullYear()} Landscape. All rights reserved.
-        </p>
+      </div>
+      <div
+        className="hidden md:flex w-full md:w-3/5 flex-col justify-center px-10 py-14 space-y-8"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+      >
+        <div>
+          <p className="text-sm uppercase tracking-[0.2em] mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
+            Alpha experience
+          </p>
+          <h1 className="text-4xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            A better Landscaper onboarding
+          </h1>
+          <p className="text-base leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
+            We pair you with a calibrated Landscaper assistant, tailored to your role, tone, and tooling.
+            Your onboarding answers map directly to how the chat introduces itself, suggests documents, and
+            keeps confidential insights locked to your private workspace.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-line-soft p-6 space-y-3" style={{ backgroundColor: 'var(--surface-card)' }}>
+          <div className="flex items-start gap-3">
+            <input
+              id="tos"
+              type="checkbox"
+              checked={tosAccepted}
+              onChange={(e) => setTosAccepted(e.target.checked)}
+              className="h-4 w-4 rounded border"
+              style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
+            />
+            <label htmlFor="tos" className="text-sm" style={{ color: 'var(--text-primary)' }}>
+              I accept the{' '}
+              <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                Alpha Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                Privacy Policy
+              </Link>
+              .
+            </label>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            These documents will appear during sign in so you always know how Landscape keeps your insights private.
+          </p>
+        </div>
       </div>
     </div>
   );
