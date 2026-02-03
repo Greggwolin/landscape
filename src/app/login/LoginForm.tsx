@@ -37,8 +37,14 @@ export default function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      await login({ username, password });
+      const result = await login({ username, password });
       await createLandscaperProfile({ tos_accepted_at: new Date().toISOString() });
+      const isAdmin = result.user?.role === 'admin';
+      if (isAdmin) {
+        setRedirecting(true);
+        router.push('/dashboard');
+        return;
+      }
       const profile = await fetchLandscaperProfile();
       const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
       setRedirecting(true);
