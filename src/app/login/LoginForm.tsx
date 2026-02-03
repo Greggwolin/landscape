@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,13 +18,52 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
+  const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const [tosMap, setTosMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !redirecting) {
       router.push('/dashboard');
     }
   }, [isLoading, isAuthenticated, redirecting, router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('tosAcceptedByUser');
+    if (stored) {
+      try {
+        setTosMap(JSON.parse(stored));
+      } catch {
+        setTosMap({});
+      }
+    }
+  }, []);
+
+  const currentTosTimestamp = useMemo(() => {
+    return username ? tosMap[username.toLowerCase()] || null : null;
+  }, [tosMap, username]);
+
+  useEffect(() => {
+    setTosAcceptedAt(currentTosTimestamp);
+    if (currentTosTimestamp && !tosAccepted) {
+      setTosAccepted(true);
+    }
+  }, [currentTosTimestamp]);
+
+  const formattedAcceptedDate = useMemo(() => {
+    if (!tosAcceptedAt) return null;
+    const date = new Date(tosAcceptedAt);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [tosAcceptedAt]);
+
+  const requiresTos = !tosAcceptedAt;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,6 +88,15 @@ export default function LoginForm() {
       const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
       setRedirecting(true);
       router.push(target);
+      if (profile.tos_accepted_at) {
+        const newMap = {
+          ...tosMap,
+          [username.toLowerCase()]: profile.tos_accepted_at,
+        };
+        setTosMap(newMap);
+        window.localStorage.setItem('tosAcceptedByUser', JSON.stringify(newMap));
+        setTosAcceptedAt(profile.tos_accepted_at);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -154,10 +202,11 @@ export default function LoginForm() {
             </div>
             <button
               type="submit"
-              disabled={isSubmitting || !tosAccepted}
+              disabled={isSubmitting || (requiresTos && !tosAccepted)}
               className="w-full rounded-xl px-4 py-3 font-semibold transition"
               style={{
-                backgroundColor: isSubmitting || !tosAccepted ? 'var(--line-soft)' : 'var(--cui-primary)',
+                backgroundColor:
+                  isSubmitting || (requiresTos && !tosAccepted) ? 'var(--line-soft)' : 'var(--cui-primary)',
                 color: 'var(--text-inverse)',
               }}
             >
@@ -190,31 +239,39 @@ export default function LoginForm() {
               )}
             </button>
           </form>
-          <div className="mt-6 rounded-2xl border p-4 md:hidden" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
-            <label className="flex items-center text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
-              <input
-                type="checkbox"
-                checked={tosAccepted}
-                onChange={(e) => setTosAccepted(e.target.checked)}
-                className="h-4 w-4 rounded border"
-                style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
-              />
-              <span>
-                I accept the{' '}
-                <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                  Alpha Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                  Privacy Policy
-                </Link>
-                .
-              </span>
-            </label>
-            <p className="text-xs mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
-              These documents explain how Landscape keeps your insights private during onboarding.
-            </p>
-          </div>
+            {requiresTos ? (
+              <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+                <label className="flex items-center text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={tosAccepted}
+                    onChange={(e) => setTosAccepted(e.target.checked)}
+                    className="h-4 w-4 rounded border"
+                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
+                  />
+                  <span>
+                    I accept the{' '}
+                    <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                      Alpha Terms of Service
+                    </Link>{' '}
+                    and{' '}
+                    <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <p className="text-xs mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                  These documents explain how Landscape keeps your insights private during onboarding.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+                <p className="text-sm" style={{ color: 'var(--text-primary)', margin: 0 }}>
+                  Terms accepted on {formattedAcceptedDate}
+                </p>
+              </div>
+            )}
           <p className="mt-6 text-xs text-center" style={{ color: 'var(--cui-secondary-color)' }}>
             Need an account?{' '}
             <Link href="/register" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
