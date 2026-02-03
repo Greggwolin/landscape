@@ -137,3 +137,4 @@ archive/gis-data/**/*.zip
 
 # Temporary working files (scratch/throwaway only)
 tmp_*
+test-results/
