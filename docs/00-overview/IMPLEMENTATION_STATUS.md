@@ -35,6 +35,19 @@ Restructured the Property folder tab navigation to include new Acquisition and R
 - `src/app/projects/[projectId]/StudioContent.tsx` - Added routing for new sub-tabs
 - `src/components/acquisition/AcquisitionLedgerGrid.tsx` - Major refactor (removed modal, inline editing)
 
+### 🆕 Additional Update: Unit Cost Category Chips (February 2, 2026)
+
+**Tokenized Category Pills**
+
+Replaced the inline hex-driven category pills in the Unit Cost Library with a canonical `SemanticCategoryChip` component that simply renders `data-intent` + `data-selected` attributes. All colors now come from tokenized CSS in `component-patterns.css`/`tokens.css`, and the pill rendering in `UnitCostsPanel.tsx` is free of color math or Tailwind color utilities. This ensures the pills render consistently in both light and dark modes and aligns with the Landscape semantic styling guidelines.
+
+**Files Modified:**
+- `src/components/ui/SemanticCategoryChip.tsx` - New reusable chip implementation with dot + intent metadata
+- `src/components/ui/landscape/SemanticCategoryChip.tsx` - Re-export of the shared chip for existing imports
+- `src/components/benchmarks/unit-costs/UnitCostsPanel.tsx` - Removed `CATEGORY_COLOR_PALETTE`/`hexToRgba` and opted for intent-driven chips
+- `src/styles/component-patterns.css` - Added intent-based styling keyed off `data-intent`/`data-selected`
+- `src/styles/tokens.css` - Added semantic chip tokens (bg/border/text/outline) for every intent in light and dark theme sections
+
 ### Previous Update: Django Cash Flow Consolidation (February 1, 2026)
 
 **Land Dev Cash Flow Engine Migration Complete**

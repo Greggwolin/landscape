@@ -73,6 +73,14 @@ Updated `filterSubtabsByType()` to check both project type and analysis type.
 - `page.tsx` and `ProjectLayoutClient.tsx` pass `analysisType: currentProject?.analysis_type`
 - All config functions (`createFolderConfig`, `getFolderById`, `getDefaultSubTabId`, `isValidFolderTab`) accept `analysisType`
 
+### 6. Unit Cost Category Chip Refresh ✅
+
+**Problem**: Unit cost category filters were still computing colors via a hardcoded hex palette plus inline RGBA math, which made both light and dark theming inconsistent and failed to surface semantic intent.
+
+**Solution**: Added `SemanticCategoryChip`, re-exported it through the Landscape UI bundle, and drove the chip’s colors entirely through tokenized CSS (`component-patterns.css` + `tokens.css`). The JSX in `UnitCostsPanel.tsx` now simply renders `<SemanticCategoryChip intent={…} />`, passing intent from `getCategoryIntent`, while the CSS selects on `data-intent`/`data-selected`.
+
+**Result**: The Unit Cost Library filter pills now stay in sync with the design system, no longer compute colors in JS, and correctly respond to theme changes.
+
 ## Files Modified
 
 ### New Files Created:
@@ -114,6 +122,22 @@ Updated `filterSubtabsByType()` to check both project type and analysis type.
    - Made "Is Conditional" column editable (clickable toggle)
    - Optimized column widths with `table-layout: fixed`
    - Reduced padding and font sizes for compact display
+
+7. **src/components/ui/SemanticCategoryChip.tsx**
+   - Implements the canonical chip button with a dot element, `data-intent`, and `data-selected`
+
+8. **src/components/ui/landscape/SemanticCategoryChip.tsx**
+   - Re-exports the shared chip so other Landscape UI code continues to import from the existing path
+
+9. **src/components/benchmarks/unit-costs/UnitCostsPanel.tsx**
+   - Removed `CATEGORY_COLOR_PALETTE`, `hexToRgba`, and inline style calculations for the category pills
+   - Replaced the Tailwind color utilities with the new `SemanticCategoryChip` + intent mapping
+
+10. **src/styles/tokens.css**
+    - Added semantic chip tokens (`--chip-*-bg/border/text/outline`) for every intent in both light and dark theme sections
+
+11. **src/styles/component-patterns.css**
+    - Added `semantic-category-chip` CSS that reads the new tokens via `data-intent` and sets outlines/focus states via tokenized colors
 
 ## Technical Details
 
