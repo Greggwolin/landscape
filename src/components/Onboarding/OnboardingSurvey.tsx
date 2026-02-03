@@ -141,7 +141,7 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
         return (
           <div className="space-y-6">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                <p className="text-2xl font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#ffffff' }}>
                 Question 1 · Role
               </p>
               <div className="grid gap-3">
@@ -150,16 +150,17 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
                     key={role.value}
                     type="button"
                     onClick={() => handleRoleChange(role.value as SurveyAnswers['role_primary'])}
-                    className="rounded-2xl border p-4 text-left transition"
+                    className="rounded-2xl border text-left transition"
                     style={{
                       color: 'var(--text-primary)',
                       borderColor: answers.role_primary === role.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
                       backgroundColor:
                         answers.role_primary === role.value ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
+                      padding: '0.75rem 1rem',
                     }}
                   >
                     <span className="font-semibold text-lg">{role.label}</span>
-                    <p className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                    <p className="text-sm mt-2 whitespace-normal leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
                       {role.description}
                     </p>
                   </button>
@@ -179,15 +180,16 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
                       onClick={() =>
                         setAnswers((prev) => ({ ...prev, role_property_type: option.value }))
                       }
-                      className="rounded-full px-4 py-2 text-sm border transition"
-                      style={{
-                        color: 'var(--text-primary)',
-                        borderColor:
-                          answers.role_property_type === option.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                        backgroundColor:
-                          answers.role_property_type === option.value ? 'var(--cui-primary-bg)' : 'transparent',
-                      }}
-                    >
+                    className="rounded-full text-sm border transition"
+                    style={{
+                      color: 'var(--text-primary)',
+                      borderColor:
+                        answers.role_property_type === option.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                      backgroundColor:
+                        answers.role_property_type === option.value ? 'var(--cui-primary-bg)' : 'transparent',
+                      padding: '0.5rem 1rem',
+                    }}
+                  >
                       {option.label}
                     </button>
                   ))}
@@ -199,7 +201,7 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
       case 1:
         return (
           <div className="space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                <p className="text-2xl font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#ffffff' }}>
               Question 2 · AI experience
             </p>
             <div className="space-y-3">
@@ -208,13 +210,14 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
                     key={option.value}
                     type="button"
                     onClick={() => setAnswers((prev) => ({ ...prev, ai_proficiency: option.value }))}
-                    className="w-full rounded-2xl border px-4 py-4 text-left transition"
+                    className="w-full rounded-2xl border text-left transition"
                     style={{
                       color: 'var(--text-primary)',
                       borderColor:
                         answers.ai_proficiency === option.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
                       backgroundColor:
                         answers.ai_proficiency === option.value ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
+                      padding: '0.75rem 1rem',
                     }}
                   >
                   <p className="font-semibold">{option.value.toUpperCase()}</p>
@@ -229,26 +232,27 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
       case 2:
         return (
           <div className="space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                <p className="text-2xl font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#ffffff' }}>
               Question 3 · Tone
             </p>
             <div className="grid md:grid-cols-2 gap-4">
               {TONE_EXAMPLES.map((tone) => (
-                <button
-                  key={tone.tone}
-                  type="button"
-                  onClick={() =>
-                    setAnswers((prev) => ({ ...prev, communication_tone: tone.tone as SurveyAnswers['communication_tone'] }))
-                  }
-                  className="rounded-2xl border p-5 text-left transition"
-                  style={{
-                    color: 'var(--text-primary)',
-                    borderColor:
-                      answers.communication_tone === tone.tone ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                    backgroundColor:
-                      answers.communication_tone === tone.tone ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
-                  }}
-                >
+                  <button
+                    key={tone.tone}
+                    type="button"
+                    onClick={() =>
+                      setAnswers((prev) => ({ ...prev, communication_tone: tone.tone as SurveyAnswers['communication_tone'] }))
+                    }
+                    className="rounded-2xl border text-left transition"
+                    style={{
+                      color: 'var(--text-primary)',
+                      borderColor:
+                        answers.communication_tone === tone.tone ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                      backgroundColor:
+                        answers.communication_tone === tone.tone ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
+                      padding: '0.75rem 1rem',
+                    }}
+                  >
                   <p className="font-semibold mb-2">{tone.title}</p>
                   <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                     {tone.body}
@@ -261,24 +265,25 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
       case 3:
         return (
           <div className="space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+            <p className="text-2xl font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#ffffff' }}>
               Question 4 · Primary tool
             </p>
             <div className="grid gap-3">
               {PRIMARY_TOOL_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setAnswers((prev) => ({ ...prev, primary_tool: option.value }))}
-                  className="w-full rounded-2xl border px-4 py-3 text-left transition"
-                  style={{
-                    color: 'var(--text-primary)',
-                    borderColor:
-                      answers.primary_tool === option.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                    backgroundColor:
-                      answers.primary_tool === option.value ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
-                  }}
-                >
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setAnswers((prev) => ({ ...prev, primary_tool: option.value }))}
+                    className="w-full rounded-2xl border text-left transition"
+                    style={{
+                      color: 'var(--text-primary)',
+                      borderColor:
+                        answers.primary_tool === option.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                      backgroundColor:
+                        answers.primary_tool === option.value ? 'var(--cui-primary-bg-subtle)' : 'var(--surface-card)',
+                      padding: '0.75rem 1rem',
+                    }}
+                  >
                   {option.label}
                 </button>
               ))}
@@ -288,7 +293,7 @@ export default function OnboardingSurvey({ profile, onComplete }: OnboardingSurv
       case 4:
         return (
           <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+            <p className="text-2xl font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#ffffff' }}>
               Question 5 · Markets
             </p>
             <textarea

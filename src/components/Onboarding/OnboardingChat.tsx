@@ -31,20 +31,61 @@ const DOCUMENT_INVITATIONS: Record<string, string> = {
   cre_investor_multifamily: 'Share investment memos, rent rolls, or T12s.',
 };
 
+const ROLE_NATURAL: Record<string, string> = {
+  appraiser: 'appraiser',
+  land_developer: 'land developer',
+  cre_investor_multifamily: 'multifamily investor',
+};
+
+const PROPERTY_FOCUS_LABELS: Record<string, string> = {
+  multifamily: 'multifamily properties',
+  land_subdivision: 'land and subdivision work',
+  entitled_land: 'entitled land',
+  raw_land: 'raw land',
+  both: 'both entitled and raw land',
+  value_add: 'value-add assets',
+  core: 'core / core+ deals',
+  opportunistic: 'opportunistic investments',
+};
+
+const TOOL_LABELS: Record<string, string> = {
+  argus: 'ARGUS',
+  excel: 'Excel',
+  both: 'ARGUS and Excel',
+  other: 'other tools',
+  none: 'new tools',
+};
+
 const getInitialMessage = (profile: LandscaperProfile) => {
-  const parts = [];
-  if (profile.role_primary) {
-    const roleLabel = profile.role_primary.replace(/_/g, ' ');
-    parts.push(`Hey! I see you are a ${roleLabel}.`);
+  const role = profile.role_primary ? ROLE_NATURAL[profile.role_primary] : null;
+  const focus = profile.role_property_type ? PROPERTY_FOCUS_LABELS[profile.role_property_type] : null;
+  const market = profile.markets_text ? profile.markets_text : null;
+  const tool = profile.primary_tool ? TOOL_LABELS[profile.primary_tool] : null;
+
+  const sentenceFragments: string[] = [];
+  if (role) {
+    sentenceFragments.push(`I see you're a ${role}`);
+  } else {
+    sentenceFragments.push("I see you're here");
   }
-  if (profile.markets_text) {
-    parts.push(`You're focused on ${profile.markets_text}.`);
+
+  if (focus) {
+    sentenceFragments.push(`who focuses on ${focus}`);
   }
-  if (profile.primary_tool) {
-    parts.push(`You typically work in ${profile.primary_tool.toUpperCase()} workflows.`);
+
+  if (market) {
+    sentenceFragments.push(`in the ${market} market`);
   }
-  parts.push(`Tell me about anything you want me to learn before we dig in.`);
-  return parts.join(' ');
+
+  if (tool && tool !== 'new tools') {
+    sentenceFragments.push(`and use ${tool} during underwriting`);
+  }
+
+  const firstSentence = sentenceFragments.join(' ').replace(/\s+/g, ' ').trim() + '.';
+  const followUp = tool && tool !== 'new tools'
+    ? `Can you tell me more about how you typically use ${tool} in your workflow?`
+    : 'Can you share how you like to work with me today?';
+  return `${firstSentence} ${followUp}`;
 };
 
 const buildMessagesFromProfile = (profile: LandscaperProfile): ChatMessage[] => {
@@ -227,7 +268,7 @@ export default function OnboardingChat({ profile, onProfileRefresh }: Onboarding
                       : 'var(--surface-card-header)',
                 }}
               >
-                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-base leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                   {message.text}
                 </p>
               </div>
