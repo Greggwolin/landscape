@@ -152,15 +152,10 @@ Project correspondence and business documents
 - ASU-memo_re-landscape.pdf - ASU landscape memo
 
 ### [00_overview/status/](00_overview/status/)
-Implementation status reports and completion documentation
+Implementation status reports and consolidated completion notices
 - IMPLEMENTATION_STATUS.md - Current implementation status
-- IMPLEMENTATION_STATUS_OLD.md - Historical status
-- CONTAINER_CRUD_IMPLEMENTATION_STATUS.md - Container CRUD status
-- CORE_UI_MIGRATION_COMPLETE.md - UI migration completion
-- PHASE_1_DEPLOYMENT_COMPLETE.md - Phase 1 deployment
-- CONTAINER_INTEGRATION_COMPLETE.md - Container integration
-- BUDGET_CONTAINER_INTEGRATION_COMPLETE.md - Budget integration
-- CONTAINER_CRUD_FRONTEND_COMPLETE.md - Frontend completion
+- COMPLETION_LOG.md - All past completion milestones in one place
+- SCENARIO_MANAGEMENT_STATUS_25-11-13.md - Detailed scenario management progress
 
 ### [12-migration-plans/](12-migration-plans/)
 Migration plans and deprecation strategies

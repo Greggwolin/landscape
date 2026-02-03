@@ -612,7 +612,7 @@ if (peLevel && peId) {
 
 ## Related Documentation
 
-- [BUDGET_CONTAINER_INTEGRATION_COMPLETE.md](BUDGET_CONTAINER_INTEGRATION_COMPLETE.md) - Data layer analysis
+- [COMPLETION_LOG.md](../00_overview/status/COMPLETION_LOG.md) - Completion milestones for budget/container work (see Budget Container Integration entry)
 - [BUDGET_CONTAINER_MIGRATION.md](BUDGET_CONTAINER_MIGRATION.md) - Migration guide
 - [PLANNING_WIZARD_CONTAINER_MIGRATION.md](PLANNING_WIZARD_CONTAINER_MIGRATION.md) - Planning frontend migration
 - [DYNAMIC_LABEL_PATTERN.md](docs/02-features/land-use/DYNAMIC_LABEL_PATTERN.md) - Dynamic label implementation
