@@ -20,6 +20,7 @@ import {
   CTableDataCell,
   CSpinner,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import {
   cilSearch,
@@ -33,12 +34,12 @@ import {
   cilPhone,
 } from '@coreui/icons';
 import { getContacts } from '@/lib/api/contacts';
-import type { ContactListItem, ContactType, PaginatedResponse } from '@/types/contacts';
+import type { ContactListItem, ContactType } from '@/types/contacts';
 import ContactDetailPanel from '@/components/contacts/ContactDetailPanel';
 import ContactModal from '@/components/contacts/ContactModal';
 import { SemanticBadge } from '@/components/ui/landscape';
 
-const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
+const CONTACT_TYPE_ICONS: Record<ContactType, string[]> = {
   Person: cilUser,
   Company: cilBuilding,
   Entity: cilInstitution,
@@ -152,10 +153,10 @@ export default function ContactsPage() {
               Manage contacts across all projects
             </small>
           </div>
-          <CButton color="primary" onClick={handleAddContact}>
+          <SemanticButton intent="primary-action" onClick={handleAddContact}>
             <CIcon icon={cilPlus} className="me-2" />
             Add Contact
-          </CButton>
+          </SemanticButton>
         </CCardHeader>
 
         <CCardBody>
@@ -168,9 +169,9 @@ export default function ContactsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <CButton color="secondary" variant="outline">
+                <SemanticButton intent="secondary-action" variant="outline">
                   <CIcon icon={cilSearch} />
-                </CButton>
+                </SemanticButton>
               </CInputGroup>
             </CCol>
             <CCol md={6} lg={8}>
@@ -214,10 +215,10 @@ export default function ContactsPage() {
                   : 'No contacts yet. Add your first contact to get started.'}
               </p>
               {!debouncedSearch && filterType === 'All' && (
-                <CButton color="primary" onClick={handleAddContact}>
+                <SemanticButton intent="primary-action" onClick={handleAddContact}>
                   <CIcon icon={cilPlus} className="me-2" />
                   Add Contact
-                </CButton>
+                </SemanticButton>
               )}
             </div>
           ) : (

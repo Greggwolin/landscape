@@ -7,7 +7,11 @@ Provides:
 - Variance calculation between AI advice and actual values
 """
 
+import logging
+
 from rest_framework import viewsets, status
+
+logger = logging.getLogger(__name__)
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -1303,6 +1307,173 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception(f"Error in thread message creation: {e}")
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# Global Chat ViewSet (Non-Project Contexts: DMS, Admin, Benchmarks)
+# =============================================================================
+
+class GlobalChatViewSet(viewsets.ViewSet):
+    """
+    Landscaper chat for non-project contexts (DMS, Admin, Benchmarks).
+
+    Endpoints:
+    - GET /api/landscaper/global/chat/ - Get message history (optional ?page_context filter)
+    - POST /api/landscaper/global/chat/ - Send message, get AI response
+
+    This endpoint handles chat for pages that don't have a project context,
+    such as the DMS (documents across all projects), Admin settings, and Benchmarks.
+    """
+    permission_classes = [AllowAny]
+
+    def list(self, request):
+        """GET chat history for global context (filtered by page_context if provided)."""
+        page_context = request.query_params.get('page_context', 'dms')
+        limit = int(request.query_params.get('limit', 50))
+
+        # Query messages without project_id filter, filtered by page_context in metadata
+        messages = ChatMessage.objects.filter(
+            project__isnull=True
+        ).order_by('-timestamp')[:limit]
+
+        # Filter by page_context if stored in metadata
+        if page_context:
+            messages = [m for m in messages if m.metadata.get('page_context') == page_context]
+
+        serializer = ChatMessageSerializer(messages, many=True)
+        return Response({
+            'success': True,
+            'messages': serializer.data,
+            'count': len(serializer.data),
+            'page_context': page_context,
+        })
+
+    def create(self, request):
+        """
+        POST new message and get AI response for global context.
+
+        Request body:
+        {
+            "message": "User message text",
+            "page_context": "dms" | "benchmarks" | "admin" | "settings",
+            "document_id": 123 (optional - for document-specific chat)
+        }
+
+        Response:
+        {
+            "success": true,
+            "content": "AI response text",
+            "messageId": "...",
+            "metadata": {...}
+        }
+        """
+        try:
+            user_message = request.data.get('message', '')
+            page_context = request.data.get('page_context', 'dms')
+            document_id = request.data.get('document_id')
+
+            if not user_message.strip():
+                return Response({
+                    'success': False,
+                    'error': 'Message is required',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Build context for global pages (no project)
+            global_context = {
+                'project_id': None,
+                'project_name': 'Global Context',
+                'project_type': None,
+                'project_type_code': None,
+                'is_global': True,
+                'page_context': page_context,
+            }
+
+            # If document_id provided, add document context
+            if document_id:
+                try:
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT d.filename, d.file_type, d.document_type,
+                                   p.project_id, p.project_name
+                            FROM landscape.tbl_document d
+                            LEFT JOIN landscape.tbl_project p ON d.project_id = p.project_id
+                            WHERE d.doc_id = %s
+                        """, [document_id])
+                        row = cursor.fetchone()
+                        if row:
+                            global_context['document'] = {
+                                'doc_id': document_id,
+                                'filename': row[0],
+                                'file_type': row[1],
+                                'document_type': row[2],
+                                'project_id': row[3],
+                                'project_name': row[4],
+                            }
+                except Exception as e:
+                    logger.warning(f"Failed to fetch document context: {e}")
+
+            # Create tool executor for global context
+            def tool_executor_fn(tool_name, tool_input, project_id=None):
+                # For global context, pass project_id=0 as sentinel
+                return execute_tool(tool_name, tool_input, project_id or 0)
+
+            # Get message history for context (last 10 messages in this page_context)
+            recent_messages = ChatMessage.objects.filter(
+                project__isnull=True,
+            ).order_by('-timestamp')[:10]
+
+            message_history = [
+                {'role': msg.role, 'content': msg.content}
+                for msg in reversed(list(recent_messages))
+                if msg.metadata.get('page_context') == page_context
+            ]
+
+            # Generate AI response
+            ai_response = get_landscaper_response(
+                message_history,
+                global_context,
+                tool_executor=tool_executor_fn,
+                page_context=page_context,
+            )
+
+            # Store user message (with project=None for global)
+            user_message_obj = ChatMessage.objects.create(
+                project=None,
+                user=None,
+                role='user',
+                content=user_message,
+                metadata={'page_context': page_context, 'document_id': document_id},
+            )
+
+            # Store assistant response
+            assistant_metadata = ai_response.get('metadata', {})
+            assistant_metadata['page_context'] = page_context
+            if document_id:
+                assistant_metadata['document_id'] = document_id
+
+            assistant_message_obj = ChatMessage.objects.create(
+                project=None,
+                user=None,
+                role='assistant',
+                content=ai_response['content'],
+                metadata=assistant_metadata,
+            )
+
+            return Response({
+                'success': True,
+                'content': ai_response['content'],
+                'messageId': str(assistant_message_obj.message_id),
+                'createdAt': assistant_message_obj.timestamp.isoformat(),
+                'metadata': assistant_metadata,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.exception(f"Error in global chat: {e}")
             return Response({
                 'success': False,
                 'error': str(e),

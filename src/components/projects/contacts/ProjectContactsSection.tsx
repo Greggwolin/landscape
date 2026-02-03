@@ -11,7 +11,6 @@ import {
   CAccordionBody,
   CListGroup,
   CListGroupItem,
-  CButton,
   CSpinner,
   CBadge,
   CModal,
@@ -26,6 +25,7 @@ import {
   CRow,
   CCol,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import {
   cilUser,
@@ -226,10 +226,10 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
             <h5 className="mb-0">Project Contacts</h5>
             <small className="text-muted">People and organizations involved in this project</small>
           </div>
-          <CButton color="primary" size="sm" onClick={() => setShowAddModal(true)}>
+          <SemanticButton intent="primary-action" size="sm" onClick={() => setShowAddModal(true)}>
             <CIcon icon={cilPlus} className="me-1" />
             Add Contact
-          </CButton>
+          </SemanticButton>
         </CCardHeader>
 
         <CCardBody className="p-0">
@@ -237,10 +237,10 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
             <div className="text-center py-5">
               <CIcon icon={cilPeople} size="3xl" className="text-muted mb-3" />
               <p className="text-muted mb-3">No contacts assigned to this project yet</p>
-              <CButton color="primary" onClick={() => setShowAddModal(true)}>
+              <SemanticButton intent="primary-action" onClick={() => setShowAddModal(true)}>
                 <CIcon icon={cilPlus} className="me-1" />
                 Add First Contact
-              </CButton>
+              </SemanticButton>
             </div>
           ) : (
             <CAccordion flush alwaysOpen activeItemKey={ROLE_CATEGORY_ORDER}>
@@ -316,17 +316,17 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
                               </div>
                             </div>
                             <div className="d-flex gap-1">
-                              <CButton
-                                color={pc.is_primary ? 'info' : 'secondary'}
+                              <SemanticButton
+                                intent={pc.is_primary ? 'confirm-action' : 'tertiary-action'}
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleTogglePrimary(pc)}
                                 title={pc.is_primary ? 'Remove primary' : 'Set as primary'}
                               >
                                 <CIcon icon={cilStar} />
-                              </CButton>
-                              <CButton
-                                color="danger"
+                              </SemanticButton>
+                              <SemanticButton
+                                intent="destructive-action"
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleRemoveContact(pc.project_contact_id)}
@@ -338,7 +338,7 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
                                 ) : (
                                   <CIcon icon={cilTrash} />
                                 )}
-                              </CButton>
+                              </SemanticButton>
                             </div>
                           </CListGroupItem>
                         ))}
@@ -421,11 +421,11 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
           </CForm>
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" variant="ghost" onClick={() => setShowAddModal(false)}>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={() => setShowAddModal(false)}>
             Cancel
-          </CButton>
-          <CButton
-            color="primary"
+          </SemanticButton>
+          <SemanticButton
+            intent="primary-action"
             onClick={handleAddContact}
             disabled={!selectedContact || !selectedRoleId || saving}
           >
@@ -437,7 +437,7 @@ export default function ProjectContactsSection({ projectId }: ProjectContactsSec
             ) : (
               'Add to Project'
             )}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     </>

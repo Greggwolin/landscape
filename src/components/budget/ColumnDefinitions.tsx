@@ -1,6 +1,5 @@
 // v2.0 · 2025-11-15 · Column sets by mode with expanded type support
 import { ColumnDef } from '@tanstack/react-table';
-import { CButton } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilTrash, cilObjectGroup } from '@coreui/icons';
 import EditableCell from './custom/EditableCell';
@@ -10,6 +9,7 @@ import type { BudgetMode, BudgetItem } from '@/types/budget';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 import { UOMSelect } from '@/components/common/UOMSelect';
+import { SemanticButton } from '@/components/ui/landscape';
 
 // Re-export BudgetItem for backward compatibility
 export type { BudgetItem };
@@ -365,8 +365,8 @@ export function getColumnsByMode(
     enableResizing: false,
     cell: ({ row }) => (
       <div className="d-flex justify-content-end gap-2">
-        <CButton
-          color="primary"
+        <SemanticButton
+          intent="secondary-action"
           size="sm"
           variant="ghost"
           className="p-1"
@@ -377,9 +377,9 @@ export function getColumnsByMode(
           title="Add item from this row"
         >
           <CIcon icon={cilPlus} size="sm" />
-        </CButton>
-        <CButton
-          color="danger"
+        </SemanticButton>
+        <SemanticButton
+          intent="destructive-action"
           size="sm"
           variant="ghost"
           className="p-1"
@@ -390,7 +390,7 @@ export function getColumnsByMode(
           title="Delete this budget item"
         >
           <CIcon icon={cilTrash} size="sm" />
-        </CButton>
+        </SemanticButton>
       </div>
     ),
   };

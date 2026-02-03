@@ -10,7 +10,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CAlert,
   CFormCheck,
   CFormTextarea,
@@ -18,6 +17,7 @@ import {
 } from '@coreui/react';
 import type { CategoryVariance } from '@/hooks/useBudgetVariance';
 import { formatMoney } from '@/utils/formatters/number';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface ReconciliationModalProps {
   visible: boolean;
@@ -192,9 +192,9 @@ export default function ReconciliationModal({
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="primary" onClick={handleClose}>
+          <SemanticButton intent="confirm-action" onClick={handleClose}>
             Done
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     );
@@ -324,10 +324,10 @@ export default function ReconciliationModal({
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" onClick={handleClose} disabled={loading}>
+        <SemanticButton intent="tertiary-action" onClick={handleClose} disabled={loading}>
           Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleReconcile} disabled={loading}>
+        </SemanticButton>
+        <SemanticButton intent="confirm-action" onClick={handleReconcile} disabled={loading}>
           {loading ? (
             <>
               <CSpinner size="sm" className="me-2" />
@@ -336,7 +336,7 @@ export default function ReconciliationModal({
           ) : (
             'Reconcile Now'
           )}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

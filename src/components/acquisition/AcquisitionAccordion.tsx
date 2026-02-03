@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CBadge,
-  CButton,
   CCol,
   CFormInput,
   CFormLabel,
@@ -11,6 +10,7 @@ import {
   CRow,
   CSpinner,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
 import ModeSelector, { type BudgetMode } from '@/components/budget/ModeSelector';
 import AcquisitionLedgerGrid from './AcquisitionLedgerGrid';
@@ -498,9 +498,9 @@ export default function AcquisitionAccordion({ projectId, mode, onModeChange }: 
                               onChange={(e) => setNewDeposit((prev) => ({ ...prev, amount: e.target.value }))}
                               placeholder="0"
                             />
-                            <CButton color="primary" size="sm" disabled={savingDepositId !== null} onClick={handleAddDeposit}>
+                            <SemanticButton intent="primary-action" size="sm" disabled={savingDepositId !== null} onClick={handleAddDeposit}>
                               {savingDepositId !== null ? <CSpinner size="sm" /> : 'Add'}
-                            </CButton>
+                            </SemanticButton>
                           </div>
                         </td>
                       </tr>
@@ -554,15 +554,15 @@ export default function AcquisitionAccordion({ projectId, mode, onModeChange }: 
                         placeholder="Goes-hard"
                       />
                       <div>
-                        <CButton
+                        <SemanticButton
                           size="sm"
-                          color="secondary"
+                          intent="secondary-action"
                           disabled={contingencySaving === 'financing'}
                           onClick={() => saveContingency('financing')}
                         >
                           {contingencySaving === 'financing' ? <CSpinner size="sm" className="me-1" /> : null}
                           Save Financing Contingency
-                        </CButton>
+                        </SemanticButton>
                       </div>
                     </div>
                   </CCol>
@@ -594,15 +594,15 @@ export default function AcquisitionAccordion({ projectId, mode, onModeChange }: 
                         placeholder="Goes-hard"
                       />
                       <div>
-                        <CButton
+                        <SemanticButton
                           size="sm"
-                          color="secondary"
+                          intent="secondary-action"
                           disabled={contingencySaving === 'entitlement'}
                           onClick={() => saveContingency('entitlement')}
                         >
                           {contingencySaving === 'entitlement' ? <CSpinner size="sm" className="me-1" /> : null}
                           Save Entitlement Contingency
-                        </CButton>
+                        </SemanticButton>
                       </div>
                     </div>
                   </CCol>
@@ -647,10 +647,10 @@ export default function AcquisitionAccordion({ projectId, mode, onModeChange }: 
                     </CCol>
                   </CRow>
                   <div className="d-flex align-items-center gap-2 mt-3">
-                    <CButton color="primary" size="sm" disabled={savingProration} onClick={handleAddProration}>
+                    <SemanticButton intent="primary-action" size="sm" disabled={savingProration} onClick={handleAddProration}>
                       {savingProration ? <CSpinner size="sm" className="me-2" /> : null}
                       Add to Ledger
-                    </CButton>
+                    </SemanticButton>
                     <div className="text-muted small">
                       Logged to acquisition ledger and applied to cash flow
                     </div>
@@ -701,10 +701,7 @@ export default function AcquisitionAccordion({ projectId, mode, onModeChange }: 
             </div>
             <AcquisitionLedgerGrid
               projectId={projectId}
-              mode={mode}
-              onModeChange={onModeChange}
               onEventsChange={setEvents}
-              hideModeSelector
             />
           </div>
         )}

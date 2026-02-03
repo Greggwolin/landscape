@@ -9,6 +9,7 @@ interface AgentChatProps {
   agentId: string;
   agentName: string;
   placeholder?: string;
+  activeTab?: string;  // Page context for tool filtering (e.g., 'mf_valuation', 'mf_operations')
 }
 
 export function AgentChat({
@@ -16,12 +17,14 @@ export function AgentChat({
   agentId,
   agentName,
   placeholder,
+  activeTab = 'home',
 }: AgentChatProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, isLoading } = useLandscaper({
     projectId,
+    activeTab,  // Pass page context for tool filtering
   });
 
   // Track if user has sent a message - only auto-scroll after user interaction

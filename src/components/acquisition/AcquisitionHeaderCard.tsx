@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import {
-  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -12,6 +11,7 @@ import {
   CRow,
   CSpinner,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import type { AcquisitionHeader } from '@/types/acquisition';
 import { formatMoney } from '@/utils/formatters/number';
 
@@ -40,10 +40,10 @@ export default function AcquisitionHeaderCard({ data, loading, saving, onChange,
           <h5 className="mb-0">Acquisition Assumptions</h5>
           <small className="text-muted">Backed by landscape.tbl_property_acquisition</small>
         </div>
-        <CButton color="primary" size="sm" disabled={saving || loading || !data} onClick={onSave}>
+        <SemanticButton intent="primary-action" size="sm" disabled={saving || loading || !data} onClick={onSave}>
           {saving ? <CSpinner size="sm" className="me-2" /> : null}
           Save
-        </CButton>
+        </SemanticButton>
       </CCardHeader>
       <CCardBody>
         {loading || !data ? (

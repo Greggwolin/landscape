@@ -11,6 +11,7 @@ interface CollapsibleChatProps {
   agentName: string;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  activeTab?: string;  // Page context for tool filtering
 }
 
 export function CollapsibleChat({
@@ -19,6 +20,7 @@ export function CollapsibleChat({
   agentName,
   isCollapsed,
   onToggleCollapse,
+  activeTab = 'home',
 }: CollapsibleChatProps) {
   if (isCollapsed) {
     return (
@@ -72,6 +74,7 @@ export function CollapsibleChat({
           agentId={agentId}
           agentName={agentName}
           placeholder={`Ask ${agentName}...`}
+          activeTab={activeTab}
         />
       </div>
     </div>

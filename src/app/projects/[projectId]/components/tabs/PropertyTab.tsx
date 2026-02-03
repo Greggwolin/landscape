@@ -9,11 +9,14 @@ import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-r
 import { CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@coreui/react';
 import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
 import { useCallback, useRef } from 'react';
+import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 
 interface Project {
   project_id: number;
   project_name: string;
   project_type_code?: string;
+  project_type?: string;
+  property_subtype?: string;
 }
 
 interface PropertyTabProps {
@@ -313,10 +316,15 @@ const defaultColumns: ColumnConfig[] = [
 
 export default function PropertyTab({ project, activeTab = 'details' }: PropertyTabProps) {
   const projectId = project.project_id;
-  const projectType = project.project_type_code;
+  // Use property_subtype (most specific) → project_type → project_type_code (fallback)
+  const effectiveProjectType = project.property_subtype
+    || project.project_type
+    || project.project_type_code;
+  const projectType = project.project_type_code; // Keep for display purposes
 
-  // Check if this is a supported project type (Multifamily only for now)
-  const isMultifamily = projectType === 'MF';
+  // Check if this is an income property (multifamily, office, retail, etc.)
+  // Uses the same logic as folderTabConfig for consistency
+  const isMultifamily = isIncomeProperty(effectiveProjectType);
 
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [comparables, setComparables] = useState<RentalComparable[]>([]);
@@ -655,20 +663,21 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
     switch (columnId) {
       case 'unitNumber':
-        return <span className="text-white font-semibold">{unit.unitNumber}</span>;
+        return <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>{unit.unitNumber}</span>;
       case 'floorPlan':
-        return <span className="text-gray-300">{unit.floorPlan}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.floorPlan}</span>;
       case 'bedrooms':
-        return <span className="text-gray-300">{formatNumber(unit.bedrooms)}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</span>;
       case 'bathrooms':
-        return <span className="text-gray-300">{formatNumber(unit.bathrooms)}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</span>;
       case 'sqft':
-        return <span className="text-gray-300">{formatNumber(unit.sqft)}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.sqft)}</span>;
       case 'currentRent':
         return isEdit ? (
           <input
             type="number"
-            className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.currentRent || 0}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, currentRent: Number(e.target.value) } : null)}
           />
@@ -679,28 +688,31 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         return isEdit ? (
           <input
             type="number"
-            className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.marketRent || 0}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, marketRent: Number(e.target.value) } : null)}
           />
         ) : (
-          <span className="text-white font-medium">{formatCurrency(unit.marketRent)}</span>
+          <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(unit.marketRent)}</span>
         );
       case 'proformaRent':
         return isEdit ? (
           <input
             type="number"
-            className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.proformaRent || 0}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, proformaRent: Number(e.target.value) } : null)}
           />
         ) : (
-          <span className="text-gray-300">{formatCurrency(unit.proformaRent)}</span>
+          <span style={{ color: 'var(--cui-secondary-color)' }}>{formatCurrency(unit.proformaRent)}</span>
         );
       case 'status':
         return isEdit ? (
           <select
-            className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="rounded px-2 py-1 text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.status || 'Unknown'}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, status: e.target.value as Unit['status'] } : null)}
           >
@@ -711,13 +723,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             <option value="Unknown">Unknown</option>
           </select>
         ) : (
-          <span className={getStatusBadge(unit.status)}>{unit.status}</span>
+          <span className="px-2 py-0.5 rounded text-xs font-medium border" style={getStatusBadge(unit.status)}>{unit.status}</span>
         );
       case 'tenantName':
         return isEdit ? (
           <input
             type="text"
-            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white"
+            className="w-full rounded px-2 py-1"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.tenantName || ''}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, tenantName: e.target.value } : null)}
           />
@@ -728,7 +741,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         return isEdit ? (
           <input
             type="date"
-            className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="rounded px-2 py-1 text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.leaseStart || ''}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseStart: e.target.value } : null)}
           />
@@ -739,7 +753,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         return isEdit ? (
           <input
             type="date"
-            className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="rounded px-2 py-1 text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.leaseEnd || ''}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseEnd: e.target.value } : null)}
           />
@@ -750,7 +765,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         return isEdit ? (
           <input
             type="number"
-            className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.deposit || 0}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, deposit: Number(e.target.value) } : null)}
           />
@@ -758,21 +774,22 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           formatCurrency(unit.deposit)
         );
       case 'monthlyIncome':
-        return <span className="text-gray-300">{formatCurrency(unit.monthlyIncome)}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatCurrency(unit.monthlyIncome)}</span>;
       case 'rentPerSF':
-        return <span className="text-gray-300">{unit.rentPerSF ? `$${formatDecimal(unit.rentPerSF)}` : '—'}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.rentPerSF ? `$${formatDecimal(unit.rentPerSF)}` : '—'}</span>;
       case 'proformaRentPerSF':
-        return <span className="text-gray-300">{unit.proformaRentPerSF ? `$${formatDecimal(unit.proformaRentPerSF)}` : '—'}</span>;
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.proformaRentPerSF ? `$${formatDecimal(unit.proformaRentPerSF)}` : '—'}</span>;
       case 'notes':
         return isEdit ? (
           <input
             type="text"
-            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs"
+            className="w-full rounded px-2 py-1 text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
             value={editDraft?.notes || ''}
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, notes: e.target.value } : null)}
           />
         ) : (
-          <span className="text-gray-400 text-xs">{unit.notes || '—'}</span>
+          <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
         );
       default:
         return null;
@@ -827,16 +844,16 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     return (totalRent / totalSF).toFixed(2);
   }, [units]);
 
-  // Status badge styles
+  // Status badge styles - using semantic CoreUI colors
   const getStatusBadge = (status: Unit['status']) => {
-    const styles = {
-      'Occupied': 'bg-emerald-900 text-emerald-300 border-emerald-700',
-      'Vacant': 'bg-red-900 text-red-300 border-red-700',
-      'Notice': 'bg-amber-900 text-amber-300 border-amber-700',
-      'Renewal': 'bg-blue-900 text-blue-300 border-blue-700',
-      'Unknown': 'bg-gray-800 text-gray-300 border-gray-600'
+    const styles: Record<Unit['status'], React.CSSProperties> = {
+      'Occupied': { backgroundColor: 'var(--cui-success-bg)', color: 'var(--cui-success)', borderColor: 'var(--cui-success)' },
+      'Vacant': { backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)', borderColor: 'var(--cui-danger)' },
+      'Notice': { backgroundColor: 'var(--cui-warning-bg)', color: 'var(--cui-warning)', borderColor: 'var(--cui-warning)' },
+      'Renewal': { backgroundColor: 'var(--cui-info-bg)', color: 'var(--cui-info)', borderColor: 'var(--cui-info)' },
+      'Unknown': { backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-secondary-color)', borderColor: 'var(--cui-border-color)' }
     };
-    return `px-2 py-0.5 rounded text-xs font-medium border ${styles[status]}`;
+    return styles[status];
   };
 
   // AI estimate indicator - shows if market rent differs from AI estimate based on comparables
@@ -938,25 +955,25 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
         <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
-            <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-3">
+          <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
             {projectTypeLabels[projectType || ''] || 'Commercial'} Property Tab Coming Soon
           </h2>
-          <p className="text-gray-400 mb-2">
-            This project is a <strong className="text-white">{projectTypeLabels[projectType || ''] || projectType}</strong> asset type.
+          <p className="mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+            This project is a <strong style={{ color: 'var(--cui-body-color)' }}>{projectTypeLabels[projectType || ''] || projectType}</strong> asset type.
           </p>
-          <p className="text-gray-400 mb-6">
+          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
             The Property tab is currently designed for multifamily projects only.
             A dedicated template for {projectTypeLabels[projectType || '']?.toLowerCase() || 'this asset type'} properties is under development.
           </p>
-          <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 text-left">
-            <p className="text-sm text-blue-300 mb-2">
+          <div className="rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
+            <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
               <strong>For now, use these alternatives:</strong>
             </p>
-            <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+            <ul className="text-sm space-y-1 ml-4 list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
               <li>Financial Analysis tab for cash flow modeling</li>
               <li>Assumptions & Factors for market rent inputs</li>
               <li>Reports tab for PDF rent roll generation</li>
@@ -973,22 +990,22 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
         <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
           <div className="mb-6">
-            <svg className="w-24 h-24 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-3">
+          <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
             No Rent Roll Data Yet
           </h2>
-          <p className="text-gray-400 mb-6">
+          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
             This multifamily project doesn't have any unit or floorplan data yet.
             Upload a rent roll or manually add unit information to get started.
           </p>
-          <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 text-left">
-            <p className="text-sm text-blue-300 mb-2">
+          <div className="rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
+            <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
               <strong>To add data:</strong>
             </p>
-            <ul className="text-sm text-gray-300 space-y-1 ml-4 list-disc">
+            <ul className="text-sm space-y-1 ml-4 list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
               <li>Navigate to the Rent Roll page to upload a rent roll spreadsheet</li>
               <li>Use the Django admin panel to manually add unit types and units</li>
               <li>Import data via the API endpoints</li>
@@ -1074,7 +1091,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <input
                               type="text"
-                              className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                              className="w-16 rounded px-2 py-1 text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.name}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, name: e.target.value} : null)}
                             />
@@ -1086,7 +1104,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <input
                               type="number"
-                              className="w-12 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
+                              className="w-12 rounded px-1 py-1 text-center text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.bedrooms}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, bedrooms: Number(e.target.value)} : null)}
                             />
@@ -1099,7 +1118,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                             <input
                               type="number"
                               step="0.5"
-                              className="w-12 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
+                              className="w-12 rounded px-1 py-1 text-center text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.bathrooms}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, bathrooms: Number(e.target.value)} : null)}
                             />
@@ -1111,7 +1131,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <input
                               type="number"
-                              className="w-16 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
+                              className="w-16 rounded px-1 py-1 text-center text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.sqft}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, sqft: Number(e.target.value)} : null)}
                             />
@@ -1123,7 +1144,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <input
                               type="number"
-                              className="w-14 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
+                              className="w-14 rounded px-1 py-1 text-center text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.unitCount}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, unitCount: Number(e.target.value)} : null)}
                             />
@@ -1135,7 +1157,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <input
                               type="number"
-                              className="w-20 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-white text-center text-sm"
+                              className="w-20 rounded px-1 py-1 text-center text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
                               value={draft.currentRent}
                               onChange={(e) => setPlanEditDraft(d => d ? {...d, currentRent: Number(e.target.value)} : null)}
                             />
@@ -1147,13 +1170,15 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           {editing ? (
                             <div className="flex items-center gap-1 justify-center">
                               <button
-                                className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600"
+                                className="px-2 py-1 text-xs rounded"
+                                style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
                                 onClick={handlePlanEditSave}
                               >
                                 Save
                               </button>
                               <button
-                                className="px-2 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+                                className="px-2 py-1 text-xs rounded"
+                                style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
                                 onClick={handlePlanEditCancel}
                               >
                                 Cancel
@@ -1161,7 +1186,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                             </div>
                           ) : (
                             <button
-                              className="px-2 py-1 text-xs rounded hover:bg-gray-600"
+                              className="px-2 py-1 text-xs rounded"
                               style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
                               onClick={() => handlePlanEditStart(plan)}
                             >
@@ -1236,13 +1261,15 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             <div className="flex items-center gap-2">
               <button
                 onClick={expandAll}
-                className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                className="text-xs px-2 py-1 rounded transition-colors"
+                style={{ color: 'var(--cui-secondary-color)' }}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                className="text-xs px-2 py-1 rounded transition-colors"
+                style={{ color: 'var(--cui-secondary-color)' }}
               >
                 Collapse All
               </button>
@@ -1263,7 +1290,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             {/* Collapsible Property Groups */}
             <div className={`space-y-1 pr-1 ${expandedProperties.size > 0 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
               {comparablesByProperty.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                   <p>No rental comparables available.</p>
                   <p className="text-xs mt-1">Ask Landscaper to extract comps from your OM.</p>
                 </div>
@@ -1285,14 +1312,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                       {/* Property Header - Clickable */}
                       <button
                         onClick={() => toggleProperty(property.propertyName)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-700/30 transition-colors text-left"
+                        className="w-full flex items-center justify-between px-3 py-2 transition-colors text-left"
                         style={{ backgroundColor: propIdx % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <ChevronDown className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cui-secondary-color)' }} />
                           ) : (
-                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cui-secondary-color)' }} />
                           )}
                           {/* Color dot */}
                           {propertyColor && (
@@ -1303,11 +1330,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-white truncate">{property.propertyName}</span>
-                              <span className="text-xs text-gray-500">({property.unitTypes.length} types)</span>
+                              <span className="text-sm font-medium truncate" style={{ color: 'var(--cui-body-color)' }}>{property.propertyName}</span>
+                              <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>({property.unitTypes.length} types)</span>
                             </div>
                             {property.address && (
-                              <div className="flex items-center gap-1 text-xs text-gray-400 truncate">
+                              <div className="flex items-center gap-1 text-xs truncate" style={{ color: 'var(--cui-secondary-color)' }}>
                                 <MapPin className="w-3 h-3 flex-shrink-0" />
                                 <span className="truncate">{property.address}</span>
                               </div>
@@ -1319,13 +1346,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                             <span className="text-blue-400 font-medium">{property.distance} mi</span>
                           )}
                           {property.yearBuilt && (
-                            <span className="text-gray-400 flex items-center gap-1">
+                            <span className="flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
                               <Calendar className="w-3 h-3" />
                               {property.yearBuilt}
                             </span>
                           )}
                           {property.totalUnits && (
-                            <span className="text-gray-400 flex items-center gap-1">
+                            <span className="flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
                               <Building2 className="w-3 h-3" />
                               {property.totalUnits}
                             </span>
@@ -1341,24 +1368,24 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
                       {/* Expanded Unit Types */}
                       {isExpanded && (
-                        <div className="border-t border-gray-600" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+                        <div style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderTop: '1px solid var(--cui-border-color)' }}>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="border-b border-gray-600">
-                                <th className="text-left px-3 py-1.5 font-medium text-gray-400 w-24">Unit Type</th>
-                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">Bed</th>
-                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">Bath</th>
-                                <th className="text-center px-2 py-1.5 font-medium text-gray-400">SF</th>
-                                <th className="text-right px-3 py-1.5 font-medium text-gray-400">Rent</th>
-                                <th className="text-right px-3 py-1.5 font-medium text-gray-400">$/SF</th>
+                              <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                                <th className="text-left px-3 py-1.5 font-medium w-24" style={{ color: 'var(--cui-secondary-color)' }}>Unit Type</th>
+                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
+                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
+                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
+                                <th className="text-right px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Rent</th>
+                                <th className="text-right px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>$/SF</th>
                               </tr>
                             </thead>
                             <tbody>
                               {property.unitTypes.map((unit, idx) => (
                                 <tr
                                   key={unit.comparable_id}
-                                  className="border-b border-gray-700/50 last:border-b-0"
-                                  style={{ backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}
+                                  className="last:border-b-0"
+                                  style={{ borderBottom: '1px solid var(--cui-border-color-translucent)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}
                                 >
                                   <td className="px-3 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{unit.unit_type || `${unit.bedrooms}BR/${unit.bathrooms}BA`}</td>
                                   <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</td>
@@ -1399,22 +1426,26 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 <span className="text-green-300 font-medium">Populates Floor Plans</span>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-gray-400">
-              <span>Occupancy: <span className="text-white font-medium">{occupancyRate}%</span></span>
-              <span>Units: <span className="text-white font-medium">{units.length} / {totalUnits}</span></span>
+            <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              <span>Occupancy: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</span></span>
+              <span>Units: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{units.length} / {totalUnits}</span></span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFieldChooser(true)}
-              className="px-3 py-1.5 bg-gray-700 text-white text-sm rounded hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-sm rounded transition-colors flex items-center gap-1.5"
+              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)' }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
               Configure Columns
             </button>
-            <button className="px-3 py-1.5 bg-blue-700 text-white text-sm rounded hover:bg-blue-600 transition-colors">
+            <button
+              className="px-3 py-1.5 text-sm rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+            >
               + Add Unit
             </button>
           </div>
@@ -1423,93 +1454,93 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         {/* KPI Tiles */}
         <div className="px-4 py-3 grid grid-cols-6 gap-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
           {/* Occupancy Rate */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Occupancy</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Occupancy</span>
               <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="text-2xl font-bold text-white">{occupancyRate}%</div>
-            <div className="text-xs text-gray-500 mt-1">{occupiedUnits} / {units.length} units</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>{occupiedUnits} / {units.length} units</div>
           </div>
 
           {/* Avg Current Rent */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Avg Current Rent</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg Current Rent</span>
               <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="text-2xl font-bold text-white">{formatCurrency(avgCurrentRent)}</div>
-            <div className="text-xs text-gray-500 mt-1">Per unit/month</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(avgCurrentRent)}</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Per unit/month</div>
           </div>
 
           {/* Avg Market Rent */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Avg Market Rent</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg Market Rent</span>
               <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <div className="text-2xl font-bold text-white">{formatCurrency(avgMarketRent)}</div>
-            <div className="text-xs text-gray-500 mt-1">Per unit/month</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(avgMarketRent)}</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Per unit/month</div>
           </div>
 
           {/* Rent Growth Potential */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Growth Potential</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Growth Potential</span>
               <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
               </svg>
             </div>
             <div className="text-2xl font-bold text-green-400">{rentGrowthPotential !== '0.0' && rentGrowthPotential !== 0 ? `+${rentGrowthPotential}%` : '—'}</div>
-            <div className="text-xs text-gray-500 mt-1">To market rate</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>To market rate</div>
           </div>
 
           {/* Total Monthly Income */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Monthly Income</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Monthly Income</span>
               <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <div className="text-2xl font-bold text-white">{totalMonthlyIncome === 0 ? '—' : `$${(totalMonthlyIncome / 1000).toFixed(1)}k`}</div>
-            <div className="text-xs text-gray-500 mt-1">Current total</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{totalMonthlyIncome === 0 ? '—' : `$${(totalMonthlyIncome / 1000).toFixed(1)}k`}</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Current total</div>
           </div>
 
           {/* Avg Rent per SF */}
-          <div className="bg-gray-750 rounded-lg p-3 border border-gray-700">
+          <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Rent/SF</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Rent/SF</span>
               <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
               </svg>
             </div>
-            <div className="text-2xl font-bold text-white">{avgRentPerSF === '0.00' || Number(avgRentPerSF) === 0 ? '—' : `$${avgRentPerSF}`}</div>
-            <div className="text-xs text-gray-500 mt-1">Average rate</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{avgRentPerSF === '0.00' || Number(avgRentPerSF) === 0 ? '—' : `$${avgRentPerSF}`}</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Average rate</div>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-900">
-              <tr className="border-b border-gray-700">
+            <thead style={{ backgroundColor: 'var(--cui-dark-bg)' }}>
+              <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                 {visibleColumns.map(col => (
-                  <th key={col.id} className={`px-3 py-2 font-medium text-gray-300 ${getColumnAlign(col.id)}`}>
+                  <th key={col.id} className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`} style={{ color: 'var(--cui-secondary-color)' }}>
                     {col.label}
                   </th>
                 ))}
-                <th className="text-center px-3 py-2 font-medium text-gray-300">Actions</th>
+                <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {units.map((unit, index) => (
-                <tr key={unit.id} className={`border-b border-gray-700 ${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}>
+                <tr key={unit.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
                   {visibleColumns.map(col => (
                     <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}>
                       {renderCellContent(unit, col.id)}
@@ -1519,13 +1550,15 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     {isEditing(unit.id) ? (
                       <div className="flex items-center gap-2 justify-center">
                         <button
-                          className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600"
+                          className="px-2 py-1 text-xs rounded"
+                          style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
                           onClick={handleEditSave}
                         >
                           Save
                         </button>
                         <button
-                          className="px-2 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+                          className="px-2 py-1 text-xs rounded"
+                          style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
                           onClick={handleEditCancel}
                         >
                           Cancel
@@ -1533,7 +1566,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                       </div>
                     ) : (
                       <button
-                        className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                        className="px-2 py-1 text-xs rounded"
+                        style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
                         onClick={() => handleEditStart(unit)}
                       >
                         Edit
@@ -1656,8 +1690,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               </button>
               <button
                 onClick={() => setShowFieldChooser(false)}
-                className="px-4 py-1.5 text-xs rounded transition-colors text-white"
-                style={{ backgroundColor: 'var(--cui-primary)' }}
+                className="px-4 py-1.5 text-xs rounded transition-colors"
+                style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
               >
                 Done
               </button>

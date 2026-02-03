@@ -3,17 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import BenchmarkAccordion from '@/components/benchmarks/BenchmarkAccordion';
-import BenchmarksFlyout, { BenchmarksFlyoutSelection } from '@/components/benchmarks/BenchmarksFlyout';
 import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
 import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
-import AbsorptionVelocityPanel from '@/components/benchmarks/absorption/AbsorptionVelocityPanel';
-import { LandscapeButton } from '@/components/ui/landscape';
 import type {
   Benchmark,
-  AISuggestion,
   BenchmarkCategory,
-  GrowthRateSet,
-  AbsorptionVelocity
+  GrowthRateSet
 } from '@/types/benchmarks';
 
 // Category definitions
@@ -21,30 +16,20 @@ const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
   { key: 'transaction_cost', label: 'Transaction Costs', icon: 'Receipt', count: 0 },
   { key: 'commission', label: 'Commissions', icon: 'Percent', count: 0 },
-  { key: 'absorption', label: 'Absorption Velocity', icon: 'Timeline', count: 0 },
   { key: 'contingency', label: 'Contingency Standards', icon: 'Shield', count: 0 },
-  { key: 'market_timing', label: 'Market Timing', icon: 'Schedule', count: 0 },
-  { key: 'land_use_pricing', label: 'Land Use Pricing', icon: 'Landscape', count: 0 },
-  { key: 'op_cost', label: 'Op Costs', icon: 'Business', count: 0 },
-  { key: 'capital_stack', label: 'Capital Stack', icon: 'Layers', count: 0 },
-  { key: 'debt_standard', label: 'Debt Standards', icon: 'CreditCard', count: 0 },
 ];
 
 export default function BenchmarksPanel() {
   // Track multiple open categories instead of single selection
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [benchmarks, setBenchmarks] = useState<Record<string, Benchmark[]>>({});
-  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingToCategory, setAddingToCategory] = useState<BenchmarkCategory | null>(null);
   const [growthRateSets, setGrowthRateSets] = useState<GrowthRateSet[]>([]);
-  const [absorptionCount, setAbsorptionCount] = useState(0);
-  const [totalCostLineItems, setTotalCostLineItems] = useState(0);
   const [leftPanelWidth, setLeftPanelWidth] = useState(40); // Adjusted to 40%
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedTile, setSelectedTile] = useState<BenchmarksFlyoutSelection | null>(null);
 
   useEffect(() => {
     loadData();
@@ -55,12 +40,9 @@ export default function BenchmarksPanel() {
     setError(null);
 
     try {
-      const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes, growthRatesRes] = await Promise.all([
+      const [benchmarkRes, saleBenchmarksRes, growthRatesRes] = await Promise.all([
         fetch('/api/benchmarks'),
         fetch('/api/sale-benchmarks/global'),
-        fetch('/api/benchmarks/ai-suggestions'),
-        fetch('/api/benchmarks/absorption-velocity'),
-        fetch('/api/unit-costs/templates'),
         fetch('/api/benchmarks/growth-rates'),
       ]);
 
@@ -70,9 +52,6 @@ export default function BenchmarksPanel() {
 
       const benchmarkData = await benchmarkRes.json();
       const saleBenchmarksData = saleBenchmarksRes.ok ? await saleBenchmarksRes.json() : { benchmarks: [] };
-      const suggestionsData = suggestionsRes.ok ? await suggestionsRes.json() : { suggestions: [] };
-      const absorptionData = absorptionRes.ok ? await absorptionRes.json() : { absorption_velocities: [] };
-      const unitCostTemplatesData = unitCostTemplatesRes.ok ? await unitCostTemplatesRes.json() : { templates: [] };
       const growthRatesData = growthRatesRes.ok ? await growthRatesRes.json() : { sets: [] };
 
       // Group benchmarks by category
@@ -122,9 +101,6 @@ export default function BenchmarksPanel() {
 
       setBenchmarks(grouped);
       setGrowthRateSets(growthRatesData.sets || []);
-      setAiSuggestions(suggestionsData.suggestions || []);
-      setAbsorptionCount(absorptionData.absorption_velocities?.length || 0);
-      setTotalCostLineItems(unitCostTemplatesData.templates?.length || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load benchmarks');
     } finally {
@@ -167,6 +143,20 @@ export default function BenchmarksPanel() {
           backgroundColor: 'var(--cui-body-bg)'
         }}
       >
+        {error && (
+          <div
+            style={{
+              padding: '0.5rem 1rem',
+              margin: '0.75rem 1rem',
+              backgroundColor: 'rgba(202, 46, 93, 0.1)',
+              color: '#ca2e5d',
+              borderRadius: '0.375rem'
+            }}
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
         {CATEGORIES.map((category) => {
           // Get benchmarks for this category
           const categoryBenchmarks = benchmarks[category.key] || [];
@@ -175,8 +165,6 @@ export default function BenchmarksPanel() {
           let displayCount = categoryBenchmarks.length;
           if (category.key === 'growth_rate') {
             displayCount = growthRateSets.length;
-          } else if (category.key === 'absorption') {
-            displayCount = absorptionCount;
           }
 
           const categoryWithCount = { ...category, count: displayCount };

@@ -15,7 +15,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   CBadge,
-  CButton,
   CSpinner,
   CTable,
   CTableBody,
@@ -23,6 +22,7 @@ import {
   CTableHeaderCell,
   CTableRow,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilPlus } from '@coreui/icons';
 import { UnitOfMeasure, UnitOfMeasureDraft } from '@/lib/measures';
@@ -136,9 +136,9 @@ const UOMTable: React.FC<UOMTableProps> = ({
                 <CTableHeaderCell scope="col" style={{ width: '160px' }} className="text-end">
                   <div className="d-flex justify-content-end align-items-center gap-2">
                     <span className="fw-semibold">Actions</span>
-                    <CButton color="primary" size="sm" onClick={onAddClick} disabled={isAdding || Boolean(savingCode) || loading}>
+                    <SemanticButton intent="primary-action" size="sm" onClick={onAddClick} disabled={isAdding || Boolean(savingCode) || loading}>
                       <CIcon icon={cilPlus} className="me-1" /> Add
-                    </CButton>
+                    </SemanticButton>
                   </div>
                 </CTableHeaderCell>
                 </CTableRow>

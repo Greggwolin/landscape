@@ -20,6 +20,7 @@ export interface ProjectProfile {
   total_units?: number; // For operating projects (actual units)
   calculated_units?: number; // Calculated from tbl_multifamily_unit (rent roll)
   gross_acres?: number;
+  asking_price?: number; // Initial asking price (before acquisition closes)
   address?: string;
   city?: string;
   county?: string;
@@ -60,6 +61,7 @@ export interface ProjectProfileFormData {
   property_subtype?: PropertySubtype;
   target_units?: number;
   gross_acres?: number;
+  asking_price?: number;
   address?: string;
   city?: string;
   county?: string;

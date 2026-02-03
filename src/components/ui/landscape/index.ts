@@ -15,6 +15,11 @@ export { StatusChip, Status } from './StatusChip';
 export type { StatusChipProps, StatusType } from './StatusChip';
 export { SemanticBadge } from './SemanticBadge';
 export type { SemanticBadgeProps, SemanticIntent } from './SemanticBadge';
+export { SemanticCategoryChip } from './SemanticCategoryChip';
+export type { SemanticCategoryChipProps, CategoryIntent } from './SemanticCategoryChip';
 
 export { DataTable } from './DataTable';
 export type { DataTableProps, DataTableColumn } from './DataTable';
+
+export { SemanticButton } from './SemanticButton';
+export type { SemanticButtonProps, SemanticButtonIntent } from './SemanticButton';

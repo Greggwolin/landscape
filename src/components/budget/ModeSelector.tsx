@@ -1,6 +1,8 @@
 // v2.0 · 2025-01-16 · Badge/chip style mode selector
 'use client';
 
+import { SemanticButton } from '@/components/ui/landscape';
+
 export type BudgetMode = 'napkin' | 'standard' | 'detail';
 
 interface Props {
@@ -36,30 +38,27 @@ export default function ModeSelector({ activeMode, onModeChange }: Props) {
     <div className="flex flex-wrap gap-2 mb-3">
       {modes.map(([mode, config]) => {
         const isActive = activeMode === mode;
-
-        // Warning badges need dark text for contrast
-        const textColor = isActive
-          ? (config.color === 'warning' ? '#000' : '#fff')
-          : `var(${config.cssVar})`;
-
+        const textColor = isActive ? (config.color === 'warning' ? '#000' : '#fff') : `var(${config.cssVar})`;
         return (
-          <button
+          <SemanticButton
             key={mode}
             type="button"
+            intent="secondary-action"
+            variant={isActive ? undefined : 'outline'}
             className="budget-mode-badge"
             data-active={isActive}
             data-color={config.color}
             style={{
               background: isActive ? `var(${config.cssVar})` : 'transparent',
               borderColor: `var(${config.cssVar})`,
-              color: textColor
+              color: textColor,
             }}
             onClick={() => onModeChange(mode)}
           >
             <span className="budget-mode-badge-text">
               {config.label} ({config.fields} fields)
             </span>
-          </button>
+          </SemanticButton>
         );
       })}
     </div>

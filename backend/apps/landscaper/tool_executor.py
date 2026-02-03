@@ -6810,6 +6810,171 @@ def delete_benchmark(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('search_irem_benchmarks')
+def search_irem_benchmarks(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Search IREM expense benchmarks for multifamily operating expenses.
+
+    This tool provides access to IREM (Institute of Real Estate Management)
+    benchmark data for expense validation and comparison.
+
+    Input parameters:
+    - query: Search term (e.g., "R&M", "utilities", "insurance")
+    - category: Specific expense category (optional)
+    - subcategory: Specific subcategory (optional)
+    - property_type: Property type filter (default: "multifamily")
+    - year: Specific year (optional, defaults to most recent)
+    - compare_value: Actual value to compare against benchmark (optional)
+    - value_type: Type of comparison ("per_unit", "pct_of_egi") - required with compare_value
+
+    Returns benchmark data including per_unit_amount, pct_of_egi, sample_size, etc.
+    """
+    from apps.knowledge.services.benchmark_service import get_benchmark_service
+
+    query = tool_input.get('query')
+    category = tool_input.get('category')
+    subcategory = tool_input.get('subcategory')
+    property_type = tool_input.get('property_type', 'multifamily')
+    year = tool_input.get('year')
+    compare_value = tool_input.get('compare_value')
+    value_type = tool_input.get('value_type')
+
+    try:
+        service = get_benchmark_service()
+
+        # If comparing a value to benchmark
+        if compare_value is not None and value_type:
+            if not category:
+                return {'success': False, 'error': 'category is required for comparison'}
+
+            result = service.compare_to_benchmark(
+                actual_value=float(compare_value),
+                value_type=value_type,
+                expense_category=category,
+                expense_subcategory=subcategory,
+                property_type=property_type,
+            )
+            return {'success': True, 'comparison': result}
+
+        # If searching by query term
+        if query:
+            results = service.search_benchmarks(
+                query=query,
+                property_type=property_type,
+                source_year=int(year) if year else None,
+            )
+            return {
+                'success': True,
+                'query': query,
+                'results': results,
+                'count': len(results)
+            }
+
+        # If getting specific category
+        if category:
+            result = service.get_benchmark(
+                expense_category=category,
+                expense_subcategory=subcategory,
+                property_type=property_type,
+                source_year=int(year) if year else None,
+            )
+            if result:
+                return {'success': True, 'benchmark': result}
+            else:
+                return {'success': False, 'error': f'No benchmark found for {category}'}
+
+        # If no query or category, return full expense summary
+        summary = service.get_expense_summary(
+            source='IREM',
+            source_year=int(year) if year else 2024,
+            property_type=property_type,
+        )
+        return {'success': True, 'summary': summary}
+
+    except Exception as e:
+        logger.error(f"Error searching IREM benchmarks: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('query_platform_knowledge')
+def query_platform_knowledge(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Query platform knowledge base (RAG) for real estate concepts and methodologies.
+
+    This tool searches foundational reference documents like The Appraisal of Real Estate,
+    IREM publications, USPAP standards, etc. for relevant information.
+
+    Input parameters:
+    - query: Natural language question (required)
+    - property_type: Filter by property type (e.g., "multifamily", "hotel")
+    - knowledge_domain: Filter by domain (e.g., "valuation", "cost")
+    - max_chunks: Maximum chunks to return (default: 5)
+
+    Returns relevant text chunks with source citations.
+    """
+    from apps.knowledge.services.platform_knowledge_retriever import get_platform_knowledge_retriever
+
+    query = tool_input.get('query')
+    if not query:
+        return {'success': False, 'error': 'query is required'}
+
+    property_type = tool_input.get('property_type')
+    knowledge_domain = tool_input.get('knowledge_domain')
+    max_chunks = tool_input.get('max_chunks', 5)
+
+    try:
+        retriever = get_platform_knowledge_retriever()
+        chunks = retriever.retrieve(
+            query=query,
+            property_type=property_type,
+            knowledge_domain=knowledge_domain,
+            max_chunks=max_chunks,
+            similarity_threshold=0.65,
+        )
+
+        if not chunks:
+            return {
+                'success': True,
+                'chunks': [],
+                'count': 0,
+                'message': 'No relevant content found in platform knowledge base.'
+            }
+
+        # Format results for Claude
+        formatted_chunks = []
+        for chunk in chunks:
+            formatted_chunks.append({
+                'content': chunk['content'],
+                'similarity': chunk['similarity'],
+                'source': {
+                    'document': chunk['source'].get('document_title'),
+                    'publisher': chunk['source'].get('publisher'),
+                    'chapter': chunk['source'].get('chapter_title'),
+                    'page': chunk['source'].get('page'),
+                }
+            })
+
+        return {
+            'success': True,
+            'chunks': formatted_chunks,
+            'count': len(formatted_chunks)
+        }
+
+    except Exception as e:
+        logger.error(f"Error querying platform knowledge: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Cost Library Tools
 # ─────────────────────────────────────────────────────────────────────────────

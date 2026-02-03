@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Send, FileText, Loader2 } from 'lucide-react';
 import type { ChatMessage } from './types';
 import NewProjectDropZone from './NewProjectDropZone';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface NewProjectChatProps {
   messages: ChatMessage[];
@@ -134,26 +135,12 @@ export default function NewProjectChat({
                         : 'bg-white border border-slate-200 text-slate-700 shadow-sm'
                   }`}
                 >
-                  {/* Message content with markdown-like rendering */}
+                  {/* Message content - sanitized for assistant messages */}
                   <div className="whitespace-pre-wrap">
-                    {message.content.split('\n').map((line, idx) => {
-                      // Handle bold text
-                      const boldLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                      // Handle table rows
-                      if (line.startsWith('|')) {
-                        return (
-                          <div key={idx} className="font-mono text-xs">
-                            {line}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div
-                          key={idx}
-                          dangerouslySetInnerHTML={{ __html: boldLine }}
-                        />
-                      );
-                    })}
+                    {message.role === 'user'
+                      ? message.content
+                      : processLandscaperResponse(message.content)
+                    }
                   </div>
 
                   {/* Metadata badges */}

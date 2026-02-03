@@ -3,13 +3,13 @@
 import React, { useEffect, useRef, useState, forwardRef } from 'react';
 import {
   CBadge,
-  CButton,
   CFormCheck,
   CFormInput,
   CFormSelect,
   CTableDataCell,
   CTableRow,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilTrash, cilPencil, cilPlus } from '@coreui/icons';
 import { MEASURE_CATEGORIES, UnitOfMeasure, UnitOfMeasureDraft, normalizeMeasureName } from '@/lib/measures';
@@ -179,9 +179,9 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
         </CTableDataCell>
         <CTableDataCell style={{ width: '160px' }}>
           <div className="uom-actions">
-            <CButton
+            <SemanticButton
               size="sm"
-              color="secondary"
+              intent="tertiary-action"
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
@@ -190,10 +190,10 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
             >
               <CIcon icon={cilPlus} className="me-1" />
               Add
-            </CButton>
-            <CButton
+            </SemanticButton>
+            <SemanticButton
               size="sm"
-              color="secondary"
+              intent="tertiary-action"
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
@@ -202,10 +202,10 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
             >
               <CIcon icon={cilPencil} className="me-1" />
               Edit
-            </CButton>
-            <CButton
+            </SemanticButton>
+            <SemanticButton
               size="sm"
-              color="danger"
+              intent="destructive-action"
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
@@ -214,7 +214,7 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
             >
               <CIcon icon={cilTrash} className="me-1" />
               Delete
-            </CButton>
+            </SemanticButton>
           </div>
         </CTableDataCell>
       </CTableRow>
@@ -297,12 +297,12 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
             disabled={isSaving}
             label="Active"
           />
-          <CButton color="primary" size="sm" onClick={handleSave} disabled={isSaving}>
+          <SemanticButton intent="primary-action" size="sm" onClick={handleSave} disabled={isSaving}>
             Save
-          </CButton>
-          <CButton color="secondary" size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+          </SemanticButton>
+          <SemanticButton intent="secondary-action" size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
             Cancel
-          </CButton>
+          </SemanticButton>
         </div>
         {error && (
           <div className="text-danger small mt-1" role="alert">

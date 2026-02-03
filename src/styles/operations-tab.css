@@ -398,7 +398,7 @@
 .ops-header-row .ops-cell {
   background: var(--surface-card-header);
   font-weight: 600;
-  color: #111111;
+  color: var(--text-primary);
   padding: 0.65rem 0.75rem;
   font-size: 0.9rem;
   border-bottom: 1px solid var(--cui-border-color);
@@ -422,12 +422,12 @@
 }
 
 .ops-expense-header .ops-section-cell {
-  background: #f0f1f2;
-  color: #111111;
+  background: var(--surface-card-header);
+  color: var(--text-primary);
 }
 
 .ops-section-controls-cell {
-  background: #f0f1f2;
+  background: var(--surface-card-header);
 }
 
 .ops-section-controls-cell .ops-section-controls {
@@ -491,16 +491,16 @@
 
 .ops-income-header .ops-cell,
 .ops-vacancy-header .ops-cell {
-  background: #f7f7fb;
+  background: var(--surface-card-header);
 }
 
 .ops-income-header .ops-section-fill,
 .ops-vacancy-header .ops-section-fill {
-  background: #f7f7fb;
+  background: var(--surface-card-header);
 }
 
 .ops-expense-header .ops-section-fill {
-  background: #f0f1f2;
+  background: var(--surface-card-header);
 }
 
 .ops-section-subtle {
@@ -548,7 +548,7 @@
   top: 0;
   left: 6px;
   right: 6px;
-  border-top: 1px solid #111111;
+  border-top: 1px solid var(--cui-border-color);
 }
 
 .ops-subtotal-row > .ops-cell {

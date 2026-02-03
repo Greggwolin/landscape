@@ -2,36 +2,6 @@ import type { PrototypeMetadata } from './types';
 
 export const prototypeRegistry: PrototypeMetadata[] = [
   {
-    id: 'project-topnav',
-    name: 'Project Workspace - Top Nav',
-    description:
-      'Multifamily project template experiment with a horizontal navigation bar and legacy menu dropdown.',
-    status: 'wip',
-    owners: ['Dev Team'],
-    tags: ['project', 'navigation', 'layout'],
-    notes: 'Replaces sidebar with top navigation; focuses on project 17 dataset.'
-  },
-  {
-    id: 'mui-budget-dashboard',
-    name: 'MUI Budget Dashboard',
-    description:
-      'Explores a card-based overview for budget metrics using Material UI components.',
-    status: 'wip',
-    owners: ['Gregg'],
-    tags: ['mui', 'data', 'layout'],
-    notes: 'Derived from existing budget grid work; compare against CoreUI approach.'
-  },
-  {
-    id: 'tailwind-landing',
-    name: 'Tailwind Landing Page',
-    description:
-      'Lightweight marketing-style landing page, useful for testing typography and dark mode.',
-    status: 'wip',
-    owners: ['Gregg'],
-    tags: ['tailwind', 'layout', 'navigation'],
-    notes: 'Great place to trial hero layouts or CTA variations without touching main app.'
-  },
-  {
     id: 'coreui-lease-input',
     name: 'CoreUI Lease Input Page',
     description: 'ARGUS-style lease input form rendered via static CoreUI HTML.',
@@ -61,16 +31,6 @@ export const prototypeRegistry: PrototypeMetadata[] = [
     notes: 'Checkout the feature/coreui-prototype branch to load this experiment locally.'
   },
   {
-    id: 'glide-parcel-grid',
-    name: 'Glide Data Grid - Parcel Table',
-    description:
-      'High-performance canvas-based data grid for parcel overview with many columns',
-    status: 'wip',
-    owners: ['Gregg'],
-    tags: ['glide', 'data', 'layout'],
-    notes: 'Testing Glide Data Grid from https://github.com/glideapps/glide-data-grid for Planning Overview parcel table. Uses legacy-peer-deps with React 19.'
-  },
-  {
     id: 'gis-test',
     name: 'GIS Test Page',
     description: 'GIS/mapping functionality test page with MapLibre integration',
@@ -96,15 +56,6 @@ export const prototypeRegistry: PrototypeMetadata[] = [
     owners: ['Dev Team'],
     tags: ['maps', 'debug', 'testing'],
     notes: 'Debugging tool for MapLibre layers, sources, and events'
-  },
-  {
-    id: 'parcel-test',
-    name: 'Parcel Test Page',
-    description: 'Test page for parcel CRUD operations and data validation',
-    status: 'wip',
-    owners: ['Dev Team'],
-    tags: ['parcels', 'testing', 'crud'],
-    notes: 'Testing parcel API endpoints and data transformations'
   },
   {
     id: 'db-schema',

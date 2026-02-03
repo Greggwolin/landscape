@@ -1,12 +1,14 @@
 /**
  * Landscaper Assistant Panel
- * Shows AI suggestions, insights, and recent activity
+ * Shows AI chat, suggestions, insights, and recent activity
  */
 
-import React, { useState } from 'react';
-import { AlertCircle, TrendingUp, CheckCircle, Info } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { TrendingUp, CheckCircle, Info, Send, MessageSquare } from 'lucide-react';
 import type { BenchmarkCategory, AISuggestion } from '@/types/benchmarks';
 import AISuggestionsSection from './AISuggestionsSection';
+import { useLandscaper } from '@/hooks/useLandscaper';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Props {
   selectedCategory: BenchmarkCategory | null;
@@ -31,6 +33,9 @@ export default function LandscaperPanel({
         </div>
       )}
 
+      {/* AI Chat Section */}
+      <BenchmarkChatSection />
+
       {/* AI Suggestions Section */}
       {aiSuggestions.length > 0 ? (
         <AISuggestionsSection
@@ -52,6 +57,123 @@ export default function LandscaperPanel({
 
       {/* Recent Activity Section */}
       <RecentActivitySection />
+    </div>
+  );
+}
+
+// Benchmark Chat Section - allows users to ask questions about benchmarks
+function BenchmarkChatSection() {
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Use unified Landscaper API for benchmark context
+  const {
+    messages,
+    isLoading,
+    sendMessage,
+  } = useLandscaper({
+    projectId: null,
+    activeTab: 'benchmarks',
+  });
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    const query = input.trim();
+    if (!query || isLoading) return;
+
+    setInput('');
+    try {
+      await sendMessage(query);
+    } catch (error) {
+      console.error('[BenchmarkChat] Error:', error);
+    }
+  };
+
+  const suggestedQuestions = [
+    "What's typical R&M per unit?",
+    "IREM expense ratios for multifamily",
+    "How do I validate my expense assumptions?"
+  ];
+
+  return (
+    <div className="space-y-3 pb-4 border-b border-line-strong">
+      <h3 className="text-sm font-semibold flex items-center gap-2">
+        <MessageSquare size={16} className="text-blue-500" />
+        Ask Landscaper
+      </h3>
+
+      {/* Messages */}
+      {messages.length > 0 && (
+        <div
+          ref={scrollRef}
+          className="max-h-[200px] overflow-y-auto space-y-2"
+        >
+          {messages.map((msg, idx) => (
+            <div
+              key={msg.messageId || idx}
+              className={`p-2 rounded text-sm ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white ml-8'
+                  : 'bg-surface-card border border-line-strong text-text-primary'
+              }`}
+              style={{ whiteSpace: 'pre-wrap' }}
+            >
+              {msg.role === 'assistant' ? processLandscaperResponse(msg.content) : msg.content}
+            </div>
+          ))}
+          {isLoading && (
+            <div className="p-2 rounded text-sm bg-surface-card border border-line-strong text-text-secondary">
+              Thinking...
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Suggested questions when no messages */}
+      {messages.length === 0 && (
+        <div className="flex flex-wrap gap-2">
+          {suggestedQuestions.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => setInput(q)}
+              className="text-xs px-2 py-1 rounded border border-line-strong hover:bg-surface-hover text-text-secondary"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Ask about benchmarks, IREM data, expenses..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void handleSend();
+            }
+          }}
+          disabled={isLoading}
+          className="flex-1 h-8 px-3 text-sm rounded border border-line-strong bg-surface-base text-text-primary placeholder:text-text-secondary"
+        />
+        <button
+          onClick={() => void handleSend()}
+          disabled={isLoading || !input.trim()}
+          className="h-8 w-8 rounded bg-blue-600 text-white flex items-center justify-center disabled:opacity-50"
+        >
+          <Send size={14} />
+        </button>
+      </div>
     </div>
   );
 }

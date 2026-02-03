@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { CCard, CCardBody, CCardHeader } from '@coreui/react';
 import VarianceItem from './VarianceItem';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface Variance {
   assumption_key: string;
@@ -73,7 +74,9 @@ export default function AdviceAdherencePanel({
         <CCardHeader className="bg-transparent border-bottom">
           <div className="d-flex justify-content-between align-items-center">
             <h6 className="mb-0">Advice Adherence</h6>
-            <span className="badge bg-secondary">{localVariances.length}</span>
+            <SemanticBadge intent="status" value="secondary">
+              {localVariances.length}
+            </SemanticBadge>
           </div>
         </CCardHeader>
 

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CFormSelect, CButton, CSpinner } from '@coreui/react';
+import { CButton, CFormSelect, CSpinner } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilSettings } from '@coreui/icons';
 import useSWR from 'swr';
@@ -258,10 +259,10 @@ export function SystemPicklistsAccordion() {
               <CIcon icon={cilSettings} />
             </CButton>
           )}
-          <CButton color="primary" size="sm" onClick={handleAdd}>
+          <SemanticButton intent="primary-action" size="sm" onClick={handleAdd}>
             <CIcon icon={cilPlus} className="me-1" />
             Add {typeConfig?.label.replace(/s$/, '')}
-          </CButton>
+          </SemanticButton>
         </div>
       </div>
 

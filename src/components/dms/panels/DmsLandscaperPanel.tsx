@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilCloudUpload, cilSend } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
+import { useLandscaper } from '@/hooks/useLandscaper';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 // ============================================
 // INTENT DETECTION SYSTEM
 // ============================================
 
-type QueryIntent = 'document_filter' | 'knowledge_query' | 'benchmark_query' | 'ambiguous';
+type QueryIntent = 'document_filter' | 'ai_query' | 'ambiguous';
 
 interface IntentResult {
   intent: QueryIntent;
@@ -17,49 +19,16 @@ interface IntentResult {
   signals: string[];
 }
 
+/**
+ * Simplified intent detection - routes to:
+ * - document_filter: when user wants to find/filter project documents
+ * - ai_query: when user wants AI to answer questions (benchmark or knowledge)
+ *
+ * The Django Landscaper API handles benchmark vs knowledge tool selection.
+ */
 function detectQueryIntent(query: string): IntentResult {
   const queryLower = query.toLowerCase();
   const signals: string[] = [];
-
-  // ============================================
-  // KNOWLEDGE QUERY SIGNALS
-  // ============================================
-
-  // Explicit knowledge source references
-  const knowledgeSources = [
-    'irem', 'appraisal of real estate', 'appraisal institute',
-    'uspap', 'uniform standards', 'platform knowledge',
-    'income expense', 'income/expense'
-  ];
-  const hasKnowledgeSource = knowledgeSources.some(src => queryLower.includes(src));
-  if (hasKnowledgeSource) signals.push('knowledge_source_reference');
-
-  // Question patterns seeking explanation/information
-  const questionPatterns = [
-    /^what'?s?\s/,                          // "what", "what's", "whats"
-    /^what (does|do|is|are|did)/,
-    /^how (does|do|should|can|to|much)/,    // Added "how much"
-    /^why (does|do|is|are)/,
-    /^explain/,
-    /^describe/,
-    /^tell me about/,
-    /what.+say about/,
-    /according to/,
-  ];
-  const hasQuestionPattern = questionPatterns.some(p => p.test(queryLower));
-  if (hasQuestionPattern) signals.push('question_pattern');
-
-  // Conceptual/methodology terms
-  const conceptTerms = [
-    'cap rate', 'capitalization', 'dcf', 'discount rate',
-    'highest and best use', 'market value', 'expense ratio',
-    'noi', 'net operating income', 'vacancy rate', 'absorption',
-    'benchmark', 'industry standard', 'best practice',
-    'methodology', 'approach', 'technique', 'calculation',
-    'expense growth', 'operating expense', 'r&m', 'repairs and maintenance'
-  ];
-  const hasConceptTerm = conceptTerms.some(term => queryLower.includes(term));
-  if (hasConceptTerm) signals.push('concept_term');
 
   // ============================================
   // DOCUMENT FILTER SIGNALS
@@ -105,94 +74,74 @@ function detectQueryIntent(query: string): IntentResult {
   if (hasProjectRef) signals.push('project_reference');
 
   // ============================================
-  // BENCHMARK QUERY SIGNALS
+  // AI QUERY SIGNALS (benchmark + knowledge combined)
   // ============================================
 
-  const benchmarkPatterns = [
-    /\bbenchmark\b/i,
-    /\birem\b/i,
-    /\bboma\b/i,
-    /\bnaa\b/i,
-    /industry (average|standard|norm)/i,
-    /typical (expense|cost|ratio)/i,
-    /how does.+compare/i,
-    /is (my|this|the).+(reasonable|normal|typical|high|low)/i,
-    /what('s| is) (a )?(reasonable|typical|normal|average)/i,
-    /\br&m\b/i,
-    /repairs and maintenance/i,
-    /operating expense/i,
-    /\$\s*\/?\s*(sf|unit|sqft|sq\.?\s*ft)/i,  // $/SF, $/unit, $ per sf, etc.
-    /per\s+(unit|sf|sqft|square foot)/i,       // "per unit", "per SF"
-    /\bestimate\b/i,
-    /\baverage\b/i,
-    /\bnorm(al)?\b/i,
-    /expense (ratio|growth|data)/i,
+  // Question patterns seeking explanation/information
+  const questionPatterns = [
+    /^what'?s?\s/,
+    /^what (does|do|is|are|did)/,
+    /^how (does|do|should|can|to|much)/,
+    /^why (does|do|is|are)/,
+    /^explain/,
+    /^describe/,
+    /^tell me about/,
+    /what.+say about/,
+    /according to/,
   ];
-  const hasBenchmarkSignal = benchmarkPatterns.some(p => p.test(queryLower));
-  if (hasBenchmarkSignal) signals.push('benchmark_query');
+  const hasQuestionPattern = questionPatterns.some(p => p.test(queryLower));
+  if (hasQuestionPattern) signals.push('question_pattern');
+
+  // Knowledge/benchmark terms
+  const aiTerms = [
+    'irem', 'appraisal', 'uspap', 'boma', 'naa',
+    'cap rate', 'capitalization', 'dcf', 'discount rate',
+    'expense ratio', 'noi', 'net operating income',
+    'benchmark', 'industry standard', 'typical',
+    'r&m', 'repairs and maintenance', 'operating expense',
+    '$/sf', '$/unit', 'per unit', 'per sf'
+  ];
+  const hasAITerm = aiTerms.some(term => queryLower.includes(term));
+  if (hasAITerm) signals.push('ai_term');
 
   // ============================================
   // SCORING
   // ============================================
 
-  const knowledgeSignals = ['knowledge_source_reference', 'question_pattern', 'concept_term'];
   const filterSignals = ['document_type_reference', 'filter_action_verb', 'time_reference', 'project_reference'];
+  const aiSignals = ['question_pattern', 'ai_term'];
 
-  const knowledgeScore = signals.filter(s => knowledgeSignals.includes(s)).length;
   const filterScore = signals.filter(s => filterSignals.includes(s)).length;
-  const hasBenchmark = signals.includes('benchmark_query');
-
-  // Check for explicit IREM/benchmark source mentions (high priority)
-  const hasExplicitBenchmarkSource = /\b(irem|boma|naa)\b/i.test(query);
+  const aiScore = signals.filter(s => aiSignals.includes(s)).length;
 
   // Determine intent
   let intent: QueryIntent;
   let confidence: number;
 
-  // PRIORITY 1: Explicit benchmark source (IREM, BOMA, NAA) - route to benchmark with high confidence
-  if (hasExplicitBenchmarkSource) {
-    intent = 'benchmark_query';
-    confidence = 0.95;  // High confidence when IREM/BOMA/NAA explicitly mentioned
-  }
-  // PRIORITY 2: Benchmark signals present ($/SF, $/unit, estimate, typical, etc.)
-  else if (hasBenchmark && filterScore === 0) {
-    intent = 'benchmark_query';
-    confidence = 0.85;
-  }
-  // PRIORITY 3: Mixed benchmark + filter signals - benchmark wins if no strong filter signals
-  else if (hasBenchmark && filterScore <= 1) {
-    intent = 'benchmark_query';
-    confidence = 0.75;
-  }
-  // PRIORITY 4: Pure knowledge query (no filter signals)
-  else if (knowledgeScore > 0 && filterScore === 0) {
-    intent = 'knowledge_query';
-    confidence = Math.min(0.9, 0.5 + (knowledgeScore * 0.15));
-  }
-  // PRIORITY 5: Pure document filter (no knowledge signals)
-  else if (filterScore > 0 && knowledgeScore === 0 && !hasBenchmark) {
+  // Pure document filter (no AI signals)
+  if (filterScore > 0 && aiScore === 0) {
     intent = 'document_filter';
     confidence = Math.min(0.9, 0.5 + (filterScore * 0.15));
   }
-  // PRIORITY 6: Knowledge signals dominate
-  else if (knowledgeScore > filterScore) {
-    intent = 'knowledge_query';
-    confidence = 0.6 + ((knowledgeScore - filterScore) * 0.1);
+  // Pure AI query (no filter signals)
+  else if (aiScore > 0 && filterScore === 0) {
+    intent = 'ai_query';
+    confidence = Math.min(0.9, 0.5 + (aiScore * 0.2));
   }
-  // PRIORITY 7: Filter signals dominate
-  else if (filterScore > knowledgeScore) {
+  // Filter signals dominate
+  else if (filterScore > aiScore) {
     intent = 'document_filter';
-    confidence = 0.6 + ((filterScore - knowledgeScore) * 0.1);
+    confidence = 0.6 + ((filterScore - aiScore) * 0.1);
   }
-  // PRIORITY 8: Only fall back to ambiguous when NO signals at all
-  else if (signals.length === 0) {
+  // AI signals dominate or tie
+  else if (aiScore >= filterScore && aiScore > 0) {
+    intent = 'ai_query';
+    confidence = 0.6 + ((aiScore - filterScore) * 0.1);
+  }
+  // No signals at all
+  else {
     intent = 'ambiguous';
     confidence = 0.3;
-  }
-  // PRIORITY 9: Tied signals - default to knowledge query (less intrusive)
-  else {
-    intent = 'knowledge_query';
-    confidence = 0.5;
   }
 
   return { intent, confidence, signals };
@@ -201,74 +150,6 @@ function detectQueryIntent(query: string): IntentResult {
 export interface DmsLandscaperMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-interface PlatformKnowledgeResult {
-  content: string;
-  similarity: number;
-  document_title: string;
-  document_key: string;
-  chapter_title?: string;
-  chapter_number?: number;
-  page?: number;
-  section_path?: string;
-}
-
-interface BenchmarkResult {
-  source: string;
-  source_year: number;
-  expense_category: string;
-  expense_subcategory?: string;
-  per_unit_amount?: number;
-  pct_of_egi?: number;
-  pct_of_gpi?: number;
-  sample_size?: number;
-  notes?: string;
-}
-
-interface BenchmarkSearchResponse {
-  query: string;
-  results: BenchmarkResult[];
-  count: number;
-}
-
-// Format category names for display
-function formatCategoryName(category: string): string {
-  return category
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// Format benchmark results for chat display
-function formatBenchmarkResults(results: BenchmarkResult[]): string {
-  if (results.length === 0) {
-    return "I don't have benchmark data for that expense category.";
-  }
-
-  const lines: string[] = [];
-
-  for (const b of results) {
-    const catName = formatCategoryName(b.expense_category);
-    const subName = b.expense_subcategory ? ` - ${formatCategoryName(b.expense_subcategory)}` : '';
-
-    lines.push(`${b.source} ${b.source_year}: ${catName}${subName}`);
-
-    if (b.pct_of_egi !== undefined && b.pct_of_egi !== null) {
-      lines.push(`    ${b.pct_of_egi}% of Effective Gross Income`);
-    }
-    if (b.per_unit_amount !== undefined && b.per_unit_amount !== null) {
-      lines.push(`    $${b.per_unit_amount.toLocaleString()}/unit/year`);
-    }
-    if (b.sample_size) {
-      lines.push(`    Based on ${b.sample_size.toLocaleString()} properties`);
-    }
-    if (b.notes) {
-      lines.push(`    Note: ${b.notes}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
 }
 
 interface DmsLandscaperPanelProps {
@@ -289,13 +170,37 @@ export default function DmsLandscaperPanel({
   notice
 }: DmsLandscaperPanelProps) {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<DmsLandscaperMessage[]>([
+  const [localMessages, setLocalMessages] = useState<DmsLandscaperMessage[]>([
     {
       role: 'assistant',
-      content: 'Ask me about documents across all projects.'
+      content: 'Ask me about documents across all projects, IREM benchmarks, or real estate concepts.'
     }
   ]);
-  const [isSending, setIsSending] = useState(false);
+
+  // Use unified Landscaper API for AI queries (projectId: null for global context)
+  const {
+    messages: aiMessages,
+    isLoading: aiLoading,
+    sendMessage: sendAiMessage,
+  } = useLandscaper({
+    projectId: null,
+    activeTab: 'dms',
+  });
+
+  // Combine local messages (document filter results) with AI messages
+  const messages = useMemo(() => {
+    const combined: DmsLandscaperMessage[] = [...localMessages];
+    // Add AI messages after the initial greeting
+    for (const msg of aiMessages) {
+      combined.push({
+        role: msg.role,
+        content: msg.role === 'assistant' ? processLandscaperResponse(msg.content) : msg.content,
+      });
+    }
+    return combined;
+  }, [localMessages, aiMessages]);
+
+  const isSending = aiLoading;
 
   const {
     getRootProps,
@@ -328,154 +233,91 @@ export default function DmsLandscaperPanel({
     return activeDocType;
   }, [activeDocType]);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     const query = input.trim();
     if (!query || isSending) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content: query }]);
     setInput('');
-    setIsSending(true);
 
-    try {
-      // ============================================
-      // INTENT DETECTION
-      // ============================================
-      const { intent, confidence, signals } = detectQueryIntent(query);
+    // ============================================
+    // INTENT DETECTION
+    // ============================================
+    const { intent, confidence, signals } = detectQueryIntent(query);
 
-      console.log(`[DMS_LANDSCAPER] Intent: ${intent} (${confidence.toFixed(2)})`);
-      console.log(`[DMS_LANDSCAPER] Signals: ${signals.join(', ')}`);
+    console.log(`[DMS_LANDSCAPER] Intent: ${intent} (${confidence.toFixed(2)})`);
+    console.log(`[DMS_LANDSCAPER] Signals: ${signals.join(', ')}`);
 
-      // ============================================
-      // ROUTE BY INTENT
-      // ============================================
+    // ============================================
+    // ROUTE BY INTENT
+    // ============================================
 
-      if (intent === 'benchmark_query') {
-        // -----------------------------------------
-        // PATH A: IREM Benchmark Query (structured data)
-        // -----------------------------------------
-        const response = await fetch(`/api/benchmarks/search?q=${encodeURIComponent(query)}`);
-        const data: BenchmarkSearchResponse = await response.json();
-
-        if (!response.ok) {
-          throw new Error('Benchmark query failed');
-        }
-
-        const formatted = formatBenchmarkResults(data.results);
-        setMessages((prev) => [
+    if (intent === 'ai_query') {
+      // -----------------------------------------
+      // PATH A: AI Query via unified Landscaper API
+      // The Django backend will use search_irem_benchmarks
+      // or query_platform_knowledge tools as appropriate
+      // -----------------------------------------
+      try {
+        await sendAiMessage(query);
+      } catch (error) {
+        console.error('[DMS_LANDSCAPER] AI query error:', error);
+        setLocalMessages((prev) => [
           ...prev,
+          { role: 'user', content: query },
           {
             role: 'assistant',
-            content: data.results.length > 0
-              ? `IREM Benchmark Data:\n\n${formatted}`
-              : `I don't have benchmark data matching "${query}". Try asking about:\n` +
-                `- R&M / repairs and maintenance\n` +
-                `- Utilities (electric, water, gas)\n` +
-                `- Management fees\n` +
-                `- Insurance\n` +
-                `- Total operating expenses`
+            content: 'I ran into an issue while processing your request. Please try again.'
           }
         ]);
+      }
 
-        // Do NOT update document list for benchmark queries
+    } else if (intent === 'document_filter') {
+      // -----------------------------------------
+      // PATH B: Document Filter (existing behavior)
+      // -----------------------------------------
+      setLocalMessages((prev) => [...prev, { role: 'user', content: query }]);
 
-      } else if (intent === 'knowledge_query') {
-        // -----------------------------------------
-        // PATH B: Platform Knowledge RAG
-        // -----------------------------------------
-        const response = await fetch('/api/platform-knowledge/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, max_chunks: 5 })
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Query failed');
-        }
-
-        const results: PlatformKnowledgeResult[] = data.results || [];
-
-        if (results.length === 0) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: `I found 0 relevant passages in the platform knowledge base for "${query}". Try rephrasing your question or uploading more reference documents.`
-            }
-          ]);
-        } else {
-          // Format the RAG results for display - clean text, no markdown
-          const formattedResults = results.slice(0, 3).map((r, idx) => {
-            const source = r.chapter_title
-              ? `${r.document_title}, Ch. ${r.chapter_number}: ${r.chapter_title}${r.page ? `, p. ${r.page}` : ''}`
-              : `${r.document_title}${r.page ? `, p. ${r.page}` : ''}`;
-            const similarity = Math.round(r.similarity * 100);
-            // Clean content: trim, normalize whitespace, truncate
-            const cleanContent = r.content
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 250);
-            const truncated = r.content.length > 250 ? '...' : '';
-            return `[${idx + 1}] ${source}\n    Match: ${similarity}%\n    "${cleanContent}${truncated}"`;
-          });
-
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: `I found ${results.length} relevant passages:\n\n${formattedResults.join('\n\n')}`
-            }
-          ]);
-        }
-
-        // Do NOT update document list for knowledge queries
-
-      } else if (intent === 'document_filter') {
-        // -----------------------------------------
-        // PATH B: Document Filter (existing behavior)
-        // -----------------------------------------
+      try {
         const result = await onQuerySubmit(query);
         const countLabel = result.count === 1 ? 'document' : 'documents';
         const limitNote = result.limit ? ` (showing ${result.limit})` : '';
-        setMessages((prev) => [
+        setLocalMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
             content: `I found ${result.count} ${countLabel}${limitNote}. They are listed at right.${result.count > 0 ? ' Want me to open one?' : ''}`
           }
         ]);
-
-      } else {
-        // -----------------------------------------
-        // PATH C: Ambiguous - Ask for clarification
-        // -----------------------------------------
-        setMessages((prev) => [
+      } catch (error) {
+        console.error('[DMS_LANDSCAPER] Document filter error:', error);
+        setLocalMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: `I'm not sure if you want me to:\n\n` +
-              `- Search documents - Find files in your projects\n` +
-              `- Answer a question - Use platform knowledge (IREM, Appraisal Institute, etc.)\n\n` +
-              `Could you clarify? For example:\n` +
-              `- "Show me rent rolls from Peoria Lakes"\n` +
-              `- "What does IREM say about expense ratios?"`
+            content: 'I ran into an issue filtering documents. Please try again.'
           }
         ]);
       }
 
-    } catch (error) {
-      console.error('[DMS_LANDSCAPER] Error:', error);
-      setMessages((prev) => [
+    } else {
+      // -----------------------------------------
+      // PATH C: Ambiguous - Ask for clarification
+      // -----------------------------------------
+      setLocalMessages((prev) => [
         ...prev,
+        { role: 'user', content: query },
         {
           role: 'assistant',
-          content: 'I ran into an issue while processing your request. Please try again.'
+          content: `I'm not sure if you want me to:\n\n` +
+            `- Search documents - Find files in your projects\n` +
+            `- Answer a question - Use platform knowledge (IREM, benchmarks, etc.)\n\n` +
+            `Could you clarify? For example:\n` +
+            `- "Show me rent rolls from Peoria Lakes"\n` +
+            `- "What does IREM say about expense ratios?"`
         }
       ]);
-    } finally {
-      setIsSending(false);
     }
-  };
+  }, [input, isSending, sendAiMessage, onQuerySubmit]);
 
   return (
     <div

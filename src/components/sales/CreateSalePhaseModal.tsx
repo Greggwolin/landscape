@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Stack,
-} from '@mui/material';
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel,
+  CFormInput,
+  CFormFeedback,
+  CRow,
+  CCol,
+} from '@coreui/react';
 import type { ParcelWithSale, SalePhaseBenchmarks, CreateSalePhasePayload } from '@/types/sales-absorption';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface Props {
   open: boolean;
@@ -44,10 +49,6 @@ export default function CreateSalePhaseModal({
     setErrors({});
   }, [open, parcel, defaultBenchmarks]);
 
-  if (!open || !parcel) {
-    return null;
-  }
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const nextErrors: Record<string, string> = {};
@@ -64,7 +65,7 @@ export default function CreateSalePhaseModal({
     }
 
     await onSubmit({
-      parcel_id: parcel.parcel_id,
+      parcel_id: parcel!.parcel_id,
       sale_phase_number: phaseNumber,
       sale_date: saleDate,
       onsite_cost_pct: onsitePct === '' ? null : Number(onsitePct),
@@ -73,75 +74,89 @@ export default function CreateSalePhaseModal({
     });
   };
 
+  if (!parcel) {
+    return null;
+  }
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <form onSubmit={handleSubmit}>
-        <DialogTitle>Create Sale Phase</DialogTitle>
-        <DialogContent dividers>
-          <p className="text-sm text-gray-600 mb-4">
+    <CModal visible={open} onClose={onClose} size="lg" backdrop="static">
+      <CForm onSubmit={handleSubmit}>
+        <CModalHeader>
+          <CModalTitle>Create Sale Phase</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <p className="text-muted mb-4">
             Assign parcel <strong>{parcel.parcel_code}</strong> to a new sale phase. Provide the sale date and defaults that other parcels in this phase should inherit.
           </p>
-
-          <Stack spacing={2}>
-            <TextField
-              label="Sale Phase Number"
-              type="number"
-              value={phaseNumber}
-              onChange={(event) => setPhaseNumber(Number(event.target.value))}
-              required
-              error={Boolean(errors.phaseNumber)}
-              helperText={errors.phaseNumber}
-              inputProps={{ min: 1, max: 999 }}
-            />
-
-            <TextField
-              label="Sale Date"
-              type="date"
-              value={saleDate}
-              onChange={(event) => setSaleDate(event.target.value)}
-              required
-              InputLabelProps={{ shrink: true }}
-              error={Boolean(errors.saleDate)}
-              helperText={errors.saleDate}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <TextField
-                label="Onsites %"
+          <CRow className="g-3">
+            <CCol xs={12} md={4}>
+              <CFormLabel>Sale Phase Number</CFormLabel>
+              <CFormInput
+                type="number"
+                value={phaseNumber}
+                onChange={(event) => setPhaseNumber(Number(event.target.value))}
+                min={1}
+                max={999}
+                invalid={Boolean(errors.phaseNumber)}
+              />
+              {errors.phaseNumber && <CFormFeedback invalid>{errors.phaseNumber}</CFormFeedback>}
+            </CCol>
+            <CCol xs={12} md={4}>
+              <CFormLabel>Sale Date</CFormLabel>
+              <CFormInput
+                type="date"
+                value={saleDate}
+                onChange={(event) => setSaleDate(event.target.value)}
+                invalid={Boolean(errors.saleDate)}
+              />
+              {errors.saleDate && <CFormFeedback invalid>{errors.saleDate}</CFormFeedback>}
+            </CCol>
+            <CCol xs={12} md={4}>
+              <CFormLabel>Onsites %</CFormLabel>
+              <CFormInput
                 type="number"
                 value={onsitePct}
                 onChange={(event) => setOnsitePct(event.target.value === '' ? '' : Number(event.target.value))}
-                InputProps={{ endAdornment: <span className="text-gray-500 ml-1">%</span> }}
-                inputProps={{ min: 0, max: 20, step: 0.1 }}
+                min={0}
+                max={20}
+                step={0.1}
+                placeholder="0.0"
               />
-              <TextField
-                label="Commissions %"
+            </CCol>
+            <CCol xs={12} md={4}>
+              <CFormLabel>Commissions %</CFormLabel>
+              <CFormInput
                 type="number"
                 value={commissionPct}
                 onChange={(event) => setCommissionPct(event.target.value === '' ? '' : Number(event.target.value))}
-                InputProps={{ endAdornment: <span className="text-gray-500 ml-1">%</span> }}
-                inputProps={{ min: 0, max: 10, step: 0.1 }}
+                min={0}
+                max={10}
+                step={0.1}
+                placeholder="0.0"
               />
-              <TextField
-                label="Closing Cost / Unit"
+            </CCol>
+            <CCol xs={12} md={4}>
+              <CFormLabel>Closing Cost / Unit</CFormLabel>
+              <CFormInput
                 type="number"
                 value={closingCostPerUnit}
                 onChange={(event) => setClosingCostPerUnit(event.target.value === '' ? '' : Number(event.target.value))}
-                InputProps={{ startAdornment: <span className="text-gray-500 mr-1">$</span> }}
-                inputProps={{ min: 0, step: 1 }}
+                min={0}
+                step={1}
+                placeholder="0"
               />
-            </div>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={isSaving} color="inherit">
+            </CCol>
+          </CRow>
+        </CModalBody>
+        <CModalFooter>
+          <SemanticButton intent="secondary-action" onClick={onClose} disabled={isSaving}>
             Cancel
-          </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={isSaving}>
             {isSaving ? 'Creating…' : 'Create Phase'}
-          </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+          </SemanticButton>
+        </CModalFooter>
+      </CForm>
+    </CModal>
   );
 }

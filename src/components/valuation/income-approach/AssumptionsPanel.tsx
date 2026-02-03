@@ -76,10 +76,10 @@ export function AssumptionsPanel({
       className="h-full overflow-y-auto"
       style={{ backgroundColor: 'var(--cui-card-bg)' }}
     >
-      {/* Main header - shaded background #F0F1F2, compact height */}
+      {/* Main header - canonical card header background */}
       <div
         className="px-4 py-2 flex items-center justify-between"
-        style={{ backgroundColor: '#F0F1F2' }}
+        style={{ backgroundColor: 'var(--cui-card-header-bg)' }}
       >
         <h2
           className="text-sm font-semibold"
@@ -106,58 +106,66 @@ export function AssumptionsPanel({
           isOpen={openSections.income}
           onToggle={() => toggleSection('income')}
         >
-          <div className="space-y-2">
-            {/* GPR - Pulled from rent roll - NO lock icon */}
-            <ReadOnlyField
-              label="Gross Potential Rent"
-              value={formatCurrency(rentRoll.forward_gpr)}
-              tooltip="Pulled from rent roll (market rent x 12)"
-            />
+          <div className="flex flex-col">
+            <AssumptionRow>
+              <ReadOnlyField
+                label="Gross Potential Rent"
+                value={formatCurrency(rentRoll.forward_gpr)}
+                tooltip="Pulled from rent roll (market rent x 12)"
+              />
+            </AssumptionRow>
 
-            {/* Vacancy Rate */}
-            <PercentInput
-              label="Vacancy Rate"
-              value={assumptions.vacancy_rate}
-              onChange={(v) => onAssumptionChange('vacancy_rate', v)}
-              min={0}
-              max={0.5}
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Vacancy Rate"
+                value={assumptions.vacancy_rate}
+                onChange={(v) => onAssumptionChange('vacancy_rate', v)}
+                min={0}
+                max={0.5}
+              />
+            </AssumptionRow>
 
-            {/* Stabilized Vacancy */}
-            <PercentInput
-              label="Stabilized Vacancy"
-              value={assumptions.stabilized_vacancy_rate}
-              onChange={(v) => onAssumptionChange('stabilized_vacancy_rate', v)}
-              min={0}
-              max={0.5}
-              tooltip="Market-standard vacancy for stabilized NOI"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Stabilized Vacancy"
+                value={assumptions.stabilized_vacancy_rate}
+                onChange={(v) =>
+                  onAssumptionChange('stabilized_vacancy_rate', v)
+                }
+                min={0}
+                max={0.5}
+                tooltip="Market-standard vacancy for stabilized NOI"
+              />
+            </AssumptionRow>
 
-            {/* Credit Loss */}
-            <PercentInput
-              label="Credit Loss"
-              value={assumptions.credit_loss_rate}
-              onChange={(v) => onAssumptionChange('credit_loss_rate', v)}
-              min={0}
-              max={0.2}
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Credit Loss"
+                value={assumptions.credit_loss_rate}
+                onChange={(v) => onAssumptionChange('credit_loss_rate', v)}
+                min={0}
+                max={0.2}
+              />
+            </AssumptionRow>
 
-            {/* Other Income */}
-            <CurrencyInput
-              label="Other Income"
-              value={assumptions.other_income}
-              onChange={(v) => onAssumptionChange('other_income', v)}
-            />
+            <AssumptionRow>
+              <CurrencyInput
+                label="Other Income"
+                value={assumptions.other_income}
+                onChange={(v) => onAssumptionChange('other_income', v)}
+              />
+            </AssumptionRow>
 
-            {/* Income Growth */}
-            <PercentInput
-              label="Income Growth Rate"
-              value={assumptions.income_growth_rate}
-              onChange={(v) => onAssumptionChange('income_growth_rate', v)}
-              min={-0.1}
-              max={0.2}
-              tooltip="For DCF projections"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Income Growth Rate"
+                value={assumptions.income_growth_rate}
+                onChange={(v) => onAssumptionChange('income_growth_rate', v)}
+                min={-0.1}
+                max={0.2}
+                tooltip="For DCF projections"
+              />
+            </AssumptionRow>
           </div>
         </AccordionSection>
 
@@ -167,40 +175,46 @@ export function AssumptionsPanel({
           isOpen={openSections.expenses}
           onToggle={() => toggleSection('expenses')}
         >
-          <div className="space-y-2">
-            {/* OpEx - Pulled - NO lock icon */}
-            <ReadOnlyField
-              label="Operating Expenses"
-              value={formatCurrency(operatingExpenses.total)}
-              tooltip="Pulled from Operations tab"
-            />
+          <div className="flex flex-col">
+            <AssumptionRow>
+              <ReadOnlyField
+                label="Operating Expenses"
+                value={formatCurrency(operatingExpenses.total)}
+                tooltip="Pulled from Operations tab"
+              />
+            </AssumptionRow>
 
-            {/* Management Fee */}
-            <PercentInput
-              label="Management Fee"
-              value={assumptions.management_fee_pct}
-              onChange={(v) => onAssumptionChange('management_fee_pct', v)}
-              min={0}
-              max={0.15}
-              tooltip="% of Effective Gross Income"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Management Fee"
+                value={assumptions.management_fee_pct}
+                onChange={(v) => onAssumptionChange('management_fee_pct', v)}
+                min={0}
+                max={0.15}
+                tooltip="% of Effective Gross Income"
+              />
+            </AssumptionRow>
 
-            {/* Replacement Reserves - label includes /Yr, value is just $X */}
-            <CurrencyInput
-              label="Reserves/Unit/Yr"
-              value={assumptions.replacement_reserves_per_unit}
-              onChange={(v) => onAssumptionChange('replacement_reserves_per_unit', v)}
-            />
+            <AssumptionRow>
+              <CurrencyInput
+                label="Reserves/Unit/Yr"
+                value={assumptions.replacement_reserves_per_unit}
+                onChange={(v) =>
+                  onAssumptionChange('replacement_reserves_per_unit', v)
+                }
+              />
+            </AssumptionRow>
 
-            {/* Expense Growth */}
-            <PercentInput
-              label="Expense Growth Rate"
-              value={assumptions.expense_growth_rate}
-              onChange={(v) => onAssumptionChange('expense_growth_rate', v)}
-              min={-0.1}
-              max={0.2}
-              tooltip="For DCF projections"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Expense Growth Rate"
+                value={assumptions.expense_growth_rate}
+                onChange={(v) => onAssumptionChange('expense_growth_rate', v)}
+                min={-0.1}
+                max={0.2}
+                tooltip="For DCF projections"
+              />
+            </AssumptionRow>
           </div>
         </AccordionSection>
 
@@ -210,37 +224,40 @@ export function AssumptionsPanel({
           isOpen={openSections.capitalization}
           onToggle={() => toggleSection('capitalization')}
         >
-          <div className="space-y-2">
-            {/* Cap Rate */}
-            <PercentInput
-              label="Going-In Cap Rate"
-              value={assumptions.selected_cap_rate}
-              onChange={(v) => onAssumptionChange('selected_cap_rate', v)}
-              min={0.01}
-              max={0.15}
-            />
+          <div className="flex flex-col">
+            <AssumptionRow>
+              <PercentInput
+                label="Going-In Cap Rate"
+                value={assumptions.selected_cap_rate}
+                onChange={(v) => onAssumptionChange('selected_cap_rate', v)}
+                min={0.01}
+                max={0.15}
+              />
+            </AssumptionRow>
 
-            {/* Method - shortened label and options */}
-            <SelectInput
-              label="Method"
-              value={assumptions.market_cap_rate_method}
-              onChange={(v) => onAssumptionChange('market_cap_rate_method', v)}
-              options={[
-                { value: 'comp_sales', label: 'Comp Sales' },
-                { value: 'band_investment', label: 'Band' },
-                { value: 'investor_survey', label: 'Survey' },
-              ]}
-            />
+            <AssumptionRow>
+              <SelectInput
+                label="Method"
+                value={assumptions.market_cap_rate_method}
+                onChange={(v) => onAssumptionChange('market_cap_rate_method', v)}
+                options={[
+                  { value: 'comp_sales', label: 'Comp Sales' },
+                  { value: 'band_investment', label: 'Band' },
+                  { value: 'investor_survey', label: 'Survey' },
+                ]}
+              />
+            </AssumptionRow>
 
-            {/* Cap Rate Interval */}
-            <PercentInput
-              label="Sensitivity Interval"
-              value={assumptions.cap_rate_interval}
-              onChange={(v) => onAssumptionChange('cap_rate_interval', v)}
-              min={0.0025}
-              max={0.01}
-              tooltip="Interval for sensitivity matrix"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Sensitivity Interval"
+                value={assumptions.cap_rate_interval}
+                onChange={(v) => onAssumptionChange('cap_rate_interval', v)}
+                min={0.0025}
+                max={0.01}
+                tooltip="Interval for sensitivity matrix"
+              />
+            </AssumptionRow>
           </div>
         </AccordionSection>
 
@@ -250,54 +267,59 @@ export function AssumptionsPanel({
           isOpen={openSections.dcf}
           onToggle={() => toggleSection('dcf')}
         >
-          <div className="space-y-2">
-            {/* Hold Period - "yrs" inside box */}
-            <NumberInput
-              label="Hold Period"
-              value={assumptions.hold_period_years}
-              onChange={(v) => onAssumptionChange('hold_period_years', v)}
-              min={1}
-              max={30}
-              suffix="yrs"
-            />
+          <div className="flex flex-col">
+            <AssumptionRow>
+              <NumberInput
+                label="Hold Period"
+                value={assumptions.hold_period_years}
+                onChange={(v) => onAssumptionChange('hold_period_years', v)}
+                min={1}
+                max={30}
+                suffix="yrs"
+              />
+            </AssumptionRow>
 
-            {/* Discount Rate */}
-            <PercentInput
-              label="Discount Rate"
-              value={assumptions.discount_rate}
-              onChange={(v) => onAssumptionChange('discount_rate', v)}
-              min={0.05}
-              max={0.20}
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Discount Rate"
+                value={assumptions.discount_rate}
+                onChange={(v) => onAssumptionChange('discount_rate', v)}
+                min={0.05}
+                max={0.20}
+              />
+            </AssumptionRow>
 
-            {/* Exit Cap Rate */}
-            <PercentInput
-              label="Exit Cap Rate"
-              value={assumptions.terminal_cap_rate}
-              onChange={(v) => onAssumptionChange('terminal_cap_rate', v)}
-              min={0.01}
-              max={0.15}
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Exit Cap Rate"
+                value={assumptions.terminal_cap_rate}
+                onChange={(v) => onAssumptionChange('terminal_cap_rate', v)}
+                min={0.01}
+                max={0.15}
+              />
+            </AssumptionRow>
 
-            {/* Discount Interval */}
-            <PercentInput
-              label="Discount Interval"
-              value={assumptions.discount_rate_interval}
-              onChange={(v) => onAssumptionChange('discount_rate_interval', v)}
-              min={0.0025}
-              max={0.01}
-              tooltip="For sensitivity matrix"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Discount Interval"
+                value={assumptions.discount_rate_interval}
+                onChange={(v) => onAssumptionChange('discount_rate_interval', v)}
+                min={0.0025}
+                max={0.01}
+                tooltip="For sensitivity matrix"
+              />
+            </AssumptionRow>
 
-            {/* Selling Costs */}
-            <PercentInput
-              label="Selling Costs"
-              value={assumptions.selling_costs_pct}
-              onChange={(v) => onAssumptionChange('selling_costs_pct', v)}
-              min={0}
-              max={0.10}
-              tooltip="Broker fees, closing costs at exit"
-            />
+            <AssumptionRow>
+              <PercentInput
+                label="Selling Costs"
+                value={assumptions.selling_costs_pct}
+                onChange={(v) => onAssumptionChange('selling_costs_pct', v)}
+                min={0}
+                max={0.10}
+                tooltip="Broker fees, closing costs at exit"
+              />
+            </AssumptionRow>
           </div>
         </AccordionSection>
       </div>
@@ -614,6 +636,18 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+interface AssumptionRowProps {
+  children: React.ReactNode;
+}
+
+function AssumptionRow({ children }: AssumptionRowProps) {
+  return (
+    <div className="border-t border-[#dfe3e8] first:border-t-0">
+      <div className="py-2">{children}</div>
     </div>
   );
 }

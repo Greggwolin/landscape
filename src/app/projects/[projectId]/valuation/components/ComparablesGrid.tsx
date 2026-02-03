@@ -675,7 +675,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   className="text-left py-1 px-2 font-semibold sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-body-color)',
-                    backgroundColor: '#F0F1F2'
+                    backgroundColor: 'var(--cui-card-header-bg)'
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -1041,7 +1041,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
               <tr
                 className="border-b"
                 style={{
-                  backgroundColor: '#F0F1F2',
+                  backgroundColor: 'var(--cui-card-header-bg)',
                   borderColor: 'var(--cui-border-color)'
                 }}
               >
@@ -1049,7 +1049,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   className="py-2 px-4 font-semibold sticky left-0 z-10"
                   style={{
                     color: 'var(--cui-body-color)',
-                    backgroundColor: '#F0F1F2'
+                    backgroundColor: 'var(--cui-card-header-bg)'
                   }}
                 >
                   Adjustments
@@ -1060,7 +1060,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                     className="border-l"
                     style={{
                       borderColor: 'var(--cui-border-color)',
-                      backgroundColor: '#F0F1F2'
+                      backgroundColor: 'var(--cui-card-header-bg)'
                     }}
                   >
                     {adjustmentsCollapsed && (
@@ -1078,13 +1078,13 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 <React.Fragment key={`section-${section.key}`}>
                   <tr
                     className="border-b"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: '#F7F7FB' }}
+                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-subheader-bg)' }}
                   >
                     <td
                       className="py-2 px-4 font-semibold sticky left-0 z-10"
                       style={{
                         color: 'var(--cui-body-color)',
-                        backgroundColor: '#F7F7FB'
+                        backgroundColor: 'var(--cui-card-subheader-bg)'
                       }}
                     >
                       <button

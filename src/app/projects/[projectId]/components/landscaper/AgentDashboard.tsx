@@ -10,9 +10,10 @@ interface AgentDashboardProps {
   agentId: string;
   agentName: string;
   children: ReactNode;
+  activeTab?: string;  // Page context for tool filtering
 }
 
-export function AgentDashboard({ projectId, agentId, agentName, children }: AgentDashboardProps) {
+export function AgentDashboard({ projectId, agentId, agentName, children, activeTab = 'home' }: AgentDashboardProps) {
   const [isChatCollapsed, setChatCollapsed] = useState(false);
   const [isContentCollapsed, setContentCollapsed] = useState(false);
   const [isStudioCollapsed, setStudioCollapsed] = useState(false);
@@ -71,6 +72,7 @@ export function AgentDashboard({ projectId, agentId, agentName, children }: Agen
         agentName={agentName}
         isCollapsed={isChatCollapsed}
         onToggleCollapse={toggleChat}
+        activeTab={activeTab}
       />
 
       {/* Studio Panel */}

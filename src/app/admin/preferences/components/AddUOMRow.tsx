@@ -2,13 +2,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  CButton,
   CFormCheck,
   CFormInput,
   CFormSelect,
   CTableDataCell,
   CTableRow,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { MEASURE_CATEGORIES, UnitOfMeasureDraft, normalizeMeasureCode, normalizeMeasureName } from '@/lib/measures';
 
 type SaveResult = { ok: boolean; error?: string };
@@ -138,12 +138,12 @@ const AddUOMRow: React.FC<AddUOMRowProps> = ({ onSave, onCancel, isSaving = fals
             disabled={isSaving}
             label="Active"
           />
-          <CButton color="primary" size="sm" onClick={handleSave} disabled={isSaving}>
+          <SemanticButton intent="primary-action" size="sm" onClick={handleSave} disabled={isSaving}>
             Save
-          </CButton>
-          <CButton color="secondary" size="sm" variant="ghost" onClick={onCancel} disabled={isSaving}>
+          </SemanticButton>
+          <SemanticButton intent="secondary-action" size="sm" variant="ghost" onClick={onCancel} disabled={isSaving}>
             Cancel
-          </CButton>
+          </SemanticButton>
         </div>
         {error && (
           <div className="text-danger small mt-1" role="alert">

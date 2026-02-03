@@ -17,6 +17,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { CButton, CToast, CToastBody, CToaster } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilChevronLeft, cilChevronRight, cilJustifyCenter } from '@coreui/icons';
 
@@ -719,9 +720,9 @@ export function NarrativeCanvas({ projectId, collapsed, onToggle, onReviewFlyout
         <div className="narrative-canvas-footer d-flex align-items-center justify-content-between">
           <div>
           {hasUnsavedChanges && (
-            <CButton color="warning" variant="ghost" size="sm" disabled>
+            <SemanticButton intent="neutral-action" variant="ghost" size="sm" disabled>
               Unsaved changes
-            </CButton>
+            </SemanticButton>
           )}
           </div>
           <div className="d-flex align-items-center gap-2">
@@ -742,9 +743,9 @@ export function NarrativeCanvas({ projectId, collapsed, onToggle, onReviewFlyout
               Save &amp; Send for Review
             </CButton>
             {currentVersion?.status === 'draft' && !hasUnsavedChanges && !isViewingOldVersion && (
-              <CButton color="success" size="sm" variant="outline" onClick={handleMarkAsFinal}>
+              <SemanticButton intent="confirm-action" size="sm" variant="outline" onClick={handleMarkAsFinal}>
                 Mark as Final
-              </CButton>
+              </SemanticButton>
             )}
           </div>
         </div>

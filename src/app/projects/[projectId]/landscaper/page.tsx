@@ -40,6 +40,7 @@ export default function LandscaperPage() {
         isOpen={isLandscaperOpen}
         onClose={() => setLandscaperOpen(false)}
         projectId={projectId}
+        activeTab="home"  // Standalone page uses home context
       />
     </>
   );

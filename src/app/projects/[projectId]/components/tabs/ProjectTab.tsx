@@ -2,6 +2,7 @@
 
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse, CTooltip } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop, cilChartPie } from '@coreui/icons';
 import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/market-intel';
@@ -490,9 +491,9 @@ export default function ProjectTab({
               <p style={{ marginBottom: '16px', color: 'var(--cui-secondary-color)' }}>
                 Set a project location using the map pin tool before viewing Location Intelligence.
               </p>
-              <CButton color="primary" onClick={() => setShowLocationIntel(false)}>
+              <SemanticButton intent="primary-action" onClick={() => setShowLocationIntel(false)}>
                 OK
-              </CButton>
+              </SemanticButton>
             </div>
           </div>
         )}

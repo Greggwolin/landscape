@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CButton, CFormInput, CSpinner } from '@coreui/react';
+import { CFormInput, CSpinner } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilX, cilSend } from '@coreui/icons';
 
@@ -167,9 +168,9 @@ export default function LandscaperReviewFlyout({
             <div className="text-danger small">Unable to load response</div>
           )}
         </div>
-        <CButton color="secondary" variant="ghost" size="sm" aria-label="Close" onClick={onClose}>
+        <SemanticButton intent="secondary-action" variant="ghost" size="sm" aria-label="Close" onClick={onClose}>
           <CIcon icon={cilX} />
-        </CButton>
+        </SemanticButton>
       </div>
 
       <div className="landscaper-review-body">
@@ -186,22 +187,22 @@ export default function LandscaperReviewFlyout({
               onChange={(event) => setFollowUpMessage(event.target.value)}
               placeholder="Ask a follow-up question..."
             />
-            <CButton color="primary" onClick={handleDiscussFurther} disabled={isSending || !canSendFollowUp}>
+            <SemanticButton intent="primary-action" onClick={handleDiscussFurther} disabled={isSending || !canSendFollowUp}>
               <CIcon icon={cilSend} size="sm" className="me-1" />
               Send
-            </CButton>
+            </SemanticButton>
           </div>
         </div>
         <div className="landscaper-review-actions">
-          <CButton color="primary" onClick={handleApply} disabled={isApplying || !response?.suggested_content}>
+          <SemanticButton intent="primary-action" onClick={handleApply} disabled={isApplying || !response?.suggested_content}>
             {isApplying ? 'Applying...' : 'Apply Changes'}
-          </CButton>
-          <CButton color="secondary" variant="outline" onClick={handleDiscussFurther} disabled={isSending || !canSendFollowUp}>
+          </SemanticButton>
+          <SemanticButton intent="secondary-action" variant="outline" onClick={handleDiscussFurther} disabled={isSending || !canSendFollowUp}>
             Discuss Further
-          </CButton>
-          <CButton color="secondary" variant="ghost" onClick={onClose}>
+          </SemanticButton>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={onClose}>
             Close
-          </CButton>
+          </SemanticButton>
         </div>
       </div>
     </div>

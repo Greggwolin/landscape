@@ -652,21 +652,21 @@ interface EditUserModalProps extends BaseModalProps {
 }
 
 export function EditUserModal({ isOpen, onClose, user, onSubmit, onSetPassword, isLoading }: EditUserModalProps) {
-  if (!user) return null;
-
   const initialData = useMemo<CreateUserData>(() => ({
-    username: user.username,
-    email: user.email,
+    username: user?.username || '',
+    email: user?.email || '',
     password: '',
     password_confirm: '',
-    first_name: user.first_name || '',
-    last_name: user.last_name || '',
-    company: user.company || '',
-    phone: user.phone || '',
-    is_active: user.is_active,
-    is_staff: user.is_staff,
-    role: user.role,
+    first_name: user?.first_name || '',
+    last_name: user?.last_name || '',
+    company: user?.company || '',
+    phone: user?.phone || '',
+    is_active: user?.is_active ?? true,
+    is_staff: user?.is_staff ?? false,
+    role: user?.role || 'viewer',
   }), [user]);
+
+  if (!user) return null;
 
   const handleSubmit = async (data: CreateUserData) => {
     const { password, password_confirm, ...updateData } = data;

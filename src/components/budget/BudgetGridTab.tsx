@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import {
-  CButton,
   CCard,
   CCardBody,
   CModal,
@@ -26,6 +25,7 @@ import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
 import { usePreference } from '@/hooks/useUserPreferences';
 import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface Props {
   projectId: number;
@@ -488,17 +488,16 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
 
         {/* Action buttons - right aligned */}
         <div className="d-flex justify-content-end align-items-center mb-3 gap-2">
-          <CButton
-            color="secondary"
-            variant="outline"
+          <SemanticButton
+            intent="secondary-action"
             size="sm"
             onClick={() => setQuickAddCategoryOpen(true)}
           >
             + Quick Add Category
-          </CButton>
-          <CButton color="primary" size="sm" onClick={openCreateModal}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" size="sm" onClick={openCreateModal}>
             + Add Item
-          </CButton>
+          </SemanticButton>
         </div>
 
         {/* Budget Grid - always full width now */}
@@ -557,12 +556,12 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
           </p>
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" variant="outline" onClick={handleCancelDelete}>
+          <SemanticButton intent="secondary-action" variant="outline" onClick={handleCancelDelete}>
             Cancel
-          </CButton>
-          <CButton color="danger" onClick={handleConfirmDelete}>
+          </SemanticButton>
+          <SemanticButton intent="destructive-action" onClick={handleConfirmDelete}>
             Delete
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     </CCard>

@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
+  CButton,
   CFormSelect,
   CFormInput,
-  CButton,
   CSpinner,
   CTable,
   CTableHead,
@@ -22,6 +22,7 @@ import {
   CFormLabel,
   CFormTextarea,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilPencil, cilChartLine, cilTrash } from '@coreui/icons';
 import useSWR from 'swr';
@@ -372,10 +373,10 @@ export function ExtractionMappingAdmin() {
             <span className="ms-1">Stats</span>
           </CButton>
 
-          <CButton color="primary" size="sm" onClick={handleAdd}>
+          <SemanticButton intent="primary-action" size="sm" onClick={handleAdd}>
             <CIcon icon={cilPlus} className="me-1" />
             Add Mapping
-          </CButton>
+          </SemanticButton>
         </div>
       </div>
 
@@ -462,25 +463,25 @@ export function ExtractionMappingAdmin() {
                   )}
                   <CTableDataCell>
                     <div className="d-flex gap-1">
-                      <CButton
-                        color="secondary"
+                      <SemanticButton
+                        intent="tertiary-action"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(mapping)}
                         title="Edit"
                       >
                         <CIcon icon={cilPencil} size="sm" />
-                      </CButton>
+                      </SemanticButton>
                       {!mapping.is_system && (
-                        <CButton
-                          color="danger"
+                        <SemanticButton
+                          intent="destructive-action"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(mapping)}
                           title="Delete"
                         >
                           <CIcon icon={cilTrash} size="sm" />
-                        </CButton>
+                        </SemanticButton>
                       )}
                     </div>
                   </CTableDataCell>
@@ -629,12 +630,12 @@ export function ExtractionMappingAdmin() {
           </div>
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" variant="ghost" onClick={() => setIsEditModalOpen(false)}>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={() => setIsEditModalOpen(false)}>
             Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSave}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSave}>
             {editingMapping ? 'Update' : 'Create'}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     </div>

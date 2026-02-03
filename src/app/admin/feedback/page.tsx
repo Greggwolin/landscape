@@ -1,37 +1,288 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CButton,
+  CFormTextarea,
+  CFormSelect,
+  CBadge,
+  CSpinner,
+} from '@coreui/react';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 interface FeedbackItem {
   id: number;
+  internal_id: string;
   user: number;
   username: string;
+  user_email?: string;
   feedback_type: 'bug' | 'feature' | 'question' | 'general';
   message: string;
   page_url: string;
   page_path: string;
   project_id?: number;
   project_name?: string;
-  created_at: string;
-  is_resolved: boolean;
+  category?: 'bug' | 'feature_request' | 'ux_confusion' | 'question';
+  affected_module?: string;
+  landscaper_summary?: string;
+  landscaper_raw_chat?: Array<{ role: string; content: string }>;
+  browser_context?: {
+    browser?: string;
+    os?: string;
+    screenSize?: string;
+    currentUrl?: string;
+    timestamp?: string;
+  };
+  report_count: number;
+  status: 'submitted' | 'under_review' | 'addressed';
   admin_notes: string;
+  admin_response?: string;
+  admin_responded_at?: string;
+  created_at: string;
+  updated_at: string;
   context_url?: string;
 }
 
-const FEEDBACK_TYPE_COLORS: Record<string, string> = {
-  bug: 'var(--cui-danger)',
-  feature: 'var(--cui-info)',
-  question: 'var(--cui-warning)',
-  general: 'var(--cui-secondary-color)',
+const STATUS_COLORS: Record<string, string> = {
+  submitted: 'warning',
+  under_review: 'info',
+  addressed: 'success',
 };
+
+const STATUS_LABELS: Record<string, string> = {
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  addressed: 'Addressed',
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  bug: 'danger',
+  feature_request: 'info',
+  ux_confusion: 'warning',
+  question: 'secondary',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  bug: 'Bug',
+  feature_request: 'Feature Request',
+  ux_confusion: 'UX Issue',
+  question: 'Question',
+};
+
+interface FeedbackDetailModalProps {
+  item: FeedbackItem | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (id: number, data: Partial<FeedbackItem>) => Promise<void>;
+}
+
+function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailModalProps) {
+  const [status, setStatus] = useState<string>('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [adminResponse, setAdminResponse] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [showRawChat, setShowRawChat] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setStatus(item.status);
+      setAdminNotes(item.admin_notes || '');
+      setAdminResponse(item.admin_response || '');
+    }
+  }, [item]);
+
+  const handleSave = async () => {
+    if (!item) return;
+    setSaving(true);
+    try {
+      await onSave(item.id, {
+        status: status as FeedbackItem['status'],
+        admin_notes: adminNotes,
+        admin_response: adminResponse,
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!item) return null;
+
+  return (
+    <CModal visible={isOpen} onClose={onClose} size="lg">
+      <CModalHeader>
+        <CModalTitle>Feedback Detail</CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        <div className="row mb-3">
+          <div className="col-md-6">
+            <strong>User:</strong> {item.username}
+            {item.user_email && <span className="text-muted ms-2">({item.user_email})</span>}
+          </div>
+          <div className="col-md-6">
+            <strong>Submitted:</strong> {new Date(item.created_at).toLocaleString()}
+          </div>
+        </div>
+
+        <div className="row mb-3">
+          <div className="col-md-6">
+            <strong>Module:</strong>{' '}
+            <CBadge color="dark">{item.affected_module || 'Unknown'}</CBadge>
+          </div>
+          <div className="col-md-6">
+            <strong>Category:</strong>{' '}
+            {item.category ? (
+              <CBadge color={CATEGORY_COLORS[item.category]}>
+                {CATEGORY_LABELS[item.category]}
+              </CBadge>
+            ) : (
+              <span className="text-muted">Not classified</span>
+            )}
+          </div>
+        </div>
+
+        {item.report_count > 1 && (
+          <div className="alert alert-info py-2 mb-3">
+            <strong>Reported by {item.report_count} users</strong>
+          </div>
+        )}
+
+        <div className="mb-3">
+          <strong>Summary:</strong>
+          <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>
+            {item.landscaper_summary || item.message}
+          </p>
+        </div>
+
+        {item.landscaper_summary && item.landscaper_summary !== item.message && (
+          <div className="mb-3">
+            <strong>Original Message:</strong>
+            <p className="mb-0 mt-1 text-muted" style={{ whiteSpace: 'pre-wrap' }}>
+              {item.message}
+            </p>
+          </div>
+        )}
+
+        {item.browser_context && Object.keys(item.browser_context).length > 0 && (
+          <div className="mb-3">
+            <strong>Browser Context:</strong>
+            <div className="mt-1 p-2 bg-light rounded small">
+              {item.browser_context.browser && <div>Browser: {item.browser_context.browser}</div>}
+              {item.browser_context.os && <div>OS: {item.browser_context.os}</div>}
+              {item.browser_context.screenSize && (
+                <div>Screen: {item.browser_context.screenSize}</div>
+              )}
+              {item.browser_context.currentUrl && (
+                <div className="text-truncate">URL: {item.browser_context.currentUrl}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {item.landscaper_raw_chat && item.landscaper_raw_chat.length > 0 && (
+          <div className="mb-3">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowRawChat(!showRawChat)}
+            >
+              {showRawChat ? 'Hide' : 'Show'} Chat History ({item.landscaper_raw_chat.length}{' '}
+              messages)
+            </button>
+            {showRawChat && (
+              <div className="mt-2 p-2 bg-light rounded" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {item.landscaper_raw_chat.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`mb-2 p-2 rounded ${msg.role === 'user' ? 'bg-primary text-white ms-4' : 'bg-white'}`}
+                  >
+                    <small className="d-block mb-1 fw-bold">
+                      {msg.role === 'user' ? 'User' : 'Assistant'}
+                    </small>
+                    {msg.content}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mb-3">
+          <strong>Page:</strong>{' '}
+          <a
+            href={item.context_url || item.page_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-decoration-none"
+          >
+            {item.page_path}
+          </a>
+        </div>
+
+        <hr />
+
+        <div className="mb-3">
+          <label className="form-label fw-bold">Status</label>
+          <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="submitted">Submitted</option>
+            <option value="under_review">Under Review</option>
+            <option value="addressed">Addressed</option>
+          </CFormSelect>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label fw-bold">Internal Notes (private)</label>
+          <CFormTextarea
+            rows={3}
+            value={adminNotes}
+            onChange={(e) => setAdminNotes(e.target.value)}
+            placeholder="Internal notes visible only to admins..."
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label fw-bold">Response to Tester (visible to user)</label>
+          <CFormTextarea
+            rows={3}
+            value={adminResponse}
+            onChange={(e) => setAdminResponse(e.target.value)}
+            placeholder="This response will be visible to the tester in their Feedback Log..."
+          />
+          {item.admin_responded_at && (
+            <small className="text-muted">
+              Last responded: {new Date(item.admin_responded_at).toLocaleString()}
+            </small>
+          )}
+        </div>
+      </CModalBody>
+      <CModalFooter>
+        <CButton color="secondary" onClick={onClose}>
+          Cancel
+        </CButton>
+        <CButton color="primary" onClick={handleSave} disabled={saving}>
+          {saving ? <CSpinner size="sm" className="me-2" /> : null}
+          Save Changes
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+}
 
 function FeedbackAdminContent() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [moduleFilter, setModuleFilter] = useState<string>('all');
+  const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -69,48 +320,57 @@ function FeedbackAdminContent() {
     void fetchFeedback();
   }, [fetchFeedback]);
 
-  const toggleResolved = async (id: number, currentStatus: boolean) => {
+  const updateFeedback = async (id: number, data: Partial<FeedbackItem>) => {
+    let accessToken: string | null = null;
     try {
-      let accessToken: string | null = null;
-      try {
-        const tokens = localStorage.getItem('auth_tokens');
-        accessToken = tokens ? JSON.parse(tokens).access : null;
-      } catch {
-        accessToken = null;
-      }
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/${id}/`,
-        {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({ is_resolved: !currentStatus }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to update');
-
-      await fetchFeedback();
-    } catch (err) {
-      console.error('Update error:', err);
+      const tokens = localStorage.getItem('auth_tokens');
+      accessToken = tokens ? JSON.parse(tokens).access : null;
+    } catch {
+      accessToken = null;
     }
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/${id}/`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to update');
+
+    await fetchFeedback();
   };
 
-  const filteredFeedback = useMemo(() => (
-    feedback.filter((item) => {
-      if (filter === 'open') return !item.is_resolved;
-      if (filter === 'resolved') return item.is_resolved;
-      return true;
-    })
-  ), [feedback, filter]);
+  const uniqueModules = useMemo(() => {
+    const modules = new Set(feedback.map((item) => item.affected_module).filter(Boolean));
+    return Array.from(modules).sort();
+  }, [feedback]);
+
+  const filteredFeedback = useMemo(
+    () =>
+      feedback.filter((item) => {
+        if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+        if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
+        if (moduleFilter !== 'all' && item.affected_module !== moduleFilter) return false;
+        return true;
+      }),
+    [feedback, statusFilter, categoryFilter, moduleFilter]
+  );
+
+  const handleRowClick = (item: FeedbackItem) => {
+    setSelectedItem(item);
+    setIsModalOpen(true);
+  };
 
   if (loading) {
     return (
@@ -123,31 +383,63 @@ function FeedbackAdminContent() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       <AdminNavBar />
-      <div className="p-6">
+      <div className="p-4">
         <div className="d-flex justify-content-between align-items-center mb-4">
-          <h1 className="h3 m-0">Tester Feedback</h1>
-          <div className="btn-group">
-            <button
-              className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('all')}
-              type="button"
+          <h1 className="h3 m-0">Feedback Queue</h1>
+          <div className="d-flex gap-2 align-items-center">
+            <span className="text-muted small">{filteredFeedback.length} items</span>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div
+          className="d-flex gap-3 mb-4 p-3 rounded"
+          style={{ backgroundColor: 'var(--cui-card-bg)' }}
+        >
+          <div>
+            <label className="form-label small mb-1">Status</label>
+            <CFormSelect
+              size="sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ minWidth: '140px' }}
             >
-              All ({feedback.length})
-            </button>
-            <button
-              className={`btn btn-sm ${filter === 'open' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('open')}
-              type="button"
+              <option value="all">All Status</option>
+              <option value="submitted">Submitted</option>
+              <option value="under_review">Under Review</option>
+              <option value="addressed">Addressed</option>
+            </CFormSelect>
+          </div>
+          <div>
+            <label className="form-label small mb-1">Category</label>
+            <CFormSelect
+              size="sm"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{ minWidth: '140px' }}
             >
-              Open ({feedback.filter((item) => !item.is_resolved).length})
-            </button>
-            <button
-              className={`btn btn-sm ${filter === 'resolved' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('resolved')}
-              type="button"
+              <option value="all">All Categories</option>
+              <option value="bug">Bug</option>
+              <option value="feature_request">Feature Request</option>
+              <option value="ux_confusion">UX Issue</option>
+              <option value="question">Question</option>
+            </CFormSelect>
+          </div>
+          <div>
+            <label className="form-label small mb-1">Module</label>
+            <CFormSelect
+              size="sm"
+              value={moduleFilter}
+              onChange={(e) => setModuleFilter(e.target.value)}
+              style={{ minWidth: '140px' }}
             >
-              Resolved ({feedback.filter((item) => item.is_resolved).length})
-            </button>
+              <option value="all">All Modules</option>
+              {uniqueModules.map((module) => (
+                <option key={module} value={module}>
+                  {module}
+                </option>
+              ))}
+            </CFormSelect>
           </div>
         </div>
 
@@ -173,13 +465,25 @@ function FeedbackAdminContent() {
           <table className="table table-hover m-0" style={{ color: 'var(--cui-body-color)' }}>
             <thead>
               <tr style={{ background: 'var(--cui-tertiary-bg)' }}>
-                <th className="p-3" style={{ width: '100px' }}>Status</th>
-                <th className="p-3" style={{ width: '120px' }}>User</th>
-                <th className="p-3" style={{ width: '100px' }}>Type</th>
-                <th className="p-3">Message</th>
-                <th className="p-3" style={{ width: '170px' }}>Page</th>
-                <th className="p-3" style={{ width: '140px' }}>Date</th>
-                <th className="p-3" style={{ width: '110px' }}>Actions</th>
+                <th className="p-3" style={{ width: '100px' }}>
+                  Status
+                </th>
+                <th className="p-3" style={{ width: '120px' }}>
+                  User
+                </th>
+                <th className="p-3" style={{ width: '110px' }}>
+                  Category
+                </th>
+                <th className="p-3" style={{ width: '120px' }}>
+                  Module
+                </th>
+                <th className="p-3">Summary</th>
+                <th className="p-3" style={{ width: '80px' }}>
+                  Reports
+                </th>
+                <th className="p-3" style={{ width: '100px' }}>
+                  Date
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -194,87 +498,71 @@ function FeedbackAdminContent() {
                   </td>
                 </tr>
               ) : (
-                filteredFeedback.map((item) => {
-                  const pageHref = item.context_url || item.page_url;
-                  const pagePath = item.page_path || 'Unknown';
-
-                  return (
-                    <tr key={item.id}>
-                      <td className="p-3">
-                        <span
-                          className="badge"
-                          style={{
-                            background: item.is_resolved
-                              ? 'var(--cui-success)'
-                              : 'var(--cui-warning)',
-                            color: 'var(--cui-body-bg)',
-                          }}
-                        >
-                          {item.is_resolved ? 'Resolved' : 'Open'}
-                        </span>
-                      </td>
-                      <td className="p-3">{item.username}</td>
-                      <td className="p-3">
-                        <span
-                          className="badge"
-                          style={{
-                            background: FEEDBACK_TYPE_COLORS[item.feedback_type],
-                            color: 'var(--cui-body-bg)',
-                          }}
-                        >
-                          {item.feedback_type}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <div style={{ maxWidth: '400px' }}>
-                          {item.message.length > 150
-                            ? `${item.message.substring(0, 150)}...`
-                            : item.message}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <a
-                          href={pageHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-decoration-none"
-                          style={{ color: 'var(--cui-primary)' }}
-                          title={item.page_url}
-                        >
-                          {pagePath.length > 25
-                            ? `...${pagePath.slice(-22)}`
-                            : pagePath}
-                          {item.project_id && (
-                            <span className="ms-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                              (P:{item.project_id})
-                            </span>
-                          )}
-                        </a>
-                      </td>
-                      <td className="p-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {new Date(item.created_at).toLocaleDateString()}
-                        <br />
-                        <small>{new Date(item.created_at).toLocaleTimeString()}</small>
-                      </td>
-                      <td className="p-3">
-                        <button
-                          onClick={() => toggleResolved(item.id, item.is_resolved)}
-                          className={`btn btn-sm ${
-                            item.is_resolved ? 'btn-outline-warning' : 'btn-outline-success'
-                          }`}
-                          type="button"
-                        >
-                          {item.is_resolved ? 'Reopen' : 'Resolve'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                filteredFeedback.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => handleRowClick(item)}
+                    style={{ cursor: 'pointer' }}
+                    className="feedback-row"
+                  >
+                    <td className="p-3">
+                      <CBadge color={STATUS_COLORS[item.status]}>
+                        {STATUS_LABELS[item.status]}
+                      </CBadge>
+                    </td>
+                    <td className="p-3">{item.username}</td>
+                    <td className="p-3">
+                      {item.category ? (
+                        <CBadge color={CATEGORY_COLORS[item.category]}>
+                          {CATEGORY_LABELS[item.category]}
+                        </CBadge>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <span className="small">{item.affected_module || '—'}</span>
+                    </td>
+                    <td className="p-3">
+                      <div style={{ maxWidth: '350px' }}>
+                        {(item.landscaper_summary || item.message).length > 120
+                          ? `${(item.landscaper_summary || item.message).substring(0, 120)}...`
+                          : item.landscaper_summary || item.message}
+                      </div>
+                    </td>
+                    <td className="p-3 text-center">
+                      {item.report_count > 1 ? (
+                        <CBadge color="primary">{item.report_count}</CBadge>
+                      ) : (
+                        <span className="text-muted">1</span>
+                      )}
+                    </td>
+                    <td className="p-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <FeedbackDetailModal
+        item={selectedItem}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedItem(null);
+        }}
+        onSave={updateFeedback}
+      />
+
+      <style jsx>{`
+        .feedback-row:hover {
+          background: var(--cui-tertiary-bg);
+        }
+      `}</style>
     </div>
   );
 }

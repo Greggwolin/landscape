@@ -25,14 +25,10 @@ export default function ContactRoleCard({
   const hasContacts = group.contacts.length > 0;
 
   return (
-    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--cui-border-color)' }}>
+    <div className="contacts-role-card border rounded-lg overflow-hidden">
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-2 cursor-pointer transition-colors"
-        style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          color: 'var(--cui-body-color)'
-        }}
+        className="contacts-role-header flex items-center justify-between px-4 py-2 cursor-pointer transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = '0.8';
@@ -80,7 +76,7 @@ export default function ContactRoleCard({
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="p-4 space-y-3" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+        <div className="contacts-role-content p-4 space-y-3">
           {hasContacts ? (
             group.contacts.map(contact => (
               <ContactCard

@@ -4,7 +4,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CCard, CCardBody, CCardHeader, CButton, CSpinner, CBadge } from '@coreui/react';
+import { CCard, CCardBody, CCardHeader, CSpinner, CBadge } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { useBudgetVariance } from '@/hooks/useBudgetVariance';
 import { formatMoney } from '@/utils/formatters/number';
 
@@ -91,22 +92,18 @@ export default function BudgetHealthWidget({
           </CBadge>
         </div>
         <div className="d-flex gap-2">
-          <CButton
-            color="ghost"
-            size="sm"
-            onClick={() => refetch()}
-            title="Refresh"
-          >
+          <SemanticButton intent="tertiary-action" variant="ghost" size="sm" onClick={() => refetch()} title="Refresh">
             🔄
-          </CButton>
-          <CButton
-            color="ghost"
+          </SemanticButton>
+          <SemanticButton
+            intent="tertiary-action"
+            variant="ghost"
             size="sm"
             onClick={() => setExpanded(!expanded)}
             title={expanded ? 'Collapse' : 'Expand'}
           >
             {expanded ? '▼' : '▶'}
-          </CButton>
+          </SemanticButton>
         </div>
       </CCardHeader>
 
@@ -181,14 +178,9 @@ export default function BudgetHealthWidget({
         {/* Action Buttons */}
         {unreconciledVariances > 0 && (
           <div className="mt-3">
-            <CButton
-              color="primary"
-              size="sm"
-              className="w-100"
-              onClick={onViewDetails}
-            >
+            <SemanticButton intent="primary-action" size="sm" className="w-100" onClick={onViewDetails}>
               View & Reconcile Variances
-            </CButton>
+            </SemanticButton>
           </div>
         )}
 

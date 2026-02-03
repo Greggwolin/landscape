@@ -30,6 +30,7 @@ interface ChatInterfaceProps {
   projectId: number;
   messages: ChatMessage[];
   onMessagesUpdate: (messages: ChatMessage[]) => void;
+  activeTab?: string;  // Page context for tool filtering (e.g., 'property', 'operations', 'valuation')
 }
 
 const REQUEST_TIMEOUT_MS = 90000;
@@ -156,6 +157,7 @@ export default function ChatInterface({
   projectId,
   messages,
   onMessagesUpdate,
+  activeTab = 'home',
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -178,16 +180,20 @@ export default function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load message history on mount
+  // Load message history on mount or when activeTab changes
   useEffect(() => {
     loadMessages();
-  }, [projectId]);
+  }, [projectId, activeTab]);
 
   const loadMessages = async () => {
     try {
-      const response = await fetchWithTimeout(
-        `/api/projects/${projectId}/landscaper/chat`
-      );
+      // Build URL with activeTab query parameter for context-aware history
+      const url = new URL(`/api/projects/${projectId}/landscaper/chat`, window.location.origin);
+      if (activeTab) {
+        url.searchParams.set('active_tab', activeTab);
+      }
+
+      const response = await fetchWithTimeout(url.toString());
 
       if (!response.ok) {
         throw new Error('Failed to load messages');
@@ -219,6 +225,7 @@ export default function ChatInterface({
           body: JSON.stringify({
             message: inputValue.trim(),
             clientRequestId,
+            activeTab,  // Pass page context for tool filtering
           }),
         }
       );

@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -22,6 +21,7 @@ import {
   CFormCheck,
 } from '@coreui/react';
 import type { BudgetCategoryTemplate } from '@/types/budget-categories';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface CategoryTemplateManagerProps {
   selectedProjectId: number | null;
@@ -223,22 +223,22 @@ export default function CategoryTemplateManager({
                   </div>
 
                   <div className="d-grid gap-2">
-                    <CButton
-                      color="info"
+                    <SemanticButton
+                      intent="secondary-action"
                       variant="outline"
                       size="sm"
                       onClick={() => handlePreview(template)}
                     >
                       Preview
-                    </CButton>
-                    <CButton
-                      color="primary"
+                    </SemanticButton>
+                    <SemanticButton
+                      intent="primary-action"
                       size="sm"
                       onClick={() => handlePreview(template)}
                       disabled={!selectedProjectId}
                     >
                       Apply to Project
-                    </CButton>
+                    </SemanticButton>
                   </div>
                 </CCardBody>
               </CCard>
@@ -313,8 +313,8 @@ export default function CategoryTemplateManager({
         </CModalBody>
 
         <CModalFooter>
-          <CButton
-            color="secondary"
+          <SemanticButton
+            intent="secondary-action"
             onClick={() => {
               setShowApplyModal(false);
               setSelectedTemplate(null);
@@ -323,10 +323,10 @@ export default function CategoryTemplateManager({
             }}
           >
             Cancel
-          </CButton>
+          </SemanticButton>
           {selectedProjectId && (
-            <CButton
-              color="primary"
+            <SemanticButton
+              intent="primary-action"
               onClick={handleApply}
               disabled={applying || !selectedTemplate}
             >
@@ -338,7 +338,7 @@ export default function CategoryTemplateManager({
               ) : (
                 'Apply Template'
               )}
-            </CButton>
+            </SemanticButton>
           )}
         </CModalFooter>
       </CModal>

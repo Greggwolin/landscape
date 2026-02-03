@@ -1,0 +1,15 @@
+.transaction-details-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  font-size: 1rem;
+  padding-left: 0;
+}
+
+.transaction-details-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.transaction-details-toggle__icon--rotated {
+  transform: rotate(90deg);
+}

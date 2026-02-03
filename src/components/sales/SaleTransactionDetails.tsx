@@ -5,6 +5,8 @@ import type { ParcelWithSale } from '@/types/sales-absorption';
 import { groupParcelsBySaleDate } from '@/utils/sales/salesAggregation';
 import FilterSidebar from './FilterSidebar';
 import TransactionGrid from './TransactionGrid';
+import { SemanticButton } from '@/components/ui/landscape';
+import './SaleTransactionDetails.css';
 
 interface SaleTransactionDetailsProps {
   projectId: number;
@@ -89,23 +91,19 @@ export default function SaleTransactionDetails({
       <div
         className="px-4 py-2 flex items-center justify-between"
         style={{
-          cursor: 'pointer',
           backgroundColor: 'var(--surface-card-header)',
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
       >
-        <button
-          type="button"
+        <SemanticButton
+          intent="tertiary-action"
+          variant="ghost"
+          className="transaction-details-toggle"
+          onClick={() => setIsExpanded(!isExpanded)}
           aria-expanded={isExpanded}
-          className="flex items-center gap-2 transition-opacity hover:opacity-70"
         >
-          {/* Chevron Icon - matches CollapsibleSection */}
           <svg
-            className="w-4 h-4 transition-transform"
-            style={{
-              color: 'var(--cui-secondary-color)',
-              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-            }}
+            className={`w-4 h-4 transition-transform ${isExpanded ? 'transaction-details-toggle__icon--rotated' : ''}`}
+            style={{ color: 'var(--cui-secondary-color)' }}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -115,7 +113,7 @@ export default function SaleTransactionDetails({
           <h3 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>
             Sale Transaction Details ({filteredSales.length} sale{filteredSales.length !== 1 ? 's' : ''})
           </h3>
-        </button>
+        </SemanticButton>
       </div>
 
       {isExpanded && (

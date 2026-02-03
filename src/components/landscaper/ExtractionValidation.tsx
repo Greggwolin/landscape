@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+  CButton,
   CCard,
   CCardBody,
   CCardHeader,
-  CButton,
   CSpinner,
   CTable,
   CTableHead,
@@ -28,7 +28,7 @@ import {
   CDropdownItem,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { SemanticBadge } from '@/components/ui/landscape';
+import { SemanticBadge, SemanticButton } from '@/components/ui/landscape';
 import { cilCheckCircle, cilXCircle, cilPencil, cilCloudDownload, cilTrash } from '@coreui/icons';
 
 interface ExtractionItem {
@@ -275,10 +275,10 @@ export function ExtractionValidation({ projectId, onExtractionApplied }: Extract
           </CDropdown>
 
           {validatedCount > 0 && (
-            <CButton color="success" onClick={handleApplyAll}>
+            <SemanticButton intent="confirm-action" onClick={handleApplyAll}>
               <CIcon icon={cilCloudDownload} className="me-1" />
               Apply {validatedCount} Validated
-            </CButton>
+            </SemanticButton>
           )}
         </div>
       </CCardHeader>
@@ -366,38 +366,38 @@ export function ExtractionValidation({ projectId, onExtractionApplied }: Extract
                   <CTableDataCell>
                     {ext.status === 'pending' && (
                       <div className="d-flex gap-1">
-                        <CButton
-                          color="success"
+                        <SemanticButton
+                          intent="confirm-action"
                           size="sm"
                           title="Approve"
                           onClick={() => handleValidate(ext.extraction_id, 'approve')}
                         >
                           <CIcon icon={cilCheckCircle} />
-                        </CButton>
-                        <CButton
-                          color="warning"
+                        </SemanticButton>
+                        <SemanticButton
+                          intent="tertiary-action"
                           size="sm"
                           title="Edit"
                           onClick={() => handleEdit(ext)}
                         >
                           <CIcon icon={cilPencil} />
-                        </CButton>
-                        <CButton
-                          color="danger"
+                        </SemanticButton>
+                        <SemanticButton
+                          intent="destructive-action"
                           size="sm"
                           title="Reject"
                           onClick={() => handleValidate(ext.extraction_id, 'reject')}
                         >
                           <CIcon icon={cilXCircle} />
-                        </CButton>
-                        <CButton
-                          color="secondary"
+                        </SemanticButton>
+                        <SemanticButton
+                          intent="neutral-action"
                           size="sm"
                           title="Delete"
                           onClick={() => handleDelete(ext.extraction_id)}
                         >
                           <CIcon icon={cilTrash} />
-                        </CButton>
+                        </SemanticButton>
                       </div>
                     )}
                     {ext.status === 'validated' && (
@@ -457,12 +457,12 @@ export function ExtractionValidation({ projectId, onExtractionApplied }: Extract
           )}
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" onClick={() => setShowEditModal(false)}>
+          <SemanticButton intent="secondary-action" onClick={() => setShowEditModal(false)}>
             Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSaveEdit}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSaveEdit}>
             Save & Validate
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     </CCard>

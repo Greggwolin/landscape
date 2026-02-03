@@ -8,7 +8,6 @@ import {
   CCard,
   CCardBody,
   CCardHeader,
-  CButton,
   CButtonGroup,
   CFormSelect,
   CAlert,
@@ -18,6 +17,7 @@ import CategoryTreeManager from './CategoryTreeManager';
 import TemplateEditorModal from './TemplateEditorModal';
 import CreateTemplateModal from './CreateTemplateModal';
 import { useBudgetCategories } from '@/hooks/useBudgetCategories';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface CostCategoriesTabProps {
   projectId: number;
@@ -164,16 +164,16 @@ export default function CostCategoriesTab({ projectId }: CostCategoriesTabProps)
     <div>
       {/* Template Selector */}
       <CCard className="mb-4">
-        <CCardHeader className="d-flex justify-content-between align-items-center">
-          <h6 className="mb-0">Quick Start: Apply Template</h6>
-          <CButton
-            color="success"
-            size="sm"
-            onClick={() => setShowCreateTemplate(true)}
-          >
-            + Create New Template
-          </CButton>
-        </CCardHeader>
+          <CCardHeader className="d-flex justify-content-between align-items-center">
+            <h6 className="mb-0">Quick Start: Apply Template</h6>
+            <SemanticButton
+              intent="primary-action"
+              size="sm"
+              onClick={() => setShowCreateTemplate(true)}
+            >
+              + Create New Template
+            </SemanticButton>
+          </CCardHeader>
         <CCardBody>
           <p className="text-medium-emphasis mb-3">
             Choose from pre-built category templates optimized for different project types.
@@ -210,8 +210,8 @@ export default function CostCategoriesTab({ projectId }: CostCategoriesTabProps)
             </div>
 
             <CButtonGroup>
-              <CButton
-                color="primary"
+              <SemanticButton
+                intent="primary-action"
                 onClick={handleApplyTemplate}
                 disabled={!selectedTemplate || applyingTemplate || loadingTemplates}
               >
@@ -223,15 +223,15 @@ export default function CostCategoriesTab({ projectId }: CostCategoriesTabProps)
                 ) : (
                   'Apply Template'
                 )}
-              </CButton>
-              <CButton
-                color="success"
+              </SemanticButton>
+              <SemanticButton
+                intent="secondary-action"
                 variant="outline"
                 onClick={handleEditTemplate}
                 disabled={!selectedTemplate || loadingTemplates}
               >
                 Edit Template
-              </CButton>
+              </SemanticButton>
             </CButtonGroup>
           </div>
 

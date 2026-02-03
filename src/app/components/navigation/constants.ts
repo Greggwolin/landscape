@@ -43,7 +43,6 @@ export const SANDBOX_PAGES = [
   { separator: true },
   { label: 'GIS Test', href: '/gis-test' },
   { label: 'GIS Simple Test', href: '/gis-simple-test' },
-  { label: 'Parcel Test', href: '/parcel-test' },
   { label: 'Map Debug', href: '/map-debug' },
   { separator: true },
   { label: 'Test CoreUI', href: '/test-coreui' },

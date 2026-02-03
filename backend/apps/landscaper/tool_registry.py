@@ -253,6 +253,54 @@ PAGE_TOOLS = {
         "get_project_fields",      # Basic project info only
         "log_alpha_feedback",      # Log bugs/suggestions from chat
     ],
+
+    "dashboard": [
+        # Dashboard context - same tools as home, explicitly defined
+        # so it doesn't fall back silently to mf_home
+        "get_project_contacts_v2",
+        "search_cabinet_contacts",
+        "get_knowledge_insights",
+        "acknowledge_insight",
+    ],
+
+    # -------------------------------------------------------------------------
+    # NON-PROJECT CONTEXTS (Global Landscaper)
+    # -------------------------------------------------------------------------
+    "dms": [
+        # Document management system - RAG and knowledge tools
+        "search_irem_benchmarks",
+        "query_platform_knowledge",
+        "get_knowledge_entities",
+        "get_knowledge_facts",
+    ],
+
+    "benchmarks": [
+        # Benchmarks page - IREM data and knowledge tools
+        "search_irem_benchmarks",
+        "get_benchmarks",
+        "update_benchmark",
+        "get_knowledge_insights",
+        "query_platform_knowledge",
+    ],
+
+    "admin": [
+        # Admin configuration pages
+        "get_benchmarks",
+        "update_benchmark",
+        "delete_benchmark",
+        "get_measures",
+        "update_measure",
+        "get_picklist_values",
+        "update_picklist_value",
+    ],
+
+    "settings": [
+        # Settings/preferences pages
+        "get_benchmarks",
+        "get_measures",
+        "get_picklist_values",
+        "get_budget_categories",
+    ],
 }
 
 

@@ -15,6 +15,8 @@ from .views import (
     # Thread-based chat views
     ChatThreadViewSet,
     ThreadMessageViewSet,
+    # Global chat (non-project contexts)
+    GlobalChatViewSet,
 )
 
 # Project-scoped endpoints
@@ -213,5 +215,18 @@ urlpatterns = [
             'post': 'create',
         }),
         name='landscaper-thread-messages'
+    ),
+
+    # ========================================================================
+    # Global Chat Endpoints (Non-Project Contexts: DMS, Admin, Benchmarks)
+    # ========================================================================
+
+    path(
+        'landscaper/global/chat/',
+        GlobalChatViewSet.as_view({
+            'get': 'list',
+            'post': 'create',
+        }),
+        name='landscaper-global-chat'
     ),
 ]

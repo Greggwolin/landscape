@@ -275,7 +275,10 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
       longitude: 'longitude',
       property_subtype: 'property_subtype',
       property_class: 'property_class',
-      cross_streets: 'cross_streets'
+      cross_streets: 'cross_streets',
+      asking_price: 'asking_price',
+      purchase_price: 'asking_price',
+      list_price: 'asking_price'
     }
 
     const updatedKeys = new Set<string>()
@@ -806,7 +809,8 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         site_area_unit: data.site_area_unit,
         total_units: getNumeric(data.total_units),
         gross_sf: getNumeric(data.building_sf),
-        analysis_start_date: data.analysis_start_date || undefined
+        analysis_start_date: data.analysis_start_date || undefined,
+        asking_price: getNumeric(data.asking_price)
       }
 
       const response = await fetch('/api/projects/minimal', {
@@ -1117,6 +1121,62 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                   hasError={invalidSectionSet.has('propertyData')}
                   extractedFieldKeys={extractedFieldKeys}
                 />
+              </div>
+
+              {/* Asking Price Field */}
+              <div className="pt-2">
+                <div className="relative">
+                  <input
+                    {...register('asking_price')}
+                    id="asking-price"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder=" "
+                    onChange={(e) => {
+                      // Format as currency while typing
+                      const value = e.target.value.replace(/[^0-9]/g, '')
+                      const formatted = value ? `$${Number(value).toLocaleString()}` : ''
+                      setValue('asking_price', value, { shouldDirty: true })
+                      e.target.value = formatted
+                    }}
+                    onFocus={(e) => {
+                      // Remove formatting on focus for easier editing
+                      const value = formData.asking_price
+                      if (value) {
+                        e.target.value = value
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Re-apply formatting on blur
+                      const value = formData.asking_price
+                      if (value) {
+                        e.target.value = `$${Number(value).toLocaleString()}`
+                      }
+                    }}
+                    defaultValue={formData.asking_price ? `$${Number(formData.asking_price).toLocaleString()}` : ''}
+                    className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
+                    } ${extractedFieldKeys.has('asking_price') ? 'ring-2 ring-blue-300 bg-blue-50/50' : ''}`}
+                  />
+                  <label
+                    htmlFor="asking-price"
+                    className={`absolute left-3 transition-all duration-200 pointer-events-none ${
+                      watch('asking_price')
+                        ? 'top-1 text-[10px] text-blue-600'
+                        : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'} peer-focus:top-1 peer-focus:text-[10px] peer-focus:text-blue-600`
+                    }`}
+                  >
+                    Asking Price (optional)
+                  </label>
+                  {extractedFieldKeys.has('asking_price') && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-600">
+                      Auto-filled
+                    </span>
+                  )}
+                </div>
+                <p className={`mt-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Initial estimate. Will be replaced by actual costs once acquisition closes.
+                </p>
               </div>
 
               {/* Implied Density Display */}

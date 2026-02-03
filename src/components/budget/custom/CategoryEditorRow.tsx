@@ -4,7 +4,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CButton, CFormSelect } from '@coreui/react';
+import { CFormSelect } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import type { BudgetItem } from '../ColumnDefinitions';
 import type { BudgetMode } from '../ModeSelector';
 
@@ -261,22 +262,22 @@ export default function CategoryEditorRow({
         {/* Save Button */}
         <div className="col-md-auto ms-auto d-flex align-items-end">
           <div className="d-flex gap-2">
-            <CButton
-              color="secondary"
+            <SemanticButton
+              intent="secondary-action"
               size="sm"
               onClick={onCancel}
               disabled={saving}
             >
               Cancel
-            </CButton>
-            <CButton
-              color="primary"
+            </SemanticButton>
+            <SemanticButton
+              intent="primary-action"
               size="sm"
               onClick={handleSave}
               disabled={saving || !selectedL1}
             >
               {saving ? 'Saving...' : 'Save'}
-            </CButton>
+            </SemanticButton>
           </div>
         </div>
       </div>

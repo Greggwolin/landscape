@@ -21,6 +21,7 @@ import CategoryCascadingDropdown from './CategoryCascadingDropdown';
 import type { BudgetItem } from './ColumnDefinitions';
 import type { BudgetMode } from './ModeSelector';
 import { useUnsavedChanges, useKeyboardShortcuts } from '@/hooks/useUnsavedChanges';
+import { SemanticButton } from '@/components/ui/landscape';
 
 export interface BudgetItemFormValues {
   fact_id?: number;
@@ -506,19 +507,28 @@ const updateDate = (key: keyof FormState, value: string) => {
         </CModalBody>
         <CModalFooter className="d-flex justify-content-between">
           {mode === 'edit' && onDelete ? (
-            <CButton color="danger" variant="outline" onClick={handleDelete} disabled={deleting}>
+            <SemanticButton
+              intent="destructive-action"
+              variant="outline"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
               {deleting ? 'Deleting…' : 'Delete'}
-            </CButton>
+            </SemanticButton>
           ) : (
             <span />
           )}
           <div className="d-flex gap-2">
-            <CButton color="secondary" variant="outline" onClick={handleCloseWithConfirmation} disabled={submitting}>
+            <SemanticButton
+              intent="tertiary-action"
+              onClick={handleCloseWithConfirmation}
+              disabled={submitting}
+            >
               Cancel
-            </CButton>
-            <CButton color="primary" type="submit" disabled={submitting}>
+            </SemanticButton>
+            <SemanticButton intent="primary-action" type="submit" disabled={submitting}>
               {submitting ? 'Saving…' : 'Save'}
-            </CButton>
+            </SemanticButton>
           </div>
         </CModalFooter>
       </form>

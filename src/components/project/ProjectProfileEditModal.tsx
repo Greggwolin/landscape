@@ -14,7 +14,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CForm,
   CFormFloating,
   CFormLabel,
@@ -23,6 +22,7 @@ import {
   CRow,
   CCol
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import useSWR from 'swr';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile, ProjectProfileFormData, MSA } from '@/types/project-profile';
@@ -61,6 +61,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
     property_subtype: current.property_subtype,
     target_units: current.target_units,
     gross_acres: current.gross_acres,
+    asking_price: current.asking_price,
     address: current.address,
     city: current.city,
     county: current.county,
@@ -235,7 +236,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
         {floatingStyles}
         <CForm className="project-profile-floating">
           <CRow className="mb-3">
-            <CCol md={12}>
+            <CCol md={9}>
               <CFormFloating>
                 <CFormInput
                   id="project_name"
@@ -251,6 +252,26 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               {errors.project_name && (
                 <div className="invalid-feedback d-block">{errors.project_name}</div>
               )}
+            </CCol>
+            <CCol md={3}>
+              <CFormFloating>
+                <CFormInput
+                  type="text"
+                  inputMode="numeric"
+                  id="asking_price"
+                  value={formData.asking_price ? Number(formData.asking_price).toLocaleString('en-US') : ''}
+                  onChange={(e) => {
+                    // Remove commas and parse as number
+                    const rawValue = e.target.value.replace(/,/g, '');
+                    const numValue = rawValue ? parseFloat(rawValue) : undefined;
+                    if (rawValue === '' || !isNaN(numValue as number)) {
+                      handleInputChange('asking_price', numValue || undefined);
+                    }
+                  }}
+                  placeholder=" "
+                />
+                <CFormLabel htmlFor="asking_price">Asking Price</CFormLabel>
+              </CFormFloating>
             </CCol>
           </CRow>
 
@@ -468,12 +489,12 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
         </CForm>
       </CModalBody>
       <CModalFooter>
-        <CButton color="secondary" onClick={onClose} disabled={isSaving}>
+        <SemanticButton intent="secondary-action" onClick={onClose} disabled={isSaving}>
           Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleSave} disabled={isSaving}>
+        </SemanticButton>
+        <SemanticButton intent="primary-action" onClick={handleSave} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save Changes'}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

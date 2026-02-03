@@ -12,7 +12,6 @@ import {
   CTableRow,
   CTableHeaderCell,
   CTableDataCell,
-  CButton,
   CSpinner,
   CBadge,
   CModal,
@@ -30,6 +29,7 @@ import {
   CInputGroup,
   CInputGroupText,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import {
   cilPlus,
@@ -227,10 +227,10 @@ export default function ContactRolesPage() {
               Manage the roles contacts can have on projects
             </small>
           </div>
-          <CButton color="primary" onClick={() => handleOpenModal()}>
+          <SemanticButton intent="primary-action" onClick={() => handleOpenModal()}>
             <CIcon icon={cilPlus} className="me-2" />
             Add Role
-          </CButton>
+          </SemanticButton>
         </CCardHeader>
 
         <CCardBody>
@@ -337,8 +337,8 @@ export default function ContactRolesPage() {
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="d-flex gap-1">
-                        <CButton
-                          color="secondary"
+                        <SemanticButton
+                          intent="tertiary-action"
                           size="sm"
                           variant="ghost"
                           onClick={() => handleOpenModal(role)}
@@ -346,18 +346,18 @@ export default function ContactRolesPage() {
                           disabled={role.is_system}
                         >
                           <CIcon icon={cilPencil} />
-                        </CButton>
-                        <CButton
-                          color={role.is_active ? 'warning' : 'success'}
+                        </SemanticButton>
+                        <SemanticButton
+                          intent={role.is_active ? 'neutral-action' : 'confirm-action'}
                           size="sm"
                           variant="ghost"
                           onClick={() => handleToggleVisibility(role)}
                           title={role.is_active ? 'Hide role' : 'Show role'}
                         >
                           <CIcon icon={role.is_active ? cilBan : cilCheckCircle} />
-                        </CButton>
-                        <CButton
-                          color="danger"
+                        </SemanticButton>
+                        <SemanticButton
+                          intent="destructive-action"
                           size="sm"
                           variant="ghost"
                           onClick={() => handleDelete(role)}
@@ -365,7 +365,7 @@ export default function ContactRolesPage() {
                           disabled={role.is_system}
                         >
                           <CIcon icon={cilTrash} />
-                        </CButton>
+                        </SemanticButton>
                       </div>
                     </CTableDataCell>
                   </CTableRow>
@@ -471,10 +471,10 @@ export default function ContactRolesPage() {
           </CForm>
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" variant="ghost" onClick={handleCloseModal}>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={handleCloseModal}>
             Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSave} disabled={saving}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSave} disabled={saving}>
             {saving ? (
               <>
                 <CSpinner size="sm" className="me-2" />
@@ -485,7 +485,7 @@ export default function ContactRolesPage() {
             ) : (
               'Create Role'
             )}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
     </CContainer>

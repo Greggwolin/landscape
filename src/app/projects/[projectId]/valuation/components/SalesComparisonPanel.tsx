@@ -262,7 +262,7 @@ export function SalesComparisonPanel({
           comparables={comparables}
           reconciliation={reconciliation}
           subjectUnits={113}
-          subjectAskingPrice={47500000}
+          projectId={projectId}
         />
       </div>
     </div>

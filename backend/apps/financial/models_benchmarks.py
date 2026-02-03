@@ -54,6 +54,12 @@ class UnitCostCategory(models.Model):
         blank=True
     )
     category_name = models.CharField(max_length=255)
+    account_number = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text='Chart of Accounts code (e.g., 1100, 1200 for Acquisition categories)'
+    )
     tags = models.JSONField(default=list)  # JSONB array of tag strings
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

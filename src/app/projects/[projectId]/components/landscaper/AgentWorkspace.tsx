@@ -9,6 +9,7 @@ interface AgentWorkspaceProps {
   agentName: string;
   agentIcon: string;
   children: ReactNode;  // The agent-specific canvas (map, grid, etc.)
+  activeTab?: string;  // Page context for tool filtering (e.g., 'mf_valuation', 'mf_operations')
 }
 
 export function AgentWorkspace({
@@ -16,7 +17,8 @@ export function AgentWorkspace({
   agentId,
   agentName,
   agentIcon,
-  children
+  children,
+  activeTab = 'home',
 }: AgentWorkspaceProps) {
   return (
     <div className="flex flex-col h-full">
@@ -42,6 +44,7 @@ export function AgentWorkspace({
             agentId={agentId}
             agentName={agentName}
             placeholder={`Ask ${agentName} anything...`}
+            activeTab={activeTab}
           />
         </aside>
       </div>

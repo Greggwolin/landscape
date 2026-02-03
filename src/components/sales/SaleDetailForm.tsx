@@ -10,6 +10,8 @@ import type { ParcelWithSale, SalePhaseSummary, SalePhaseBenchmarks } from '@/ty
 import { useSaveParcelOverrides } from '@/hooks/useSalesAbsorption';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import { calculateNetProceeds } from '@/utils/sales/calculations';
+import { SemanticButton } from '@/components/ui/landscape';
+import './SaleDetailForm.css';
 
 interface Props {
   projectId: number;
@@ -296,21 +298,23 @@ export default function SaleDetailForm({ projectId, parcel, salePhase, benchmark
           </div>
 
           <div className="flex gap-3">
-            <button
-              type="button"
+            <SemanticButton
+              intent="secondary-action"
+              size="sm"
+              className="sale-detail-cancel"
               onClick={onClose}
-              className="btn btn-secondary"
             >
               Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!parcel.sale_date || saveOverrides.isPending}
+            </SemanticButton>
+            <SemanticButton
+              intent="primary-action"
+              size="sm"
+              className="sale-detail-save"
               onClick={handleSave}
-              className="btn btn-primary"
+              disabled={!parcel.sale_date || saveOverrides.isPending}
             >
               {saveOverrides.isPending ? 'Saving…' : 'Save Changes'}
-            </button>
+            </SemanticButton>
           </div>
         </div>
 

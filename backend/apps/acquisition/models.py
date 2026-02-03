@@ -34,6 +34,26 @@ class AcquisitionEvent(models.Model):
         help_text='Reference to contact (buyer, seller, etc.)'
     )
 
+    # Category Classification (references core_unit_cost_category)
+    category = models.ForeignKey(
+        'financial.UnitCostCategory',
+        on_delete=models.SET_NULL,
+        db_column='category_id',
+        related_name='acquisition_events_as_category',
+        null=True,
+        blank=True,
+        help_text='Parent category (e.g., 1100 Due Diligence, 1200 Transaction Costs)'
+    )
+    subcategory = models.ForeignKey(
+        'financial.UnitCostCategory',
+        on_delete=models.SET_NULL,
+        db_column='subcategory_id',
+        related_name='acquisition_events_as_subcategory',
+        null=True,
+        blank=True,
+        help_text='Child subcategory (e.g., 1110 Phase I Environmental)'
+    )
+
     # Event Details
     event_date = models.DateField(null=True, blank=True, help_text='Date of the acquisition event')
     event_type = models.CharField(

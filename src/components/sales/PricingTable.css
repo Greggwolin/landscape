@@ -1,0 +1,34 @@
+.pricing-delete-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.35rem;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.pricing-delete-btn svg {
+  stroke-width: 2;
+}
+
+.pricing-delete-btn:hover {
+  border-color: transparent;
+  background-color: rgba(var(--cui-danger-rgb), 0.1);
+}
+
+.pricing-cancel-btn {
+  border: 1px solid var(--cui-border-color);
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+}
+
+.pricing-save-btn {
+  background-color: var(--cui-primary);
+  border-color: var(--cui-primary);
+  color: #ffffff;
+}
+
+.pricing-add-btn {
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: var(--cui-primary);
+}

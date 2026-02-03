@@ -222,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('auth_tokens', JSON.stringify(result.tokens));
     // Set cookie for middleware auth check
     document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';
-    router.push('/dashboard');
+    return result;
   };
 
   // Register

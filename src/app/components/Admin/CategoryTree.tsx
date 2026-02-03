@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useEffect, useMemo, useState } from 'react'
+import { SemanticButton } from '@/components/ui/landscape'
 
 type Category = {
   category_id: number
@@ -84,7 +87,7 @@ const CategoryTree: React.FC = () => {
               </button>
             ))}
             <div className="mt-2">
-              <button className="px-2 py-1 rounded bg-blue-700 text-white" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] }) }}>New Category</button>
+              <SemanticButton intent="primary-action" size="sm" onClick={() => { setSelectedId(null); setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] }) }}>New Category</SemanticButton>
             </div>
           </div>
           <div className="md:col-span-2 border border-gray-700 rounded p-3 bg-gray-900 space-y-3">
@@ -139,8 +142,8 @@ const CategoryTree: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <button className="px-3 py-1 rounded bg-blue-700 text-white" onClick={onSave} disabled={saving}>Save</button>
-              {selectedId && <button className="px-3 py-1 rounded bg-red-700 text-white" onClick={onDelete} disabled={saving}>Delete</button>}
+              <SemanticButton intent="primary-action" size="sm" onClick={onSave} disabled={saving}>Save</SemanticButton>
+              {selectedId && <SemanticButton intent="destructive-action" size="sm" onClick={onDelete} disabled={saving}>Delete</SemanticButton>}
             </div>
           </div>
         </div>

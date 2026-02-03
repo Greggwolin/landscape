@@ -1,19 +1,24 @@
 export type AcquisitionEventType =
-  | 'Deposit'
+  // Milestone events (date-only, no Amount/Category/Subcategory)
+  | 'Milestone'
   | 'Open Escrow'
-  | 'Closing'
+  | 'Closing Date'
+  // Financial events (have Amount, Category, Subcategory)
+  | 'Deposit'
   | 'Fee'
   | 'Credit'
   | 'Refund'
   | 'Adjustment'
-  | 'Extension'
-  | 'Effective Date'
-  | 'Title Survey';
+  | 'Closing Costs';
 
 export interface AcquisitionEvent {
   acquisitionId: number;
   projectId: number;
   contactId: number | null;
+  categoryId: number | null;
+  subcategoryId: number | null;
+  categoryName: string | null;
+  subcategoryName: string | null;
   eventDate: string | null;
   eventType: AcquisitionEventType;
   description: string | null;
@@ -26,6 +31,18 @@ export interface AcquisitionEvent {
   notes: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+export interface AcquisitionCategoryOption {
+  category_id: number;
+  category_name: string;
+  account_number: string | null;
+  sort_order: number;
+}
+
+export interface AcquisitionCategoriesResponse {
+  categories: AcquisitionCategoryOption[];
+  subcategories_by_parent: Record<string, AcquisitionCategoryOption[]>;
 }
 
 export interface AcquisitionHeader {
@@ -54,30 +71,58 @@ export interface AcquisitionHeader {
   updated_at?: string | null;
 }
 
-export const ACQUISITION_EVENT_TYPES: AcquisitionEventType[] = [
-  'Deposit',
+// Milestone actions (date-only, no financial fields)
+export const MILESTONE_ACTIONS: AcquisitionEventType[] = [
+  'Milestone',
   'Open Escrow',
-  'Closing',
+  'Closing Date',
+];
+
+// Financial actions (have Amount, Category, Subcategory)
+export const FINANCIAL_ACTIONS: AcquisitionEventType[] = [
+  'Deposit',
   'Fee',
   'Credit',
   'Refund',
   'Adjustment',
-  'Extension',
-  'Effective Date',
-  'Title Survey',
+  'Closing Costs',
 ];
 
+// Combined list - milestones first, then financial
+export const ACQUISITION_EVENT_TYPES: AcquisitionEventType[] = [
+  // Milestones
+  'Milestone',
+  'Open Escrow',
+  'Closing Date',
+  // Financial
+  'Deposit',
+  'Fee',
+  'Credit',
+  'Refund',
+  'Adjustment',
+  'Closing Costs',
+];
+
+export const isMilestoneAction = (action: AcquisitionEventType | null): boolean => {
+  return action ? MILESTONE_ACTIONS.includes(action) : false;
+};
+
+export const isFinancialAction = (action: AcquisitionEventType | null): boolean => {
+  return action ? FINANCIAL_ACTIONS.includes(action) : false;
+};
+
 export const acquisitionEventDebitCreditMap: Record<AcquisitionEventType, 'debit' | 'credit'> = {
+  // Milestones - default to debit (no financial impact)
+  Milestone: 'debit',
+  'Open Escrow': 'debit',
+  'Closing Date': 'debit',
+  // Financial
   Deposit: 'credit',
   Credit: 'credit',
   Refund: 'credit',
-  'Open Escrow': 'debit',
-  Closing: 'debit',
   Fee: 'debit',
   Adjustment: 'debit',
-  Extension: 'debit',
-  'Effective Date': 'debit',
-  'Title Survey': 'debit',
+  'Closing Costs': 'debit',
 };
 
 export const isCreditEvent = (eventType: AcquisitionEventType): boolean =>

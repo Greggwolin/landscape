@@ -4,8 +4,19 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/styles/style-catalog.css';
 import { colorRegistry } from '@/config/colorRegistry';
 import { getResolvedColor } from '@/utils/cssVariables';
+import { ButtonIntentsSection } from './ButtonIntentsSection';
+import { BadgeIntentsSection } from './BadgeIntentsSection';
+import { NavTabsSection } from './NavTabsSection';
+import { CardHeadersSection } from './CardHeadersSection';
+import { buttonIntentRegistry, badgeIntentRegistry } from '@/config/semanticIntentRegistry';
 
 const DEFAULT_PATH = 'docs/design-system/style-catalog.md';
+
+interface StyleCatalogContentProps {
+  filePath?: string;
+  title?: string;
+  showTitle?: boolean;
+}
 
 type PaletteVariantType = 'dark' | 'base' | 'fill' | 'bg' | 'bgSubtle' | 'text' | 'border' | 'alias';
 
@@ -506,6 +517,37 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
         <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
           {paletteFamilies.map((family) => renderPaletteFamily(family))}
         </div>
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Button Intents — Semantic Governance</h2>
+          <span className="style-catalog-section-count">{buttonIntentRegistry.length} intents</span>
+        </div>
+        <ButtonIntentsSection />
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Badge Intents — Semantic Governance</h2>
+          <span className="style-catalog-section-count">{badgeIntentRegistry.length} intents</span>
+        </div>
+        <BadgeIntentsSection />
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Nav Tabs — Functional Color Coding</h2>
+          <span className="style-catalog-section-count">8 tabs / 4 groups</span>
+        </div>
+        <NavTabsSection />
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Card & Accordion Headers — Canonical Colors</h2>
+        </div>
+        <CardHeadersSection />
       </section>
 
       <section className="style-catalog-section">

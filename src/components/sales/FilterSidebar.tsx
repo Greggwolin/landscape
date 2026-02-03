@@ -2,6 +2,8 @@
 
 import React, { useMemo } from 'react';
 import type { SaleTransaction } from '@/utils/sales/salesAggregation';
+import { SemanticButton } from '@/components/ui/landscape';
+import './FilterSidebar.css';
 
 interface FilterSidebarProps {
   sales: SaleTransaction[];
@@ -59,82 +61,84 @@ export default function FilterSidebar({
       }}
     >
       {/* All Sales */}
-      <button
-        className={`btn w-100 text-start mb-2 ${
-          activeFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary'
-        }`}
+      <SemanticButton
+        intent="secondary-action"
+        className={`filter-btn ${activeFilter === 'all' ? 'filter-btn--active' : ''}`}
         onClick={() => {
           onFilterChange('all');
           onPhaseSelect(null);
           onUseTypeSelect(null);
         }}
         aria-label="Show all sales"
+        variant="ghost"
       >
         📊 All Sales
-      </button>
+      </SemanticButton>
 
       {/* By Phase */}
-      <button
-        className={`btn w-100 text-start mb-1 ${
-          activeFilter === 'phase' && !selectedPhase ? 'btn-primary' : 'btn-outline-secondary'
-        }`}
+      <SemanticButton
+        intent="secondary-action"
+        className={`filter-btn ${activeFilter === 'phase' && !selectedPhase ? 'filter-btn--active' : ''}`}
         onClick={() => {
           onFilterChange('phase');
           onPhaseSelect(null);
           onUseTypeSelect(null);
         }}
         aria-label="Filter by phase"
+        variant="ghost"
       >
         📍 By Phase
-      </button>
+      </SemanticButton>
       {activeFilter === 'phase' && Object.keys(phaseCounts).length > 0 && (
         <div className="ps-3 mb-2">
           {Object.entries(phaseCounts)
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([phase, count]) => (
-              <button
-                key={phase}
-                className={`btn btn-sm w-100 text-start mb-1 ${
-                  selectedPhase === phase ? 'btn-primary' : 'btn-ghost-secondary'
-                }`}
-                onClick={() => onPhaseSelect(phase)}
-                aria-label={`Filter to ${phase}`}
-              >
-                {phase} ({count})
-              </button>
+                <SemanticButton
+                  key={phase}
+                  intent="tertiary-action"
+                  size="sm"
+                  className={`filter-btn filter-btn--nested ${selectedPhase === phase ? 'filter-btn--active' : ''}`}
+                  onClick={() => onPhaseSelect(phase)}
+                  aria-label={`Filter to ${phase}`}
+                  variant="ghost"
+                >
+                  {phase} ({count})
+                </SemanticButton>
             ))}
         </div>
       )}
 
       {/* By Use Type */}
-      <button
-        className={`btn w-100 text-start mb-1 ${
-          activeFilter === 'use' && !selectedUseType ? 'btn-primary' : 'btn-outline-secondary'
-        }`}
+      <SemanticButton
+        intent="secondary-action"
+        className={`filter-btn ${activeFilter === 'use' && !selectedUseType ? 'filter-btn--active' : ''}`}
         onClick={() => {
           onFilterChange('use');
           onPhaseSelect(null);
           onUseTypeSelect(null);
         }}
         aria-label="Filter by use type"
+        variant="ghost"
       >
         🏘️ By Use Type
-      </button>
+      </SemanticButton>
       {activeFilter === 'use' && Object.keys(useTypeCounts).length > 0 && (
         <div className="ps-3">
           {Object.entries(useTypeCounts)
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([useType, count]) => (
-              <button
+              <SemanticButton
                 key={useType}
-                className={`btn btn-sm w-100 text-start mb-1 ${
-                  selectedUseType === useType ? 'btn-primary' : 'btn-ghost-secondary'
-                }`}
+                intent="tertiary-action"
+                size="sm"
+                className={`filter-btn filter-btn--nested ${selectedUseType === useType ? 'filter-btn--active' : ''}`}
                 onClick={() => onUseTypeSelect(useType)}
                 aria-label={`Filter to ${useType} parcels`}
+                variant="ghost"
               >
                 {useType} ({count})
-              </button>
+              </SemanticButton>
             ))}
         </div>
       )}

@@ -13,6 +13,7 @@ import {
 } from '@/lib/napkin/sfdCompStats';
 import { NapkinCompsMap } from './NapkinCompsMap';
 import { CompDetailsSection } from './CompDetailsSection';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 type NapkinSfdPricingProps = {
   projectId: number;
@@ -281,12 +282,14 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
         <h5 className="mb-0">SFD Product Pricing</h5>
         <div className="d-flex align-items-center gap-2">
           {!isLoading && analysis && (
-            <span className="badge bg-info">
+            <SemanticBadge intent="status" value="validated">
               {analysis.compsWithLotSize} comps w/ lot size
-            </span>
+            </SemanticBadge>
           )}
           {productRows.length > 0 && (
-            <span className="badge bg-success">{productRows.length} Products</span>
+            <SemanticBadge intent="status" value="complete">
+              {productRows.length} Products
+            </SemanticBadge>
           )}
         </div>
       </div>

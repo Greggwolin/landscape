@@ -7,7 +7,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CForm,
   CFormLabel,
   CFormInput,
@@ -15,6 +14,7 @@ import {
   CRow,
   CCol,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import type { DebtFacility } from './DebtFacilitiesTable';
 import { useUnsavedChanges, useKeyboardShortcuts } from '@/hooks/useUnsavedChanges';
 
@@ -263,12 +263,12 @@ export default function DebtFacilityModal({
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseWithConfirmation} disabled={saving}>
+          <SemanticButton intent="secondary-action" onClick={handleCloseWithConfirmation} disabled={saving}>
             Cancel
-          </CButton>
-          <CButton color="primary" type="submit" disabled={saving}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={saving}>
             {saving ? 'Saving...' : facility ? 'Update' : 'Add'}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CForm>
     </CModal>

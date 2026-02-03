@@ -27,6 +27,7 @@ import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 import { useUnitCostCategoriesForBudget } from '@/hooks/useUnitCostCategoriesForBudget';
 import './BudgetItemModal.css';
 import { UOMSelect } from '@/components/common/UOMSelect';
+import { SemanticButton } from '@/components/ui/landscape';
 
 export interface BudgetItemFormValues {
   fact_id?: number;
@@ -867,16 +868,21 @@ export default function BudgetItemModalV2({
 
         <CModalFooter>
           {mode === 'edit' && onDelete && (
-            <CButton color="danger" variant="outline" onClick={onDelete} className="me-auto">
+            <SemanticButton
+              intent="destructive-action"
+              variant="outline"
+              onClick={onDelete}
+              className="me-auto"
+            >
               Delete
-            </CButton>
+            </SemanticButton>
           )}
-          <CButton color="secondary" onClick={onClose}>
+          <SemanticButton intent="tertiary-action" onClick={onClose}>
             Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSave}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSave}>
             Save
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CModal>
 
@@ -907,24 +913,24 @@ export default function BudgetItemModalV2({
           </dl>
         </CModalBody>
 
-        <CModalFooter>
-          <CButton
-            color="secondary"
-            onClick={async () => {
-              await saveBudgetItem(false);
-            }}
-          >
-            Skip
-          </CButton>
-          <CButton
-            color="primary"
-            onClick={async () => {
-              await saveBudgetItem(true);
-            }}
-          >
-            Save to Cost Library
-          </CButton>
-        </CModalFooter>
+          <CModalFooter>
+            <SemanticButton
+              intent="tertiary-action"
+              onClick={async () => {
+                await saveBudgetItem(false);
+              }}
+            >
+              Skip
+            </SemanticButton>
+            <SemanticButton
+              intent="confirm-action"
+              onClick={async () => {
+                await saveBudgetItem(true);
+              }}
+            >
+              Save to Cost Library
+            </SemanticButton>
+          </CModalFooter>
       </CModal>
     </>
   );

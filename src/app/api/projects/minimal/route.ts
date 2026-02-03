@@ -21,6 +21,7 @@ type MinimalProjectRequest = {
   total_units?: number | null
   gross_sf?: number | null
   analysis_start_date?: string | null
+  asking_price?: number | null
 }
 
 const convertToAcres = (value: number | null | undefined, unit: MinimalProjectRequest['site_area_unit']): number | null => {
@@ -86,6 +87,9 @@ export async function POST(request: NextRequest) {
     const grossSf = typeof body.gross_sf === 'number' && Number.isFinite(body.gross_sf)
       ? Math.round(body.gross_sf)
       : null
+    const askingPrice = typeof body.asking_price === 'number' && Number.isFinite(body.asking_price)
+      ? body.asking_price
+      : null
     const jurisdictionCity = city
     const jurisdictionState = state
     const jurisdictionCounty = county
@@ -117,6 +121,7 @@ export async function POST(request: NextRequest) {
         total_units,
         gross_sf,
         analysis_start_date,
+        asking_price,
         analysis_mode,
         is_active,
         created_at,
@@ -142,6 +147,7 @@ export async function POST(request: NextRequest) {
         ${totalUnits},
         ${grossSf},
         ${body.analysis_start_date || null},
+        ${askingPrice},
         'napkin',
         true,
         NOW(),

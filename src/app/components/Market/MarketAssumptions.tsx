@@ -11,6 +11,7 @@
 "use client";
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import { SemanticButton } from '@/components/ui/landscape';
 
 // ---- Types ----
 interface MarketFactor {
@@ -427,7 +428,7 @@ const CommissionDetailModal: React.FC<ModalBaseProps> = ({ onClose }) => {
         </div>
 
         <div className="px-4 py-3 border-t border-slate-600 flex justify-end space-x-3">
-          <button onClick={onClose} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Save & Close</button>
+          <SemanticButton intent="primary-action" size="sm" onClick={onClose}>Save & Close</SemanticButton>
         </div>
       </div>
     </div>
@@ -509,8 +510,8 @@ const GrowthRateDetailModal: React.FC<GrowthRateModalProps> = ({ onClose }) => {
         </div>
 
         <div className="px-4 py-3 border-t border-slate-600 flex justify-end space-x-3">
-          <button onClick={onClose} className="px-4 py-2 border border-slate-500 rounded text-slate-300 hover:bg-slate-700 text-sm">Cancel</button>
-          <button onClick={onClose} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Save / Update</button>
+          <SemanticButton intent="secondary-action" size="sm" onClick={onClose}>Cancel</SemanticButton>
+          <SemanticButton intent="primary-action" size="sm" onClick={onClose}>Save / Update</SemanticButton>
         </div>
       </div>
     </div>

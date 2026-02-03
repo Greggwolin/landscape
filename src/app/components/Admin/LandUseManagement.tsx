@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Save, ChevronRight, ChevronDown, Settings } from 'lucide-react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 // Type definitions
 interface Family {
@@ -234,13 +235,13 @@ const LandUseManagement: React.FC = () => {
             This will create the database tables and populate them with default residential, 
             commercial, and industrial land use types with programming and zoning parameters.
           </div>
-          <button
+          <SemanticButton
+            intent="primary-action"
             onClick={initializeSystem}
             disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? 'Initializing...' : 'Initialize Land Use System'}
-          </button>
+          </SemanticButton>
         </div>
       </div>
     );
@@ -254,13 +255,13 @@ const LandUseManagement: React.FC = () => {
           Land Use Management
         </h3>
         <div className="flex gap-2">
-          <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center">
+          <SemanticButton intent="primary-action" size="sm" className="flex items-center">
             <Plus className="w-4 h-4 mr-1" />
             Import
-          </button>
-          <button className="px-3 py-1 bg-gray-600 text-gray-300 rounded text-sm hover:bg-gray-700">
+          </SemanticButton>
+          <SemanticButton intent="secondary-action" size="sm">
             Export
-          </button>
+          </SemanticButton>
         </div>
       </div>
 

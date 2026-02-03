@@ -13,6 +13,7 @@ import {
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilTrash, cilFile } from '@coreui/icons';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface DeleteConfirmModalProps {
   visible: boolean;
@@ -86,10 +87,14 @@ export default function DeleteConfirmModal({
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" variant="outline" onClick={onClose} disabled={isLoading}>
+        <SemanticButton
+          intent="tertiary-action"
+          onClick={onClose}
+          disabled={isLoading}
+        >
           Cancel
-        </CButton>
-        <CButton color="danger" onClick={handleDelete} disabled={isLoading}>
+        </SemanticButton>
+        <SemanticButton intent="destructive-action" onClick={handleDelete} disabled={isLoading}>
           {isLoading ? (
             <CSpinner size="sm" />
           ) : (
@@ -98,7 +103,7 @@ export default function DeleteConfirmModal({
               Delete
             </>
           )}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

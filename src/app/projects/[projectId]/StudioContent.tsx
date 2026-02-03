@@ -21,6 +21,7 @@ import React, { memo, Suspense } from 'react';
 import ProjectTab from './components/tabs/ProjectTab';
 import PropertyTab from './components/tabs/PropertyTab';
 import PlanningTab from './components/tabs/PlanningTab';
+import MarketTab from './components/tabs/MarketTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import OperationsTab from './components/tabs/OperationsTab';
 import SalesTab from './components/tabs/SalesTab';
@@ -32,11 +33,14 @@ import CapitalizationTab from './components/tabs/CapitalizationTab';
 import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
 import RenovationSubTab from './components/tabs/RenovationSubTab';
 import { MapTab } from '@/components/map-tab';
+import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 
 interface Project {
   project_id: number;
   project_name: string;
   project_type_code?: string;
+  project_type?: string;
+  property_subtype?: string;
   analysis_type?: string;
   [key: string]: unknown;
 }
@@ -121,7 +125,13 @@ function StudioContent({
       // Income: details, acquisition, market, rent-roll, renovation (VALUE_ADD only)
       // PropertyTab has working content with controlled activeTab prop
       // ========================================
-      case 'property':
+      case 'property': {
+        // Determine if this is an income property using the same logic as folderTabConfig
+        const effectiveProjectType = project.property_subtype
+          || project.project_type
+          || project.project_type_code;
+        const isIncome = isIncomeProperty(effectiveProjectType);
+
         switch (currentTab) {
           // Acquisition sub-tab - ALL project types
           case 'acquisition':
@@ -129,9 +139,13 @@ function StudioContent({
           // Renovation sub-tab - VALUE_ADD analysis type only
           case 'renovation':
             return <RenovationSubTab project={project} />;
+          // Market tab - uses MarketTab which handles both project types
+          // Land Dev: Competitive housing research (Redfin, Zonda), SFD pricing, market map
+          // Income/CRE: Rental comps, floor plans, market assumptions (via PropertyTab)
+          case 'market':
+            return <MarketTab project={project} />;
           // Income property subtabs - pass activeTab to PropertyTab (controlled component)
           case 'details':
-          case 'market':
           case 'rent-roll':
             return <PropertyTab project={project} activeTab={currentTab} />;
           // Land development subtabs
@@ -141,11 +155,12 @@ function StudioContent({
             return <ComingSoon folder="property" tab="parcels" icon="🗺️" />;
           default:
             // Default based on project type
-            if (project.project_type_code === 'LAND') {
+            if (!isIncome) {
               return <PlanningTab project={project} />;
             }
             return <PropertyTab project={project} activeTab="details" />;
         }
+      }
 
       // ========================================
       // FOLDER 3a: BUDGET (Land Development)

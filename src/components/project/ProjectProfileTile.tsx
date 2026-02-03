@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { CCard, CCardHeader, CCardBody, CButton } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import useSWR from 'swr';
 import ProfileField from './ProfileField';
 import ProjectProfileEditModal from './ProjectProfileEditModal';
@@ -17,6 +17,21 @@ import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
+
+// Acquisition price summary types
+interface AcquisitionPriceSummary {
+  project_id: number;
+  asking_price: number | null;
+  has_closing_date: boolean;
+  closing_date: string | null;
+  total_acquisition_cost: number | null;
+  land_cost: number;
+  total_fees: number;
+  total_deposits: number;
+  total_credits: number;
+  effective_acquisition_price: number | null;
+  price_source: 'calculated' | 'asking' | null;
+}
 
 interface ProjectProfileTileProps {
   projectId: number;
@@ -31,6 +46,14 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   const { data: profile, error, isLoading, mutate } = useSWR<ProjectProfile>(
     `/api/projects/${projectId}/profile`,
     fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // Fetch acquisition price summary
+  const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+  const { data: priceSummary, mutate: mutatePriceSummary } = useSWR<AcquisitionPriceSummary>(
+    `${apiUrl}/api/projects/${projectId}/acquisition/price-summary/`,
+    (url: string) => fetch(url).then(res => res.ok ? res.json() : null),
     { revalidateOnFocus: false }
   );
 
@@ -52,8 +75,60 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
 
   const handleSaveSuccess = () => {
     mutate(); // Refresh the profile data
+    mutatePriceSummary(); // Refresh the acquisition price summary
     refreshProjects(); // Refresh the global projects list (for Dashboard, map, etc.)
     setIsEditModalOpen(false);
+  };
+
+  // Format currency
+  const formatCurrency = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Render acquisition price section
+  const renderAcquisitionPriceSection = () => {
+    if (!priceSummary) return null;
+
+    const { has_closing_date, total_acquisition_cost, asking_price } = priceSummary;
+
+    // If we have a calculated total (closing date exists), show read-only
+    if (has_closing_date && total_acquisition_cost !== null) {
+      return (
+        <div
+          className="d-flex gap-3 py-2 border-bottom"
+          style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
+        >
+          <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
+            Acquisition Cost
+          </span>
+          <span style={{ color: 'var(--cui-secondary-color)' }}>
+            {formatCurrency(total_acquisition_cost)}
+            <small className="text-muted ms-2" style={{ fontSize: '0.75rem' }}>(from ledger)</small>
+          </span>
+        </div>
+      );
+    }
+
+    // Otherwise, show asking price (editable via modal)
+    return (
+      <div
+        className="d-flex gap-3 py-2 border-bottom"
+        style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
+      >
+        <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
+          Asking Price
+        </span>
+        <span style={{ color: 'var(--cui-secondary-color)' }}>
+          {asking_price ? formatCurrency(asking_price) : <span className="text-muted fst-italic">Not specified</span>}
+        </span>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -143,6 +218,8 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               label="Project Type"
               value={profile.property_subtype}
             />
+            {/* Acquisition Price Section */}
+            {renderAcquisitionPriceSection()}
             <ProfileField
               label={getUnitsLabel(profile)}
               value={getUnitCount(profile) ? formatUnits(getUnitCount(profile)) : undefined}

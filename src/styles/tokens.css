@@ -14,6 +14,8 @@
   --surface-card-header: #f0f1f2;
   --surface-subheader: #f4f5f8;
   --surface-operations-tile: #f1f2f6;
+  --cui-card-header-bg: #f0f1f2;
+  --cui-card-subheader-bg: #f7f7fb;
 
   /* Text */
   --text-primary: #0f172a;
@@ -40,6 +42,47 @@
   --chip-error: #dc2626;
   --chip-muted: #4b5563;
 
+  /* Semantic category chips */
+  --chip-horizontal-bg: rgba(37, 99, 235, 0.12);
+  --chip-horizontal-border: rgba(37, 99, 235, 0.45);
+  --chip-horizontal-text: #1d4ed8;
+  --chip-horizontal-outline: rgba(37, 99, 235, 0.65);
+
+  --chip-vertical-bg: rgba(124, 58, 237, 0.12);
+  --chip-vertical-border: rgba(124, 58, 237, 0.45);
+  --chip-vertical-text: #7c3aed;
+  --chip-vertical-outline: rgba(124, 58, 237, 0.65);
+
+  --chip-systems-bg: rgba(5, 150, 105, 0.12);
+  --chip-systems-border: rgba(5, 150, 105, 0.45);
+  --chip-systems-text: #0f766e;
+  --chip-systems-outline: rgba(5, 150, 105, 0.65);
+
+  --chip-finishes-bg: rgba(219, 39, 119, 0.12);
+  --chip-finishes-border: rgba(219, 39, 119, 0.45);
+  --chip-finishes-text: #be185d;
+  --chip-finishes-outline: rgba(219, 39, 119, 0.7);
+
+  --chip-soft_costs-bg: rgba(217, 119, 6, 0.12);
+  --chip-soft_costs-border: rgba(217, 119, 6, 0.45);
+  --chip-soft_costs-text: #b45309;
+  --chip-soft_costs-outline: rgba(217, 119, 6, 0.65);
+
+  --chip-offsite-bg: rgba(14, 165, 233, 0.12);
+  --chip-offsite-border: rgba(14, 165, 233, 0.45);
+  --chip-offsite-text: #0b7dbf;
+  --chip-offsite-outline: rgba(14, 165, 233, 0.7);
+
+  --chip-contingency-bg: rgba(244, 63, 94, 0.12);
+  --chip-contingency-border: rgba(244, 63, 94, 0.55);
+  --chip-contingency-text: #b91c1c;
+  --chip-contingency-outline: rgba(244, 63, 94, 0.8);
+
+  --chip-other-bg: rgba(15, 23, 42, 0.15);
+  --chip-other-border: rgba(15, 23, 42, 0.45);
+  --chip-other-text: #0f172a;
+  --chip-other-outline: rgba(15, 23, 42, 0.6);
+
   /* Top Navigation - forced dark palette */
   --nav-bg: #111827;
   --nav-border: #1f2937;
@@ -47,6 +90,35 @@
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
+
+  /* ==========================================================================
+     NAV TAB COLORS - D12 Functional Color Coding
+     EXACT VALUES — DO NOT MODIFY
+     Mode-stable: same colors in light and dark mode
+     ========================================================================== */
+
+  /* Setup Group (Blue) */
+  --nav-tab-project: #2563eb;
+  --nav-tab-property: #3b82f6;
+
+  /* Financial Group (Cyan/Teal) */
+  --nav-tab-operations: #0891b2;
+  --nav-tab-valuation: #06b6d4;
+  --nav-tab-capitalization: #0d9488;
+
+  /* Output Group (Purple) */
+  --nav-tab-reports: #7c3aed;
+  --nav-tab-documents: #8b5cf6;
+
+  /* Spatial Group (Green) */
+  --nav-tab-map: #059669;
+
+  /* Text — Always white */
+  --nav-tab-text: #ffffff;
+
+  /* Nav Tab Layout */
+  --nav-tab-radius: 6px;
+  --nav-tab-inactive-opacity: 0.75; /* All tabs show color, inactive slightly muted */
 
   /* Spacing */
   --app-padding: 0.75rem; /* align to nav bar horizontal padding */
@@ -103,6 +175,39 @@
   --hover-overlay: rgba(255, 255, 255, 0.06);
   --active-overlay: rgba(255, 255, 255, 0.12);
 
+  /* Semantic category chips - dark theme */
+  --chip-horizontal-bg: rgba(37, 99, 235, 0.24);
+  --chip-horizontal-border: rgba(37, 99, 235, 0.7);
+  --chip-horizontal-outline: rgba(37, 99, 235, 0.9);
+
+  --chip-vertical-bg: rgba(124, 58, 237, 0.24);
+  --chip-vertical-border: rgba(124, 58, 237, 0.7);
+  --chip-vertical-outline: rgba(124, 58, 237, 0.9);
+
+  --chip-systems-bg: rgba(5, 150, 105, 0.24);
+  --chip-systems-border: rgba(5, 150, 105, 0.7);
+  --chip-systems-outline: rgba(5, 150, 105, 0.9);
+
+  --chip-finishes-bg: rgba(219, 39, 119, 0.24);
+  --chip-finishes-border: rgba(219, 39, 119, 0.7);
+  --chip-finishes-outline: rgba(219, 39, 119, 0.9);
+
+  --chip-soft_costs-bg: rgba(217, 119, 6, 0.24);
+  --chip-soft_costs-border: rgba(217, 119, 6, 0.7);
+  --chip-soft_costs-outline: rgba(217, 119, 6, 0.9);
+
+  --chip-offsite-bg: rgba(14, 165, 233, 0.24);
+  --chip-offsite-border: rgba(14, 165, 233, 0.7);
+  --chip-offsite-outline: rgba(14, 165, 233, 0.9);
+
+  --chip-contingency-bg: rgba(244, 63, 94, 0.24);
+  --chip-contingency-border: rgba(244, 63, 94, 0.75);
+  --chip-contingency-outline: rgba(244, 63, 94, 0.95);
+
+  --chip-other-bg: rgba(15, 23, 42, 0.3);
+  --chip-other-border: rgba(15, 23, 42, 0.7);
+  --chip-other-outline: rgba(15, 23, 42, 0.9);
+
   /* Keep parcel/chip hues stable for recognizability; adjust only if contrast fails */
 
   /* Top Navigation stays dark; reuse root values */
@@ -135,4 +240,6 @@
   --ops-positive: #68d391;
   --ops-muted: #a0aec0;
   --ops-warn: #f6ad55;
+  --cui-card-header-bg: #1f2937;
+  --cui-card-subheader-bg: #111827;
 }

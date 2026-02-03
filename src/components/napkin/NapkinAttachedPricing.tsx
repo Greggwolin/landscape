@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Map, X } from 'lucide-react';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { formatMoney } from '@/utils/formatters/number';
 import { NapkinCompsMap } from './NapkinCompsMap';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 type NapkinAttachedPricingProps = {
   projectId: number;
@@ -251,9 +252,9 @@ export function NapkinAttachedPricing({ projectId }: NapkinAttachedPricingProps)
         <h5 className="mb-0">Attached Product Pricing</h5>
         <div className="d-flex align-items-center gap-2">
           {!isLoading && data && (
-            <span className="badge bg-info">
+            <SemanticBadge intent="status" value="validated">
               {totalComps} comps
-            </span>
+            </SemanticBadge>
           )}
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>

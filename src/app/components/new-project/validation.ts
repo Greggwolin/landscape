@@ -51,6 +51,9 @@ export const newProjectSchema = z.object({
   scale_input_method: scaleMethodEnum.default('units'),
   analysis_start_date: optionalString(),
 
+  // Acquisition
+  asking_price: optionalString(),
+
   // Path selection
   path_choice: z.enum(['immediate', 'extended_wizard', 'ai_extraction']).optional().or(z.literal(''))
 })
@@ -200,6 +203,9 @@ export const emptyFormDefaults: NewProjectFormData = {
   density: '',
   scale_input_method: 'units',
   analysis_start_date: new Date().toISOString().split('T')[0],
+
+  // Acquisition
+  asking_price: '',
 
   // Path selection
   path_choice: ''

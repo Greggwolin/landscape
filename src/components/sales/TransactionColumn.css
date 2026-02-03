@@ -1,0 +1,16 @@
+.transaction-save-btn,
+.transaction-cancel-btn,
+.transaction-edit-btn {
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  border-radius: 0.35rem;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.transaction-edit-btn {
+  background: transparent;
+  border: 1px solid transparent;
+}

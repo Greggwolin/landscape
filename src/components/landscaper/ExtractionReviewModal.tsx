@@ -8,10 +8,10 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CBadge,
   CAlert,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { UnitMixAccordion, UnitMixRow } from './UnitMixAccordion';
 import { ExtractionFieldRow } from './ExtractionFieldRow';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
@@ -382,14 +382,14 @@ export function ExtractionReviewModal({
           {/* Header action buttons */}
           <div className="d-flex gap-2">
             {onCreateProject && (
-              <CButton color="success" size="sm" onClick={onCreateProject}>
+              <SemanticButton intent="primary-action" size="sm" onClick={onCreateProject}>
                 Create Project
-              </CButton>
+              </SemanticButton>
             )}
             {onOpenProject && (
-              <CButton color="primary" size="sm" variant="outline" onClick={onOpenProject}>
+              <SemanticButton intent="secondary-action" size="sm" variant="outline" onClick={onOpenProject}>
                 Open Project
-              </CButton>
+              </SemanticButton>
             )}
           </div>
         </div>
@@ -601,16 +601,16 @@ export function ExtractionReviewModal({
           )}
         </div>
         <div className="d-flex gap-2">
-          <CButton color="secondary" variant="ghost" onClick={onClose} disabled={isCommitting}>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={onClose} disabled={isCommitting}>
             Cancel
-          </CButton>
-          <CButton
-            color="primary"
+          </SemanticButton>
+          <SemanticButton
+            intent="primary-action"
             onClick={handleCommit}
             disabled={isCommitting || acceptedCount === 0}
           >
             {isCommitting ? 'Committing...' : `Commit ${acceptedCount} Field(s)`}
-          </CButton>
+          </SemanticButton>
         </div>
       </CModalFooter>
     </CModal>

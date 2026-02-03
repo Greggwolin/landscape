@@ -9,7 +9,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CFormInput,
   CFormLabel,
   CRow,
@@ -19,6 +18,7 @@ import {
 import type { BudgetItem } from '@/types/budget';
 import { formatMoney } from '@/utils/formatters/number';
 import { useCloseOnEscape } from '@/hooks/useCloseOnEscape';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface Props {
   item: BudgetItem | null;
@@ -197,12 +197,12 @@ export default function GanttEditModal({ item, isOpen, onClose, onSave }: Props)
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" onClick={onClose} disabled={saving}>
+        <SemanticButton intent="tertiary-action" onClick={onClose} disabled={saving}>
           Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleSave} disabled={!isValid || saving}>
+        </SemanticButton>
+        <SemanticButton intent="primary-action" onClick={handleSave} disabled={!isValid || saving}>
           {saving ? 'Saving...' : 'Save'}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

@@ -4,8 +4,9 @@
 'use client';
 
 import React from 'react';
-import { CButton } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { formatMoney } from '@/utils/formatters/number';
+import { SemanticBadge } from '@/components/ui/landscape';
 import type { BudgetMode } from '../ModeSelector';
 import type { CategoryVariance } from '@/hooks/useBudgetVariance';
 
@@ -178,14 +179,19 @@ export default function GroupRow({
             )}
 
             {/* Child count badge */}
-            <span className="badge bg-secondary ms-1" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
+            <SemanticBadge
+              intent="navigation-meta"
+              value="count"
+              className="ms-1"
+              style={{ fontSize: '0.75rem', flexShrink: 0 }}
+            >
               {childCount}
-            </span>
+            </SemanticBadge>
           </div>
 
           {isExpanded && onAddItem && (
-            <CButton
-              color="primary"
+            <SemanticButton
+              intent="secondary-action"
               size="sm"
               variant="ghost"
               className="text-nowrap"
@@ -195,7 +201,7 @@ export default function GroupRow({
               }}
             >
               + Add Item
-            </CButton>
+            </SemanticButton>
           )}
         </div>
       </td>

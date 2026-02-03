@@ -4,7 +4,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CButton, CFormSelect } from '@coreui/react';
+import { CFormSelect } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import type { BudgetItem } from '../ColumnDefinitions';
 
 interface EditableCategoryCellProps {
@@ -251,12 +252,12 @@ export default function EditableCategoryCell({
           )}
 
           <div className="d-flex gap-2 mt-2">
-            <CButton color="primary" size="sm" onClick={handleSave}>
+            <SemanticButton intent="primary-action" size="sm" onClick={handleSave}>
               Save
-            </CButton>
-            <CButton color="secondary" size="sm" onClick={handleCancel}>
+            </SemanticButton>
+            <SemanticButton intent="secondary-action" size="sm" onClick={handleCancel}>
               Cancel
-            </CButton>
+            </SemanticButton>
           </div>
         </>
       )}

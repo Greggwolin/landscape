@@ -8,6 +8,14 @@ export type SemanticVariant =
   | 'light'
   | 'dark';
 
+export type SemanticIntent =
+  | 'status'
+  | 'confidence'
+  | 'category'
+  | 'action-state'
+  | 'navigation-meta'
+  | 'user-tag';
+
 const normalizeValue = (value: string) => value?.toLowerCase().trim() ?? '';
 
 const statusVariants: Record<string, SemanticVariant> = {
@@ -76,41 +84,57 @@ const navMetaVariants: Record<string, SemanticVariant> = {
   count: 'light',
 };
 
-export function resolveSemanticVariant(
-  intent: string,
-  value: string,
-  interactive?: boolean
-): SemanticVariant {
-  const normalized = normalizeValue(value);
+type ResolverFn = (normalizedValue: string, interactive?: boolean) => SemanticVariant | undefined;
 
-  if (intent === 'status') {
+const dynamicResolvers: Partial<Record<SemanticIntent, ResolverFn>> = {
+  status: (normalized) => {
     if (normalized.startsWith('physical-complete-')) {
       if (normalized.endsWith('high')) return 'success';
       if (normalized.endsWith('medium')) return 'warning';
       return 'secondary';
     }
-    return statusVariants[normalized] ?? 'secondary';
-  }
-
-  if (intent === 'confidence') {
+    return undefined;
+  },
+  confidence: (normalized) => {
     if (normalized.includes('high')) return 'success';
     if (normalized.includes('med')) return 'warning';
     if (normalized.includes('low')) return 'danger';
-    return 'secondary';
-  }
+    return undefined;
+  },
+  'action-state': (_normalized, interactive) => (interactive ? 'primary' : undefined),
+};
 
-  if (intent === 'category') {
-    return categoryVariants[normalized] ?? 'secondary';
-  }
+const staticMappings: Record<SemanticIntent, Record<string, SemanticVariant>> = {
+  status: statusVariants,
+  confidence: {},
+  category: categoryVariants,
+  'action-state': actionStateVariants,
+  'navigation-meta': navMetaVariants,
+  'user-tag': {},
+};
 
-  if (intent === 'action-state') {
-    return actionStateVariants[normalized] ?? (interactive ? 'primary' : 'secondary');
-  }
+const fallbackVariants: Record<SemanticIntent, SemanticVariant> = {
+  status: 'secondary',
+  confidence: 'secondary',
+  category: 'secondary',
+  'action-state': 'secondary',
+  'navigation-meta': 'secondary',
+  'user-tag': 'light',
+};
 
-  if (intent === 'navigation-meta') {
-    return navMetaVariants[normalized] ?? 'secondary';
-  }
+export function resolveSemanticVariant(
+  intent: SemanticIntent,
+  value: string,
+  interactive?: boolean
+): SemanticVariant {
+  const normalized = normalizeValue(value);
+  const dynamicVariant = dynamicResolvers[intent]?.(normalized, interactive);
+  if (dynamicVariant) return dynamicVariant;
 
-  // Fallback to secondary for unknown intents
-  return 'secondary';
+  const staticVariant = staticMappings[intent]?.[normalized];
+  if (staticVariant) return staticVariant;
+
+  if (intent === 'action-state' && interactive) return 'primary';
+
+  return fallbackVariants[intent] ?? 'secondary';
 }

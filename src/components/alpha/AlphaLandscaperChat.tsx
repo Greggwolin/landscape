@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { CButton, CFormInput, CSpinner } from '@coreui/react';
+import { CFormInput, CSpinner } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilSend } from '@coreui/icons';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -90,8 +92,9 @@ export function AlphaLandscaperChat({ projectId, pageContext }: AlphaLandscaperC
             className={`chat-message mb-2 p-2 rounded ${
               msg.role === 'user' ? 'bg-primary text-white ms-4' : 'bg-light'
             }`}
+            style={{ whiteSpace: 'pre-wrap' }}
           >
-            {msg.content}
+            {msg.role === 'user' ? msg.content : processLandscaperResponse(msg.content)}
           </div>
         ))}
         {loading && (
@@ -110,9 +113,9 @@ export function AlphaLandscaperChat({ projectId, pageContext }: AlphaLandscaperC
           onKeyDown={handleKeyDown}
           disabled={loading}
         />
-        <CButton color="primary" onClick={sendMessage} disabled={!input.trim() || loading}>
+        <SemanticButton intent="primary-action" onClick={sendMessage} disabled={!input.trim() || loading}>
           <CIcon icon={cilSend} />
-        </CButton>
+        </SemanticButton>
       </div>
     </div>
   );

@@ -4,10 +4,11 @@
  * Full-width bar above the Studio split layout containing:
  * - Project selector dropdown (left)
  * - Collapse toggle for Landscaper panel (left, after selector)
- * - Future: vitals, completeness chips (right side)
+ * - Version badge and Alpha Assistant button (right side)
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-01-28
+ * @updated 2026-02-03 - Added version badge
  */
 
 'use client';
@@ -19,6 +20,7 @@ import CIcon from '@coreui/icons-react';
 import { cilChevronDoubleLeft, cilChevronDoubleRight, cilLifeRing } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
+import { VersionBadge } from '@/components/changelog';
 
 interface StudioProjectBarProps {
   projectId: number;
@@ -133,12 +135,15 @@ export function StudioProjectBar({
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
+      {/* Version badge - right side, before Alpha Assistant */}
+      <VersionBadge />
+
       {/* Alpha Assistant button - right side */}
       {onAlphaAssistantClick && (
         <button
           onClick={onAlphaAssistantClick}
           className="alpha-assistant-trigger"
-          title="Alpha Assistant - Help, Chat & Feedback"
+          title="Alpha Assistant - Help & Feedback"
           style={{
             display: 'flex',
             alignItems: 'center',

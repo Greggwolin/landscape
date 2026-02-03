@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  CButton,
   CModal,
   CModalHeader,
   CModalTitle,
@@ -22,6 +21,7 @@ import {
 } from '@coreui/react';
 import { useBudgetCategories } from '@/hooks/useBudgetCategories';
 import type { BudgetCategory, BudgetCategoryTreeNode } from '@/types/budget-categories';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface CategoryTreeManagerProps {
   projectId: number;
@@ -171,16 +171,17 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
         >
           {/* Expand/Collapse Button */}
           <div style={{ width: '24px', marginRight: '8px' }}>
-            {hasChildren && (
-              <CButton
-                color="ghost"
-                size="sm"
-                onClick={() => toggleExpanded(node.category_id)}
-                style={{ padding: '0', width: '24px', height: '24px' }}
-              >
-                {isExpanded ? '▼' : '▶'}
-              </CButton>
-            )}
+          {hasChildren && (
+            <SemanticButton
+              intent="tertiary-action"
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleExpanded(node.category_id)}
+              style={{ padding: '0', width: '24px', height: '24px' }}
+            >
+              {isExpanded ? '▼' : '▶'}
+            </SemanticButton>
+          )}
           </div>
 
           {/* Level Badge */}
@@ -219,31 +220,31 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
 
           {/* Actions */}
           <CButtonGroup size="sm">
-            <CButton
-              color="primary"
+            <SemanticButton
+              intent="secondary-action"
               variant="ghost"
               onClick={() => handleCreate(node)}
               disabled={node.level >= 4}
               title="Add child category"
             >
               + Child
-            </CButton>
-            <CButton
-              color="info"
+            </SemanticButton>
+            <SemanticButton
+              intent="secondary-action"
               variant="ghost"
               onClick={() => handleEdit(node)}
               title="Edit category"
             >
               Edit
-            </CButton>
-            <CButton
-              color={isConfirmingDelete ? 'danger' : 'danger'}
+            </SemanticButton>
+            <SemanticButton
+              intent="destructive-action"
               variant={isConfirmingDelete ? 'outline' : 'ghost'}
               onClick={() => handleDelete(node.category_id)}
               title={isConfirmingDelete ? 'Click again to confirm' : 'Delete category'}
             >
               {isConfirmingDelete ? 'Confirm?' : 'Delete'}
-            </CButton>
+            </SemanticButton>
           </CButtonGroup>
         </div>
 
@@ -277,17 +278,17 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
   return (
     <div>
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h5 className="mb-1">Category Hierarchy</h5>
-          <p className="text-medium-emphasis mb-0">
-            Organize budget line items into up to 4 levels of categories
-          </p>
-        </div>
-        <CButton color="primary" onClick={() => handleCreate()}>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h5 className="mb-1">Category Hierarchy</h5>
+            <p className="text-medium-emphasis mb-0">
+              Organize budget line items into up to 4 levels of categories
+            </p>
+          </div>
+        <SemanticButton intent="primary-action" onClick={() => handleCreate()}>
           + Add Root Category
-        </CButton>
-      </div>
+        </SemanticButton>
+        </div>
 
       {/* Delete Error Alert */}
       {deleteError && (
@@ -400,12 +401,19 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
           </CModalBody>
 
           <CModalFooter>
-            <CButton color="secondary" onClick={() => setShowModal(false)}>
+            <SemanticButton
+              intent="secondary-action"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
-            </CButton>
-            <CButton color="primary" type="submit" disabled={loading}>
+            </SemanticButton>
+            <SemanticButton
+              intent="primary-action"
+              type="submit"
+              disabled={loading}
+            >
               {loading ? <CSpinner size="sm" /> : modalMode === 'create' ? 'Create' : 'Save'}
-            </CButton>
+            </SemanticButton>
           </CModalFooter>
         </CForm>
       </CModal>

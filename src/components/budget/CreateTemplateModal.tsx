@@ -10,7 +10,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CForm,
   CFormInput,
   CFormLabel,
@@ -19,6 +18,7 @@ import {
   CAlert,
   CSpinner,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface CreateTemplateModalProps {
   open: boolean;
@@ -169,21 +169,21 @@ export default function CreateTemplateModal({
           </div>
         </CModalBody>
 
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleClose} disabled={creating}>
-            Cancel
-          </CButton>
-          <CButton color="primary" type="submit" disabled={creating}>
-            {creating ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Creating...
-              </>
-            ) : (
-              'Create Template'
-            )}
-          </CButton>
-        </CModalFooter>
+      <CModalFooter>
+        <SemanticButton intent="tertiary-action" onClick={handleClose} disabled={creating}>
+          Cancel
+        </SemanticButton>
+        <SemanticButton intent="primary-action" type="submit" disabled={creating}>
+          {creating ? (
+            <>
+              <CSpinner size="sm" className="me-2" />
+              Creating...
+            </>
+          ) : (
+            'Create Template'
+          )}
+        </SemanticButton>
+      </CModalFooter>
       </CForm>
     </CModal>
   );

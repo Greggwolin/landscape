@@ -7,9 +7,9 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CAlert,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilWarning, cilFile, cilCloudUpload, cilCopy } from '@coreui/icons';
 
@@ -121,22 +121,22 @@ export default function UploadCollisionModal({
       </CModalBody>
 
       <CModalFooter className="d-flex gap-2 justify-content-end">
-        <CButton color="secondary" variant="outline" onClick={onClose} disabled={isLoading}>
+        <SemanticButton intent="secondary-action" variant="outline" onClick={onClose} disabled={isLoading}>
           Cancel
-        </CButton>
-        <CButton
-          color="primary"
+        </SemanticButton>
+        <SemanticButton
+          intent="secondary-action"
           variant="outline"
           onClick={onUploadAsNew}
           disabled={isLoading}
         >
           <CIcon icon={cilCopy} className="me-2" />
           Upload as New Document
-        </CButton>
-        <CButton color="primary" onClick={onReplace} disabled={isLoading}>
+        </SemanticButton>
+        <SemanticButton intent="primary-action" onClick={onReplace} disabled={isLoading}>
           <CIcon icon={cilCloudUpload} className="me-2" />
           Replace (Add Knowledge)
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

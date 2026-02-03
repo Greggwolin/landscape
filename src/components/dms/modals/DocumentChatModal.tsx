@@ -13,6 +13,8 @@ import {
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilFile, cilSend, cilCommentSquare } from '@coreui/icons';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -31,19 +33,9 @@ interface DocumentChatModalProps {
   };
 }
 
+// Use the centralized sanitizer for consistent formatting across all chat components
 const formatChatResponse = (content: string) => {
-  let text = content || '';
-  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  text = text.replace(/\s*#{2,6}\s*/g, '\n');
-  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
-  text = text.replace(/__(.*?)__/g, '$1');
-  text = text.replace(/\s*-\s+/g, '\n  ');
-  text = text.replace(/\s*\*\s+/g, '\n  ');
-  text = text.replace(/(^|\s)\*(\S)/g, '$1$2');
-  text = text.replace(/(\S)\*(\s|$)/g, '$1$2');
-  text = text.replace(/[ \t]+\n/g, '\n');
-  text = text.replace(/\n{3,}/g, '\n\n');
-  return text.trim();
+  return processLandscaperResponse(content || '');
 };
 
 export default function DocumentChatModal({
@@ -142,7 +134,13 @@ export default function DocumentChatModal({
           <span className="text-truncate" style={{ maxWidth: '280px' }}>
             {document.filename}
           </span>
-          <span className="badge bg-secondary ms-1">V{document.version_number}</span>
+          <SemanticBadge
+            intent="status"
+            value="secondary"
+            className="ms-1"
+          >
+            V{document.version_number}
+          </SemanticBadge>
         </COffcanvasTitle>
         <CCloseButton className="text-reset" onClick={onClose} />
       </COffcanvasHeader>

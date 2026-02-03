@@ -7,11 +7,11 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CFormInput,
   CFormLabel,
   CSpinner,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface RenameModalProps {
   visible: boolean;
@@ -93,16 +93,16 @@ export default function RenameModal({
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" variant="outline" onClick={onClose} disabled={isLoading}>
+        <SemanticButton intent="secondary-action" variant="outline" onClick={onClose} disabled={isLoading}>
           Cancel
-        </CButton>
-        <CButton
-          color="primary"
+        </SemanticButton>
+        <SemanticButton
+          intent="primary-action"
           onClick={handleRename}
           disabled={isLoading || !newName.trim()}
         >
           {isLoading ? <CSpinner size="sm" /> : 'Rename'}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

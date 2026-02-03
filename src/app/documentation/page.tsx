@@ -31,6 +31,14 @@ const DocumentationIndex: React.FC = () => {
       lastModified: '2026-02-02'
     },
     {
+      title: 'Semantic Category Chips for Unit Cost Library (Feb 2, 2026)',
+      path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
+      category: 'Component',
+      description: 'Tokenized the Unit Cost category pills by introducing `SemanticCategoryChip` + intent tokens, eliminating inline color math and enabling consistent light/dark theming.',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-02'
+    },
+    {
       title: 'Django Cash Flow Consolidation (Feb 1, 2026)',
       path: '/docs/09_session_notes/2026-02-01-project-switch-tab-preservation.md',
       category: 'Migration',

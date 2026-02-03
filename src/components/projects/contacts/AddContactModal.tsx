@@ -12,6 +12,9 @@ interface AddContactModalProps {
   preselectedRole?: string;
 }
 
+const fieldClass =
+  'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 contacts-input';
+
 export default function AddContactModal({
   isOpen,
   onClose,
@@ -91,10 +94,10 @@ export default function AddContactModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto contacts-modal">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
+        <div className="flex items-center justify-between p-6 border-b contacts-modal-header">
+          <h2 className="text-xl font-semibold contacts-modal-title">Add Contact</h2>
           <button
             onClick={handleClose}
             className="btn btn-sm btn-ghost-secondary"
@@ -114,7 +117,7 @@ export default function AddContactModal({
 
           {/* Contact Role */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Contact Role *
             </label>
             <select
@@ -122,7 +125,7 @@ export default function AddContactModal({
               onChange={(e) =>
                 setFormData({ ...formData, contact_role: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             >
               {CONTACT_ROLES.map(role => (
                 <option key={role.value} value={role.value}>
@@ -134,7 +137,7 @@ export default function AddContactModal({
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Name *
             </label>
             <input
@@ -143,13 +146,13 @@ export default function AddContactModal({
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="John Smith"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             />
           </div>
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Title
             </label>
             <input
@@ -157,13 +160,13 @@ export default function AddContactModal({
               value={formData.title || ''}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="Regional Manager"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             />
           </div>
 
           {/* Company */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Company
             </label>
             <input
@@ -171,13 +174,13 @@ export default function AddContactModal({
               value={formData.company || ''}
               onChange={(e) => setFormData({ ...formData, company: e.target.value })}
               placeholder="ABC Property Management"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             />
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Email
             </label>
             <input
@@ -185,45 +188,45 @@ export default function AddContactModal({
               value={formData.email || ''}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="john.smith@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             />
           </div>
 
           {/* Phone Numbers */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Direct Phone
-              </label>
-              <input
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
+              Direct Phone
+            </label>
+            <input
                 type="text"
                 value={formData.phone_direct || ''}
                 onChange={(e) =>
                   setFormData({ ...formData, phone_direct: e.target.value })
                 }
                 placeholder="+1 555 123 4567"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={fieldClass}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mobile Phone
-              </label>
-              <input
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
+              Mobile Phone
+            </label>
+            <input
                 type="text"
                 value={formData.phone_mobile || ''}
                 onChange={(e) =>
                   setFormData({ ...formData, phone_mobile: e.target.value })
                 }
                 placeholder="+1 555 987 6543"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              className={fieldClass}
+            />
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium contacts-modal-label mb-1">
               Notes
             </label>
             <textarea
@@ -231,7 +234,7 @@ export default function AddContactModal({
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Additional information..."
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={fieldClass}
             />
           </div>
 

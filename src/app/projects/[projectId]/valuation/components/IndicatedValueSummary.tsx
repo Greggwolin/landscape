@@ -1,26 +1,64 @@
 /**
  * IndicatedValueSummary Component
  *
- * Shows the reconciled value calculation from all comparables
+ * Shows the reconciled value calculation from all comparables.
+ * Uses the effective acquisition price (calculated from ledger or asking price fallback).
  */
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { SalesComparable, ValuationReconciliation } from '@/types/valuation';
+
+interface AcquisitionPriceSummary {
+  asking_price: number | null;
+  has_closing_date: boolean;
+  total_acquisition_cost: number | null;
+  effective_acquisition_price: number | null;
+  price_source: 'calculated' | 'asking' | null;
+}
 
 interface IndicatedValueSummaryProps {
   comparables: SalesComparable[];
   reconciliation: ValuationReconciliation | null;
   subjectUnits?: number;
   subjectAskingPrice?: number;
+  projectId: number;
 }
 
 export function IndicatedValueSummary({
   comparables,
   reconciliation,
   subjectUnits = 113,
-  subjectAskingPrice = 47500000
+  subjectAskingPrice,
+  projectId
 }: IndicatedValueSummaryProps) {
+  const [acquisitionData, setAcquisitionData] = useState<AcquisitionPriceSummary | null>(null);
+
+  // Fetch effective acquisition price from Django API
+  useEffect(() => {
+    const fetchAcquisitionPrice = async () => {
+      try {
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${djangoUrl}/api/projects/${projectId}/acquisition/price-summary/`);
+        if (response.ok) {
+          const data = await response.json();
+          setAcquisitionData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch acquisition price:', error);
+      }
+    };
+
+    if (projectId) {
+      fetchAcquisitionPrice();
+    }
+  }, [projectId]);
+
+  // Use effective acquisition price from API, fall back to prop, then to 0
+  const effectivePrice = acquisitionData?.effective_acquisition_price ?? subjectAskingPrice ?? 0;
+  const priceSource = acquisitionData?.price_source;
+  const priceLabel = priceSource === 'calculated' ? 'Acquisition Cost' : 'Asking Price';
   const formatCurrency = (value: number | null | undefined) => {
     if (!value) return '$0';
     return `$${Math.round(Number(value)).toLocaleString()}`;
@@ -55,7 +93,9 @@ export function IndicatedValueSummary({
     ? Number(reconciliation.final_reconciled_value)
     : weightedAvg * subjectUnits;
 
-  const variance = ((subjectAskingPrice - indicatedValue) / indicatedValue) * 100;
+  const variance = effectivePrice > 0 && indicatedValue > 0
+    ? ((effectivePrice - indicatedValue) / indicatedValue) * 100
+    : 0;
 
   return (
     <div
@@ -199,27 +239,42 @@ export function IndicatedValueSummary({
           className="flex justify-between items-center text-sm"
           style={{ color: 'var(--cui-secondary-color)' }}
         >
-          <span>Subject Asking Price</span>
+          <span className="flex items-center gap-2">
+            Subject {priceLabel}
+            {priceSource === 'calculated' && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded"
+                style={{
+                  backgroundColor: 'var(--cui-success-bg)',
+                  color: 'var(--cui-success)',
+                }}
+              >
+                Closed
+              </span>
+            )}
+          </span>
           <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>
-            {formatLargeCurrency(subjectAskingPrice)}
+            {effectivePrice > 0 ? formatLargeCurrency(effectivePrice) : '—'}
           </span>
         </div>
 
-        <div
-          className="flex justify-between items-center text-sm"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          <span>Variance</span>
-          <span
-            style={{
-              color: variance > 0 ? 'var(--cui-warning)' : 'var(--cui-success)',
-              fontWeight: 600
-            }}
+        {effectivePrice > 0 && indicatedValue > 0 && (
+          <div
+            className="flex justify-between items-center text-sm"
+            style={{ color: 'var(--cui-secondary-color)' }}
           >
-            {variance > 0 ? '+' : ''}{variance.toFixed(1)}%
-            {variance > 0 ? ' above' : ' below'} indicated value
-          </span>
-        </div>
+            <span>Variance</span>
+            <span
+              style={{
+                color: variance > 0 ? 'var(--cui-warning)' : 'var(--cui-success)',
+                fontWeight: 600
+              }}
+            >
+              {variance > 0 ? '+' : ''}{variance.toFixed(1)}%
+              {variance > 0 ? ' above' : ' below'} indicated value
+            </span>
+          </div>
+        )}
       </div>
 
       </div>

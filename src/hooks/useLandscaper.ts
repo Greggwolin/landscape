@@ -59,7 +59,9 @@ export interface ChatMessage {
 }
 
 interface UseLandscaperOptions {
-  projectId: string;
+  /** Project ID, or null for global context (DMS, Admin, Benchmarks) */
+  projectId: string | null;
+  /** Active tab for project context, or page context for global (e.g., 'dms', 'benchmarks', 'admin') */
   activeTab?: string;
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
 }
@@ -166,27 +168,40 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
     }
   }, []);
 
+  // Determine if this is a global (non-project) context
+  const isGlobalContext = projectId === null;
+
   const loadHistory = useCallback(async () => {
     try {
-      // Build URL with active_tab filter for tab-specific history
-      const url = new URL(`/api/projects/${projectId}/landscaper/chat`, window.location.origin);
-      if (activeTab) {
-        url.searchParams.set('active_tab', activeTab);
+      // Build URL based on context type
+      let url: URL;
+      if (isGlobalContext) {
+        // Global context: DMS, Admin, Benchmarks
+        url = new URL('/api/landscaper/global/chat', window.location.origin);
+        if (activeTab) {
+          url.searchParams.set('page_context', activeTab);
+        }
+      } else {
+        // Project context
+        url = new URL(`/api/projects/${projectId}/landscaper/chat`, window.location.origin);
+        if (activeTab) {
+          url.searchParams.set('active_tab', activeTab);
+        }
       }
 
-      console.log('[Landscaper] Loading chat history for tab:', activeTab, url.toString());
+      console.log('[Landscaper] Loading chat history for', isGlobalContext ? 'global' : 'project', 'context:', activeTab, url.toString());
 
       const response = await fetchWithTimeout(url.toString());
       const data = await response.json();
 
       if (data.success && data.messages) {
-        console.log('[Landscaper] Loaded', data.messages.length, 'messages for tab:', activeTab);
+        console.log('[Landscaper] Loaded', data.messages.length, 'messages for', isGlobalContext ? 'page' : 'tab', ':', activeTab);
         setMessages(data.messages);
       }
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
-  }, [projectId, activeTab, fetchWithTimeout]);
+  }, [projectId, activeTab, fetchWithTimeout, isGlobalContext]);
 
   // Reload history when project or tab changes - clear immediately for responsive UX
   useEffect(() => {
@@ -211,10 +226,24 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       setMessages((prev) => [...prev, tempUserMessage]);
 
       try {
-        const response = await fetchWithTimeout(`/api/projects/${projectId}/landscaper/chat`, {
+        // Build request URL and body based on context type
+        let requestUrl: string;
+        let requestBody: Record<string, unknown>;
+
+        if (isGlobalContext) {
+          // Global context: DMS, Admin, Benchmarks
+          requestUrl = '/api/landscaper/global/chat';
+          requestBody = { message, clientRequestId, page_context: activeTab };
+        } else {
+          // Project context
+          requestUrl = `/api/projects/${projectId}/landscaper/chat`;
+          requestBody = { message, clientRequestId, activeTab };
+        }
+
+        const response = await fetchWithTimeout(requestUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, clientRequestId, activeTab }),
+          body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
@@ -241,9 +270,11 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
           onFieldUpdate(data.metadata.fieldUpdates);
         }
 
-        // Emit mutation events if any tools executed successfully
+        // Emit mutation events if any tools executed successfully (only for project context)
         // This triggers auto-refresh in listening components (RentRollGrid, etc.)
-        emitMutationEventsIfNeeded(Number(projectId), data.metadata);
+        if (!isGlobalContext && projectId) {
+          emitMutationEventsIfNeeded(Number(projectId), data.metadata);
+        }
 
         if (data.wasDuplicate) {
           console.info('Response was cached (duplicate request)');
@@ -263,12 +294,17 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
         setIsLoading(false);
       }
     },
-    [projectId, activeTab, onFieldUpdate, fetchWithTimeout]
+    [projectId, activeTab, onFieldUpdate, fetchWithTimeout, isGlobalContext]
   );
 
   const clearChat = useCallback(async () => {
     try {
-      const response = await fetchWithTimeout(`/api/projects/${projectId}/landscaper/chat`, {
+      // Build request URL based on context type
+      const requestUrl = isGlobalContext
+        ? '/api/landscaper/global/chat'
+        : `/api/projects/${projectId}/landscaper/chat`;
+
+      const response = await fetchWithTimeout(requestUrl, {
         method: 'DELETE',
       });
 
@@ -283,7 +319,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       console.error('Failed to clear chat:', err);
       throw err;
     }
-  }, [projectId, fetchWithTimeout]);
+  }, [projectId, fetchWithTimeout, isGlobalContext]);
 
   return {
     messages,

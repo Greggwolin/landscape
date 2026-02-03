@@ -2,7 +2,6 @@
 
 import React from 'react';
 import {
-  CButton,
   CModal,
   CModalBody,
   CModalFooter,
@@ -10,6 +9,7 @@ import {
   CModalTitle,
 } from '@coreui/react';
 import { UnitOfMeasure } from '@/lib/measures';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface DeleteUOMModalProps {
   open: boolean;
@@ -47,12 +47,16 @@ const DeleteUOMModal: React.FC<DeleteUOMModalProps> = ({
         )}
       </CModalBody>
       <CModalFooter>
-        <CButton color="secondary" variant="ghost" onClick={onCancel} disabled={isProcessing}>
+        <SemanticButton intent="secondary-action" variant="ghost" onClick={onCancel} disabled={isProcessing}>
           Cancel
-        </CButton>
-        <CButton color="danger" onClick={onConfirm} disabled={isProcessing}>
+        </SemanticButton>
+        <SemanticButton
+          intent="destructive-action"
+          onClick={onConfirm}
+          disabled={isProcessing}
+        >
           Deactivate
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

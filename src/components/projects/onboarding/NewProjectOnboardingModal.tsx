@@ -115,7 +115,10 @@ export default function NewProjectOnboardingModal({
         const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: content }),
+          body: JSON.stringify({
+            message: content,
+            activeTab: 'documents',  // Onboarding focuses on document upload/extraction
+          }),
         });
 
         if (response.ok) {

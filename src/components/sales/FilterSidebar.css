@@ -1,0 +1,19 @@
+.filter-sidebar .filter-btn {
+  width: 100%;
+  border-radius: 0.35rem;
+  justify-content: flex-start;
+  font-weight: 600;
+  gap: 0.5rem;
+}
+
+.filter-btn--active {
+  border-color: var(--cui-primary);
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+  color: var(--cui-primary);
+}
+
+.filter-btn--nested {
+  padding-left: 1rem;
+  font-weight: normal;
+  color: var(--cui-body-color);
+}

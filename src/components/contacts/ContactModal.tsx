@@ -7,7 +7,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CForm,
   CFormLabel,
   CFormInput,
@@ -24,6 +23,7 @@ import {
   CTabContent,
   CTabPane,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import {
   cilUser,
@@ -36,6 +36,7 @@ import {
 } from '@coreui/icons';
 import { createContact, updateContact } from '@/lib/api/contacts';
 import type { ContactListItem, ContactFormData, ContactType } from '@/types/contacts';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -489,25 +490,29 @@ export default function ContactModal({
                         }
                       }}
                     />
-                    <CButton
-                      color="secondary"
+                    <SemanticButton
+                      intent="secondary-action"
                       variant="outline"
                       onClick={handleAddTag}
                     >
                       Add
-                    </CButton>
+                    </SemanticButton>
                   </CInputGroup>
                   <div className="d-flex flex-wrap gap-1">
                     {formData.tags?.map((tag, index) => (
-                      <span
+                      <SemanticBadge
                         key={index}
-                        className="badge bg-secondary d-flex align-items-center gap-1"
+                        intent="user-tag"
+                        value={tag}
+                        interactive
+                        userTagState="filled"
+                        className="d-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                         onClick={() => handleRemoveTag(tag)}
                       >
-                        {tag}
-                        <span>&times;</span>
-                      </span>
+                        <span>{tag}</span>
+                        <span aria-hidden="true">&times;</span>
+                      </SemanticBadge>
                     ))}
                   </div>
                 </CCol>
@@ -521,10 +526,10 @@ export default function ContactModal({
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="secondary" variant="ghost" onClick={onClose}>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={onClose}>
             Cancel
-          </CButton>
-          <CButton color="primary" type="submit" disabled={saving}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={saving}>
             {saving ? (
               <>
                 <CSpinner size="sm" className="me-2" />
@@ -533,7 +538,7 @@ export default function ContactModal({
             ) : (
               isEditing ? 'Update Contact' : 'Create Contact'
             )}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CForm>
     </CModal>

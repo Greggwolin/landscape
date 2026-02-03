@@ -3,7 +3,6 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { CButton } from '@coreui/react';
 import { LandscapeButton } from '@/components/ui/landscape';
 import { getColumnsByMode, type BudgetItem, type BudgetColumnDef } from './ColumnDefinitions';
 import type { BudgetMode } from '@/types/budget';

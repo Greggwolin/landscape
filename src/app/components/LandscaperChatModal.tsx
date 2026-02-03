@@ -19,12 +19,14 @@ interface LandscaperChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: number;
+  activeTab?: string;  // Page context for tool filtering (e.g., 'property', 'operations', 'valuation')
 }
 
 export default function LandscaperChatModal({
   isOpen,
   onClose,
   projectId,
+  activeTab = 'home',
 }: LandscaperChatModalProps) {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [adviceVariances, setAdviceVariances] = useState<any[]>([]);
@@ -102,6 +104,7 @@ export default function LandscaperChatModal({
                 projectId={projectId}
                 messages={chatMessages}
                 onMessagesUpdate={setChatMessages}
+                activeTab={activeTab}
               />
             </div>
 

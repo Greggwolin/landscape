@@ -18,9 +18,9 @@ import {
   CListGroup,
   CListGroupItem,
   CBadge,
-  CButton,
   CButtonGroup,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import {
   cilUser,
@@ -204,18 +204,18 @@ export default function ContactDetailPanel({
               </div>
               <CButtonGroup size="sm">
                 {onEdit && (
-                  <CButton color="secondary" variant="ghost" onClick={handleEdit}>
+                  <SemanticButton intent="tertiary-action" variant="ghost" onClick={handleEdit}>
                     <CIcon icon={cilPencil} />
-                  </CButton>
+                  </SemanticButton>
                 )}
-                <CButton
-                  color="danger"
+                <SemanticButton
+                  intent="destructive-action"
                   variant="ghost"
                   onClick={handleDelete}
                   disabled={deleting}
                 >
                   <CIcon icon={cilTrash} />
-                </CButton>
+                </SemanticButton>
               </CButtonGroup>
             </div>
 

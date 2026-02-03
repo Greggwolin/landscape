@@ -4,12 +4,16 @@
  * ARGUS-style rectangular colored tab navigation.
  * Pattern matches Landscape tile navigation and .studio-badge-* from Style Catalog.
  *
- * Active: Full saturated color background, white text (yellow = dark text)
- * Inactive: 10% opacity tint ({color}1A), colored text
+ * Active: Full saturated color background, white text, slight elevation
+ * Inactive: Same color at 75% opacity, white text
+ * Hover: Brighten slightly from current state
  *
- * @version 3.0
+ * All 8 tabs ALWAYS show their assigned color (D12 functional color coding)
+ * regardless of active/inactive state.
+ *
+ * @version 4.0
  * @created 2026-01-23
- * @updated 2026-01-23 - Rectangular tabs, always colored (active/inactive)
+ * @updated 2026-02-02 - All tabs show color in both states, improved visibility
  */
 
 /* ==========================================================================
@@ -45,16 +49,16 @@
   display: none;
 }
 
-/* Individual Folder Tab - Rectangular, no rounded corners */
+/* Individual Folder Tab - Rounded corners, flex-fill */
 .folder-tab {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 132px;
-  max-width: 132px;
-  height: 36px;
-  padding: 4px 10px;
+  flex: 1 1 0;
+  min-width: 100px;
+  height: 44px; /* 36px + 0.5rem (8px) */
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: center;
@@ -62,8 +66,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 
-  /* Rectangular - no border radius */
-  border-radius: 0;
+  /* Rounded corners */
+  border-radius: var(--nav-tab-radius, 6px);
   border: none;
 }
 
@@ -95,120 +99,191 @@
 
 .folder-tab-label-primary {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.8125rem; /* 13px */
   font-weight: 600;
   white-space: nowrap;
 }
 
 .folder-tab-label-secondary {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.75rem; /* 12px - 1pt smaller than primary (13px) */
   font-weight: 500;
   opacity: 0.9;
   white-space: nowrap;
 }
 
 /* ==========================================================================
-   COLOR VARIANTS - Active and Inactive States
-   Pattern: Inactive uses {color}1A (10% opacity), active uses full color
-   Matches .studio-badge-* pattern from Landscape Style Catalog
+   COLOR VARIANTS - D12 Token-Based Functional Color Coding
+   EXACT VALUES — DO NOT MODIFY
+
+   NEW PATTERN (v4.0):
+   - Inactive: Full solid color at 75% opacity, white text
+   - Active: Full solid color at 100% opacity, white text, slight shadow
+   - Hover: Brighten slightly from current state
+
+   Grouped by function: Setup (Blue), Financial (Cyan/Teal), Output (Purple), Spatial (Green)
+   Mode-stable: same colors in light and dark mode
+   Text color: Always white (#ffffff) for both states
    ========================================================================== */
 
-/* HOME - Blue #3d99f5 */
+/* ----- SETUP GROUP (Blue) ----- */
+
+/* HOME/PROJECT - #2563eb */
 .folder-tab[data-folder="home"] {
-  background: #3d99f51A;
-  color: #3d99f5;
+  background: var(--nav-tab-project);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="home"]:hover {
-  background: #3d99f533;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="home"].active {
-  background: #3d99f5;
+  background: var(--nav-tab-project);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* PROPERTY - Green #57c68a */
+/* PROPERTY - #3b82f6 */
 .folder-tab[data-folder="property"] {
-  background: #57c68a1A;
-  color: #57c68a;
+  background: var(--nav-tab-property);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="property"]:hover {
-  background: #57c68a33;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="property"].active {
-  background: #57c68a;
+  background: var(--nav-tab-property);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* OPERATIONS / BUDGET - Purple #7a80ec */
+/* ----- FINANCIAL GROUP (Cyan/Teal) ----- */
+
+/* OPERATIONS / BUDGET - #0891b2 */
 .folder-tab[data-folder="operations"],
 .folder-tab[data-folder="budget"] {
-  background: #7a80ec1A;
-  color: #7a80ec;
+  background: var(--nav-tab-operations);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="operations"]:hover,
 .folder-tab[data-folder="budget"]:hover {
-  background: #7a80ec33;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="operations"].active,
 .folder-tab[data-folder="budget"].active {
-  background: #7a80ec;
+  background: var(--nav-tab-operations);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* FEASIBILITY / VALUATION - Yellow #f2c40d */
+/* FEASIBILITY / VALUATION - #06b6d4 */
 .folder-tab[data-folder="feasibility"],
 .folder-tab[data-folder="valuation"] {
-  background: #f2c40d1A;
-  color: #8a7008;
+  background: var(--nav-tab-valuation);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="feasibility"]:hover,
 .folder-tab[data-folder="valuation"]:hover {
-  background: #f2c40d33;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="feasibility"].active,
 .folder-tab[data-folder="valuation"].active {
-  background: #f2c40d;
-  color: #000000; /* Dark text for yellow */
+  background: var(--nav-tab-valuation);
+  color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* CAPITALIZATION - Purple #9b59b6 */
+/* ----- FINANCIAL GROUP continued (Teal) ----- */
+
+/* CAPITALIZATION - #0d9488 */
 .folder-tab[data-folder="capital"] {
-  background: #9b59b61A;
-  color: #9b59b6;
+  background: var(--nav-tab-capitalization);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="capital"]:hover {
-  background: #9b59b633;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="capital"].active {
-  background: #9b59b6;
+  background: var(--nav-tab-capitalization);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* REPORTS - Gray #6b7785 */
+/* ----- OUTPUT GROUP (Purple) ----- */
+
+/* REPORTS - #7c3aed */
 .folder-tab[data-folder="reports"] {
-  background: #6b77851A;
-  color: #6b7785;
+  background: var(--nav-tab-reports);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="reports"]:hover {
-  background: #6b778533;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="reports"].active {
-  background: #6b7785;
+  background: var(--nav-tab-reports);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
-/* DOCUMENTS - Dark #272d35 */
+/* DOCUMENTS - #8b5cf6 */
 .folder-tab[data-folder="documents"] {
-  background: #272d351A;
-  color: #374151;
+  background: var(--nav-tab-documents);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
 }
 .folder-tab[data-folder="documents"]:hover {
-  background: #272d3533;
+  opacity: 0.85;
+  filter: brightness(1.1);
 }
 .folder-tab[data-folder="documents"].active {
-  background: #272d35;
+  background: var(--nav-tab-documents);
   color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+  border: 1px solid var(--cui-body-color);
+}
+
+/* ----- SPATIAL GROUP (Green) ----- */
+
+/* MAP - #059669 */
+.folder-tab[data-folder="map"] {
+  background: var(--nav-tab-map);
+  color: #FFFFFF;
+  opacity: var(--nav-tab-inactive-opacity, 0.75);
+}
+.folder-tab[data-folder="map"]:hover {
+  opacity: 0.85;
+  filter: brightness(1.1);
+}
+.folder-tab[data-folder="map"].active {
+  background: var(--nav-tab-map);
+  color: #FFFFFF;
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
+  border: 1px solid var(--cui-body-color);
 }
 
 /* ==========================================================================
@@ -269,75 +344,19 @@
 }
 
 /* ==========================================================================
-   DARK THEME ADJUSTMENTS
-   Pattern from catalog: Navigation Tile Inactive dark = bg #1F2937
+   THEME-SPECIFIC ADJUSTMENTS
+   Mode-stable: Colors remain the same, only adjust inactive opacity
+   for optimal visibility on each background
    ========================================================================== */
 
-[data-coreui-theme="dark"] .folder-tab[data-folder="home"] {
-  background: #3d99f533;
-  color: #6bb3f7;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="home"].active {
-  background: #3d99f5;
-  color: #FFFFFF;
+/* Light mode - slightly more muted inactive tabs */
+[data-coreui-theme="light"] .folder-tab {
+  --nav-tab-inactive-opacity: 0.65;
 }
 
-[data-coreui-theme="dark"] .folder-tab[data-folder="property"] {
-  background: #57c68a33;
-  color: #7dd4a5;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="property"].active {
-  background: #57c68a;
-  color: #FFFFFF;
-}
-
-[data-coreui-theme="dark"] .folder-tab[data-folder="operations"],
-[data-coreui-theme="dark"] .folder-tab[data-folder="budget"] {
-  background: #7a80ec33;
-  color: #9a9ef0;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="operations"].active,
-[data-coreui-theme="dark"] .folder-tab[data-folder="budget"].active {
-  background: #7a80ec;
-  color: #FFFFFF;
-}
-
-[data-coreui-theme="dark"] .folder-tab[data-folder="feasibility"],
-[data-coreui-theme="dark"] .folder-tab[data-folder="valuation"] {
-  background: #f2c40d33;
-  color: #f5d657;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="feasibility"].active,
-[data-coreui-theme="dark"] .folder-tab[data-folder="valuation"].active {
-  background: #f2c40d;
-  color: #000000;
-}
-
-[data-coreui-theme="dark"] .folder-tab[data-folder="capital"] {
-  background: #9b59b633;
-  color: #b57fd0;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="capital"].active {
-  background: #9b59b6;
-  color: #FFFFFF;
-}
-
-[data-coreui-theme="dark"] .folder-tab[data-folder="reports"] {
-  background: #6b778533;
-  color: #9ca3af;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="reports"].active {
-  background: #6b7785;
-  color: #FFFFFF;
-}
-
-[data-coreui-theme="dark"] .folder-tab[data-folder="documents"] {
-  background: #FFFFFF1A;
-  color: #D1D5DB;
-}
-[data-coreui-theme="dark"] .folder-tab[data-folder="documents"].active {
-  background: #272d35;
-  color: #FFFFFF;
+/* Dark mode - slightly brighter inactive tabs for visibility */
+[data-coreui-theme="dark"] .folder-tab {
+  --nav-tab-inactive-opacity: 0.65;
 }
 
 /* ==========================================================================
@@ -478,19 +497,18 @@
   }
 
   .folder-tab {
-    min-width: 108px;
-    max-width: 108px;
-    height: 32px;
-    padding: 4px 8px;
+    min-width: 90px;
+    height: 40px; /* 32px + 0.5rem (8px) */
+    padding: 8px 8px;
   }
 
   .folder-tab-label,
   .folder-tab-label-primary {
-    font-size: 0.7rem;
+    font-size: 0.75rem; /* 12px - +1pt from before */
   }
 
   .folder-tab-label-secondary {
-    font-size: 0.6rem;
+    font-size: 0.6875rem; /* 11px - 1pt smaller than primary */
   }
 
   .sub-tab {
@@ -523,9 +541,9 @@
   }
 
   .folder-tab {
-    min-width: 96px;
-    max-width: 96px;
-    height: 32px;
+    flex: 0 0 auto;
+    min-width: 80px;
+    height: 40px; /* 32px + 0.5rem (8px) */
   }
 
   .folder-tabs-row2 {

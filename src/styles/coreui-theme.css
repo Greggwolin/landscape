@@ -15,6 +15,7 @@
   --cui-card-bg: var(--surface-card);
   --cui-card-border-color: var(--line-soft);
   --cui-footer-bg: var(--surface-card);
+  --cui-card-shadow: 0 6px 18px rgba(9, 10, 11, 0.25);
 
   /* Primary brand bridge */
   --bs-primary: var(--brand-primary);
@@ -180,6 +181,83 @@
   --landscaper-icon-color: #FFFFFF;
   --cui-primary-text: #ffffff;
   --cui-danger-text: #ffffff;
+}
+
+/* Contacts module theming */
+.contacts-modal {
+  border-radius: var(--cui-card-border-radius);
+  border: 1px solid var(--cui-border-color);
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  box-shadow: var(--cui-card-shadow);
+}
+
+.contacts-modal-header {
+  border-color: var(--cui-border-color);
+}
+
+.contacts-modal-title {
+  color: var(--cui-body-color);
+}
+
+.contacts-modal-label {
+  color: var(--cui-body-color);
+}
+
+.contacts-input {
+  background-color: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  border-color: var(--cui-border-color);
+}
+
+.contacts-role-card {
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-card-border-radius);
+  overflow: hidden;
+}
+
+.contacts-role-header {
+  background-color: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+}
+
+.contacts-role-content {
+  background-color: var(--cui-body-bg);
+}
+
+.contacts-card,
+.contacts-card-edit {
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-card-border-radius);
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  box-shadow: var(--cui-card-shadow);
+}
+
+.contacts-card-edit {
+  background-color: var(--cui-body-bg);
+}
+
+.contacts-card-icon {
+  color: var(--cui-secondary-color);
+}
+
+.contacts-card-name {
+  color: var(--cui-body-color);
+}
+
+.contacts-card-title,
+.contacts-card-meta,
+.contacts-card-notes {
+  color: var(--cui-secondary-color);
+}
+
+.contacts-card-link {
+  color: var(--cui-primary);
+}
+
+.contacts-card-notes {
+  border-top: 1px solid var(--cui-border-color);
 }
 
 /* Dark mode button overrides - direct rules, not variables */
@@ -398,15 +476,19 @@ body {
 }
 
 .card-header,
-.card > .card-header {
-  background-color: var(--cui-card-cap-bg) !important;
+.card > .card-header,
+.accordion-header,
+CCardHeader {
+  background-color: var(--cui-card-header-bg) !important;
   border-bottom-color: var(--cui-border-color);
 }
 
-/* Ensure light theme card headers use the correct background */
-.light-theme .card-header,
-.light-theme .card > .card-header {
-  background-color: var(--surface-card-header) !important;
+/* Canonical sub-headers */
+.card-subheader,
+.accordion-subheader,
+.table-header-row,
+.grid-header {
+  background-color: var(--cui-card-subheader-bg) !important;
 }
 
 /* Form controls */
@@ -472,7 +554,7 @@ thead th,
 .table thead,
 .table thead tr,
 .table thead th {
-  background-color: var(--surface-card-header) !important;
+  background-color: var(--cui-card-header-bg) !important;
 }
 
 /* Table hover - general rule comes first */
@@ -483,12 +565,12 @@ thead th,
 /* Group rows - maintain background even on hover (more specific, comes after) */
 .table.table-hover tbody tr.budget-group-row,
 .table-hover tbody tr.budget-group-row {
-  background-color: var(--surface-subheader) !important;
+  background-color: var(--cui-card-subheader-bg) !important;
 }
 
 .table.table-hover tbody tr.budget-group-row:hover,
 .table-hover tbody tr.budget-group-row:hover {
-  background-color: var(--surface-subheader) !important;
+  background-color: var(--cui-card-subheader-bg) !important;
   filter: brightness(0.97);
 }
 

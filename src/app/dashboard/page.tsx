@@ -11,6 +11,7 @@ import { ActivityFeed } from '@/components/landscaper/ActivityFeed';
 import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
 import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
+import { CollapsedLandscaperStrip } from '@/components/studio/CollapsedLandscaperStrip';
 
 type PropertyFilterKey = 'ALL' | 'LAND' | 'MF' | 'COMMERCIAL' | 'RET' | 'OFF' | 'IND';
 
@@ -150,12 +151,16 @@ function ProjectAccordion({
   projects,
   selectedProjectId,
   onProjectClick,
-  onNewProject
+  onNewProject,
+  isLandscaperCollapsed,
+  onToggleLandscaper,
 }: {
   projects: ProjectSummary[];
   selectedProjectId: number | null;
   onProjectClick: (project: ProjectSummary) => void;
   onNewProject: () => void;
+  isLandscaperCollapsed: boolean;
+  onToggleLandscaper: () => void;
 }) {
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -171,8 +176,23 @@ function ProjectAccordion({
   return (
     <CCard>
       <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-        <div className="flex items-center justify-between">
-          <span className="text-base font-semibold">Projects</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleLandscaper}
+              className="text-xs font-semibold tracking-wide rounded-full px-2 py-1"
+              style={{
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--cui-body-color)',
+              }}
+              aria-label="Toggle Landscaper panel"
+            >
+              {isLandscaperCollapsed ? '>>' : '<<'}
+            </button>
+            <span className="text-base font-semibold">Projects</span>
+          </div>
           <LandscapeButton color="primary" size="sm" onClick={onNewProject}>
             + New Project
           </LandscapeButton>
@@ -428,6 +448,9 @@ export default function DashboardPage() {
   };
 
   const [isActivityExpanded, setActivityExpanded] = useState(true);
+  const [isLandscaperCollapsed, setLandscaperCollapsed] = useState(false);
+
+  const toggleLandscaperCollapsed = () => setLandscaperCollapsed((prev) => !prev);
 
   return (
     <CContainer fluid className="space-y-2" style={{ padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
@@ -437,42 +460,48 @@ export default function DashboardPage() {
         <div
           className="flex-shrink-0 sticky top-0 flex flex-col gap-1"
           style={{
-            width: '30%',
-            minWidth: '350px',
-            maxWidth: '450px',
+            width: isLandscaperCollapsed ? '56px' : '30%',
+            minWidth: isLandscaperCollapsed ? '56px' : '350px',
+            maxWidth: isLandscaperCollapsed ? '56px' : '450px',
             height: 'calc(100vh - 100px)',
           }}
         >
-          {/* Landscaper Chat - Top */}
-          <CCard
-            className="flex-1 shadow-lg overflow-hidden"
-            style={{
-              minHeight: '200px',
-            }}
-          >
-            <LandscaperChat
-              projectId={0}
-              activeTab="dashboard"
-              isExpanded={!isActivityExpanded}
-              onToggleExpand={() => setActivityExpanded(!isActivityExpanded)}
-            />
-          </CCard>
+          {isLandscaperCollapsed ? (
+            <CollapsedLandscaperStrip onExpand={toggleLandscaperCollapsed} />
+          ) : (
+            <>
+              {/* Landscaper Chat - Top */}
+              <CCard
+                className="flex-1 shadow-lg overflow-hidden transition-all"
+                style={{
+                  minHeight: '200px',
+                }}
+              >
+                <LandscaperChat
+                  projectId={0}
+                  activeTab="dashboard"
+                  isExpanded={!isActivityExpanded}
+                  onToggleExpand={() => setActivityExpanded(!isActivityExpanded)}
+                />
+              </CCard>
 
-          {/* Activity Feed - Bottom */}
-          <CCard
-            className="shadow-lg overflow-hidden"
-            style={{
-              height: isActivityExpanded ? '45%' : '48px',
-              minHeight: isActivityExpanded ? '200px' : '48px',
-              transition: 'height 0.2s ease',
-            }}
-          >
-            <ActivityFeed
-              projectId={0}
-              isExpanded={isActivityExpanded}
-              onToggle={() => setActivityExpanded(!isActivityExpanded)}
-            />
-          </CCard>
+              {/* Activity Feed - Bottom */}
+              <CCard
+                className="shadow-lg overflow-hidden transition-all"
+                style={{
+                  height: isActivityExpanded ? '45%' : '48px',
+                  minHeight: isActivityExpanded ? '200px' : '48px',
+                  transition: 'height 0.2s ease',
+                }}
+              >
+                <ActivityFeed
+                  projectId={0}
+                  isExpanded={isActivityExpanded}
+                  onToggle={() => setActivityExpanded(!isActivityExpanded)}
+                />
+              </CCard>
+            </>
+          )}
         </div>
 
         {/* Middle Column: Projects List */}
@@ -492,12 +521,18 @@ export default function DashboardPage() {
               handleProjectClick(project.project_id);
             }}
             onNewProject={() => setIsNewProjectModalOpen(true)}
+            isLandscaperCollapsed={isLandscaperCollapsed}
+            onToggleLandscaper={toggleLandscaperCollapsed}
           />
         </div>
 
         {/* Right Column: Filter Tiles + Map */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
-          {/* Filter Tiles */}
+          <div className="px-3">
+            <span className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+              Project Locations
+            </span>
+          </div>
           <div className="px-1">
             <ProjectCountTiles
               projects={projects}

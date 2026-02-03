@@ -13,6 +13,7 @@ export type ProjectTypeCode = 'LAND' | 'MF' | 'OFF' | 'RET' | 'IND' | 'HTL' | 'M
 
 export type ProjectTypeCategory = 'land_development' | 'multifamily' | 'office' | 'retail' | 'industrial' | 'hotel' | 'mixed_use';
 
+/** Short code mapping (e.g., 'MF' → 'multifamily') */
 export const PROJECT_TYPE_MAP: Record<ProjectTypeCode, ProjectTypeCategory> = {
   LAND: 'land_development',
   MF: 'multifamily',
@@ -24,13 +25,82 @@ export const PROJECT_TYPE_MAP: Record<ProjectTypeCode, ProjectTypeCategory> = {
 };
 
 /**
- * Maps a project type code to its category.
+ * Extended mapping for descriptive project subtypes from database taxonomy.
+ * Maps full subtype names (e.g., "Garden Multifamily") to categories.
+ * Case-insensitive lookup.
+ */
+const PROJECT_SUBTYPE_MAP: Record<string, ProjectTypeCategory> = {
+  // Land Development subtypes
+  'master planned community': 'land_development',
+  'subdivision': 'land_development',
+  'multifamily development': 'land_development',
+  'commercial development': 'land_development',
+  'industrial development': 'land_development',
+  'mixed-use development': 'land_development',
+
+  // Multifamily Income subtypes
+  'garden multifamily': 'multifamily',
+  'mid-rise multifamily': 'multifamily',
+  'high-rise multifamily': 'multifamily',
+  'student housing': 'multifamily',
+  'senior housing': 'multifamily',
+  'affordable housing': 'multifamily',
+
+  // Office Income subtypes
+  'class a office': 'office',
+  'class b office': 'office',
+  'class c office': 'office',
+  'medical office': 'office',
+  'flex/r&d': 'office',
+  'coworking': 'office',
+
+  // Retail Income subtypes
+  'neighborhood retail': 'retail',
+  'community retail': 'retail',
+  'power center': 'retail',
+  'lifestyle center': 'retail',
+  'strip center': 'retail',
+  'regional mall': 'retail',
+
+  // Industrial Income subtypes
+  'warehouse/distribution': 'industrial',
+  'manufacturing': 'industrial',
+  'flex space': 'industrial',
+  'cold storage': 'industrial',
+  'self-storage': 'industrial',
+
+  // Other Income subtypes
+  'hotel': 'hotel',
+  'mixed-use office/retail': 'mixed_use',
+  'mixed-use office/multifamily': 'mixed_use',
+  'mixed-use retail/multifamily': 'mixed_use',
+};
+
+/**
+ * Maps a project type code or subtype name to its category.
+ * Supports both:
+ * - Short codes: 'MF', 'LAND', 'OFF', etc.
+ * - Descriptive subtypes: 'Garden Multifamily', 'Master Planned Community', etc.
+ *
  * Returns 'land_development' as default for unknown types.
  */
 export function getProjectCategory(code: string | undefined): ProjectTypeCategory {
   if (!code) return 'land_development';
+
+  // First, try short code lookup (uppercase)
   const upperCode = code.toUpperCase() as ProjectTypeCode;
-  return PROJECT_TYPE_MAP[upperCode] ?? 'land_development';
+  if (PROJECT_TYPE_MAP[upperCode]) {
+    return PROJECT_TYPE_MAP[upperCode];
+  }
+
+  // Second, try descriptive subtype lookup (lowercase)
+  const lowerCode = code.toLowerCase();
+  if (PROJECT_SUBTYPE_MAP[lowerCode]) {
+    return PROJECT_SUBTYPE_MAP[lowerCode];
+  }
+
+  // Default to land_development for unrecognized types
+  return 'land_development';
 }
 
 /**
@@ -42,18 +112,29 @@ export function isIncomeProperty(code: string | undefined): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tile Colors (extracted from existing implementation)
+// Tile Colors - D12 Functional Color Coding
+// EXACT VALUES — DO NOT MODIFY
+// Grouped by function: Setup (Blue), Financial (Cyan/Teal), Output (Purple), Spatial (Green)
+// Mode-stable: same colors in light and dark mode
+// Tokens defined in src/styles/tokens.css (--nav-tab-*)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TILE_COLORS = {
-  home: '#3d99f5',        // Blue
-  planning: '#57c68a',    // Green
-  devOps: '#7a80ec',      // Purple (Development/Operations)
-  feasVal: '#f2c40d',     // Yellow (Feasibility/Valuation)
-  capital: '#9b59b6',     // Purple (Capitalization)
-  reports: '#6b7785',     // Gray
-  documents: '#272d35',   // Dark Gray
-  map: '#14b8a6',         // Teal (Map/GIS)
+  // Setup Group (Blue)
+  home: '#2563eb',        // Blue - Project
+  planning: '#3b82f6',    // Blue - Property
+
+  // Financial Group (Cyan/Teal)
+  devOps: '#0891b2',      // Cyan - Operations/Budget
+  feasVal: '#06b6d4',     // Cyan - Valuation
+  capital: '#0d9488',     // Teal - Capitalization
+
+  // Output Group (Purple)
+  reports: '#7c3aed',     // Purple - Reports
+  documents: '#8b5cf6',   // Purple - Documents
+
+  // Spatial Group (Green)
+  map: '#059669',         // Emerald - Map
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,17 +169,10 @@ export interface SubtabConfig {
 
 /**
  * Get contextual label for tile position 3 based on project type.
- * Land Development → "Development / Sales" (two-line)
- * Income Properties → "Operations"
+ * All project types → "Operations"
  */
-export function getTile3Label(projectType: string | undefined): string | TileLabel {
-  if (isIncomeProperty(projectType)) {
-    return 'Operations';
-  }
-  return {
-    primary: 'Development',
-    secondary: 'Sales',
-  };
+export function getTile3Label(_projectType: string | undefined): string | TileLabel {
+  return 'Operations';
 }
 
 /**

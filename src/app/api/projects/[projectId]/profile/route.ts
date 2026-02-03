@@ -23,6 +23,7 @@ export interface ProjectProfile {
   total_units?: number; // For operating projects (actual units)
   calculated_units?: number; // Calculated from tbl_multifamily_unit
   gross_acres?: number;
+  asking_price?: number; // Initial asking price (before acquisition closes)
   address?: string;
   city?: string;
   county?: string;
@@ -64,6 +65,7 @@ export async function GET(
         p.total_units,
         (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
+        p.asking_price,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
         COALESCE(p.county, p.jurisdiction_county) as county,
@@ -133,6 +135,7 @@ export async function PATCH(
       'property_subtype': 'property_subtype',
       'target_units': 'target_units',
       'gross_acres': 'acres_gross',
+      'asking_price': 'asking_price',
       'address': 'street_address',
       'city': 'city',
       'county': 'county',
@@ -286,6 +289,7 @@ export async function PATCH(
         p.total_units,
         (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
         p.acres_gross as gross_acres,
+        p.asking_price,
         COALESCE(p.street_address, p.project_address) as address,
         COALESCE(p.city, p.jurisdiction_city) as city,
         COALESCE(p.county, p.jurisdiction_county) as county,

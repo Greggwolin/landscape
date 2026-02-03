@@ -6,6 +6,8 @@ import { CBadge } from '@coreui/react';
 import type { SaleTransaction } from '@/utils/sales/salesAggregation';
 import { generateAutoLabel } from '@/utils/sales/salesAggregation';
 import { formatMoney } from '@/utils/formatters/number';
+import './TransactionColumn.css';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface TransactionColumnProps {
   sale: SaleTransaction;
@@ -104,16 +106,13 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
                 placeholder="Name this sale..."
                 disabled={isSaving}
               />
-              <button
-                className="btn btn-sm btn-success"
-                onClick={handleSaveName}
-                disabled={isSaving}
-                aria-label="Save sale name"
-              >
+              <SemanticButton intent="primary-action" size="sm" className="transaction-save-btn" onClick={handleSaveName} disabled={isSaving} aria-label="Save sale name">
                 ✓
-              </button>
-              <button
-                className="btn btn-sm btn-ghost-secondary"
+              </SemanticButton>
+              <SemanticButton
+                intent="secondary-action"
+                size="sm"
+                className="transaction-cancel-btn"
                 onClick={() => {
                   setSaleName(sale.saleName || generateAutoLabel(sale));
                   setEditingName(false);
@@ -122,19 +121,14 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
                 aria-label="Cancel editing"
               >
                 ✕
-              </button>
+              </SemanticButton>
             </>
           ) : (
             <>
               <span className="text-muted small">{saleName}</span>
-              <button
-                className="btn btn-sm btn-ghost-secondary p-0"
-                onClick={() => setEditingName(true)}
-                aria-label="Edit sale name"
-                style={{ lineHeight: 1 }}
-              >
+              <SemanticButton intent="tertiary-action" size="sm" className="transaction-edit-btn" onClick={() => setEditingName(true)} aria-label="Edit sale name">
                 ✏️
-              </button>
+              </SemanticButton>
             </>
           )}
           <CBadge color="secondary" style={{ marginLeft: 'auto' }}>

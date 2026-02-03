@@ -1,6 +1,11 @@
 'use client'
 
-import { LeafletGISView } from '@/components/map-tab/LeafletGISView'
+import dynamic from 'next/dynamic'
+
+const LeafletGISView = dynamic(
+  () => import('@/components/map-tab/LeafletGISView').then((mod) => mod.LeafletGISView),
+  { ssr: false }
+)
 
 export default function MapDebugPage() {
   return (

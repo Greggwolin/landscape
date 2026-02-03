@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { X } from 'lucide-react'
 import { formatNumber, parseNumber } from '../../lib/number'
+import { SemanticButton } from '@/components/ui/landscape'
 
 type MarketFactor = {
   id: number
@@ -238,12 +239,9 @@ export const CommissionDetailModal: React.FC<{ onClose: () => void }> = ({ onClo
         </div>
 
         <div className="px-4 py-3 border-t border-slate-600 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
+          <SemanticButton intent="primary-action" size="sm" onClick={onClose}>
             Save & Close
-          </button>
+          </SemanticButton>
         </div>
       </div>
     </div>
@@ -299,7 +297,7 @@ export const ContingencyDetailModal: React.FC<{ onClose: () => void }> = ({ onCl
           ))}
         </div>
         <div className="px-4 py-3 border-t border-slate-600 flex justify-end space-x-3">
-          <button onClick={onClose} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Save & Close</button>
+          <SemanticButton intent="primary-action" size="sm" onClick={onClose}>Save & Close</SemanticButton>
         </div>
       </div>
     </div>

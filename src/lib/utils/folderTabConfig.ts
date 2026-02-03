@@ -202,15 +202,13 @@ export function createFolderConfig(projectType?: string, analysisType?: string):
     },
 
     // ========================================
-    // Position 3: Budget (Land) / Operations (Income)
-    // Land: budget, schedule, sales, draws
+    // Position 3: Operations (Income) / Development Sales (Land)
+    // Land: budget, sales subtabs - two-line label "Development / Sales"
     // Income: Single unified page (no subtabs) - shows P&L view with all sections
     // ========================================
     {
       id: isIncome ? 'operations' : 'budget',
-      label: isIncome
-        ? 'Operations'
-        : { primary: 'Development', secondary: 'Sales' },
+      label: isIncome ? 'Operations' : { primary: 'Development', secondary: 'Sales' },
       color: TILE_COLORS.devOps,
       subTabs: isIncome
         ? [] // Single page - no subtabs
@@ -221,13 +219,13 @@ export function createFolderConfig(projectType?: string, analysisType?: string):
     },
 
     // ========================================
-    // Position 4: Valuation
-    // Land: feasibility, cashflow, returns, sensitivity
+    // Position 4: Feasibility (Land) / Valuation (Income)
+    // Land: feasibility, cashflow, returns, sensitivity - two-line label
     // Income: sales-comparison, cost, income (matches ValuationTab's internal tabs)
     // ========================================
     {
       id: isIncome ? 'valuation' : 'feasibility',
-      label: 'Valuation',
+      label: isIncome ? 'Valuation' : { primary: 'Feasibility', secondary: 'Valuation' },
       color: TILE_COLORS.feasVal,
       subTabs: isIncome
         ? [

@@ -49,13 +49,18 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     projects.find((p) => p.project_id === projectId) || activeProject;
 
   // Get folder navigation state
+  // Use property_subtype (most specific) → project_type → project_type_code (fallback)
+  const effectivePropertyType = currentProject?.property_subtype
+    || currentProject?.project_type
+    || currentProject?.project_type_code;
+
   const {
     currentFolder,
     currentTab,
     setFolderTab,
     folderConfig,
   } = useFolderNavigation({
-    propertyType: currentProject?.project_type_code,
+    propertyType: effectivePropertyType,
     analysisType: currentProject?.analysis_type,
   });
 

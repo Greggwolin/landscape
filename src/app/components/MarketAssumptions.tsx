@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { SemanticButton } from '@/components/ui/landscape';
 import MarketFactors from './MarketFactors'
 import ProjectCosts from './ProjectCosts'
 import LandUsePricing from './LandUsePricing'
@@ -184,9 +185,9 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
       <div className="bg-slate-800 rounded border border-slate-600 overflow-hidden">
         <div className="bg-gray-900 px-3 py-2 border-b border-slate-600 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white">Market Factors</h2>
-          <button onClick={onSave} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs">
+          <SemanticButton intent="primary-action" size="sm" onClick={onSave}>
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : 'Save'}
-          </button>
+          </SemanticButton>
         </div>
         {/* Core Market Factors + Growth Rates */}
         <MarketFactors 

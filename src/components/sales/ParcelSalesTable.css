@@ -1,0 +1,30 @@
+.parcel-detail-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.parcel-detail-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.parcel-detail-btn--has-calculation {
+  border-color: var(--cui-primary);
+  background-color: var(--cui-primary-bg);
+  color: var(--cui-primary);
+}
+
+.parcel-sort-btn {
+  min-width: 1.5rem;
+  padding: 0;
+  color: var(--cui-primary);
+  font-size: 0.65rem;
+  line-height: 1;
+}

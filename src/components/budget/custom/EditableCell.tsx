@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ColoredDotIndicator from './ColoredDotIndicator';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 type SelectOption = { value: string; label: string };
 
@@ -403,7 +404,14 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
               >
                 <div className="d-flex justify-content-between align-items-center">
                   <span className="fw-semibold text-light">{template.item_name}</span>
-                  <span className="badge bg-secondary text-light">{template.default_uom_code}</span>
+                  <SemanticBadge
+                    intent="category"
+                    value={template.default_uom_code}
+                    className="ms-2"
+                    style={{ flexShrink: 0 }}
+                  >
+                    {template.default_uom_code}
+                  </SemanticBadge>
                 </div>
                 <div className="small text-muted">
                   {template.market_geography || '—'} · Usage {template.usage_count ?? 0}

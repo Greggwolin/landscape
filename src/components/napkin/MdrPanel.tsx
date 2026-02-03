@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CCard, CCardHeader, CCardBody, CCollapse, CFormSelect } from '@coreui/react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface MdrPanelProps {
   hasData: boolean;
@@ -56,7 +57,9 @@ export default function MdrPanel({ hasData }: MdrPanelProps) {
         </h6>
         <div className="d-flex align-items-center gap-2">
           {hasData && (
-            <span className="badge bg-info">{MOCK_MDR_DATA.length} Parcels</span>
+            <SemanticBadge intent="status" value="validated">
+              {MOCK_MDR_DATA.length} Parcels
+            </SemanticBadge>
           )}
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>

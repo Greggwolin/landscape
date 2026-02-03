@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { CCloseButton } from '@coreui/react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { CCloseButton, CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilLifeRing } from '@coreui/icons';
-import { HelpContentPanel, HelpContent } from './HelpContentPanel';
-import { AlphaLandscaperChat } from './AlphaLandscaperChat';
-import { AlphaFeedbackForm } from './AlphaFeedbackForm';
+import { HelpFeedbackAgent } from './HelpFeedbackAgent';
+import { FeedbackLog } from './FeedbackLog';
 import './alpha-flyout.css';
 
 interface AlphaAssistantFlyoutProps {
@@ -22,31 +21,8 @@ export function AlphaAssistantFlyout({
   pageContext,
   projectId,
 }: AlphaAssistantFlyoutProps) {
-  const [helpContent, setHelpContent] = useState<HelpContent | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<'help' | 'chat' | 'feedback'>('help');
-
-  useEffect(() => {
-    if (isOpen && pageContext) {
-      fetchHelpContent();
-    }
-  }, [isOpen, pageContext]);
-
-  const fetchHelpContent = async () => {
-    setLoading(true);
-    setHelpContent(null);
-    try {
-      const response = await fetch(`/api/alpha/help?page_context=${encodeURIComponent(pageContext)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setHelpContent(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch help content:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [activeAccordion, setActiveAccordion] = useState<number | null>(1);
+  const [feedbackLogKey, setFeedbackLogKey] = useState(0);
 
   // Close on Escape key
   useEffect(() => {
@@ -59,6 +35,15 @@ export function AlphaAssistantFlyout({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
+  // Refresh feedback log when feedback is submitted
+  const handleFeedbackSubmitted = useCallback(() => {
+    setFeedbackLogKey((prev) => prev + 1);
+  }, []);
+
+  const handleAccordionChange = (itemKey: number | null) => {
+    setActiveAccordion(itemKey);
+  };
+
   return (
     <div className={`alpha-flyout ${isOpen ? 'open' : ''}`}>
       {/* Header */}
@@ -70,41 +55,36 @@ export function AlphaAssistantFlyout({
         <CCloseButton onClick={onClose} />
       </div>
 
-      {/* Section Tabs */}
-      <div className="alpha-flyout-tabs">
-        <button
-          className={`alpha-tab ${activeSection === 'help' ? 'active' : ''}`}
-          onClick={() => setActiveSection('help')}
+      {/* Accordion Content */}
+      <div className="alpha-flyout-accordion-wrapper">
+        <CAccordion
+          activeItemKey={activeAccordion}
+          className="alpha-assistant-accordion"
         >
-          Help
-        </button>
-        <button
-          className={`alpha-tab ${activeSection === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveSection('chat')}
-        >
-          Chat
-        </button>
-        <button
-          className={`alpha-tab ${activeSection === 'feedback' ? 'active' : ''}`}
-          onClick={() => setActiveSection('feedback')}
-        >
-          Feedback
-        </button>
-      </div>
+          {/* Accordion 1: Help / Feedback Agent */}
+          <CAccordionItem itemKey={1}>
+            <CAccordionHeader onClick={() => handleAccordionChange(activeAccordion === 1 ? null : 1)}>
+              Help / Feedback Agent
+            </CAccordionHeader>
+            <CAccordionBody>
+              <HelpFeedbackAgent
+                projectId={projectId}
+                pageContext={pageContext}
+                onFeedbackSubmitted={handleFeedbackSubmitted}
+              />
+            </CAccordionBody>
+          </CAccordionItem>
 
-      {/* Content */}
-      <div className="alpha-flyout-content">
-        {activeSection === 'help' && (
-          <HelpContentPanel content={helpContent} loading={loading} />
-        )}
-
-        {activeSection === 'chat' && (
-          <AlphaLandscaperChat projectId={projectId} pageContext={pageContext} />
-        )}
-
-        {activeSection === 'feedback' && (
-          <AlphaFeedbackForm projectId={projectId} pageContext={pageContext} />
-        )}
+          {/* Accordion 2: Feedback Log */}
+          <CAccordionItem itemKey={2}>
+            <CAccordionHeader onClick={() => handleAccordionChange(activeAccordion === 2 ? null : 2)}>
+              Feedback Log
+            </CAccordionHeader>
+            <CAccordionBody>
+              <FeedbackLog key={feedbackLogKey} />
+            </CAccordionBody>
+          </CAccordionItem>
+        </CAccordion>
       </div>
     </div>
   );

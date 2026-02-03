@@ -179,6 +179,7 @@ export function COODashboard({ projectId }: COODashboardProps) {
         agentName="Landscaper"
         isCollapsed={isChatCollapsed}
         onToggleCollapse={toggleChat}
+        activeTab="home"  // COO Dashboard uses home/overview context
       />
 
       {/* Studio Panel */}

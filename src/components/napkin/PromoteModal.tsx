@@ -8,8 +8,8 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface PromoteModalProps {
@@ -83,11 +83,11 @@ export default function PromoteModal({ visible, onClose, projectId }: PromoteMod
         </p>
       </CModalBody>
       <CModalFooter>
-        <CButton color="secondary" variant="outline" onClick={onClose}>
+        <SemanticButton intent="secondary-action" variant="outline" onClick={onClose}>
           Cancel
-        </CButton>
-        <CButton
-          color="primary"
+        </SemanticButton>
+        <SemanticButton
+          intent="primary-action"
           onClick={handlePromote}
           disabled={isPromoting}
         >
@@ -99,7 +99,7 @@ export default function PromoteModal({ visible, onClose, projectId }: PromoteMod
           ) : (
             'Promote to Developer'
           )}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

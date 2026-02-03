@@ -42,6 +42,8 @@ import {
 } from '@/lib/sales/calculations';
 import { useProjectConfig } from '@/hooks/useProjectConfig';
 import type { SaveAssumptionsPayload, CreateBenchmarkPayload } from '@/types/sales-absorption';
+import { SemanticButton } from '@/components/ui/landscape';
+import './ParcelSalesTable.css';
 
 interface Props {
   projectId: number;
@@ -793,25 +795,14 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
           return (
             <div className="flex justify-center">
               <CTooltip content="View detailed sale calculation" placement="top">
-                <button
+                <SemanticButton
+                  intent="secondary-action"
+                  variant="ghost"
+                  size="sm"
                   type="button"
-                  className="px-3 py-1 text-sm border rounded flex items-center gap-1"
-                  style={
-                    hasCalculation
-                      ? {
-                          borderColor: 'var(--cui-primary)',
-                          color: 'var(--cui-primary)',
-                          backgroundColor: 'var(--cui-primary-bg)',
-                        }
-                      : {
-                          borderColor: 'var(--cui-border-color)',
-                          color: 'var(--cui-body-color)',
-                        }
-                  }
+                  className={`parcel-detail-btn${hasCalculation ? ' parcel-detail-btn--has-calculation' : ''}`}
                   onClick={() => {
-                    // Clear any previous errors
                     setActionError(null);
-                    // Create a parcel object with the calculated sale_date
                     const parcelWithDate: ParcelWithSale = {
                       ...parcel,
                       sale_date: saleDate || null,
@@ -822,15 +813,13 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <path fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                   Detail
-                </button>
+                </SemanticButton>
               </CTooltip>
             </div>
           );
@@ -979,18 +968,20 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </div>
                       {header.column.getCanSort() && (
-                        <button
+                        <SemanticButton
+                          intent="tertiary-action"
+                          variant="ghost"
+                          size="sm"
                           type="button"
+                          className="parcel-sort-btn"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="text-xs flex-shrink-0"
-                          style={{ color: 'var(--cui-primary)' }}
                         >
                           {header.column.getIsSorted() === 'asc'
                             ? '↑'
                             : header.column.getIsSorted() === 'desc'
                             ? '↓'
                             : '↕︎'}
-                        </button>
+                        </SemanticButton>
                       )}
                     </div>
                   </th>

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useRef } from 'react';
-import { CCard, CCardHeader, CCardBody, CButton, CCollapse, CFormInput, CSpinner } from '@coreui/react';
+import { CButton, CCard, CCardHeader, CCardBody, CCollapse, CFormInput, CSpinner } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import { ChevronDown, ChevronUp, Upload, RefreshCw, AlertCircle } from 'lucide-react';
 import { type SfCompsResponse } from '@/hooks/analysis/useSfComps';
 import {
@@ -10,6 +11,7 @@ import {
   DEFAULT_SFD_PRODUCTS,
   type SfdProductStats
 } from '@/lib/napkin/sfdCompStats';
+import { SemanticBadge } from '@/components/ui/landscape';
 
 interface SfdPricingPanelProps {
   projectId: number;
@@ -218,12 +220,14 @@ export default function SfdPricingPanel({
         <div className="d-flex align-items-center gap-2">
           {isLoading && <CSpinner size="sm" />}
           {!isLoading && analysis && (
-            <span className="badge bg-info">
+            <SemanticBadge intent="status" value="validated">
               {analysis.compsWithLotSize} comps w/ lot size
-            </span>
+            </SemanticBadge>
           )}
           {productRows.length > 0 && (
-            <span className="badge bg-success">{productRows.length} Products</span>
+            <SemanticBadge intent="status" value="complete">
+              {productRows.length} Products
+            </SemanticBadge>
           )}
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
@@ -240,10 +244,10 @@ export default function SfdPricingPanel({
               <p className="small mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
                 Tell Landscaper about your land use mix, or upload a parcel table to get started.
               </p>
-              <CButton color="primary" variant="outline">
+              <SemanticButton intent="primary-action" variant="outline">
                 <Upload size={16} className="me-2" />
                 Upload Parcel Table
-              </CButton>
+              </SemanticButton>
             </div>
           ) : (
             <>

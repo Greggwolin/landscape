@@ -7,7 +7,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CForm,
   CFormLabel,
   CFormInput,
@@ -16,6 +15,7 @@ import {
   CInputGroup,
   CInputGroupText
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 type PicklistForm = {
   code: string;
@@ -240,12 +240,12 @@ export function PicklistItemModal({
           </div>
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" onClick={onClose} disabled={saving}>
+          <SemanticButton intent="secondary-action" onClick={onClose} disabled={saving}>
             Cancel
-          </CButton>
-          <CButton color="primary" type="submit" disabled={saving}>
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={saving}>
             {saving ? 'Saving...' : editingItem ? 'Update' : 'Add'}
-          </CButton>
+          </SemanticButton>
         </CModalFooter>
       </CForm>
     </CModal>

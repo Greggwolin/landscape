@@ -20,6 +20,8 @@ import type {
   UnitCostTemplateSummary,
   UnitCostType
 } from '@/types/benchmarks';
+import { SemanticCategoryChip } from '@/components/ui/landscape';
+import type { CategoryIntent } from '@/components/ui/landscape';
 
 const COST_SCOPE = 'development';
 const AUTO_SAVE_DELAY_MS = 500;
@@ -28,6 +30,127 @@ const DEFAULT_SOURCE = 'Copper Nail Development';
 export const DEFAULT_PROJECT_TYPE = 'LAND';
 const ALLOWED_UOMS: ReadonlyArray<string> = ['EA', 'LF', 'CY', 'SF', 'SY', 'LS', 'MO', 'DAY', '%'];
 const ALLOWED_UOM_SET = new Set(ALLOWED_UOMS);
+
+const CATEGORY_INTENT_RULES: Array<{ intent: CategoryIntent; keywords: string[] }> = [
+  {
+    intent: 'horizontal',
+    keywords: ['horizontal', 'sitework', 'site work', 'grading', 'earthwork', 'stormwater', 'utility trench']
+  },
+  {
+    intent: 'vertical',
+    keywords: ['vertical', 'structure', 'superstructure', 'vertical core', 'tower', 'frame']
+  },
+  {
+    intent: 'systems',
+    keywords: [
+      'systems',
+      'mechanical',
+      'electrical',
+      'plumbing',
+      'hvac',
+      'sprinkler',
+      'fire',
+      'security',
+      'controls',
+      'telecom',
+      'communications',
+      'data',
+      'it',
+      'power'
+    ]
+  },
+  {
+    intent: 'finishes',
+    keywords: [
+      'finishes',
+      'finishing',
+      'interior',
+      'exterior',
+      'painting',
+      'flooring',
+      'carpet',
+      'tiling',
+      'millwork',
+      'casework',
+      'doors',
+      'glazing',
+      'trim',
+      'ceilings'
+    ]
+  },
+  {
+    intent: 'soft_costs',
+    keywords: [
+      'soft cost',
+      'soft-cost',
+      'soft costs',
+      'professional services',
+      'consulting',
+      'design',
+      'architecture',
+      'engineering',
+      'permits',
+      'fees',
+      'insurance',
+      'legal',
+      'marketing',
+      'closing',
+      'bond',
+      'financing',
+      'interest',
+      'project management',
+      'construction management',
+      'entitlement',
+      'leasing',
+      'administrative'
+    ]
+  },
+  {
+    intent: 'offsite',
+    keywords: [
+      'offsite',
+      'off-site',
+      'public works',
+      'infrastructure',
+      'right of way',
+      'road',
+      'street',
+      'landscape',
+      'landscaping',
+      'park',
+      'storm drain',
+      'engineering services'
+    ]
+  },
+  {
+    intent: 'contingency',
+    keywords: [
+      'contingency',
+      'reserve',
+      'escalation',
+      'risk',
+      'unknown',
+      'uncertainty',
+      'owner contingency',
+      'escalation reserve'
+    ]
+  }
+];
+
+function getCategoryIntent(category: UnitCostCategoryReference): CategoryIntent {
+  const normalizedName = category.category_name?.toLowerCase() ?? '';
+  const normalizedTags = (category.tags ?? []).map((tag) => tag.toLowerCase());
+  for (const rule of CATEGORY_INTENT_RULES) {
+    const matchesKeyword = rule.keywords.some(
+      (keyword) =>
+        normalizedName.includes(keyword) || normalizedTags.some((tag) => tag.includes(keyword))
+    );
+    if (matchesKeyword) {
+      return rule.intent;
+    }
+  }
+  return 'other';
+}
 
 const COST_TYPE_TABS: Array<{ key: UnitCostType; label: string }> = [
   { key: 'hard', label: 'Hard' },
@@ -76,26 +199,10 @@ type UnitCostsPanelProps = {
   projectTypeFilter: string;
 };
 
-const CATEGORY_COLOR_PALETTE = ['#2563EB', '#7C3AED', '#059669', '#DB2777', '#D97706', '#0EA5E9', '#F43F5E', '#14B8A6'];
-
 const UnitCostCategoryManager = dynamic(
   () => import('@/app/admin/preferences/components/UnitCostCategoryManager'),
   { ssr: false }
 );
-
-function getCategoryColor(categoryId: number): string {
-  const index = Math.abs(categoryId) % CATEGORY_COLOR_PALETTE.length;
-  return CATEGORY_COLOR_PALETTE[index];
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const sanitized = hex.replace('#', '');
-  const bigint = parseInt(sanitized, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 async function fetchJSON<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -696,6 +803,14 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
     });
   }, [categories, activeCostType]);
 
+  const categoryIntentMap = useMemo(() => {
+    const lookup = new Map<number, CategoryIntent>();
+    filteredCategories.forEach((category) => {
+      lookup.set(category.category_id, getCategoryIntent(category));
+    });
+    return lookup;
+  }, [filteredCategories]);
+
   const categoryNameLookup = useMemo(() => {
     const lookup = new Map<number, string>();
     categories.forEach((category) => {
@@ -974,29 +1089,16 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((category) => {
                 const isSelected = selectedCategories.includes(category.category_id);
-                const chipColor = getCategoryColor(category.category_id);
+                const intent = categoryIntentMap.get(category.category_id) ?? 'other';
                 return (
-                  <button
+                  <SemanticCategoryChip
                     key={category.category_id}
+                    intent={intent}
+                    selected={isSelected}
                     onClick={() => toggleCategoryFilter(category.category_id)}
-                    className={clsx(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors whitespace-nowrap',
-                      isSelected ? 'shadow-sm' : 'opacity-90 hover:opacity-100'
-                    )}
-                    style={{
-                      borderColor: chipColor,
-                      color: chipColor,
-                      backgroundColor: hexToRgba(chipColor, isSelected ? 0.25 : 0.08),
-                      outline: `2px solid ${hexToRgba(chipColor, isSelected ? 0.75 : 0.45)}`,
-                      outlineOffset: '2px'
-                    }}
                   >
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: chipColor }}
-                    />
                     {category.category_name}
-                  </button>
+                  </SemanticCategoryChip>
                 );
               })}
           </div>

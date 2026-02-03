@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import GrowthRateDetail from '@/app/components/GrowthRateDetail';
-import { CButton } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 export default function GrowthRateDetailSandboxPage() {
   const [visible, setVisible] = useState(true);
@@ -13,9 +13,9 @@ export default function GrowthRateDetailSandboxPage() {
       <p className="text-sm text-slate-300">
         Use this sandbox to experiment with the GrowthRateDetail component.
       </p>
-      <CButton color="primary" onClick={() => setVisible(true)}>
+      <SemanticButton intent="primary-action" onClick={() => setVisible(true)}>
         Open Detail Modal
-      </CButton>
+      </SemanticButton>
       {visible && <GrowthRateDetail onClose={() => setVisible(false)} />}
     </div>
   );

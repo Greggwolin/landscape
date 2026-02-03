@@ -4,9 +4,10 @@
 'use client';
 
 import React from 'react';
-import { CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CButton, CAlert } from '@coreui/react';
+import { CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CAlert } from '@coreui/react';
 import type { CategoryVariance } from '@/hooks/useBudgetVariance';
 import { formatMoney } from '@/utils/formatters/number';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface VarianceAlertModalProps {
   visible: boolean;
@@ -117,15 +118,15 @@ export default function VarianceAlertModal({
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" onClick={onContinueAnyway}>
+        <SemanticButton intent="tertiary-action" onClick={onContinueAnyway}>
           Continue Anyway
-        </CButton>
-        <CButton color="primary" variant="outline" onClick={onSwitchToStandard}>
+        </SemanticButton>
+        <SemanticButton intent="confirm-action" onClick={onSwitchToStandard}>
           Switch to Standard Mode
-        </CButton>
-        <CButton color="success" onClick={onReconcile}>
+        </SemanticButton>
+        <SemanticButton intent="confirm-action" onClick={onReconcile}>
           Reconcile Now
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

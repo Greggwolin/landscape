@@ -1,0 +1,396 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CButton,
+  CFormInput,
+  CFormTextarea,
+  CFormCheck,
+  CBadge,
+  CSpinner,
+} from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilPlus, cilPencil, cilTrash } from '@coreui/icons';
+import AdminNavBar from '@/app/components/AdminNavBar';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
+interface ChangelogEntry {
+  changelog_id: number;
+  version: string;
+  deployed_at: string;
+  auto_generated_notes?: string;
+  published_notes?: string;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ChangelogFormData {
+  version: string;
+  auto_generated_notes: string;
+  published_notes: string;
+  is_published: boolean;
+}
+
+interface ChangelogModalProps {
+  entry: ChangelogEntry | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: ChangelogFormData) => Promise<void>;
+  isNew: boolean;
+}
+
+function ChangelogModal({ entry, isOpen, onClose, onSave, isNew }: ChangelogModalProps) {
+  const [formData, setFormData] = useState<ChangelogFormData>({
+    version: '',
+    auto_generated_notes: '',
+    published_notes: '',
+    is_published: false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (entry) {
+      setFormData({
+        version: entry.version,
+        auto_generated_notes: entry.auto_generated_notes || '',
+        published_notes: entry.published_notes || '',
+        is_published: entry.is_published,
+      });
+    } else {
+      setFormData({
+        version: '',
+        auto_generated_notes: '',
+        published_notes: '',
+        is_published: false,
+      });
+    }
+  }, [entry]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(formData);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <CModal visible={isOpen} onClose={onClose} size="lg">
+      <CModalHeader>
+        <CModalTitle>{isNew ? 'Create Changelog Entry' : 'Edit Changelog Entry'}</CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        <div className="mb-3">
+          <label className="form-label fw-bold">Version</label>
+          <CFormInput
+            value={formData.version}
+            onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+            placeholder="e.g., v0.1.24"
+          />
+          <small className="text-muted">Use semantic versioning format</small>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label fw-bold">Auto-Generated Notes (from git)</label>
+          <CFormTextarea
+            rows={4}
+            value={formData.auto_generated_notes}
+            onChange={(e) => setFormData({ ...formData, auto_generated_notes: e.target.value })}
+            placeholder="Paste git commit summaries here..."
+          />
+          <small className="text-muted">
+            Raw notes from git commits - will be edited into published notes
+          </small>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label fw-bold">Published Notes</label>
+          <CFormTextarea
+            rows={6}
+            value={formData.published_notes}
+            onChange={(e) => setFormData({ ...formData, published_notes: e.target.value })}
+            placeholder="- Feature: Added dark mode toggle&#10;- Fix: Resolved budget calculation error&#10;- Improvement: Faster page load times"
+          />
+          <small className="text-muted">
+            User-facing release notes - use bullet points for readability
+          </small>
+        </div>
+
+        <div className="mb-3">
+          <CFormCheck
+            id="is_published"
+            label="Publish this changelog entry"
+            checked={formData.is_published}
+            onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
+          />
+          <small className="text-muted d-block mt-1">
+            Only published entries are visible to testers
+          </small>
+        </div>
+      </CModalBody>
+      <CModalFooter>
+        <CButton color="secondary" onClick={onClose}>
+          Cancel
+        </CButton>
+        <CButton
+          color="primary"
+          onClick={handleSave}
+          disabled={saving || !formData.version.trim()}
+        >
+          {saving ? <CSpinner size="sm" className="me-2" /> : null}
+          {isNew ? 'Create' : 'Save Changes'}
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+}
+
+function ChangelogAdminContent() {
+  const [entries, setEntries] = useState<ChangelogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<ChangelogEntry | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewEntry, setIsNewEntry] = useState(false);
+
+  const getAuthHeaders = (): HeadersInit => {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    try {
+      const tokens = localStorage.getItem('auth_tokens');
+      const accessToken = tokens ? JSON.parse(tokens).access : null;
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+    } catch {
+      // ignore
+    }
+    return headers;
+  };
+
+  const fetchEntries = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch changelog');
+
+      const data = await response.json();
+      setEntries(Array.isArray(data) ? data : data.results || []);
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to load changelog entries');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchEntries();
+  }, [fetchEntries]);
+
+  const handleCreate = async (data: ChangelogFormData) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to create');
+    await fetchEntries();
+  };
+
+  const handleUpdate = async (data: ChangelogFormData) => {
+    if (!selectedEntry) return;
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/${selectedEntry.changelog_id}/`,
+      {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to update');
+    await fetchEntries();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this changelog entry?')) return;
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/${id}/`,
+      {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to delete');
+    await fetchEntries();
+  };
+
+  const openNewModal = () => {
+    setSelectedEntry(null);
+    setIsNewEntry(true);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (entry: ChangelogEntry) => {
+    setSelectedEntry(entry);
+    setIsNewEntry(false);
+    setIsModalOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">Loading changelog...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+      <AdminNavBar />
+      <div className="p-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h1 className="h3 m-0">Changelog Management</h1>
+          <CButton color="primary" onClick={openNewModal}>
+            <CIcon icon={cilPlus} className="me-2" />
+            New Entry
+          </CButton>
+        </div>
+
+        {error && (
+          <div
+            className="alert mb-4"
+            style={{
+              background: 'color-mix(in srgb, var(--cui-danger) 15%, var(--cui-body-bg))',
+              color: 'var(--cui-danger)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div
+          className="rounded overflow-hidden"
+          style={{
+            background: 'var(--cui-card-bg)',
+            border: '1px solid var(--cui-border-color)',
+          }}
+        >
+          {entries.length === 0 ? (
+            <div className="text-center py-8" style={{ color: 'var(--cui-secondary-color)' }}>
+              No changelog entries yet. Create the first one!
+            </div>
+          ) : (
+            <table className="table table-hover m-0" style={{ color: 'var(--cui-body-color)' }}>
+              <thead>
+                <tr style={{ background: 'var(--cui-tertiary-bg)' }}>
+                  <th className="p-3" style={{ width: '120px' }}>
+                    Version
+                  </th>
+                  <th className="p-3" style={{ width: '100px' }}>
+                    Status
+                  </th>
+                  <th className="p-3">Published Notes</th>
+                  <th className="p-3" style={{ width: '140px' }}>
+                    Deployed
+                  </th>
+                  <th className="p-3" style={{ width: '120px' }}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <tr key={entry.changelog_id}>
+                    <td className="p-3">
+                      <strong>{entry.version}</strong>
+                    </td>
+                    <td className="p-3">
+                      {entry.is_published ? (
+                        <CBadge color="success">Published</CBadge>
+                      ) : (
+                        <CBadge color="secondary">Draft</CBadge>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div style={{ maxWidth: '400px', whiteSpace: 'pre-wrap' }}>
+                        {entry.published_notes
+                          ? entry.published_notes.length > 150
+                            ? `${entry.published_notes.substring(0, 150)}...`
+                            : entry.published_notes
+                          : <span className="text-muted">No published notes</span>}
+                      </div>
+                    </td>
+                    <td className="p-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {new Date(entry.deployed_at).toLocaleDateString()}
+                    </td>
+                    <td className="p-3">
+                      <div className="d-flex gap-2">
+                        <CButton
+                          color="light"
+                          size="sm"
+                          onClick={() => openEditModal(entry)}
+                          title="Edit"
+                        >
+                          <CIcon icon={cilPencil} size="sm" />
+                        </CButton>
+                        <CButton
+                          color="danger"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(entry.changelog_id)}
+                          title="Delete"
+                        >
+                          <CIcon icon={cilTrash} size="sm" />
+                        </CButton>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <ChangelogModal
+        entry={selectedEntry}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedEntry(null);
+        }}
+        onSave={isNewEntry ? handleCreate : handleUpdate}
+        isNew={isNewEntry}
+      />
+    </div>
+  );
+}
+
+export default function ChangelogAdminPage() {
+  return (
+    <ProtectedRoute requireAdmin>
+      <ChangelogAdminContent />
+    </ProtectedRoute>
+  );
+}

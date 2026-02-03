@@ -10,7 +10,6 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CFormInput,
   CFormLabel,
   CFormSelect,
@@ -20,6 +19,7 @@ import {
 } from '@coreui/react';
 import CategoryTreeManager from './CategoryTreeManager';
 import { useBudgetCategories } from '@/hooks/useBudgetCategories';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface TemplateEditorModalProps {
   open: boolean;
@@ -281,10 +281,10 @@ export default function TemplateEditorModal({
         </div>
       </CModalBody>
       <CModalFooter>
-        <CButton color="secondary" onClick={onClose} disabled={saving}>
+        <SemanticButton intent="tertiary-action" onClick={onClose} disabled={saving}>
           Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleSave} disabled={saving || loading}>
+        </SemanticButton>
+        <SemanticButton intent="primary-action" onClick={handleSave} disabled={saving || loading}>
           {saving ? (
             <>
               <CSpinner size="sm" className="me-2" />
@@ -293,7 +293,7 @@ export default function TemplateEditorModal({
           ) : (
             'Save Changes'
           )}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

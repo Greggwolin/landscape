@@ -80,6 +80,9 @@ export interface NewProjectFormData {
   scale_input_method: ScaleInputMethod
   analysis_start_date: string
 
+  // Acquisition
+  asking_price: string
+
   // Step 3: Creation Path
   path_choice: ProjectCreationPath | ''
 }

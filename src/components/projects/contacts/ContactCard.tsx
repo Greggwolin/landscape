@@ -11,6 +11,9 @@ interface ContactCardProps {
   onDeleted: () => void;
 }
 
+const contactFieldClass =
+  'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 contacts-input';
+
 export default function ContactCard({
   contact,
   projectId,
@@ -68,21 +71,21 @@ export default function ContactCard({
 
   if (isEditing) {
     return (
-      <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+      <div className="contacts-card-edit p-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <input
             type="text"
             placeholder="Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={contactFieldClass}
           />
           <input
             type="text"
             placeholder="Title"
             value={formData.title || ''}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={contactFieldClass}
           />
         </div>
         <input
@@ -90,14 +93,14 @@ export default function ContactCard({
           placeholder="Company"
           value={formData.company || ''}
           onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={contactFieldClass}
         />
         <input
           type="email"
           placeholder="Email"
           value={formData.email || ''}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={contactFieldClass}
         />
         <div className="grid grid-cols-2 gap-3">
           <input
@@ -105,14 +108,14 @@ export default function ContactCard({
             placeholder="Direct Phone"
             value={formData.phone_direct || ''}
             onChange={(e) => setFormData({ ...formData, phone_direct: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={contactFieldClass}
           />
           <input
             type="text"
             placeholder="Mobile Phone"
             value={formData.phone_mobile || ''}
             onChange={(e) => setFormData({ ...formData, phone_mobile: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={contactFieldClass}
           />
         </div>
         <textarea
@@ -120,7 +123,7 @@ export default function ContactCard({
           value={formData.notes || ''}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           rows={2}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={contactFieldClass}
         />
         <div className="flex justify-end gap-2">
           <button
@@ -142,15 +145,15 @@ export default function ContactCard({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-white hover:border-gray-300 transition-colors">
+    <div className="contacts-card p-4 space-y-2">
       {/* Name and Title */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-gray-400" />
-            <span className="font-medium text-gray-900">{contact.name}</span>
+            <User className="w-4 h-4 contacts-card-icon" />
+            <span className="font-medium contacts-card-name">{contact.name}</span>
             {contact.title && (
-              <span className="text-sm text-gray-500">- {contact.title}</span>
+              <span className="text-sm contacts-card-title">- {contact.title}</span>
             )}
           </div>
         </div>
@@ -174,19 +177,19 @@ export default function ContactCard({
 
       {/* Company */}
       {contact.company && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Building2 className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm contacts-card-meta">
+          <Building2 className="w-4 h-4 contacts-card-icon" />
           <span>{contact.company}</span>
         </div>
       )}
 
       {/* Email */}
       {contact.email && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Mail className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm contacts-card-meta">
+          <Mail className="w-4 h-4 contacts-card-icon" />
           <a
             href={`mailto:${contact.email}`}
-            className="text-blue-600 hover:underline"
+            className="contacts-card-link hover:underline"
           >
             {contact.email}
           </a>
@@ -195,8 +198,8 @@ export default function ContactCard({
 
       {/* Phones */}
       {(contact.phone_direct || contact.phone_mobile) && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Phone className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 text-sm contacts-card-meta">
+          <Phone className="w-4 h-4 contacts-card-icon" />
           <div className="flex gap-3">
             {contact.phone_direct && (
               <span>D: {contact.phone_direct}</span>
@@ -210,8 +213,8 @@ export default function ContactCard({
 
       {/* Notes */}
       {contact.notes && (
-        <div className="flex items-start gap-2 text-sm text-gray-600 mt-2 pt-2 border-t border-gray-100">
-          <StickyNote className="w-4 h-4 text-gray-400 mt-0.5" />
+        <div className="flex items-start gap-2 mt-2 pt-2 contacts-card-notes">
+          <StickyNote className="w-4 h-4 contacts-card-icon mt-0.5" />
           <span className="text-xs">{contact.notes}</span>
         </div>
       )}

@@ -10,9 +10,9 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CAlert,
 } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 
 interface EditConfirmationDialogProps {
   visible: boolean;
@@ -171,15 +171,12 @@ export default function EditConfirmationDialog({
       </CModalBody>
 
       <CModalFooter>
-        <CButton color="secondary" onClick={onCancel}>
+        <SemanticButton intent="tertiary-action" onClick={onCancel}>
           Cancel
-        </CButton>
-        <CButton
-          color={willCreateVariance && Math.abs(variancePct) > 5 ? 'warning' : 'primary'}
-          onClick={onConfirm}
-        >
+        </SemanticButton>
+        <SemanticButton intent="confirm-action" onClick={onConfirm}>
           {willCreateVariance ? 'Proceed with Edit' : 'Confirm Edit'}
-        </CButton>
+        </SemanticButton>
       </CModalFooter>
     </CModal>
   );

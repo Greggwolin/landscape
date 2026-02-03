@@ -1,15 +1,7 @@
 import React from 'react';
 import { CBadge } from '@coreui/react';
 import type { CBadgeProps } from '@coreui/react';
-import { resolveSemanticVariant, SemanticVariant } from './semanticBadgeTheme';
-
-export type SemanticIntent =
-  | 'status'
-  | 'confidence'
-  | 'category'
-  | 'action-state'
-  | 'navigation-meta'
-  | 'user-tag';
+import { resolveSemanticVariant, SemanticVariant, SemanticIntent } from './semanticBadgeTheme';
 
 export interface SemanticBadgeProps extends Omit<CBadgeProps, 'color'> {
   intent: SemanticIntent;

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Sparkles, History, MessageSquare, Settings2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { LandscapeButton } from '@/components/ui/landscape';
+import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
 
 // Dynamically import components to avoid SSR issues
 const ExtractionMappingAdmin = dynamic(
@@ -106,9 +106,14 @@ export default function LandscaperAdminPanel() {
                       <span className="fw-semibold">
                         {section.label}
                         {isDisabled && (
-                          <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem', fontWeight: 400 }}>
+                          <SemanticBadge
+                            intent="status"
+                            value="coming soon"
+                            className="ms-2"
+                            style={{ fontSize: '0.65rem', fontWeight: 400 }}
+                          >
                             Coming Soon
-                          </span>
+                          </SemanticBadge>
                         )}
                         <span className="text-sm ms-2" style={{ color: 'var(--cui-secondary-color)', fontWeight: 400 }}>
                           — {section.description}

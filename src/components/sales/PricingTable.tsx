@@ -26,6 +26,8 @@ import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 import type { PricingAssumption } from '@/types/sales-absorption';
 import { formatMoney } from '@/utils/formatters/number';
 import { Trash2, Plus, Save, X } from 'lucide-react';
+import { SemanticButton } from '@/components/ui/landscape';
+import './PricingTable.css';
 
 interface Props {
   projectId: number;
@@ -664,27 +666,19 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
         cell: ({ row }) => {
           const rowIndex = row.index;
           return (
-            <div className="text-center">
-              <button
-                onClick={() => handleDeleteRow(rowIndex)}
-                className="p-1 rounded transition-colors"
-                style={{
-                  color: 'var(--cui-secondary-color)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--cui-danger)';
-                  e.currentTarget.style.backgroundColor = 'var(--cui-danger-bg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--cui-secondary-color)';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                title="Delete pricing"
-                disabled={isSaving}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+      <div className="text-center">
+        <SemanticButton
+          intent="destructive-action"
+          variant="ghost"
+          size="sm"
+          className="pricing-delete-btn"
+          onClick={() => handleDeleteRow(rowIndex)}
+          title="Delete pricing"
+          disabled={isSaving}
+        >
+          <Trash2 className="w-4 h-4" />
+        </SemanticButton>
+      </div>
           );
         },
       });
@@ -840,31 +834,26 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
         <div className="flex gap-2">
           {hasUnsavedChanges && (
             <>
-              <button
+              <SemanticButton
+                intent="secondary-action"
+                size="sm"
+                className="pricing-cancel-btn"
                 onClick={handleCancel}
                 disabled={isSaving}
-                className="px-3 py-1.5 text-sm border rounded disabled:opacity-50 flex items-center gap-1"
-                style={{
-                  color: 'var(--cui-body-color)',
-                  backgroundColor: 'var(--cui-card-bg)',
-                  borderColor: 'var(--cui-border-color)',
-                }}
               >
                 <X className="w-4 h-4" />
                 Cancel
-              </button>
-              <button
+              </SemanticButton>
+              <SemanticButton
+                intent="primary-action"
+                size="sm"
+                className="pricing-save-btn"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-3 py-1.5 text-sm rounded disabled:opacity-50 flex items-center gap-1"
-                style={{
-                  color: 'white',
-                  backgroundColor: 'var(--cui-primary)',
-                }}
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : `Save Changes (${dirtyRowIndices.size})`}
-              </button>
+              </SemanticButton>
             </>
           )}
         </div>
@@ -937,23 +926,16 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
         <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
           {editingRows.length} pricing assumption(s)
         </span>
-        <button
+        <SemanticButton
+          intent="primary-action"
+          size="sm"
+          className="pricing-add-btn"
           onClick={handleAddRow}
           disabled={isSaving}
-          className="px-3 py-1.5 text-sm rounded disabled:opacity-50 flex items-center gap-1"
-          style={{
-            color: 'var(--cui-primary)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--cui-primary-bg)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
         >
           <Plus className="w-4 h-4" />
           Add Pricing
-        </button>
+        </SemanticButton>
       </div>
     </div>
   );
