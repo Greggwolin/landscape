@@ -8,13 +8,27 @@ from rest_framework.permissions import AllowAny
 from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.db.models import Q
-from .models import Document, DocumentFolder, DMSExtractQueue, DMSAssertion, AICorrectionLog
+from django.db import connection, transaction
+from .models import (
+    Document,
+    DocumentFolder,
+    DMSExtractQueue,
+    DMSAssertion,
+    AICorrectionLog,
+    ExtractionCommitSnapshot,
+)
 from .serializers import DocumentSerializer, DocumentFolderSerializer
 from apps.multifamily.models import MultifamilyUnitType, MultifamilyUnit, MultifamilyLease
+from apps.knowledge.services.extraction_service import (
+    parse_rent_roll_tags,
+    map_occupancy_status,
+    extract_tenant_name,
+)
 import uuid
 import json
 import hashlib
 import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -326,6 +340,297 @@ def get_staging_data(request, doc_id):
         )
 
 
+def _parse_date_value(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if hasattr(value, 'isoformat') and not isinstance(value, str):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value).date()
+        except ValueError:
+            try:
+                return datetime.strptime(value, '%m/%d/%Y').date()
+            except ValueError:
+                return None
+    return None
+
+
+def _snapshot_model(instance, extra=None):
+    from decimal import Decimal
+    from datetime import date, datetime
+
+    def _serialize_value(value):
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        return value
+
+    data = {}
+    for field in instance._meta.fields:
+        data[field.attname] = _serialize_value(getattr(instance, field.attname))
+    if extra:
+        data.update(extra)
+    return data
+
+
+def commit_staging_data_internal(
+    project_id,
+    extraction_ids,
+    decisions,
+    user,
+    create_snapshot=True
+):
+    """
+    Internal commit function used by both DMS and modal paths.
+    Writes directly to MultifamilyUnit/MultifamilyLease from ai_extraction_staging JSON.
+    """
+    if not project_id:
+        return ({'success': False, 'error': 'project_id is required'}, status.HTTP_400_BAD_REQUEST)
+    if not extraction_ids:
+        return ({'success': False, 'error': 'extraction_ids is required'}, status.HTTP_400_BAD_REQUEST)
+
+    decisions = decisions or {}
+
+    with transaction.atomic():
+        # Fetch extractions
+        placeholders = ','.join(['%s'] * len(extraction_ids))
+        params = [int(project_id)] + [int(eid) for eid in extraction_ids]
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT extraction_id, doc_id, extracted_value, status
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s
+                  AND extraction_id IN ({placeholders})
+                ORDER BY extraction_id
+            """, params)
+            rows = cursor.fetchall()
+
+        if not rows:
+            return ({'success': False, 'error': 'No matching extractions found'}, status.HTTP_404_NOT_FOUND)
+
+        doc_id = rows[0][1]
+
+        # Create snapshot before any changes
+        snapshot = None
+        if create_snapshot:
+            ExtractionCommitSnapshot.objects.filter(
+                project_id=project_id,
+                scope='rent_roll',
+                is_active=True
+            ).update(is_active=False)
+
+            existing_units = MultifamilyUnit.objects.filter(project_id=project_id).select_related('project')
+            existing_leases = MultifamilyLease.objects.filter(unit__project_id=project_id).select_related('unit')
+
+            snapshot_data = {
+                'units': [_snapshot_model(u) for u in existing_units],
+                'leases': [
+                    _snapshot_model(l, extra={'unit_number': l.unit.unit_number if l.unit else None})
+                    for l in existing_leases
+                ],
+            }
+
+            snapshot = ExtractionCommitSnapshot.objects.create(
+                project_id=project_id,
+                document_id=doc_id,
+                scope='rent_roll',
+                committed_by=user if getattr(user, 'is_authenticated', False) else None,
+                snapshot_data=snapshot_data,
+                changes_applied={
+                    'extraction_ids': extraction_ids,
+                    'decisions': decisions
+                }
+            )
+
+        errors = []
+        units_affected = 0
+
+        for extraction_id, _, extracted_value, _ in rows:
+            decision = decisions.get(str(extraction_id)) or decisions.get(extraction_id) or {}
+            action = decision.get('action', 'accept')
+
+            if action == 'reject':
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE landscape.ai_extraction_staging
+                        SET status = 'rejected'
+                        WHERE extraction_id = %s
+                    """, [extraction_id])
+                continue
+
+            value_to_apply = decision.get('edited_value') if action == 'edit' else extracted_value
+            if isinstance(value_to_apply, str):
+                try:
+                    value_to_apply = json.loads(value_to_apply)
+                except json.JSONDecodeError:
+                    errors.append({'extraction_id': extraction_id, 'error': 'Invalid JSON value'})
+                    continue
+
+            if not isinstance(value_to_apply, dict):
+                errors.append({'extraction_id': extraction_id, 'error': 'Extraction payload is not a JSON object'})
+                continue
+
+            unit_number = value_to_apply.get('unit_number')
+            if not unit_number:
+                errors.append({'extraction_id': extraction_id, 'error': 'Missing unit_number'})
+                continue
+
+            unit = MultifamilyUnit.objects.filter(project_id=project_id, unit_number=unit_number).first()
+
+            def _set_if_present(obj, field_name, source_key):
+                if source_key in value_to_apply and value_to_apply[source_key] is not None:
+                    setattr(obj, field_name, value_to_apply[source_key])
+                    return True
+                return False
+
+            # Process tenant name - extract actual name, not placeholders
+            raw_tenant = value_to_apply.get('tenant_name')
+            actual_tenant_name = extract_tenant_name(raw_tenant)
+
+            # Map occupancy status from source_status or occupancy_status
+            source_status = value_to_apply.get('source_status') or value_to_apply.get('occupancy_status')
+            mapped_status = map_occupancy_status(source_status, actual_tenant_name)
+
+            # Build extra_data from extraction
+            extra_data = value_to_apply.get('extra_data', {})
+
+            # If tags are present at top level, parse them into extra_data
+            if 'tags' in value_to_apply and value_to_apply['tags']:
+                tag_data = parse_rent_roll_tags(value_to_apply['tags'])
+                extra_data.update(tag_data)
+
+            # Also capture any unmapped fields in extra_data
+            known_fields = {
+                'unit_number', 'unit_type', 'bedrooms', 'bathrooms', 'square_feet', 'sf',
+                'current_rent', 'rent_current', 'market_rent', 'lease_start', 'lease_end',
+                'tenant_name', 'status', 'source_status', 'occupancy_status', 'extra_data', 'tags'
+            }
+            for key, val in value_to_apply.items():
+                if key not in known_fields and val is not None:
+                    extra_data[key] = val
+
+            # Check for Section 8 in extra_data and set flag
+            is_section8 = extra_data.get('section_8', False)
+
+            if unit:
+                updated = False
+                updated |= _set_if_present(unit, 'unit_type', 'unit_type')
+                updated |= _set_if_present(unit, 'bedrooms', 'bedrooms')
+                updated |= _set_if_present(unit, 'bathrooms', 'bathrooms')
+                updated |= _set_if_present(unit, 'square_feet', 'square_feet')
+                updated |= _set_if_present(unit, 'current_rent', 'current_rent')
+                updated |= _set_if_present(unit, 'market_rent', 'market_rent')
+
+                # Use mapped status instead of raw value
+                if mapped_status:
+                    unit.occupancy_status = mapped_status
+                    updated = True
+
+                # Set Section 8 flag if detected
+                if is_section8:
+                    unit.is_section8 = True
+                    updated = True
+
+                # Save extra_data if present
+                if extra_data:
+                    # Merge with existing extra_data if any
+                    existing_extra = unit.extra_data or {}
+                    existing_extra.update(extra_data)
+                    unit.extra_data = existing_extra
+                    updated = True
+
+                if updated:
+                    unit.save()
+            else:
+                create_data = {
+                    'project_id': project_id,
+                    'unit_number': unit_number,
+                    'unit_type': value_to_apply.get('unit_type') or 'Unknown',
+                    'square_feet': value_to_apply.get('square_feet') or 0,
+                    'occupancy_status': mapped_status,
+                }
+                if value_to_apply.get('bedrooms') is not None:
+                    create_data['bedrooms'] = value_to_apply.get('bedrooms')
+                if value_to_apply.get('bathrooms') is not None:
+                    create_data['bathrooms'] = value_to_apply.get('bathrooms')
+                if value_to_apply.get('current_rent') is not None:
+                    create_data['current_rent'] = value_to_apply.get('current_rent')
+                if value_to_apply.get('market_rent') is not None:
+                    create_data['market_rent'] = value_to_apply.get('market_rent')
+                if is_section8:
+                    create_data['is_section8'] = True
+                if extra_data:
+                    create_data['extra_data'] = extra_data
+                unit = MultifamilyUnit.objects.create(**create_data)
+
+            lease_start = _parse_date_value(value_to_apply.get('lease_start'))
+            lease_end = _parse_date_value(value_to_apply.get('lease_end'))
+
+            if lease_start or lease_end:
+                if not lease_start:
+                    lease_start = timezone.now().date()
+                if not lease_end:
+                    lease_end = lease_start + timedelta(days=365)
+
+                term_days = (lease_end - lease_start).days
+                term_months = max(1, round(term_days / 30))
+
+                existing_lease = None
+                if lease_start:
+                    existing_lease = MultifamilyLease.objects.filter(
+                        unit_id=unit.unit_id,
+                        lease_start_date=lease_start
+                    ).first()
+                if not existing_lease:
+                    existing_lease = MultifamilyLease.objects.filter(
+                        unit_id=unit.unit_id
+                    ).order_by('-lease_start_date').first()
+
+                rent_value = value_to_apply.get('current_rent') or value_to_apply.get('market_rent') or 0
+
+                if existing_lease:
+                    existing_lease.lease_start_date = lease_start
+                    existing_lease.lease_end_date = lease_end
+                    existing_lease.lease_term_months = term_months
+                    existing_lease.base_rent_monthly = rent_value
+                    # Use processed tenant name (not placeholder)
+                    if actual_tenant_name is not None:
+                        existing_lease.resident_name = actual_tenant_name
+                    existing_lease.save()
+                else:
+                    MultifamilyLease.objects.create(
+                        unit_id=unit.unit_id,
+                        resident_name=actual_tenant_name,
+                        lease_start_date=lease_start,
+                        lease_end_date=lease_end,
+                        lease_term_months=term_months,
+                        base_rent_monthly=rent_value,
+                        lease_status='ACTIVE'
+                    )
+
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'committed'
+                    WHERE extraction_id = %s
+                """, [extraction_id])
+
+            units_affected += 1
+
+    response_payload = {
+        'success': len(errors) == 0,
+        'snapshot_id': snapshot.snapshot_id if snapshot else None,
+        'units_affected': units_affected,
+        'rollback_available': bool(snapshot),
+        'errors': errors
+    }
+    return (response_payload, status.HTTP_200_OK if len(errors) == 0 else status.HTTP_207_MULTI_STATUS)
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def commit_staging_data(request, doc_id):
@@ -352,6 +657,16 @@ def commit_staging_data(request, doc_id):
     print(f"Request data: {request.data}")
 
     try:
+        if request.data.get('extraction_ids'):
+            payload, status_code = commit_staging_data_internal(
+                project_id=request.data.get('project_id'),
+                extraction_ids=request.data.get('extraction_ids'),
+                decisions=request.data.get('decisions'),
+                user=getattr(request, 'user', None),
+                create_snapshot=True
+            )
+            return Response(payload, status=status_code)
+
         approved_ids = request.data.get('approved_assertions', [])
         corrections = request.data.get('corrections', [])
         project_id = request.data.get('project_id')
@@ -785,6 +1100,104 @@ def rename_document(request, project_id, doc_id):
         )
     except Exception as e:
         logger.exception("Error renaming doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def restore_document(request, project_id, doc_id):
+    """Restore a soft-deleted document from trash."""
+    try:
+        doc = Document.objects.get(doc_id=doc_id, project_id=project_id)
+
+        if not doc.deleted_at:
+            return Response(
+                {"error": "Document is not in trash"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        doc.deleted_at = None
+        doc.deleted_by = None
+        doc.updated_at = timezone.now()
+        doc.save()
+
+        return Response({
+            "success": True,
+            "message": "Document restored",
+            "doc_id": doc_id,
+            "doc_name": doc.doc_name
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error restoring doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def permanent_delete_document(request, project_id, doc_id):
+    """
+    Permanently delete a document. Only works on documents that are already in trash.
+    This is irreversible and will delete the document record and associated data.
+    """
+    try:
+        doc = Document.objects.get(doc_id=doc_id, project_id=project_id)
+
+        if not doc.deleted_at:
+            return Response(
+                {"error": "Document must be in trash before permanent deletion. Use soft delete first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        doc_name = doc.doc_name
+
+        # Delete associated data
+        from django.db import connection
+        with connection.cursor() as cursor:
+            # Delete extracted facts
+            cursor.execute("""
+                DELETE FROM landscape.doc_extracted_facts
+                WHERE doc_id = %s
+            """, [doc_id])
+            facts_deleted = cursor.rowcount
+
+            # Delete embeddings
+            cursor.execute("""
+                DELETE FROM landscape.knowledge_embeddings
+                WHERE source_type = 'document' AND source_id = %s
+            """, [doc_id])
+            embeddings_deleted = cursor.rowcount
+
+        # Delete the document record
+        doc.delete()
+
+        return Response({
+            "success": True,
+            "message": "Document permanently deleted",
+            "doc_id": doc_id,
+            "doc_name": doc_name,
+            "facts_deleted": facts_deleted,
+            "embeddings_deleted": embeddings_deleted
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error permanently deleting doc %s", doc_id)
         return Response(
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

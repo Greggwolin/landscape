@@ -2,11 +2,23 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { CCard } from '@coreui/react';
+import { CCard, CAlert, CButton, CSpinner } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilCheckCircle, cilWarning, cilX } from '@coreui/icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { LandscaperChatThreaded } from './LandscaperChatThreaded';
 import { ActivityFeed } from './ActivityFeed';
 import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
+import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
+import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
+import {
+  RentRollUpdateReviewModal,
+  type RentRollComparisonResponse,
+  type RentRollExtractionMap,
+} from './RentRollUpdateReviewModal';
+import FieldMappingInterface from './FieldMappingInterface';
+import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
   projectId: number;
@@ -62,6 +74,7 @@ export function LandscaperPanel({
   pageContext,
 }: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
+  const queryClient = useQueryClient();
   const [isActivityExpanded, setActivityExpanded] = useState(true);
   const [expandedSplitRatio, setExpandedSplitRatio] = useState(0.25);
   const [collapsedSplitRatio, setCollapsedSplitRatio] = useState(0.75);
@@ -78,7 +91,23 @@ export function LandscaperPanel({
   const [uploadMessage, setUploadMessage] = useState('');
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [, setPendingFile] = useState<File | null>(null);
+  const [rentRollComparison, setRentRollComparison] = useState<RentRollComparisonResponse | null>(null);
+  const [rentRollExtractedUnits, setRentRollExtractedUnits] = useState<RentRollExtractionMap>({});
+  const [showRentRollReviewModal, setShowRentRollReviewModal] = useState(false);
+
+  // Field mapping interface state (for Excel/CSV rent rolls)
+  const [showFieldMappingModal, setShowFieldMappingModal] = useState(false);
+  const [fieldMappingDocId, setFieldMappingDocId] = useState<number | null>(null);
+  const [fieldMappingDocName, setFieldMappingDocName] = useState<string>('');
+
+  // Extraction job status
+  const { rentRollJob, cancelJob: cancelExtractionJob } = useExtractionJobStatus(projectId);
+  const { pendingCount: rentRollPendingCount, documentId: pendingDocumentId, refresh: refreshPendingExtractions } = usePendingRentRollExtractions(projectId);
+  const [extractionBannerDismissed, setExtractionBannerDismissed] = useState(false);
+
+  // Get files dropped anywhere in the project layout
+  const { pendingFiles, consumeFiles } = useFileDrop();
 
   const RESIZER_SIZE = 10;
   const MIN_CHAT_HEIGHT = 180;
@@ -317,16 +346,69 @@ export function LandscaperPanel({
             setUploadMessage('Running AI extraction...');
             setUploadProgress(90);
 
-            // Use the Python backend's batched extraction endpoint for comprehensive field extraction
-            const extractResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/extract-batched/`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                project_id: projectId,
-                property_type: 'multifamily', // Default to multifamily for OMs
-                batches: ['core_property', 'financials', 'deal_market'], // Key batches for OMs
-              }),
-            });
+            // Detect document type from filename to choose appropriate extraction batches
+            const docName = files[0]?.name?.toLowerCase() || '';
+            const isRentRoll = docName.includes('rent roll') ||
+                              docName.includes('rentroll') ||
+                              docName.includes('rent_roll') ||
+                              docName.includes('unit list') ||
+                              docName.includes('lease list');
+            const isT12 = docName.includes('t-12') ||
+                         docName.includes('t12') ||
+                         docName.includes('trailing') ||
+                         docName.includes('operating statement');
+
+            // Check if file is Excel or CSV (structured format that supports column mapping)
+            const fileExt = files[0]?.name?.split('.').pop()?.toLowerCase() || '';
+            const isStructuredFile = ['xlsx', 'xls', 'csv'].includes(fileExt);
+
+            // For structured rent roll files, use the Field Mapping Interface
+            if (isRentRoll && isStructuredFile) {
+              setFieldMappingDocId(docId);
+              setFieldMappingDocName(files[0].name);
+              setShowFieldMappingModal(true);
+              setDropNotice(null);
+              setIsUploading(false);
+              setUploadProgress(0);
+              setUploadMessage('');
+              return;
+            }
+
+            // Select extraction approach based on document type
+            let extractResponse: Response;
+
+            if (isRentRoll) {
+              // Use dedicated chunked rent roll extraction endpoint for PDF rent rolls
+              // This handles large rent rolls (100+ units) by processing in chunks
+              extractResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/extract-rent-roll/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  project_id: projectId,
+                  property_type: 'multifamily',
+                }),
+              });
+            } else {
+              // Use batched extraction for other document types
+              let batches: string[];
+              if (isT12) {
+                // T-12s focus on operating expenses and income
+                batches = ['core_property', 'financials'];
+              } else {
+                // Default for OMs and other documents
+                batches = ['core_property', 'financials', 'deal_market'];
+              }
+
+              extractResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/extract-batched/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  project_id: projectId,
+                  property_type: 'multifamily',
+                  batches,
+                }),
+              });
+            }
 
             if (extractResponse.ok) {
               const extractData = await extractResponse.json();
@@ -337,6 +419,63 @@ export function LandscaperPanel({
               const pendingData = pendingResponse.ok ? await pendingResponse.json() : { extractions: [], summary: null };
 
               if (extractData.success && (extractData.total_staged > 0 || pendingData.extractions?.length > 0)) {
+                if (isRentRoll) {
+                  try {
+                    const compareResponse = await fetch(
+                      `${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`,
+                      {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ document_id: docId }),
+                      }
+                    );
+
+                    if (compareResponse.ok) {
+                      const comparison = await compareResponse.json();
+                      if (comparison?.deltas?.length > 0) {
+                        const extractionIds = new Set(
+                          comparison.deltas.map((delta: { extraction_id: number }) => delta.extraction_id)
+                        );
+                        const extractedUnits: RentRollExtractionMap = {};
+                        (pendingData.extractions || []).forEach((ext: {
+                          extraction_id?: number;
+                          extracted_value?: unknown;
+                        }) => {
+                          if (!ext.extraction_id || !extractionIds.has(ext.extraction_id)) return;
+                          let extractedValue = ext.extracted_value;
+                          if (typeof extractedValue === 'string') {
+                            try {
+                              extractedValue = JSON.parse(extractedValue);
+                            } catch {
+                              return;
+                            }
+                          }
+                          if (extractedValue && typeof extractedValue === 'object') {
+                            extractedUnits[ext.extraction_id] = extractedValue as Record<string, unknown>;
+                          }
+                        });
+
+                        setRentRollComparison(comparison);
+                        setRentRollExtractedUnits(extractedUnits);
+                        setShowRentRollReviewModal(true);
+                        setShowExtractionModal(false);
+                        setExtractionResult(null);
+                        setPendingFile(null);
+                        setDropNotice(null);
+                        return;
+                      }
+
+                      setDropNotice(`Uploaded ${createdDocs.length} document(s). No rent roll changes found to review.`);
+                      return;
+                    }
+
+                    const compareErrorText = await compareResponse.text();
+                    console.error('Rent roll comparison failed:', compareResponse.status, compareErrorText);
+                  } catch (compareError) {
+                    console.error('Rent roll comparison failed:', compareError);
+                  }
+                }
+
                 // Convert extraction staging format to field_mappings format for modal
                 // field_key contains the proper field name (e.g., "replacement_reserves")
                 // target_field contains the generic column name (e.g., "value")
@@ -428,6 +567,16 @@ export function LandscaperPanel({
     }
   }, [startUpload, projectId, defaultWorkspaceId]);
 
+  // Process files dropped anywhere in the project layout (via FileDropContext)
+  useEffect(() => {
+    if (pendingFiles.length > 0 && !isUploading && !uploadThingIsUploading) {
+      const files = consumeFiles();
+      if (files.length > 0) {
+        uploadFiles(files);
+      }
+    }
+  }, [pendingFiles, consumeFiles, uploadFiles, isUploading, uploadThingIsUploading]);
+
   // Restore state from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('landscape-activity-expanded');
@@ -478,6 +627,104 @@ export function LandscaperPanel({
       setDropNotice('No files detected in drop.');
     }
   }, [uploadFiles, isUploading, uploadThingIsUploading]);
+
+  // Open rent roll review modal
+  const openRentRollReviewModal = useCallback(async () => {
+    if (!pendingDocumentId || rentRollPendingCount === 0) return;
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: pendingDocumentId }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch rent roll comparison:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Build extraction map from deltas
+      const extractedUnits: RentRollExtractionMap = {};
+      if (data.deltas) {
+        data.deltas.forEach((delta: { extraction_id: number; unit_number: string | number | null; changes: Array<{ field: string; extracted_value: unknown }> }) => {
+          const unitData: Record<string, unknown> = { unit_number: delta.unit_number };
+          delta.changes.forEach((change) => {
+            unitData[change.field] = change.extracted_value;
+          });
+          extractedUnits[delta.extraction_id] = unitData;
+        });
+      }
+
+      setRentRollComparison(data);
+      setRentRollExtractedUnits(extractedUnits);
+      setShowRentRollReviewModal(true);
+    } catch (err) {
+      console.error('Error fetching rent roll comparison:', err);
+    }
+  }, [projectId, pendingDocumentId, rentRollPendingCount]);
+
+  // Handle field mapping completion
+  const handleFieldMappingComplete = useCallback(
+    async (result: { jobId: number; unitsExtracted: number }) => {
+      setShowFieldMappingModal(false);
+      setFieldMappingDocId(null);
+      setFieldMappingDocName('');
+
+      // Reset banner dismissed state so it shows for this new extraction
+      setExtractionBannerDismissed(false);
+
+      // Refresh pending extractions to pick up any staged data
+      refreshPendingExtractions();
+
+      // If there are pending changes, open the rent roll review modal
+      if (result.unitsExtracted > 0 && pendingDocumentId) {
+        setDropNotice(`Extraction complete! ${result.unitsExtracted} units ready for review.`);
+        // The review banner will appear automatically via the pending extractions hook
+      } else {
+        setDropNotice(`Extraction complete. ${result.unitsExtracted} units processed.`);
+      }
+    },
+    [refreshPendingExtractions, pendingDocumentId]
+  );
+
+  const handleRentRollCommitSuccess = useCallback(async (snapshotId?: number) => {
+    setShowRentRollReviewModal(false);
+    setRentRollComparison(null);
+    setRentRollExtractedUnits({});
+    setDropNotice('Rent roll data committed successfully.');
+    refreshPendingExtractions();
+
+    if (!snapshotId) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/landscaper/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: 'update',
+          title: 'Rent Roll Updated',
+          summary: `Rent roll updated from ${rentRollComparison?.document_name || 'document'}.`,
+          status: 'complete',
+          confidence: null,
+          details: [
+            'Rollback available',
+            `snapshot_id:${snapshotId}`,
+          ],
+          source_type: 'rent_roll',
+          source_id: String(snapshotId),
+        }),
+      });
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['landscaper-activities', projectId.toString()] });
+      }
+    } catch (activityError) {
+      console.error('Failed to create activity item:', activityError);
+    }
+  }, [projectId, queryClient, rentRollComparison, refreshPendingExtractions]);
 
   // Use react-dropzone for more reliable drag and drop
   // Supports multiple files for OM packages (rent roll + T-12 + OM together)
@@ -692,6 +939,67 @@ export function LandscaperPanel({
           />
         </div>
 
+        {/* Extraction Job Status Indicator */}
+        {rentRollJob && (rentRollJob.status === 'processing' || rentRollJob.status === 'queued') && (
+          <CAlert color="info" className="mb-2 d-flex align-items-center justify-content-between py-2">
+            <div className="d-flex align-items-center gap-2">
+              <CSpinner size="sm" />
+              <span className="small">
+                Processing {rentRollJob.document_name || 'rent roll'}...
+                {rentRollJob.progress.total && rentRollJob.progress.total > 0 && (
+                  <span className="text-body-secondary ms-1">
+                    ({rentRollJob.progress.processed}/{rentRollJob.progress.total})
+                  </span>
+                )}
+              </span>
+            </div>
+            <CButton
+              color="link"
+              size="sm"
+              className="p-0 text-body-secondary"
+              onClick={() => cancelExtractionJob(rentRollJob.id)}
+              title="Cancel extraction"
+            >
+              <CIcon icon={cilX} size="sm" />
+            </CButton>
+          </CAlert>
+        )}
+
+        {rentRollJob?.status === 'failed' && (
+          <CAlert color="danger" className="mb-2 py-2">
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilWarning} size="sm" />
+              <span className="small">
+                Extraction failed: {rentRollJob.error_message || 'Unknown error'}
+              </span>
+            </div>
+          </CAlert>
+        )}
+
+        {rentRollJob?.status === 'completed' && rentRollPendingCount > 0 && !extractionBannerDismissed && (
+          <CAlert
+            color="success"
+            className="mb-2 d-flex align-items-center justify-content-between py-2"
+            dismissible
+            onClose={() => setExtractionBannerDismissed(true)}
+          >
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilCheckCircle} size="sm" />
+              <span className="small">
+                Extraction complete! {rentRollPendingCount} changes ready for review.
+              </span>
+            </div>
+            <CButton
+              color="primary"
+              size="sm"
+              onClick={openRentRollReviewModal}
+              className="me-2"
+            >
+              Review Now
+            </CButton>
+          </CAlert>
+        )}
+
         {/* Activity Feed Card */}
         <CCard
           className="shadow-lg overflow-hidden"
@@ -709,6 +1017,21 @@ export function LandscaperPanel({
       </div>
 
       {/* Extraction Review Modal */}
+      {showRentRollReviewModal && rentRollComparison && (
+        <RentRollUpdateReviewModal
+          visible={showRentRollReviewModal}
+          onClose={() => {
+            setShowRentRollReviewModal(false);
+            setRentRollComparison(null);
+            setRentRollExtractedUnits({});
+          }}
+          projectId={projectId}
+          comparisonData={rentRollComparison}
+          extractedUnitsById={rentRollExtractedUnits}
+          onCommitSuccess={handleRentRollCommitSuccess}
+        />
+      )}
+
       {showExtractionModal && extractionResult && (
         <ExtractionReviewModal
           isOpen={showExtractionModal}
@@ -728,6 +1051,22 @@ export function LandscaperPanel({
             setPendingFile(null);
             setDropNotice('Extraction data committed successfully.');
           }}
+        />
+      )}
+
+      {/* Field Mapping Interface for structured rent rolls (Excel/CSV) */}
+      {showFieldMappingModal && fieldMappingDocId && (
+        <FieldMappingInterface
+          projectId={projectId}
+          documentId={fieldMappingDocId}
+          documentName={fieldMappingDocName}
+          visible={showFieldMappingModal}
+          onClose={() => {
+            setShowFieldMappingModal(false);
+            setFieldMappingDocId(null);
+            setFieldMappingDocName('');
+          }}
+          onComplete={handleFieldMappingComplete}
         />
       )}
     </div>

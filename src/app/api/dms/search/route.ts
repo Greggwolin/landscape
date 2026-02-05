@@ -176,6 +176,68 @@ async function databaseSearch(params: any) {
 }
 
 /**
+ * Search for deleted (trashed) documents directly from core_doc
+ */
+async function searchDeletedDocuments(params: any) {
+  try {
+    const { filters, limit, offset } = params;
+
+    const conditions: any[] = [sql`deleted_at IS NOT NULL`];
+
+    if (filters?.project_id) {
+      conditions.push(sql`project_id = ${filters.project_id}`);
+    }
+    if (filters?.workspace_id) {
+      conditions.push(sql`workspace_id = ${filters.workspace_id}`);
+    }
+
+    const whereClause = sql`WHERE ${conditions.reduce((acc, cond, idx) =>
+      idx === 0 ? cond : sql`${acc} AND ${cond}`
+    )}`;
+
+    const docs = await sql`
+      SELECT
+        doc_id::text as doc_id,
+        project_id,
+        workspace_id,
+        doc_name,
+        doc_type,
+        discipline,
+        status,
+        version_no,
+        created_at,
+        updated_at,
+        deleted_at,
+        deleted_by,
+        storage_uri,
+        mime_type,
+        file_size_bytes
+      FROM landscape.core_doc
+      ${whereClause}
+      ORDER BY deleted_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `;
+
+    const countResult = await sql<{ count: number }[]>`
+      SELECT COUNT(*) as count
+      FROM landscape.core_doc
+      ${whereClause}
+    `;
+    const totalHits = countResult[0]?.count || 0;
+
+    return {
+      hits: docs,
+      totalHits,
+      source: 'database-trash',
+    };
+  } catch (error) {
+    console.error('❌ Deleted documents search failed:', error);
+    throw error;
+  }
+}
+
+/**
  * GET /api/dms/search (legacy URL params)
  */
 export async function GET(request: Request) {
@@ -192,22 +254,39 @@ export async function GET(request: Request) {
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20;
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0;
 
-    console.log(`🔍 GET search: q="${query}", project=${projectId}, limit=${limit}`);
+    // Support for deleted documents search
+    const deletedOnly = searchParams.get('deleted_only') === 'true';
 
-    // Use database search for GET requests
-    const results = await databaseSearch({
-      query,
-      filters: {
-        project_id: projectId,
-        workspace_id: workspaceId,
-        doc_type: docType,
-        discipline,
-        status,
-      },
-      facets: ['doc_type', 'discipline', 'status', 'project_name'],
-      limit,
-      offset,
-    });
+    console.log(`🔍 GET search: q="${query}", project=${projectId}, limit=${limit}, deletedOnly=${deletedOnly}`);
+
+    let results;
+
+    if (deletedOnly) {
+      // Search only deleted documents
+      results = await searchDeletedDocuments({
+        filters: {
+          project_id: projectId,
+          workspace_id: workspaceId,
+        },
+        limit,
+        offset,
+      });
+    } else {
+      // Normal search (excludes deleted by default via materialized view)
+      results = await databaseSearch({
+        query,
+        filters: {
+          project_id: projectId,
+          workspace_id: workspaceId,
+          doc_type: docType,
+          discipline,
+          status,
+        },
+        facets: ['doc_type', 'discipline', 'status', 'project_name'],
+        limit,
+        offset,
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -215,8 +294,8 @@ export async function GET(request: Request) {
       facets: results.facetDistribution || {},
       totalHits: results.totalHits,
       source: results.source,
-      processingTimeMs: results.processingTimeMs,
-      query: results.query,
+      processingTimeMs: results.processingTimeMs || 0,
+      query: query,
       pagination: {
         limit,
         offset,

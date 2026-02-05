@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "apps.feedback",  # Tester feedback system
     "apps.location_intelligence",  # Location Intelligence (ring demographics, POIs)
     "apps.valuation",  # Valuation approaches (Sales Comparison, Cost Approach)
+    "apps.dynamic",  # Dynamic columns (EAV pattern for extensible fields)
 ]
 
 MIDDLEWARE = [

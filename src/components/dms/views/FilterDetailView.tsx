@@ -215,9 +215,6 @@ export default function FilterDetailView({
       {/* Filter Header */}
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <button className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors">
-            ⭐
-          </button>
           <CIcon icon={cilFilterSquare} className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{docType}</h1>
           <div className="ml-auto flex items-center gap-2">
@@ -351,7 +348,6 @@ export default function FilterDetailView({
                   </th>
                   <th className="w-8"></th>
                   <th className="w-8"></th>
-                  <th className="w-8"></th>
                   <th className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-400">
                     Name
                   </th>
@@ -384,17 +380,6 @@ export default function FilterDetailView({
                         onChange={() => toggleDocSelection(doc.doc_id)}
                         onClick={(e) => e.stopPropagation()}
                       />
-                    </td>
-                    <td className="px-3 py-3">
-                      <button
-                        className="text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: Toggle star
-                        }}
-                      >
-                        ⭐
-                      </button>
                     </td>
                     <td className="px-3 py-3">
                       <button

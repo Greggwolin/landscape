@@ -34,14 +34,14 @@
 .folder-tabs-row1 {
   display: flex;
   gap: 4px;
-  padding: 0.25rem 1rem;
+  padding: 0.5rem 1rem;
   background: var(--surface-card-header, var(--cui-tertiary-bg));
   border-bottom: 1px solid var(--cui-border-color);
   overflow-x: auto;
   flex-wrap: nowrap;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  min-height: 44px;
+  min-height: 56px;
   align-items: center;
 }
 
@@ -341,6 +341,47 @@
   color: var(--cui-body-color);
   border-bottom-color: var(--cui-primary);
   font-weight: 600;
+}
+
+.sub-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 0.5rem;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--cui-warning-bg-subtle, #fff3cd);
+  color: var(--cui-warning-text-emphasis, #664d03);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.sub-tab-badge:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Badge state variants */
+.sub-tab-badge-processing {
+  background: var(--cui-info-bg-subtle, #cff4fc);
+  color: var(--cui-info-text-emphasis, #055160);
+  min-width: 24px;
+  padding: 0 4px;
+}
+
+.sub-tab-badge-processing .spinner-border {
+  border-color: currentColor;
+  border-right-color: transparent;
+}
+
+.sub-tab-badge-error {
+  background: var(--cui-danger-bg-subtle, #f8d7da);
+  color: var(--cui-danger-text-emphasis, #842029);
+  font-weight: 700;
 }
 
 /* ==========================================================================

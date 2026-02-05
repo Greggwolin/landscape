@@ -47,6 +47,7 @@ interface CompetitiveMarketChartsProps {
   subjectPropertyName?: string;
   onPropertyClick?: (propertyName: string) => void;
   onColorsAssigned?: (colors: PropertyColorMap) => void;
+  selectedProperty?: string | null;
 }
 
 interface DataPoint {
@@ -68,15 +69,20 @@ interface PropertyLine {
   color: string;
 }
 
-interface TooltipData {
-  x: number;
-  y: number;
+interface TooltipItem {
   propertyName: string;
   bedrooms: number;
   bathrooms: number;
   sqft: number;
   rent: number;
   isSubject: boolean;
+  color: string;
+}
+
+interface TooltipData {
+  x: number;
+  y: number;
+  items: TooltipItem[];
 }
 
 interface LineChartProps {
@@ -86,15 +92,29 @@ interface LineChartProps {
   isBedroomMode: boolean;
   onPropertyClick?: (propertyName: string) => void;
   theme: 'light' | 'dark';
+  selectedProperty?: string | null;
 }
 
-function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, theme }: LineChartProps) {
+function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, theme, selectedProperty }: LineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const [containerWidth, setContainerWidth] = useState(900);
 
-  const width = 900;
+  // Measure container width on mount and resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const width = containerWidth;
   const height = 336;
-  const padding = { top: 20, right: 20, bottom: 45, left: 60 };
+  const padding = { top: 20, right: 30, bottom: 55, left: 75 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -181,15 +201,44 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    // Find all points near this location (within 15px radius)
+    const targetX = scaleX(point.xDisplay);
+    const targetY = scaleY(point.y);
+    const threshold = 15;
+
+    const nearbyItems: TooltipItem[] = [];
+
+    lines.forEach(l => {
+      l.points.forEach(p => {
+        const px = scaleX(p.xDisplay);
+        const py = scaleY(p.y);
+        const distance = Math.sqrt(Math.pow(px - targetX, 2) + Math.pow(py - targetY, 2));
+
+        if (distance <= threshold) {
+          nearbyItems.push({
+            propertyName: l.propertyName,
+            bedrooms: p.bedrooms,
+            bathrooms: p.bathrooms,
+            sqft: p.sqft,
+            rent: p.rent,
+            isSubject: l.isSubject,
+            color: l.color,
+          });
+        }
+      });
+    });
+
+    // Sort: subject first, then by property name
+    nearbyItems.sort((a, b) => {
+      if (a.isSubject && !b.isSubject) return -1;
+      if (!a.isSubject && b.isSubject) return 1;
+      return a.propertyName.localeCompare(b.propertyName);
+    });
+
     setTooltip({
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
-      propertyName: line.propertyName,
-      bedrooms: point.bedrooms,
-      bathrooms: point.bathrooms,
-      sqft: point.sqft,
-      rent: point.rent,
-      isSubject: line.isSubject,
+      items: nearbyItems,
     });
   };
 
@@ -210,9 +259,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
   };
 
   const handleClick = (propertyName: string) => {
-    if (onPropertyClick) {
-      onPropertyClick(propertyName);
-    }
+    onPropertyClick?.(propertyName);
   };
 
   // Theme-aware colors
@@ -236,7 +283,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+      <svg width={width} height={height}>
         {/* Background */}
         <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} fill={colors.background} />
 
@@ -271,7 +318,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
         {/* Y-axis ticks and labels */}
         {yTicks.map((tick) => (
           <g key={`y-label-${tick}`}>
-            <text x={padding.left - 8} y={scaleY(tick) + 4} textAnchor="end" fill={colors.text} fontSize="11">
+            <text x={padding.left - 12} y={scaleY(tick) + 4} textAnchor="end" fill={colors.text} fontSize="11">
               ${tick.toLocaleString()}
             </text>
           </g>
@@ -280,22 +327,22 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
         {/* X-axis ticks and labels */}
         {xTicks.map((tick) => (
           <g key={`x-label-${tick}`}>
-            <text x={scaleX(tick)} y={padding.top + chartHeight + 20} textAnchor="middle" fill={colors.text} fontSize="11">
+            <text x={scaleX(tick)} y={padding.top + chartHeight + 22} textAnchor="middle" fill={colors.text} fontSize="11">
               {isBedroomMode ? tick : tick.toLocaleString()}
             </text>
           </g>
         ))}
 
         {/* Axis labels */}
-        <text x={width / 2} y={height - 8} textAnchor="middle" fill={colors.text} fontSize="12">
+        <text x={width / 2} y={height - 5} textAnchor="middle" fill={colors.text} fontSize="12">
           {xLabel}
         </text>
-        <text x={18} y={height / 2} textAnchor="middle" fill={colors.text} fontSize="12" transform={`rotate(-90, 18, ${height / 2})`}>
+        <text x={16} y={height / 2} textAnchor="middle" fill={colors.text} fontSize="12" transform={`rotate(-90, 16, ${height / 2})`}>
           {yLabel}
         </text>
 
-        {/* Comparable lines and dots - render first */}
-        {comparableLines.map((line, lineIdx) => (
+        {/* Comparable lines and dots - render first (non-selected) */}
+        {comparableLines.filter(l => l.propertyName !== selectedProperty).map((line, lineIdx) => (
           <g key={`comp-line-${lineIdx}`}>
             {/* Line connecting points */}
             {line.points.length > 1 && (
@@ -316,6 +363,40 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
                 r={6}
                 fill={line.color}
                 opacity={0.9}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={(e) => handleMouseEnter(point, line, e)}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                onClick={() => handleClick(line.propertyName)}
+              />
+            ))}
+          </g>
+        ))}
+
+        {/* Selected comparable line - render on top with thicker stroke */}
+        {comparableLines.filter(l => l.propertyName === selectedProperty).map((line, lineIdx) => (
+          <g key={`selected-comp-line-${lineIdx}`}>
+            {/* Line connecting points - thicker */}
+            {line.points.length > 1 && (
+              <path
+                d={generatePath(line.points)}
+                fill="none"
+                stroke={line.color}
+                strokeWidth="5"
+                opacity={1}
+              />
+            )}
+            {/* Dots - larger */}
+            {line.points.map((point, i) => (
+              <circle
+                key={`selected-comp-${lineIdx}-${i}`}
+                cx={scaleX(point.xDisplay)}
+                cy={scaleY(point.y)}
+                r={9}
+                fill={line.color}
+                opacity={1}
+                stroke="#fff"
+                strokeWidth={2}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={(e) => handleMouseEnter(point, line, e)}
                 onMouseMove={handleMouseMove}
@@ -369,7 +450,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
       </svg>
 
       {/* Tooltip */}
-      {tooltip && (
+      {tooltip && tooltip.items.length > 0 && (
         <div
           style={{
             position: 'absolute',
@@ -384,17 +465,41 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
             boxShadow: theme === 'light'
               ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               : '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
-            minWidth: '160px',
+            minWidth: '180px',
+            maxHeight: '300px',
+            overflowY: 'auto',
           }}
         >
-          <div style={{ fontWeight: 600, color: theme === 'light' ? '#1e293b' : '#f3f4f6', marginBottom: '4px', fontSize: '12px' }}>
-            {tooltip.propertyName}
-          </div>
-          <div style={{ color: theme === 'light' ? '#64748b' : '#9ca3af', fontSize: '11px', lineHeight: 1.5 }}>
-            <div>{tooltip.bedrooms} bed / {tooltip.bathrooms} bath</div>
-            <div>{tooltip.sqft.toLocaleString()} SF</div>
-            <div style={{ color: '#22c55e', fontWeight: 500 }}>${tooltip.rent.toLocaleString()}/mo</div>
-          </div>
+          {tooltip.items.map((item, idx) => (
+            <div
+              key={`${item.propertyName}-${item.bedrooms}-${item.rent}-${idx}`}
+              style={{
+                borderBottom: idx < tooltip.items.length - 1 ? `1px solid ${theme === 'light' ? '#e2e8f0' : '#374151'}` : 'none',
+                paddingBottom: idx < tooltip.items.length - 1 ? '6px' : 0,
+                marginBottom: idx < tooltip.items.length - 1 ? '6px' : 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: item.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontWeight: 600, color: theme === 'light' ? '#1e293b' : '#f3f4f6', fontSize: '11px' }}>
+                  {item.propertyName}
+                  {item.isSubject && <span style={{ color: '#3b82f6', marginLeft: '4px' }}>(Subject)</span>}
+                </span>
+              </div>
+              <div style={{ color: theme === 'light' ? '#64748b' : '#9ca3af', fontSize: '10px', lineHeight: 1.4, paddingLeft: '14px' }}>
+                <div>{item.bedrooms} bed / {item.bathrooms} bath • {item.sqft.toLocaleString()} SF</div>
+                <div style={{ color: '#22c55e', fontWeight: 500 }}>${item.rent.toLocaleString()}/mo</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -407,6 +512,7 @@ export function CompetitiveMarketCharts({
   subjectPropertyName = 'Subject Property',
   onPropertyClick,
   onColorsAssigned,
+  selectedProperty,
 }: CompetitiveMarketChartsProps) {
   const { theme } = useTheme();
   const [viewMode, setViewMode] = useState<'sqft' | 'bedrooms'>('sqft');
@@ -634,6 +740,7 @@ export function CompetitiveMarketCharts({
         isBedroomMode={viewMode === 'bedrooms'}
         onPropertyClick={onPropertyClick}
         theme={theme}
+        selectedProperty={selectedProperty}
       />
 
       {/* Toggle selector - bottom left */}

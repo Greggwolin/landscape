@@ -3655,25 +3655,17 @@ def handle_delete_rental_comparable(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Capital Stack Tools - Debt Facilities
+# Capital Stack Tools - Loans
 # ─────────────────────────────────────────────────────────────────────────────
 
-DEBT_FACILITY_COLUMNS = [
-    'facility_name', 'facility_type', 'lender_name', 'commitment_amount',
-    'interest_rate', 'interest_calculation', 'payment_frequency',
-    'commitment_date', 'maturity_date', 'origination_fee_pct', 'unused_fee_pct',
-    'extension_fee_amount', 'covenants', 'draw_trigger_type', 'notes',
-    'can_participate_in_profits', 'profit_participation_tier', 'profit_participation_pct',
-    'interest_payment_method', 'ltv_pct', 'dscr', 'amortization_years', 'loan_term_years',
-    'is_construction_loan', 'loan_amount', 'interest_rate_pct', 'rate_type',
-    'spread_over_index_bps', 'rate_floor_pct', 'rate_cap_pct', 'index_name',
-    'rate_reset_frequency', 'commitment_fee_pct', 'extension_fee_bps',
-    'prepayment_penalty_years', 'exit_fee_pct', 'guarantee_type', 'guarantor_name',
-    'loan_covenant_dscr_min', 'loan_covenant_ltv_max', 'loan_covenant_occupancy_min',
-    'covenant_test_frequency', 'reserve_requirements', 'replacement_reserve_per_unit',
-    'tax_insurance_escrow_months', 'initial_reserve_months', 'recourse_carveout_provisions',
-    'commitment_balance', 'drawn_to_date', 'extension_options', 'extension_option_years',
-    'monthly_payment', 'annual_debt_service'
+LOAN_COLUMNS = [
+    'loan_name', 'loan_type', 'structure_type', 'lender_name', 'commitment_amount',
+    'loan_amount', 'interest_rate_pct', 'interest_type', 'interest_index',
+    'interest_spread_bps', 'loan_term_months', 'loan_term_years',
+    'amortization_months', 'amortization_years', 'interest_only_months',
+    'payment_frequency', 'origination_fee_pct', 'exit_fee_pct',
+    'loan_to_cost_pct', 'loan_to_value_pct', 'seniority', 'status',
+    'loan_start_date', 'loan_maturity_date', 'notes'
 ]
 
 EQUITY_STRUCTURE_COLUMNS = [
@@ -3715,25 +3707,26 @@ def _log_capital_stack_activity(project_id: int, table_name: str, action: str,
         logger.warning(f"Failed to log capital stack activity: {e}")
 
 
-@register_tool('get_debt_facilities')
-def handle_get_debt_facilities(
+@register_tool('get_loans')
+def handle_get_loans(
     tool_input: Dict[str, Any],
     project_id: int,
     **kwargs
 ) -> Dict[str, Any]:
-    """Get debt facilities for a project."""
+    """Get loans for a project."""
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT facility_id, facility_name, facility_type, lender_name,
-                       commitment_amount, loan_amount, interest_rate, interest_rate_pct,
-                       rate_type, ltv_pct, dscr, loan_term_years, amortization_years,
-                       is_construction_loan, commitment_date, maturity_date,
-                       origination_fee_pct, monthly_payment, annual_debt_service,
-                       notes, covenants, reserve_requirements
-                FROM landscape.tbl_debt_facility
+                SELECT loan_id, loan_name, loan_type, structure_type, lender_name,
+                       commitment_amount, loan_amount, interest_rate_pct, interest_type,
+                       interest_index, interest_spread_bps, loan_term_months, loan_term_years,
+                       amortization_months, amortization_years, interest_only_months,
+                       payment_frequency, origination_fee_pct, exit_fee_pct, loan_to_cost_pct,
+                       loan_to_value_pct, seniority, status, loan_start_date,
+                       loan_maturity_date, notes
+                FROM landscape.tbl_loan
                 WHERE project_id = %s
-                ORDER BY facility_name
+                ORDER BY loan_name
             """, [project_id])
 
             columns = [col[0] for col in cursor.description]
@@ -3743,12 +3736,12 @@ def handle_get_debt_facilities(
             for row in rows:
                 record = dict(zip(columns, row))
                 # Convert Decimal to float
-                for key in ['commitment_amount', 'loan_amount', 'interest_rate', 'interest_rate_pct',
-                           'ltv_pct', 'dscr', 'origination_fee_pct', 'monthly_payment', 'annual_debt_service']:
+                for key in ['commitment_amount', 'loan_amount', 'interest_rate_pct', 'interest_spread_bps',
+                           'origination_fee_pct', 'exit_fee_pct', 'loan_to_cost_pct', 'loan_to_value_pct']:
                     if record.get(key) is not None:
                         record[key] = float(record[key])
                 # Handle dates
-                for key in ['commitment_date', 'maturity_date']:
+                for key in ['loan_start_date', 'loan_maturity_date']:
                     if record.get(key):
                         record[key] = str(record[key])
                 records.append(record)
@@ -3760,36 +3753,36 @@ def handle_get_debt_facilities(
             }
 
     except Exception as e:
-        logger.error(f"Error getting debt facilities: {e}")
+        logger.error(f"Error getting loans: {e}")
         return {'success': False, 'error': str(e)}
 
 
-@register_tool('update_debt_facility', is_mutation=True)
-def handle_update_debt_facility(
+@register_tool('update_loan', is_mutation=True)
+def handle_update_loan(
     tool_input: Dict[str, Any],
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Add or update a debt facility."""
-    reason = tool_input.get('reason', 'Update debt facility')
+    """Add or update a loan."""
+    reason = tool_input.get('reason', 'Update loan')
 
-    facility_id = tool_input.get('facility_id')
-    facility_name = tool_input.get('facility_name')
+    loan_id = tool_input.get('loan_id')
+    loan_name = tool_input.get('loan_name')
 
-    if not facility_name and not facility_id:
-        return {'success': False, 'error': 'facility_name or facility_id required'}
+    if not loan_name and not loan_id:
+        return {'success': False, 'error': 'loan_name or loan_id required'}
 
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='capital_stack_upsert',
-            table_name='tbl_debt_facility',
+            table_name='tbl_loan',
             field_name=None,
-            record_id=str(facility_id) if facility_id else None,
-            proposed_value={k: v for k, v in tool_input.items() if k in DEBT_FACILITY_COLUMNS},
+            record_id=str(loan_id) if loan_id else None,
+            proposed_value={k: v for k, v in tool_input.items() if k in LOAN_COLUMNS},
             current_value=None,
             reason=reason,
             source_message_id=source_message_id,
@@ -3799,27 +3792,22 @@ def handle_update_debt_facility(
         with connection.cursor() as cursor:
             # Check if exists
             existing = None
-            if facility_id:
+            if loan_id:
                 cursor.execute("""
-                    SELECT facility_id FROM landscape.tbl_debt_facility
-                    WHERE facility_id = %s AND project_id = %s
-                """, [facility_id, project_id])
+                    SELECT loan_id FROM landscape.tbl_loan
+                    WHERE loan_id = %s AND project_id = %s
+                """, [loan_id, project_id])
                 existing = cursor.fetchone()
-            elif facility_name:
+            elif loan_name:
                 cursor.execute("""
-                    SELECT facility_id FROM landscape.tbl_debt_facility
-                    WHERE project_id = %s AND facility_name = %s
-                """, [project_id, facility_name])
+                    SELECT loan_id FROM landscape.tbl_loan
+                    WHERE project_id = %s AND loan_name = %s
+                """, [project_id, loan_name])
                 existing = cursor.fetchone()
 
             # Build update dict
             updates = {k: v for k, v in tool_input.items()
-                      if k in DEBT_FACILITY_COLUMNS and v is not None}
-
-            # Handle JSONB fields
-            for jsonb_field in ['covenants', 'reserve_requirements']:
-                if jsonb_field in updates and isinstance(updates[jsonb_field], dict):
-                    updates[jsonb_field] = json.dumps(updates[jsonb_field])
+                      if k in LOAN_COLUMNS and v is not None}
 
             if existing:
                 # Update
@@ -3828,85 +3816,85 @@ def handle_update_debt_facility(
                     set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
                     values = list(updates.values()) + [existing_id]
                     cursor.execute(f"""
-                        UPDATE landscape.tbl_debt_facility
+                        UPDATE landscape.tbl_loan
                         SET {set_clauses}, updated_at = NOW()
-                        WHERE facility_id = %s
+                        WHERE loan_id = %s
                     """, values)
 
-                _log_capital_stack_activity(project_id, 'tbl_debt_facility', 'update', 1, reason)
+                _log_capital_stack_activity(project_id, 'tbl_loan', 'update', 1, reason)
                 return {
                     'success': True,
                     'action': 'updated',
-                    'facility_id': existing_id,
-                    'facility_name': facility_name or updates.get('facility_name')
+                    'loan_id': existing_id,
+                    'loan_name': loan_name or updates.get('loan_name')
                 }
             else:
-                # Insert - facility_name and facility_type are required
-                if not facility_name:
-                    return {'success': False, 'error': 'facility_name required for new facility'}
-                if not tool_input.get('facility_type'):
-                    return {'success': False, 'error': 'facility_type required for new facility'}
+                # Insert - loan_name and loan_type are required
+                if not loan_name:
+                    return {'success': False, 'error': 'loan_name required for new loan'}
+                if not tool_input.get('loan_type'):
+                    return {'success': False, 'error': 'loan_type required for new loan'}
                 if tool_input.get('commitment_amount') is None and tool_input.get('loan_amount') is None:
                     return {'success': False, 'error': 'commitment_amount or loan_amount required'}
-                if tool_input.get('interest_rate') is None and tool_input.get('interest_rate_pct') is None:
-                    return {'success': False, 'error': 'interest_rate or interest_rate_pct required'}
+                if tool_input.get('interest_rate_pct') is None:
+                    return {'success': False, 'error': 'interest_rate_pct required'}
 
-                updates['facility_name'] = facility_name
-                updates['facility_type'] = tool_input.get('facility_type')
+                updates['loan_name'] = loan_name
+                updates['loan_type'] = tool_input.get('loan_type')
                 # Set defaults for required fields
                 if 'commitment_amount' not in updates:
                     updates['commitment_amount'] = tool_input.get('loan_amount', 0)
-                if 'interest_rate' not in updates:
-                    updates['interest_rate'] = tool_input.get('interest_rate_pct', 0)
+                if 'interest_rate_pct' not in updates:
+                    updates['interest_rate_pct'] = tool_input.get('interest_rate_pct', 0)
 
                 col_names = ['project_id'] + list(updates.keys())
                 placeholders = ', '.join(['%s'] * len(col_names))
                 values = [project_id] + list(updates.values())
 
                 cursor.execute(f"""
-                    INSERT INTO landscape.tbl_debt_facility ({', '.join(col_names)})
+                    INSERT INTO landscape.tbl_loan ({', '.join(col_names)})
                     VALUES ({placeholders})
-                    RETURNING facility_id
+                    RETURNING loan_id
                 """, values)
                 new_id = cursor.fetchone()[0]
 
-                _log_capital_stack_activity(project_id, 'tbl_debt_facility', 'create', 1, reason)
+                _log_capital_stack_activity(project_id, 'tbl_loan', 'create', 1, reason)
                 return {
                     'success': True,
                     'action': 'created',
-                    'facility_id': new_id,
-                    'facility_name': facility_name
+                    'loan_id': new_id,
+                    'loan_name': loan_name
                 }
 
     except Exception as e:
-        logger.error(f"Error updating debt facility: {e}")
+        logger.error(f"Error updating loan: {e}")
         return {'success': False, 'error': str(e)}
 
 
-@register_tool('delete_debt_facility', is_mutation=True)
-def handle_delete_debt_facility(
+@register_tool('delete_loan', is_mutation=True)
+def handle_delete_loan(
     tool_input: Dict[str, Any],
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Delete a debt facility."""
-    facility_id = tool_input.get('facility_id')
-    reason = tool_input.get('reason', 'Delete debt facility')
+    """Delete a loan."""
+    loan_id = tool_input.get('loan_id')
+    reason = tool_input.get('reason', 'Delete loan')
 
-    if not facility_id:
-        return {'success': False, 'error': 'facility_id required'}
+    if not loan_id:
+        return {'success': False, 'error': 'loan_id required'}
 
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='capital_stack_delete',
-            table_name='tbl_debt_facility',
+            table_name='tbl_loan',
             field_name=None,
-            record_id=str(facility_id),
-            proposed_value={'delete': True, 'facility_id': facility_id},
+            record_id=str(loan_id),
+            proposed_value={'delete': True, 'loan_id': loan_id},
             current_value=None,
             reason=reason,
             source_message_id=source_message_id,
@@ -3914,33 +3902,33 @@ def handle_delete_debt_facility(
 
     try:
         with connection.cursor() as cursor:
-            # Get facility name for logging
+            # Get loan name for logging
             cursor.execute("""
-                SELECT facility_name FROM landscape.tbl_debt_facility
-                WHERE facility_id = %s AND project_id = %s
-            """, [facility_id, project_id])
+                SELECT loan_name FROM landscape.tbl_loan
+                WHERE loan_id = %s AND project_id = %s
+            """, [loan_id, project_id])
             row = cursor.fetchone()
 
             if not row:
-                return {'success': False, 'error': f'Facility {facility_id} not found'}
+                return {'success': False, 'error': f'Loan {loan_id} not found'}
 
-            facility_name = row[0]
+            loan_name = row[0]
 
             cursor.execute("""
-                DELETE FROM landscape.tbl_debt_facility
-                WHERE facility_id = %s AND project_id = %s
-            """, [facility_id, project_id])
+                DELETE FROM landscape.tbl_loan
+                WHERE loan_id = %s AND project_id = %s
+            """, [loan_id, project_id])
 
-            _log_capital_stack_activity(project_id, 'tbl_debt_facility', 'delete', 1, reason)
+            _log_capital_stack_activity(project_id, 'tbl_loan', 'delete', 1, reason)
             return {
                 'success': True,
                 'action': 'deleted',
-                'facility_id': facility_id,
-                'facility_name': facility_name
+                'loan_id': loan_id,
+                'loan_name': loan_name
             }
 
     except Exception as e:
-        logger.error(f"Error deleting debt facility: {e}")
+        logger.error(f"Error deleting loan: {e}")
         return {'success': False, 'error': str(e)}
 
 

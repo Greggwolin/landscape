@@ -204,28 +204,6 @@ export default function DocumentPreviewPanel({
 
       {/* Preview Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {/* Document Thumbnail */}
-        <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
-          {doc.mime_type?.startsWith('image/') && doc.storage_uri ? (
-            <div className="aspect-[8.5/11] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <img
-                src={doc.storage_uri}
-                alt={doc.doc_name}
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  target.parentElement!.innerHTML = '<span class="text-gray-400 dark:text-gray-600 text-6xl">📄</span>';
-                }}
-              />
-            </div>
-          ) : (
-            <div className="aspect-[8.5/11] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <span className="text-gray-400 dark:text-gray-600 text-6xl">📄</span>
-            </div>
-          )}
-        </div>
-
         {/* Document Metadata - 2-column layout */}
         <table className="w-full text-sm">
           <tbody>

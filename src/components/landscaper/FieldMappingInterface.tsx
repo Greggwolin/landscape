@@ -1,0 +1,672 @@
+/**
+ * FieldMappingInterface - Interactive column mapping for rent roll extraction
+ *
+ * Multi-step flow:
+ * 1. MAPPING: User maps source columns to Landscape fields or creates dynamic columns
+ * 2. EXTRACTING: Job runs in background with progress indicator
+ * 3. REVIEW: If conflicts exist, show simplified review (or SUCCESS toast if clean)
+ *
+ * Replaces the "extract then review" modal with guided mapping experience.
+ */
+
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CButton,
+  CSpinner,
+  CAlert,
+  CBadge,
+  CFormSelect,
+  CTooltip,
+  CProgress,
+} from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import {
+  cilCheckCircle,
+  cilWarning,
+  cilXCircle,
+  cilPlus,
+  cilArrowRight,
+  cilInfo,
+  cilLightbulb,
+} from '@coreui/icons';
+import {
+  useFieldMapping,
+  STANDARD_FIELDS,
+  FIELD_CATEGORIES,
+  type ColumnMapping,
+} from '@/hooks/useFieldMapping';
+import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
+import CreateDynamicColumnModal from './CreateDynamicColumnModal';
+
+// Flow phases
+type FlowPhase = 'mapping' | 'extracting' | 'review' | 'success' | 'error';
+
+interface FieldMappingInterfaceProps {
+  projectId: number;
+  documentId: number;
+  documentName?: string;
+  visible: boolean;
+  onClose: () => void;
+  onComplete: (result: { jobId: number; unitsExtracted: number }) => void;
+}
+
+const FieldMappingInterface: React.FC<FieldMappingInterfaceProps> = ({
+  projectId,
+  documentId,
+  documentName,
+  visible,
+  onClose,
+  onComplete,
+}) => {
+  // Flow state
+  const [phase, setPhase] = useState<FlowPhase>('mapping');
+  const [jobId, setJobId] = useState<number | null>(null);
+
+  // Create dynamic column modal
+  const [showCreateColumn, setShowCreateColumn] = useState<string | null>(null);
+  const [createColumnData, setCreateColumnData] = useState<{
+    sourceColumn: string;
+    suggestedName: string;
+    suggestedType: string;
+    sampleValues: string[];
+  } | null>(null);
+
+  // Field mapping hook
+  const {
+    discovery,
+    loading,
+    error,
+    discoverColumns,
+    updateDecision,
+    getDecision,
+    applyMapping,
+    reset,
+    getStats,
+  } = useFieldMapping(projectId);
+
+  // Extraction job status (for monitoring progress)
+  const { rentRollJob, refresh: refreshJobStatus, cancelJob } = useExtractionJobStatus(projectId);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Load column discovery on mount
+  useEffect(() => {
+    if (visible && documentId) {
+      setPhase('mapping');
+      discoverColumns(documentId);
+    }
+  }, [visible, documentId, discoverColumns]);
+
+  // Monitor job progress
+  useEffect(() => {
+    if (phase === 'extracting' && rentRollJob) {
+      if (rentRollJob.status === 'completed') {
+        // Check if there are conflicts to review
+        const stagedCount = rentRollJob.result_summary?.staged_count || 0;
+        if (stagedCount > 0) {
+          setPhase('review');
+        } else {
+          setPhase('success');
+        }
+      } else if (rentRollJob.status === 'failed') {
+        setPhase('error');
+      } else if (rentRollJob.status === 'processing' && rentRollJob.started_at) {
+        // Check for stuck job - if processing for more than 3 minutes, treat as failed
+        const startedAt = new Date(rentRollJob.started_at);
+        const now = new Date();
+        const elapsedMs = now.getTime() - startedAt.getTime();
+        const threeMinutes = 3 * 60 * 1000;
+        if (elapsedMs > threeMinutes) {
+          console.warn('Extraction job appears stuck, treating as failed');
+          setPhase('error');
+        }
+      }
+    }
+  }, [phase, rentRollJob]);
+
+  // Handle close
+  const handleClose = useCallback(() => {
+    reset();
+    setPhase('mapping');
+    setJobId(null);
+    setIsCancelling(false);
+    onClose();
+  }, [reset, onClose]);
+
+  // Handle cancel extraction
+  const handleCancelExtraction = useCallback(async () => {
+    if (!jobId) return;
+
+    setIsCancelling(true);
+    try {
+      const success = await cancelJob(jobId);
+      if (success) {
+        setPhase('mapping');
+        setJobId(null);
+        refreshJobStatus();
+      } else {
+        console.error('Failed to cancel extraction job');
+      }
+    } catch (err) {
+      console.error('Error cancelling extraction:', err);
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [jobId, cancelJob, refreshJobStatus]);
+
+  // Handle apply mapping
+  const handleApplyMapping = useCallback(async () => {
+    const result = await applyMapping(documentId);
+
+    if (result.success && result.job_id) {
+      setJobId(result.job_id);
+      setPhase('extracting');
+      refreshJobStatus();
+
+      // If extraction already completed (synchronous), handle it
+      if (result.job_status === 'completed') {
+        const stagedCount = result.staged_count || 0;
+        if (stagedCount > 0) {
+          setPhase('review');
+        } else {
+          setPhase('success');
+          onComplete({
+            jobId: result.job_id,
+            unitsExtracted: result.units_extracted || 0,
+          });
+        }
+      }
+    }
+  }, [documentId, applyMapping, refreshJobStatus, onComplete]);
+
+  // Handle opening create dynamic column modal
+  const handleOpenCreateColumn = useCallback(
+    (col: ColumnMapping) => {
+      setCreateColumnData({
+        sourceColumn: col.source_column,
+        suggestedName: col.source_column
+          .replace(/_/g, ' ')
+          .replace(/([A-Z])/g, ' $1')
+          .trim()
+          .split(' ')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' '),
+        suggestedType: col.data_type_hint,
+        sampleValues: col.sample_values,
+      });
+      setShowCreateColumn(col.source_column);
+    },
+    []
+  );
+
+  // Handle create dynamic column
+  const handleCreateColumn = useCallback(
+    (name: string, dataType: string) => {
+      if (showCreateColumn) {
+        updateDecision(showCreateColumn, {
+          target_field: null,
+          create_dynamic: true,
+          dynamic_column_name: name,
+          data_type: dataType,
+        });
+      }
+      setShowCreateColumn(null);
+      setCreateColumnData(null);
+    },
+    [showCreateColumn, updateDecision]
+  );
+
+  // Confidence indicator
+  const getConfidenceIndicator = (confidence: string) => {
+    switch (confidence) {
+      case 'high':
+        return (
+          <CTooltip content="High confidence - exact header match">
+            <span>
+              <CIcon icon={cilCheckCircle} className="text-success" />
+            </span>
+          </CTooltip>
+        );
+      case 'medium':
+        return (
+          <CTooltip content="Medium confidence - please confirm">
+            <span>
+              <CIcon icon={cilWarning} className="text-warning" />
+            </span>
+          </CTooltip>
+        );
+      case 'low':
+      case 'none':
+        return (
+          <CTooltip content="No automatic match - choose a field or create new">
+            <span>
+              <CIcon icon={cilXCircle} className="text-danger" />
+            </span>
+          </CTooltip>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const stats = getStats();
+
+  // Render mapping phase
+  const renderMappingPhase = () => (
+    <>
+      {/* Summary Bar */}
+      <div
+        className="d-flex justify-content-between align-items-center mb-4 p-3 rounded"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+      >
+        <div>
+          <strong>{discovery?.total_rows || 0}</strong> rows •{' '}
+          <strong>{discovery?.total_columns || 0}</strong> columns detected
+        </div>
+        <div>
+          <CBadge color="success" className="me-2">
+            {stats.mapped} mapped
+          </CBadge>
+          <CBadge color="secondary">{stats.skipped} skipped</CBadge>
+          {stats.dynamic > 0 && (
+            <CBadge color="info" className="ms-2">
+              {stats.dynamic} new columns
+            </CBadge>
+          )}
+        </div>
+      </div>
+
+      {/* Warnings */}
+      {discovery?.parse_warnings && discovery.parse_warnings.length > 0 && (
+        <CAlert color="warning" className="mb-4">
+          <strong>Parsing Notes:</strong>
+          <ul className="mb-0 mt-2">
+            {discovery.parse_warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </CAlert>
+      )}
+
+      {/* Mapping Table */}
+      <div className="table-responsive" style={{ maxHeight: '50vh', overflow: 'auto' }}>
+        <table className="table table-sm align-middle">
+          <thead className="sticky-top bg-body">
+            <tr>
+              <th style={{ width: '25%' }}>Source Column</th>
+              <th style={{ width: '20%' }}>Sample Values</th>
+              <th style={{ width: '10%' }}>Match</th>
+              <th style={{ width: '30%' }}>Maps To</th>
+              <th style={{ width: '15%' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {discovery?.columns.map((col) => {
+              const decision = getDecision(col.source_column);
+              const isSkipped = !decision?.target_field && !decision?.create_dynamic;
+              const isDynamic = decision?.create_dynamic;
+
+              return (
+                <tr
+                  key={col.source_column}
+                  style={{
+                    opacity: isSkipped ? 0.6 : 1,
+                    backgroundColor:
+                      col.confidence === 'none'
+                        ? 'var(--cui-warning-bg-subtle)'
+                        : isDynamic
+                          ? 'var(--cui-info-bg-subtle)'
+                          : undefined,
+                  }}
+                >
+                  {/* Source Column */}
+                  <td>
+                    <strong>{col.source_column}</strong>
+                    {col.notes && (
+                      <CTooltip content={col.notes}>
+                        <span className="ms-2">
+                          <CIcon icon={cilInfo} className="text-body-secondary" size="sm" />
+                        </span>
+                      </CTooltip>
+                    )}
+                    <div className="small text-body-secondary">Type: {col.data_type_hint}</div>
+                  </td>
+
+                  {/* Sample Values */}
+                  <td>
+                    <div className="small" style={{ maxWidth: 180 }}>
+                      {col.sample_values.slice(0, 3).map((v, i) => (
+                        <div key={i} className="text-truncate" title={v}>
+                          {v || <span className="text-body-secondary">(empty)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+
+                  {/* Confidence */}
+                  <td className="text-center">{getConfidenceIndicator(col.confidence)}</td>
+
+                  {/* Maps To */}
+                  <td>
+                    {isDynamic ? (
+                      <div>
+                        <CBadge color="info">New Column</CBadge>
+                        <div className="small mt-1 fw-medium">
+                          {decision?.dynamic_column_name}
+                        </div>
+                        <div className="small text-body-secondary">
+                          ({decision?.data_type})
+                        </div>
+                      </div>
+                    ) : (
+                      <CFormSelect
+                        size="sm"
+                        value={decision?.target_field || ''}
+                        onChange={(e) =>
+                          updateDecision(col.source_column, {
+                            target_field: e.target.value || null,
+                            create_dynamic: false,
+                          })
+                        }
+                      >
+                        <option value="">-- Skip (save to extra_data) --</option>
+                        {FIELD_CATEGORIES.map((category) => (
+                          <optgroup key={category} label={category}>
+                            {STANDARD_FIELDS.filter((f) => f.category === category).map((f) => (
+                              <option key={f.value} value={f.value}>
+                                {f.label}
+                                {f.required && ' *'}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </CFormSelect>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td>
+                    <div className="d-flex gap-1">
+                      {isDynamic ? (
+                        <CButton
+                          color="secondary"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            updateDecision(col.source_column, {
+                              target_field: null,
+                              create_dynamic: false,
+                              dynamic_column_name: undefined,
+                              data_type: undefined,
+                            })
+                          }
+                          title="Remove dynamic column"
+                        >
+                          <CIcon icon={cilXCircle} />
+                        </CButton>
+                      ) : (
+                        <CButton
+                          color="primary"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenCreateColumn(col)}
+                          title="Create new column for this data"
+                        >
+                          <CIcon icon={cilPlus} />
+                        </CButton>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
+  // Render extracting phase
+  const renderExtractingPhase = () => (
+    <div className="text-center py-5">
+      <CSpinner color="primary" style={{ width: '3rem', height: '3rem' }} />
+      <h5 className="mt-4">Extracting Rent Roll Data...</h5>
+      <p className="text-body-secondary">
+        Landscaper is analyzing your document with the column mappings you specified.
+      </p>
+      {rentRollJob && (
+        <div className="mt-4" style={{ maxWidth: 400, margin: '0 auto' }}>
+          <CProgress
+            value={rentRollJob.progress?.percent || 0}
+            color="primary"
+            className="mb-2"
+          />
+          <div className="small text-body-secondary">
+            {rentRollJob.progress?.processed || 0} of {rentRollJob.progress?.total || '?'} items
+            processed
+          </div>
+        </div>
+      )}
+      <div className="mt-4">
+        <CButton
+          color="secondary"
+          variant="outline"
+          size="sm"
+          onClick={handleCancelExtraction}
+          disabled={isCancelling}
+        >
+          {isCancelling ? (
+            <>
+              <CSpinner size="sm" className="me-2" />
+              Cancelling...
+            </>
+          ) : (
+            'Cancel Extraction'
+          )}
+        </CButton>
+      </div>
+    </div>
+  );
+
+  // Render success phase
+  const renderSuccessPhase = () => (
+    <div className="text-center py-5">
+      <CIcon icon={cilCheckCircle} size="3xl" className="text-success mb-3" />
+      <h5>Extraction Complete!</h5>
+      <p className="text-body-secondary">
+        {rentRollJob?.result_summary?.units_extracted || 0} units extracted successfully.
+      </p>
+      {stats.dynamic > 0 && (
+        <CAlert color="info" className="mt-3 text-start" style={{ maxWidth: 400, margin: '0 auto' }}>
+          <CIcon icon={cilLightbulb} className="me-2" />
+          <strong>{stats.dynamic} new column(s)</strong> have been added to your rent roll.
+          They will appear in the Rent Roll grid.
+        </CAlert>
+      )}
+    </div>
+  );
+
+  // Render error phase
+  const renderErrorPhase = () => (
+    <div className="text-center py-5">
+      <CIcon icon={cilXCircle} size="3xl" className="text-danger mb-3" />
+      <h5>Extraction Failed</h5>
+      <p className="text-body-secondary">
+        {rentRollJob?.error_message || error || 'An error occurred during extraction.'}
+      </p>
+      <CButton color="primary" onClick={() => setPhase('mapping')}>
+        Try Again
+      </CButton>
+    </div>
+  );
+
+  // Render review phase (conflicts)
+  const renderReviewPhase = () => (
+    <div className="text-center py-5">
+      <CIcon icon={cilWarning} size="3xl" className="text-warning mb-3" />
+      <h5>Review Required</h5>
+      <p className="text-body-secondary">
+        {rentRollJob?.result_summary?.staged_count || 0} rows staged for review.
+        Click the Rent Roll badge to review and commit changes.
+      </p>
+      <CAlert color="info" className="mt-3 text-start" style={{ maxWidth: 500, margin: '0 auto' }}>
+        The extraction found data that may conflict with existing records.
+        Use the Rent Roll review modal to accept or reject individual changes.
+      </CAlert>
+    </div>
+  );
+
+  // PDF fallback message (non-structured file)
+  const renderPDFMessage = () => (
+    <div className="text-center py-5">
+      <CIcon icon={cilInfo} size="3xl" className="text-info mb-3" />
+      <h5>PDF Detected</h5>
+      <p className="text-body-secondary">
+        Landscaper will analyze this document and propose extracted data for your review.
+      </p>
+      <p className="small text-body-secondary">
+        Column mapping is available for Excel and CSV files.
+        For PDFs, the AI will automatically detect and extract rent roll data.
+      </p>
+    </div>
+  );
+
+  return (
+    <>
+      <CModal
+        visible={visible}
+        onClose={handleClose}
+        size="xl"
+        backdrop="static"
+        scrollable
+      >
+        <CModalHeader>
+          <CModalTitle className="d-flex align-items-center gap-2">
+            <CIcon icon={cilArrowRight} />
+            {phase === 'mapping' && 'Map Columns'}
+            {phase === 'extracting' && 'Extracting...'}
+            {phase === 'success' && 'Complete'}
+            {phase === 'review' && 'Review Required'}
+            {phase === 'error' && 'Error'}
+            {documentName && (
+              <span className="text-body-secondary fw-normal ms-2">— {documentName}</span>
+            )}
+          </CModalTitle>
+        </CModalHeader>
+
+        <CModalBody>
+          {loading && phase === 'mapping' && (
+            <div className="text-center py-5">
+              <CSpinner color="primary" />
+              <p className="mt-3 text-body-secondary">Analyzing file structure...</p>
+            </div>
+          )}
+
+          {error && phase === 'mapping' && (
+            <CAlert color="danger">
+              <strong>Error:</strong> {error}
+            </CAlert>
+          )}
+
+          {!loading && discovery && !discovery.is_structured && renderPDFMessage()}
+
+          {!loading && discovery && discovery.is_structured && (
+            <>
+              {phase === 'mapping' && renderMappingPhase()}
+              {phase === 'extracting' && renderExtractingPhase()}
+              {phase === 'success' && renderSuccessPhase()}
+              {phase === 'review' && renderReviewPhase()}
+              {phase === 'error' && renderErrorPhase()}
+            </>
+          )}
+        </CModalBody>
+
+        <CModalFooter>
+          <div className="d-flex justify-content-between w-100">
+            <CButton color="secondary" variant="ghost" onClick={handleClose}>
+              {phase === 'success' || phase === 'review' ? 'Close' : 'Cancel'}
+            </CButton>
+
+            {phase === 'mapping' && discovery?.is_structured && (
+              <CButton
+                color="primary"
+                onClick={handleApplyMapping}
+                disabled={loading || stats.mapped === 0}
+              >
+                {loading ? (
+                  <>
+                    <CSpinner size="sm" className="me-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Apply Mapping ({stats.mapped} columns)
+                    <CIcon icon={cilArrowRight} className="ms-2" />
+                  </>
+                )}
+              </CButton>
+            )}
+
+            {phase === 'success' && (
+              <CButton
+                color="success"
+                onClick={() => {
+                  if (jobId && rentRollJob) {
+                    onComplete({
+                      jobId,
+                      unitsExtracted: rentRollJob.result_summary?.units_extracted || 0,
+                    });
+                  }
+                  handleClose();
+                }}
+              >
+                Done
+              </CButton>
+            )}
+
+            {phase === 'review' && (
+              <CButton
+                color="primary"
+                onClick={() => {
+                  if (jobId && rentRollJob) {
+                    onComplete({
+                      jobId,
+                      unitsExtracted: rentRollJob.result_summary?.units_extracted || 0,
+                    });
+                  }
+                  handleClose();
+                }}
+              >
+                Open Review
+              </CButton>
+            )}
+          </div>
+        </CModalFooter>
+      </CModal>
+
+      {/* Create Dynamic Column Modal */}
+      {createColumnData && (
+        <CreateDynamicColumnModal
+          visible={!!showCreateColumn}
+          sourceColumn={createColumnData.sourceColumn}
+          suggestedName={createColumnData.suggestedName}
+          suggestedType={createColumnData.suggestedType}
+          sampleValues={createColumnData.sampleValues}
+          onClose={() => {
+            setShowCreateColumn(null);
+            setCreateColumnData(null);
+          }}
+          onCreate={handleCreateColumn}
+        />
+      )}
+    </>
+  );
+};
+
+export default FieldMappingInterface;

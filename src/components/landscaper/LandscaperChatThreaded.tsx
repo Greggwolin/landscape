@@ -8,6 +8,12 @@ import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThread
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 import { ThreadList } from './ThreadList';
+import {
+  useLandscaperCollision,
+  buildCollisionMessage,
+  type CollisionAction,
+  type PendingCollision,
+} from '@/contexts/LandscaperCollisionContext';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -89,6 +95,9 @@ export function LandscaperChatThreaded({
     subtabContext,
   });
 
+  // Collision handling via context
+  const { pendingCollision, clearCollision, setOnCollisionResolved } = useLandscaperCollision();
+
   // Mutation handlers for Level 2 autonomy
   const handleConfirmMutation = useCallback(async (mutationId: string) => {
     try {
@@ -143,6 +152,73 @@ export function LandscaperChatThreaded({
       console.error('Error confirming batch:', error);
     }
   }, [loadThreads]);
+
+  // Handle document collision - send message to Landscaper
+  useEffect(() => {
+    if (pendingCollision) {
+      const message = buildCollisionMessage(
+        pendingCollision.file,
+        pendingCollision.matchType,
+        pendingCollision.existingDoc
+      );
+
+      // Mark that user interacted so we auto-scroll
+      userHasSentMessage.current = true;
+
+      // Send the collision message to Landscaper
+      sendMessage(message).catch((err) => {
+        console.error('Failed to send collision message:', err);
+      });
+    }
+  }, [pendingCollision, sendMessage]);
+
+  // Set up collision resolution handler
+  // This will be called when user responds (detected via message parsing)
+  useEffect(() => {
+    const handleCollisionResponse = async (action: CollisionAction, collision: PendingCollision) => {
+      const { file, existingDoc, projectId: collisionProjectId } = collision;
+
+      try {
+        if (action === 'version') {
+          // Upload as new version
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await fetch(
+            `/api/projects/${collisionProjectId}/dms/docs/${existingDoc.doc_id}/version`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to upload new version');
+          }
+
+          const result = await response.json();
+
+          // Send confirmation message
+          await sendMessage(`Done! I've uploaded "${file.name}" as Version ${result.version_no || 'new'} of "${existingDoc.filename}".`);
+        } else if (action === 'rename') {
+          // This would be handled by the upload component
+          console.log('Rename action - will be handled by upload component');
+        } else if (action === 'skip') {
+          // Just clear and continue
+          console.log('Skip action - collision ignored');
+        }
+      } catch (error) {
+        console.error('Error handling collision resolution:', error);
+        await sendMessage(`There was an error processing the file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    setOnCollisionResolved(handleCollisionResponse);
+
+    return () => {
+      setOnCollisionResolved(null);
+    };
+  }, [sendMessage, setOnCollisionResolved]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {

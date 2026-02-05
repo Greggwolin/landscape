@@ -300,6 +300,7 @@ export async function GET(request: NextRequest) {
       FROM landscape.core_doc d
       LEFT JOIN landscape.tbl_project p ON d.project_id = p.project_id
       WHERE d.project_id = ${parseInt(projectId)}
+        AND d.deleted_at IS NULL
         ${workspaceId ? sql`AND d.workspace_id = ${parseInt(workspaceId)}` : sql``}
         ${docType ? sql`AND d.doc_type = ${docType}` : sql``}
         ${status ? sql`AND d.status = ${status}` : sql``}

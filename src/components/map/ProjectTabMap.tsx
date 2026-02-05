@@ -34,9 +34,10 @@ export interface ProjectTabMapProps {
   tabId?: string; // Optional identifier for which tab this map is on (e.g., 'project', 'property')
   rentalComparables?: RentalComparable[]; // Optional rental comparables to display as markers
   comparableColors?: ComparableColorMap; // Optional color mapping for comparable markers
+  onMarkerClick?: (propertyName: string) => void; // Callback when a comparable marker is clicked
 }
 
-export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {} }: ProjectTabMapProps) {
+export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {}, onMarkerClick }: ProjectTabMapProps) {
   const { data, error, isLoading, mutate } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
   const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
@@ -46,8 +47,6 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   // Create storage key with tabId to keep tab views independent
   const storageKey = `map-saved-view-${projectId}-${tabId}`;
 
-  // Track if we've fit bounds for comparables
-  const hasFitBoundsRef = useRef(false);
 
   // Load initial values from localStorage
   const getInitialSavedView = () => {
@@ -108,6 +107,24 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables, comparableColors]);
 
+  // Create a lookup map from marker ID to property name for click handling
+  const markerIdToPropertyName = useMemo(() => {
+    const map: Record<string, string> = {};
+    rentalComparables.forEach(comp => {
+      map[`comp-${comp.comparable_id}`] = comp.property_name;
+    });
+    return map;
+  }, [rentalComparables]);
+
+  // Handle marker clicks - map marker ID to property name and call callback
+  const handleFeatureClick = (markerId?: string) => {
+    if (!markerId || !onMarkerClick) return;
+    const propertyName = markerIdToPropertyName[markerId];
+    if (propertyName) {
+      onMarkerClick(propertyName);
+    }
+  };
+
   const lines = useMemo(
     () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,53 +172,8 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
     }
   }, [savedView, storageKey]);
 
-  // Fit bounds to include subject and all rental comparables when they load
-  useEffect(() => {
-    // Only fit bounds once when data is available and we have comparables
-    if (!data?.center || rentalComparables.length === 0 || hasFitBoundsRef.current) return;
-
-    // Give map time to initialize
-    const timer = setTimeout(() => {
-      if (!mapRef.current) return;
-
-      // Calculate bounds including subject and all comparables
-      const allCoords: [number, number][] = [data.center];
-
-      rentalComparables.forEach(comp => {
-        if (comp.latitude && comp.longitude) {
-          allCoords.push([comp.longitude, comp.latitude]);
-        }
-      });
-
-      if (allCoords.length <= 1) return; // Only subject, no need to fit bounds
-
-      // Calculate bounding box
-      let minLng = allCoords[0][0];
-      let maxLng = allCoords[0][0];
-      let minLat = allCoords[0][1];
-      let maxLat = allCoords[0][1];
-
-      allCoords.forEach(([lng, lat]) => {
-        minLng = Math.min(minLng, lng);
-        maxLng = Math.max(maxLng, lng);
-        minLat = Math.min(minLat, lat);
-        maxLat = Math.max(maxLat, lat);
-      });
-
-      // Add some padding to the bounds
-      const lngPadding = (maxLng - minLng) * 0.15;
-      const latPadding = (maxLat - minLat) * 0.15;
-
-      mapRef.current.fitBounds(
-        [[minLng - lngPadding, minLat - latPadding], [maxLng + lngPadding, maxLat + latPadding]],
-        { padding: 40, pitch: 0, bearing: 0 }
-      );
-
-      hasFitBoundsRef.current = true;
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [data?.center, rentalComparables]);
+  // Note: We no longer auto-fit bounds to comparables as it disrupts the user's view.
+  // The subject property should stay centered. Users can manually zoom out to see comparables.
 
   if (isLoading) {
     return (
@@ -267,6 +239,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
           markers={markers}
           lines={lines}
           onMapClick={handleMapClick}
+          onFeatureClick={handleFeatureClick}
         />
       </div>
 

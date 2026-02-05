@@ -54,4 +54,5 @@ urlpatterns = [
     path("api/v1/map/", include('apps.location_intelligence.urls_map')),  # Map features (draw tools)
     path("api/alpha/feedback/", alpha_views.AlphaFeedbackView.as_view(), name='alpha_feedback'),
     path("api/", include('apps.valuation.urls')),  # Valuation approaches
+    path("api/", include('apps.dynamic.urls')),  # Dynamic columns (EAV pattern)
 ]

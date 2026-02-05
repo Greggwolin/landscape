@@ -12,6 +12,8 @@ from .views import (
     upload_new_version,
     soft_delete_document,
     rename_document,
+    restore_document,
+    permanent_delete_document,
 )
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
@@ -33,4 +35,6 @@ urlpatterns = [
     path('projects/<int:project_id>/docs/<int:doc_id>/version/', upload_new_version, name='upload_new_version'),
     path('projects/<int:project_id>/docs/<int:doc_id>/delete/', soft_delete_document, name='soft_delete_document'),
     path('projects/<int:project_id>/docs/<int:doc_id>/rename/', rename_document, name='rename_document'),
+    path('projects/<int:project_id>/docs/<int:doc_id>/restore/', restore_document, name='restore_document'),
+    path('projects/<int:project_id>/docs/<int:doc_id>/permanent-delete/', permanent_delete_document, name='permanent_delete_document'),
 ]

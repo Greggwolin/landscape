@@ -255,6 +255,12 @@
   border-bottom: 1px solid var(--cui-border-color);
 }
 
+.ops-section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .ops-section-title {
   font-size: 1rem;
   font-weight: 600;
@@ -262,7 +268,14 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+}
+
+.ops-section-description {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--cui-secondary-color);
+  max-width: 420px;
 }
 
 .ops-section-subtitle {
@@ -1163,94 +1176,147 @@
 /* Three-column body (Inputs | Summary | Graphic) */
 .va-body {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 0.8fr 0.7fr 1.5fr;
+  gap: 0.75rem;
+  padding: 1rem;
 }
 
-/* Left panel: Inputs in 2-column layout */
-.va-inputs-panel {
-  padding: 0.5rem 0.75rem;
-  border-right: 1px solid var(--cui-border-color);
-}
-
-.va-form {
+.va-summary-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.75rem;
 }
 
-.va-row {
+.va-panel {
+  background: var(--cui-card-bg);
+  border-radius: 0.5rem;
+  border: 1px solid var(--cui-border-color);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.va-panel-header {
+  padding: 0.65rem 0.75rem;
+  background: #F0F1F2;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.va-panel-body {
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.va-panel-assumptions {
+  min-height: 100%;
+}
+
+.va-inputs-panel {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 0.95rem;
+}
+
+.va-field-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--cui-border-color);
   gap: 0.5rem;
+  cursor: pointer;
+  font-size: inherit;
 }
 
-.va-label {
-  font-size: 0.75rem;
+.va-field-row:last-child {
+  border-bottom: none;
+}
+
+.va-field-label {
+  color: var(--cui-secondary-color);
+  font-weight: 400;
+  font-size: 0.875rem;
+}
+
+.va-field-value-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 84px;
+}
+
+.va-field-value {
   color: var(--cui-body-color);
-  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.va-input {
-  width: 3.5rem;
-  height: 1.5rem;
-  padding: 0 0.25rem;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+.va-field-value.empty {
+  color: var(--cui-secondary-color);
+  font-weight: 400;
+}
+
+.va-field-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.va-field-input {
+  width: 4.5rem;
+  font-size: 0.9rem;
+  padding: 0.2rem 0.35rem;
   background: var(--cui-tertiary-bg);
   border: 1px solid var(--cui-border-color);
   border-radius: 0.25rem;
+  text-align: right;
   color: var(--cui-body-color);
-  outline: none;
-  transition: border-color 0.15s ease;
 }
 
-.va-input:focus {
+.va-field-input:focus {
   border-color: var(--cui-primary);
+  outline: none;
 }
 
-.va-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Input group for toggle + input combos */
-.va-input-group {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* Currency input with $ prefix */
-.va-input-currency {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-}
-
-.va-prefix {
-  font-size: 0.7rem;
+.va-field-prefix,
+.va-field-suffix {
+  font-size: 0.8rem;
   color: var(--cui-secondary-color);
 }
 
-.va-select {
-  height: 1.5rem;
-  padding: 0 0.25rem;
-  font-size: 0.7rem;
+.va-field-select {
+  min-width: 4rem;
+  height: 1.75rem;
+  padding: 0 0.35rem;
+  font-size: 0.9rem;
   background: var(--cui-tertiary-bg);
   border: 1px solid var(--cui-border-color);
   border-radius: 0.25rem;
   color: var(--cui-body-color);
-  cursor: pointer;
+}
+
+.va-field-select:focus {
+  border-color: var(--cui-primary);
   outline: none;
 }
 
-.va-select:focus {
-  border-color: var(--cui-primary);
+.va-cost-editor,
+.va-units-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-/* SF/Unit toggle */
+.va-units-editor .va-field-input {
+  width: 4.25rem;
+}
+
 .va-basis-toggle {
   display: flex;
   background: var(--cui-tertiary-bg);
@@ -1286,57 +1352,41 @@
 }
 
 /* Middle panel: Costs + Annual Impact stacked */
-.va-summary-panel {
-  padding: 0.5rem 0.75rem;
-  background: var(--cui-tertiary-bg);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border-left: 1px solid var(--cui-border-color);
-  border-right: 1px solid var(--cui-border-color);
-}
-
-/* Section container (Costs, Annual Impact) */
-.va-section {
-  background: var(--cui-card-bg);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--cui-border-color);
-}
-
 .va-section-title {
-  font-size: 0.7rem;
+  margin: 0;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--cui-body-color);
-  margin: 0 0 0.5rem 0;
-  padding-bottom: 0.25rem;
-  border-bottom: 1px solid var(--cui-border-color);
 }
 
 .va-section-rows {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem;
+  padding: 0;
 }
 
 .va-section-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
-  gap: 1rem;
+  font-size: 0.875rem;
+  gap: 0.75rem;
 }
 
 .va-section-label {
   color: var(--cui-secondary-color);
   white-space: nowrap;
+  font-size: inherit;
+  font-weight: 400;
 }
 
 .va-section-value {
-  font-weight: 500;
+  font-weight: 400;
   color: var(--cui-body-color);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  font-size: inherit;
 }
 
 .va-section-row-total {
@@ -1352,18 +1402,11 @@
 
 /* Right panel: Graphic with treemap */
 .va-graphic-panel {
-  padding: 0.375rem 0.5rem;
-  background: var(--cui-tertiary-bg);
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-}
-
-.va-graphic-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--cui-body-color);
-  margin: 0;
+  gap: 0.5rem;
+  min-height: 280px;
+  flex: 1;
 }
 
 /* Treemap container */
@@ -1371,7 +1414,7 @@
   display: flex;
   width: 100%;
   flex: 1;
-  min-height: 160px;
+  min-height: 200px;
   gap: 3px;
   border-radius: 0.375rem;
   overflow: hidden;
@@ -1463,7 +1506,7 @@
 .va-metrics {
   display: flex;
   justify-content: space-around;
-  padding: 0.375rem 0;
+  padding: 0.5rem 0;
   margin-top: auto;
   background: var(--cui-card-bg);
   border-radius: 0.5rem;

@@ -125,9 +125,9 @@ PAGE_TOOLS = {
 
     "mf_capitalization": [
         # Debt
-        "get_debt_facilities",
-        "update_debt_facility",
-        "delete_debt_facility",
+        "get_loans",
+        "update_loan",
+        "delete_loan",
         # Equity
         "get_equity_structure",
         "update_equity_structure",
@@ -210,9 +210,9 @@ PAGE_TOOLS = {
 
     "land_capitalization": [
         # Debt
-        "get_debt_facilities",
-        "update_debt_facility",
-        "delete_debt_facility",
+        "get_loans",
+        "update_loan",
+        "delete_loan",
         # Equity
         "get_equity_structure",
         "update_equity_structure",

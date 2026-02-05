@@ -2,10 +2,11 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import CIcon from '@coreui/icons-react';
-import { cilFilterSquare } from '@coreui/icons';
+import { cilLayers } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
 import type { DMSDocument } from '@/types/dms';
 import { useUploadThing } from '@/lib/uploadthing';
+import { useLandscaperCollision } from '@/contexts/LandscaperCollisionContext';
 
 export interface FilterAccordion {
   doc_type: string;
@@ -37,6 +38,63 @@ interface UploadThingResult {
   };
 }
 
+interface CollisionCheckResult {
+  collision: boolean;
+  match_type?: 'filename' | 'content' | 'both';
+  existing_doc?: {
+    doc_id: number;
+    filename: string;
+    version_number: number;
+    uploaded_at: string;
+    extraction_summary: {
+      facts_extracted: number;
+      embeddings: number;
+    };
+  };
+}
+
+// CollisionData type moved to LandscaperCollisionContext
+
+/**
+ * Compute real SHA-256 hash of file content
+ */
+async function computeFileHash(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Check for collision with existing documents
+ */
+async function checkCollision(
+  projectId: number,
+  filename: string,
+  contentHash: string
+): Promise<CollisionCheckResult> {
+  try {
+    const response = await fetch(`/api/projects/${projectId}/dms/check-collision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename,
+        content_hash: contentHash
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Collision check failed:', response.status);
+      return { collision: false };
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Collision check error:', error);
+    return { collision: false };
+  }
+}
+
 interface AccordionFiltersProps {
   projectId: number;
   workspaceId: number;
@@ -47,6 +105,8 @@ interface AccordionFiltersProps {
   expandedFilter?: string | null;
   activeFilter?: string | null;
   onUploadComplete?: () => void;
+  selectedDocIds?: Set<string>;
+  onToggleDocSelection?: (docId: string) => void;
 }
 
 const acceptedFileTypes = {
@@ -70,6 +130,8 @@ interface FilterDropRowProps {
   onExpand: (docType: string) => void;
   onDocumentSelect: (doc: DMSDocument) => void;
   onUploadComplete?: () => void;
+  selectedDocIds?: Set<string>;
+  onToggleDocSelection?: (docId: string) => void;
 }
 
 function FilterDropRow({
@@ -79,9 +141,15 @@ function FilterDropRow({
   expandedFilter,
   onExpand,
   onDocumentSelect,
-  onUploadComplete
+  onUploadComplete,
+  selectedDocIds,
+  onToggleDocSelection
 }: FilterDropRowProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  // Collision handling via Landscaper context
+  const { addCollision, pendingCollision } = useLandscaperCollision();
 
   const { startUpload, isUploading: uploadThingUploading } = useUploadThing('documentUploader', {
     headers: {
@@ -95,81 +163,138 @@ function FilterDropRow({
     }
   });
 
-  const generateSha256 = async (file: File, url: string): Promise<string> => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(url + file.name + file.size + Date.now());
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
+  /**
+   * Upload a single file and create document record
+   */
+  const uploadSingleFile = useCallback(async (file: File, hash: string): Promise<void> => {
+    const results = await startUpload([file]) as UploadThingResult[] | undefined;
+
+    if (!results || results.length === 0) {
+      throw new Error('No upload results returned');
+    }
+
+    const result = results[0];
+    const serverData = result.serverData;
+
+    const payload = {
+      system: {
+        project_id: serverData?.project_id ?? projectId,
+        workspace_id: serverData?.workspace_id ?? workspaceId,
+        doc_name: serverData?.doc_name ?? file.name,
+        doc_type: serverData?.doc_type ?? filter.doc_type,
+        status: 'draft',
+        storage_uri: serverData?.storage_uri ?? result.url,
+        sha256: hash,
+        file_size_bytes: serverData?.file_size_bytes ?? file.size,
+        mime_type: serverData?.mime_type ?? file.type,
+        version_no: 1
+      },
+      profile: {},
+      ai: { source: 'upload' }
+    };
+
+    const response = await fetch('/api/dms/docs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      let errorData: unknown = {};
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { raw: responseText };
+      }
+      console.error(
+        `Failed to create document record for ${file.name}:`,
+        {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        }
+      );
+    }
+  }, [filter.doc_type, projectId, workspaceId, startUpload]);
+
+  /**
+   * Process files with collision detection - triggers Landscaper for collisions
+   */
+  const processFilesWithCollisionCheck = useCallback(async (files: File[]) => {
+    if (files.length === 0) {
+      setIsUploading(false);
+      onUploadComplete?.();
+      return;
+    }
+
+    const file = files[0];
+    const remainingFiles = files.slice(1);
+
+    try {
+      // 1. Compute real content hash
+      console.log(`Computing hash for: ${file.name}`);
+      const contentHash = await computeFileHash(file);
+      console.log(`Hash computed: ${contentHash.substring(0, 16)}...`);
+
+      // 2. Check for collision
+      console.log(`Checking collision for: ${file.name}`);
+      const collision = await checkCollision(projectId, file.name, contentHash);
+      console.log('Collision result:', collision);
+
+      if (collision.collision && collision.existing_doc && collision.match_type) {
+        // 3. Collision found - trigger Landscaper instead of modal
+        addCollision({
+          file,
+          hash: contentHash,
+          matchType: collision.match_type,
+          existingDoc: {
+            doc_id: collision.existing_doc.doc_id,
+            filename: collision.existing_doc.filename,
+            version_number: collision.existing_doc.version_number,
+            uploaded_at: collision.existing_doc.uploaded_at,
+          },
+          projectId,
+        });
+        setPendingFiles(remainingFiles);
+        // Don't proceed with upload - Landscaper will handle via context
+        return;
+      }
+
+      // 4. No collision - proceed with upload
+      await uploadSingleFile(file, contentHash);
+
+      // 5. Continue with remaining files
+      if (remainingFiles.length > 0) {
+        await processFilesWithCollisionCheck(remainingFiles);
+      } else {
+        setIsUploading(false);
+        onUploadComplete?.();
+      }
+
+    } catch (error) {
+      console.error('Error processing file:', error);
+      // Continue with remaining files despite error
+      if (remainingFiles.length > 0) {
+        await processFilesWithCollisionCheck(remainingFiles);
+      } else {
+        setIsUploading(false);
+        onUploadComplete?.();
+      }
+    }
+  }, [projectId, uploadSingleFile, onUploadComplete, addCollision]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
     setIsUploading(true);
 
-    try {
-      const results = await startUpload(acceptedFiles) as UploadThingResult[] | undefined;
+    // Process files with collision detection
+    await processFilesWithCollisionCheck(acceptedFiles);
+  }, [processFilesWithCollisionCheck]);
 
-      if (!results || results.length === 0) {
-        throw new Error('No upload results returned');
-      }
-
-      for (let index = 0; index < results.length; index++) {
-        const result = results[index];
-        const file = acceptedFiles[index];
-        const serverData = result.serverData;
-        const sha256 = serverData?.sha256 || await generateSha256(file, result.url);
-
-        const payload = {
-          system: {
-            project_id: serverData?.project_id ?? projectId,
-            workspace_id: serverData?.workspace_id ?? workspaceId,
-            doc_name: serverData?.doc_name ?? file.name,
-            doc_type: serverData?.doc_type ?? filter.doc_type,
-            status: 'draft',
-            storage_uri: serverData?.storage_uri ?? result.url,
-            sha256: sha256,
-            file_size_bytes: serverData?.file_size_bytes ?? file.size,
-            mime_type: serverData?.mime_type ?? file.type,
-            version_no: 1
-          },
-          profile: {},
-          ai: { source: 'upload' }
-        };
-
-        const response = await fetch('/api/dms/docs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          const responseText = await response.text();
-          let errorData: unknown = {};
-          try {
-            errorData = JSON.parse(responseText);
-          } catch {
-            errorData = { raw: responseText };
-          }
-          console.error(
-            `Failed to create document record for ${file.name}:`,
-            {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorData
-            }
-          );
-        }
-      }
-
-      onUploadComplete?.();
-    } catch (error) {
-      console.error('Filter upload failed:', error);
-    } finally {
-      setIsUploading(false);
-    }
-  }, [filter.doc_type, onUploadComplete, projectId, workspaceId, startUpload]);
+  // Collision resolution is now handled by Landscaper via context
+  // When user responds in Landscaper chat, the context will trigger the appropriate action
 
   const {
     getRootProps,
@@ -182,7 +307,7 @@ function FilterDropRow({
     maxFiles: 10,
     noClick: true,
     noKeyboard: true,
-    disabled: isUploading || uploadThingUploading
+    disabled: isUploading || uploadThingUploading || !!pendingCollision
   });
 
   const isExpanded = expandedFilter === filter.doc_type;
@@ -232,7 +357,7 @@ function FilterDropRow({
           className={`${styles.filterIconButton} ${isExpanded ? styles.filterIconButtonActive : ''}`}
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${filter.doc_type}`}
         >
-          <CIcon icon={cilFilterSquare} className="w-6 h-6" />
+          <CIcon icon={cilLayers} className="w-5 h-5" />
         </button>
 
         <button
@@ -287,19 +412,10 @@ function FilterDropRow({
                   type="checkbox"
                   className="h-4 w-4 rounded"
                   style={{ borderColor: 'var(--cui-border-color)' }}
+                  checked={selectedDocIds?.has(doc.doc_id) ?? false}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={() => {}}
+                  onChange={() => onToggleDocSelection?.(doc.doc_id)}
                 />
-                <button
-                  className="transition-colors"
-                  style={mutedTextStyle}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // TODO: Toggle star
-                  }}
-                >
-                  ⭐
-                </button>
                 <span className="text-lg" style={{ color: 'var(--cui-danger)' }}>📄</span>
                 <div className="flex-1 min-w-0" style={{ color: 'var(--cui-body-color)' }}>
                   <div className="font-medium truncate">
@@ -318,6 +434,8 @@ function FilterDropRow({
           )}
         </div>
       )}
+
+      {/* Collision handling moved to Landscaper chat via LandscaperCollisionContext */}
     </div>
   );
 }
@@ -329,7 +447,9 @@ export default function AccordionFilters({
   expandedFilter,
   projectId,
   workspaceId,
-  onUploadComplete
+  onUploadComplete,
+  selectedDocIds,
+  onToggleDocSelection
 }: AccordionFiltersProps) {
   const renderedFilters = useMemo(() => filters, [filters]);
 
@@ -345,6 +465,8 @@ export default function AccordionFilters({
           onExpand={onExpand}
           onDocumentSelect={onDocumentSelect}
           onUploadComplete={onUploadComplete}
+          selectedDocIds={selectedDocIds}
+          onToggleDocSelection={onToggleDocSelection}
         />
       ))}
     </div>

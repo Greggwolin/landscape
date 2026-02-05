@@ -67,7 +67,7 @@ class MultifamilyAssumptions:
     exit_cap_rate: Decimal
     disposition_costs_pct: Decimal
 
-    # Debt (loaded from tbl_debt_facility)
+    # Debt (loaded from tbl_loan)
     loan_amount: Decimal
     interest_rate: Decimal
     amortization_months: int
@@ -162,18 +162,18 @@ class MultifamilyCashFlowAdapter:
             estimated_opex = unit_count_for_opex * 5500
             opex = (estimated_opex,)
 
-            # Load debt facility (PERMANENT type preferred)
+            # Load loan (PERMANENT type preferred)
             cursor.execute("""
                 SELECT
                     COALESCE(loan_amount, commitment_amount) as loan_amount,
-                    COALESCE(interest_rate_pct, interest_rate * 100) as interest_rate_pct,
+                    interest_rate_pct as interest_rate_pct,
                     COALESCE(amortization_years, 30) as amortization_years,
                     COALESCE(loan_term_years, 10) as loan_term_years
-                FROM landscape.tbl_debt_facility
+                FROM landscape.tbl_loan
                 WHERE project_id = %s
-                  AND facility_type IN ('PERMANENT', 'BRIDGE')
+                  AND loan_type IN ('PERMANENT', 'BRIDGE')
                 ORDER BY
-                    CASE facility_type WHEN 'PERMANENT' THEN 1 WHEN 'BRIDGE' THEN 2 ELSE 3 END
+                    CASE loan_type WHEN 'PERMANENT' THEN 1 WHEN 'BRIDGE' THEN 2 ELSE 3 END
                 LIMIT 1
             """, [self.project_id])
             debt = cursor.fetchone()

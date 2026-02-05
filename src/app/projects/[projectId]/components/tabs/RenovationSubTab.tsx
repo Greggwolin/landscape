@@ -5,16 +5,19 @@
  *
  * Displays renovation assumptions for VALUE_ADD analysis type projects.
  * Uses the existing ValueAddCard component with the useValueAddAssumptions hook.
+ * Shows the Rental Income section below for real-time revenue preview.
  *
  * This component is only visible when analysis_type === 'VALUE_ADD'.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-02-01
+ * @updated 2026-02-03 - Added RentalIncomeSection for real-time preview
  */
 
 import React, { useMemo } from 'react';
 import { CCard, CCardBody, CCardHeader, CSpinner } from '@coreui/react';
 import { ValueAddCard } from '@/components/operations/ValueAddCard';
+import { RentalIncomeSection } from '@/components/operations/RentalIncomeSection';
 import { useValueAddAssumptions, type ValueAddStats } from '@/hooks/useValueAddAssumptions';
 import { useOperationsData } from '@/hooks/useOperationsData';
 import type { LineItemRow } from '@/components/operations/types';
@@ -71,11 +74,6 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
     isSaving: isValueAddSaving,
     error: valueAddError,
   } = useValueAddAssumptions(projectId, unitMixStats);
-
-  // Handle toggle (for the enable/disable toggle in ValueAddCard)
-  const handleToggle = () => {
-    updateValueAddField('isEnabled', !valueAddState.isEnabled);
-  };
 
   // Handle field updates
   const handleUpdate = <K extends keyof typeof valueAddState>(
@@ -151,27 +149,11 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Info Banner */}
-      <div
-        className="rounded-lg px-4 py-3 border"
-        style={{
-          backgroundColor: 'var(--cui-info-bg)',
-          borderColor: 'var(--cui-info)',
-        }}
-      >
-        <p className="text-sm mb-0" style={{ color: 'var(--cui-info)' }}>
-          <strong>Value-Add Analysis:</strong> Configure renovation scope, costs, and timing.
-          These assumptions drive the Post-Rehab column in the Operations tab.
-        </p>
-      </div>
-
       {/* Value Add Card */}
       <ValueAddCard
-        isEnabled={valueAddState.isEnabled}
         state={valueAddState}
         calculated={valueAddCalculated}
         stats={unitMixStats}
-        onToggle={handleToggle}
         onUpdate={handleUpdate}
         isLoading={isValueAddLoading}
         isSaving={isValueAddSaving}
@@ -183,6 +165,20 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
           <CSpinner size="sm" className="me-2" />
           Saving changes...
         </div>
+      )}
+
+      {/* Rental Income Preview - shows real-time impact of value-add assumptions */}
+      {rentalRows.length > 0 && (
+        <RentalIncomeSection
+          rows={rentalRows}
+          unitCount={unitMixStats.totalUnits}
+          availableScenarios={['as_is', 'post_reno']}
+          preferredScenario="as_is"
+          valueAddEnabled={true}
+          rentPremiumPct={valueAddState.rentPremiumPct}
+          hasDetailedRentRoll={false}
+          onUpdateRow={() => {}}
+        />
       )}
     </div>
   );

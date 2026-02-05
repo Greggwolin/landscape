@@ -191,8 +191,8 @@ class ExtractionWriter:
                     ON CONFLICT (project_id) DO UPDATE SET {column} = EXCLUDED.{column}, updated_at = NOW()
                 """
                 params = [self.project_id, converted_value]
-            elif table == 'tbl_debt_facility':
-                # Debt facility - need to handle upsert
+            elif table == 'tbl_loan':
+                # Loan - need to handle upsert
                 sql = f"""
                     INSERT INTO landscape.{table} (project_id, {column}, created_at, updated_at)
                     VALUES (%s, %s, NOW(), NOW())

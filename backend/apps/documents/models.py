@@ -1,5 +1,6 @@
 """Django models for Documents application."""
 
+from django.conf import settings
 from django.db import models
 from apps.projects.models import Project
 
@@ -204,3 +205,44 @@ class AICorrectionLog(models.Model):
 
     def __str__(self):
         return f"Correction {self.correction_id} - {self.field_path}"
+
+
+class ExtractionCommitSnapshot(models.Model):
+    """Snapshot of data before extraction commit, enables rollback."""
+
+    snapshot_id = models.BigAutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id'
+    )
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='doc_id',
+        related_name='extraction_snapshots'
+    )
+    scope = models.CharField(max_length=50)
+    committed_at = models.DateTimeField(auto_now_add=True)
+    committed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='committed_by'
+    )
+    snapshot_data = models.JSONField()
+    changes_applied = models.JSONField()
+    is_active = models.BooleanField(default=True)
+    rolled_back_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'extraction_commit_snapshot'
+        indexes = [
+            models.Index(fields=['project', 'scope', 'is_active'], name='snapshot_project_scope_idx'),
+        ]
+
+    def __str__(self):
+        return f"Snapshot {self.snapshot_id} ({self.scope})"

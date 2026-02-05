@@ -146,12 +146,12 @@ def _calculate_property_data_score(project_id: int) -> Dict[str, Any]:
 def _calculate_sources_score(project_id: int) -> Dict[str, Any]:
     """Check capital structure / financing inputs."""
     with connection.cursor() as cursor:
-        # Check for debt facilities
+        # Check for loans
         cursor.execute("""
-            SELECT COUNT(*) FROM landscape.tbl_debt_facility
+            SELECT COUNT(*) FROM landscape.tbl_loan
             WHERE project_id = %s
         """, [project_id])
-        debt_count = cursor.fetchone()[0] or 0
+        loan_count = cursor.fetchone()[0] or 0
 
         # Check for equity partners
         cursor.execute("""
@@ -163,7 +163,7 @@ def _calculate_sources_score(project_id: int) -> Dict[str, Any]:
         score = 0
         missing = []
 
-        if debt_count > 0:
+        if loan_count > 0:
             score += 50
         else:
             missing.append('debt terms')
@@ -174,7 +174,7 @@ def _calculate_sources_score(project_id: int) -> Dict[str, Any]:
             missing.append('equity structure')
 
         if not missing:
-            details = f"Capital structure complete ({debt_count} debt, {equity_count} equity)"
+            details = f"Capital structure complete ({loan_count} debt, {equity_count} equity)"
         else:
             details = f"Missing: {', '.join(missing)}"
 

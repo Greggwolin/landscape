@@ -7,12 +7,11 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CButton,
   CAlert,
   CSpinner,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilTrash, cilFile } from '@coreui/icons';
+import { cilTrash, cilFile, cilActionRedo } from '@coreui/icons';
 import { SemanticButton } from '@/components/ui/landscape';
 
 interface DeleteConfirmModalProps {
@@ -21,9 +20,12 @@ interface DeleteConfirmModalProps {
   documents: Array<{
     doc_id: number;
     doc_name: string;
+    is_trashed?: boolean;
   }>;
   projectId: number;
   onDelete: () => Promise<void>;
+  /** If true, documents are already in trash and this will be permanent deletion */
+  isPermanentDelete?: boolean;
 }
 
 export default function DeleteConfirmModal({
@@ -32,6 +34,7 @@ export default function DeleteConfirmModal({
   documents,
   projectId: _projectId,
   onDelete,
+  isPermanentDelete = false,
 }: DeleteConfirmModalProps) {
   // projectId reserved for future audit logging
   void _projectId;
@@ -54,27 +57,49 @@ export default function DeleteConfirmModal({
 
   const isSingleDoc = documents.length === 1;
 
+  const title = isPermanentDelete
+    ? `Permanently Delete ${isSingleDoc ? 'Document' : `${documents.length} Documents`}`
+    : `Move ${isSingleDoc ? 'Document' : `${documents.length} Documents`} to Trash`;
+
+  const alertMessage = isPermanentDelete
+    ? isSingleDoc
+      ? 'This document will be permanently deleted. This action cannot be undone.'
+      : `These ${documents.length} documents will be permanently deleted. This action cannot be undone.`
+    : isSingleDoc
+      ? 'This document will be moved to trash and can be recovered later.'
+      : `These ${documents.length} documents will be moved to trash.`;
+
+  const alertColor = isPermanentDelete ? 'danger' : 'warning';
+  const buttonText = isPermanentDelete ? 'Delete Permanently' : 'Move to Trash';
+
   return (
     <CModal visible={visible} onClose={onClose}>
       <CModalHeader>
         <CModalTitle className="d-flex align-items-center gap-2">
-          <CIcon icon={cilTrash} className="text-danger" />
-          Delete {isSingleDoc ? 'Document' : `${documents.length} Documents`}
+          <CIcon icon={cilTrash} className={isPermanentDelete ? 'text-danger' : 'text-warning'} />
+          {title}
         </CModalTitle>
       </CModalHeader>
 
       <CModalBody>
-        <CAlert color="warning" className="mb-3">
-          {isSingleDoc
-            ? 'This document will be moved to trash and can be recovered later.'
-            : `These ${documents.length} documents will be moved to trash.`}
+        <CAlert color={alertColor} className="mb-3">
+          {alertMessage}
         </CAlert>
 
-        <div className="border rounded p-3 bg-light" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+        <div
+          className="border rounded p-3"
+          style={{
+            maxHeight: '200px',
+            overflowY: 'auto',
+            backgroundColor: 'var(--cui-tertiary-bg)'
+          }}
+        >
           {documents.map((doc) => (
             <div key={doc.doc_id} className="d-flex align-items-center gap-2 mb-2">
-              <CIcon icon={cilFile} className="text-secondary" />
-              <span className="text-truncate">{doc.doc_name}</span>
+              <CIcon icon={cilFile} style={{ color: 'var(--cui-secondary-color)' }} />
+              <span className="text-truncate" style={{ color: 'var(--cui-body-color)' }}>
+                {doc.doc_name}
+              </span>
             </div>
           ))}
         </div>
@@ -100,7 +125,109 @@ export default function DeleteConfirmModal({
           ) : (
             <>
               <CIcon icon={cilTrash} className="me-2" />
-              Delete
+              {buttonText}
+            </>
+          )}
+        </SemanticButton>
+      </CModalFooter>
+    </CModal>
+  );
+}
+
+interface RestoreConfirmModalProps {
+  visible: boolean;
+  onClose: () => void;
+  documents: Array<{
+    doc_id: number;
+    doc_name: string;
+  }>;
+  projectId: number;
+  onRestore: () => Promise<void>;
+}
+
+export function RestoreConfirmModal({
+  visible,
+  onClose,
+  documents,
+  projectId: _projectId,
+  onRestore,
+}: RestoreConfirmModalProps) {
+  void _projectId;
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRestore = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await onRestore();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore document(s)');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isSingleDoc = documents.length === 1;
+
+  return (
+    <CModal visible={visible} onClose={onClose}>
+      <CModalHeader>
+        <CModalTitle className="d-flex align-items-center gap-2">
+          <CIcon icon={cilActionRedo} className="text-success" />
+          Restore {isSingleDoc ? 'Document' : `${documents.length} Documents`}
+        </CModalTitle>
+      </CModalHeader>
+
+      <CModalBody>
+        <CAlert color="info" className="mb-3">
+          {isSingleDoc
+            ? 'This document will be restored from trash.'
+            : `These ${documents.length} documents will be restored from trash.`}
+        </CAlert>
+
+        <div
+          className="border rounded p-3"
+          style={{
+            maxHeight: '200px',
+            overflowY: 'auto',
+            backgroundColor: 'var(--cui-tertiary-bg)'
+          }}
+        >
+          {documents.map((doc) => (
+            <div key={doc.doc_id} className="d-flex align-items-center gap-2 mb-2">
+              <CIcon icon={cilFile} style={{ color: 'var(--cui-secondary-color)' }} />
+              <span className="text-truncate" style={{ color: 'var(--cui-body-color)' }}>
+                {doc.doc_name}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {error && (
+          <CAlert color="danger" className="mt-3 mb-0">
+            {error}
+          </CAlert>
+        )}
+      </CModalBody>
+
+      <CModalFooter>
+        <SemanticButton
+          intent="tertiary-action"
+          onClick={onClose}
+          disabled={isLoading}
+        >
+          Cancel
+        </SemanticButton>
+        <SemanticButton intent="primary-action" onClick={handleRestore} disabled={isLoading}>
+          {isLoading ? (
+            <CSpinner size="sm" />
+          ) : (
+            <>
+              <CIcon icon={cilActionRedo} className="me-2" />
+              Restore
             </>
           )}
         </SemanticButton>

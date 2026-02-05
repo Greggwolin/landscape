@@ -573,15 +573,22 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     }, 50);
   };
 
+  const renderPicklistPlaceholder = (label: string) => (
+    <span className="dropdown-placeholder">
+      <span>{label}</span>
+      <span className="dropdown-arrow" aria-hidden="true">⌄</span>
+    </span>
+  );
+
   const renderAmountCell = (amount: number | null | undefined) => {
-    const amountLabel = amount !== null && amount !== undefined
-      ? formatMoney(amount)
-      : '—';
-    return (
-      <span className="fw-semibold" style={{ fontVariantNumeric: 'tabular-nums' }}>
-        {amountLabel}
-      </span>
-    );
+    if (amount !== null && amount !== undefined) {
+      return (
+        <span className="fw-semibold" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {formatMoney(amount)}
+        </span>
+      );
+    }
+    return renderPicklistPlaceholder('Add amount');
   };
 
   // Render header cell with resize handle and drag support
@@ -600,7 +607,14 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         onDragOver={(e) => handleDragOver(e, column.key)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, column.key)}
-        className={`${column.className || ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+        className={[
+          column.className,
+          column.key === 'eventDate' ? 'date-column' : null,
+          isDragging ? 'dragging' : null,
+          isDragOver ? 'drag-over' : null,
+        ]
+          .filter(Boolean)
+          .join(' ')}
         style={{
           width: `${width}px`,
           minWidth: `${MIN_COLUMN_WIDTH}px`,
@@ -611,7 +625,9 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
           borderLeft: isDragOver ? '2px solid var(--cui-primary)' : undefined,
         }}
       >
-        <span className="column-label">{column.label}</span>
+        <CTooltip content={HEADER_TOOLTIP}>
+          <span className="column-label">{column.label}</span>
+        </CTooltip>
         <div
           className="resize-handle"
           onMouseDown={(e) => {
@@ -692,19 +708,9 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
 
       case 'category': {
         const isMilestone = isMilestoneAction(row.eventType);
-        // Milestone actions - show disabled dropdown
+        // Milestone actions - show empty cell (no dropdown needed)
         if (isMilestone) {
-          return (
-            <CFormSelect
-              size="sm"
-              value=""
-              disabled
-              className="bg-light text-muted"
-              style={{ cursor: 'not-allowed', opacity: 0.6 }}
-            >
-              <option value=""></option>
-            </CFormSelect>
-          );
+          return null;
         }
         return isEditingField('category') ? (
           <CFormSelect
@@ -726,30 +732,24 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
             ))}
           </CFormSelect>
         ) : (
-          <span title={row.categoryName || ''}>
-            {truncate(
-              categories.find(c => c.category_id === rowCategoryId)?.category_name || row.categoryName,
-              20
-            ) || '—'}
-          </span>
+          (() => {
+            const label =
+              truncate(
+                categories.find(c => c.category_id === rowCategoryId)?.category_name || row.categoryName || '',
+                20
+              );
+            return label
+              ? <span title={row.categoryName || ''}>{label}</span>
+              : renderPicklistPlaceholder('Select category');
+          })()
         );
       }
 
       case 'subcategory': {
         const isMilestone = isMilestoneAction(row.eventType);
-        // Milestone actions - show disabled dropdown
+        // Milestone actions - show empty cell (no dropdown needed)
         if (isMilestone) {
-          return (
-            <CFormSelect
-              size="sm"
-              value=""
-              disabled
-              className="bg-light text-muted"
-              style={{ cursor: 'not-allowed', opacity: 0.6 }}
-            >
-              <option value=""></option>
-            </CFormSelect>
-          );
+          return null;
         }
         return isEditingField('subcategory') ? (
           <CFormSelect
@@ -772,12 +772,22 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
             ))}
           </CFormSelect>
         ) : (
-          <span className={!rowCategoryId ? 'text-muted opacity-50' : ''} title={row.subcategoryName || ''}>
-            {truncate(
-              rowSubcatOptions.find(s => s.category_id === (getInlineValue(row, 'subcategoryId') as number))?.category_name || row.subcategoryName,
-              20
-            ) || '—'}
-          </span>
+          (() => {
+            const label =
+              truncate(
+                rowSubcatOptions.find(s => s.category_id === (getInlineValue(row, 'subcategoryId') as number))?.category_name ||
+                  row.subcategoryName ||
+                  '',
+                20
+              );
+            if (label) {
+              return <span title={row.subcategoryName || ''}>{label}</span>;
+            }
+            if (!rowCategoryId) {
+              return <span className="text-muted opacity-50">Select category first</span>;
+            }
+            return renderPicklistPlaceholder('Select subcategory');
+          })()
         );
       }
 
@@ -957,6 +967,8 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     const isMilestone = isMilestoneAction(eventType);
 
     switch (columnKey) {
+      case 'eventDate':
+        return `editable-cell date-column ${baseClass}`;
       case 'eventType':
         return `fw-semibold editable-cell ${baseClass}`;
       case 'category':
@@ -1287,10 +1299,13 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
       <tr style={{ backgroundColor: 'rgba(var(--cui-primary-rgb), 0.05)' }}>
         {orderedColumns.map((column) => {
           const onClick = getNewRowCellClickHandler(column.key);
+          const classes = [column.className, column.key === 'eventDate' ? 'date-column' : null]
+            .filter(Boolean)
+            .join(' ');
           return (
             <td
               key={column.key}
-              className={column.className || ''}
+              className={classes || undefined}
               onClick={onClick}
               style={{ cursor: onClick ? 'pointer' : 'default' }}
             >
@@ -1302,16 +1317,47 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     );
   };
 
+  const HEADER_TOOLTIP = 'Click cells to edit • Drag headers to reorder • Drag edges to resize';
+
   return (
-    <CCard className="shadow-sm">
+      <CCard className="shadow-sm" style={{ overflow: 'hidden' }}>
       <style>{`
-        .acq-table { table-layout: fixed; width: 100%; }
+        .acq-table { table-layout: fixed; width: 100%; background-color: transparent; }
         .acq-table th, .acq-table td {
-          padding: 0.5rem 0.4rem;
+          padding: 0.25rem 0.4rem;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
           font-size: 0.875rem;
+        }
+        .acq-table th:not(:first-child),
+        .acq-table td:not(:first-child) {
+          border-left: 1px solid rgba(15, 23, 42, 0.08);
+        }
+        .acq-table tbody tr {
+          height: 34px;
+        }
+        .dropdown-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          height: 100%;
+          padding: 0 0.35rem;
+          border-radius: 0;
+          border: none !important;
+          background: transparent !important;
+          box-shadow: none !important;
+          font-size: 0.78rem;
+          color: transparent;
+        }
+        .dropdown-arrow {
+          font-size: 0.7rem;
+          color: transparent;
+        }
+        .acq-table th.date-column,
+        .acq-table td.date-column {
+          padding-left: 1rem;
         }
         .acq-table .editable-cell {
           cursor: pointer;
@@ -1326,9 +1372,15 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         .resize-handle:hover {
           background: var(--cui-border-color) !important;
         }
-        .acq-table th {
+        .acq-table thead th {
           border-right: 1px solid var(--cui-border-color-translucent);
           transition: background-color 0.15s ease, border-left 0.15s ease;
+          background-color: #F7F7FB !important;
+          background-image: none !important;
+          color: var(--cui-body-color) !important;
+        }
+        .acq-table tbody th {
+          background-color: transparent !important;
         }
         .acq-table th:last-child {
           border-right: none;
@@ -1349,10 +1401,14 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
           background-color: var(--cui-secondary-bg);
         }
       `}</style>
-      <CCardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+      <CCardHeader
+        className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2"
+        style={{ backgroundColor: '#F0F1F2', borderBottom: '1px solid var(--cui-border-color)' }}
+      >
         <div>
-          <h6 className="mb-0">Acquisition Ledger</h6>
-          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Click cells to edit • Drag headers to reorder • Drag edges to resize</small>
+          <CTooltip content={HEADER_TOOLTIP}>
+            <h6 className="mb-0 fw-bold">Acquisition Ledger</h6>
+          </CTooltip>
         </div>
         <div className="d-flex align-items-center gap-2">
           {/* Column Selector Dropdown */}
@@ -1420,7 +1476,13 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
             <CSpinner size="sm" className="me-2" /> Loading ledger...
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div
+            style={{
+              overflowX: 'auto',
+              borderRadius: '0 0 var(--cui-card-border-radius) var(--cui-card-border-radius)',
+              backgroundColor: 'var(--cui-card-bg)',
+            }}
+          >
             <table ref={tableRef} className="table table-hover align-middle mb-0 acq-table">
               <thead>
                 <tr>

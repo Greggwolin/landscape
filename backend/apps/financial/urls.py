@@ -49,6 +49,13 @@ from .views_dcf_analysis import (
     GrowthRateSetDetailView,
 )
 from .views_land_dev_cashflow import LandDevCashFlowView
+from .views_debt import (
+    LoanViewSet,
+    DebtDrawScheduleViewSet,
+    LoanContainerViewSet,
+    LoanFinanceStructureViewSet,
+    DebtBalanceSummaryViewSet,
+)
 
 router = DefaultRouter()
 
@@ -108,6 +115,53 @@ urlpatterns = [
 
     # Router URLs (ViewSets)
     path('', include(router.urls)),
+
+    # Debt / Loan endpoints (nested under project/loan)
+    path(
+        'projects/<int:project_id>/loans/',
+        LoanViewSet.as_view({'get': 'list', 'post': 'create'}),
+        name='loan-list'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/',
+        LoanViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
+        name='loan-detail'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/draws/',
+        DebtDrawScheduleViewSet.as_view({'get': 'list', 'post': 'create'}),
+        name='loan-draw-list'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/draws/<int:draw_id>/',
+        DebtDrawScheduleViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
+        name='loan-draw-detail'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/containers/',
+        LoanContainerViewSet.as_view({'get': 'list', 'post': 'create'}),
+        name='loan-container-list'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/containers/<int:loan_container_id>/',
+        LoanContainerViewSet.as_view({'delete': 'destroy'}),
+        name='loan-container-detail'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/finance-structures/',
+        LoanFinanceStructureViewSet.as_view({'get': 'list', 'post': 'create'}),
+        name='loan-finance-structure-list'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/finance-structures/<int:loan_fs_id>/',
+        LoanFinanceStructureViewSet.as_view({'delete': 'destroy'}),
+        name='loan-finance-structure-detail'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/balance-summary/',
+        DebtBalanceSummaryViewSet.as_view({'get': 'list'}),
+        name='loan-balance-summary'
+    ),
 
     # Budget Variance endpoints
     path('budget/variance/<int:project_id>/', get_project_variance_summary, name='budget-variance-summary'),

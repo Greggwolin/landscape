@@ -1906,144 +1906,84 @@ Requires comparable_id.""",
     # Capital Stack Tools
     # ─────────────────────────────────────────────────────────────────────────────
     {
-        "name": "get_debt_facilities",
-        "description": """Retrieve debt facilities for a project.
+        "name": "get_loans",
+        "description": """Retrieve loans for a project.
 
-Returns all debt facilities including:
-- Basic info: facility_name, facility_type, lender_name
+Returns loans including:
+- Basic info: loan_name, loan_type, structure_type, lender_name
 - Amounts: commitment_amount, loan_amount
-- Rates: interest_rate, interest_rate_pct, rate_type
-- Terms: loan_term_years, amortization_years, maturity_date
-- Metrics: ltv_pct, dscr
-- Covenants and reserve requirements (JSONB)
-
-Optional: Pass facility_id to get a single facility.""",
+- Rates: interest_rate_pct, interest_type, interest_index, interest_spread_bps
+- Terms: loan_term_months/years, amortization_months/years, loan_maturity_date
+- Other: seniority, status, loan_start_date, notes""",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "facility_id": {"type": "integer", "description": "Optional facility ID for single record"}
-            },
+            "properties": {},
             "required": []
         }
     },
     {
-        "name": "update_debt_facility",
-        "description": """Create or update a debt facility (MUTATION).
+        "name": "update_loan",
+        "description": """Create or update a loan (MUTATION).
 
-For updates, pass facility_id. For new facilities, omit facility_id.
+For updates, pass loan_id. For new loans, omit loan_id.
 
 CORE FIELDS:
-- facility_name: REQUIRED - Descriptive name
-- facility_type: CONSTRUCTION, PERMANENT, BRIDGE, MEZZANINE (uppercase)
-- lender_name: Lending institution | is_construction_loan: Construction loan flag
+- loan_name: REQUIRED - Descriptive name
+- loan_type: CONSTRUCTION, PERMANENT, BRIDGE, MEZZANINE, LINE_OF_CREDIT, PREFERRED_EQUITY
+- structure_type: TERM or REVOLVER
+- lender_name: Lending institution
 
 LOAN AMOUNT & TERMS:
 - commitment_amount: Total commitment | loan_amount: Actual loan
-- loan_term_years: Term in years | amortization_years: Amort period
-- maturity_date: Maturity (YYYY-MM-DD) | commitment_date: Commitment date
-- ltv_pct: LTV % | dscr: Debt service coverage ratio
+- loan_term_months / loan_term_years: Term
+- amortization_months / amortization_years: Amortization
+- interest_only_months: IO period
+- loan_start_date / loan_maturity_date: YYYY-MM-DD
 
-INTEREST RATE:
-- interest_rate / interest_rate_pct: Rate (decimal or %)
-- rate_type: fixed, floating, hybrid | index_name: SOFR, Prime, etc.
-- spread_over_index_bps: Spread in basis points
-- rate_floor_pct, rate_cap_pct: Rate collar | rate_reset_frequency: Reset freq
+INTEREST RATE (percentage):
+- interest_rate_pct: e.g., 5.75 (NOT decimal)
+- interest_type: Fixed or Floating
+- interest_index: SOFR, Prime, etc.
+- interest_spread_bps: Spread in basis points
 
 FEES:
-- origination_fee_pct: Origination fee | commitment_fee_pct: Commitment/unused fee
-- extension_fee_bps: Extension fee basis points | extension_fee_amount: Extension fee $
-- exit_fee_pct: Exit/prepayment fee | prepayment_penalty_years: Penalty period
+- origination_fee_pct: Origination fee %
+- exit_fee_pct: Exit/prepayment fee %
 
-DRAWS & PAYMENTS:
-- draw_trigger_type: percent_complete, cost_certification, milestone
-- interest_calculation: SIMPLE, COMPOUNDED | payment_frequency: MONTHLY, QUARTERLY
-- interest_payment_method: paid_current, accrued, reserved
-- drawn_to_date: Amount drawn | commitment_balance: Remaining commitment
-- monthly_payment: Monthly P&I | annual_debt_service: Annual debt service
+SIZING & STATUS:
+- loan_to_cost_pct, loan_to_value_pct
+- seniority: 1=senior, 2=subordinate, etc.
+- status: active, pending, closed, defeased
 
-COVENANTS:
-- loan_covenant_dscr_min: Minimum DSCR | loan_covenant_ltv_max: Maximum LTV
-- loan_covenant_occupancy_min: Minimum occupancy | covenant_test_frequency: Quarterly/etc
-- covenants: JSONB object with detailed covenants
-
-RESERVES:
-- reserve_requirements: JSONB object | replacement_reserve_per_unit: Per-unit reserve
-- tax_insurance_escrow_months: T&I escrow | initial_reserve_months: Initial reserve
-
-GUARANTY:
-- guarantee_type: Full recourse, limited, non-recourse
-- guarantor_name: Guarantor name | recourse_carveout_provisions: Carveout details
-
-EXTENSIONS:
-- extension_options: Number of extension options | extension_option_years: Extension term
-
-PROFIT PARTICIPATION:
-- can_participate_in_profits: Has participation | profit_participation_tier: Tier #
-- profit_participation_pct: Participation %
-
-SCOPE:
-- applies_to_finance_structures: Array of structure IDs
-- applies_to_containers: Array of container IDs
-
-Example: Extract loan terms from term sheet or commitment letter.""",
+Example: Extract loan terms from a term sheet or commitment letter.""",
         "input_schema": {
             "type": "object",
             "properties": {
-                "facility_id": {"type": "integer", "description": "Existing facility ID (for updates)"},
-                "facility_name": {"type": "string", "description": "Facility name"},
-                "facility_type": {"type": "string", "description": "CONSTRUCTION, PERMANENT, BRIDGE, MEZZANINE (uppercase)"},
+                "loan_id": {"type": "integer", "description": "Existing loan ID (for updates)"},
+                "loan_name": {"type": "string", "description": "Loan name"},
+                "loan_type": {"type": "string", "description": "CONSTRUCTION, PERMANENT, BRIDGE, MEZZANINE, LINE_OF_CREDIT, PREFERRED_EQUITY"},
+                "structure_type": {"type": "string", "description": "TERM or REVOLVER"},
                 "lender_name": {"type": "string", "description": "Lender name"},
-                "is_construction_loan": {"type": "boolean", "description": "Is construction loan"},
                 "commitment_amount": {"type": "number", "description": "Total commitment"},
                 "loan_amount": {"type": "number", "description": "Loan amount"},
+                "interest_rate_pct": {"type": "number", "description": "Interest rate (percentage, e.g., 5.75)"},
+                "interest_type": {"type": "string", "description": "Fixed or Floating"},
+                "interest_index": {"type": "string", "description": "Index name (SOFR, Prime, etc.)"},
+                "interest_spread_bps": {"type": "integer", "description": "Spread over index in basis points"},
+                "loan_term_months": {"type": "number", "description": "Loan term in months"},
                 "loan_term_years": {"type": "number", "description": "Loan term in years"},
-                "amortization_years": {"type": "number", "description": "Amortization period"},
-                "maturity_date": {"type": "string", "description": "Maturity date (YYYY-MM-DD)"},
-                "commitment_date": {"type": "string", "description": "Commitment date (YYYY-MM-DD)"},
-                "ltv_pct": {"type": "number", "description": "LTV percentage"},
-                "dscr": {"type": "number", "description": "DSCR ratio"},
-                "interest_rate": {"type": "number", "description": "Interest rate (decimal)"},
-                "interest_rate_pct": {"type": "number", "description": "Interest rate (percentage)"},
-                "rate_type": {"type": "string", "description": "fixed, floating, hybrid"},
-                "index_name": {"type": "string", "description": "Index name (SOFR, Prime, etc.)"},
-                "spread_over_index_bps": {"type": "integer", "description": "Spread over index in basis points"},
-                "rate_floor_pct": {"type": "number", "description": "Interest rate floor %"},
-                "rate_cap_pct": {"type": "number", "description": "Interest rate cap %"},
-                "rate_reset_frequency": {"type": "string", "description": "Rate reset frequency"},
+                "amortization_months": {"type": "number", "description": "Amortization period in months"},
+                "amortization_years": {"type": "number", "description": "Amortization period in years"},
+                "interest_only_months": {"type": "number", "description": "Interest-only period in months"},
+                "payment_frequency": {"type": "string", "description": "MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL, AT_MATURITY"},
                 "origination_fee_pct": {"type": "number", "description": "Origination fee %"},
-                "commitment_fee_pct": {"type": "number", "description": "Commitment/unused fee %"},
-                "unused_fee_pct": {"type": "number", "description": "Unused line fee %"},
-                "extension_fee_bps": {"type": "integer", "description": "Extension fee basis points"},
-                "extension_fee_amount": {"type": "number", "description": "Extension fee amount"},
                 "exit_fee_pct": {"type": "number", "description": "Exit/prepayment fee %"},
-                "prepayment_penalty_years": {"type": "integer", "description": "Prepayment penalty period (years)"},
-                "draw_trigger_type": {"type": "string", "description": "percent_complete, cost_certification, milestone"},
-                "interest_calculation": {"type": "string", "description": "SIMPLE, COMPOUNDED"},
-                "payment_frequency": {"type": "string", "description": "MONTHLY, QUARTERLY, ANNUAL"},
-                "interest_payment_method": {"type": "string", "description": "paid_current, accrued, reserved"},
-                "drawn_to_date": {"type": "number", "description": "Amount drawn to date"},
-                "commitment_balance": {"type": "number", "description": "Remaining commitment balance"},
-                "monthly_payment": {"type": "number", "description": "Monthly principal & interest"},
-                "annual_debt_service": {"type": "number", "description": "Annual debt service"},
-                "loan_covenant_dscr_min": {"type": "number", "description": "Covenant minimum DSCR"},
-                "loan_covenant_ltv_max": {"type": "number", "description": "Covenant maximum LTV"},
-                "loan_covenant_occupancy_min": {"type": "number", "description": "Covenant minimum occupancy"},
-                "covenant_test_frequency": {"type": "string", "description": "Quarterly, Monthly, Annual"},
-                "covenants": {"type": "object", "description": "JSONB covenants object"},
-                "reserve_requirements": {"type": "object", "description": "JSONB reserves object"},
-                "replacement_reserve_per_unit": {"type": "number", "description": "Replacement reserve per unit"},
-                "tax_insurance_escrow_months": {"type": "integer", "description": "T&I escrow months"},
-                "initial_reserve_months": {"type": "integer", "description": "Initial reserve months"},
-                "guarantee_type": {"type": "string", "description": "Full recourse, limited, non-recourse"},
-                "guarantor_name": {"type": "string", "description": "Guarantor name"},
-                "recourse_carveout_provisions": {"type": "string", "description": "Recourse carveout provisions"},
-                "extension_options": {"type": "integer", "description": "Number of extension options"},
-                "extension_option_years": {"type": "integer", "description": "Extension term (years per option)"},
-                "can_participate_in_profits": {"type": "boolean", "description": "Has profit participation"},
-                "profit_participation_tier": {"type": "integer", "description": "Profit participation tier"},
-                "profit_participation_pct": {"type": "number", "description": "Profit participation %"},
-                "applies_to_finance_structures": {"type": "array", "items": {"type": "integer"}, "description": "Finance structure IDs"},
-                "applies_to_containers": {"type": "array", "items": {"type": "integer"}, "description": "Container IDs"},
+                "loan_to_cost_pct": {"type": "number", "description": "Loan-to-cost %"},
+                "loan_to_value_pct": {"type": "number", "description": "Loan-to-value %"},
+                "seniority": {"type": "integer", "description": "1=senior, 2=subordinate, etc."},
+                "status": {"type": "string", "description": "active, pending, closed, defeased"},
+                "loan_start_date": {"type": "string", "description": "Loan start date (YYYY-MM-DD)"},
+                "loan_maturity_date": {"type": "string", "description": "Loan maturity date (YYYY-MM-DD)"},
                 "notes": {"type": "string", "description": "Notes"},
                 "reason": {"type": "string", "description": "Reason for update"}
             },
@@ -2051,17 +1991,17 @@ Example: Extract loan terms from term sheet or commitment letter.""",
         }
     },
     {
-        "name": "delete_debt_facility",
-        "description": """Delete a debt facility (MUTATION).
+        "name": "delete_loan",
+        "description": """Delete a loan (MUTATION).
 
-Requires facility_id.""",
+Requires loan_id.""",
         "input_schema": {
             "type": "object",
             "properties": {
-                "facility_id": {"type": "integer", "description": "Facility ID to delete"},
+                "loan_id": {"type": "integer", "description": "Loan ID to delete"},
                 "reason": {"type": "string", "description": "Reason for deletion"}
             },
-            "required": ["facility_id"]
+            "required": ["loan_id"]
         }
     },
     {

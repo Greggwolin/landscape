@@ -15,8 +15,15 @@
 
 'use client';
 
-import React, { Suspense, useState } from 'react';
-import { CCard } from '@coreui/react';
+import React, { Suspense, useState, useCallback, useEffect } from 'react';
+import { CCard, CToast, CToastBody, CToaster } from '@coreui/react';
+import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
+import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
+import {
+  RentRollUpdateReviewModal,
+  RentRollComparisonResponse,
+  RentRollExtractionMap,
+} from '@/components/landscaper/RentRollUpdateReviewModal';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
 import { StudioProjectBar } from '@/components/studio/StudioProjectBar';
@@ -25,6 +32,9 @@ import { AlphaAssistantFlyout } from '@/components/alpha';
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
+import { FileDropProvider, useFileDrop } from '@/contexts/FileDropContext';
+import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
+import { DropZoneWrapper } from '@/components/ui/DropZoneWrapper';
 import '@/styles/folder-tabs.css';
 import '@/styles/resizable-panel.css';
 
@@ -39,7 +49,6 @@ const MIN_LANDSCAPER_WIDTH = 280;
 const MAX_WIDTH_PERCENT = 50;
 const COLLAPSE_THRESHOLD = 100;
 const COLLAPSED_WIDTH = 56;
-const SPLITTER_WIDTH = 6;
 
 function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientProps) {
   const { projects, activeProject, isLoading } = useProjectContext();
@@ -64,6 +73,50 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     analysisType: currentProject?.analysis_type,
   });
 
+  // Use the pending rent roll extractions hook
+  const {
+    pendingCount: rentRollPendingCount,
+    documentId: pendingDocumentId,
+    refresh: refreshPendingExtractions,
+  } = usePendingRentRollExtractions(projectId);
+
+  // Use extraction job status hook
+  const {
+    rentRollJob,
+    refresh: refreshJobStatus,
+  } = useExtractionJobStatus(projectId);
+
+  // Determine badge state based on job status and pending count
+  const getRentRollBadgeState = useCallback((): {
+    type: 'processing' | 'error' | 'pending' | null;
+    count: number | null;
+    message?: string;
+  } => {
+    // Check for active job first
+    if (rentRollJob) {
+      if (rentRollJob.status === 'processing' || rentRollJob.status === 'queued') {
+        return { type: 'processing', count: null };
+      }
+      if (rentRollJob.status === 'failed') {
+        return { type: 'error', count: null, message: rentRollJob.error_message || 'Extraction failed' };
+      }
+    }
+
+    // Check for pending review
+    if (rentRollPendingCount > 0) {
+      return { type: 'pending', count: rentRollPendingCount };
+    }
+
+    return { type: null, count: null };
+  }, [rentRollJob, rentRollPendingCount]);
+
+  const rentRollBadgeState = getRentRollBadgeState();
+
+  // Rent roll review modal state
+  const [showRentRollReviewModal, setShowRentRollReviewModal] = useState(false);
+  const [rentRollComparisonData, setRentRollComparisonData] = useState<RentRollComparisonResponse | null>(null);
+  const [rentRollExtractedUnits, setRentRollExtractedUnits] = useState<RentRollExtractionMap>({});
+
   // Resizable panel state
   const {
     width: landscaperWidth,
@@ -80,10 +133,116 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     collapsedWidth: COLLAPSED_WIDTH,
   });
 
+  // File drop notification state
+  const [dropToast, setDropToast] = useState<string | null>(null);
+  const { pendingFiles } = useFileDrop();
+
+  // Show toast when files are dropped (especially when Landscaper is collapsed)
+  useEffect(() => {
+    if (pendingFiles.length > 0) {
+      const fileNames = pendingFiles.slice(0, 2).map(pf => pf.file.name).join(', ');
+      const extra = pendingFiles.length > 2 ? ` (+${pendingFiles.length - 2} more)` : '';
+      setDropToast(`Processing: ${fileNames}${extra}`);
+
+      // Auto-expand Landscaper panel if collapsed so the upload can proceed
+      if (isCollapsed) {
+        toggleCollapsed();
+      }
+    }
+  }, [pendingFiles, isCollapsed, toggleCollapsed]);
+
+  // Auto-dismiss toast after 5 seconds
+  useEffect(() => {
+    if (!dropToast) return;
+    const timer = setTimeout(() => setDropToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [dropToast]);
+
   // Handle folder/tab navigation
   const handleNavigate = (folder: string, tab: string) => {
     setFolderTab(folder, tab);
   };
+
+  // Handle rent roll badge click - fetch comparison data and open modal
+  const handleRentRollBadgeClick = useCallback(async (): Promise<boolean> => {
+    if (rentRollPendingCount === 0 || !pendingDocumentId) {
+      return false; // Allow normal navigation
+    }
+
+    try {
+      // Fetch comparison data from the Django backend
+      const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: pendingDocumentId }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch rent roll comparison:', response.status);
+        return false; // Allow normal navigation on error
+      }
+
+      const data = await response.json();
+
+      // Build extraction map from deltas
+      const extractedUnits: RentRollExtractionMap = {};
+      if (data.deltas) {
+        data.deltas.forEach((delta: { extraction_id: number; unit_number: string | number | null; changes: Array<{ field: string; extracted_value: unknown }> }) => {
+          const unitData: Record<string, unknown> = { unit_number: delta.unit_number };
+          delta.changes.forEach((change) => {
+            unitData[change.field] = change.extracted_value;
+          });
+          extractedUnits[delta.extraction_id] = unitData;
+        });
+      }
+
+      setRentRollComparisonData(data);
+      setRentRollExtractedUnits(extractedUnits);
+      setShowRentRollReviewModal(true);
+      return true; // Prevent normal navigation
+    } catch (err) {
+      console.error('Error fetching rent roll comparison:', err);
+      return false; // Allow normal navigation on error
+    }
+  }, [projectId, rentRollPendingCount, pendingDocumentId]);
+
+  // Handle sub-tab badge click
+  const handleSubTabBadgeClick = useCallback((tabId: string, badgeCount: number): boolean => {
+    if (tabId === 'rent-roll') {
+      // If processing or queued, don't do anything
+      if (rentRollBadgeState.type === 'processing') {
+        return true; // Prevent navigation but don't open modal
+      }
+      // If error, refresh and try again
+      if (rentRollBadgeState.type === 'error') {
+        refreshJobStatus();
+        return true;
+      }
+      // If pending with count, open the modal
+      if (badgeCount > 0 || rentRollBadgeState.type === 'pending') {
+        handleRentRollBadgeClick();
+        return true;
+      }
+    }
+    return false;
+  }, [handleRentRollBadgeClick, rentRollBadgeState, refreshJobStatus]);
+
+  // Handle commit success - refresh pending count and close modal
+  const handleRentRollCommitSuccess = useCallback((snapshotId?: number) => {
+    console.log('Rent roll commit successful, snapshot ID:', snapshotId);
+    refreshPendingExtractions();
+    setShowRentRollReviewModal(false);
+    setRentRollComparisonData(null);
+    setRentRollExtractedUnits({});
+  }, [refreshPendingExtractions]);
+
+  // Handle modal close (without commit) - just close, keep pending
+  const handleRentRollModalClose = useCallback(() => {
+    setShowRentRollReviewModal(false);
+    setRentRollComparisonData(null);
+    setRentRollExtractedUnits({});
+  }, []);
 
   // Alpha Assistant flyout state
   const [isAlphaFlyoutOpen, setIsAlphaFlyoutOpen] = useState(false);
@@ -207,12 +366,16 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             currentFolder={currentFolder}
             currentTab={currentTab}
             onNavigate={handleNavigate}
+            subTabBadgeStates={{ 'rent-roll': rentRollBadgeState }}
+            onSubTabBadgeClick={handleSubTabBadgeClick}
           />
 
-          {/* Content Area */}
-          <div className="studio-folder-content" data-subtab={currentTab}>
-            {children}
-          </div>
+          {/* Content Area - with drop zone for file uploads */}
+          <DropZoneWrapper className="studio-folder-content-wrapper">
+            <div className="studio-folder-content" data-subtab={currentTab}>
+              {children}
+            </div>
+          </DropZoneWrapper>
         </CCard>
       </div>
 
@@ -223,12 +386,49 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         pageContext={pageContext}
         projectId={projectId}
       />
+
+      {/* Rent Roll Review Modal */}
+      {rentRollComparisonData && (
+        <RentRollUpdateReviewModal
+          visible={showRentRollReviewModal}
+          onClose={handleRentRollModalClose}
+          projectId={projectId}
+          comparisonData={rentRollComparisonData}
+          extractedUnitsById={rentRollExtractedUnits}
+          onCommitSuccess={handleRentRollCommitSuccess}
+          onRefresh={refreshPendingExtractions}
+        />
+      )}
+
+      {/* File drop toast notification */}
+      <CToaster placement="top-end" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 9999 }}>
+        {dropToast && (
+          <CToast
+            autohide={true}
+            delay={5000}
+            visible={true}
+            onClose={() => setDropToast(null)}
+            style={{
+              backgroundColor: 'var(--cui-primary)',
+              color: 'white',
+              minWidth: '280px',
+            }}
+          >
+            <CToastBody className="d-flex align-items-center gap-2">
+              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+              {dropToast}
+            </CToastBody>
+          </CToast>
+        )}
+      </CToaster>
     </div>
   );
 }
 
 export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClientProps) {
   return (
+    <FileDropProvider>
+    <LandscaperCollisionProvider>
     <Suspense
       fallback={
         <div
@@ -285,5 +485,7 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
         {children}
       </ProjectLayoutClientInner>
     </Suspense>
+    </LandscaperCollisionProvider>
+    </FileDropProvider>
   );
 }

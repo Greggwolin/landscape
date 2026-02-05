@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { CButton } from '@coreui/react';
 
 export interface ActivityItem {
   id: string;
@@ -36,9 +37,61 @@ const confidenceColors = {
   low: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
   const config = item.status ? statusConfig[item.status] : statusConfig['not-started'];
+  const [isRollingBack, setIsRollingBack] = useState(false);
+
+  const { rollbackSnapshotId, visibleDetails } = useMemo(() => {
+    // Ensure details is an array before processing
+    const detailsArray = Array.isArray(item.details) ? item.details : [];
+    if (detailsArray.length === 0) {
+      return { rollbackSnapshotId: null as number | null, visibleDetails: detailsArray };
+    }
+
+    let snapshotId: number | null = null;
+    const filtered = detailsArray.filter((detail) => {
+      const match = detail.match(/snapshot[_ ]?id[:= ]+(\d+)/i);
+      if (match) {
+        const parsed = Number(match[1]);
+        if (!Number.isNaN(parsed)) {
+          snapshotId = parsed;
+        }
+        return false;
+      }
+      return true;
+    });
+
+    return { rollbackSnapshotId: snapshotId, visibleDetails: filtered };
+  }, [item.details]);
+
+  const handleRollback = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!rollbackSnapshotId) return;
+
+    const confirmed = window.confirm('This will restore the rent roll to its previous state. Continue?');
+    if (!confirmed) return;
+
+    setIsRollingBack(true);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const response = await fetch(
+        `${backendUrl}/api/knowledge/projects/${projectId}/rollback/${rollbackSnapshotId}/`,
+        { method: 'POST' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Rollback failed');
+      }
+
+      window.location.reload();
+    } catch (err) {
+       
+      alert('Failed to rollback changes');
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
 
   const content = (
     <div
@@ -68,13 +121,13 @@ export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
         {item.summary}
       </p>
 
-      {item.details && item.details.length > 0 && (
+      {visibleDetails && visibleDetails.length > 0 && (
         <ul className="text-xs space-y-0.5 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
-          {item.details.slice(0, 2).map((detail, idx) => (
+          {visibleDetails.slice(0, 2).map((detail, idx) => (
             <li key={idx}>• {detail}</li>
           ))}
-          {item.details.length > 2 && (
-            <li>+{item.details.length - 2} more</li>
+          {visibleDetails.length > 2 && (
+            <li>+{visibleDetails.length - 2} more</li>
           )}
         </ul>
       )}
@@ -82,6 +135,19 @@ export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
       {item.blockedBy && (
         <div className="mt-2 text-xs text-red-500">
           Blocked: {item.blockedBy}
+        </div>
+      )}
+
+      {rollbackSnapshotId && (
+        <div className="mt-2">
+          <CButton
+            color="link"
+            size="sm"
+            disabled={isRollingBack}
+            onClick={handleRollback}
+          >
+            {isRollingBack ? 'Undoing...' : 'Undo'}
+          </CButton>
         </div>
       )}
 

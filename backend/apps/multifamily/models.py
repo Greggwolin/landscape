@@ -96,6 +96,11 @@ class MultifamilyUnit(models.Model):
     renovation_date = models.DateField(null=True, blank=True)
     renovation_cost = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     other_features = models.TextField(null=True, blank=True)
+    extra_data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Additional extraction data that doesn't map to schema fields (tags, delinquency, etc.)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

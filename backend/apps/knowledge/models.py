@@ -1025,3 +1025,101 @@ class OpexBenchmark(models.Model):
 
     def __str__(self):
         return f"{self.source} {self.source_year} - {self.expense_category} ({self.geographic_scope})"
+
+
+# =============================================================================
+# EXTRACTION JOB TRACKING
+# Tracks extraction job status for UI persistence across page navigations
+# =============================================================================
+
+class ExtractionJob(models.Model):
+    """
+    Tracks extraction job status for UI persistence.
+
+    Enables users to see extraction progress even after navigating away,
+    and prevents duplicate extraction attempts.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    class Scope(models.TextChoices):
+        RENT_ROLL = 'rent_roll', 'Rent Roll'
+        OPERATING_STATEMENT = 'operating_statement', 'Operating Statement'
+        PROFORMA = 'proforma', 'Pro Forma'
+        OFFERING_MEMO = 'offering_memo', 'Offering Memorandum'
+        OTHER = 'other', 'Other'
+
+    job_id = models.BigAutoField(primary_key=True)
+
+    project_id = models.BigIntegerField(db_index=True)
+    document_id = models.BigIntegerField(db_index=True)
+
+    scope = models.CharField(
+        max_length=50,
+        choices=Scope.choices,
+        db_index=True,
+        help_text="Extraction scope: rent_roll, operating_statement, etc."
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+        db_index=True
+    )
+
+    # Progress tracking
+    total_items = models.IntegerField(null=True, blank=True)
+    processed_items = models.IntegerField(default=0)
+
+    # Timing
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Error handling
+    error_message = models.TextField(null=True, blank=True)
+
+    # Results summary (populated on completion)
+    result_summary = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Summary: {fills: N, conflicts: N, total: N}"
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='extraction_jobs'
+    )
+
+    class Meta:
+        db_table = 'landscape"."tbl_extraction_job'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project_id', 'scope', 'status']),
+            models.Index(fields=['project_id', 'created_at']),
+        ]
+        verbose_name = 'Extraction Job'
+        verbose_name_plural = 'Extraction Jobs'
+
+    def __str__(self):
+        return f"Job {self.job_id}: {self.project_id}/{self.scope} - {self.status}"
+
+    @property
+    def progress_percent(self) -> int:
+        """Calculate progress percentage."""
+        if not self.total_items or self.total_items == 0:
+            return 0
+        return min(100, int((self.processed_items / self.total_items) * 100))
+
+    @property
+    def is_active(self) -> bool:
+        """Check if job is still running."""
+        return self.status in (self.Status.QUEUED, self.Status.PROCESSING)

@@ -1025,7 +1025,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         <div className="w-full lg:w-[32%] flex-shrink-0">
           <div
             className="shadow-lg"
-            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: 'var(--cui-border-radius, 0.375rem)',
+            }}
           >
             <div
               className="border-b px-3 py-2"
@@ -1046,7 +1050,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           {/* Floor Plan Matrix */}
           <div
             className="shadow-lg overflow-hidden"
-            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: 'var(--cui-border-radius, 0.375rem)',
+            }}
           >
             <div
               className="border-b px-3 py-2"
@@ -1057,8 +1065,25 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>
                     Floor Plan Matrix
                   </h3>
-                  <div className="flex items-center gap-2 px-2 py-0.5 bg-blue-900/20 border border-blue-700/40 rounded text-xs">
-                    <span className="text-blue-300 font-medium">Aggregates from Units</span>
+                  <div
+                    className="flex items-center gap-2"
+                    style={{
+                      padding: '0.2rem 0.9rem',
+                      borderRadius: '999px',
+                      border: '1px solid var(--cui-primary)',
+                      backgroundColor: 'var(--cui-primary-bg)',
+                    }}
+                  >
+                    <span
+                      className="font-semibold"
+                      style={{
+                        color: 'var(--cui-primary)',
+                        fontSize: '0.65rem',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      Aggregates from Units
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs">
@@ -1087,7 +1112,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     const draft = editing ? planEditDraft! : plan;
 
                     return (
-                      <tr key={plan.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
+                      <tr key={plan.id} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                         <td className="px-2 py-2">
                           {editing ? (
                             <input
@@ -1236,9 +1261,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
   const renderMarketContent = () => (
     <div className="space-y-4">
-      {/* Competitive Market Rentals Chart */}
+      {/* Competitive Market Rentals Chart - Full Width */}
       {comparables.length > 0 && (
-        <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: 'var(--cui-card-bg)', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: 'var(--cui-card-bg)', borderRadius: '8px', width: '100%' }}>
           <h4 style={{ color: 'var(--cui-body-color)', marginBottom: '12px' }}>Competitive Market Rentals</h4>
           <CompetitiveMarketCharts
             comparables={comparables}
@@ -1246,6 +1271,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             subjectPropertyName={project.project_name}
             onPropertyClick={handlePropertyClick}
             onColorsAssigned={handleColorsAssigned}
+            selectedProperty={highlightedProperty}
           />
         </div>
       )}
@@ -1276,20 +1302,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               </button>
             </div>
           </div>
-          <div className="p-4 space-y-3" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-            {/* Project Map with Rental Comparables */}
-            <div className="h-[400px] rounded-lg overflow-hidden">
-              <ProjectTabMap
-                projectId={projectId.toString()}
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-                tabId="property"
-                rentalComparables={comparables}
-                comparableColors={propertyColors}
-              />
-            </div>
-
-            {/* Collapsible Property Groups */}
-            <div className={`space-y-1 pr-1 ${expandedProperties.size > 0 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
+          <div className="d-flex" style={{ backgroundColor: 'var(--cui-card-bg)', gap: '1rem', padding: '1rem' }}>
+            {/* Left: Collapsible Property Groups */}
+            <div className="space-y-1 pr-1 overflow-y-auto" style={{ flex: '0 0 50%', maxHeight: '500px' }}>
               {comparablesByProperty.length === 0 ? (
                 <div className="text-center py-8 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                   <p>No rental comparables available.</p>
@@ -1373,7 +1388,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           <table className="w-full text-xs">
                             <thead>
                               <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                                <th className="text-left px-3 py-1.5 font-medium w-24" style={{ color: 'var(--cui-secondary-color)' }}>Unit Type</th>
+                                <th className="text-left px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)', minWidth: '140px' }}>Unit Type</th>
                                 <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
                                 <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
                                 <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
@@ -1407,6 +1422,18 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 })
               )}
             </div>
+
+            {/* Right: Map */}
+            <div className="rounded-lg overflow-hidden" style={{ flex: '1 1 auto', minHeight: '500px' }}>
+              <ProjectTabMap
+                projectId={projectId.toString()}
+                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+                tabId="property"
+                rentalComparables={comparables}
+                comparableColors={propertyColors}
+                onMarkerClick={handlePropertyClick}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1416,41 +1443,6 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     <div className="space-y-4">
       {/* Detailed Rent Roll Table */}
       <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
-        <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Detailed Rent Roll</h3>
-              <div className="flex items-center gap-2 px-2 py-1 bg-green-900/20 border border-green-700/40 rounded text-xs">
-                <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                </svg>
-                <span className="text-green-300 font-medium">Populates Floor Plans</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-              <span>Occupancy: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</span></span>
-              <span>Units: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{units.length} / {totalUnits}</span></span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFieldChooser(true)}
-              className="px-3 py-1.5 text-sm rounded transition-colors flex items-center gap-1.5"
-              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)' }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              Configure Columns
-            </button>
-            <button
-              className="px-3 py-1.5 text-sm rounded transition-colors"
-              style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
-            >
-              + Add Unit
-            </button>
-          </div>
-        </div>
 
         {/* KPI Tiles */}
         <div className="px-4 py-3 grid grid-cols-6 gap-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
@@ -1524,6 +1516,42 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </div>
             <div className="text-2xl font-bold" style={{ color: 'var(--cui-body-color)' }}>{avgRentPerSF === '0.00' || Number(avgRentPerSF) === 0 ? '—' : `$${avgRentPerSF}`}</div>
             <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Average rate</div>
+          </div>
+        </div>
+
+        <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Detailed Rent Roll</h3>
+              <div className="flex items-center gap-2 px-2 py-1 bg-green-900/20 border border-green-700/40 rounded text-xs">
+                <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                </svg>
+                <span className="text-green-300 font-medium">Populates Floor Plans</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              <span>Occupancy: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</span></span>
+              <span>Units: <span className="font-medium" style={{ color: 'var(--cui-body-color)' }}>{units.length} / {totalUnits}</span></span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFieldChooser(true)}
+              className="px-3 py-1.5 text-sm rounded transition-colors flex items-center gap-1.5"
+              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)' }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Configure Columns
+            </button>
+            <button
+              className="px-3 py-1.5 text-sm rounded transition-colors"
+              style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+            >
+              + Add Unit
+            </button>
           </div>
         </div>
 

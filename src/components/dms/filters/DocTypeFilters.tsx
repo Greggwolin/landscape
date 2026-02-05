@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilLayers } from '@coreui/icons';
 
 export interface DocTypeFilter {
   doc_type: string;
@@ -162,7 +164,7 @@ export default function DocTypeFilters({
 
   if (isLoading) {
     return (
-      <div className={`text-sm text-gray-500 dark:text-gray-400 p-4 ${className}`}>
+      <div className={`text-sm p-4 ${className}`} style={{ color: 'var(--cui-secondary-color)' }}>
         Loading filters...
       </div>
     );
@@ -170,7 +172,7 @@ export default function DocTypeFilters({
 
   if (docTypes.length === 0) {
     return (
-      <div className={`text-sm text-gray-500 dark:text-gray-400 p-4 ${className}`}>
+      <div className={`text-sm p-4 ${className}`} style={{ color: 'var(--cui-secondary-color)' }}>
         No document types found
       </div>
     );
@@ -184,23 +186,26 @@ export default function DocTypeFilters({
         const smartList = smartFiltersByType.get(item.doc_type) ?? [];
 
         return (
-          <div key={item.doc_type} className="border-b border-gray-200 dark:border-gray-800">
+          <div key={item.doc_type} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
             <button
               onClick={() => {
                 handleToggle(item.doc_type);
                 onFilterChange(item.doc_type);
               }}
-              className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
-                isActive ? 'bg-[#EBF5FF] text-[#1E40AF]' : 'text-gray-800 dark:text-gray-100'
-              }`}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm transition-colors"
+              style={{
+                backgroundColor: isActive ? 'var(--cui-primary-bg)' : 'transparent',
+                color: isActive ? 'var(--cui-primary)' : 'var(--cui-body-color)'
+              }}
             >
               <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400">
+                <span style={{ color: 'var(--cui-secondary-color)' }}>
                   {isExpanded ? '▾' : '▸'}
                 </span>
+                <CIcon icon={cilLayers} className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
                 <span className="font-medium">{item.doc_type}</span>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{item.count ?? 0}</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>{item.count ?? 0}</span>
             </button>
 
             {isExpanded && smartList.length > 0 && (
@@ -211,15 +216,17 @@ export default function DocTypeFilters({
                     <button
                       key={sf.filter_id}
                       onClick={() => onFilterChange(sf.doc_type)}
-                      className={`w-full flex items-center justify-between text-xs px-2 py-1 rounded ${
-                        sfActive ? 'bg-[#EBF5FF] text-[#1E40AF]' : 'text-gray-700 dark:text-gray-200'
-                      }`}
+                      className="w-full flex items-center justify-between text-xs px-2 py-1 rounded"
+                      style={{
+                        backgroundColor: sfActive ? 'var(--cui-primary-bg)' : 'transparent',
+                        color: sfActive ? 'var(--cui-primary)' : 'var(--cui-body-color)'
+                      }}
                     >
                       <span className="flex items-center gap-2">
-                        <span className="text-gray-400">•</span>
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>•</span>
                         {sf.filter_name}
                       </span>
-                      <span className="text-gray-500 dark:text-gray-400">{sf.count ?? 0}</span>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>{sf.count ?? 0}</span>
                     </button>
                   );
                 })}

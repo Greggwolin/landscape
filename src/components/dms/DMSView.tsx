@@ -2,67 +2,53 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import CIcon from '@coreui/icons-react';
-import { cilFilterSquare } from '@coreui/icons';
+import { cilLayers, cilTrash, cilActionRedo } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
-import Dropzone from '@/components/dms/upload/Dropzone';
-import Queue from '@/components/dms/upload/Queue';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
+import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import type { DMSDocument } from '@/types/dms';
-
-type TabType = 'documents' | 'upload';
 
 interface DMSViewProps {
   projectId: number;
   projectName: string;
   projectType?: string | null;
-  hideHeader?: boolean;
-  defaultTab?: TabType;
 }
 
 export default function DMSView({
   projectId,
   projectName,
-  projectType = null,
-  hideHeader = false,
-  defaultTab = 'documents'
+  projectType = null
 }: DMSViewProps) {
-  const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
   const defaultWorkspaceId = 1;
 
-  // Documents tab state
+  // Documents state
   const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showPermanentDeleteModal, setShowPermanentDeleteModal] = useState(false);
   const [allFilters, setAllFilters] = useState<FilterAccordion[]>([]);
   const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
   const [isLoadingFilters, setIsLoadingFilters] = useState(true);
 
-  // Upload tab state
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{
-    id: string;
-    filename: string;
-    size: number;
-    status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
-    progress: number;
-    error?: string;
-    doc_id?: number;
-    name?: string;
-    profile_json?: Record<string, unknown>;
-  }>>([]);
-  const [selectedUploadFile, setSelectedUploadFile] = useState<typeof uploadedFiles[number] | null>(null);
+  // Trash view state
+  const [viewingTrash, setViewingTrash] = useState(false);
+  const [trashedDocuments, setTrashedDocuments] = useState<DMSDocument[]>([]);
+  const [trashCount, setTrashCount] = useState(0);
+  const [isLoadingTrash, setIsLoadingTrash] = useState(false);
+
   const [panelExpanded, setPanelExpanded] = useState(true);
 
-  const secondaryColorStyle: React.CSSProperties = { color: 'var(--cui-secondary-color)' };
-  const primaryColorStyle: React.CSSProperties = { color: 'var(--cui-primary)' };
-  const borderColor = 'var(--cui-border-color)';
-  const cardBg = 'var(--cui-card-bg)';
-
-  // Fetch filter data when Documents tab is active
+  // Fetch filter data
   useEffect(() => {
-    if (projectId && activeTab === 'documents') {
+    if (projectId) {
       void loadFilters();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, projectType, activeTab]);
+  }, [projectId, projectType]);
 
   const loadFilters = async () => {
     setIsLoadingFilters(true);
@@ -222,219 +208,455 @@ export default function DMSView({
   // Handle document changes (refresh filters)
   const handleDocumentChange = () => {
     void loadFilters();
+    if (viewingTrash) {
+      void loadTrashedDocuments();
+    }
     setSelectedDocument(null);
+    setSelectedDocIds(new Set());
   };
 
-  // Upload handlers
-  const handleUploadComplete = (results: Array<Record<string, unknown>>) => {
-    console.log('Upload complete:', results);
-    const queueItems = results.map((result, index) => ({
-      id: (result.key as string) || (result.fileKey as string) || `upload-${Date.now()}-${index}`,
-      filename: (result.name as string) || (result.fileName as string) || 'Unknown',
-      name: (result.name as string) || (result.fileName as string) || 'Unknown',
-      size: (result.size as number) || 0,
-      status: 'completed' as const,
-      progress: 100,
-      doc_id: result.doc_id as number | undefined,
-      profile_json: result.profile_json as Record<string, unknown> | undefined
-    }));
-    setUploadedFiles((prev) => [...prev, ...queueItems]);
-  };
-
-  const handleUploadError = (error: Error) => {
-    console.error('Upload error:', error);
-    alert(`Upload failed: ${error.message}`);
-  };
-
-  const handleProfileSave = async (docId: number, profile: Record<string, unknown>) => {
+  // Load trashed documents
+  const loadTrashedDocuments = async () => {
+    setIsLoadingTrash(true);
     try {
-      const response = await fetch(`/api/dms/documents/${docId}/profile`, {
+      const response = await fetch(
+        `/api/dms/search?project_id=${projectId}&include_deleted=true&deleted_only=true&limit=100`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setTrashedDocuments(data.results || []);
+        setTrashCount(data.totalHits || data.results?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error loading trashed documents:', error);
+      setTrashedDocuments([]);
+    } finally {
+      setIsLoadingTrash(false);
+    }
+  };
+
+  // Toggle trash view
+  const handleToggleTrashView = () => {
+    const newViewingTrash = !viewingTrash;
+    setViewingTrash(newViewingTrash);
+    setSelectedDocIds(new Set());
+    setSelectedDocument(null);
+    if (newViewingTrash) {
+      void loadTrashedDocuments();
+    }
+  };
+
+  // Get all documents from expanded filters for selection/deletion
+  const allDocuments = useMemo(() => {
+    if (viewingTrash) {
+      return trashedDocuments;
+    }
+    return allFilters.flatMap((f) => f.documents || []);
+  }, [allFilters, viewingTrash, trashedDocuments]);
+
+  // Get selected documents for delete modal
+  const selectedDocuments = useMemo(() => {
+    return allDocuments.filter((doc) => selectedDocIds.has(doc.doc_id));
+  }, [allDocuments, selectedDocIds]);
+
+  // Get selected trashed documents for restore/permanent delete
+  const selectedTrashedDocuments = useMemo(() => {
+    if (!viewingTrash) return [];
+    return trashedDocuments.filter((doc) => selectedDocIds.has(doc.doc_id));
+  }, [trashedDocuments, selectedDocIds, viewingTrash]);
+
+  // Get first selected document (for single-select actions like rename/edit profile)
+  const firstSelectedDoc = useMemo(() => {
+    if (selectedDocIds.size !== 1) return null;
+    const docId = Array.from(selectedDocIds)[0];
+    return allDocuments.find((doc) => doc.doc_id === docId) || null;
+  }, [allDocuments, selectedDocIds]);
+
+  // Handle bulk delete (move to trash)
+  const handleBulkDelete = async () => {
+    const errors: string[] = [];
+
+    for (const doc of selectedDocuments) {
+      try {
+        const response = await fetch(
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          errors.push(`${doc.doc_name}: ${data.error || 'Delete failed'}`);
+        }
+      } catch (error) {
+        errors.push(`${doc.doc_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Bulk delete errors:', errors);
+    }
+
+    setSelectedDocIds(new Set());
+    setShowDeleteModal(false);
+    void loadFilters();
+  };
+
+  // Handle bulk restore from trash
+  const handleBulkRestore = async () => {
+    const errors: string[] = [];
+
+    for (const doc of selectedTrashedDocuments) {
+      try {
+        const response = await fetch(
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/restore`,
+          { method: 'POST' }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          errors.push(`${doc.doc_name}: ${data.error || 'Restore failed'}`);
+        }
+      } catch (error) {
+        errors.push(`${doc.doc_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Bulk restore errors:', errors);
+    }
+
+    setSelectedDocIds(new Set());
+    setShowRestoreModal(false);
+    void loadTrashedDocuments();
+    void loadFilters();
+  };
+
+  // Handle bulk permanent delete
+  const handleBulkPermanentDelete = async () => {
+    const errors: string[] = [];
+
+    for (const doc of selectedTrashedDocuments) {
+      try {
+        const response = await fetch(
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/permanent-delete`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          errors.push(`${doc.doc_name}: ${data.error || 'Permanent delete failed'}`);
+        }
+      } catch (error) {
+        errors.push(`${doc.doc_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Bulk permanent delete errors:', errors);
+    }
+
+    setSelectedDocIds(new Set());
+    setShowPermanentDeleteModal(false);
+    void loadTrashedDocuments();
+  };
+
+  // Handle rename for single selected document
+  const handleRename = async (newName: string) => {
+    if (!firstSelectedDoc) return;
+
+    const response = await fetch(
+      `/api/projects/${projectId}/dms/docs/${firstSelectedDoc.doc_id}/rename`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save profile');
+        body: JSON.stringify({ new_name: newName }),
       }
+    );
 
-      alert('Profile saved successfully!');
-      setSelectedUploadFile(null);
-    } catch (error) {
-      console.error('Profile save error:', error);
-      alert(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to rename document');
     }
+
+    setShowRenameModal(false);
+    setSelectedDocIds(new Set());
+    void loadFilters();
+  };
+
+  // Handle profile save for single selected document
+  const handleEditProfileSave = async (profile: Record<string, unknown>) => {
+    if (!firstSelectedDoc) return;
+
+    const response = await fetch(`/api/dms/documents/${firstSelectedDoc.doc_id}/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save profile');
+    }
+
+    setShowProfileModal(false);
+    setSelectedDocIds(new Set());
+    void loadFilters();
+  };
+
+  // Toggle document selection
+  const handleToggleDocSelection = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
   };
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-      {/* Header */}
-      {!hideHeader && (
-        <div
-          className="border-b"
-          style={{
-            borderColor,
-            backgroundColor: cardBg
-          }}
-        >
-          <div className="px-6">
-            <nav className="flex space-x-8" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('documents')}
-                className="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
-                style={
-                  activeTab === 'documents'
-                    ? { borderColor: primaryColorStyle.color, color: primaryColorStyle.color }
-                    : { borderColor: 'transparent', ...secondaryColorStyle }
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Documents
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('upload')}
-                className="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
-                style={
-                  activeTab === 'upload'
-                    ? { borderColor: primaryColorStyle.color, color: primaryColorStyle.color }
-                    : { borderColor: 'transparent', ...secondaryColorStyle }
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Upload
-                </div>
-              </button>
-            </nav>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Content */}
+      {/* Main Content */}
       <div className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-        {/* Documents Tab */}
-        {activeTab === 'documents' && (
-          <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-            <div className="px-3 lg:px-4 py-4 lg:py-6">
-              <div
-                className="rounded-lg border shadow-sm overflow-hidden"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-card-bg)'
-                }}
+        <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+          <div className="px-3 lg:px-4 py-4 lg:py-6">
+            <div
+              className="rounded-lg border shadow-sm overflow-hidden"
+              style={{
+                borderColor: 'var(--cui-border-color)',
+                backgroundColor: 'var(--cui-card-bg)'
+              }}
+            >
+              <button
+                className="w-full px-4 py-3 text-left"
+                style={{ color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-card-bg)' }}
+                onClick={() => setPanelExpanded((prev) => !prev)}
+                aria-expanded={panelExpanded}
               >
-                <button
-                  className="w-full px-4 py-3 text-left"
-                  style={{ color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-card-bg)' }}
-                  onClick={() => setPanelExpanded((prev) => !prev)}
-                  aria-expanded={panelExpanded}
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {panelExpanded ? '▾' : '▸'}
-                      </span>
-                      <div>
-                        <div className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-                          Project Documents
-                        </div>
-                        <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                          {projectName}
-                        </div>
-                        <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                          Filtered to project #{projectId} • {totalItemCount} items
-                        </div>
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {panelExpanded ? '▾' : '▸'}
+                    </span>
+                    <div>
+                      <div className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+                        Project Documents
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <a
-                        href="/dms"
-                        className="px-3 py-2 rounded border transition-colors"
-                        style={{
-                          borderColor: 'var(--cui-border-color)',
-                          color: 'var(--cui-primary)'
-                        }}
-                      >
-                        Open Global DMS
-                      </a>
-                      <a
-                        href={`/projects/${projectId}/documents?tab=upload`}
-                        className="px-3 py-2 rounded text-white"
-                        style={{ backgroundColor: 'var(--cui-primary)' }}
-                      >
-                        Upload Documents
-                      </a>
+                      <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                        {projectName}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                        Filtered to project #{projectId} • {totalItemCount} items
+                      </div>
                     </div>
                   </div>
-                </button>
+                  <div className="flex items-center gap-2 text-sm">
+                    <a
+                      href="/dms"
+                      className="px-3 py-2 rounded border transition-colors"
+                      style={{
+                        borderColor: 'var(--cui-border-color)',
+                        color: 'var(--cui-primary)'
+                      }}
+                    >
+                      Open Global DMS
+                    </a>
+                    <a
+                      href={`/projects/${projectId}/documents?tab=upload`}
+                      className="px-3 py-2 rounded text-white"
+                      style={{ backgroundColor: 'var(--cui-primary)' }}
+                    >
+                      Upload Documents
+                    </a>
+                  </div>
+                </div>
+              </button>
 
-                {panelExpanded && (
-                  <div
-                    className="border-t"
-                    style={{
-                      borderColor: 'var(--cui-border-color)',
-                      backgroundColor: 'var(--cui-body-bg)'
-                    }}
-                  >
-                    {/* Breadcrumb */}
-                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-                      <div className="flex items-center gap-2 text-sm">
-                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
-                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
-                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                        <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
-                          {projectName}
-                        </span>
+              {panelExpanded && (
+                <div
+                  className="border-t"
+                  style={{
+                    borderColor: 'var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-body-bg)'
+                  }}
+                >
+                  {/* Breadcrumb */}
+                  <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                    <div className="flex items-center gap-2 text-sm">
+                      <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                      <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                      <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
+                        {projectName}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Toolbar */}
+                  <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                    <div className="flex items-center gap-4">
+                      <button style={{ color: 'var(--cui-primary)' }}>🔻</button>
+                      <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {viewingTrash ? `${trashCount} in trash` : `${totalItemCount} items`} | {selectedDocIds.size} selected
+                      </span>
+
+                      {/* Trash view actions */}
+                      {viewingTrash ? (
+                        <>
+                          {selectedDocIds.size > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setShowRestoreModal(true)}
+                                className="px-3 py-1 text-xs rounded-md text-white flex items-center gap-1"
+                                style={{ backgroundColor: 'var(--cui-success)' }}
+                              >
+                                <CIcon icon={cilActionRedo} className="w-3 h-3" />
+                                Restore ({selectedDocIds.size})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowPermanentDeleteModal(true)}
+                                className="px-3 py-1 text-xs rounded-md text-white flex items-center gap-1"
+                                style={{ backgroundColor: 'var(--cui-danger)' }}
+                              >
+                                <CIcon icon={cilTrash} className="w-3 h-3" />
+                                Delete Permanently ({selectedDocIds.size})
+                              </button>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {selectedDocIds.size > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowDeleteModal(true)}
+                              className="px-3 py-1 text-xs rounded-md text-white flex items-center gap-1"
+                              style={{ backgroundColor: 'var(--cui-warning)' }}
+                            >
+                              <CIcon icon={cilTrash} className="w-3 h-3" />
+                              Move to Trash ({selectedDocIds.size})
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      <div className="ml-auto flex items-center gap-3 text-sm">
+                        {/* Trash toggle button */}
+                        <button
+                          className="hover:opacity-70 flex items-center gap-1"
+                          style={{ color: viewingTrash ? 'var(--cui-warning)' : 'var(--cui-secondary-color)' }}
+                          onClick={handleToggleTrashView}
+                        >
+                          <CIcon icon={cilTrash} className="w-4 h-4" />
+                          {viewingTrash ? 'Exit Trash' : 'View Trash'}
+                        </button>
+
+                        {/* Normal view actions - hidden when viewing trash */}
+                        {!viewingTrash && (
+                          <>
+                            <button
+                              className={`hover:opacity-70 ${selectedDocIds.size !== 1 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              style={{ color: 'var(--cui-secondary-color)' }}
+                              disabled={selectedDocIds.size !== 1}
+                              onClick={() => selectedDocIds.size === 1 && setShowRenameModal(true)}
+                            >
+                              ✏️ Rename
+                            </button>
+                            <button
+                              className={`hover:opacity-70 flex items-center gap-1 ${selectedDocIds.size !== 1 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              style={{ color: 'var(--cui-secondary-color)' }}
+                              disabled={selectedDocIds.size !== 1}
+                              onClick={() => selectedDocIds.size === 1 && alert('Move/Copy coming soon')}
+                            >
+                              <CIcon icon={cilLayers} className="w-4 h-4" />
+                              Move/Copy
+                            </button>
+                            <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
+                              📧 Email copy
+                            </button>
+                            <button
+                              className={`hover:opacity-70 ${selectedDocIds.size !== 1 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              style={{ color: 'var(--cui-secondary-color)' }}
+                              disabled={selectedDocIds.size !== 1}
+                              onClick={() => selectedDocIds.size === 1 && setShowProfileModal(true)}
+                            >
+                              ✏️ Edit profile
+                            </button>
+                            <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
+                              ⋯ More
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
+                  </div>
 
-                    {/* Toolbar */}
-                    <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-                      <div className="flex items-center gap-4">
-                        <button style={{ color: 'var(--cui-primary)' }}>🔻</button>
-                        <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-                          {totalItemCount} items | 0 selected
-                        </span>
-                        <div className="ml-auto flex items-center gap-3 text-sm">
-                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
-                            ✏️ Rename
-                          </button>
-                          <button className="hover:opacity-70 flex items-center gap-1 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
-                            <CIcon icon={cilFilterSquare} className="w-4 h-4" />
-                            Move/Copy
-                          </button>
-                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
-                            📧 Email copy
-                          </button>
-                          <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
-                            ✏️ Edit profile
-                          </button>
-                          <button className="hover:opacity-70" style={{ color: 'var(--cui-secondary-color)' }}>
-                            ⋯ More
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                      <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>
-                        <div className="p-4 lg:p-6" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                          {isLoadingFilters ? (
+                  <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                    <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>
+                      <div className="p-4 lg:p-6" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                        {viewingTrash ? (
+                          /* Trash View */
+                          isLoadingTrash ? (
+                            <div className="flex items-center justify-center h-64">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
+                              <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading trash...</span>
+                            </div>
+                          ) : trashedDocuments.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--cui-secondary-color)' }}>
+                              <CIcon icon={cilTrash} className="w-8 h-8 mb-3" />
+                              <p className="text-sm">Trash is empty</p>
+                            </div>
+                          ) : (
+                            <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                              <div className="mb-4 p-3 rounded border" style={{ borderColor: 'var(--cui-warning)', backgroundColor: 'var(--cui-warning-bg)' }}>
+                                <p className="text-sm" style={{ color: 'var(--cui-warning)' }}>
+                                  Documents in trash can be restored or permanently deleted. Permanent deletion cannot be undone.
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                {trashedDocuments.map((doc) => (
+                                  <div
+                                    key={doc.doc_id}
+                                    className="flex items-center gap-3 px-4 py-3 rounded border cursor-pointer transition-colors"
+                                    style={{
+                                      borderColor: selectedDocIds.has(doc.doc_id) ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                                      backgroundColor: selectedDocIds.has(doc.doc_id) ? 'var(--cui-primary-bg)' : 'var(--cui-body-bg)'
+                                    }}
+                                    onClick={() => handleToggleDocSelection(doc.doc_id)}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded"
+                                      style={{ borderColor: 'var(--cui-border-color)' }}
+                                      checked={selectedDocIds.has(doc.doc_id)}
+                                      onChange={() => handleToggleDocSelection(doc.doc_id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <CIcon icon={cilTrash} className="w-5 h-5" style={{ color: 'var(--cui-warning)' }} />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate" style={{ color: 'var(--cui-body-color)' }}>
+                                        {doc.doc_name}
+                                      </div>
+                                      <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                                        {doc.doc_type || 'Unknown type'} • Deleted {doc.deleted_at ? new Date(doc.deleted_at).toLocaleDateString() : 'recently'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          /* Normal Document View */
+                          isLoadingFilters ? (
                             <div className="flex items-center justify-center h-64">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--cui-primary)' }}></div>
                               <span className="ml-3" style={{ color: 'var(--cui-secondary-color)' }}>Loading filters...</span>
                             </div>
                           ) : allFilters.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--cui-secondary-color)' }}>
-                              <CIcon icon={cilFilterSquare} className="w-8 h-8 mb-3" />
+                              <CIcon icon={cilLayers} className="w-8 h-8 mb-3" />
                               <p className="text-sm">No documents found in this project</p>
                             </div>
                           ) : (
@@ -449,6 +671,8 @@ export default function DMSView({
                                   onDocumentSelect={handleDocumentSelect}
                                   expandedFilter={expandedFilter}
                                   onUploadComplete={handleDocumentChange}
+                                  selectedDocIds={selectedDocIds}
+                                  onToggleDocSelection={handleToggleDocSelection}
                                 />
                               </div>
 
@@ -462,129 +686,135 @@ export default function DMSView({
                                   onDocumentSelect={handleDocumentSelect}
                                   expandedFilter={expandedFilter}
                                   onUploadComplete={handleDocumentChange}
+                                  selectedDocIds={selectedDocIds}
+                                  onToggleDocSelection={handleToggleDocSelection}
                                 />
                               </div>
                             </div>
-                          )}
-                        </div>
+                          )
+                        )}
                       </div>
+                    </div>
 
-                      {/* Single document preview panel */}
-                      {selectedDocument && (
-                        <>
-                          <div
-                            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-                            onClick={handleCloseDocumentPreview}
-                            role="presentation"
+                    {/* Single document preview panel */}
+                    {selectedDocument && (
+                      <>
+                        <div
+                          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+                          onClick={handleCloseDocumentPreview}
+                          role="presentation"
+                        />
+                        <div
+                          className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[480px]"
+                          style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
+                        >
+                          <DocumentPreviewPanel
+                            projectId={projectId}
+                            document={selectedDocument}
+                            onClose={handleCloseDocumentPreview}
+                            onDocumentChange={handleDocumentChange}
                           />
-                          <div
-                            className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[480px]"
-                            style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
-                          >
-                            <DocumentPreviewPanel
-                              projectId={projectId}
-                              document={selectedDocument}
-                              onClose={handleCloseDocumentPreview}
-                              onDocumentChange={handleDocumentChange}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-
-        {/* Upload Tab */}
-        {activeTab === 'upload' && (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="max-w-6xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
-                  Upload Documents
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Drag and drop files or click to select
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Left: Upload */}
-                <div className="space-y-6">
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 bg-white dark:bg-gray-900">
-                    <Dropzone
-                      projectId={projectId}
-                      workspaceId={defaultWorkspaceId}
-                      docType="general"
-                      onUploadComplete={handleUploadComplete}
-                      onUploadError={handleUploadError}
-                    />
-                  </div>
-
-                  {uploadedFiles.length > 0 && (
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 bg-white dark:bg-gray-900">
-                      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                        Uploaded Files ({uploadedFiles.length})
-                      </h3>
-                      <Queue
-                        items={uploadedFiles}
-                        onRetry={(id) => console.log('Retry upload:', id)}
-                        onRemove={(id) => setUploadedFiles(prev => prev.filter(f => f.id !== id))}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Profile Form */}
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 h-fit sticky top-6 bg-white dark:bg-gray-900">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                    Document Profile
-                  </h3>
-
-                  {selectedUploadFile ? (
-                    <div>
-                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                          {selectedUploadFile.name || selectedUploadFile.filename}
-                        </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                          {(selectedUploadFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-
-                      <ProfileForm
-                        docId={selectedUploadFile.doc_id}
-                        projectId={projectId}
-                        workspaceId={defaultWorkspaceId}
-                        docType="general"
-                        projectType={projectType}
-                        initialProfile={selectedUploadFile.profile_json || {}}
-                        onSave={(profile) => handleProfileSave(selectedUploadFile.doc_id!, profile)}
-                        onCancel={() => setSelectedUploadFile(null)}
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                      <svg
-                        className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="mt-2 text-sm">Select an uploaded file to edit its profile</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {selectedDocIds.size > 0 && (
+        <DeleteConfirmModal
+          visible={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          documents={selectedDocuments.map((doc) => ({
+            doc_id: parseInt(doc.doc_id, 10),
+            doc_name: doc.doc_name
+          }))}
+          projectId={projectId}
+          onDelete={handleBulkDelete}
+        />
+      )}
+
+      {/* Rename Modal */}
+      {firstSelectedDoc && (
+        <RenameModal
+          visible={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          docId={parseInt(firstSelectedDoc.doc_id, 10)}
+          projectId={projectId}
+          currentName={firstSelectedDoc.doc_name}
+          onRename={handleRename}
+        />
+      )}
+
+      {/* Edit Profile Modal */}
+      {firstSelectedDoc && showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            className="w-full max-w-lg mx-4 rounded-lg shadow-xl overflow-hidden"
+            style={{ backgroundColor: 'var(--cui-body-bg)' }}
+          >
+            <div
+              className="px-6 py-4 border-b"
+              style={{ borderColor: 'var(--cui-border-color)' }}
+            >
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                Edit Profile: {firstSelectedDoc.doc_name}
+              </h3>
+            </div>
+            <div className="p-6">
+              <ProfileForm
+                docId={parseInt(firstSelectedDoc.doc_id, 10)}
+                projectId={projectId}
+                workspaceId={defaultWorkspaceId}
+                docType={firstSelectedDoc.doc_type || 'general'}
+                projectType={projectType}
+                initialProfile={(firstSelectedDoc.profile_json as Record<string, unknown>) || {}}
+                onSave={handleEditProfileSave}
+                onCancel={() => setShowProfileModal(false)}
+                onSuccess={() => {
+                  setShowProfileModal(false);
+                  setSelectedDocIds(new Set());
+                  void loadFilters();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Confirmation Modal */}
+      {selectedTrashedDocuments.length > 0 && (
+        <RestoreConfirmModal
+          visible={showRestoreModal}
+          onClose={() => setShowRestoreModal(false)}
+          documents={selectedTrashedDocuments.map((doc) => ({
+            doc_id: parseInt(doc.doc_id, 10),
+            doc_name: doc.doc_name
+          }))}
+          projectId={projectId}
+          onRestore={handleBulkRestore}
+        />
+      )}
+
+      {/* Permanent Delete Confirmation Modal */}
+      {selectedTrashedDocuments.length > 0 && (
+        <DeleteConfirmModal
+          visible={showPermanentDeleteModal}
+          onClose={() => setShowPermanentDeleteModal(false)}
+          documents={selectedTrashedDocuments.map((doc) => ({
+            doc_id: parseInt(doc.doc_id, 10),
+            doc_name: doc.doc_name
+          }))}
+          projectId={projectId}
+          onDelete={handleBulkPermanentDelete}
+          isPermanentDelete={true}
+        />
+      )}
     </div>
   );
 }

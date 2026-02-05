@@ -234,12 +234,6 @@ export default function DocumentPreview({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
-          <div className="aspect-[8.5/11] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <span className="text-gray-400 dark:text-gray-600 text-6xl">📄</span>
-          </div>
-        </div>
-
         <table className="w-full text-sm">
           <tbody>
             {showProject && (

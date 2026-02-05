@@ -180,19 +180,15 @@ MUTABLE_FIELDS = {
         "as_of_date", "is_active",
     ],
     # Capital Stack Tables
-    "tbl_debt_facility": [
-        "facility_name", "facility_type", "lender_name", "commitment_amount",
-        "interest_rate", "interest_calculation", "payment_frequency",
-        "commitment_date", "maturity_date", "origination_fee_pct", "unused_fee_pct",
-        "extension_fee_amount", "covenants", "draw_trigger_type", "notes",
-        "can_participate_in_profits", "profit_participation_tier", "profit_participation_pct",
-        "interest_payment_method", "ltv_pct", "dscr", "amortization_years", "loan_term_years",
-        "is_construction_loan", "loan_amount", "interest_rate_pct", "rate_type",
-        "interest_only_months", "index_type", "spread_bps", "floor_rate", "ceiling_rate",
-        "prepayment_penalty_type", "prepayment_lockout_months", "exit_fee_pct",
-        "recourse_type", "guarantor", "carve_out_guarantor", "reserve_requirements",
-        "debt_yield_min", "max_ltc_pct", "extension_options", "extension_fee_pct",
-        "is_senior", "is_subordinate", "priority_order", "intercreditor_agreement_id",
+    "tbl_loan": [
+        "loan_name", "loan_type", "structure_type", "lender_name",
+        "commitment_amount", "loan_amount", "interest_rate_pct",
+        "interest_type", "interest_index", "interest_spread_bps",
+        "loan_term_months", "loan_term_years", "amortization_months",
+        "amortization_years", "interest_only_months", "payment_frequency",
+        "origination_fee_pct", "exit_fee_pct", "loan_to_cost_pct",
+        "loan_to_value_pct", "seniority", "status", "loan_start_date",
+        "loan_maturity_date", "notes",
     ],
     "tbl_equity_structure": [
         "lp_ownership_pct", "gp_ownership_pct", "preferred_return_pct",
@@ -357,7 +353,7 @@ PK_COLUMNS = {
     "tbl_sales_comp_adjustments": "adjustment_id",
     "tbl_rent_comparable": "comparable_id",
     # Capital stack tables
-    "tbl_debt_facility": "facility_id",
+    "tbl_loan": "loan_id",
     "tbl_equity_structure": "equity_structure_id",
     "tbl_waterfall_tier": "tier_id",
     # Budget tables

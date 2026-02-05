@@ -20,6 +20,112 @@ from .opex_utils import upsert_opex_entry
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Rent Roll Extraction Helpers
+# =============================================================================
+
+def parse_rent_roll_tags(tags_value: str) -> dict:
+    """
+    Parse Tags column into structured data.
+
+    Tags may contain:
+    - Property classification: "retail", "Office", "Residential Unit"
+    - Program flags: "Sec. 8", "Section 8"
+    - Status flags: "UD Mirage" (unlawful detainer), "under payment plan"
+    - Recertification: "January-recertification"
+    """
+    if not tags_value:
+        return {}
+
+    tags = [t.strip() for t in str(tags_value).split(',')]
+    result = {
+        'all_tags': tags,
+        'section_8': any('sec' in t.lower() and '8' in t for t in tags) or any('hud' in t.lower() for t in tags),
+        'payment_plan': any('payment plan' in t.lower() for t in tags),
+        'unlawful_detainer': any('ud' in t.lower().split() or 'unlawful' in t.lower() or 'eviction' in t.lower() for t in tags),
+        'property_type': None,
+        'recertification': None,
+    }
+
+    # Extract property type
+    property_types = ['retail', 'office', 'residential', 'commercial', 'industrial']
+    for tag in tags:
+        for pt in property_types:
+            if pt in tag.lower():
+                result['property_type'] = tag
+                break
+        if result['property_type']:
+            break
+
+    # Extract recertification
+    for tag in tags:
+        if 'recertification' in tag.lower() or 'recert' in tag.lower():
+            result['recertification'] = tag
+            break
+
+    return result
+
+
+def map_occupancy_status(source_status: str, tenant_name: str = None) -> str:
+    """
+    Map source status values to standard occupancy_status.
+
+    Mapping:
+    - Current, Occupied, Active -> Occupied
+    - Vacant, Vacant-Unrented -> Vacant
+    - Notice, Notice Given -> Notice
+    - Down, Offline -> Down
+
+    If status is empty, infer from tenant name presence.
+    """
+    if not source_status:
+        # Infer from tenant name
+        if tenant_name and tenant_name.strip() and tenant_name.lower() not in ['current tenant', 'tenant', 'n/a', 'na', '--', '-']:
+            return 'Occupied'
+        return 'Vacant'
+
+    status_lower = str(source_status).lower().strip()
+
+    # Direct matches
+    if status_lower in ('current', 'occupied', 'active', 'leased'):
+        return 'Occupied'
+    elif 'vacant' in status_lower or status_lower in ('empty', 'available'):
+        return 'Vacant'
+    elif 'notice' in status_lower or status_lower in ('ntv', 'move out'):
+        return 'Notice'
+    elif status_lower in ('down', 'offline', 'maintenance', 'renovation'):
+        return 'Down'
+    else:
+        # Default to Occupied if unclear but has a value
+        return 'Occupied'
+
+
+def extract_tenant_name(value: str) -> Optional[str]:
+    """
+    Extract tenant name, never defaulting to placeholder.
+
+    Returns None for known placeholders or empty values.
+    """
+    if not value:
+        return None
+
+    value = str(value).strip()
+
+    # Reject known placeholders
+    placeholders = [
+        'current tenant', 'tenant', 'occupied', 'n/a', 'na', '--', '-',
+        'vacant', 'unknown', 'tbd', 'to be determined', 'resident'
+    ]
+    if value.lower() in placeholders:
+        return None
+
+    # Reject if it looks like a status rather than a name
+    if value.lower() in ['current', 'active', 'leased']:
+        return None
+
+    return value
+
+
 def _get_anthropic_client() -> Anthropic:
     """Get Anthropic client with API key from .env or settings."""
     api_key = None
@@ -93,6 +199,119 @@ def is_empty_value(value: Any) -> bool:
         normalized = value.strip().lower()
         return normalized in ('', 'null', 'none', 'n/a', '-')
     return False
+
+
+class PlaceholderDetector:
+    """Detect placeholder/dummy data patterns in existing records."""
+
+    # Suspicious patterns
+    PLACEHOLDER_DATES = [
+        '2020-01-01', '2000-01-01', '1970-01-01',
+        '2099-12-31', '9999-12-31',
+    ]
+
+    @classmethod
+    def analyze_units(cls, existing_units: List[Dict[str, Any]], field: str) -> Dict[str, Any]:
+        """
+        Analyze a field across all units for placeholder patterns.
+
+        Returns:
+            {
+                'is_placeholder': bool,
+                'pattern': str or None,
+                'unique_values': int,
+                'total_units': int,
+                'recommendation': str
+            }
+        """
+        if not existing_units:
+            return {'is_placeholder': False, 'pattern': None}
+
+        values = [u.get(field) for u in existing_units if u.get(field) is not None]
+
+        if not values:
+            return {
+                'is_placeholder': False,
+                'pattern': 'all_null',
+                'unique_values': 0,
+                'total_units': len(existing_units),
+                'recommendation': 'fill_blanks'
+            }
+
+        unique = set(values)
+        total = len(values)
+
+        # All identical values -- suspicious for dates/rents
+        if len(unique) == 1:
+            single_value = list(unique)[0]
+
+            # Check if it's a known placeholder date
+            if str(single_value) in cls.PLACEHOLDER_DATES:
+                return {
+                    'is_placeholder': True,
+                    'pattern': 'all_identical_placeholder',
+                    'value': single_value,
+                    'unique_values': 1,
+                    'total_units': total,
+                    'recommendation': 'replace_all'
+                }
+
+            # All same date is suspicious for lease_start/lease_end
+            if field in ('lease_start', 'lease_end', 'move_in_date'):
+                return {
+                    'is_placeholder': True,
+                    'pattern': 'all_identical_date',
+                    'value': single_value,
+                    'unique_values': 1,
+                    'total_units': total,
+                    'recommendation': 'replace_all'
+                }
+
+            # All same rent is suspicious if > 10 units and mixed unit types
+            if field in ('current_rent', 'market_rent') and total > 10:
+                return {
+                    'is_placeholder': True,
+                    'pattern': 'all_identical_rent',
+                    'value': single_value,
+                    'unique_values': 1,
+                    'total_units': total,
+                    'recommendation': 'review_individually'
+                }
+
+        return {
+            'is_placeholder': False,
+            'pattern': None,
+            'unique_values': len(unique),
+            'total_units': total,
+            'recommendation': None
+        }
+
+    @classmethod
+    def analyze_rent_roll(cls, existing_units: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyze entire rent roll for placeholder patterns.
+
+        Returns analysis for key fields.
+        """
+        fields_to_check = [
+            'lease_start', 'lease_end', 'move_in_date',
+            'current_rent', 'market_rent', 'tenant_name'
+        ]
+
+        analysis: Dict[str, Any] = {}
+        placeholder_fields = []
+
+        for field in fields_to_check:
+            result = cls.analyze_units(existing_units, field)
+            analysis[field] = result
+            if result.get('is_placeholder'):
+                placeholder_fields.append(field)
+
+        return {
+            'fields': analysis,
+            'placeholder_detected': len(placeholder_fields) > 0,
+            'placeholder_fields': placeholder_fields
+        }
 
 
 def deduplicate_extractions(extractions: Dict[str, Any]) -> Dict[str, Any]:
@@ -329,20 +548,57 @@ Return as JSON array of objects. Only include data you find in the documents.'''
     },
     'rent_roll': {
         'target_table': 'tbl_mf_unit',
-        'prompt_template': '''Extract rent roll data from the document. For each unit, provide:
+        'prompt_template': '''Extract ALL data from this rent roll. Do not skip any columns.
+
+For each unit, extract these STANDARD fields:
 - unit_number: The unit identifier (e.g., "101", "A-102")
-- unit_type: The unit type (e.g., "1BR/1BA")
+- unit_type: The floorplan type (e.g., "1BR/1BA", "2x2") - derive from bedrooms/bathrooms if not explicit
 - bedrooms: Number of bedrooms
 - bathrooms: Number of bathrooms
-- sf: Square footage
-- rent_current: Current rent amount
-- lease_start: Lease start date (YYYY-MM-DD format)
-- lease_end: Lease end date (YYYY-MM-DD format)
-- tenant_name: Tenant name (if available)
-- status: Occupancy status (occupied, vacant, notice, etc.)
+- square_feet: Square footage (may be labeled "Sqft", "SF", "Size")
+- current_rent: Current rent amount (may be labeled "Rent", "Contract Rent")
+- lease_start: Lease start date (YYYY-MM-DD format) - may be "Lease From", "Move In"
+- lease_end: Lease end date (YYYY-MM-DD format) - may be "Lease To", "Expiration"
+- tenant_name: Actual tenant name from the source - NEVER substitute "Current Tenant" as a placeholder
+- source_status: Original status value from source (e.g., "Current", "Vacant-Unrented") - we will map it later
 
-Return as JSON array of objects. Only include data you find in the documents.''',
-        'required_fields': ['unit_number', 'rent_current'],
+CRITICAL: Also capture ALL OTHER COLUMNS as extra_data. Common examples:
+- tags: Any Tags/Labels column (may contain "Sec. 8", "retail", "payment plan", etc.)
+- delinquent_rent: Delinquency amounts
+- rent_received: Monthly payment amounts
+- additional_tags: Secondary tag columns
+- Any other columns present in the source
+
+For the Tags column, also parse into flags:
+- section_8: true if tags mention "Sec. 8", "Section 8", "HUD"
+- payment_plan: true if tags mention "payment plan" or "under payment plan"
+- unlawful_detainer: true if tags mention "UD", "unlawful detainer", "eviction"
+- recertification: Extract recertification month/date if mentioned
+
+Return format for each unit:
+{
+  "unit_number": "204",
+  "bedrooms": 2,
+  "bathrooms": 2,
+  "square_feet": 1035,
+  "current_rent": 2200,
+  "lease_start": "2024-08-01",
+  "lease_end": "2025-07-31",
+  "tenant_name": "Alana J. Sims",
+  "source_status": "Current",
+  "extra_data": {
+    "tags": "Residential Unit, under payment plan",
+    "section_8": false,
+    "payment_plan": true,
+    "unlawful_detainer": false,
+    "delinquent_rent": 800.00,
+    "rent_received": 2300,
+    "additional_tags": "under payment plan"
+  }
+}
+
+Return as JSON array. Include ALL units. Do not skip any columns from the source.''',
+        'required_fields': ['unit_number'],
     },
     'opex': {
         'target_table': 'tbl_operating_expenses',
@@ -2872,8 +3128,9 @@ class ChunkedRentRollExtractor:
                 likely_units.add(u)
 
         if len(likely_units) >= 5:
-            # Return the count, but pad by 20% to ensure we get all units
-            return int(len(likely_units) * 1.2)
+            # Return the count, but pad by 50% to ensure we get all units
+            # (better to have extra chunks than miss units)
+            return int(len(likely_units) * 1.5)
 
         # Look for rent roll table rows - each row is typically a unit
         # Count rows that look like unit entries
@@ -2909,7 +3166,9 @@ class ChunkedRentRollExtractor:
                 max_tokens=8000,
                 system="""You are a real estate rent roll data extractor.
 Extract unit-level data with high precision. Return ONLY valid JSON array.
-IMPORTANT: Extract exactly the units requested in this chunk.""",
+IMPORTANT: Extract exactly the ROW RANGE requested - count rows from the first data row after headers.
+The row number is NOT the same as unit number (e.g., row 1 might be unit 100, row 36 might be unit 201).
+CRITICAL: For tenant_name, extract the EXACT name from the source. NEVER use placeholders like "Current Tenant" or "Tenant" - always use the actual name or omit the field.""",
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -2966,10 +3225,16 @@ IMPORTANT: Extract exactly the units requested in this chunk.""",
         return f"""Extract rent roll data from this document.
 
 ## CHUNK INSTRUCTIONS
-This is chunk {chunk_idx + 1} of {total_chunks}.
-Extract units approximately #{start_unit} through #{end_unit} based on their position in the rent roll.
-If this is chunk 1, start from the first unit in the rent roll.
-If this is the last chunk, continue until the end of the rent roll.
+This is chunk {chunk_idx + 1} of {total_chunks}. The rent roll has approximately {total_chunks * 35} units total.
+
+IMPORTANT: Extract units based on their ROW POSITION in the rent roll table (not their unit number):
+- Chunk 1: Extract rows 1-35 (the first 35 units in the table)
+- Chunk 2: Extract rows 36-70 (the next 35 units)
+- Chunk 3: Extract rows 71-105
+- And so on...
+
+For THIS chunk ({chunk_idx + 1}), extract rows {start_unit} through {end_unit} from the rent roll table.
+Count from the first data row (after headers). Include ALL units in this row range regardless of their unit numbers.
 
 ## FIELDS TO EXTRACT (per unit)
 {field_list}
@@ -3016,6 +3281,7 @@ RULES:
 - Numeric fields: numbers only (1595 not "$1,595")
 - Dates: ISO format "YYYY-MM-DD"
 - Include all available fields; omit if not found
+- tenant_name: Extract the EXACT name from the source document. NEVER substitute "Current Tenant", "Tenant", or any placeholder - use the actual name or omit the field entirely if not present
 - Return ONLY the JSON array, no other text"""
 
     def _parse_rent_roll_response(self, response_text: str) -> Optional[List[Dict]]:
@@ -3058,6 +3324,19 @@ RULES:
 
         staged_count = 0
 
+        # Clear any existing pending extractions for this project's rent roll
+        # This prevents IntegrityError on re-upload of same file
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM landscape.ai_extraction_staging
+                WHERE project_id = %s
+                AND scope = 'unit'
+                AND status = 'pending'
+            """, [self.project_id])
+            deleted_count = cursor.rowcount
+            if deleted_count > 0:
+                logger.info(f"Cleared {deleted_count} existing pending unit extractions for project {self.project_id}")
+
         # Get unit scope fields from registry
         unit_fields = self.registry.get_fields_by_scope('unit', self.property_type)
 
@@ -3075,6 +3354,16 @@ RULES:
         with connection.cursor() as cursor:
             for array_idx, unit in enumerate(units):
                 unit_number = unit.get('unit_number', f'Unit {array_idx + 1}')
+
+                # Clean up tenant_name - remove any placeholders that slipped through
+                raw_tenant = unit.get('tenant_name')
+                clean_tenant = extract_tenant_name(raw_tenant) if raw_tenant else None
+                if clean_tenant != raw_tenant:
+                    if clean_tenant:
+                        unit['tenant_name'] = clean_tenant
+                    else:
+                        # Remove placeholder tenant_name entirely
+                        unit.pop('tenant_name', None)
 
                 # Get extraction_type from doc_info
                 extraction_type = doc_info.get('doc_type', 'rent_roll')
@@ -3111,7 +3400,71 @@ RULES:
         return staged_count
 
     def _get_document_content(self, doc_id: int) -> Optional[str]:
-        """Get document text content from embeddings."""
+        """
+        Get document text content.
+
+        For Excel/CSV files: Download and parse directly for complete data.
+        For other files: Use embeddings.
+        """
+        import tempfile
+        import requests
+
+        # Get document info including storage URI and mime type
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT storage_uri, mime_type, doc_name
+                FROM landscape.core_doc
+                WHERE doc_id = %s
+            """, [doc_id])
+            row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        storage_uri, mime_type, doc_name = row
+
+        # For Excel/CSV files, read directly from file for complete data
+        excel_types = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv',
+            'application/csv',
+        ]
+
+        if mime_type in excel_types and storage_uri:
+            try:
+                logger.info(f"Reading Excel/CSV file directly for doc {doc_id}")
+
+                # Download file
+                response = requests.get(storage_uri, timeout=60)
+                response.raise_for_status()
+
+                # Save to temp file
+                suffix = '.xlsx' if 'spreadsheet' in mime_type else '.csv'
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(response.content)
+                    tmp_path = tmp.name
+
+                try:
+                    if suffix == '.xlsx':
+                        content = self._parse_excel_to_text(tmp_path)
+                    else:
+                        content = self._parse_csv_to_text(tmp_path)
+
+                    if content:
+                        logger.info(f"Parsed {len(content)} chars from Excel/CSV")
+                        return content
+                finally:
+                    import os
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
+
+            except Exception as e:
+                logger.warning(f"Failed to read Excel/CSV directly: {e}, falling back to embeddings")
+
+        # Fallback: Use embeddings
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT content_text
@@ -3125,6 +3478,43 @@ RULES:
         if rows:
             return "\n\n".join(row[0] for row in rows if row[0])
         return None
+
+    def _parse_excel_to_text(self, file_path: str) -> Optional[str]:
+        """Parse Excel file to text format for extraction."""
+        try:
+            from openpyxl import load_workbook
+
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            sheet = wb.active
+
+            lines = []
+            for row in sheet.iter_rows(values_only=True):
+                # Convert row to tab-separated string
+                row_vals = [str(cell) if cell is not None else '' for cell in row]
+                if any(v.strip() for v in row_vals):  # Skip empty rows
+                    lines.append('\t'.join(row_vals))
+
+            wb.close()
+            return '\n'.join(lines)
+
+        except Exception as e:
+            logger.error(f"Error parsing Excel: {e}")
+            return None
+
+    def _parse_csv_to_text(self, file_path: str) -> Optional[str]:
+        """Parse CSV file to text format for extraction."""
+        try:
+            import csv
+
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                reader = csv.reader(f)
+                lines = ['\t'.join(row) for row in reader if any(cell.strip() for cell in row)]
+
+            return '\n'.join(lines)
+
+        except Exception as e:
+            logger.error(f"Error parsing CSV: {e}")
+            return None
 
     def _get_document_info(self, doc_id: int) -> Optional[Dict[str, Any]]:
         """Get document info."""

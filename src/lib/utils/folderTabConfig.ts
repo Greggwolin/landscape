@@ -270,16 +270,13 @@ export function createFolderConfig(projectType?: string, analysisType?: string):
 
     // ========================================
     // Position 7: Documents
-    // Subtabs: all, extractions
+    // No subtabs - content handled by DMSView
     // ========================================
     {
       id: 'documents',
       label: 'Documents',
       color: TILE_COLORS.documents,
-      subTabs: [
-        { id: 'all', label: 'All Documents' },
-        { id: 'extractions', label: 'Extractions' },
-      ],
+      subTabs: [],
     },
 
     // ========================================

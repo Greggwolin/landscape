@@ -11,8 +11,7 @@ import ProjectSelector from '@/components/dms/filters/ProjectSelector';
 import DocTypeFilters from '@/components/dms/filters/DocTypeFilters';
 import DocumentTable from '@/components/dms/list/DocumentTable';
 import PlatformKnowledgeTable from '@/components/dms/list/PlatformKnowledgeTable';
-import DocumentPreview from '@/components/dms/preview/DocumentPreview';
-import { DocumentChatModal } from '@/components/dms/modals';
+import { DeleteConfirmModal } from '@/components/dms/modals';
 import DmsLandscaperPanel from '@/components/dms/panels/DmsLandscaperPanel';
 import { useDropzone } from 'react-dropzone';
 import TriageModal from '@/app/components/dashboard/TriageModal';
@@ -49,7 +48,6 @@ function DMSPageContent() {
   const [isLoadingPlatformDocs, setIsLoadingPlatformDocs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLimit, setSearchLimit] = useState<number | null>(null);
-  const [chatDoc, setChatDoc] = useState<DMSDocument | null>(null);
   const [isLandscaperCollapsed, setLandscaperCollapsed] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [landscaperNotice, setLandscaperNotice] = useState<string | null>(null);
@@ -69,6 +67,7 @@ function DMSPageContent() {
   const [isKnowledgeSubmitting, setIsKnowledgeSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'folders'>('list');
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     new Set(['name', 'project', 'doc_type', 'version', 'modified'])
   );
@@ -304,6 +303,38 @@ function DMSPageContent() {
   const handleDropFiles = (files: File[]) => {
     setPendingFiles(files);
     setIsTriageModalOpen(true);
+  };
+
+  const handleBulkDelete = async () => {
+    const docsToDelete = documents.filter((doc) => selectedDocs.has(doc.doc_id));
+    const errors: string[] = [];
+
+    for (const doc of docsToDelete) {
+      if (!doc.project_id) {
+        errors.push(`${doc.doc_name}: No project ID`);
+        continue;
+      }
+      try {
+        const response = await fetch(
+          `/api/projects/${doc.project_id}/dms/docs/${doc.doc_id}/delete`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          errors.push(`${doc.doc_name}: ${data.error || 'Delete failed'}`);
+        }
+      } catch (error) {
+        errors.push(`${doc.doc_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Bulk delete errors:', errors);
+    }
+
+    setSelectedDocs(new Set());
+    setShowDeleteModal(false);
+    void fetchDocuments();
   };
 
   const handleTriageClose = () => {
@@ -551,6 +582,15 @@ function DMSPageContent() {
                 <div className="flex items-center gap-4">
                   <span>{totalItemCount} items</span>
                   {!isPlatformKnowledge && <span>{selectedDocs.size} selected</span>}
+                  {!isPlatformKnowledge && selectedDocs.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="px-3 py-1 text-xs rounded-md bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Delete ({selectedDocs.size})
+                    </button>
+                  )}
                 </div>
                 {!isPlatformKnowledge && (
                   <div className="flex items-center gap-2">
@@ -659,38 +699,27 @@ function DMSPageContent() {
                   selectedDocIds={selectedDocs}
                   showProjectColumn={!selectedProject && !isPlatformKnowledge}
                   visibleColumns={visibleColumns}
+                  useAccordion={true}
                   onSelectDoc={setSelectedDoc}
                   onToggleDoc={toggleDocSelection}
                   onToggleAll={toggleAllDocs}
-                  onChat={(doc) => setChatDoc(doc)}
                 />
               )}
             </div>
           </div>
         }
-        preview={
-          selectedDoc && !isPlatformKnowledge ? (
-            <DocumentPreview
-              document={selectedDoc}
-              showProject
-              onClose={() => setSelectedDoc(null)}
-              onChat={(doc) => setChatDoc(doc)}
-              onUpdate={fetchDocuments}
-            />
-          ) : null
-        }
+        preview={null}
       />
 
-      {chatDoc && chatDoc.project_id && (
-        <DocumentChatModal
-          visible={Boolean(chatDoc)}
-          onClose={() => setChatDoc(null)}
-          projectId={parseInt(chatDoc.project_id, 10)}
-          document={{
-            doc_id: parseInt(chatDoc.doc_id, 10),
-            filename: chatDoc.doc_name,
-            version_number: chatDoc.version_no || 1,
-          }}
+      {selectedDocs.size > 0 && (
+        <DeleteConfirmModal
+          visible={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          documents={documents
+            .filter((doc) => selectedDocs.has(doc.doc_id))
+            .map((doc) => ({ doc_id: parseInt(doc.doc_id, 10), doc_name: doc.doc_name }))}
+          projectId={0}
+          onDelete={handleBulkDelete}
         />
       )}
 

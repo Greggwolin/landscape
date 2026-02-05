@@ -20,6 +20,7 @@ urlpatterns = [
     path('projects/<int:project_id>/extractions/<int:extraction_id>/validate/', extraction_views.validate_extraction, name='knowledge-extraction-validate'),
     path('projects/<int:project_id>/extractions/<int:extraction_id>/validate-v2/', extraction_views.validate_extraction_v2, name='knowledge-extraction-validate-v2'),
     path('projects/<int:project_id>/extractions/bulk-validate/', extraction_views.bulk_validate_extractions, name='knowledge-extractions-bulk-validate'),
+    path('projects/<int:project_id>/extractions/apply/', extraction_views.apply_extractions, name='knowledge-extractions-apply'),
     path('projects/<int:project_id>/documents/classify/', extraction_views.classify_project_documents, name='knowledge-classify-project-docs'),
 
     # Document-level extraction endpoints (registry-based v3)
@@ -28,6 +29,16 @@ urlpatterns = [
     path('documents/<int:doc_id>/extract-rent-roll/', extraction_views.extract_rent_roll, name='knowledge-extract-rent-roll'),
     path('documents/<int:doc_id>/classify/', extraction_views.classify_document, name='knowledge-classify-doc'),
     path('documents/<int:doc_id>/extractable-fields/', extraction_views.preview_extractable_fields, name='knowledge-extractable-fields'),
+    path('projects/<int:project_id>/rent-roll/compare/', extraction_views.compare_rent_roll, name='knowledge-rent-roll-compare'),
+    path('projects/<int:project_id>/snapshots/', extraction_views.list_rent_roll_snapshots, name='knowledge-rent-roll-snapshots'),
+    path('projects/<int:project_id>/rollback/<int:snapshot_id>/', extraction_views.rollback_rent_roll_commit, name='knowledge-rent-roll-rollback'),
+    path('projects/<int:project_id>/extraction-jobs/', extraction_views.get_extraction_jobs, name='knowledge-extraction-jobs'),
+    path('projects/<int:project_id>/extraction-jobs/<int:job_id>/', extraction_views.get_extraction_job, name='knowledge-extraction-job'),
+    path('projects/<int:project_id>/extraction-jobs/<int:job_id>/cancel/', extraction_views.cancel_extraction_job, name='knowledge-cancel-extraction-job'),
+
+    # Column discovery & field mapping (CC Prompt C3)
+    path('projects/<int:project_id>/discover-columns/', extraction_views.discover_rent_roll_columns, name='knowledge-discover-columns'),
+    path('projects/<int:project_id>/apply-mapping/', extraction_views.apply_rent_roll_mapping, name='knowledge-apply-mapping'),
 
     # Field registry endpoints
     path('field-registry/', extraction_views.get_field_registry, name='knowledge-field-registry'),

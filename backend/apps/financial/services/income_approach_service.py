@@ -223,7 +223,7 @@ class IncomeApproachDataService:
 
     def get_operating_assumptions(self) -> Dict[str, Any]:
         """
-        Pull management fee, reserves from tbl_project_assumption and tbl_debt_facility.
+        Pull management fee, reserves from tbl_project_assumption and tbl_loan.
         """
         with connection.cursor() as cursor:
             # Get management fee and replacement reserves from project assumptions
@@ -255,11 +255,11 @@ class IncomeApproachDataService:
                         value, self.DEFAULTS['replacement_reserves_per_unit']
                     )
 
-            # Also check tbl_debt_facility for replacement reserves (if table exists)
+            # Also check tbl_loan for replacement reserves (if table exists)
             try:
                 cursor.execute("""
                     SELECT replacement_reserve_per_unit
-                    FROM landscape.tbl_debt_facility
+                    FROM landscape.tbl_loan
                     WHERE project_id = %s AND replacement_reserve_per_unit IS NOT NULL
                     LIMIT 1
                 """, [self.project_id])

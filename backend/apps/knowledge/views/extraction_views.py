@@ -199,7 +199,53 @@ def apply_extractions(request, project_id: int):
 
     Apply all validated extractions to their target tables.
     """
+    from django.db import connection
     from ..services.extraction_service import ExtractionService
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        body = {}
+
+    extraction_ids = body.get('extraction_ids') or []
+    decisions = body.get('decisions') or {}
+
+    fields = body.get('fields') or []
+    if fields and not extraction_ids:
+        extraction_ids = [f.get('extraction_id') for f in fields if f.get('extraction_id')]
+        for field in fields:
+            extraction_id = field.get('extraction_id')
+            if not extraction_id:
+                continue
+            field_value = field.get('value')
+            decisions[str(extraction_id)] = {
+                'action': 'edit' if field_value is not None else 'accept',
+                'edited_value': field_value
+            }
+
+    if extraction_ids:
+        placeholders = ','.join(['%s'] * len(extraction_ids))
+        params = [int(project_id)] + [int(eid) for eid in extraction_ids]
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT extraction_id, extraction_type, scope
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s
+                  AND extraction_id IN ({placeholders})
+            """, params)
+            rows = cursor.fetchall()
+
+        has_rent_roll = any((row[1] == 'rent_roll' or row[2] == 'unit') for row in rows)
+        if has_rent_roll:
+            from apps.documents.views import commit_staging_data_internal
+            payload, status_code = commit_staging_data_internal(
+                project_id=int(project_id),
+                extraction_ids=extraction_ids,
+                decisions=decisions,
+                user=getattr(request, 'user', None),
+                create_snapshot=True
+            )
+            return JsonResponse(payload, status=status_code)
 
     service = ExtractionService(int(project_id))
     result = service.apply_validated_extractions()
@@ -884,6 +930,7 @@ def extract_rent_roll(request, doc_id: int):
         "success": true/false,
         "doc_id": 58,
         "project_id": 17,
+        "job_id": 123,
         "estimated_units": 113,
         "chunks_processed": 4,
         "units_extracted": 113,
@@ -891,7 +938,9 @@ def extract_rent_roll(request, doc_id: int):
         "errors": []
     }
     """
+    from django.utils import timezone
     from ..services.extraction_service import extract_rent_roll_chunked
+    from ..models import ExtractionJob
 
     try:
         body = json.loads(request.body) if request.body else {}
@@ -904,20 +953,584 @@ def extract_rent_roll(request, doc_id: int):
 
     property_type = body.get('property_type', 'multifamily')
 
-    # Get user_id if available
-    user_id = None
-    if hasattr(request, 'user') and hasattr(request.user, 'id'):
-        user_id = request.user.id
+    # Get user if available
+    user = None
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        user = request.user
 
-    result = extract_rent_roll_chunked(
+    # Check for existing active job for this project/scope
+    existing_job = ExtractionJob.objects.filter(
+        project_id=project_id,
+        scope=ExtractionJob.Scope.RENT_ROLL,
+        status__in=[ExtractionJob.Status.QUEUED, ExtractionJob.Status.PROCESSING]
+    ).first()
+
+    if existing_job:
+        return JsonResponse({
+            'success': False,
+            'error': 'An extraction is already in progress for this project',
+            'job_id': existing_job.job_id,
+            'status': existing_job.status,
+        }, status=409)
+
+    # Create job record
+    job = ExtractionJob.objects.create(
         project_id=int(project_id),
-        doc_id=int(doc_id),
-        property_type=property_type,
-        user_id=user_id
+        document_id=int(doc_id),
+        scope=ExtractionJob.Scope.RENT_ROLL,
+        status=ExtractionJob.Status.PROCESSING,
+        started_at=timezone.now(),
+        created_by=user
     )
 
-    status = 200 if result.get('success') else 400
-    return JsonResponse(result, status=status)
+    try:
+        result = extract_rent_roll_chunked(
+            project_id=int(project_id),
+            doc_id=int(doc_id),
+            property_type=property_type,
+            user_id=user.id if user else None
+        )
+
+        # Update job with results
+        if result.get('success'):
+            job.status = ExtractionJob.Status.COMPLETED
+            job.completed_at = timezone.now()
+            job.total_items = result.get('units_extracted', 0)
+            job.processed_items = result.get('staged_count', 0)
+            job.result_summary = {
+                'units_extracted': result.get('units_extracted', 0),
+                'staged_count': result.get('staged_count', 0),
+                'chunks_processed': result.get('chunks_processed', 0),
+                'estimated_units': result.get('estimated_units', 0),
+            }
+        else:
+            job.status = ExtractionJob.Status.FAILED
+            job.completed_at = timezone.now()
+            job.error_message = result.get('error', 'Extraction failed')
+
+        job.save()
+
+        # Include job_id in response
+        result['job_id'] = job.job_id
+
+        status_code = 200 if result.get('success') else 400
+        return JsonResponse(result, status=status_code)
+
+    except Exception as e:
+        # Update job with failure
+        job.status = ExtractionJob.Status.FAILED
+        job.completed_at = timezone.now()
+        job.error_message = str(e)
+        job.save()
+
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'job_id': job.job_id,
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def compare_rent_roll(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/rent-roll/compare/
+
+    Compare extracted rent roll against existing data.
+    Returns deltas only + analysis summary.
+    """
+    from django.db import connection
+    from apps.documents.models import Document
+    from apps.multifamily.models import MultifamilyUnit, MultifamilyLease
+    from ..services.extraction_service import PlaceholderDetector
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    document_id = body.get('document_id')
+    if not document_id:
+        return JsonResponse({'success': False, 'error': 'document_id is required'}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                extraction_id,
+                extracted_value
+            FROM landscape.ai_extraction_staging
+            WHERE project_id = %s
+              AND doc_id = %s
+              AND status = 'pending'
+              AND (extraction_type = 'rent_roll' OR scope = 'unit')
+            ORDER BY extraction_id
+        """, [int(project_id), int(document_id)])
+        staged_rows = cursor.fetchall()
+
+    doc = Document.objects.filter(doc_id=document_id).first()
+    document_name = doc.doc_name if doc else None
+
+    def _normalize_value(value):
+        from decimal import Decimal
+        if value is None:
+            return None
+        # Handle Decimal explicitly (before string check since Decimal can be converted to str)
+        if isinstance(value, Decimal):
+            return round(float(value), 2)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned == '' or cleaned.lower() in ('null', 'none', 'n/a', '-'):
+                return None
+            try:
+                num = float(cleaned.replace(',', '').replace('$', '').replace('%', ''))
+                return round(num, 2)
+            except ValueError:
+                return cleaned.lower()
+        if isinstance(value, (int, float)):
+            return round(float(value), 2)
+        if hasattr(value, 'isoformat'):
+            return value.isoformat()
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, sort_keys=True)
+        return value
+
+    # Build existing unit + latest lease map
+    units = list(MultifamilyUnit.objects.filter(project_id=project_id).values())
+    leases = list(
+        MultifamilyLease.objects.filter(unit__project_id=project_id)
+        .order_by('-lease_start_date')
+        .values('unit_id', 'resident_name', 'lease_start_date', 'lease_end_date', 'base_rent_monthly')
+    )
+    lease_by_unit_id = {}
+    for lease in leases:
+        unit_id = lease.get('unit_id')
+        if unit_id and unit_id not in lease_by_unit_id:
+            lease_by_unit_id[unit_id] = lease
+
+    existing_units = []
+    existing_by_unit_num = {}
+    for unit in units:
+        unit_number = unit.get('unit_number')
+        lease = lease_by_unit_id.get(unit.get('unit_id'))
+        current_rent = unit.get('current_rent')
+        if current_rent is None and lease:
+            current_rent = lease.get('base_rent_monthly')
+
+        combined = {
+            'unit_number': unit_number,
+            'unit_type': unit.get('unit_type'),
+            'bedrooms': unit.get('bedrooms'),
+            'bathrooms': unit.get('bathrooms'),
+            'square_feet': unit.get('square_feet'),
+            'current_rent': current_rent,
+            'market_rent': unit.get('market_rent'),
+            'occupancy_status': unit.get('occupancy_status'),
+            'tenant_name': lease.get('resident_name') if lease else None,
+            'lease_start': lease.get('lease_start_date') if lease else None,
+            'lease_end': lease.get('lease_end_date') if lease else None,
+            'move_in_date': None,
+        }
+        existing_units.append(combined)
+        if unit_number is not None:
+            existing_by_unit_num[str(unit_number)] = combined
+
+    placeholder_analysis = PlaceholderDetector.analyze_rent_roll(existing_units)
+
+    deltas = []
+    exact_matches = 0
+    fills = 0
+    conflicts = 0
+
+    for extraction_id, extracted_value in staged_rows:
+        extracted_data = extracted_value
+        if isinstance(extracted_data, str):
+            try:
+                extracted_data = json.loads(extracted_data)
+            except json.JSONDecodeError:
+                continue
+
+        if not isinstance(extracted_data, dict):
+            continue
+
+        unit_number = extracted_data.get('unit_number')
+        existing = existing_by_unit_num.get(str(unit_number), {})
+        unit_deltas = []
+
+        for field, extracted_field_value in extracted_data.items():
+            if field in ('id', 'extraction_id'):
+                continue
+
+            extracted_norm = _normalize_value(extracted_field_value)
+            if extracted_norm is None:
+                continue
+
+            existing_value = existing.get(field)
+            existing_norm = _normalize_value(existing_value)
+
+            if extracted_norm == existing_norm:
+                exact_matches += 1
+                continue
+
+            field_placeholder = placeholder_analysis['fields'].get(field, {})
+            is_placeholder = field_placeholder.get('is_placeholder', False)
+
+            if existing_norm is None and extracted_norm is not None:
+                fills += 1
+                unit_deltas.append({
+                    'field': field,
+                    'action': 'fill',
+                    'extracted_value': extracted_field_value,
+                    'existing_value': None
+                })
+            elif is_placeholder:
+                fills += 1
+                unit_deltas.append({
+                    'field': field,
+                    'action': 'replace_placeholder',
+                    'extracted_value': extracted_field_value,
+                    'existing_value': existing_value,
+                    'placeholder_pattern': field_placeholder.get('pattern')
+                })
+            else:
+                conflicts += 1
+                unit_deltas.append({
+                    'field': field,
+                    'action': 'conflict',
+                    'extracted_value': extracted_field_value,
+                    'existing_value': existing_value
+                })
+
+        if unit_deltas:
+            deltas.append({
+                'unit_number': unit_number,
+                'extraction_id': extraction_id,
+                'changes': unit_deltas
+            })
+
+    analysis_message_parts = []
+    if placeholder_analysis['placeholder_detected']:
+        fields = ', '.join(placeholder_analysis['placeholder_fields'])
+        analysis_message_parts.append(
+            f"Placeholder data detected in: {fields}. "
+            "The existing values appear to be defaults, not actual lease data."
+        )
+    if fills > 0 and conflicts == 0:
+        analysis_message_parts.append(f"{fills} blank fields will be populated from this file.")
+    if conflicts > 0:
+        analysis_message_parts.append(f"{conflicts} fields have different values that need review.")
+    if exact_matches > 0:
+        analysis_message_parts.append(f"{exact_matches} fields matched exactly and will not be modified.")
+
+    analysis_message = ' '.join(analysis_message_parts)
+
+    if placeholder_analysis['placeholder_detected'] and conflicts == 0:
+        recommendation = 'accept_all'
+    elif conflicts > 0:
+        recommendation = 'review_conflicts'
+    else:
+        recommendation = 'accept_all'
+
+    return JsonResponse({
+        'document_name': document_name,
+        'summary': {
+            'total_fields_extracted': exact_matches + fills + conflicts,
+            'exact_matches': exact_matches,
+            'fills': fills,
+            'conflicts': conflicts
+        },
+        'analysis': {
+            'placeholder_detected': placeholder_analysis['placeholder_detected'],
+            'placeholder_fields': placeholder_analysis['placeholder_fields'],
+            'message': analysis_message,
+            'recommendation': recommendation
+        },
+        'deltas': deltas
+    })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def list_rent_roll_snapshots(request, project_id: int):
+    """
+    GET /api/knowledge/projects/{project_id}/snapshots/
+
+    List available snapshots for rollback.
+    Returns snapshots ordered by most recent first.
+    """
+    from apps.documents.models import ExtractionCommitSnapshot
+
+    snapshots = ExtractionCommitSnapshot.objects.filter(
+        project_id=project_id,
+        scope='rent_roll',
+    ).order_by('-committed_at')[:20]
+
+    result = []
+    for snap in snapshots:
+        extraction_ids = snap.changes_applied.get('extraction_ids', []) if snap.changes_applied else []
+        result.append({
+            'snapshot_id': snap.snapshot_id,
+            'committed_at': snap.committed_at.isoformat() if snap.committed_at else None,
+            'is_active': snap.is_active,
+            'rolled_back_at': snap.rolled_back_at.isoformat() if snap.rolled_back_at else None,
+            'units_count': len(snap.snapshot_data.get('units', [])) if snap.snapshot_data else 0,
+            'extractions_count': len(extraction_ids),
+            'doc_id': snap.doc_id,
+        })
+
+    return JsonResponse({
+        'success': True,
+        'snapshots': result
+    })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_extraction_jobs(request, project_id: int):
+    """
+    GET /api/knowledge/projects/{project_id}/extraction-jobs/
+
+    Get status of extraction jobs for a project.
+
+    Query params:
+    - scope: Filter by scope (rent_roll, operating_statement, etc.)
+
+    Returns list of jobs with their current status.
+    """
+    from ..models import ExtractionJob
+    from django.db import connection
+
+    scope = request.GET.get('scope')
+
+    # Get jobs for this project
+    jobs = ExtractionJob.objects.filter(project_id=project_id)
+
+    if scope:
+        jobs = jobs.filter(scope=scope)
+
+    # Get the most recent job per scope
+    jobs = jobs.order_by('scope', '-created_at')
+
+    latest_jobs = {}
+    for job in jobs:
+        if job.scope not in latest_jobs:
+            latest_jobs[job.scope] = job
+
+    # Get document names
+    doc_ids = [j.document_id for j in latest_jobs.values()]
+    doc_names = {}
+    if doc_ids:
+        with connection.cursor() as cursor:
+            placeholders = ','.join(['%s'] * len(doc_ids))
+            cursor.execute(f"""
+                SELECT doc_id, doc_name FROM landscape.core_doc
+                WHERE doc_id IN ({placeholders})
+            """, doc_ids)
+            for row in cursor.fetchall():
+                doc_names[row[0]] = row[1]
+
+    results = []
+    for scope_key, job in latest_jobs.items():
+        results.append({
+            'id': job.job_id,
+            'scope': job.scope,
+            'status': job.status,
+            'document_id': job.document_id,
+            'document_name': doc_names.get(job.document_id),
+            'progress': {
+                'total': job.total_items,
+                'processed': job.processed_items,
+                'percent': job.progress_percent,
+            },
+            'result_summary': job.result_summary,
+            'error_message': job.error_message,
+            'created_at': job.created_at.isoformat(),
+            'started_at': job.started_at.isoformat() if job.started_at else None,
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        })
+
+    return JsonResponse({'success': True, 'jobs': results})
+
+
+@require_http_methods(["GET"])
+def get_extraction_job(request, project_id: int, job_id: int):
+    """
+    GET /api/knowledge/projects/{project_id}/extraction-jobs/{job_id}/
+
+    Get status of a single extraction job.
+    Used for polling after apply-mapping starts async extraction.
+    """
+    from ..models import ExtractionJob
+    from django.db import connection
+
+    try:
+        job = ExtractionJob.objects.get(job_id=job_id, project_id=project_id)
+    except ExtractionJob.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Job not found'}, status=404)
+
+    # Get document name
+    doc_name = None
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT doc_name FROM landscape.core_doc WHERE doc_id = %s
+        """, [job.document_id])
+        row = cursor.fetchone()
+        if row:
+            doc_name = row[0]
+
+    return JsonResponse({
+        'success': True,
+        'job': {
+            'id': job.job_id,
+            'scope': job.scope,
+            'status': job.status,
+            'document_id': job.document_id,
+            'document_name': doc_name,
+            'progress': {
+                'total': job.total_items,
+                'processed': job.processed_items,
+                'percent': job.progress_percent,
+            },
+            'result_summary': job.result_summary,
+            'error_message': job.error_message,
+            'created_at': job.created_at.isoformat(),
+            'started_at': job.started_at.isoformat() if job.started_at else None,
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        }
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def cancel_extraction_job(request, project_id: int, job_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/extraction-jobs/{job_id}/cancel/
+
+    Cancel a running extraction job.
+    """
+    from django.utils import timezone
+    from django.db import connection
+    from ..models import ExtractionJob
+
+    try:
+        job = ExtractionJob.objects.get(
+            job_id=job_id,
+            project_id=project_id
+        )
+    except ExtractionJob.DoesNotExist:
+        return JsonResponse(
+            {'success': False, 'error': 'Job not found'},
+            status=404
+        )
+
+    if job.status not in (ExtractionJob.Status.QUEUED, ExtractionJob.Status.PROCESSING):
+        return JsonResponse(
+            {'success': False, 'error': 'Job cannot be cancelled (already completed or failed)'},
+            status=400
+        )
+
+    job.status = ExtractionJob.Status.CANCELLED
+    job.completed_at = timezone.now()
+    job.error_message = 'Cancelled by user'
+    job.save()
+
+    logger.info(f"[cancel_extraction_job] Cancelled job {job_id} for project {project_id}")
+
+    # Clear any staged data for this document
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            DELETE FROM landscape.ai_extraction_staging
+            WHERE project_id = %s
+            AND doc_id = %s
+            AND status = 'pending'
+        """, [project_id, job.document_id])
+        deleted_count = cursor.rowcount
+
+    logger.info(f"[cancel_extraction_job] Cleaned up {deleted_count} pending extractions for doc {job.document_id}")
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Job cancelled',
+        'cleaned_up': deleted_count
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def rollback_rent_roll_commit(request, project_id: int, snapshot_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/rollback/{snapshot_id}/
+
+    Rollback a previous extraction commit.
+    """
+    from django.db import transaction, connection
+    from django.utils import timezone
+    from apps.documents.models import ExtractionCommitSnapshot
+    from apps.multifamily.models import MultifamilyUnit, MultifamilyLease
+
+    try:
+        snapshot = ExtractionCommitSnapshot.objects.get(
+            snapshot_id=snapshot_id,
+            project_id=project_id,
+            is_active=True
+        )
+    except ExtractionCommitSnapshot.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Snapshot not found or no longer available for rollback'
+        }, status=404)
+
+    snapshot_units = snapshot.snapshot_data.get('units', [])
+    snapshot_leases = snapshot.snapshot_data.get('leases', [])
+
+    with transaction.atomic():
+        MultifamilyLease.objects.filter(unit__project_id=project_id).delete()
+        MultifamilyUnit.objects.filter(project_id=project_id).delete()
+
+        for unit_data in snapshot_units:
+            unit_data = dict(unit_data)
+            unit_data.pop('unit_id', None)
+            unit_data.pop('created_at', None)
+            unit_data.pop('updated_at', None)
+            MultifamilyUnit.objects.create(**unit_data)
+
+        for lease_data in snapshot_leases:
+            lease_data = dict(lease_data)
+            lease_data.pop('lease_id', None)
+            lease_data.pop('created_at', None)
+            lease_data.pop('updated_at', None)
+            unit_number = lease_data.pop('unit_number', None)
+            if not unit_number:
+                continue
+            unit = MultifamilyUnit.objects.filter(
+                project_id=project_id,
+                unit_number=unit_number
+            ).first()
+            if not unit:
+                continue
+            lease_data['unit_id'] = unit.unit_id
+            MultifamilyLease.objects.create(**lease_data)
+
+        snapshot.is_active = False
+        snapshot.rolled_back_at = timezone.now()
+        snapshot.save()
+
+        extraction_ids = snapshot.changes_applied.get('extraction_ids', [])
+        if extraction_ids:
+            placeholders = ','.join(['%s'] * len(extraction_ids))
+            params = [int(project_id)] + [int(eid) for eid in extraction_ids]
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'rolled_back'
+                    WHERE project_id = %s
+                      AND extraction_id IN ({placeholders})
+                """, params)
+
+    return JsonResponse({
+        'success': True,
+        'units_restored': len(snapshot_units),
+        'message': 'Rent roll restored to previous state'
+    })
 
 
 # ============================================================================
@@ -1800,4 +2413,292 @@ def approve_high_confidence(request, project_id: int):
         'fields': list(set(applied)),
         'failed': failed,
         'unit_types_created': unit_types_created
+    })
+
+
+# =============================================================================
+# COLUMN DISCOVERY & FIELD MAPPING (CC Prompt C3)
+# =============================================================================
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def discover_rent_roll_columns(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/discover-columns/
+
+    Analyze uploaded rent roll file and return column discovery results.
+    Does NOT extract data yet—just analyzes structure for user confirmation.
+
+    Request body:
+    {
+        "document_id": int (required)
+    }
+
+    Response:
+    {
+        "file_name": str,
+        "total_rows": int,
+        "total_columns": int,
+        "columns": [
+            {
+                "source_column": str,
+                "source_index": int,
+                "sample_values": [str],
+                "proposed_target": str|null,
+                "confidence": "high"|"medium"|"low"|"none",
+                "action": "auto"|"suggest"|"needs_input"|"skip",
+                "data_type_hint": str,
+                "notes": str|null
+            }
+        ],
+        "parse_warnings": [str],
+        "is_structured": bool
+    }
+    """
+    from apps.documents.models import Document
+    from ..services.column_discovery import discover_columns, discovery_result_to_dict
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    document_id = body.get('document_id')
+    if not document_id:
+        return JsonResponse({'success': False, 'error': 'document_id required'}, status=400)
+
+    try:
+        document = Document.objects.get(doc_id=document_id, project_id=project_id)
+    except Document.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not document.storage_uri:
+        return JsonResponse({'success': False, 'error': 'Document has no storage URI'}, status=400)
+
+    try:
+        result = discover_columns(
+            storage_uri=document.storage_uri,
+            mime_type=document.mime_type,
+            file_name=document.doc_name,
+            project_id=project_id,
+        )
+
+        response_data = discovery_result_to_dict(result)
+        response_data['success'] = True
+        response_data['document_id'] = document_id
+
+        return JsonResponse(response_data)
+
+    except Exception as e:
+        logger.exception(f"Column discovery failed for doc {document_id}: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def apply_rent_roll_mapping(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/apply-mapping/
+
+    Apply user's column mapping decisions and queue extraction job.
+    Creates dynamic columns as needed.
+
+    Request body:
+    {
+        "document_id": int (required),
+        "mappings": [
+            {
+                "source_column": str,
+                "target_field": str|null,
+                "create_dynamic": bool,
+                "dynamic_column_name": str (if create_dynamic),
+                "data_type": str (if create_dynamic)
+            }
+        ]
+    }
+
+    Response:
+    {
+        "success": bool,
+        "job_id": int,
+        "dynamic_columns_created": int,
+        "standard_mappings": int,
+        "skipped_columns": int
+    }
+    """
+    from apps.documents.models import Document
+    from apps.dynamic.models import DynamicColumnDefinition
+    from ..models import ExtractionJob
+    from django.utils import timezone
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    document_id = body.get('document_id')
+    mappings = body.get('mappings', [])
+
+    if not document_id:
+        return JsonResponse({'success': False, 'error': 'document_id required'}, status=400)
+
+    try:
+        document = Document.objects.get(doc_id=document_id, project_id=project_id)
+    except Document.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    # Separate standard field mappings from dynamic column creations
+    standard_mappings = {}
+    dynamic_columns_to_create = []
+    skipped_columns = []
+
+    for mapping in mappings:
+        source_col = mapping.get('source_column')
+        if not source_col:
+            continue
+
+        if mapping.get('create_dynamic'):
+            dynamic_columns_to_create.append({
+                'source_column': source_col,
+                'name': mapping.get('dynamic_column_name', source_col),
+                'data_type': mapping.get('data_type', 'text'),
+            })
+        elif mapping.get('target_field'):
+            standard_mappings[source_col] = mapping['target_field']
+        else:
+            skipped_columns.append(source_col)
+
+    # Create dynamic column definitions (immediately active, not proposed)
+    created_columns = []
+    for dc in dynamic_columns_to_create:
+        col_key = dc['name'].lower().replace(' ', '_').replace('-', '_')
+
+        col_def, created = DynamicColumnDefinition.objects.get_or_create(
+            project_id=project_id,
+            table_name='multifamily_unit',
+            column_key=col_key,
+            defaults={
+                'display_label': dc['name'],
+                'data_type': dc['data_type'],
+                'source': 'user',
+                'is_proposed': False,  # User explicitly created it
+                'proposed_from_document_id': document_id,
+            }
+        )
+        created_columns.append({
+            'id': col_def.id,
+            'column_key': col_def.column_key,
+            'display_label': col_def.display_label,
+            'source_column': dc['source_column'],
+            'created': created,
+        })
+
+    # Check for existing active job for this document
+    existing_job = ExtractionJob.objects.filter(
+        project_id=project_id,
+        document_id=document_id,
+        scope='rent_roll',
+        status__in=['queued', 'processing']
+    ).first()
+
+    if existing_job:
+        return JsonResponse({
+            'success': False,
+            'error': 'An extraction job is already in progress for this document',
+            'existing_job_id': existing_job.job_id
+        }, status=409)
+
+    # Create extraction job with mapping metadata
+    job = ExtractionJob.objects.create(
+        project_id=project_id,
+        document_id=document_id,
+        scope='rent_roll',
+        status='queued',
+        result_summary={
+            'standard_mappings': standard_mappings,
+            'dynamic_columns': [c for c in created_columns],
+            'skipped_columns': skipped_columns,
+        }
+    )
+
+    # Run extraction asynchronously to avoid HTTP timeout
+    # The frontend should poll the job status endpoint
+    import threading
+
+    def run_extraction_async(job_id: int, project_id: int, document_id: int):
+        """Background thread to run extraction without blocking HTTP request."""
+        import django
+        django.db.connections.close_all()  # Close inherited connections
+
+        try:
+            from ..services.extraction_service import ChunkedRentRollExtractor
+            from ..models import ExtractionJob
+
+            # Re-fetch job in this thread's DB connection
+            job = ExtractionJob.objects.get(job_id=job_id)
+
+            logger.info(f"[async_extraction] Starting extraction for job {job_id}, doc {document_id}")
+
+            # Update job status
+            job.status = 'processing'
+            job.started_at = timezone.now()
+            job.save()
+
+            # Create extractor and run
+            extractor = ChunkedRentRollExtractor(
+                project_id=project_id,
+                property_type='multifamily'
+            )
+
+            extract_result = extractor.extract_rent_roll_chunked(
+                doc_id=document_id,
+                user_id=None
+            )
+
+            # Update job with results
+            job.status = 'completed'
+            job.completed_at = timezone.now()
+            job.result_summary.update({
+                'units_extracted': extract_result.get('units_extracted', 0),
+                'staged_count': extract_result.get('staged_count', 0),
+            })
+            job.save()
+            logger.info(f"[async_extraction] Completed job {job_id}: {extract_result.get('units_extracted', 0)} units")
+
+        except Exception as e:
+            logger.exception(f"[async_extraction] Failed for job {job_id}: {e}")
+            try:
+                job = ExtractionJob.objects.get(job_id=job_id)
+                job.status = 'failed'
+                job.error_message = str(e)
+                job.completed_at = timezone.now()
+                job.save()
+            except Exception as save_err:
+                logger.exception(f"[async_extraction] Failed to save error state: {save_err}")
+
+    # Start background thread
+    # Note: Using daemon=False so the thread survives Django dev server restarts
+    # In production, use Celery or a task queue instead
+    thread = threading.Thread(
+        target=run_extraction_async,
+        args=(job.job_id, project_id, document_id),
+        daemon=False,
+        name=f"extraction-job-{job.job_id}"
+    )
+    thread.start()
+
+    logger.info(f"[apply_rent_roll_mapping] Started async extraction job {job.job_id}")
+
+    # Return immediately with job_id for polling
+    return JsonResponse({
+        'success': True,
+        'job_id': job.job_id,
+        'job_status': 'queued',  # Will transition to 'processing' in background
+        'dynamic_columns_created': len([c for c in created_columns if c.get('created')]),
+        'standard_mappings': len(standard_mappings),
+        'skipped_columns': len(skipped_columns),
+        'message': 'Extraction started. Poll job status for progress.',
     })

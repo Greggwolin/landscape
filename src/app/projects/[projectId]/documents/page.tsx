@@ -1,18 +1,13 @@
 'use client';
 
-// Force dynamic rendering for pages using useSearchParams
-export const dynamic = 'force-dynamic';
-
 import React, { useMemo } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import DMSView from '@/components/dms/DMSView';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
 export default function ProjectDocumentsPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const projectId = Number(params.projectId);
-  const defaultTab = searchParams.get('tab') === 'upload' ? 'upload' : 'documents';
   const { projects, isLoading } = useProjectContext();
 
   const project = useMemo(
@@ -58,8 +53,6 @@ export default function ProjectDocumentsPage() {
           projectId={project.project_id}
           projectName={project.project_name}
           projectType={project.project_type || project.project_type_code || null}
-          defaultTab={defaultTab}
-          hideHeader
         />
       </div>
     </div>

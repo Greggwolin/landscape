@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { CFormInput, CFormSelect } from '@coreui/react';
 import { formatCurrency } from './types';
-import type { CalculatedValues, ValueAddState, ValueAddStats } from '@/hooks/useValueAddAssumptions';
+import type {
+  CalculatedValues,
+  ValueAddState,
+  ValueAddStats,
+  RenoCostBasis
+} from '@/hooks/useValueAddAssumptions';
 
 interface ValueAddCardProps {
-  isEnabled: boolean;
   state: ValueAddState;
   calculated: CalculatedValues;
   stats: ValueAddStats;
-  onToggle: () => void;
   onUpdate: <K extends keyof ValueAddState>(key: K, value: ValueAddState[K]) => void;
   isLoading?: boolean;
   isSaving?: boolean;
@@ -22,11 +26,9 @@ interface ValueAddCardProps {
  * Right panel: Costs breakdown + Annual Impact summary (vertically stacked)
  */
 export function ValueAddCard({
-  isEnabled,
   state,
   calculated,
   stats,
-  onToggle,
   onUpdate,
   isLoading = false,
   isSaving = false
@@ -37,232 +39,100 @@ export function ValueAddCard({
     return formatCurrency(value);
   };
 
-  // Format number with commas for display
-  const formatWithCommas = (value: number) => {
-    return value.toLocaleString('en-US');
-  };
-
-  const handleNumberInput = (
-    key: keyof ValueAddState,
-    e: React.ChangeEvent<HTMLInputElement>,
-    transform?: (val: number) => number
-  ) => {
-    const raw = parseFloat(e.target.value) || 0;
-    const value = transform ? transform(raw) : raw;
-    onUpdate(key, value as ValueAddState[typeof key]);
-  };
-
-  // Currency input with comma formatting
-  const CurrencyInput = ({
-    value,
-    onChange,
-    disabled
-  }: {
-    value: number;
-    onChange: (val: number) => void;
-    disabled?: boolean;
-  }) => {
-    const [displayValue, setDisplayValue] = useState(formatWithCommas(value));
-
-    useEffect(() => {
-      setDisplayValue(formatWithCommas(value));
-    }, [value]);
-
-    return (
-      <div className="va-input-currency">
-        <span className="va-prefix">$</span>
-        <input
-          type="text"
-          className="va-input"
-          value={displayValue}
-          onChange={(e) => {
-            const raw = e.target.value.replace(/[^0-9]/g, '');
-            const num = parseInt(raw) || 0;
-            setDisplayValue(formatWithCommas(num));
-            onChange(num);
-          }}
-          onBlur={() => setDisplayValue(formatWithCommas(value))}
-          disabled={disabled}
-        />
-      </div>
-    );
-  };
-
   return (
     <div className="ops-card">
       {/* Header row - matches other section headers */}
       <div className="ops-section-header">
-        <h3 className="ops-section-title">
-          Value-Add Program
-          {isSaving && <span className="va-saving">Saving...</span>}
-        </h3>
-        <div className="ops-section-controls">
-          <button
-            type="button"
-            className={`va-toggle ${isEnabled ? 'on' : ''}`}
-            onClick={onToggle}
-            disabled={isLoading}
-            aria-pressed={isEnabled}
-          >
-            <span className="va-toggle-slider" />
-          </button>
+        <div className="d-flex align-items-baseline gap-3" style={{ textAlign: 'left' }}>
+          <h3 className="ops-section-title" style={{ margin: 0 }}>Value-Add Assumptions</h3>
+          <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
+            Configure renovation scope, costs, and timing. These assumptions drive the Post-Rehab column in the Operations tab.
+          </span>
         </div>
+        {isSaving && <span className="va-saving">Saving...</span>}
       </div>
 
-      {isEnabled && (
-        <div className="va-body">
-          {/* Left Panel: Inputs in 2-column layout */}
-          <div className="va-inputs-panel">
-            <div className="va-form">
-              {/* Row 1: Reno Start Month */}
-              <div className="va-row">
-                <label className="va-label">Renovation Start Month</label>
-                <input
-                  type="number"
-                  className="va-input"
-                  value={state.renoStartMonth || ''}
-                  onChange={(e) => handleNumberInput('renoStartMonth', e)}
-                  disabled={isLoading}
-                  min="1"
-                />
-              </div>
-
-              {/* Row 2: Reno Starts Per Month */}
-              <div className="va-row">
-                <label className="va-label">Reno Starts / Month</label>
-                <input
-                  type="number"
-                  className="va-input"
-                  value={state.renoStartsPerMonth || ''}
-                  onChange={(e) => handleNumberInput('renoStartsPerMonth', e)}
-                  disabled={isLoading}
-                  min="1"
-                />
-              </div>
-
-              {/* Row 3: Months to Complete */}
-              <div className="va-row">
-                <label className="va-label">Months to Complete Reno</label>
-                <input
-                  type="number"
-                  className="va-input"
-                  value={state.monthsToComplete || ''}
-                  onChange={(e) => handleNumberInput('monthsToComplete', e)}
-                  disabled={isLoading}
-                  min="1"
-                />
-              </div>
-
-              {/* Row 4: Renovation Cost with SF/Unit toggle */}
-              <div className="va-row">
-                <label className="va-label">Renovation Cost</label>
-                <div className="va-input-group">
-                  <div className="va-basis-toggle">
-                    <button
-                      type="button"
-                      className={`va-basis-btn ${state.renoCostBasis === 'sf' ? 'active' : ''}`}
-                      onClick={() => onUpdate('renoCostBasis', 'sf')}
-                      disabled={isLoading}
-                    >
-                      /SF
-                    </button>
-                    <button
-                      type="button"
-                      className={`va-basis-btn ${state.renoCostBasis === 'unit' ? 'active' : ''}`}
-                      onClick={() => onUpdate('renoCostBasis', 'unit')}
-                      disabled={isLoading}
-                    >
-                      /Unit
-                    </button>
-                  </div>
-                  <div className="va-input-currency">
-                    <span className="va-prefix">$</span>
-                    <input
-                      type="number"
-                      className="va-input"
-                      value={state.renoCost || ''}
-                      onChange={(e) => handleNumberInput('renoCost', e)}
-                      disabled={isLoading}
-                      min="0"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 5: Relocation Incentive */}
-              <div className="va-row">
-                <label className="va-label">Relocation Incentive</label>
-                <CurrencyInput
-                  value={state.relocationIncentive || 0}
-                  onChange={(val) => onUpdate('relocationIncentive', val)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* Row 6: Rent Premium */}
-              <div className="va-row">
-                <label className="va-label">Rent Premium %</label>
-                <input
-                  type="number"
-                  className="va-input"
-                  value={state.rentPremiumPct ? Math.round(state.rentPremiumPct * 100) : ''}
-                  onChange={(e) => handleNumberInput('rentPremiumPct', e, (v) => v / 100)}
-                  disabled={isLoading}
-                  min="0"
-                  max="100"
-                />
-              </div>
-
-              {/* Row 7: Relet Months */}
-              <div className="va-row">
-                <label className="va-label">Relet Lag [Months]</label>
-                <input
-                  type="number"
-                  className="va-input"
-                  value={state.reletMonths ?? ''}
-                  onChange={(e) => handleNumberInput('reletMonths', e)}
-                  disabled={isLoading}
-                  min="0"
-                />
-              </div>
-
-              {/* Row 8: Units to Renovate */}
-              <div className="va-row">
-                <label className="va-label">Units to Renovate</label>
-                <div className="va-input-group">
-                  <select
-                    className="va-select"
-                    value={state.renovateAll ? 'all' : 'custom'}
-                    onChange={(e) => onUpdate('renovateAll', e.target.value === 'all')}
-                    disabled={isLoading}
-                  >
-                    <option value="all">All</option>
-                    <option value="custom">#</option>
-                  </select>
-                  {!state.renovateAll && (
-                    <input
-                      type="number"
-                      className="va-input"
-                      value={state.unitsToRenovate ?? ''}
-                      onChange={(e) => {
-                        const val = Math.min(parseInt(e.target.value) || 0, stats.totalUnits);
-                        onUpdate('unitsToRenovate', val || null);
-                      }}
-                      disabled={isLoading}
-                      max={stats.totalUnits}
-                      min="1"
-                    />
-                  )}
-                </div>
-              </div>
+      <div className="va-body">
+        <div className="va-panel va-panel-assumptions">
+          <div className="va-panel-header">
+            <h4 className="va-section-title">Assumptions</h4>
+          </div>
+          <div className="va-panel-body" >
+            <div className="va-inputs-panel">
+              <EditableNumberRow
+                label="Renovation Start Month"
+                value={state.renoStartMonth}
+                min={1}
+                onSave={(val) => onUpdate('renoStartMonth', val)}
+                disabled={isLoading}
+              />
+              <EditableNumberRow
+                label="Reno Starts / Month"
+                value={state.renoStartsPerMonth}
+                min={1}
+                onSave={(val) => onUpdate('renoStartsPerMonth', val)}
+                disabled={isLoading}
+              />
+              <EditableNumberRow
+                label="Months to Complete Reno"
+                value={state.monthsToComplete}
+                min={1}
+                onSave={(val) => onUpdate('monthsToComplete', val)}
+                disabled={isLoading}
+              />
+              <RenovationCostRow
+                cost={state.renoCost}
+                basis={state.renoCostBasis}
+                onUpdateCost={(val) => onUpdate('renoCost', val)}
+                onUpdateBasis={(val) => onUpdate('renoCostBasis', val)}
+                disabled={isLoading}
+              />
+              <EditableNumberRow
+                label="Relocation Incentive"
+                value={state.relocationIncentive}
+                formatter={(val) => formatCurrency(val)}
+                prefix="$"
+                min={0}
+                onSave={(val) => onUpdate('relocationIncentive', val)}
+                disabled={isLoading}
+              />
+              <EditableNumberRow
+                label="Rent Premium %"
+                value={state.rentPremiumPct}
+                formatter={(val) => `${Math.round(val * 100)}`}
+                parser={(input) => input / 100}
+                inputFormatter={(val) => val * 100}
+                min={0}
+                max={100}
+                onSave={(val) => onUpdate('rentPremiumPct', val)}
+                disabled={isLoading}
+              />
+              <EditableNumberRow
+                label="Relet Lag [Months]"
+                value={state.reletMonths}
+                min={0}
+                onSave={(val) => onUpdate('reletMonths', val)}
+                disabled={isLoading}
+              />
+              <UnitsToRenovateRow
+                renovateAll={state.renovateAll}
+                units={state.unitsToRenovate}
+                totalUnits={stats.totalUnits}
+                onUpdateRenovateAll={(flag) => onUpdate('renovateAll', flag)}
+                onUpdateUnits={(val) => onUpdate('unitsToRenovate', val)}
+                disabled={isLoading}
+              />
             </div>
           </div>
+        </div>
 
-          {/* Middle Column: Costs + Annual Impact (stacked) */}
-          <div className="va-summary-panel">
-            {/* Costs Section */}
-            <div className="va-section">
+        {/* Middle Column: Costs + Annual Impact (stacked) */}
+        <div className="va-summary-panel">
+          <div className="va-panel">
+            <div className="va-panel-header">
               <h4 className="va-section-title">Costs</h4>
+            </div>
+            <div className="va-panel-body" >
               <div className="va-section-rows">
                 <div className="va-section-row">
                   <span className="va-section-label">Renovation</span>
@@ -282,10 +152,13 @@ export function ValueAddCard({
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Annual Impact Section */}
-            <div className="va-section">
+          <div className="va-panel">
+            <div className="va-panel-header">
               <h4 className="va-section-title">Annual Impact (Stabilized)</h4>
+            </div>
+            <div className="va-panel-body" >
               <div className="va-section-rows">
                 <div className="va-section-row">
                   <span className="va-section-label">Gross Revenue</span>
@@ -301,62 +174,65 @@ export function ValueAddCard({
                 </div>
               </div>
             </div>
-
-            {/* Summary Metrics */}
-            <div className="va-metrics">
-              <div className="va-metric">
-                <span className="va-metric-value">{formatCurrency(calculated.costPerUnit)}</span>
-                <span className="va-metric-label">Cost/Unit</span>
-              </div>
-              <div className="va-metric">
-                <span className="va-metric-value">{calculated.programDurationMonths}</span>
-                <span className="va-metric-label">Program Mo</span>
-              </div>
-              <div className="va-metric">
-                <span className="va-metric-value">{calculated.simplePaybackMonths}</span>
-                <span className="va-metric-label">Payback Mo</span>
-              </div>
-            </div>
           </div>
 
-          {/* Right Column: Treemap with Legend */}
-          <div className="va-graphic-panel">
-            <h4 className="va-graphic-title">Cost Breakdown</h4>
+          <div className="va-metrics">
+            <div className="va-metric">
+              <span className="va-metric-value">{formatCurrency(calculated.costPerUnit)}</span>
+              <span className="va-metric-label">Cost/Unit</span>
+            </div>
+            <div className="va-metric">
+              <span className="va-metric-value">{calculated.programDurationMonths}</span>
+              <span className="va-metric-label">Program Mo</span>
+            </div>
+            <div className="va-metric">
+              <span className="va-metric-value">{calculated.simplePaybackMonths}</span>
+              <span className="va-metric-label">Payback Mo</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Treemap with Legend */}
+        <div className="va-panel va-panel-graphic">
+          <div className="va-panel-header">
+            <h4 className="va-section-title">Cost Breakdown</h4>
+          </div>
+          <div className="va-panel-body va-graphic-panel" >
             {/* Treemap */}
             <div className="va-treemap">
               <div
                 className="va-treemap-cell va-treemap-reno"
                 style={{
-                  flexBasis: `${(calculated.costs.renovation / calculated.costs.total) * 100}%`,
+                  flexBasis: `${calculated.costs.total > 0 ? (calculated.costs.renovation / calculated.costs.total) * 100 : 33}%`,
                   background: '#05AB3F'
                 }}
               >
                 <span className="va-treemap-label">Renovation</span>
                 <span className="va-treemap-value">{formatCompact(calculated.costs.renovation)}</span>
-                <span className="va-treemap-pct">{Math.round((calculated.costs.renovation / calculated.costs.total) * 100)}%</span>
+                <span className="va-treemap-pct">{calculated.costs.total > 0 ? Math.round((calculated.costs.renovation / calculated.costs.total) * 100) : 0}%</span>
               </div>
               <div className="va-treemap-right">
                 <div
                   className="va-treemap-cell"
                   style={{
-                    flexBasis: `${(calculated.costs.relocation / (calculated.costs.relocation + calculated.costs.vacancyLoss)) * 100}%`,
+                    flexBasis: `${(calculated.costs.relocation + calculated.costs.vacancyLoss) > 0 ? (calculated.costs.relocation / (calculated.costs.relocation + calculated.costs.vacancyLoss)) * 100 : 50}%`,
                     background: '#EA1846'
                   }}
                 >
                   <span className="va-treemap-label">Relocation</span>
                   <span className="va-treemap-value">{formatCompact(calculated.costs.relocation)}</span>
-                  <span className="va-treemap-pct">{Math.round((calculated.costs.relocation / calculated.costs.total) * 100)}%</span>
+                  <span className="va-treemap-pct">{calculated.costs.total > 0 ? Math.round((calculated.costs.relocation / calculated.costs.total) * 100) : 0}%</span>
                 </div>
                 <div
                   className="va-treemap-cell"
                   style={{
-                    flexBasis: `${(calculated.costs.vacancyLoss / (calculated.costs.relocation + calculated.costs.vacancyLoss)) * 100}%`,
+                    flexBasis: `${(calculated.costs.relocation + calculated.costs.vacancyLoss) > 0 ? (calculated.costs.vacancyLoss / (calculated.costs.relocation + calculated.costs.vacancyLoss)) * 100 : 50}%`,
                     background: '#059DDF'
                   }}
                 >
                   <span className="va-treemap-label">Vacancy</span>
                   <span className="va-treemap-value">{formatCompact(calculated.costs.vacancyLoss)}</span>
-                  <span className="va-treemap-pct">{Math.round((calculated.costs.vacancyLoss / calculated.costs.total) * 100)}%</span>
+                  <span className="va-treemap-pct">{calculated.costs.total > 0 ? Math.round((calculated.costs.vacancyLoss / calculated.costs.total) * 100) : 0}%</span>
                 </div>
               </div>
             </div>
@@ -367,7 +243,419 @@ export function ValueAddCard({
             </div>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+interface EditableNumberRowProps {
+  label: string;
+  value: number | null | undefined;
+  onSave: (value: number) => void;
+  formatter?: (value: number) => string;
+  parser?: (input: number) => number;
+  inputFormatter?: (value: number) => number;
+  min?: number;
+  max?: number;
+  step?: number;
+  prefix?: string;
+  suffix?: string;
+  displayValue?: string;
+  disabled?: boolean;
+}
+
+function EditableNumberRow({
+  label,
+  value,
+  onSave,
+  formatter,
+  parser,
+  inputFormatter,
+  min,
+  max,
+  step = 1,
+  prefix,
+  suffix,
+  displayValue,
+  disabled = false,
+}: EditableNumberRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const formatInput = (nextValue?: number | null) => {
+    if (nextValue === null || nextValue === undefined || Number.isNaN(nextValue)) {
+      return '';
+    }
+    const normalized = inputFormatter ? inputFormatter(nextValue) : nextValue;
+    return normalized.toString();
+  };
+
+  const parseDraft = (text: string) => {
+    if (!text) return null;
+    const parsed = parseFloat(text);
+    if (Number.isNaN(parsed)) return null;
+    return parser ? parser(parsed) : parsed;
+  };
+
+  const formatDisplay = () => {
+    if (displayValue) return displayValue;
+    if (value === null || value === undefined || Number.isNaN(value)) return '—';
+    if (formatter) return formatter(value);
+    return value.toString();
+  };
+
+  useEffect(() => {
+    setDraft(formatInput(value));
+  }, [value, inputFormatter]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleCommit = () => {
+    const parsed = parseDraft(draft);
+    if (parsed !== null) {
+      onSave(parsed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setDraft(formatInput(value));
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  };
+
+  const handleRowClick = () => {
+    if (disabled) return;
+    if (!isEditing) {
+      setIsEditing(true);
+    }
+  };
+
+  return (
+    <div className="va-field-row" onClick={handleRowClick}>
+      <span className="va-field-label">{label}</span>
+      <div className="va-field-value-container" onMouseDown={(e) => e.stopPropagation()}>
+        {isEditing ? (
+          <div className="va-field-editor">
+            {prefix && <span className="va-field-prefix">{prefix}</span>}
+            <CFormInput
+              size="sm"
+              type="number"
+              inputMode="decimal"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={handleCommit}
+              onKeyDown={handleKeyDown}
+              min={min}
+              max={max}
+              step={step}
+              disabled={disabled}
+              ref={inputRef}
+              className="va-field-input"
+            />
+            {suffix && <span className="va-field-suffix">{suffix}</span>}
+          </div>
+        ) : (
+          <span className={`va-field-value ${formatDisplay() === '—' ? 'empty' : ''}`}>{formatDisplay()}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface RenovationCostRowProps {
+  cost: number;
+  basis: RenoCostBasis;
+  onUpdateCost: (value: number) => void;
+  onUpdateBasis: (value: RenoCostBasis) => void;
+  disabled?: boolean;
+}
+
+function RenovationCostRow({
+  cost,
+  basis,
+  onUpdateCost,
+  onUpdateBasis,
+  disabled = false,
+}: RenovationCostRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftCost, setDraftCost] = useState(cost.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDraftCost(cost.toString());
+  }, [cost]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleCommitAndClose = () => {
+    const parsed = parseFloat(draftCost);
+    if (!Number.isNaN(parsed)) {
+      onUpdateCost(parsed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setDraftCost(cost.toString());
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitAndClose();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  };
+
+  const handleRowClick = () => {
+    if (disabled) return;
+    if (!isEditing) {
+      setIsEditing(true);
+    }
+  };
+
+  // Close editor when clicking outside
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        const parsed = parseFloat(draftCost);
+        if (!Number.isNaN(parsed)) {
+          onUpdateCost(parsed);
+        }
+        setIsEditing(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEditing, draftCost, onUpdateCost]);
+
+  const displayValue = `${formatCurrency(cost)} /${basis === 'sf' ? 'SF' : 'Unit'}`;
+
+  return (
+    <div className="va-field-row" onClick={handleRowClick} ref={containerRef}>
+      <span className="va-field-label">Renovation Cost</span>
+      <div className="va-field-value-container" onMouseDown={(e) => e.stopPropagation()}>
+        {!isEditing ? (
+          <span className="va-field-value">{displayValue}</span>
+        ) : (
+          <div className="va-cost-editor">
+            <div className="va-basis-toggle">
+              <button
+                type="button"
+                className={`va-basis-btn ${basis === 'sf' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateBasis('sf');
+                }}
+                disabled={disabled}
+              >
+                /SF
+              </button>
+              <button
+                type="button"
+                className={`va-basis-btn ${basis === 'unit' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateBasis('unit');
+                }}
+                disabled={disabled}
+              >
+                /Unit
+              </button>
+            </div>
+            <div className="va-field-editor">
+              <span className="va-field-prefix">$</span>
+              <CFormInput
+                size="sm"
+                type="number"
+                inputMode="decimal"
+                value={draftCost}
+                onChange={(e) => setDraftCost(e.target.value)}
+                onKeyDown={handleKeyDown}
+                min={0}
+                step={0.5}
+                disabled={disabled}
+                ref={inputRef}
+                className="va-field-input"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface UnitsToRenovateRowProps {
+  renovateAll: boolean;
+  units: number | null;
+  totalUnits: number;
+  onUpdateRenovateAll: (value: boolean) => void;
+  onUpdateUnits: (value: number | null) => void;
+  disabled?: boolean;
+}
+
+function UnitsToRenovateRow({
+  renovateAll,
+  units,
+  totalUnits,
+  onUpdateRenovateAll,
+  onUpdateUnits,
+  disabled = false,
+}: UnitsToRenovateRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [mode, setMode] = useState(renovateAll ? 'all' : 'custom');
+  const [draftUnits, setDraftUnits] = useState(units?.toString() ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMode(renovateAll ? 'all' : 'custom');
+    setDraftUnits(units?.toString() ?? '');
+  }, [renovateAll, units]);
+
+  useEffect(() => {
+    if (isEditing && mode === 'custom' && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing, mode]);
+
+  const handleRowClick = () => {
+    if (disabled) return;
+    setIsEditing(true);
+  };
+
+  const handleModeChange = (selected: 'all' | 'custom') => {
+    setMode(selected);
+    if (selected === 'all') {
+      onUpdateRenovateAll(true);
+      onUpdateUnits(null);
+      setIsEditing(false);
+    } else {
+      onUpdateRenovateAll(false);
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 0);
+    }
+  };
+
+  const handleCommitAndClose = () => {
+    if (mode === 'custom') {
+      const parsed = parseInt(draftUnits) || 0;
+      if (parsed > 0) {
+        const clamped = Math.min(parsed, totalUnits || parsed);
+        onUpdateUnits(clamped);
+      }
+    }
+    setIsEditing(false);
+  };
+
+  // Close editor when clicking outside
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        // Inline the commit logic to avoid stale closure
+        if (mode === 'custom') {
+          const parsed = parseInt(draftUnits) || 0;
+          if (parsed > 0) {
+            const clamped = Math.min(parsed, totalUnits || parsed);
+            onUpdateUnits(clamped);
+          }
+        }
+        setIsEditing(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEditing, mode, draftUnits, totalUnits, onUpdateUnits]);
+
+  const handleCancel = () => {
+    setDraftUnits(units?.toString() ?? '');
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitAndClose();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  };
+
+  const displayValue = renovateAll ? 'All' : units?.toString() ?? '—';
+
+  return (
+    <div className="va-field-row" onClick={handleRowClick} ref={containerRef}>
+      <span className="va-field-label">Units to Renovate</span>
+      <div className="va-field-value-container" onMouseDown={(e) => e.stopPropagation()}>
+        {!isEditing ? (
+          <span className={`va-field-value ${displayValue === '—' ? 'empty' : ''}`}>{displayValue}</span>
+        ) : (
+          <div className="va-units-editor">
+            <CFormSelect
+              size="sm"
+              value={mode}
+              onChange={(e) => handleModeChange(e.target.value as 'all' | 'custom')}
+              disabled={disabled}
+              className="va-field-select"
+            >
+              <option value="all">All</option>
+              <option value="custom">Custom</option>
+            </CFormSelect>
+            {mode === 'custom' && (
+              <CFormInput
+                size="sm"
+                type="number"
+                min={1}
+                max={totalUnits || undefined}
+                value={draftUnits}
+                onChange={(e) => setDraftUnits(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={disabled}
+                ref={inputRef}
+                className="va-field-input"
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

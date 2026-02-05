@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const project = parseInt(projectId);
 
-    // Query doc_type counts
+    // Query doc_type counts (exclude soft-deleted documents)
     const docTypeCounts = await sql`
       SELECT
         COALESCE(doc_type, 'general') AS doc_type,
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       FROM landscape.core_doc
       WHERE project_id = ${project}
         AND status NOT IN ('deleted', 'archived')
+        AND deleted_at IS NULL
       GROUP BY COALESCE(doc_type, 'general')
       ORDER BY COALESCE(doc_type, 'general') ASC
     `;
