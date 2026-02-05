@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-02
-**Version:** 3.4
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure)
+**Last Updated:** 2026-02-05
+**Version:** 3.5
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements)
 
 ---
 
@@ -9,7 +9,35 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Property Tab Restructure (February 2, 2026)**
+### 🆕 **Latest Update: Rent Roll Extraction Improvements (February 5, 2026)**
+
+**Async Processing, Field Mapping, and User Experience Enhancements**
+
+Major improvements to the rent roll extraction pipeline:
+
+- ✅ **Async Background Processing** - Extraction runs in background threads to avoid HTTP timeout
+- ✅ **Direct Excel Parsing** - Reads Excel/CSV files directly for complete data (vs embeddings)
+- ✅ **Tenant Name Fix** - Now extracts actual tenant names instead of "Current Tenant" placeholders
+- ✅ **Standard Field Mapping** - Added tenant_name, lease_start, lease_end, move_in_date to dropdowns
+- ✅ **Cancel Extraction** - Users can abort running extractions and clean up staged data
+- ✅ **Dismissible Banners** - "Changes ready for review" banner can be dismissed
+- ✅ **Stuck Job Detection** - Frontend detects jobs stuck >3 minutes and shows error state
+- 📁 **Location:** See `docs/09-session-notes/2026-02-05-rent-roll-extraction-improvements.md`
+
+**Files Modified:**
+- `backend/apps/knowledge/views/extraction_views.py` - Async extraction, job status endpoints
+- `backend/apps/knowledge/services/extraction_service.py` - Excel parsing, tenant name cleanup
+- `backend/apps/knowledge/services/column_discovery.py` - Standard field mappings
+- `src/components/landscaper/FieldMappingInterface.tsx` - Cancel button, timeout detection
+- `src/components/landscaper/LandscaperPanel.tsx` - Dismissible success banner
+- `src/hooks/useFieldMapping.ts` - Frontend standard fields
+
+**Extraction Stats (Test):**
+- 113 units extracted in 4 chunks (~30 seconds)
+- 102 tenant names captured (11 vacant units)
+- Data matches database for all occupied units
+
+### Previous Update: Property Tab Restructure (February 2, 2026)
 
 **Acquisition & Renovation Sub-Tabs Added to Property Folder**
 
