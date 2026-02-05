@@ -6,6 +6,13 @@ Historical record of feature and migration completions. For current implementati
 
 ## 2026
 
+### February
+
+| Date | Milestone | Notes |
+|------|-----------|-------|
+| 2026-02-05 | DMS Version Control Collision Detection | Fixed AccordionFilters to use real SHA-256 hashing and collision check |
+| 2026-02-05 | DMS Two-Step Delete System | Soft delete (trash) + permanent delete + restore functionality |
+
 ### January
 
 | Date | Milestone | Notes |

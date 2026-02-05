@@ -1,8 +1,8 @@
 # DMS Implementation Status & Handoff Guide
 
-**Last Updated:** 2025-12-11
-**Current Branch:** `work`
-**Last Commit:** `0d0a1d1` - chore: sync workspace changes
+**Last Updated:** 2026-02-05
+**Current Branch:** `feature/folder-tabs`
+**Last Commit:** Various - DMS version control and collision detection fixes
 
 ---
 
@@ -19,6 +19,8 @@ The Landscape Document Management System (DMS) has completed **Steps 1-7 + Tag-B
 - ✅ PDF text extraction pipeline
 - ✅ **Tag autocomplete with usage tracking**
 - ✅ **Project-scoped DMS integration** (embedded in project pages)
+- ✅ **Document version control with collision detection** (Feb 2026)
+- ✅ **Two-step delete (soft delete to trash + permanent delete)** (Feb 2026)
 
 **Next Phase:** Step 8 - Folder Security & Setup Page (planning complete, ready for implementation)
 
@@ -403,6 +405,74 @@ $ curl http://localhost:3000/api/dms/folders | jq
 - `src/components/dms/filters/AccordionFilters.tsx`
 - `src/components/dms/profile/ProfileForm.tsx`
 - `src/app/api/dms/docs/[id]/route.ts` (DELETE endpoint)
+
+**Status:** ✅ Complete
+
+---
+
+### Version Control & Collision Detection (February 5, 2026)
+
+**Session:** DMS Version Control Fix
+
+**Problem:** Document version control was not working - uploading duplicate files created multiple V1 copies instead of triggering the collision modal and incrementing version numbers.
+
+**Root Cause:** `AccordionFilters.tsx` had its own upload functionality that completely bypassed the collision detection in `Dropzone.tsx`:
+- Fake `generateSha256()` function computed hash from URL + filename + size + timestamp (NOT actual file content)
+- Files uploaded directly via `startUpload` without collision checking
+- `version_no` was always hardcoded to `1`
+
+**Solution Implemented:**
+
+1. **Real SHA-256 Hashing**
+   - Added proper `computeFileHash()` using `crypto.subtle.digest('SHA-256', arrayBuffer)`
+   - Computes real hash from actual file content
+
+2. **Collision Detection Flow**
+   - `checkCollision()` calls `/api/projects/${projectId}/dms/check-collision` before upload
+   - Shows `UploadCollisionModal` when collision detected
+   - User can: Cancel, Upload as New Document (renamed), or Replace (new version)
+
+3. **Sequential File Processing**
+   - `processFilesWithCollisionCheck()` handles files one at a time
+   - Pauses for user decision on each collision
+   - Continues with remaining files after resolution
+
+**Files Modified:**
+- `src/components/dms/filters/AccordionFilters.tsx` - Major rewrite with collision detection
+- `src/components/dms/modals/UploadCollisionModal.tsx` - Collision modal UI
+
+**Status:** ✅ Complete
+
+---
+
+### Two-Step Delete System (February 2026)
+
+**Changes:**
+
+1. **Soft Delete (Move to Trash)**
+   - Documents moved to trash via `deleted_at` timestamp
+   - Preserves document data for potential recovery
+   - Django endpoint: `POST /api/dms/projects/{project_id}/docs/{doc_id}/delete/`
+
+2. **Permanent Delete**
+   - Removes document and all associated data (extracted facts, embeddings)
+   - Django endpoint: `DELETE /api/dms/projects/{project_id}/docs/{doc_id}/permanent-delete/`
+
+3. **Restore from Trash**
+   - Clears `deleted_at` and `deleted_by` to restore document
+   - Django endpoint: `POST /api/dms/projects/{project_id}/docs/{doc_id}/restore/`
+
+4. **Trash View**
+   - View deleted documents via `deleted_only=true` search parameter
+   - Trash-specific toolbar actions (Restore, Permanent Delete)
+
+**New Components:**
+- `RestoreConfirmModal` - Confirmation dialog for restore action
+- Updated `DeleteConfirmModal` with `isPermanentDelete` prop
+
+**New API Routes:**
+- `src/app/api/projects/[projectId]/dms/docs/[docId]/restore/route.ts`
+- `src/app/api/projects/[projectId]/dms/docs/[docId]/permanent-delete/route.ts`
 
 **Status:** ✅ Complete
 
