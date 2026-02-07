@@ -215,6 +215,26 @@ class Project(models.Model):
     cabinet_id = models.BigIntegerField(blank=True, null=True)
     project_focus = models.CharField(max_length=50, blank=True, null=True)
 
+    # =========================================================================
+    # Collateral & Lotbank Settings
+    # =========================================================================
+    collateral_enforcement = models.CharField(
+        max_length=20, blank=True, null=True, default='STRICT',
+        help_text='STRICT = no overlapping pledges, PERMISSIVE = warn but allow'
+    )
+    lotbank_management_fee_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, blank=True, null=True,
+        help_text='Monthly management fee as decimal (0.005 = 0.5%). Only when analysis_type=LOTBANK.'
+    )
+    lotbank_default_provision_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, blank=True, null=True,
+        help_text='Builder default provision as decimal (0.02 = 2%). Only when analysis_type=LOTBANK.'
+    )
+    lotbank_underwriting_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=True, null=True,
+        help_text='Flat underwriting fee at close ($). Only when analysis_type=LOTBANK.'
+    )
+
     # Ownership - links to user who created/owns this project
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -246,6 +266,7 @@ ANALYSIS_TYPE_CHOICES = [
     ('VALUE_ADD', 'Value-Add'),
     ('DEVELOPMENT', 'Development'),
     ('FEASIBILITY', 'Feasibility'),
+    ('LOTBANK', 'Lotbank'),
 ]
 
 

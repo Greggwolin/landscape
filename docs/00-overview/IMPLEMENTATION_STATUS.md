@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-05
-**Version:** 3.5
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements)
+**Last Updated:** 2026-02-06
+**Version:** 3.6
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation)
 
 ---
 
@@ -9,7 +9,36 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Rent Roll Extraction Improvements (February 5, 2026)**
+### 🆕 **Latest Update: Debt UI Consolidation (February 6, 2026)**
+
+**Loan Schedule Grid, Loan Schedule Modal, and Leveraged Cash Flow**
+
+Complete Debt tab build-out with three interconnected components:
+
+- ✅ **Loan Schedule Grid** - Horizontal scrolling amortization table with Monthly/Quarterly/Annual period toggles, IO/P&I/BALLOON badges
+- ✅ **Loan Schedule Modal** - Full-screen modal for detailed single-loan schedule view with export stub
+- ✅ **Leveraged Cash Flow** - ARGUS-style DCF grid showing NOI → Debt Service → Net Cash Flow
+- ✅ **3-Scenario Support** - Full data (income + debt), debt only, income only with appropriate info messages
+- ✅ **Sticky Columns** - Row labels remain visible during horizontal scroll
+- ✅ **Period Aggregation** - Monthly → Quarterly → Annual with correct summing logic
+- ✅ **Django Fixes** - AllowAny permissions on LoanViewSet, FloatField serializer overrides, expanded field list
+- ✅ **Legacy Route Cleanup** - Deleted 3 legacy proxy routes under `/debt/facilities/[id]/`
+- 📁 **Location:** See `docs/09-session-notes/2026-02-06-debt-ui-consolidation.md`
+
+**Files Created:**
+- `src/components/capitalization/LeveragedCashFlow.tsx` - Leveraged cash flow grid
+- `src/components/capitalization/LoanScheduleGrid.tsx` - Loan amortization schedule
+- `src/components/capitalization/LoanScheduleModal.tsx` - Full-screen schedule modal
+- `src/hooks/useCapitalization.ts` - React Query hooks for debt/loan data
+- `src/styles/leveraged-cf.css` - Leveraged CF grid styles
+- `src/styles/loan-schedule.css` - Loan schedule grid styles
+
+**Files Modified:**
+- `src/app/projects/[projectId]/capitalization/debt/page.tsx` - Wired all 4 sections
+- `backend/apps/financial/views_debt.py` - AllowAny permissions
+- `backend/apps/financial/serializers_debt.py` - FloatField + expanded fields
+
+### Previous Update: Rent Roll Extraction Improvements (February 5, 2026)
 
 **Async Processing, Field Mapping, and User Experience Enhancements**
 
@@ -23,19 +52,6 @@ Major improvements to the rent roll extraction pipeline:
 - ✅ **Dismissible Banners** - "Changes ready for review" banner can be dismissed
 - ✅ **Stuck Job Detection** - Frontend detects jobs stuck >3 minutes and shows error state
 - 📁 **Location:** See `docs/09-session-notes/2026-02-05-rent-roll-extraction-improvements.md`
-
-**Files Modified:**
-- `backend/apps/knowledge/views/extraction_views.py` - Async extraction, job status endpoints
-- `backend/apps/knowledge/services/extraction_service.py` - Excel parsing, tenant name cleanup
-- `backend/apps/knowledge/services/column_discovery.py` - Standard field mappings
-- `src/components/landscaper/FieldMappingInterface.tsx` - Cancel button, timeout detection
-- `src/components/landscaper/LandscaperPanel.tsx` - Dismissible success banner
-- `src/hooks/useFieldMapping.ts` - Frontend standard fields
-
-**Extraction Stats (Test):**
-- 113 units extracted in 4 chunks (~30 seconds)
-- 102 tenant names captured (11 vacant units)
-- Data matches database for all occupied units
 
 ### Previous Update: Property Tab Restructure (February 2, 2026)
 

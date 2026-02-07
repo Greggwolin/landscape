@@ -36,7 +36,7 @@ export async function GET(
     // Fetch comparables with their actual coordinates
     const compsResult = await pool.query(
       `SELECT comparable_id, property_name, address, city, state,
-              sale_price, sale_date, units, building_sf,
+              sale_price, sale_date, units, building_sf, price_per_unit,
               latitude, longitude
        FROM landscape.tbl_sales_comparables
        WHERE project_id = $1
@@ -54,6 +54,10 @@ export async function GET(
       const offsetLng = 0.0002;
       const offsetLat = 0.0001;
 
+      const pricePerUnit = comp.price_per_unit
+        ? Number(comp.price_per_unit)
+        : (comp.sale_price && comp.units ? Number(comp.sale_price) / Number(comp.units) : null);
+
       return {
         type: 'Feature',
         id: `comp-${comp.comparable_id}`,
@@ -63,6 +67,7 @@ export async function GET(
           name: `${comp.property_name || comp.address}`,
           type: 'sale',
           price: comp.sale_price ? Number(comp.sale_price) : null,
+          price_per_unit: pricePerUnit,
           date: comp.sale_date,
           stories: Math.ceil(Number(comp.building_sf || 0) / Number(comp.units || 1) / 1000) || 3,
           defaultStories: 3,

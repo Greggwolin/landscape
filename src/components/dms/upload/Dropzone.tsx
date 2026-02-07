@@ -117,7 +117,9 @@ export default function Dropzone({
 }: DropzoneProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // pendingFiles stores remaining files when collision pauses processing
+  // Will be used by collision resolution to continue the upload queue
+  const [, setPendingFiles] = useState<File[]>([]);
 
   // Collision handling via Landscaper context
   const { addCollision, pendingCollision } = useLandscaperCollision();

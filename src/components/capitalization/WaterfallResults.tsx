@@ -267,7 +267,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
   };
 
   const summaryWrapperStyle: React.CSSProperties = {
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--cui-border-color)',
     borderRadius: 10,
     overflow: 'hidden',
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
@@ -276,25 +276,25 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
   const summaryTableStyle: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--cui-card-bg)',
     fontSize: '0.8rem',
   };
 
   const summaryHeaderCell: React.CSSProperties = {
     padding: '4px 10px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'var(--cui-tertiary-bg)',
     color: 'var(--cui-secondary-color)',
     fontWeight: 600,
     textAlign: 'center',
-    border: '1px solid #e5e7eb',
+    border: '1px solid var(--cui-border-color)',
     height: '32px',
   };
 
   const summaryCell: React.CSSProperties = {
     padding: '4px 10px',
     textAlign: 'center',
-    border: '1px solid #e5e7eb',
-    backgroundColor: '#ffffff',
+    border: '1px solid var(--cui-border-color)',
+    backgroundColor: 'var(--cui-card-bg)',
     height: '32px',
   };
   const summaryRowStyle: React.CSSProperties = { height: '32px' };

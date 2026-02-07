@@ -79,11 +79,14 @@ export function AssumptionsPanel({
       {/* Main header - canonical card header background */}
       <div
         className="px-4 py-2 flex items-center justify-between"
-        style={{ backgroundColor: 'var(--cui-card-header-bg)' }}
+        style={{
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderBottom: '1px solid var(--cui-border-color)',
+        }}
       >
         <h2
           className="text-sm font-semibold"
-          style={{ color: '#1a1a1a' }}
+          style={{ color: 'var(--cui-body-color)' }}
         >
           Assumptions
         </h2>
@@ -347,8 +350,10 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
         className="w-full px-4 py-2 flex items-center justify-between text-left focus:outline-none"
         style={{
           color: 'var(--cui-body-color)',
-          background: 'var(--cui-tertiary-bg)',
+          background: 'var(--cui-card-subheader-bg)',
           border: 'none',
+          borderTop: '1px solid var(--cui-border-color)',
+          borderBottom: '1px solid var(--cui-border-color)',
         }}
       >
         <span className="font-semibold text-sm">{title}</span>
@@ -377,7 +382,7 @@ function ReadOnlyField({ label, value, tooltip }: ReadOnlyFieldProps) {
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs"
+        className="text-[13px] font-medium"
         style={{ color: 'var(--cui-secondary-color)' }}
         title={tooltip}
       >
@@ -446,7 +451,7 @@ function PercentInput({
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs"
+        className="text-[13px] font-medium"
         style={{ color: 'var(--cui-secondary-color)' }}
         title={tooltip}
       >
@@ -511,7 +516,7 @@ function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs"
+        className="text-[13px] font-medium"
         style={{ color: 'var(--cui-secondary-color)' }}
       >
         {label}
@@ -579,7 +584,7 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs"
+        className="text-[13px] font-medium"
         style={{ color: 'var(--cui-secondary-color)' }}
       >
         {label}
@@ -614,7 +619,7 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
   return (
     <div className="flex items-center justify-between">
       <label
-        className="text-xs"
+        className="text-[13px] font-medium"
         style={{ color: 'var(--cui-secondary-color)' }}
       >
         {label}
@@ -646,7 +651,10 @@ interface AssumptionRowProps {
 
 function AssumptionRow({ children }: AssumptionRowProps) {
   return (
-    <div className="border-t border-[#dfe3e8] first:border-t-0">
+    <div
+      className="border-t first:border-t-0"
+      style={{ borderColor: 'var(--cui-border-color)' }}
+    >
       <div className="py-2">{children}</div>
     </div>
   );

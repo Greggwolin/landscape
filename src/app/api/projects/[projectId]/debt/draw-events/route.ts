@@ -1,105 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
 
-type Params = {
-  projectId: string;
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+const buildUrl = (baseUrl: string, searchParams: URLSearchParams) => {
+  const query = searchParams.toString();
+  return query ? `${baseUrl}?${query}` : baseUrl;
 };
 
-/**
- * GET /api/projects/[projectId]/debt/draw-events
- *
- * Fetch all draw events for a project's debt facilities
- * Uses existing tbl_debt_draw_schedule table
- */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<Params> }
-) {
-  const { projectId } = await params;
-  const id = Number(projectId);
+const getAuthHeaders = (request: NextRequest) => {
+  const authHeader = request.headers.get('Authorization');
+  return authHeader ? { Authorization: authHeader } : {};
+};
 
-  if (!Number.isFinite(id)) {
-    return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 });
-  }
+type Params = { params: Promise<{ projectId: string }> };
 
+export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const drawEvents = await sql`
-      SELECT
-        dds.draw_schedule_id as id,
-        dds.facility_id AS "facilityId",
-        dds.period_start_date AS "drawDate",
-        dds.draw_amount AS "drawAmount",
-        dds.notes as description,
-        df.facility_name AS "facilityName"
-      FROM landscape.tbl_debt_draw_schedule dds
-      JOIN landscape.tbl_debt_facility df ON dds.facility_id = df.facility_id
-      WHERE df.project_id = ${id}
-        AND dds.draw_amount > 0
-      ORDER BY dds.period_start_date DESC
-    `;
+    const { projectId } = await params;
+    const { searchParams } = new URL(request.url);
+    const loanId = searchParams.get('loanId') || searchParams.get('loan_id') || searchParams.get('facility_id');
 
-    return NextResponse.json({ drawEvents });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to fetch draw events:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch draw events', details: message },
-      { status: 500 }
+    if (!loanId) {
+      return NextResponse.json({ error: 'loanId is required' }, { status: 400 });
+    }
+
+    const djangoUrl = buildUrl(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/`,
+      searchParams
     );
+
+    const response = await fetch(djangoUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: unknown) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
   }
 }
 
-/**
- * POST /api/projects/[projectId]/debt/draw-events
- *
- * Create a new draw event for a debt facility
- */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<Params> }
-) {
-  const { projectId } = await params;
-  const id = Number(projectId);
-
-  if (!Number.isFinite(id)) {
-    return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 });
-  }
-
+export async function POST(request: NextRequest, { params }: Params) {
   try {
+    const { projectId } = await params;
     const body = await request.json();
+    const loanId = body.loan_id || body.loanId || body.facility_id;
 
-    // Note: tbl_debt_draw_schedule requires period_id from tbl_calculation_period
-    // For now, create a simplified draw without period linkage
-    const result = await sql`
-      INSERT INTO landscape.tbl_debt_draw_schedule (
-        facility_id,
-        period_start_date,
-        period_end_date,
-        draw_amount,
-        notes
-      )
-      VALUES (
-        ${body.facilityId},
-        ${body.drawDate},
-        ${body.drawDate},
-        ${body.drawAmount},
-        ${body.description}
-      )
-      RETURNING
-        draw_schedule_id as id,
-        facility_id AS "facilityId",
-        period_start_date AS "drawDate",
-        draw_amount AS "drawAmount",
-        notes as description
-    `;
+    if (!loanId) {
+      return NextResponse.json({ error: 'loanId is required' }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, drawEvent: result[0] });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to create draw event:', error);
-    return NextResponse.json(
-      { error: 'Failed to create draw event', details: message },
-      { status: 500 }
+    const { loan_id, loanId: bodyLoanId, facility_id, ...payload } = body;
+
+    const response = await fetch(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(request),
+        },
+        body: JSON.stringify(payload),
+      }
     );
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: unknown) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
   }
 }

@@ -117,9 +117,18 @@ class LandDevCashFlowView(APIView):
                 except (ValueError, TypeError):
                     container_ids = None
 
+            include_financing = request.data.get('includeFinancing', False)
+            if isinstance(include_financing, str):
+                include_financing = include_financing.strip().lower() in {'true', '1', 'yes'}
+            else:
+                include_financing = bool(include_financing)
+
             # Generate cash flow
             service = LandDevCashFlowService(project_id)
-            result = service.calculate(container_ids=container_ids)
+            result = service.calculate(
+                container_ids=container_ids,
+                include_financing=include_financing,
+            )
 
             duration_ms = int((time.time() - start_time) * 1000)
 

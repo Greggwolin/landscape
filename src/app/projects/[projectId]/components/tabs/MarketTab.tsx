@@ -14,6 +14,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMarketCompetitors, useCreateCompetitor, useUpdateCompetitor, useDeleteCompetitor, MarketCompetitiveProject } from '@/hooks/useMarketData';
 import { NapkinSfdPricing } from '@/components/napkin/NapkinSfdPricing';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import MarketMapView from '@/app/components/Market/MarketMapView';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import PropertyTab from './PropertyTab';
@@ -330,9 +332,9 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
   }, [competitors]);
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       {/* Two Column Layout - 50/50 split */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-market-row="pricing">
         {/* Left Column - SFD Pricing */}
         <div>
           <NapkinSfdPricing projectId={projectId} showCompDetails={true} />
@@ -340,17 +342,21 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
 
         {/* Right Column - Landscaper Analysis */}
         <div>
-          <div
-            className="rounded-lg h-full"
-            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
-          >
-            <div
-              className="px-4 py-3 flex justify-between items-center"
-              style={{ borderBottom: '1px solid var(--cui-border-color)' }}
-            >
-              <h5 className="font-semibold m-0" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h5>
-            </div>
-            <div className="p-4">
+          <CCard className="h-100">
+            <CCardHeader className="d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <LandscaperIcon
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    color: 'var(--landscaper-icon-color)',
+                    flexShrink: 0
+                  }}
+                />
+                <span className="fw-semibold">Landscaper Analysis</span>
+              </div>
+            </CCardHeader>
+            <CCardBody>
               <div
                 className="rounded p-3"
                 style={{
@@ -403,25 +409,19 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </CCardBody>
+          </CCard>
         </div>
       </div>
 
       {/* Competitive Projects Map + List - 50/50 split */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Map */}
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
-        >
-          <div
-            className="px-4 py-3 flex justify-between items-center"
-            style={{ borderBottom: '1px solid var(--cui-border-color)' }}
-          >
-            <h5 className="font-semibold m-0" style={{ color: 'var(--cui-body-color)' }}>Competitive Projects Map</h5>
-          </div>
-          <div className="p-0">
+        <CCard className="h-100 overflow-hidden">
+          <CCardHeader className="d-flex justify-content-between align-items-center">
+            <span className="fw-semibold">Competitive Projects Map</span>
+          </CCardHeader>
+          <CCardBody className="p-3">
             <MarketMapView
               projectId={projectId}
               competitors={competitors}
@@ -430,19 +430,13 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
               onSelectCompetitor={setSelectedCompetitorId}
               onClearSelection={() => setSelectedCompetitorId(null)}
             />
-          </div>
-        </div>
+          </CCardBody>
+        </CCard>
 
         {/* Competitor List */}
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
-        >
-          <div
-            className="px-4 py-3 flex justify-between items-center"
-            style={{ borderBottom: '1px solid var(--cui-border-color)' }}
-          >
-            <h5 className="font-semibold m-0" style={{ color: 'var(--cui-body-color)' }}>Competitive Projects</h5>
+        <CCard className="h-100 overflow-hidden">
+          <CCardHeader className="d-flex justify-content-between align-items-center">
+            <span className="fw-semibold">Competitive Projects</span>
             <div className="flex gap-2">
               <button
                 className="px-3 py-1.5 text-sm rounded"
@@ -462,9 +456,9 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                 + Add
               </button>
             </div>
-          </div>
+          </CCardHeader>
 
-          <div className="p-4 max-h-[500px] overflow-y-auto">
+          <CCardBody className="max-h-[500px] overflow-y-auto">
             {/* Competitor Form */}
             {showCompForm && (
               <div className="mb-4 p-4 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
@@ -634,9 +628,9 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                       {isExpanded && group.competitors.map((comp) => (
                         <div
                           key={comp.id}
-                          className="grid items-center px-3 py-2 cursor-pointer rounded ml-4"
+                          className="grid items-center px-3 py-2 cursor-pointer rounded pl-4"
                           style={{
-                            gridTemplateColumns: 'calc(2fr - 1rem) 1fr 0.7fr 1fr 0.9fr auto',
+                            gridTemplateColumns: '2fr 1fr 0.7fr 1fr 0.9fr auto',
                             gap: '0.75rem',
                             backgroundColor: comp.id === selectedCompetitorId ? 'rgba(13, 110, 253, 0.1)' : 'transparent',
                           }}
@@ -690,8 +684,8 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                 })}
               </div>
             )}
-          </div>
-        </div>
+          </CCardBody>
+        </CCard>
       </div>
     </div>
   );

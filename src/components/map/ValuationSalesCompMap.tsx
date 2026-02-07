@@ -208,23 +208,34 @@ export default function ValuationSalesCompMap({
             },
             ...data.comps.features.map((f, idx) => {
               const props = f.properties;
+              const formatShortCurrency = (value?: number | null) => {
+                if (value == null || !Number.isFinite(value)) return '';
+                if (Math.abs(value) >= 1_000_000) {
+                  return `$${(value / 1_000_000).toFixed(2)}M`;
+                }
+                if (Math.abs(value) >= 1_000) {
+                  return `$${Math.round(value / 1_000)}K`;
+                }
+                return `$${Math.round(value).toLocaleString()}`;
+              };
+
+              const priceLabel = formatShortCurrency(props.price);
+              const unitLabel = formatShortCurrency(props.price_per_unit);
+              const priceLine = priceLabel
+                ? `${priceLabel}${unitLabel ? `&nbsp;&nbsp;<span style="color:#94a3b8;">${unitLabel} / unit</span>` : ''}`
+                : '';
+
               const popupHTML = `
-                <div style="padding: 8px; min-width: 200px;">
-                  <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #1f2937;">
-                    ${props.name || `Comp ${idx + 1}`}
+                <div style="padding: 10px 12px; min-width: 220px; color: #f8fafc; font-family: system-ui, -apple-system, Segoe UI, sans-serif;">
+                  <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #ffffff;">
+                    <span style="color:#cbd5f5; font-weight:600;">Name:</span> ${props.name || `Comp ${idx + 1}`}
                   </div>
-                  ${props.price ? `<div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">
-                    <strong>Price:</strong> $${props.price.toLocaleString()}
+                  ${priceLine ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
+                    <span style="color:#cbd5f5; font-weight:600;">Price:</span> ${priceLine}
                   </div>` : ''}
-                  ${props.date ? `<div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">
-                    <strong>Date:</strong> ${new Date(props.date).toLocaleDateString()}
+                  ${props.date ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
+                    <span style="color:#cbd5f5; font-weight:600;">Date:</span> ${new Date(props.date).toLocaleDateString()}
                   </div>` : ''}
-                  <div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">
-                    <strong>Type:</strong> ${props.type || 'N/A'}
-                  </div>
-                  <div style="font-size: 12px; color: #6b7280; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-                    ${props.selected ? '<span style="color: #10b981;">✓ Selected</span>' : '<span style="color: #9ca3af;">Not Selected</span>'}
-                  </div>
                 </div>
               `;
 
@@ -234,6 +245,7 @@ export default function ValuationSalesCompMap({
                   ? [(f.geometry.coordinates[0][0][0] as number), (f.geometry.coordinates[0][0][1] as number)]
                   : [0, 0],
                 color: props.selected ? '#10b981' : '#f59e0b',
+                stroke: '#000000',
                 label: `Comp ${idx + 1}`,
                 popup: popupHTML
               };

@@ -20,6 +20,7 @@ import { MapAccordion } from './MapAccordion';
 import { NarrativeCanvas } from './NarrativeCanvas';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
 import { useFlyout } from '../../studio/components/FlyoutContext';
+import { useProjectContext } from '@/app/components/ProjectProvider';
 
 // Default and constraints for narrative panel width
 const NARRATIVE_DEFAULT_WIDTH = 576;
@@ -35,6 +36,20 @@ interface SalesComparisonPanelProps {
   mode?: 'multifamily' | 'land';
 }
 
+interface ProjectDetails {
+  street_address?: string;
+  city?: string;
+  state?: string;
+  jurisdiction_city?: string;
+  jurisdiction_state?: string;
+  analysis_start_date?: string | null;
+  total_units?: number;
+  target_units?: number;
+  gross_sf?: number;
+  year_built?: number;
+  ownership_type?: string;
+}
+
 export function SalesComparisonPanel({
   projectId,
   comparables,
@@ -45,8 +60,17 @@ export function SalesComparisonPanel({
   const [narrativeWidth, setNarrativeWidth] = useState(NARRATIVE_DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [reviewFlyoutOpen, setReviewFlyoutOpen] = useState(false);
+  const [subjectProperty, setSubjectProperty] = useState<{
+    city?: string | null;
+    analysisStartDate?: string | null;
+    units?: number | null;
+    buildingSf?: number | null;
+    yearBuilt?: number | null;
+    ownershipType?: string | null;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gridMinWidth = reviewFlyoutOpen ? GRID_MIN_WIDTH_WITH_REVIEW : GRID_MIN_WIDTH;
+  const { activeProject } = useProjectContext();
 
   // Try to use flyout context if available (only works in Studio)
   let openFlyout: ((flyoutId: string) => void) | null = null;
@@ -77,6 +101,45 @@ export function SalesComparisonPanel({
   const handleCanvasToggle = useCallback(() => {
     setCanvasCollapsed(prev => !prev);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadSubjectDetails = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/details`);
+        if (response.ok) {
+          const details = (await response.json()) as ProjectDetails;
+          if (!active) return;
+          setSubjectProperty({
+            city: details.city ?? details.jurisdiction_city ?? activeProject?.jurisdiction_city ?? null,
+            analysisStartDate: details.analysis_start_date ?? null,
+            units: details.total_units ?? details.target_units ?? activeProject?.total_residential_units ?? null,
+            buildingSf: details.gross_sf ?? activeProject?.total_commercial_sqft ?? null,
+            yearBuilt: details.year_built ?? null,
+            ownershipType: details.ownership_type ?? null
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load subject property details:', error);
+      }
+
+      if (!active) return;
+      setSubjectProperty({
+        city: activeProject?.jurisdiction_city ?? null,
+        analysisStartDate: null,
+        units: activeProject?.total_residential_units ?? null,
+        buildingSf: activeProject?.total_commercial_sqft ?? null,
+        yearBuilt: null,
+        ownershipType: null
+      });
+    };
+
+    loadSubjectDetails();
+    return () => {
+      active = false;
+    };
+  }, [activeProject, projectId]);
 
   // Resize handle logic
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -186,6 +249,7 @@ export function SalesComparisonPanel({
             comparables={comparables}
             projectId={projectId}
             mode={mode}
+            subjectProperty={subjectProperty ?? undefined}
             readOnly={true}
             onEdit={handleEditComp}
           />

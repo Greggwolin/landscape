@@ -144,9 +144,9 @@ export function NapkinCompsMap({
         .setLngLat([projectLon, projectLat])
         .setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(
-            `<div style="padding: 8px;">
-              <strong style="color: #0d6efd;">📍 ${project?.project_name || 'Subject Property'}</strong><br/>
-              <small>${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</small>
+            `<div style="padding: 8px; color: var(--cui-body-color);">
+              <div style="font-weight: 600; color: #0d6efd;">📍 ${project?.project_name || 'Subject Property'}</div>
+              <div style="font-size: 11px; color: var(--cui-secondary-color);">${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</div>
             </div>`
           )
         )
@@ -182,9 +182,9 @@ export function NapkinCompsMap({
           .setLngLat([projectLon, projectLat])
           .setPopup(
             new maplibregl.Popup({ offset: 25 }).setHTML(
-              `<div style="padding: 8px;">
-                <strong style="color: #0d6efd;">📍 ${project?.project_name || 'Subject Property'}</strong><br/>
-                <small>${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</small>
+              `<div style="padding: 8px; color: var(--cui-body-color);">
+                <div style="font-weight: 600; color: #0d6efd;">📍 ${project?.project_name || 'Subject Property'}</div>
+                <div style="font-size: 11px; color: var(--cui-secondary-color);">${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</div>
               </div>`
             )
           )
@@ -243,24 +243,24 @@ export function NapkinCompsMap({
           .setLngLat([comp.lng, comp.lat])
           .setPopup(
             new maplibregl.Popup({ offset: 25, maxWidth: '280px' }).setHTML(
-              `<div style="padding: 8px; min-width: 200px;">
-                <div style="font-weight: 600; color: #111; margin-bottom: 4px; font-size: 13px;">${comp.address}</div>
-                <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${comp.city}, ${comp.state} · ${comp.distanceMiles.toFixed(1)} mi</div>
-                <div style="font-size: 18px; font-weight: 700; color: #111; margin-bottom: 4px;">
+              `<div style="padding: 8px; min-width: 200px; color: var(--cui-body-color);">
+                <div style="font-weight: 600; color: var(--cui-body-color); margin-bottom: 4px; font-size: 13px;">${comp.address}</div>
+                <div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 6px;">${comp.city}, ${comp.state} · ${comp.distanceMiles.toFixed(1)} mi</div>
+                <div style="font-size: 18px; font-weight: 700; color: var(--cui-body-color); margin-bottom: 4px;">
                   ${priceFormatted}
-                  <span style="font-size: 11px; font-weight: 400; color: #666; margin-left: 4px;">${psfFormatted}</span>
+                  <span style="font-size: 11px; font-weight: 400; color: var(--cui-secondary-color); margin-left: 4px;">${psfFormatted}</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 11px; margin-bottom: 6px;">
-                  <div><span style="color: #888;">Size:</span> <span style="font-weight: 500;">${comp.sqft?.toLocaleString() || '—'} SF</span></div>
-                  <div><span style="color: #888;">Built:</span> <span style="font-weight: 500;">${comp.yearBuilt || '—'}</span></div>
-                  <div><span style="color: #888;">Beds:</span> <span style="font-weight: 500;">${comp.beds ?? '—'}</span></div>
-                  <div><span style="color: #888;">Baths:</span> <span style="font-weight: 500;">${comp.baths ?? '—'}</span></div>
-                  ${comp.lotSqft ? `<div><span style="color: #888;">Lot:</span> <span style="font-weight: 500;">${comp.lotSqft.toLocaleString()} SF</span></div>` : ''}
+                  <div><span style="color: var(--cui-secondary-color);">Size:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.sqft?.toLocaleString() || '—'} SF</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Built:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.yearBuilt || '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Beds:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.beds ?? '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Baths:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.baths ?? '—'}</span></div>
+                  ${comp.lotSqft ? `<div><span style="color: var(--cui-secondary-color);">Lot:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.lotSqft.toLocaleString()} SF</span></div>` : ''}
                 </div>
-                <div style="font-size: 10px; color: #888; border-top: 1px solid #eee; padding-top: 4px;">
+                <div style="font-size: 10px; color: var(--cui-secondary-color); border-top: 1px solid var(--cui-border-color); padding-top: 4px;">
                   Sold ${new Date(comp.saleDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                 </div>
-                ${comp.url ? `<a href="${comp.url}" target="_blank" rel="noreferrer" style="font-size: 10px; color: #0d6efd; text-decoration: none;">View on Redfin →</a>` : ''}
+                ${comp.url ? `<a href="${comp.url}" target="_blank" rel="noreferrer" style="font-size: 10px; color: var(--cui-primary); text-decoration: none;">View on Redfin →</a>` : ''}
               </div>`
             )
           )
@@ -356,15 +356,21 @@ export function NapkinCompsMap({
   const isFlexMode = height === '100%';
 
   return (
-    <div className={isFlexMode ? 'd-flex flex-column flex-grow-1' : ''}>
+    <div
+      className={isFlexMode ? 'd-flex flex-column flex-grow-1' : ''}
+      style={isFlexMode ? { height: '100%', minHeight: 0 } : undefined}
+    >
       {/* Map Container */}
-      <div className={`position-relative ${isFlexMode ? 'flex-grow-1' : ''}`}>
+      <div
+        className={`position-relative ${isFlexMode ? 'flex-grow-1' : ''}`}
+        style={isFlexMode ? { minHeight: 0 } : undefined}
+      >
         <div
           ref={mapContainer}
           className="rounded overflow-hidden"
           style={{
             height: isFlexMode ? '100%' : height,
-            minHeight: isFlexMode ? 300 : undefined,
+            minHeight: isFlexMode ? 0 : undefined,
             border: '1px solid var(--cui-border-color)'
           }}
         />
@@ -373,8 +379,9 @@ export function NapkinCompsMap({
         <div
           className="position-absolute top-0 start-0 m-2 px-2 py-1 rounded shadow-sm"
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            border: '1px solid var(--cui-border-color)',
+            backgroundColor: 'var(--cui-card-bg)',
+            border: '1px solid var(--cui-card-border-color)',
+            color: 'var(--cui-body-color)',
             zIndex: 1,
             fontSize: '11px'
           }}
@@ -395,9 +402,9 @@ export function NapkinCompsMap({
             className="btn btn-sm px-2 py-1"
             onClick={() => setMapStyle('voyager')}
             style={{
-              backgroundColor: mapStyle === 'voyager' ? 'var(--cui-primary)' : 'rgba(255, 255, 255, 0.95)',
+              backgroundColor: mapStyle === 'voyager' ? 'var(--cui-primary)' : 'var(--cui-card-bg)',
               color: mapStyle === 'voyager' ? 'white' : 'var(--cui-body-color)',
-              border: '1px solid var(--cui-border-color)',
+              border: '1px solid var(--cui-card-border-color)',
               borderRight: 'none',
               borderRadius: '4px 0 0 4px',
               fontSize: '11px'
@@ -410,9 +417,9 @@ export function NapkinCompsMap({
             className="btn btn-sm px-2 py-1"
             onClick={() => setMapStyle('satellite')}
             style={{
-              backgroundColor: mapStyle === 'satellite' ? 'var(--cui-primary)' : 'rgba(255, 255, 255, 0.95)',
+              backgroundColor: mapStyle === 'satellite' ? 'var(--cui-primary)' : 'var(--cui-card-bg)',
               color: mapStyle === 'satellite' ? 'white' : 'var(--cui-body-color)',
-              border: '1px solid var(--cui-border-color)',
+              border: '1px solid var(--cui-card-border-color)',
               borderRadius: '0 4px 4px 0',
               fontSize: '11px'
             }}

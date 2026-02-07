@@ -194,17 +194,23 @@ export default function TagInput({
         {value.map((tag, index) => (
           <span
             key={`${tag}-${index}`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+            className="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
+            style={{
+              backgroundColor: 'var(--cui-primary-bg-subtle)',
+              color: 'var(--cui-primary)',
+              border: '1px solid var(--cui-primary-border-subtle)',
+              fontSize: '0.75rem'
+            }}
           >
             {tag}
             {!disabled && (
               <button
                 type="button"
                 onClick={() => removeTag(index)}
-                className="hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
+                style={{ color: 'var(--cui-primary)' }}
                 aria-label={`Remove ${tag}`}
               >
-                <XMarkIcon className="w-3.5 h-3.5" />
+                <XMarkIcon style={{ width: '14px', height: '14px' }} />
               </button>
             )}
           </span>
@@ -226,13 +232,18 @@ export default function TagInput({
           }}
           disabled={disabled}
           placeholder={value.length >= maxTags ? `Maximum ${maxTags} tags reached` : placeholder}
-          className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+          className="form-control form-control-sm"
+          style={{
+            backgroundColor: 'var(--cui-input-bg)',
+            borderColor: 'var(--cui-border-color)',
+            color: 'var(--cui-body-color)'
+          }}
         />
 
         {/* Loading Indicator */}
         {isLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <div className="spinner-border spinner-border-sm" role="status" />
           </div>
         )}
 
@@ -240,7 +251,13 @@ export default function TagInput({
         {showSuggestions && suggestions.length > 0 && (
           <div
             ref={dropdownRef}
-            className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto"
+            className="position-absolute z-3 w-100 mt-1 border rounded shadow"
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              borderColor: 'var(--cui-card-border-color)',
+              maxHeight: '15rem',
+              overflow: 'auto'
+            }}
           >
             {suggestions.map((suggestion, index) => (
               <button
@@ -248,16 +265,16 @@ export default function TagInput({
                 type="button"
                 onClick={() => addTag(suggestion.tag_name)}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                  selectedIndex === index
-                    ? 'bg-blue-50 dark:bg-blue-900/20'
-                    : ''
-                }`}
+                className="w-100 text-start px-3 py-2 d-flex align-items-center justify-content-between"
+                style={{
+                  backgroundColor: selectedIndex === index ? 'var(--cui-primary-bg-subtle)' : 'transparent',
+                  color: 'var(--cui-body-color)'
+                }}
               >
-                <span className="text-gray-900 dark:text-gray-100">
+                <span style={{ color: 'var(--cui-body-color)' }}>
                   {suggestion.tag_name}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                <span className="small" style={{ color: 'var(--cui-secondary-color)' }}>
                   {suggestion.usage_count} uses
                 </span>
               </button>
@@ -267,7 +284,7 @@ export default function TagInput({
       </div>
 
       {/* Helper Text */}
-      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+      <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)' }}>
         Press Enter or comma to add a tag. {value.length}/{maxTags} tags
       </p>
     </div>

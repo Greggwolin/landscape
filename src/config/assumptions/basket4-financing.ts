@@ -5,7 +5,7 @@ export const basket4Config: BasketConfig = {
   basketName: "The Financing",
   basketDescription: "Debt structure, rates, terms, and covenants.",
   icon: "credit-card",
-  tableName: "tbl_debt_facility",
+  tableName: "tbl_loan",
   relatedTables: ['tbl_debt_draw_schedule'],
 
   fieldGroups: [

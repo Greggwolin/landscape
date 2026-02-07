@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Map, X } from 'lucide-react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { formatMoney } from '@/utils/formatters/number';
 import {
@@ -97,26 +98,38 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
   // Map accordion state
   const [showMap, setShowMap] = useState(false);
   const [flyoutWidth, setFlyoutWidth] = useState<number>(0);
+  const [flyoutHeight, setFlyoutHeight] = useState<number>(0);
+  const [flyoutGap, setFlyoutGap] = useState<number>(16);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Calculate flyout width when map opens or window resizes
   useEffect(() => {
     if (!showMap || !cardRef.current) return;
 
-    const calculateWidth = () => {
-      if (cardRef.current) {
-        const rect = cardRef.current.getBoundingClientRect();
-        const rightEdge = rect.right;
-        const viewportWidth = window.innerWidth;
-        // Width from card's right edge to viewport right edge, minus some padding
-        const width = viewportWidth - rightEdge - 16;
-        setFlyoutWidth(Math.max(width, 300)); // Minimum 300px
+    const element = cardRef.current;
+    const calculateSize = () => {
+      const rect = element.getBoundingClientRect();
+      setFlyoutWidth(Math.max(rect.width, 300));
+      setFlyoutHeight(Math.max(rect.height, 300));
+      const grid = element.closest('[data-market-row="pricing"]') as HTMLElement | null;
+      if (grid) {
+        const styles = window.getComputedStyle(grid);
+        const gapValue = styles.columnGap || styles.gap || '16px';
+        const gapPx = parseFloat(gapValue);
+        setFlyoutGap(Number.isFinite(gapPx) ? gapPx : 16);
+      } else {
+        setFlyoutGap(16);
       }
     };
 
-    calculateWidth();
-    window.addEventListener('resize', calculateWidth);
-    return () => window.removeEventListener('resize', calculateWidth);
+    calculateSize();
+    const resizeObserver = new ResizeObserver(() => calculateSize());
+    resizeObserver.observe(element);
+    window.addEventListener('resize', calculateSize);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', calculateSize);
+    };
   }, [showMap]);
 
   // Close map on ESC key
@@ -277,9 +290,9 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
   );
 
   return (
-    <div ref={cardRef} className="card h-100 position-relative" style={{ overflow: 'visible' }}>
-      <div className="card-header d-flex justify-content-between align-items-center">
-        <h5 className="mb-0">SFD Product Pricing</h5>
+    <CCard ref={cardRef} className="h-100 position-relative" style={{ overflow: 'visible' }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center">
+        <span className="fw-semibold">SFD Product Pricing</span>
         <div className="d-flex align-items-center gap-2">
           {!isLoading && analysis && (
             <SemanticBadge intent="status" value="validated">
@@ -292,99 +305,98 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
             </SemanticBadge>
           )}
         </div>
-      </div>
-      <div className="card-body">
+      </CCardHeader>
+      <CCardBody>
         {isLoading && renderLoading()}
         {isError && !isLoading && renderError()}
 
         {!isLoading && !isError && data && (
           <>
             {/* Settings Row */}
-            <div className="d-flex flex-wrap gap-3 align-items-end mb-3 justify-content-between">
-              <div className="d-flex flex-wrap gap-3 align-items-end">
-                {/* Search Radius */}
-                <div className="text-center">
-                  <label className="text-muted small d-block mb-1">Search<br/>Radius</label>
-                  <input
-                    type="text"
-                    value={`${draftRadius} mi`}
-                    onChange={(e) => {
-                      const num = e.target.value.replace(/[^0-9.]/g, '');
-                      setDraftRadius(num);
-                    }}
-                    onBlur={commitRadius}
-                    onKeyDown={handleRadiusKeyDown}
-                    className="form-control form-control-sm text-center"
-                    style={{ width: 70 }}
-                  />
-                </div>
-                {/* Year Built */}
-                <div className="text-center">
-                  <label className="text-muted small d-block mb-1">Year<br/>Built</label>
-                  <input
-                    type="text"
-                    value={`${draftMinYear}+`}
-                    onChange={(e) => {
-                      const num = e.target.value.replace(/[^0-9]/g, '');
-                      setDraftMinYear(num);
-                    }}
-                    onBlur={commitMinYear}
-                    onKeyDown={handleMinYearKeyDown}
-                    className="form-control form-control-sm text-center"
-                    style={{ width: 70 }}
-                  />
-                </div>
-                {/* History Days */}
-                <div className="text-center">
-                  <label className="text-muted small d-block mb-1">History<br/>Days</label>
-                  <input
-                    type="number"
-                    min={30}
-                    max={365}
-                    step={30}
-                    value={draftDays}
-                    onChange={(e) => setDraftDays(e.target.value)}
-                    onBlur={commitDays}
-                    onKeyDown={handleDaysKeyDown}
-                    className="form-control form-control-sm text-center"
-                    style={{ width: 70 }}
-                  />
-                </div>
-                {/* Subdiv Cost/FF */}
-                <div className="text-center">
-                  <label className="text-muted small d-block mb-1">Subdiv<br/>Cost / FF</label>
-                  <input
-                    type="text"
-                    value={`$${subImpPerFf.toLocaleString()}`}
-                    onChange={(e) => {
-                      const num = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10);
-                      if (!isNaN(num)) setSubImpPerFf(num);
-                    }}
-                    className="form-control form-control-sm text-center"
-                    style={{ width: 90 }}
-                  />
-                </div>
-                {/* FinLot Ratio */}
-                <div className="text-center">
-                  <label className="text-muted small d-block mb-1">FinLot<br/>Ratio</label>
-                  <input
-                    type="text"
-                    value={`${defaultFlf}%`}
-                    onChange={(e) => {
-                      const num = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10);
-                      if (!isNaN(num)) setDefaultFlf(num);
-                    }}
-                    className="form-control form-control-sm text-center"
-                    style={{ width: 70 }}
-                  />
-                </div>
+            <div className="d-flex flex-wrap gap-3 align-items-end mb-3">
+              {/* Search Radius */}
+              <div className="text-center">
+                <label className="text-muted small d-block mb-1">Search<br/>Radius</label>
+                <input
+                  type="text"
+                  value={`${draftRadius} mi`}
+                  onChange={(e) => {
+                    const num = e.target.value.replace(/[^0-9.]/g, '');
+                    setDraftRadius(num);
+                  }}
+                  onBlur={commitRadius}
+                  onKeyDown={handleRadiusKeyDown}
+                  className="form-control form-control-sm text-center"
+                  style={{ width: 70 }}
+                />
+              </div>
+              {/* Year Built */}
+              <div className="text-center">
+                <label className="text-muted small d-block mb-1">Year<br/>Built</label>
+                <input
+                  type="text"
+                  value={`${draftMinYear}+`}
+                  onChange={(e) => {
+                    const num = e.target.value.replace(/[^0-9]/g, '');
+                    setDraftMinYear(num);
+                  }}
+                  onBlur={commitMinYear}
+                  onKeyDown={handleMinYearKeyDown}
+                  className="form-control form-control-sm text-center"
+                  style={{ width: 70 }}
+                />
+              </div>
+              {/* History Days */}
+              <div className="text-center">
+                <label className="text-muted small d-block mb-1">History<br/>Days</label>
+                <input
+                  type="number"
+                  min={30}
+                  max={365}
+                  step={30}
+                  value={draftDays}
+                  onChange={(e) => setDraftDays(e.target.value)}
+                  onBlur={commitDays}
+                  onKeyDown={handleDaysKeyDown}
+                  className="form-control form-control-sm text-center"
+                  style={{ width: 70 }}
+                />
+              </div>
+              {/* Subdiv Cost/FF */}
+              <div className="text-center">
+                <label className="text-muted small d-block mb-1">Subdiv<br/>Cost / FF</label>
+                <input
+                  type="text"
+                  value={`$${subImpPerFf.toLocaleString()}`}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(num)) setSubImpPerFf(num);
+                  }}
+                  className="form-control form-control-sm text-center"
+                  style={{ width: 90 }}
+                />
+              </div>
+              {/* FinLot Ratio */}
+              <div className="text-center">
+                <label className="text-muted small d-block mb-1">FinLot<br/>Ratio</label>
+                <input
+                  type="text"
+                  value={`${defaultFlf}%`}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(num)) setDefaultFlf(num);
+                  }}
+                  className="form-control form-control-sm text-center"
+                  style={{ width: 70 }}
+                />
               </div>
               {/* View/Hide Comps Map Button */}
               {data && data.comps.length > 0 && (
                 <button
                   type="button"
-                  className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+                  className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
                   onClick={() => setShowMap(!showMap)}
+                  style={{ padding: '0.35rem 0.6rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
                 >
                   <Map size={14} />
                   <span>{showMap ? 'Hide Comps Map' : 'View Comps Map'}</span>
@@ -411,9 +423,7 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
                       <th>Lot SF Band</th>
                       <th className="text-center">Comps</th>
                       <th className="text-end">Median Price</th>
-                      <th className="text-center">FLF %</th>
                       <th className="text-center">FLV/FF</th>
-                      <th className="text-end">SubImp/FF</th>
                       <th className="text-end">Residual/FF</th>
                       <th className="text-center">Src</th>
                     </tr>
@@ -456,9 +466,7 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
                             }}
                           />
                         </td>
-                        <td className="text-center" style={{ color: 'var(--cui-body-color)' }}>{row.flf}%</td>
                         <td className="text-center" style={{ color: 'var(--cui-body-color)' }}>{formatCurrencyCompact(row.flvPerFf)}</td>
-                        <td className="text-end" style={{ color: 'var(--cui-body-color)' }}>{formatCurrencyCompact(row.subImpPerFf)}</td>
                         <td className="text-end fw-semibold" style={{ color: row.residualPerFf && row.residualPerFf > 0 ? '#57c68a' : '#ef4444' }}>
                           {formatCurrencyCompact(row.residualPerFf)}
                         </td>
@@ -500,56 +508,60 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
 
           </>
         )}
-      </div>
+      </CCardBody>
 
       {/* Inline Map Flyout - slides out from the card, covers Landscaper panel */}
       {showMap && data && (
-        <div
-          className="position-absolute top-0 d-flex flex-column"
+        <CCard
+          className="position-absolute top-0 d-flex flex-column overflow-hidden"
           style={{
-            left: '100%',
-            width: flyoutWidth > 0 ? `${flyoutWidth}px` : 'calc(40vw)',  // Dynamic width to viewport edge
-            height: 'calc(100vh - 300px)',  // Fixed height, doesn't expand with comp details
-            minHeight: '400px',
-            maxHeight: '700px',
-            backgroundColor: 'var(--cui-body-bg)',
-            borderLeft: '1px solid var(--cui-border-color)',
+            left: `calc(100% + ${flyoutGap}px)`,
+            width: flyoutWidth > 0 ? `${flyoutWidth}px` : 'calc(40vw)',
+            height: flyoutHeight > 0 ? `${flyoutHeight}px` : '100%',
+            borderColor: 'var(--cui-card-border-color)',
+            backgroundColor: 'var(--cui-card-bg)',
             boxShadow: '4px 0 20px rgba(0, 0, 0, 0.1)',
             zIndex: 10,
             animation: 'slideInFromCard 0.2s ease-out'
           }}
         >
           {/* Flyout Header */}
-          <div
-            className="card-header d-flex justify-content-between align-items-center py-2"
-          >
-            <h5 className="mb-0" style={{ fontSize: '1.09375rem' }}>
-              SFD Comps Map
-              <span className="ms-2 small fw-normal" style={{ color: 'var(--cui-secondary-color)' }}>
+          <CCardHeader className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center gap-2">
+              <span className="fw-semibold">SFD Comps Map</span>
+              <span className="small fw-normal" style={{ color: 'var(--cui-secondary-color)' }}>
                 {data.comps.length} comps within {radiusMiles} mi
               </span>
-            </h5>
+            </div>
             <button
               type="button"
-              className="btn btn-sm btn-link p-1"
+              className="btn btn-link p-0"
               onClick={() => setShowMap(false)}
-              style={{ color: 'var(--cui-secondary-color)' }}
+              style={{
+                color: 'var(--cui-secondary-color)',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1
+              }}
               aria-label="Close"
             >
-              <X size={20} />
+              <X size={16} />
             </button>
-          </div>
+          </CCardHeader>
 
           {/* Map Container */}
-          <div className="flex-grow-1 p-3 d-flex flex-column" style={{ overflow: 'hidden' }}>
+          <CCardBody className="flex-grow-1 p-3 d-flex flex-column" style={{ overflow: 'hidden' }}>
             <NapkinCompsMap
               projectId={projectId}
               comps={data.comps}
               height="100%"
               radiusMiles={radiusMiles}
             />
-          </div>
-        </div>
+          </CCardBody>
+        </CCard>
       )}
 
       {/* Animation keyframes */}
@@ -565,7 +577,7 @@ export function NapkinSfdPricing({ projectId, showCompDetails = false }: NapkinS
           }
         }
       `}</style>
-    </div>
+    </CCard>
   );
 }
 

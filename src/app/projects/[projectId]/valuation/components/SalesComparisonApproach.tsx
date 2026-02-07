@@ -31,6 +31,20 @@ interface SalesComparisonApproachProps {
   mode?: 'multifamily' | 'land'; // Field label mode for ComparablesGrid
 }
 
+interface ProjectDetails {
+  street_address?: string;
+  city?: string;
+  state?: string;
+  jurisdiction_city?: string;
+  jurisdiction_state?: string;
+  analysis_start_date?: string | null;
+  total_units?: number;
+  target_units?: number;
+  gross_sf?: number;
+  year_built?: number;
+  ownership_type?: string;
+}
+
 export function SalesComparisonApproach({
   projectId,
   comparables,
@@ -41,12 +55,59 @@ export function SalesComparisonApproach({
   const [mapHeight, setMapHeight] = useState<string>('800px');
   const [showModal, setShowModal] = useState(false);
   const [editingComp, setEditingComp] = useState<SalesComparable | null>(null);
+  const [subjectProperty, setSubjectProperty] = useState<{
+    city?: string | null;
+    analysisStartDate?: string | null;
+    units?: number | null;
+    buildingSf?: number | null;
+    yearBuilt?: number | null;
+    ownershipType?: string | null;
+  } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const { activeProject } = useProjectContext();
   const subjectLocation = useMemo(
     () => buildSubjectLocationFromProject(activeProject),
     [activeProject]
   );
+
+  useEffect(() => {
+    let active = true;
+    const loadSubjectDetails = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/details`);
+        if (response.ok) {
+          const details = (await response.json()) as ProjectDetails;
+          if (!active) return;
+          setSubjectProperty({
+            city: details.city ?? details.jurisdiction_city ?? activeProject?.jurisdiction_city ?? null,
+            analysisStartDate: details.analysis_start_date ?? null,
+            units: details.total_units ?? details.target_units ?? activeProject?.total_residential_units ?? null,
+            buildingSf: details.gross_sf ?? activeProject?.total_commercial_sqft ?? null,
+            yearBuilt: details.year_built ?? null,
+            ownershipType: details.ownership_type ?? null
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load subject property details:', error);
+      }
+
+      if (!active) return;
+      setSubjectProperty({
+        city: activeProject?.jurisdiction_city ?? null,
+        analysisStartDate: null,
+        units: activeProject?.total_residential_units ?? null,
+        buildingSf: activeProject?.total_commercial_sqft ?? null,
+        yearBuilt: null,
+        ownershipType: null
+      });
+    };
+
+    loadSubjectDetails();
+    return () => {
+      active = false;
+    };
+  }, [activeProject, projectId]);
   // Measure the grid height and set map to match
   useEffect(() => {
     const updateMapHeight = () => {
@@ -186,6 +247,7 @@ export function SalesComparisonApproach({
               <ComparablesGrid
                 comparables={comparables}
                 projectId={projectId}
+                subjectProperty={subjectProperty ?? undefined}
                 onEdit={handleEditComp}
                 onDelete={handleDeleteComp}
                 onRefresh={onRefresh}

@@ -9,7 +9,7 @@ interface FacilityOption {
 
 interface DrawScheduleItem {
   draw_id?: number;
-  debt_facility_id?: string;
+  loan_id?: string | number;
   period_name: string;
   draw_number?: number;
   draw_amount: number;
@@ -47,10 +47,10 @@ export default function DrawScheduleForm({
   isSaving,
   facilityOptions = []
 }: DrawScheduleFormProps) {
-  const defaultFacilityId = draw?.debt_facility_id ?? facilityOptions[0]?.value;
+  const defaultFacilityId = draw?.loan_id ?? facilityOptions[0]?.value;
 
   const [formData, setFormData] = React.useState<DrawScheduleItem>({
-    debt_facility_id: defaultFacilityId,
+    loan_id: defaultFacilityId,
     period_name: '',
     draw_amount: 0,
     draw_purpose: '',
@@ -59,10 +59,10 @@ export default function DrawScheduleForm({
   });
 
   React.useEffect(() => {
-    if (!formData.debt_facility_id && defaultFacilityId) {
-      setFormData((prev) => ({ ...prev, debt_facility_id: defaultFacilityId }));
+    if (!formData.loan_id && defaultFacilityId) {
+      setFormData((prev) => ({ ...prev, loan_id: defaultFacilityId }));
     }
-  }, [defaultFacilityId, formData.debt_facility_id]);
+  }, [defaultFacilityId, formData.loan_id]);
 
   const updateField = (field: keyof DrawScheduleItem, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -109,16 +109,16 @@ export default function DrawScheduleForm({
                 {facilityOptions.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Debt Facility <span className="text-red-400">*</span>
+                      Loan <span className="text-red-400">*</span>
                     </label>
                     <select
                       required
                       className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={formData.debt_facility_id || ''}
-                      onChange={(e) => updateField('debt_facility_id', e.target.value || undefined)}
+                      value={formData.loan_id || ''}
+                      onChange={(e) => updateField('loan_id', e.target.value || undefined)}
                     >
                       <option value="" disabled>
-                        Select facility
+                        Select loan
                       </option>
                       {facilityOptions.map((option) => (
                         <option key={option.value} value={option.value}>

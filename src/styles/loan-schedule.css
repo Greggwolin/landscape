@@ -1,0 +1,95 @@
+/* Loan Schedule Grid — amortization/revolver schedule display */
+
+.loan-schedule-container {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+}
+
+.loan-schedule-container-full {
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+}
+
+.loan-schedule-grid {
+  font-size: 0.8125rem;
+  font-family: var(--cui-body-font-family);
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.loan-schedule-grid th {
+  background: var(--cui-tertiary-bg);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--cui-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+  color: var(--cui-body-color);
+}
+
+.loan-schedule-grid td {
+  padding: 2px 8px;
+  height: 28px;
+  border-bottom: 1px solid var(--cui-border-color-translucent);
+  white-space: nowrap;
+  color: var(--cui-body-color);
+}
+
+.loan-schedule-grid tr:nth-child(even) {
+  background: var(--cui-secondary-bg);
+}
+
+.loan-schedule-grid tr:hover {
+  background: rgba(var(--cui-primary-rgb), 0.04);
+}
+
+.loan-schedule-grid tr.balloon-row {
+  font-weight: 700;
+  background: rgba(var(--cui-warning-rgb), 0.08);
+}
+
+.loan-schedule-grid tr.balloon-row:hover {
+  background: rgba(var(--cui-warning-rgb), 0.12);
+}
+
+.loan-schedule-grid td.currency {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.loan-schedule-grid tr.summary-row {
+  font-weight: 700;
+  border-top: 2px solid var(--cui-border-color);
+}
+
+.loan-schedule-grid tr.summary-row td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  background: var(--cui-tertiary-bg);
+}
+
+/* Summary strip in modal */
+
+.schedule-summary-strip {
+  background: var(--cui-tertiary-bg);
+  padding: 8px 16px;
+  border-radius: var(--cui-border-radius);
+  font-size: 0.8125rem;
+  color: var(--cui-body-color);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.schedule-summary-strip .metric-label {
+  color: var(--cui-text-muted);
+}
+
+.schedule-summary-strip .metric-value {
+  font-weight: 600;
+}

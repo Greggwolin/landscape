@@ -64,6 +64,26 @@ class Container(models.Model):
         help_text='Flexible attributes (units, acres, status, etc.)'
     )
     is_active = models.BooleanField(default=True)
+
+    # ── Lotbank per-product fields (division level) ─────────────────
+    # All _pct fields stored as DECIMALS (0.15 = 15%), NOT percentages.
+    option_deposit_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Option deposit as decimal (0.15 = 15%).'
+    )
+    option_deposit_cap_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Deposit cap ratio as decimal (0.20 = 20%).'
+    )
+    retail_lot_price = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='Per-lot option/takedown price ($).'
+    )
+    premium_pct = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Phase premium as decimal (0.15 = 15%).'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

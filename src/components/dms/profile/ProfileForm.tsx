@@ -132,14 +132,27 @@ export default function ProfileForm({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div
+      className="border rounded overflow-hidden"
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        borderColor: 'var(--cui-card-border-color)',
+        color: 'var(--cui-body-color)'
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div
+        className="d-flex align-items-center justify-content-between p-3 border-bottom"
+        style={{
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderColor: 'var(--cui-card-border-color)'
+        }}
+      >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          <h2 className="m-0 fw-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
             {docId ? 'Edit Document Profile' : 'Document Profile'}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <p className="mb-0" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
             Add metadata to help organize and find this document
           </p>
         </div>
@@ -148,30 +161,33 @@ export default function ProfileForm({
           className="btn btn-sm btn-ghost-secondary"
           aria-label="Close"
         >
-          <XMarkIcon className="w-5 h-5" />
+          <XMarkIcon style={{ width: '1.25rem', height: '1.25rem' }} />
         </button>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="p-4">
-        <div className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="p-3">
+        <div className="d-flex flex-column gap-3">
           {/* Document Type */}
           <div>
-            <label htmlFor="doc_type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Document Type <span className="text-red-500">*</span>
+            <label htmlFor="doc_type" className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
+              Document Type <span className="text-danger">*</span>
             </label>
             {loadingDocTypes ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <div className="d-flex align-items-center gap-2 small" style={{ color: 'var(--cui-secondary-color)' }}>
+                <div className="spinner-border spinner-border-sm" role="status" />
                 Loading options...
               </div>
             ) : (
               <select
                 {...register('doc_type')}
                 id="doc_type"
-                className={`block w-full rounded-md border ${
-                  errors.doc_type ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
-                } px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white`}
+                className={`form-select form-select-sm ${errors.doc_type ? 'is-invalid' : ''}`}
+                style={{
+                  backgroundColor: 'var(--cui-input-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)'
+                }}
               >
                 <option value="">Select document type</option>
                 {docTypeOptions.map(option => (
@@ -182,27 +198,32 @@ export default function ProfileForm({
               </select>
             )}
             {errors.doc_type && (
-              <p className="mt-1 text-xs text-red-600">{errors.doc_type.message}</p>
+              <p className="mt-1 small text-danger">{errors.doc_type.message}</p>
             )}
           </div>
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="description" className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
               Description
             </label>
             <textarea
               {...register('description')}
               id="description"
               rows={3}
-              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="form-control form-control-sm"
+              style={{
+                backgroundColor: 'var(--cui-input-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)'
+              }}
               placeholder="Brief description of the document..."
             />
           </div>
 
           {/* Tags */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
               Tags
             </label>
             <TagInput
@@ -216,45 +237,55 @@ export default function ProfileForm({
 
           {/* Document Date */}
           <div>
-            <label htmlFor="doc_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="doc_date" className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
               Document Date
             </label>
             <input
               {...register('doc_date')}
               type="date"
               id="doc_date"
-              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="form-control form-control-sm"
+              style={{
+                backgroundColor: 'var(--cui-input-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)'
+              }}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)' }}>
               The official date of the document (e.g., contract date, report date)
             </p>
           </div>
 
           {/* Parties */}
           <div>
-            <label htmlFor="parties" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="parties" className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
               Parties Involved
             </label>
             <input
               {...register('parties')}
               type="text"
               id="parties"
-              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="form-control form-control-sm"
+              style={{
+                backgroundColor: 'var(--cui-input-bg)',
+                borderColor: 'var(--cui-border-color)',
+                color: 'var(--cui-body-color)'
+              }}
               placeholder="e.g., ABC Corp, City of Portland"
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)' }}>
               Organizations or individuals related to this document
             </p>
           </div>
 
           {/* Dollar Amount */}
           <div>
-            <label htmlFor="dollar_amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="dollar_amount" className="form-label mb-1" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
               Dollar Amount
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-sm">$</span>
+            <div className="position-relative">
+              <div className="position-absolute top-0 bottom-0 start-0 d-flex align-items-center ps-2 pe-1">
+                <span className="small" style={{ color: 'var(--cui-secondary-color)' }}>$</span>
               </div>
               <input
                 {...register('dollar_amount', {
@@ -264,18 +295,24 @@ export default function ProfileForm({
                 id="dollar_amount"
                 step="0.01"
                 min="0"
-                className="block w-full rounded-md border border-gray-300 dark:border-gray-600 pl-8 pr-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="form-control form-control-sm"
+                style={{
+                  paddingLeft: '1.75rem',
+                  backgroundColor: 'var(--cui-input-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--cui-body-color)'
+                }}
                 placeholder="0.00"
               />
             </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)' }}>
               Contract value, invoice amount, or other financial figure
             </p>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="d-flex justify-content-end gap-3 mt-4 pt-3 border-top" style={{ borderColor: 'var(--cui-card-border-color)' }}>
           <button
             type="button"
             onClick={onCancel}
@@ -291,12 +328,12 @@ export default function ProfileForm({
           >
             {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <span className="spinner-border spinner-border-sm me-2" role="status" />
                 Saving...
               </>
             ) : (
               <>
-                <CheckIcon className="w-4 h-4 mr-2" />
+                <CheckIcon style={{ width: '16px', height: '16px', marginRight: '0.5rem' }} />
                 Save Profile
               </>
             )}

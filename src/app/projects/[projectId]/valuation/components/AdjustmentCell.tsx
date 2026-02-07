@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SalesCompAdjustment } from '@/types/valuation';
 
 interface AdjustmentCellProps {
@@ -24,43 +24,40 @@ export function AdjustmentCell({
   const stripNonNumeric = (value: string) => value.replace(/[^0-9.\-]/g, '');
 
   const [finalValue, setFinalValue] = useState<string>(
-    formatDisplayValue(currentAdjustment?.user_adjustment_pct ?? null)
+    formatDisplayValue(currentAdjustment?.user_adjustment_pct ?? currentAdjustment?.adjustment_pct ?? null)
   );
 
   useEffect(() => {
-    if (currentAdjustment?.user_adjustment_pct != null) {
-      setFinalValue(formatDisplayValue(currentAdjustment.user_adjustment_pct));
+    const displayValue = currentAdjustment?.user_adjustment_pct ?? currentAdjustment?.adjustment_pct ?? null;
+    if (displayValue != null) {
+      setFinalValue(formatDisplayValue(displayValue));
     } else {
       setFinalValue('');
     }
-  }, [currentAdjustment?.user_adjustment_pct]);
+  }, [currentAdjustment?.user_adjustment_pct, currentAdjustment?.adjustment_pct]);
+
+  const commitFinalValue = useCallback((rawValue: string) => {
+    const cleaned = stripNonNumeric(rawValue);
+    if (cleaned === '' || cleaned === '-') {
+      setFinalValue('');
+      onFinalChange(comparableId, adjustmentType, null);
+      return;
+    }
+
+    const numValue = parseFloat(cleaned);
+    if (!Number.isNaN(numValue)) {
+      setFinalValue(`${numValue}%`);
+      onFinalChange(comparableId, adjustmentType, numValue / 100);
+    }
+  }, [adjustmentType, comparableId, onFinalChange]);
 
   const handleFinalInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const cleaned = stripNonNumeric(event.target.value);
     setFinalValue(cleaned);
-
-    if (cleaned === '' || cleaned === '-') {
-      onFinalChange(comparableId, adjustmentType, null);
-      return;
-    }
-
-    const numValue = parseFloat(cleaned);
-    if (!isNaN(numValue)) {
-      onFinalChange(comparableId, adjustmentType, numValue / 100);
-    }
   };
 
   const handleBlur = () => {
-    const cleaned = stripNonNumeric(finalValue);
-    if (cleaned === '' || cleaned === '-') {
-      setFinalValue('');
-      onFinalChange(comparableId, adjustmentType, null);
-      return;
-    }
-    const numValue = parseFloat(cleaned);
-    if (!isNaN(numValue)) {
-      setFinalValue(`${numValue}%`);
-    }
+    commitFinalValue(finalValue);
   };
 
   return (
@@ -76,6 +73,13 @@ export function AdjustmentCell({
         value={finalValue}
         onChange={handleFinalInputChange}
         onBlur={handleBlur}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commitFinalValue((event.target as HTMLInputElement).value);
+            (event.target as HTMLInputElement).blur();
+          }
+        }}
         placeholder="-"
         className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{

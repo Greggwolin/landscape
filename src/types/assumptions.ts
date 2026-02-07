@@ -253,43 +253,100 @@ export interface CapexReserve {
   updated_at?: string;
 }
 
-export interface DebtFacility {
-  debt_facility_id?: string;
-  project_id: number;
-
-  // Napkin tier
-  loan_amount: number;
-  interest_rate_pct: number;
-  amortization_years: number;
-  loan_term_years: number;
-
-  // Mid tier
-  ltv_pct?: number;
-  dscr?: number;
-  interest_only_years?: number;
-  origination_fee_pct?: number;
-  lender_legal_fees?: number;
-  third_party_reports?: number;
-  rate_type?: string;
-  index_spread_bps?: number;
-
-  // Pro tier
-  prepayment_penalty_structure?: string;
-  prepayment_penalty_years?: number;
-  guarantee_type?: string;
-  guarantor_name?: string;
-  loan_covenant_dscr_min?: number;
-  loan_covenant_ltv_max?: number;
-  reserve_requirements?: Record<string, number | string>; // JSONB
-  replacement_reserve_per_unit?: number;
-  tax_insurance_escrow_months?: number;
-  commitment_fee_pct?: number;
-  extension_option_years?: number;
-  extension_fee_bps?: number;
-
-  created_at?: string;
-  updated_at?: string;
+export interface Loan {
+  loan_id: number;
+  loan_name: string;
+  loan_type:
+    | 'CONSTRUCTION'
+    | 'BRIDGE'
+    | 'PERMANENT'
+    | 'MEZZANINE'
+    | 'LINE_OF_CREDIT'
+    | 'PREFERRED_EQUITY'
+    | string;
+  facility_structure?: 'TERM' | 'REVOLVER' | string | null;
+  structure_type?: 'TERM' | 'REVOLVER' | string | null;
+  lender_name: string | null;
+  seniority: number;
+  status: 'active' | 'pending' | 'closed' | 'defeased';
+  commitment_amount: number;
+  loan_amount: number | null;
+  loan_to_cost_pct: number | null;
+  loan_to_value_pct: number | null;
+  interest_rate_pct: number | null;
+  interest_type: 'Fixed' | 'Floating' | string | null;
+  interest_index?: 'SOFR' | 'PRIME' | 'FIXED' | string | null;
+  interest_spread_bps?: number | null;
+  loan_term_months: number | null;
+  loan_term_years: number | null;
+  amortization_months: number | null;
+  amortization_years: number | null;
+  interest_only_months: number | null;
+  payment_frequency:
+    | 'MONTHLY'
+    | 'QUARTERLY'
+    | 'SEMI_ANNUAL'
+    | 'ANNUAL'
+    | 'AT_MATURITY'
+    | 'Monthly'
+    | 'Quarterly'
+    | string
+    | null;
+  loan_start_date: string | null;
+  loan_maturity_date: string | null;
+  origination_fee_pct: number | null;
+  exit_fee_pct: number | null;
+  unused_fee_pct?: number | null;
+  interest_reserve_inflator?: number | null;
+  repayment_acceleration?: number | null;
+  draw_trigger_type?: 'COST_INCURRED' | 'MANUAL' | string | null;
+  collateral_basis_type?: 'PROJECT_COST' | 'RESIDUAL_LAND_VALUE' | string | null;
+  closing_costs_appraisal?: number | null;
+  closing_costs_legal?: number | null;
+  closing_costs_closing?: number | null;
+  closing_costs_other?: number | null;
+  recourse_type?: 'FULL' | 'NON_RECOURSE' | 'PARTIAL' | string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
+
+export interface LoanSummary {
+  loan_id: number;
+  loan_name: string;
+  loan_type: string;
+  facility_structure?: string | null;
+  structure_type?: string | null;
+  lender_name: string | null;
+  commitment_amount: number;
+  loan_amount: number | null;
+  interest_rate_pct: number | null;
+  seniority: number;
+  status: string;
+  loan_maturity_date: string | null;
+  loan_term_months?: number | null;
+  amortization_months?: number | null;
+  interest_only_months?: number | null;
+  loan_start_date?: string | null;
+  interest_type?: string | null;
+}
+
+export interface DebtDrawSchedule {
+  draw_id: number;
+  loan_id: number;
+  period_id: number;
+  draw_number: number | null;
+  draw_amount: number | null;
+  cumulative_drawn: number | null;
+  available_remaining: number | null;
+  beginning_balance: number | null;
+  ending_balance: number | null;
+  draw_status: 'PROJECTED' | 'REQUESTED' | 'FUNDED' | 'ACTUAL';
+  interest_amount: number | null;
+  principal_payment: number | null;
+}
+
+export type DebtFacility = Loan;
 
 export interface EquityStructure {
   equity_structure_id?: number;

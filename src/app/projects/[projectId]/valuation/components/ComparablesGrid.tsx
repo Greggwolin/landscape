@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type {
   SalesComparable,
   SalesCompAdjustment,
@@ -17,9 +17,19 @@ import { AdjustmentCell } from './AdjustmentCell';
 import { updateSalesComparable, updateUserAdjustment } from '@/lib/api/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
 
+interface SubjectPropertyInfo {
+  city?: string | null;
+  analysisStartDate?: string | null;
+  units?: number | null;
+  buildingSf?: number | string | null;
+  yearBuilt?: number | null;
+  ownershipType?: string | null;
+}
+
 interface ComparablesGridProps {
   comparables: SalesComparable[];
   projectId: number;
+  subjectProperty?: SubjectPropertyInfo;
   onEdit?: (comp: SalesComparable) => void;
   onDelete?: (compId: number) => Promise<void>;
   onRefresh?: () => void;
@@ -32,40 +42,46 @@ type AdjustmentSectionKey = 'transaction' | 'property';
 const ADJUSTMENT_SECTIONS: {
   key: AdjustmentSectionKey;
   label: string;
-  adjustments: { type: string; label: string; indent: number }[];
+  adjustments: { type: string; label: string; indent: number; source: 'backend' | 'local' }[];
 }[] = [
   {
     key: 'transaction',
     label: 'Transaction',
     adjustments: [
-      { type: 'property_rights', label: 'Property Rights', indent: 1 },
-      { type: 'financing', label: 'Financing', indent: 1 },
-      { type: 'conditions_of_sale', label: 'Conditions of Sale', indent: 1 },
-      { type: 'market_conditions', label: 'Market Conditions', indent: 1 },
-      { type: 'other', label: 'Other', indent: 1 },
+      { type: 'property_rights', label: 'Property Rights', indent: 1, source: 'backend' },
+      { type: 'financing', label: 'Financing', indent: 1, source: 'backend' },
+      { type: 'conditions_of_sale', label: 'Conditions of Sale', indent: 1, source: 'backend' },
+      { type: 'market_conditions', label: 'Market Conditions', indent: 1, source: 'backend' },
+      { type: 'other', label: 'Other', indent: 1, source: 'backend' },
     ]
   },
   {
     key: 'property',
     label: 'Property',
     adjustments: [
-      { type: 'location', label: 'Location', indent: 2 },
-      { type: 'physical_condition', label: 'Age / Condition', indent: 2 },
-      { type: 'economic', label: 'Economic', indent: 2 },
-      { type: 'deferred_maintenance', label: 'Deferred Maint', indent: 2 },
-      { type: 'other', label: 'Other', indent: 2 },
+      { type: 'location', label: 'Location', indent: 2, source: 'backend' },
+      { type: 'size_units', label: 'Size (Units)', indent: 2, source: 'local' },
+      { type: 'physical_age', label: 'Age / Condition', indent: 2, source: 'backend' },
+      { type: 'physical_unit_mix', label: 'Unit Mix', indent: 2, source: 'backend' },
+      { type: 'economic', label: 'Economic', indent: 2, source: 'backend' },
+      { type: 'deferred_maintenance', label: 'Deferred Maint', indent: 2, source: 'local' },
+      { type: 'property_other', label: 'Other', indent: 2, source: 'local' },
     ]
   }
 ];
 
-export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRefresh, onAddComp, mode = 'multifamily' }: ComparablesGridProps) {
+export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdit, onDelete, onRefresh, onAddComp, mode = 'multifamily' }: ComparablesGridProps) {
   const [openSections, setOpenSections] = useState<Record<AdjustmentSectionKey, boolean>>({
     transaction: true,
     property: true
   });
-  const [editingCompId, setEditingCompId] = useState<number | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState<{ compId: number; comp: SalesComparable } | null>(null);
   const [pendingValues, setPendingValues] = useState<Record<number, Record<string, string>>>({});
+  const [subjectAdjustments, setSubjectAdjustments] = useState<Record<string, string>>({});
+  const [ownershipOptions, setOwnershipOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [subjectOwnership, setSubjectOwnership] = useState<string>('');
+  const compColumnWidth = 128;
+  const compColumnStyle = { width: `${compColumnWidth}px`, minWidth: `${compColumnWidth}px` };
   type ComparableField =
     | 'city'
     | 'sale_date'
@@ -144,10 +160,77 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     return Math.round(num).toString();
   };
 
+  const formatCapRateValue = (value: number | string | null | undefined) => {
+    if (value == null || value === '') return '';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return `${(num * 100).toFixed(1)}%`;
+  };
+
+  const formatSubjectValue = (value: string | number | null | undefined) => {
+    if (value == null || value === '') return '-';
+    return String(value);
+  };
+
   const dateFormatter = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     year: '2-digit'
   });
+
+  useEffect(() => {
+    let active = true;
+    const loadOwnershipOptions = async () => {
+      try {
+        const response = await fetch('/api/lookups/ownership-types');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!active) return;
+        setOwnershipOptions(Array.isArray(data?.options) ? data.options : []);
+      } catch (error) {
+        console.error('Failed to load ownership types:', error);
+      }
+    };
+
+    loadOwnershipOptions();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!subjectProperty?.ownershipType || subjectOwnership) return;
+    const raw = subjectProperty.ownershipType.trim();
+    if (!raw) return;
+    const normalized = raw.toLowerCase().replace(/[\s-]+/g, '_');
+    const matched = ownershipOptions.find(option =>
+      option.value.toLowerCase() === normalized ||
+      option.label.toLowerCase() === raw.toLowerCase()
+    );
+    setSubjectOwnership(matched?.value || raw);
+  }, [ownershipOptions, subjectOwnership, subjectProperty?.ownershipType]);
+
+  useEffect(() => {
+    if (!subjectProperty) return;
+    const currentYear = new Date().getFullYear();
+    const subjectCity = subjectProperty.city ?? '';
+    const subjectAge = subjectProperty.yearBuilt ? `${currentYear - subjectProperty.yearBuilt}` : 'N/A';
+
+    setSubjectAdjustments(prev => {
+      const next = { ...prev };
+      if (next.financing == null) next.financing = 'All Cash';
+      if (next.conditions_of_sale == null) next.conditions_of_sale = 'Arms Length';
+      if (next.market_conditions == null) next.market_conditions = 'Current';
+      if (next.other == null) next.other = 'N/A';
+      if (next.location == null) next.location = subjectCity || 'N/A';
+      if (next.size_units == null) next.size_units = subjectProperty.units != null ? `${subjectProperty.units}` : '';
+      if (next.physical_age == null) next.physical_age = subjectAge;
+      if (next.physical_unit_mix == null) next.physical_unit_mix = 'N/A';
+      if (next.economic == null) next.economic = 'N/A';
+      if (next.deferred_maintenance == null) next.deferred_maintenance = '-';
+      if (next.property_other == null) next.property_other = '';
+      return next;
+    });
+  }, [subjectProperty]);
 
   const formatDateLabel = (value: string | null | undefined) => {
     if (!value) return '';
@@ -159,8 +242,28 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     return month && year ? `${month}-${year}` : `${month}${year}`;
   };
 
-  // Get current adjustment for a specific comparable and adjustment type
+  const subjectCityLabel = formatSubjectValue(subjectProperty?.city);
+  const subjectAnalysisDateLabel = subjectProperty?.analysisStartDate
+    ? formatDateLabel(subjectProperty.analysisStartDate)
+    : '-';
+  const subjectUnitsLabel = subjectProperty?.units != null
+    ? formatNumberWithCommas(subjectProperty.units)
+    : '-';
+  const subjectBuildingSfLabel = subjectProperty?.buildingSf != null
+    ? formatNumberWithCommas(Number(subjectProperty.buildingSf))
+    : '-';
+  const subjectYearBuiltLabel = subjectProperty?.yearBuilt != null
+    ? formatYearValue(subjectProperty.yearBuilt)
+    : '-';
+
   const getCurrentAdjustment = (comp: SalesComparable, adjType: string): SalesCompAdjustment | null => {
+    if (adjType === 'physical_age') {
+      return (
+        comp.adjustments?.find(a => a.adjustment_type === 'physical_age') ||
+        comp.adjustments?.find(a => a.adjustment_type === 'physical_condition') ||
+        null
+      );
+    }
     return comp.adjustments?.find(a => a.adjustment_type === adjType) || null;
   };
 
@@ -216,7 +319,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
           comp.building_sf != null ? Number(comp.building_sf) : null
         );
       case 'cap_rate':
-        return formatDecimalPercentage(comp.cap_rate);
+        return formatCapRateValue(comp.cap_rate);
       case 'year_built':
         return formatYearValue(comp.year_built);
       default:
@@ -431,11 +534,6 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     }
   }, [comparables, onRefresh]);
 
-  // Toggle edit mode
-  const handleEditToggle = (compId: number) => {
-    setEditingCompId(editingCompId === compId ? null : compId);
-  };
-
   // Handle delete click - open confirmation modal
   const handleDeleteClick = (compId: number) => {
     const comp = comparables.find(c => c.comparable_id === compId);
@@ -470,6 +568,87 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     return `${pct > 0 ? '+' : ''}${formatted}%`;
   };
 
+  const getAdjustmentValue = (adjustment: SalesCompAdjustment) => {
+    const rawValue = adjustment.user_adjustment_pct ?? adjustment.adjustment_pct;
+    if (rawValue == null) return 0;
+    const numValue = Number(rawValue);
+    return Number.isFinite(numValue) ? numValue : 0;
+  };
+
+  const transactionAdjustmentTypes = ADJUSTMENT_SECTIONS
+    .find(section => section.key === 'transaction')
+    ?.adjustments.filter(adj => adj.source === 'backend')
+    .map(adj => adj.type) ?? [];
+
+  const propertyAdjustmentTypes = ADJUSTMENT_SECTIONS
+    .find(section => section.key === 'property')
+    ?.adjustments.filter(adj => adj.source === 'backend')
+    .map(adj => adj.type) ?? [];
+
+  const getAdjustmentByType = (comp: SalesComparable, adjType: string) => {
+    if (adjType === 'physical_age') {
+      return (
+        comp.adjustments?.find(adj => adj.adjustment_type === 'physical_age') ||
+        comp.adjustments?.find(adj => adj.adjustment_type === 'physical_condition') ||
+        null
+      );
+    }
+    return comp.adjustments?.find(adj => adj.adjustment_type === adjType) ?? null;
+  };
+
+  const getTransactionAdjustmentPct = (comp: SalesComparable) => {
+    return transactionAdjustmentTypes.reduce((sum, adjType) => {
+      const adjustment = getAdjustmentByType(comp, adjType);
+      if (!adjustment) return sum;
+      return sum + getAdjustmentValue(adjustment);
+    }, 0);
+  };
+
+  const getPropertyAdjustmentPct = (comp: SalesComparable) => {
+    return propertyAdjustmentTypes.reduce((sum, adjType) => {
+      const adjustment = getAdjustmentByType(comp, adjType);
+      if (!adjustment) return sum;
+      return sum + getAdjustmentValue(adjustment);
+    }, 0);
+  };
+
+  const getTotalAdjustmentPct = (comp: SalesComparable) => {
+    const transactionAdj = getTransactionAdjustmentPct(comp);
+    const propertyAdj = getPropertyAdjustmentPct(comp);
+    return transactionAdj + propertyAdj;
+  };
+
+  const getBasePricePerUnit = (comp: SalesComparable) => {
+    const pricePerUnit = comp.price_per_unit != null ? Number(comp.price_per_unit) : null;
+    if (pricePerUnit != null && Number.isFinite(pricePerUnit)) return pricePerUnit;
+    const salePrice = comp.sale_price != null ? Number(comp.sale_price) : null;
+    const units = comp.units != null ? Number(comp.units) : null;
+    if (salePrice != null && units != null && Number.isFinite(salePrice) && Number.isFinite(units) && units !== 0) {
+      return salePrice / units;
+    }
+    return null;
+  };
+
+  const getAdjustedPricePerUnit = (comp: SalesComparable) => {
+    const basePrice = getBasePricePerUnit(comp);
+    if (basePrice == null) return null;
+    const totalAdj = getTotalAdjustmentPct(comp);
+    const adjusted = basePrice * (1 + totalAdj);
+    if (!Number.isFinite(adjusted)) return null;
+    return adjusted;
+  };
+
+  const handleSubjectAdjustmentChange = (adjType: string, value: string) => {
+    setSubjectAdjustments(prev => ({
+      ...prev,
+      [adjType]: value
+    }));
+  };
+
+  const formatCurrencyValue = (value: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  };
+
   const toggleSection = (sectionKey: AdjustmentSectionKey) => {
     setOpenSections(prev => ({
       ...prev,
@@ -477,12 +656,106 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
     }));
   };
 
+  const subjectOwnershipIsCustom = Boolean(
+    subjectOwnership && !ownershipOptions.some(option => option.value === subjectOwnership)
+  );
+
+  const renderSubjectAdjustmentCell = (
+    sectionKey: AdjustmentSectionKey,
+    adjType: string,
+    source: 'backend' | 'local'
+  ) => {
+    const isPropertyOther = sectionKey === 'property' && adjType === 'property_other';
+    const isDeferredMaintenance = adjType === 'deferred_maintenance';
+    const valueKey = isPropertyOther ? 'property_other' : adjType;
+    const currentValue = subjectAdjustments[valueKey] ?? '';
+    const placeholder = isPropertyOther ? 'N/A' : isDeferredMaintenance ? '-' : '-';
+
+    const handleDeferredBlur = () => {
+      if (!isDeferredMaintenance) return;
+      const cleaned = currentValue.replace(/[^0-9.\-]/g, '');
+      if (cleaned === '' || cleaned === '-') {
+        handleSubjectAdjustmentChange(valueKey, '-');
+        return;
+      }
+      const numValue = parseFloat(cleaned);
+      if (!Number.isNaN(numValue)) {
+        handleSubjectAdjustmentChange(valueKey, formatCurrencyValue(numValue));
+      }
+    };
+
+    return (
+    <td
+      key={`subject-${adjType}`}
+      className="py-1 px-4 text-center border-l"
+      style={{
+        borderColor: 'var(--cui-border-color)',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      {adjType === 'property_rights' ? (
+        <select
+          value={subjectOwnership}
+          onChange={(event) => setSubjectOwnership(event.target.value)}
+          className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+          style={{
+            color: 'var(--cui-body-color)',
+            outline: 'none',
+            boxShadow: 'none',
+            border: 'none',
+            borderWidth: 0,
+            borderRadius: 0,
+            backgroundColor: 'transparent',
+            fontSize: '13px',
+            lineHeight: '1.2',
+            minHeight: '20px'
+          }}
+        >
+          <option value="">Select</option>
+          {subjectOwnershipIsCustom && (
+            <option value={subjectOwnership}>
+              {subjectProperty?.ownershipType || subjectOwnership}
+            </option>
+          )}
+          {ownershipOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          value={currentValue}
+          onChange={(event) => handleSubjectAdjustmentChange(valueKey, event.target.value)}
+          onBlur={handleDeferredBlur}
+          placeholder={placeholder}
+          className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+          style={{
+            color: 'var(--cui-body-color)',
+            outline: 'none',
+            boxShadow: 'none',
+            border: 'none',
+            borderWidth: 0,
+            borderRadius: 0,
+            backgroundColor: 'transparent',
+            fontSize: '13px',
+            lineHeight: '1.2',
+            minHeight: '20px'
+          }}
+        />
+      )}
+    </td>
+    );
+  };
+
   // Render adjustment row helper
   const renderAdjustmentRow = (
     sectionKey: AdjustmentSectionKey,
     adjType: string,
     label: string,
-    indentLevel: number
+    indentLevel: number,
+    source: 'backend' | 'local'
   ) => {
     const paddingLeft = 16 + indentLevel * 12;
     return (
@@ -497,15 +770,31 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
         >
           {label}
         </td>
-        {comparables.map(comp => (
-          <AdjustmentCell
-            key={`${sectionKey}-${adjType}-${comp.comparable_id}`}
-            comparableId={comp.comparable_id}
-            adjustmentType={adjType}
-            currentAdjustment={getCurrentAdjustment(comp, adjType)}
-            onFinalChange={handleFinalChange}
-          />
-        ))}
+        {renderSubjectAdjustmentCell(sectionKey, adjType, source)}
+        {source === 'backend'
+          ? comparables.map(comp => (
+            <AdjustmentCell
+              key={`${sectionKey}-${adjType}-${comp.comparable_id}`}
+              comparableId={comp.comparable_id}
+              adjustmentType={adjType}
+              currentAdjustment={getCurrentAdjustment(comp, adjType)}
+              onFinalChange={handleFinalChange}
+            />
+          ))
+          : comparables.map(comp => (
+            <td
+              key={`${sectionKey}-${adjType}-${comp.comparable_id}`}
+              className="py-1 px-4 text-center border-l"
+              style={{
+                color: 'var(--cui-secondary-color)',
+                borderColor: 'var(--cui-border-color)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              -
+            </td>
+          ))
+        }
       </tr>
     );
   };
@@ -563,7 +852,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                     <div className="text-sm" style={{ color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
                       {(() => {
                         const comp = deleteModalOpen.comp;
-                        const totalAdj = Math.abs(comp.total_adjustment_pct * 100);
+                        const totalAdj = Math.abs(getTotalAdjustmentPct(comp) * 100);
 
                         // AI decision logic
                         if (totalAdj > 25) {
@@ -655,12 +944,13 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
             {/* Column widths */}
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
-              {comparables.map(comp => (
-                <React.Fragment key={`colgroup-${comp.comparable_id}`}>
-                  <col style={{ width: '128px', minWidth: '128px' }} />
-                </React.Fragment>
-              ))}
-            </colgroup>
+              <col style={compColumnStyle} />
+      {comparables.map(comp => (
+        <React.Fragment key={`colgroup-${comp.comparable_id}`}>
+          <col style={compColumnStyle} />
+        </React.Fragment>
+      ))}
+    </colgroup>
 
             <thead>
               {/* Main header row - Comp numbers with Edit/Save */}
@@ -694,6 +984,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                     </LandscapeButton>
                   </div>
                 </th>
+                <th
+                  className="text-center py-1 px-2 font-semibold border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)'
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
+                    <span>Subject</span>
+                  </div>
+                </th>
                 {comparables.map((comp, idx) => (
                   <th
                     key={`comp-header-${comp.comparable_id}`}
@@ -704,26 +1005,8 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                     }}
                   >
                     <div className="flex flex-col items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
-                      <span>Comp {idx + 1}</span>
-                      <div className="flex items-center gap-2">
-                        <LandscapeButton
-                          variant="ghost"
-                          color="secondary"
-                          size="sm"
-                          onClick={() => handleEditToggle(comp.comparable_id)}
-                          className="!p-0 transition-opacity hover:opacity-70"
-                          title={editingCompId === comp.comparable_id ? 'Save changes' : 'Edit comparable'}
-                        >
-                          {editingCompId === comp.comparable_id ? (
-                            <svg className="icon" width="14" height="14" viewBox="0 0 512 512" style={{ opacity: 0.6 }}>
-                              <path fill="var(--cui-success)" d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"/>
-                            </svg>
-                          ) : (
-                            <svg className="icon" width="14" height="14" viewBox="0 0 512 512" style={{ opacity: 0.5 }}>
-                              <path fill="var(--cui-secondary-color)" d="M453.3125,120.99609,391.00391,58.6875a54.32117,54.32117,0,0,0-76.81641,0l-270.293,270.29688a7.99971,7.99971,0,0,0-2.34375,5.65625L32.00391,460.34766A7.99922,7.99922,0,0,0,40,468.00391l125.70312-9.55078a7.99971,7.99971,0,0,0,5.65625-2.34375L441.65234,185.8125l11.66016-11.66016A54.27776,54.27776,0,0,0,453.3125,120.99609ZM164.89844,440.918,47.41016,449.32422l8.40625-117.48828L243.26953,144.38281l109.08594,109.08594ZM442.03516,162.82422,430.37891,174.48047,321.29688,65.39844,332.95312,53.74219a38.35946,38.35946,0,1,1,54.24609,54.24609l.00391.00391Z"/>
-                            </svg>
-                          )}
-                        </LandscapeButton>
+                      <span className="flex items-center gap-2">
+                        Comp {idx + 1}
                         <LandscapeButton
                           variant="ghost"
                           color="secondary"
@@ -743,6 +1026,8 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                             <path fill="var(--cui-danger)" d="M320,160c-8.284,0-15,6.716-15,15v241c0,8.284,6.716,15,15,15s15-6.716,15-15V175C335,166.716,328.284,160,320,160z"/>
                           </svg>
                         </LandscapeButton>
+                      </span>
+                      <div className="flex items-center gap-2">
                       </div>
                     </div>
                   </th>
@@ -761,6 +1046,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   Location
+                </td>
+                <td
+                  key="subject-location"
+                  className="py-1 px-4 text-center border-l text-sm"
+                  style={{
+                    color: 'var(--cui-secondary-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {subjectCityLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -787,6 +1083,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   Date
+                </td>
+                <td
+                  key="subject-date"
+                  className="py-1 px-4 text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {subjectAnalysisDateLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -816,6 +1123,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   Sale Price
+                </td>
+                <td
+                  key="subject-sale-price"
+                  className="py-1 px-4 font-medium text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  N/A
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -847,6 +1165,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   {getFieldLabel('Price/Unit')}
                 </td>
+                <td
+                  key="subject-ppu"
+                  className="py-1 px-4 font-medium text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  N/A
+                </td>
                 {comparables.map(comp => (
                 <td
                     key={`ppu-${comp.comparable_id}`}
@@ -876,6 +1205,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   {getFieldLabel('Price/SF')}
+                </td>
+                <td
+                  key="subject-psf"
+                  className="py-1 px-4 font-medium text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  N/A
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -907,6 +1247,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   {getFieldLabel('Units')}
                 </td>
+                <td
+                  key="subject-units"
+                  className="py-1 px-4 text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {subjectUnitsLabel}
+                </td>
                 {comparables.map(comp => (
                 <td
                     key={`units-${comp.comparable_id}`}
@@ -936,6 +1287,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   {getFieldLabel('Building SF')}
+                </td>
+                <td
+                  key="subject-building-sf"
+                  className="py-1 px-4 text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {subjectBuildingSfLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -967,6 +1329,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   {getFieldLabel('Cap Rate')}
                 </td>
+                <td
+                  key="subject-cap-rate"
+                  className="py-1 px-4 text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  N/A
+                </td>
                 {comparables.map(comp => (
                 <td
                     key={`cap-${comp.comparable_id}`}
@@ -980,7 +1353,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                     {renderEditableInput(comp, 'cap_rate', {
                       type: 'text',
                       inputMode: 'decimal',
-                      placeholder: 'Cap Rate'
+                      placeholder: ''
                     })}
                   </td>
                 ))}
@@ -996,6 +1369,17 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   }}
                 >
                   {getFieldLabel('Year Built')}
+                </td>
+                <td
+                  key="subject-year-built"
+                  className="py-1 px-4 text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {subjectYearBuiltLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
@@ -1032,8 +1416,9 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
           <table className="text-sm" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
+              <col style={compColumnStyle} />
               {comparables.map(comp => (
-                <col key={`adj-col-${comp.comparable_id}`} style={{ width: '128px', minWidth: '128px' }} />
+                <col key={`adj-col-${comp.comparable_id}`} style={compColumnStyle} />
               ))}
             </colgroup>
 
@@ -1054,6 +1439,20 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   Adjustments
                 </td>
+                <td
+                  className="border-l"
+                  style={{
+                    borderColor: 'var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-card-header-bg)'
+                  }}
+                >
+                  <div
+                    className="text-xs font-semibold text-center"
+                    style={{ color: 'var(--cui-secondary-color)' }}
+                  >
+                    Subject
+                  </div>
+                </td>
                 {comparables.map(comp => (
                   <td
                     key={`adj-header-${comp.comparable_id}`}
@@ -1065,7 +1464,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   >
                     {adjustmentsCollapsed && (
                       <div className="text-xs font-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {formatTotalAdjustment(comp.total_adjustment_pct)}
+                        {formatTotalAdjustment(getTotalAdjustmentPct(comp))}
                       </div>
                     )}
                   </td>
@@ -1104,6 +1503,12 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                         <span>{section.label}</span>
                       </button>
                     </td>
+                    <td
+                      className="py-2 px-4 border-l text-center"
+                      style={{ borderColor: 'var(--cui-border-color)' }}
+                    >
+                      {/* Subject spacer */}
+                    </td>
                     {comparables.map(comp => (
                       <td
                         key={`section-${section.key}-${comp.comparable_id}`}
@@ -1116,7 +1521,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                   </tr>
                   {openSections[section.key] &&
                     section.adjustments.map(adj =>
-                      renderAdjustmentRow(section.key, adj.type, adj.label, adj.indent)
+                      renderAdjustmentRow(section.key, adj.type, adj.label, adj.indent, adj.source)
                     )}
                 </React.Fragment>
               ))}
@@ -1137,23 +1542,35 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   Total Adjustments
                 </td>
-                {comparables.map(comp => (
-                  <td
-                    key={`total-${comp.comparable_id}`}
-                    className="py-2 px-4 font-bold text-center border-l"
-                    style={{
-                      color: comp.total_adjustment_pct > 0
-                        ? 'var(--cui-success)'
-                        : comp.total_adjustment_pct < 0
-                        ? 'var(--cui-danger)'
-                        : 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)'
-                    }}
-                  >
-                    {comp.total_adjustment_pct > 0 ? '+' : ''}
-                    {(comp.total_adjustment_pct * 100).toFixed(0)}%
-                  </td>
-                ))}
+                <td
+                  className="py-2 px-4 font-bold text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)'
+                  }}
+                >
+                  N/A
+                </td>
+                {comparables.map(comp => {
+                  const totalAdjustmentPct = getTotalAdjustmentPct(comp);
+                  return (
+                    <td
+                      key={`total-${comp.comparable_id}`}
+                      className="py-2 px-4 font-bold text-center border-l"
+                      style={{
+                        color: totalAdjustmentPct > 0
+                          ? 'var(--cui-success)'
+                          : totalAdjustmentPct < 0
+                          ? 'var(--cui-danger)'
+                          : 'var(--cui-body-color)',
+                        borderColor: 'var(--cui-border-color)'
+                      }}
+                    >
+                      {totalAdjustmentPct > 0 ? '+' : ''}
+                      {(totalAdjustmentPct * 100).toFixed(0)}%
+                    </td>
+                  );
+                })}
               </tr>
 
               <tr style={{ backgroundColor: 'var(--surface-subheader)' }}>
@@ -1166,6 +1583,15 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                 >
                   Adjusted Price/Unit
                 </td>
+                <td
+                  className="py-3 px-4 font-bold text-base text-center border-l"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    borderColor: 'var(--cui-border-color)'
+                  }}
+                >
+                  N/A
+                </td>
                 {comparables.map(comp => (
                   <td
                     key={`adj-price-${comp.comparable_id}`}
@@ -1175,7 +1601,7 @@ export function ComparablesGrid({ comparables, projectId, onEdit, onDelete, onRe
                       borderColor: 'var(--cui-border-color)'
                     }}
                   >
-                    {formatCurrency(comp.adjusted_price_per_unit ? Number(comp.adjusted_price_per_unit) : null)}
+                    {formatCurrency(getAdjustedPricePerUnit(comp))}
                   </td>
                 ))}
               </tr>

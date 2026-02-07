@@ -1,101 +1,105 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ draw_id: string }> }
-) {
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+const buildUrl = (baseUrl: string, searchParams: URLSearchParams) => {
+  const query = searchParams.toString();
+  return query ? `${baseUrl}?${query}` : baseUrl;
+};
+
+const getAuthHeaders = (request: NextRequest) => {
+  const authHeader = request.headers.get('Authorization');
+  return authHeader ? { Authorization: authHeader } : {};
+};
+
+type Params = { params: Promise<{ draw_id: string }> };
+
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { draw_id } = await params;
-    const drawId = parseInt(draw_id);
-    const body = await request.json();
-
-    // Build the SET clause dynamically
-    const updates: string[] = [];
-    const fieldMapping: Record<string, string> = {
-      draw_amount: 'draw_amount',
-      draw_date: 'draw_date',
-      draw_purpose: 'draw_purpose',
-      draw_status: 'draw_status',
-    };
-
-    for (const [apiField, dbField] of Object.entries(fieldMapping)) {
-      if (body[apiField] !== undefined) {
-        const value = body[apiField];
-        // Handle string values that need quotes
-        if (typeof value === 'string') {
-          updates.push(`${dbField} = '${value.replace(/'/g, "''")}'`);
-        } else {
-          updates.push(`${dbField} = ${value}`);
-        }
-      }
-    }
-
-    if (updates.length === 0) {
+    const drawId = draw_id;
+    if (!/^[0-9]+$/.test(drawId)) {
       return NextResponse.json(
-        { success: false, error: 'No fields to update' },
+        { success: false, error: 'Invalid drawId parameter' },
         { status: 400 }
       );
     }
 
-    const result = await sql`
-      UPDATE landscape.tbl_debt_draw_schedule
-      SET ${sql.raw(updates.join(', '))}
-      WHERE draw_id = ${drawId}
-      RETURNING *
-    `;
+    const body = await request.json();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || searchParams.get('project_id') || body.project_id || body.projectId;
+    const loanId = searchParams.get('loanId') || searchParams.get('loan_id') || body.loan_id || body.loanId || body.facility_id;
 
-    if (result.length === 0) {
+    if (!projectId || !loanId) {
       return NextResponse.json(
-        { success: false, error: 'Draw schedule item not found' },
-        { status: 404 }
+        { success: false, error: 'projectId and loanId are required' },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result[0],
-    });
-  } catch (error: any) {
-    console.error('Error updating draw schedule:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update draw schedule' },
-      { status: 500 }
+    const { loan_id, loanId: bodyLoanId, facility_id, ...payload } = body;
+
+    const djangoUrl = buildUrl(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/${drawId}/`,
+      searchParams
     );
+
+    const response = await fetch(djangoUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ draw_id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { draw_id } = await params;
-    const drawId = parseInt(draw_id);
-
-    const result = await sql`
-      DELETE FROM landscape.tbl_debt_draw_schedule
-      WHERE draw_id = ${drawId}
-      RETURNING draw_id, draw_purpose
-    `;
-
-    if (result.length === 0) {
+    const drawId = draw_id;
+    if (!/^[0-9]+$/.test(drawId)) {
       return NextResponse.json(
-        { success: false, error: 'Draw schedule item not found' },
-        { status: 404 }
+        { success: false, error: 'Invalid drawId parameter' },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result[0],
-    });
-  } catch (error: any) {
-    console.error('Error deleting draw schedule:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete draw schedule' },
-      { status: 500 }
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || searchParams.get('project_id');
+    const loanId = searchParams.get('loanId') || searchParams.get('loan_id') || searchParams.get('facility_id');
+
+    if (!projectId || !loanId) {
+      return NextResponse.json(
+        { success: false, error: 'projectId and loanId are required' },
+        { status: 400 }
+      );
+    }
+
+    const djangoUrl = buildUrl(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/${drawId}/`,
+      searchParams
     );
+
+    const response = await fetch(djangoUrl, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
   }
 }

@@ -2,23 +2,22 @@
 
 import React, { useEffect } from 'react';
 
-interface DebtFacility {
-  facility_id?: string;
-  facility_name: string;
+interface Loan {
+  loan_id?: string;
+  loan_name: string;
   lender_name?: string;
   loan_amount: number;
   interest_rate_pct: number;
   loan_term_years: number;
   amortization_years?: number;
   is_construction_loan?: boolean;
-  rate_type?: string;
-  spread_over_index_bps?: number;
+  interest_type?: string;
+  interest_spread_bps?: number;
   rate_floor_pct?: number;
   rate_cap_pct?: number;
-  index_name?: string;
+  interest_index?: string;
   rate_reset_frequency?: string;
-  ltv_pct?: number;
-  dscr?: number;
+  loan_to_value_pct?: number;
   commitment_fee_pct?: number;
   extension_fee_bps?: number;
   prepayment_penalty_years?: number;
@@ -42,23 +41,23 @@ interface DebtFacility {
   annual_debt_service?: number;
 }
 
-interface DebtFacilityFormProps {
-  facility: DebtFacility | null;
+interface LoanFormProps {
+  facility: Loan | null;
   mode: 'basic' | 'standard' | 'advanced';
-  onSave: (facility: DebtFacility) => void;
+  onSave: (facility: Loan) => void;
   onCancel: () => void;
   isSaving: boolean;
 }
 
-export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isSaving }: DebtFacilityFormProps) {
-  const defaultFormData: DebtFacility = {
-    facility_name: '',
+export default function LoanForm({ facility, mode, onSave, onCancel, isSaving }: LoanFormProps) {
+  const defaultFormData: Loan = {
+    loan_name: '',
     loan_amount: 0,
     interest_rate_pct: 0,
     loan_term_years: 0,
   };
 
-  const [formData, setFormData] = React.useState<DebtFacility>(
+  const [formData, setFormData] = React.useState<Loan>(
     facility
       ? {
           ...defaultFormData,
@@ -85,7 +84,7 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facility]);
 
-  const updateField = (field: keyof DebtFacility, value: any) => {
+  const updateField = (field: keyof Loan, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -109,7 +108,7 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-2xl font-semibold text-white">
-            {facility ? 'Edit Debt Facility' : 'Add Debt Facility'}
+            {facility ? 'Edit Loan' : 'Add Loan'}
           </h2>
           <button onClick={onCancel} className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,14 +128,14 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Facility Name <span className="text-red-400">*</span>
+                    Loan Name <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={formData.facility_name}
-                    onChange={(e) => updateField('facility_name', e.target.value)}
+                    value={formData.loan_name}
+                    onChange={(e) => updateField('loan_name', e.target.value)}
                   />
                 </div>
 
@@ -236,8 +235,8 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                       </label>
                       <select
                         className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={formData.rate_type || 'fixed'}
-                        onChange={(e) => updateField('rate_type', e.target.value)}
+                        value={formData.interest_type || 'fixed'}
+                        onChange={(e) => updateField('interest_type', e.target.value)}
                       >
                         <option value="fixed">Fixed</option>
                         <option value="floating">Floating</option>
@@ -245,7 +244,7 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                       </select>
                     </div>
 
-                    {formData.rate_type === 'floating' && (
+                    {formData.interest_type === 'floating' && (
                       <>
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -255,8 +254,8 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                             type="text"
                             placeholder="e.g., SOFR, Prime"
                             className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.index_name || ''}
-                            onChange={(e) => updateField('index_name', e.target.value)}
+                            value={formData.interest_index || ''}
+                            onChange={(e) => updateField('interest_index', e.target.value)}
                           />
                         </div>
 
@@ -267,8 +266,8 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                           <input
                             type="number"
                             className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={formData.spread_over_index_bps ?? ''}
-                            onChange={(e) => updateField('spread_over_index_bps', e.target.value ? Number(e.target.value) : undefined)}
+                        value={formData.interest_spread_bps ?? ''}
+                            onChange={(e) => updateField('interest_spread_bps', e.target.value ? Number(e.target.value) : undefined)}
                           />
                         </div>
 
@@ -324,7 +323,7 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                   <h3 className="text-lg font-semibold text-white mb-4 pb-2 border-b border-gray-700">
                     Underwriting Metrics
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         LTV (%)
@@ -333,21 +332,8 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
                         type="number"
                         step="0.01"
                         className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={formData.ltv_pct ?? ''}
-                        onChange={(e) => updateField('ltv_pct', e.target.value ? Number(e.target.value) : undefined)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        DSCR
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={formData.dscr ?? ''}
-                        onChange={(e) => updateField('dscr', e.target.value ? Number(e.target.value) : undefined)}
+                        value={formData.loan_to_value_pct ?? ''}
+                        onChange={(e) => updateField('loan_to_value_pct', e.target.value ? Number(e.target.value) : undefined)}
                       />
                     </div>
                   </div>
@@ -687,7 +673,7 @@ export default function DebtFacilityForm({ facility, mode, onSave, onCancel, isS
               disabled={isSaving}
               className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? 'Saving...' : 'Save Facility'}
+              {isSaving ? 'Saving...' : 'Save Loan'}
             </button>
           </div>
         </div>

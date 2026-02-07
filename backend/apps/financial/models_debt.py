@@ -73,10 +73,14 @@ class Loan(models.Model):
     extension_fee_bps = models.IntegerField(null=True, blank=True)
     extension_fee_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     prepayment_penalty_years = models.IntegerField(null=True, blank=True)
+    closing_costs_appraisal = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    closing_costs_legal = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    closing_costs_other = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     # Reserves
     interest_reserve_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     interest_reserve_funded_upfront = models.BooleanField(default=False, null=True, blank=True)
+    interest_reserve_inflator = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, default=1.0)
     reserve_requirements = models.JSONField(default=dict, blank=True)
     replacement_reserve_per_unit = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     tax_insurance_escrow_months = models.IntegerField(null=True, blank=True)
@@ -93,6 +97,7 @@ class Loan(models.Model):
     guarantee_type = models.CharField(max_length=50, null=True, blank=True)
     guarantor_name = models.CharField(max_length=200, null=True, blank=True)
     recourse_carveout_provisions = models.TextField(null=True, blank=True)
+    recourse_type = models.CharField(max_length=30, null=True, blank=True, default='FULL')
 
     # Extensions
     extension_options = models.IntegerField(null=True, blank=True, default=0)
@@ -107,6 +112,13 @@ class Loan(models.Model):
     # Release pricing
     release_price_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     minimum_release_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    repayment_acceleration = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, default=1.0)
+
+    # Collateral basis (lotbank revolvers)
+    collateral_basis_type = models.CharField(
+        max_length=30, null=True, blank=True, default='PROJECT_COST',
+        help_text='PROJECT_COST = LTC on actual cost; RESIDUAL_LAND_VALUE = LTC on finished lot price minus improvements'
+    )
 
     # Refinancing linkage
     takes_out_loan = models.ForeignKey(

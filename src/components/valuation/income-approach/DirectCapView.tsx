@@ -116,7 +116,10 @@ export function DirectCapView({
       >
         <div
           className="px-4 py-3 border-b flex items-center justify-between"
-          style={{ borderColor: 'var(--cui-border-color)' }}
+          style={{
+            borderColor: 'var(--cui-border-color)',
+            backgroundColor: 'var(--cui-card-header-bg)',
+          }}
         >
           <h3
             className="text-sm font-semibold uppercase tracking-wider"
@@ -166,7 +169,13 @@ export function DirectCapView({
           ) : (
             <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
               <thead>
-                <tr style={{ color: 'var(--cui-secondary-color)' }}>
+                <tr
+                  style={{
+                    color: 'var(--cui-secondary-color)',
+                    backgroundColor: 'var(--cui-card-subheader-bg)',
+                    borderBottom: '1px solid var(--cui-border-color)',
+                  }}
+                >
                   <th className="text-left py-2 w-1/2"></th>
                   <th className="text-right py-2 w-1/6">Amount</th>
                   <th className="text-right py-2 w-1/6">$/Unit</th>
@@ -394,7 +403,16 @@ function TableRow({ label, amount, unitCount, totalSf, isNegative }: TableRowPro
         color: isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)',
       }}
     >
-      <td className="py-1.5 pl-4">{label}</td>
+      <td
+        className="py-1.5 pl-4"
+        style={{
+          fontSize: '13px',
+          fontWeight: 500,
+          fontFamily: 'inherit',
+        }}
+      >
+        {label}
+      </td>
       <td className="text-right py-1.5">
         {isNegative ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount)}
       </td>
@@ -425,7 +443,15 @@ function SubtotalRow({ label, amount, unitCount, totalSf }: SubtotalRowProps) {
         color: 'var(--cui-body-color)',
       }}
     >
-      <td className="py-2 font-medium">{label}</td>
+      <td
+        className="py-2 font-medium"
+        style={{
+          fontSize: '13px',
+          fontFamily: 'inherit',
+        }}
+      >
+        {label}
+      </td>
       <td className="text-right py-2 font-medium">{formatCurrency(amount)}</td>
       <td className="text-right py-2 font-medium">{formatCurrency(perUnit)}</td>
       <td className="text-right py-2 font-medium">${perSf.toFixed(2)}</td>
@@ -454,7 +480,10 @@ function TotalRow({ label, amount, unitCount, totalSf }: TotalRowProps) {
     >
       <td
         className="py-3 font-bold"
-        style={{ color: 'var(--cui-body-color)' }}
+        style={{
+          color: 'var(--cui-body-color)',
+          fontFamily: 'inherit',
+        }}
       >
         {label}
       </td>
@@ -535,7 +564,13 @@ function MultiColumnPLTable({
   return (
     <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
       <thead>
-        <tr style={{ color: 'var(--cui-secondary-color)' }}>
+        <tr
+          style={{
+            color: 'var(--cui-secondary-color)',
+            backgroundColor: 'var(--cui-card-subheader-bg)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
           <th className="text-left py-2" style={{ width: '40%' }}></th>
           {tiles.map((tile) => {
             const colors = TILE_COLORS[tile.id];
@@ -764,7 +799,14 @@ function MultiColRow({ label, values, rates, tileIds, selectedBasis, isNegative 
         color: isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)',
       }}
     >
-      <td className="py-1.5 pl-4">
+      <td
+        className="py-1.5 pl-4"
+        style={{
+          fontSize: '13px',
+          fontWeight: 500,
+          fontFamily: 'inherit',
+        }}
+      >
         {label}
         {rates && rates[0] !== undefined && (
           <span className="text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -806,7 +848,15 @@ function MultiColSubtotalRow({ label, values, tileIds, selectedBasis }: MultiCol
         color: 'var(--cui-body-color)',
       }}
     >
-      <td className="py-2 font-medium">{label}</td>
+      <td
+        className="py-2 font-medium"
+        style={{
+          fontSize: '13px',
+          fontFamily: 'inherit',
+        }}
+      >
+        {label}
+      </td>
       {values.map((amount, idx) => {
         const isSelected = tileIds[idx] === selectedBasis;
         return (
@@ -841,7 +891,7 @@ function MultiColTotalRow({ label, values, tileIds, selectedBasis }: MultiColTot
     >
       <td
         className="py-3 font-bold"
-        style={{ color: 'var(--cui-body-color)' }}
+        style={{ color: 'var(--cui-body-color)', fontFamily: 'inherit' }}
       >
         {label}
       </td>

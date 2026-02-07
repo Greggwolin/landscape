@@ -90,7 +90,7 @@ class CalculationService:
 
         try:
             service = LandDevCashFlowService(project_id)
-            cf_data = service.calculate()
+            cf_data = service.calculate(include_financing=True)
 
             summary = cf_data.get('summary', {})
             periods = cf_data.get('periods', [])
@@ -110,16 +110,20 @@ class CalculationService:
             # Note: Django service returns uppercase section names (e.g., 'DEVELOPMENT COSTS')
             cost_section_names = {'development costs', 'planning & engineering', 'land acquisition'}
             revenue_section_names = {'net revenue'}
+            financing_section_names = {'financing'}
 
             period_costs = defaultdict(float)
             period_revenue = defaultdict(float)
+            period_financing = defaultdict(float)
 
             for section in sections:
                 sname = section.get('sectionName', '').lower()
                 is_cost = sname in cost_section_names
                 is_revenue = sname in revenue_section_names
 
-                if is_cost or is_revenue:
+                is_financing = sname in financing_section_names
+
+                if is_cost or is_revenue or is_financing:
                     for line_item in section.get('lineItems', []):
                         for period_data in line_item.get('periods', []):
                             ps = period_data.get('periodSequence')
@@ -132,6 +136,8 @@ class CalculationService:
                                 period_costs[ps] += abs(amt)
                             if is_revenue:
                                 period_revenue[ps] += abs(amt)
+                            if is_financing:
+                                period_financing[ps] += amt
 
             # Get period dates from response
             period_dates = {}
@@ -151,6 +157,7 @@ class CalculationService:
             max_period = max(
                 max(period_costs.keys()) if period_costs else 0,
                 max(period_revenue.keys()) if period_revenue else 0,
+                max(period_financing.keys()) if period_financing else 0,
                 len(periods)
             )
 
@@ -158,7 +165,8 @@ class CalculationService:
             for period_seq in range(1, max_period + 1):
                 costs = period_costs.get(period_seq, 0)
                 revenue = period_revenue.get(period_seq, 0)
-                net_cf = revenue - costs  # negative when costs > revenue (contribution)
+                financing = period_financing.get(period_seq, 0)
+                net_cf = revenue - costs + financing  # negative when costs > revenue (contribution)
 
                 # Get date
                 if period_seq in period_dates:

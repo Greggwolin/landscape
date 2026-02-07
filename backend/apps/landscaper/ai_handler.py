@@ -6,10 +6,23 @@ Uses Claude API (Anthropic) with context-aware system prompts and tool use.
 """
 
 import logging
+import os
+from decimal import Decimal
 from typing import Dict, List, Any, Optional
 
 import anthropic
-from decouple import config
+from django.conf import settings
+
+
+def _sanitize_for_json(obj):
+    """Recursively convert Decimal values to float for JSON serialization."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_json(item) for item in obj]
+    return obj
 
 from .tool_registry import (
     get_tools_for_page,
@@ -4773,7 +4786,58 @@ def _build_project_context_message(project_context: Dict[str, Any]) -> str:
 
 def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
     """Get Anthropic client, returns None if API key not configured."""
-    api_key = config('ANTHROPIC_API_KEY', default='')
+    api_key = None
+    source = None
+
+    def _mask_key(value: Optional[str]) -> str:
+        if not value:
+            return "None"
+        if len(value) <= 10:
+            return "***"
+        return f"{value[:6]}...{value[-4:]}"
+
+    # First, try to read directly from .env files (repo root and backend/.env)
+    backend_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    repo_root = os.path.dirname(backend_root)
+    env_candidates = [
+        os.path.join(backend_root, '.env'),
+        os.path.join(repo_root, '.env'),
+    ]
+    logger.info(
+        "[AI_HANDLER] _get_anthropic_client env_candidates=%s cwd=%s",
+        env_candidates,
+        os.getcwd(),
+    )
+    for env_file in env_candidates:
+        if not os.path.exists(env_file):
+            continue
+        with open(env_file) as f:
+            for line in f:
+                if line.strip().startswith('ANTHROPIC_API_KEY='):
+                    api_key = line.split('=', 1)[1].strip()
+                    source = env_file
+                    break
+        if api_key:
+            break
+
+    # Fallback to system env or Django settings
+    if not api_key:
+        env_key = os.getenv('ANTHROPIC_API_KEY')
+        if env_key:
+            api_key = env_key
+            source = "env:ANTHROPIC_API_KEY"
+        else:
+            settings_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
+            if settings_key:
+                api_key = settings_key
+                source = "settings.ANTHROPIC_API_KEY"
+
+    logger.info(
+        "[AI_HANDLER] _get_anthropic_client called. api_key_source=%s api_key=%s",
+        source,
+        _mask_key(api_key),
+    )
+
     if not api_key:
         logger.warning("ANTHROPIC_API_KEY not set, falling back to stub responses")
         return None
@@ -4826,6 +4890,17 @@ def get_landscaper_response(
     # Add project context to system prompt
     project_context_msg = _build_project_context_message(project_context)
     full_system = f"{system_prompt}\n\n---\n{project_context_msg}"
+
+    # Add rich project context (structured data from all tables including market/competitive)
+    project_id = project_context.get('project_id')
+    if project_id:
+        try:
+            from apps.knowledge.services.project_context import get_project_context
+            rich_context = get_project_context(project_id)
+            if rich_context:
+                full_system += f"\n\n=== PROJECT DATA ===\n{rich_context}"
+        except Exception as e:
+            logger.warning(f"Failed to load rich project context: {e}")
 
     # Add platform knowledge if user query relates to valuation methodology
     last_user_message = _get_last_user_message(messages)
@@ -5016,7 +5091,7 @@ def get_landscaper_response(
                         'tool': tool_name,
                         'success': result.get('success', False),
                         'is_proposal': False,
-                        'result': result
+                        'result': _sanitize_for_json(result)
                     })
                 except Exception as e:
                     logger.error(f"Tool execution error: {e}")
@@ -5065,10 +5140,10 @@ def get_landscaper_response(
                 'output_tokens': total_output_tokens,
                 'stop_reason': response.stop_reason,
                 'system_prompt_category': project_type or 'default',
-                'tool_executions': tool_executions,  # For frontend mutation events
+                'tool_executions': _sanitize_for_json(tool_executions),
             },
-            'tool_calls': tool_calls_made,
-            'field_updates': field_updates
+            'tool_calls': _sanitize_for_json(tool_calls_made),
+            'field_updates': _sanitize_for_json(field_updates)
         }
 
     except anthropic.APIConnectionError as e:

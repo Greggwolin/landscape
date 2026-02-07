@@ -255,6 +255,11 @@ def get_landscaper_response(
     strict_opex_extraction = _is_opex_document_extraction_request(user_message)
 
     # 1. Retrieve or hydrate RAG context
+    # Extract doc_system_context if present (from document-scoped chat)
+    doc_system_context = None
+    if isinstance(rag_context, dict):
+        doc_system_context = rag_context.get('doc_context')
+
     if isinstance(rag_context, RAGContext):
         rag_context_obj = rag_context
     elif isinstance(rag_context, dict):
@@ -264,7 +269,7 @@ def get_landscaper_response(
             normalized_chunks.append({
                 **chunk,
                 'doc_name': chunk.get('doc_name') or chunk.get('filename') or 'Unknown document',
-                'content': chunk.get('content') or chunk.get('content_text') or ''
+                'content': chunk.get('content') or chunk.get('content_text') or chunk.get('text') or ''
             })
         rag_context_obj.document_chunks = normalized_chunks
         if normalized_chunks:
@@ -309,6 +314,10 @@ def get_landscaper_response(
         analysis_type_context
     )
     print(f"[AI_TIMING] _build_system_prompt: {time.time() - t0:.2f}s (prompt len: {len(system_prompt)} chars)")
+
+    # Override system prompt for document-scoped chat
+    if doc_system_context:
+        system_prompt = doc_system_context + "\n\n" + system_prompt
 
     if strict_opex_extraction:
         has_doc_chunks = bool(getattr(rag_context_obj, 'document_chunks', []))

@@ -192,9 +192,9 @@ export default function MarketMapView({
         .setLngLat([projectLon, projectLat])
         .setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(
-            `<div style="padding: 8px;">
-              <strong style="color: #0d6efd;">📍 ${project?.project_name || 'Subject Property'}</strong><br/>
-              <small>${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</small>
+            `<div style="padding: 8px; color: var(--cui-body-color);">
+              <strong style="color: var(--cui-primary);">📍 ${project?.project_name || 'Subject Property'}</strong><br/>
+              <small style="color: var(--cui-secondary-color);">${projectLat.toFixed(6)}, ${projectLon.toFixed(6)}</small>
             </div>`
           )
         )
@@ -280,15 +280,15 @@ export default function MarketMapView({
           .setLngLat([comp.longitude, comp.latitude])
           .setPopup(
             new maplibregl.Popup({ offset: 25, maxWidth: '280px' }).setHTML(
-              `<div style="padding: 10px;">
-                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">${comp.comp_name}</div>
-                ${comp.builder_name ? `<div style="font-size: 12px; color: #555; margin-bottom: 4px;">${comp.builder_name}</div>` : ''}
-                ${comp.comp_address ? `<div style="font-size: 11px; color: #666; margin-bottom: 6px;">${comp.comp_address}</div>` : ''}
+              `<div style="padding: 10px; color: var(--cui-body-color);">
+                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--cui-body-color);">${comp.comp_name}</div>
+                ${comp.builder_name ? `<div style="font-size: 12px; color: var(--cui-secondary-color); margin-bottom: 4px;">${comp.builder_name}</div>` : ''}
+                ${comp.comp_address ? `<div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 6px;">${comp.comp_address}</div>` : ''}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px;">
-                  <div><span style="color: #888;">${lotDisplay.label}:</span> <span style="font-weight: 600;">${lotDisplay.value}</span></div>
-                  <div><span style="color: #888;">Units:</span> <span style="font-weight: 600;">${comp.total_units?.toLocaleString() || '—'}</span></div>
-                  <div><span style="color: #888;">Price Range:</span> <span style="font-weight: 600;">${priceRange}</span></div>
-                  <div><span style="color: #888;">Last Sale:</span> <span style="font-weight: 600;">${lastSalePrice ? formatShortCurrency(lastSalePrice) : '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">${lotDisplay.label}:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${lotDisplay.value}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Units:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${comp.total_units?.toLocaleString() || '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Price Range:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${priceRange}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Last Sale:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${lastSalePrice ? formatShortCurrency(lastSalePrice) : '—'}</span></div>
                 </div>
               </div>`
             )
@@ -390,24 +390,24 @@ export default function MarketMapView({
           .setLngLat([comp.lng, comp.lat])
           .setPopup(
             new maplibregl.Popup({ offset: 25, maxWidth: '300px' }).setHTML(
-              `<div style="padding: 10px; min-width: 220px;">
-                <div style="font-weight: 600; color: #111; margin-bottom: 4px;">${comp.address}</div>
-                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">${comp.city}, ${comp.state} · ${comp.distanceMiles.toFixed(1)} mi</div>
-                <div style="font-size: 20px; font-weight: 700; color: #111; margin-bottom: 4px;">
+              `<div style="padding: 10px; min-width: 220px; color: var(--cui-body-color);">
+                <div style="font-weight: 600; color: var(--cui-body-color); margin-bottom: 4px;">${comp.address}</div>
+                <div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 8px;">${comp.city}, ${comp.state} · ${comp.distanceMiles.toFixed(1)} mi</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--cui-body-color); margin-bottom: 4px;">
                   ${priceFormatted}
-                  <span style="font-size: 12px; font-weight: 400; color: #666; margin-left: 6px;">${psfFormatted}</span>
+                  <span style="font-size: 12px; font-weight: 400; color: var(--cui-secondary-color); margin-left: 6px;">${psfFormatted}</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; margin-bottom: 8px;">
-                  <div><span style="color: #888;">Size:</span> <span style="font-weight: 500;">${comp.sqft?.toLocaleString() || '—'} SF</span></div>
-                  <div><span style="color: #888;">Built:</span> <span style="font-weight: 500;">${comp.yearBuilt || '—'}</span></div>
-                  <div><span style="color: #888;">Beds:</span> <span style="font-weight: 500;">${comp.beds ?? '—'}</span></div>
-                  <div><span style="color: #888;">Baths:</span> <span style="font-weight: 500;">${comp.baths ?? '—'}</span></div>
-                  <div><span style="color: #888;">Lot:</span> <span style="font-weight: 500;">${comp.lotSqft?.toLocaleString() || '—'} SF</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Size:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.sqft?.toLocaleString() || '—'} SF</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Built:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.yearBuilt || '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Beds:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.beds ?? '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Baths:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.baths ?? '—'}</span></div>
+                  <div><span style="color: var(--cui-secondary-color);">Lot:</span> <span style="font-weight: 500; color: var(--cui-body-color);">${comp.lotSqft?.toLocaleString() || '—'} SF</span></div>
                 </div>
-                <div style="font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 6px;">
+                <div style="font-size: 11px; color: var(--cui-secondary-color); border-top: 1px solid var(--cui-border-color); padding-top: 6px;">
                   Sold ${new Date(comp.saleDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                 </div>
-                ${comp.url ? `<a href="${comp.url}" target="_blank" rel="noreferrer" style="font-size: 11px; color: #0d6efd; text-decoration: none;">View on Redfin →</a>` : ''}
+                ${comp.url ? `<a href="${comp.url}" target="_blank" rel="noreferrer" style="font-size: 11px; color: var(--cui-primary); text-decoration: none;">View on Redfin →</a>` : ''}
               </div>`
             )
           )
@@ -475,17 +475,23 @@ export default function MarketMapView({
       <div
         className="position-absolute top-0 start-0 m-3 p-2 rounded shadow-sm"
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'var(--cui-card-bg)',
           border: '1px solid var(--cui-border-color)',
+          color: 'var(--cui-body-color)',
           zIndex: 1
         }}
       >
-        <div className="text-muted small fw-semibold mb-2" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="small fw-semibold mb-2" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>
           Map Layers
         </div>
         <div className="mb-2">
           <select
             className="form-select form-select-sm"
+            style={{
+              backgroundColor: 'var(--cui-input-bg)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--cui-body-color)'
+            }}
             value={mapStyleId}
             onChange={(event) => setMapStyleId(event.target.value)}
           >
@@ -494,17 +500,17 @@ export default function MarketMapView({
             ))}
           </select>
         </div>
-        <div className="d-flex flex-column gap-1" style={{ fontSize: '12px' }}>
+        <div className="d-flex flex-column gap-1" style={{ fontSize: '12px', color: 'var(--cui-body-color)' }}>
           <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={showCompetitors}
               onChange={() => setShowCompetitors(!showCompetitors)}
               className="form-check-input m-0"
-              style={{ width: '14px', height: '14px' }}
+              style={{ width: '14px', height: '14px', accentColor: 'var(--cui-primary)' }}
             />
             <span>Competitive Projects</span>
-            <span className="text-muted">({competitors.length})</span>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>({competitors.length})</span>
           </label>
           <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: 'pointer' }}>
             <input
@@ -512,10 +518,10 @@ export default function MarketMapView({
               checked={showComps}
               onChange={() => setShowComps(!showComps)}
               className="form-check-input m-0"
-              style={{ width: '14px', height: '14px' }}
+              style={{ width: '14px', height: '14px', accentColor: 'var(--cui-primary)' }}
             />
             <span>Recent Sales</span>
-            <span className="text-muted">({comps.length})</span>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>({comps.length})</span>
           </label>
         </div>
       </div>
@@ -523,19 +529,20 @@ export default function MarketMapView({
       <div
         className="position-absolute bottom-0 start-0 m-3 p-2 rounded shadow-sm"
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'var(--cui-card-bg)',
           border: '1px solid var(--cui-border-color)',
+          color: 'var(--cui-body-color)',
           zIndex: 1
         }}
       >
-        <div className="d-flex flex-column gap-1" style={{ fontSize: '11px' }}>
+        <div className="d-flex flex-column gap-1" style={{ fontSize: '11px', color: 'var(--cui-body-color)' }}>
           <div className="d-flex align-items-center gap-2">
             <div style={{ width: '12px', height: '12px', backgroundColor: '#0d6efd', borderRadius: '50%' }}></div>
             <span>Subject Property</span>
           </div>
           {showComps && comps.length > 0 && (
             <>
-              <div className="text-muted mt-1" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recent Sales</div>
+              <div className="mt-1" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>Recent Sales</div>
               <div className="d-flex align-items-center gap-2">
                 <div style={{ width: '10px', height: '10px', backgroundColor: '#22c55e', borderRadius: '50%', border: '1.5px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }}></div>
                 <span>Below 25th %ile</span>

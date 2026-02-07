@@ -37,6 +37,7 @@ export interface CompFeatureProps extends SiteFeatureProps {
   compId: string; // internal comp key
   type: 'sale' | 'listing' | 'rental';
   price?: number | null;
+  price_per_unit?: number | null;
   date?: string | null; // ISO
   selected?: boolean;
 }

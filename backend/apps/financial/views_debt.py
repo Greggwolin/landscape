@@ -6,6 +6,7 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.projects.models import Project
@@ -25,6 +26,7 @@ class LoanViewSet(viewsets.ModelViewSet):
     """CRUD for loans scoped to a project."""
 
     queryset = Loan.objects.all()
+    permission_classes = [AllowAny]
     lookup_field = 'loan_id'
     lookup_url_kwarg = 'loan_id'
 
@@ -139,6 +141,7 @@ class LoanContainerViewSet(
     """CRUD for loan-to-division assignments."""
 
     queryset = LoanContainer.objects.all()
+    permission_classes = [AllowAny]
     serializer_class = LoanContainerSerializer
     lookup_field = 'loan_container_id'
     lookup_url_kwarg = 'loan_container_id'
@@ -167,6 +170,7 @@ class LoanFinanceStructureViewSet(
     """CRUD for loan-to-finance-structure assignments."""
 
     queryset = LoanFinanceStructure.objects.all()
+    permission_classes = [AllowAny]
     serializer_class = LoanFinanceStructureSerializer
     lookup_field = 'loan_fs_id'
     lookup_url_kwarg = 'loan_fs_id'

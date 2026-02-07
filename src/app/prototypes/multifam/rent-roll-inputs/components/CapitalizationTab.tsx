@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import DebtFacilityForm from './DebtFacilityForm';
+import LoanForm from './DebtFacilityForm';
 import EquityPartnerForm from './EquityPartnerForm';
 import WaterfallTierForm from './WaterfallTierForm';
 import DrawScheduleForm from './DrawScheduleForm';
@@ -13,31 +13,31 @@ interface CapitalizationTabProps {
   mode: 'basic' | 'standard' | 'advanced';
 }
 
-interface DebtFacility {
-  facility_id?: string;
+interface LoanRecord {
+  loan_id?: string | number;
   project_id?: number;
-  facility_name: string;
+  loan_name: string;
   lender_name?: string;
   loan_amount: number;
+  commitment_amount?: number;
   interest_rate_pct: number;
   loan_term_years: number;
   amortization_years?: number;
   is_construction_loan?: boolean;
-  rate_type?: string;
-  spread_over_index_bps?: number;
+  interest_type?: string;
+  interest_spread_bps?: number;
   rate_floor_pct?: number;
   rate_cap_pct?: number;
-  index_name?: string;
+  interest_index?: string;
   rate_reset_frequency?: string;
-  ltv_pct?: number;
-  dscr?: number;
+  loan_to_value_pct?: number;
+  loan_covenant_dscr_min?: number;
   commitment_fee_pct?: number;
   extension_fee_bps?: number;
   prepayment_penalty_years?: number;
   exit_fee_pct?: number;
   guarantee_type?: string;
   guarantor_name?: string;
-  loan_covenant_dscr_min?: number;
   loan_covenant_ltv_max?: number;
   loan_covenant_occupancy_min?: number;
   covenant_test_frequency?: string;
@@ -115,7 +115,7 @@ interface WaterfallTier {
 
 interface DrawScheduleItem {
   draw_id?: number;
-  debt_facility_id?: string;
+  loan_id?: string | number;
   project_id?: number;
   period_id?: number | null;
   period_name: string;
@@ -146,7 +146,7 @@ interface SummaryData {
   total_debt: number;
   total_equity: number;
   leverage_ratio_pct: number;
-  debt_facilities_count: number;
+  loans_count: number;
   equity_tranches_count: number;
   waterfall_tiers_count: number;
   waterfall_active_tiers_count?: number;
@@ -157,14 +157,14 @@ interface SummaryData {
 }
 
 type ModalState =
-  | { type: 'debt'; entity: DebtFacility | null }
+  | { type: 'debt'; entity: LoanRecord | null }
   | { type: 'equity'; entity: EquityTranche | null }
   | { type: 'waterfall'; entity: WaterfallTier | null }
   | { type: 'draw'; entity: DrawScheduleItem | null }
   | null;
 
 const SECTION_LABELS: Record<Section, string> = {
-  debt: 'Debt Facilities',
+  debt: 'Loans',
   equity: 'Equity Structure',
   waterfall: 'Waterfall Tiers',
   draws: 'Draw Schedule',
@@ -172,7 +172,7 @@ const SECTION_LABELS: Record<Section, string> = {
 
 export default function CapitalizationTab({ projectId, mode }: CapitalizationTabProps) {
   const [activeSection, setActiveSection] = useState<Section>('debt');
-  const [debtFacilities, setDebtFacilities] = useState<DebtFacility[]>([]);
+  const [loans, setLoans] = useState<LoanRecord[]>([]);
   const [equityTranches, setEquityTranches] = useState<EquityTranche[]>([]);
   const [waterfallTiers, setWaterfallTiers] = useState<WaterfallTier[]>([]);
   const [drawSchedule, setDrawSchedule] = useState<DrawScheduleItem[]>([]);
@@ -208,55 +208,77 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
     loadNotes();
   }, []);
 
-  const facilityOptions = useMemo(
+  const loanOptions = useMemo(
     () =>
-      debtFacilities
-        .filter((facility): facility is DebtFacility & { facility_id: string } =>
-          typeof facility.facility_id === 'string' && facility.facility_id.length > 0
-        )
-        .map((facility) => ({
-          value: facility.facility_id,
-          label: facility.facility_name,
+      loans
+        .filter((loan): loan is LoanRecord & { loan_id: string | number } => loan.loan_id != null)
+        .map((loan) => ({
+          value: String(loan.loan_id),
+          label: loan.loan_name,
         })),
-    [debtFacilities]
+    [loans]
   );
 
-  const facilityLookup = useMemo(() => {
-    const map = new Map<string, DebtFacility>();
-    debtFacilities.forEach((facility) => {
-      if (typeof facility.facility_id === 'string' && facility.facility_id.length > 0) {
-        map.set(facility.facility_id, facility);
+  const loanLookup = useMemo(() => {
+    const map = new Map<string, LoanRecord>();
+    loans.forEach((loan) => {
+      if (loan.loan_id != null) {
+        map.set(String(loan.loan_id), loan);
       }
     });
     return map;
-  }, [debtFacilities]);
+  }, [loans]);
 
   const fetchAllData = async () => {
     try {
       setIsLoading(true);
-      const [summaryRes, debtRes, equityRes, waterfallRes, drawsRes] = await Promise.all([
-        fetch(`/api/capitalization/summary?projectId=${projectId}`),
-        fetch(`/api/capitalization/debt?projectId=${projectId}`),
+      setSummary(null);
+      setDrawSummary(null);
+
+      const debtRes = await fetch(`/api/capitalization/debt?projectId=${projectId}`);
+      const debtData = await debtRes.json();
+      const loanData = Array.isArray(debtData)
+        ? debtData
+        : debtData?.data || debtData?.loans || debtData?.facilities || [];
+      setLoans(loanData);
+
+      const activeLoanId = loanData[0]?.loan_id != null ? String(loanData[0].loan_id) : null;
+
+      const [equityRes, waterfallRes] = await Promise.all([
         fetch(`/api/capitalization/equity?projectId=${projectId}`),
         fetch(`/api/capitalization/waterfall?projectId=${projectId}`),
-        fetch(`/api/capitalization/draws?projectId=${projectId}`),
       ]);
 
-      const [summaryData, debtData, equityData, waterfallData, drawsData] = await Promise.all([
-        summaryRes.json(),
-        debtRes.json(),
+      const [equityData, waterfallData] = await Promise.all([
         equityRes.json(),
         waterfallRes.json(),
-        drawsRes.json(),
       ]);
 
-      if (summaryData.success) setSummary(summaryData.data);
-      if (debtData.success) setDebtFacilities(debtData.data);
       if (equityData.success) setEquityTranches(equityData.data);
       if (waterfallData.success) setWaterfallTiers(waterfallData.data);
-      if (drawsData.success) {
-        setDrawSchedule(drawsData.data);
-        setDrawSummary(drawsData.summary ?? null);
+
+      if (activeLoanId) {
+        const [summaryRes, drawsRes] = await Promise.all([
+          fetch(`/api/capitalization/summary?projectId=${projectId}&loanId=${activeLoanId}`),
+          fetch(`/api/capitalization/draws?projectId=${projectId}&loanId=${activeLoanId}`),
+        ]);
+
+        const [summaryData, drawsData] = await Promise.all([
+          summaryRes.json(),
+          drawsRes.json(),
+        ]);
+
+        if (summaryData?.success) {
+          setSummary(summaryData.data);
+        }
+        if (Array.isArray(drawsData)) {
+          setDrawSchedule(drawsData);
+        } else if (drawsData?.success) {
+          setDrawSchedule(drawsData.data);
+          setDrawSummary(drawsData.summary ?? null);
+        }
+      } else {
+        setDrawSchedule([]);
       }
     } catch (error) {
       console.error('Error fetching capitalization data:', error);
@@ -265,8 +287,8 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
     }
   };
 
-  const openDebtForm = (facility?: DebtFacility | null) => {
-    setModalState({ type: 'debt', entity: facility ?? null });
+  const openLoanForm = (loan?: LoanRecord | null) => {
+    setModalState({ type: 'debt', entity: loan ?? null });
   };
 
   const openEquityForm = (partner?: EquityTranche | null) => {
@@ -287,13 +309,13 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
     }
   };
 
-  const handleDebtSave = async (formValues: DebtFacility) => {
+  const handleLoanSave = async (formValues: LoanRecord) => {
     try {
       setIsModalSaving(true);
-      const { facility_id, ...rest } = formValues;
-      const isEdit = Boolean(facility_id);
+      const { loan_id, ...rest } = formValues;
+      const isEdit = Boolean(loan_id);
       const response = await fetch(
-        isEdit ? `/api/capitalization/debt/${facility_id}` : '/api/capitalization/debt',
+        isEdit ? `/api/capitalization/debt/${loan_id}?projectId=${projectId}` : '/api/capitalization/debt',
         {
           method: isEdit ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -313,22 +335,22 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
       }
 
       if (!response.ok || payload?.success === false) {
-        console.error('Debt facility save failed', {
+        console.error('Loan save failed', {
           status: response.status,
           payload,
         });
         const message =
           payload?.error ||
           payload?.message ||
-          `Failed to ${isEdit ? 'update' : 'create'} debt facility (status ${response.status})`;
+          `Failed to ${isEdit ? 'update' : 'create'} loan (status ${response.status})`;
         throw new Error(message);
       }
 
       await fetchAllData();
       setModalState(null);
     } catch (error) {
-      console.error('Error saving debt facility:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save debt facility');
+      console.error('Error saving loan:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save loan');
     } finally {
       setIsModalSaving(false);
     }
@@ -391,10 +413,10 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
   const handleDrawSave = async (formValues: DrawScheduleItem) => {
     try {
       setIsModalSaving(true);
-      const { draw_id, debt_facility_id, ...rest } = formValues;
+      const { draw_id, loan_id, ...rest } = formValues;
       const isEdit = Boolean(draw_id);
-      if (!debt_facility_id) {
-        throw new Error('Select a debt facility for this draw schedule item.');
+      if (!loan_id) {
+        throw new Error('Select a loan for this draw schedule item.');
       }
       const payload = isEdit
         ? {
@@ -404,7 +426,8 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
             draw_status: rest.draw_status,
           }
         : {
-            facility_id: debt_facility_id,
+            loan_id,
+            project_id: projectId,
             draw_amount: rest.draw_amount,
             draw_date: rest.draw_date,
             draw_purpose: rest.draw_purpose,
@@ -413,7 +436,9 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
           };
 
       const response = await fetch(
-        isEdit ? `/api/capitalization/draws/${draw_id}` : '/api/capitalization/draws',
+        isEdit
+          ? `/api/capitalization/draws/${draw_id}?projectId=${projectId}&loanId=${loan_id}`
+          : '/api/capitalization/draws',
         {
           method: isEdit ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -434,20 +459,20 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
     }
   };
 
-  const deleteDebtFacility = async (facilityId: string) => {
-    if (!confirm('Delete this debt facility? Associated draw schedules will also be removed.')) {
+  const deleteLoan = async (loanId: string | number) => {
+    if (!confirm('Delete this loan? Associated draw schedules will also be removed.')) {
       return;
     }
     try {
-      const response = await fetch(`/api/capitalization/debt/${facilityId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/capitalization/debt/${loanId}?projectId=${projectId}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok || data.success === false) {
-        throw new Error(data.error || 'Failed to delete debt facility');
+        throw new Error(data.error || 'Failed to delete loan');
       }
       await fetchAllData();
     } catch (error) {
-      console.error('Error deleting debt facility:', error);
-      alert(error instanceof Error ? error.message : 'Failed to delete debt facility');
+      console.error('Error deleting loan:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete loan');
     }
   };
 
@@ -485,12 +510,15 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
     }
   };
 
-  const deleteDrawScheduleItem = async (drawId: number) => {
+  const deleteDrawScheduleItem = async (drawId: number, loanId?: string | number) => {
     if (!confirm('Delete this draw schedule item?')) {
       return;
     }
     try {
-      const response = await fetch(`/api/capitalization/draws/${drawId}`, { method: 'DELETE' });
+      const response = await fetch(
+        `/api/capitalization/draws/${drawId}?projectId=${projectId}&loanId=${loanId ?? ''}`,
+        { method: 'DELETE' }
+      );
       const data = await response.json();
       if (!response.ok || data.success === false) {
         throw new Error(data.error || 'Failed to delete draw schedule item');
@@ -559,13 +587,13 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
   };
 
   const handleAddDraw = () => {
-    if (debtFacilities.length === 0) {
-      alert('Add a debt facility before creating draw schedule items.');
+    if (loans.length === 0) {
+      alert('Add a loan before creating draw schedule items.');
       return;
     }
-    const defaultFacilityId = facilityOptions[0]?.value;
+    const defaultLoanId = loanOptions[0]?.value;
     openDrawForm({
-      debt_facility_id: defaultFacilityId,
+      loan_id: defaultLoanId,
       period_name: '',
       draw_amount: 0,
       draw_purpose: '',
@@ -585,23 +613,23 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
   const renderDebtSection = () => (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-white">Debt Facilities</h3>
+        <h3 className="text-lg font-semibold text-white">Loans</h3>
         <button
-          onClick={() => openDebtForm()}
+          onClick={() => openLoanForm()}
           className="px-4 py-2 bg-blue-700 text-white text-sm rounded hover:bg-blue-600"
         >
-          + Add Facility
+          + Add Loan
         </button>
       </div>
 
-      {debtFacilities.length === 0 ? (
-        <div className="text-center py-8 text-gray-400">No debt facilities recorded yet.</div>
+      {loans.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No loans recorded yet.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-900">
               <tr className="border-b border-gray-700">
-                <th className="text-left px-3 py-2 font-medium text-gray-300">Facility</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Loan</th>
                 <th className="text-left px-3 py-2 font-medium text-gray-300">Lender</th>
                 <th className="text-right px-3 py-2 font-medium text-gray-300">Loan Amount</th>
                 <th className="text-right px-3 py-2 font-medium text-gray-300">Rate</th>
@@ -616,43 +644,43 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
               </tr>
             </thead>
             <tbody>
-              {debtFacilities.map((facility, idx) => (
+              {loans.map((loan, idx) => (
                 <tr
-                  key={facility.facility_id ?? idx}
+                  key={loan.loan_id ?? idx}
                   className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
                 >
                   <td className="px-3 py-3 align-top">
-                    <div className="text-white font-semibold">{facility.facility_name}</div>
+                    <div className="text-white font-semibold">{loan.loan_name}</div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Created {facility.created_at ? new Date(facility.created_at).toLocaleDateString() : '—'}
+                      Created {loan.created_at ? new Date(loan.created_at).toLocaleDateString() : '—'}
                     </div>
                   </td>
-                  <td className="px-3 py-3 align-top text-gray-300">{facility.lender_name || '—'}</td>
-                  <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(facility.loan_amount)}</td>
-                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(facility.interest_rate_pct)}</td>
-                  <td className="px-3 py-3 align-top text-center text-gray-300">{facility.loan_term_years ?? '—'}</td>
+                  <td className="px-3 py-3 align-top text-gray-300">{loan.lender_name || '—'}</td>
+                  <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(loan.loan_amount)}</td>
+                  <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(loan.interest_rate_pct)}</td>
+                  <td className="px-3 py-3 align-top text-center text-gray-300">{loan.loan_term_years ?? '—'}</td>
                   {mode !== 'basic' && (
                     <>
-                      <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(facility.ltv_pct)}</td>
+                      <td className="px-3 py-3 align-top text-right text-gray-300">{formatPercent(loan.loan_to_value_pct)}</td>
                       <td className="px-3 py-3 align-top text-right text-gray-300">
-                        {facility.dscr != null ? facility.dscr.toFixed(2) : '—'}
+                        {loan.loan_covenant_dscr_min != null ? loan.loan_covenant_dscr_min.toFixed(2) : '—'}
                       </td>
                     </>
                   )}
                   <td className="px-3 py-3 align-top text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={() => openDebtForm(facility)}
+                        onClick={() => openLoanForm(loan)}
                         className="px-3 py-1 text-xs bg-gray-700 text-gray-200 rounded hover:bg-gray-600 transition-colors"
                       >
                         View / Edit
                       </button>
                       <button
                         onClick={() => {
-                          if (!facility.facility_id) return;
-                          deleteDebtFacility(facility.facility_id);
+                          if (!loan.loan_id) return;
+                          deleteLoan(loan.loan_id);
                         }}
-                        disabled={!facility.facility_id}
+                        disabled={!loan.loan_id}
                         className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Delete
@@ -896,7 +924,7 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
             <thead className="bg-gray-900">
               <tr className="border-b border-gray-700">
                 <th className="text-left px-3 py-2 font-medium text-gray-300">Period</th>
-                <th className="text-left px-3 py-2 font-medium text-gray-300">Facility</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-300">Loan</th>
                 <th className="text-right px-3 py-2 font-medium text-gray-300">Draw Amount</th>
                 <th className="text-left px-3 py-2 font-medium text-gray-300">Purpose</th>
                 <th className="text-center px-3 py-2 font-medium text-gray-300">Draw Date</th>
@@ -905,14 +933,14 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
             </thead>
             <tbody>
               {drawSchedule.map((draw, idx) => {
-                const facility = draw.debt_facility_id ? facilityLookup.get(draw.debt_facility_id) : undefined;
+                const loan = draw.loan_id ? loanLookup.get(String(draw.loan_id)) : undefined;
                 return (
                   <tr
                     key={draw.draw_id ?? idx}
                     className={`border-b border-gray-700 ${idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'}`}
                   >
                     <td className="px-3 py-3 align-top text-white font-medium">{draw.period_name || 'Unscheduled'}</td>
-                    <td className="px-3 py-3 align-top text-gray-300">{facility?.facility_name || '—'}</td>
+                    <td className="px-3 py-3 align-top text-gray-300">{loan?.loan_name || '—'}</td>
                     <td className="px-3 py-3 align-top text-right text-white font-medium">{formatCurrency(draw.draw_amount)}</td>
                     <td className="px-3 py-3 align-top text-gray-300">{draw.draw_purpose || '—'}</td>
                     <td className="px-3 py-3 align-top text-center text-gray-300">
@@ -927,7 +955,7 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
                           View / Edit
                         </button>
                         <button
-                          onClick={() => deleteDrawScheduleItem(draw.draw_id ?? 0)}
+                          onClick={() => deleteDrawScheduleItem(draw.draw_id ?? 0, draw.loan_id)}
                           className="px-3 py-1 text-xs bg-red-900 text-red-200 rounded hover:bg-red-800 transition-colors"
                         >
                           Delete
@@ -968,7 +996,7 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
           <div className="bg-gray-800 rounded border border-gray-700 p-4">
             <div className="text-xs text-gray-400 mb-1">Total Debt</div>
             <div className="text-2xl font-bold text-white">{formatCurrency(summary.total_debt)}</div>
-            <div className="text-xs text-gray-500 mt-1">{summary.debt_facilities_count} facilities</div>
+            <div className="text-xs text-gray-500 mt-1">{summary.loans_count} loans</div>
           </div>
           <div className="bg-gray-800 rounded border border-gray-700 p-4">
             <div className="text-xs text-gray-400 mb-1">Total Equity</div>
@@ -996,7 +1024,7 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
           >
             {SECTION_LABELS[section]} (
             {section === 'debt'
-              ? debtFacilities.length
+              ? loans.length
               : section === 'equity'
                 ? equityTranches.length
                 : section === 'waterfall'
@@ -1050,10 +1078,10 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
       )}
 
       {modalState?.type === 'debt' && (
-        <DebtFacilityForm
+        <LoanForm
           facility={modalState.entity}
           mode={mode}
-          onSave={handleDebtSave}
+          onSave={handleLoanSave}
           onCancel={closeModal}
           isSaving={isModalSaving}
         />
@@ -1086,7 +1114,7 @@ export default function CapitalizationTab({ projectId, mode }: CapitalizationTab
           onSave={handleDrawSave}
           onCancel={closeModal}
           isSaving={isModalSaving}
-          facilityOptions={facilityOptions}
+          facilityOptions={loanOptions}
         />
       )}
     </div>

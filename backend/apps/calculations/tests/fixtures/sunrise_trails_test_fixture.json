@@ -1,0 +1,373 @@
+{
+  "project_name": "Sunrise Trails",
+  "description": "Single-product 32-lot lotbank deal from KHov Executed LOI Exhibit A",
+  "products": [
+    {
+      "id": 1,
+      "dimensions": "53x120",
+      "lots": 32,
+      "retail_lot_price": 302200,
+      "aggregate_retail_price": 9670400,
+      "land_cost": 6000000,
+      "improvement_cost": 2059419,
+      "total_cost": 8059419
+    }
+  ],
+  "lotbank_params": {
+    "deposit_pct": 0.10,
+    "deposit_cap_pct": 0.19,
+    "underwriting_fee": 48000,
+    "lotbank_cost_irr": 0.1383,
+    "lotbank_cost_multiplier": 1.2
+  },
+  "expected_totals": {
+    "initial_deposit": 967040,
+    "total_revenue": 9670400,
+    "total_costs": 8059419,
+    "net_income": 1610981,
+    "net_deposits": 0
+  },
+  "periods": [
+    {
+      "period": 1,
+      "date": "2015-04-30",
+      "land_cost": -6000000,
+      "improvement_cost": 0,
+      "total_cost": -6000000,
+      "deposit": 967040,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": -5032960
+    },
+    {
+      "period": 2,
+      "date": "2015-05-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 3,
+      "date": "2015-06-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 4,
+      "date": "2015-07-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 5,
+      "date": "2015-08-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 6,
+      "date": "2015-09-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 7,
+      "date": "2015-10-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 8,
+      "date": "2015-11-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 9,
+      "date": "2015-12-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 10,
+      "date": "2016-01-30",
+      "land_cost": 0,
+      "improvement_cost": -245084,
+      "total_cost": -245084,
+      "deposit": 0,
+      "lots_purchased": 1,
+      "revenue": 302200,
+      "net_income": 57116
+    },
+    {
+      "period": 11,
+      "date": "2016-02-28",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 12,
+      "date": "2016-03-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 13,
+      "date": "2016-04-30",
+      "land_cost": 0,
+      "improvement_cost": -4950,
+      "total_cost": -4950,
+      "deposit": 0,
+      "lots_purchased": 4,
+      "revenue": 1208800,
+      "net_income": 1203850
+    },
+    {
+      "period": 14,
+      "date": "2016-05-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 15,
+      "date": "2016-06-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 16,
+      "date": "2016-07-30",
+      "land_cost": 0,
+      "improvement_cost": -4950,
+      "total_cost": -4950,
+      "deposit": 0,
+      "lots_purchased": 5,
+      "revenue": 1511000,
+      "net_income": 1506050
+    },
+    {
+      "period": 17,
+      "date": "2016-08-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 18,
+      "date": "2016-09-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 19,
+      "date": "2016-10-30",
+      "land_cost": 0,
+      "improvement_cost": -28872,
+      "total_cost": -28872,
+      "deposit": 0,
+      "lots_purchased": 4,
+      "revenue": 1208800,
+      "net_income": 1179928
+    },
+    {
+      "period": 20,
+      "date": "2016-11-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 21,
+      "date": "2016-12-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 22,
+      "date": "2017-01-30",
+      "land_cost": 0,
+      "improvement_cost": -70970,
+      "total_cost": -70970,
+      "deposit": -220606,
+      "lots_purchased": 5,
+      "revenue": 1511000,
+      "net_income": 1219424
+    },
+    {
+      "period": 23,
+      "date": "2017-02-28",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 24,
+      "date": "2017-03-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 25,
+      "date": "2017-04-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": -229672,
+      "lots_purchased": 4,
+      "revenue": 1208800,
+      "net_income": 979128
+    },
+    {
+      "period": 26,
+      "date": "2017-05-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 27,
+      "date": "2017-06-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 28,
+      "date": "2017-07-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": -287090,
+      "lots_purchased": 5,
+      "revenue": 1511000,
+      "net_income": 1223910
+    },
+    {
+      "period": 29,
+      "date": "2017-08-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 30,
+      "date": "2017-09-30",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": 0,
+      "lots_purchased": 0,
+      "revenue": 0,
+      "net_income": 0
+    },
+    {
+      "period": 31,
+      "date": "2017-10-28",
+      "land_cost": 0,
+      "improvement_cost": 0,
+      "total_cost": 0,
+      "deposit": -229672,
+      "lots_purchased": 4,
+      "revenue": 1208800,
+      "net_income": 979128
+    }
+  ]
+}

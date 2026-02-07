@@ -1375,7 +1375,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         .acq-table thead th {
           border-right: 1px solid var(--cui-border-color-translucent);
           transition: background-color 0.15s ease, border-left 0.15s ease;
-          background-color: #F7F7FB !important;
+          background-color: var(--cui-tertiary-bg) !important;
           background-image: none !important;
           color: var(--cui-body-color) !important;
         }
@@ -1403,7 +1403,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
       `}</style>
       <CCardHeader
         className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2"
-        style={{ backgroundColor: '#F0F1F2', borderBottom: '1px solid var(--cui-border-color)' }}
+        style={{ backgroundColor: 'var(--cui-secondary-bg)', borderBottom: '1px solid var(--cui-border-color)' }}
       >
         <div>
           <CTooltip content={HEADER_TOOLTIP}>

@@ -420,7 +420,6 @@ export default function ProjectTab({
       <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
         <CCardHeader
           className="d-flex align-items-center justify-content-between"
-          style={{ padding: '0.5rem 1rem', minHeight: '44px', fontSize: '0.875rem', lineHeight: 1 }}
         >
           <span className="fw-semibold">Map - 3D Oblique View</span>
           <CTooltip content="Location Intelligence">
@@ -503,11 +502,9 @@ export default function ProjectTab({
 
   const renderLocationCard = () => (
     <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
-      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ backgroundColor: "var(--cui-card-cap-bg)", color: "var(--cui-body-color)" }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center gap-3">
         <div className="flex-grow-1">
-          <span className="text-xs text-uppercase fw-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
-            Project Profile
-          </span>
+          <span className="fw-semibold">Project Profile</span>
         </div>
         {!editingLocation ? (
           <CButton
@@ -999,7 +996,7 @@ export default function ProjectTab({
     <>
       <div
         className="d-flex flex-column"
-        style={{ gap: 'var(--component-gap)', padding: '0' }}
+        style={{ gap: 'var(--component-gap)', padding: '0.5rem' }}
       >
       {/* Section 1: Project Profile + Map - Side by side, no wrapper */}
       <CRow className="g-3" style={{ alignItems: 'stretch' }}>
@@ -1243,10 +1240,10 @@ export default function ProjectTab({
       <CCard>
         <CCardHeader
           className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer', padding: '0.5rem 1rem' }}
+          style={{ cursor: 'pointer' }}
           onClick={() => setContactsExpanded(!contactsExpanded)}
         >
-          <span className="fw-semibold" style={{ fontSize: '1rem' }}>Contacts</span>
+          <span className="fw-semibold">Contacts</span>
           <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
         {contactsExpanded && (

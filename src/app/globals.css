@@ -6,6 +6,8 @@
 @import '../styles/component-patterns.css';
 @import '../styles/folder-tabs.css';
 @import '../styles/property-page.css';
+@import '../styles/loan-schedule.css';
+@import '../styles/leveraged-cf.css';
 
 /* MapLibre popup styles */
 .maplibregl-popup {
@@ -13,31 +15,58 @@
 }
 
 .maplibregl-popup-content {
-  background: #1f2937 !important;
-  color: #f9fafb !important;
+  background: var(--cui-card-bg) !important;
+  color: var(--cui-body-color) !important;
   border-radius: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
   padding: 0 !important;
-  border: 1px solid #374151 !important;
+  border: 1px solid var(--cui-card-border-color) !important;
 }
 
 .maplibregl-popup-tip {
-  border-top-color: #1f2937 !important;
+  border-top-color: var(--cui-card-bg) !important;
 }
 
 .maplibregl-popup-close-button {
-  color: #9ca3af !important;
+  color: var(--cui-secondary-color) !important;
   font-size: 18px !important;
   padding: 4px 8px !important;
 }
 
 .maplibregl-popup-close-button:hover {
-  color: #f9fafb !important;
+  color: var(--cui-body-color) !important;
   background: transparent !important;
 }
 
 .map-marker-popup .maplibregl-popup-content {
-  background: #1f2937 !important;
+  background: var(--cui-card-bg) !important;
+}
+
+/* MapLibre control theming */
+.maplibregl-ctrl-group {
+  background: var(--cui-card-bg) !important;
+  border: 1px solid var(--cui-border-color) !important;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+  border-color: var(--cui-border-color) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: var(--cui-tertiary-bg) !important;
+}
+
+[data-coreui-theme='dark'] .maplibregl-ctrl-group button span,
+[data-coreui-theme='dark'] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.9);
+}
+
+.maplibregl-ctrl-scale {
+  background: var(--cui-card-bg) !important;
+  border-color: var(--cui-border-color) !important;
+  color: var(--cui-body-color) !important;
+  font-size: 10px !important;
 }
 
 @tailwind base;

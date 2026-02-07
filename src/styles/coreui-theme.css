@@ -5,6 +5,10 @@
 
 /* v1.0 – CoreUI Bridge (2025-11-07) */
 :root {
+  /* Global card header sizing */
+  --cui-card-cap-padding-y: 0.25rem;
+  --cui-card-cap-padding-x: 1rem;
+  --cui-card-border-radius: 0.375rem;
   --bs-body-bg: var(--surface-bg);
   --bs-body-color: var(--text-primary);
   --bs-border-color: var(--line-soft);
@@ -14,6 +18,7 @@
   --cui-body-color: var(--text-primary);
   --cui-card-bg: var(--surface-card);
   --cui-card-border-color: var(--line-soft);
+  --cui-border-color: var(--cui-card-border-color);
   --cui-footer-bg: var(--surface-card);
   --cui-card-shadow: 0 6px 18px rgba(9, 10, 11, 0.25);
 
@@ -472,7 +477,9 @@ body {
   background-color: var(--cui-card-bg);
   border-color: var(--cui-card-border-color);
   box-shadow: var(--cui-box-shadow-sm);
-  border-radius: 0.375rem;
+  border-radius: var(--cui-card-border-radius);
+  overflow: hidden;
+  background-clip: padding-box;
 }
 
 .card-header,
@@ -481,6 +488,19 @@ body {
 CCardHeader {
   background-color: var(--cui-card-header-bg) !important;
   border-bottom-color: var(--cui-border-color);
+}
+
+/* Consistent CoreUI card corner rounding */
+.card-header:first-child,
+.card > .card-header:first-child {
+  border-top-left-radius: var(--cui-card-border-radius);
+  border-top-right-radius: var(--cui-card-border-radius);
+}
+
+.card-footer:last-child,
+.card > .card-footer:last-child {
+  border-bottom-left-radius: var(--cui-card-border-radius);
+  border-bottom-right-radius: var(--cui-card-border-radius);
 }
 
 /* Canonical sub-headers */

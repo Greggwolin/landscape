@@ -56,6 +56,7 @@ from .views_debt import (
     LoanFinanceStructureViewSet,
     DebtBalanceSummaryViewSet,
 )
+from .views_debt_schedule import DebtScheduleView
 
 router = DefaultRouter()
 
@@ -161,6 +162,11 @@ urlpatterns = [
         'projects/<int:project_id>/loans/<int:loan_id>/balance-summary/',
         DebtBalanceSummaryViewSet.as_view({'get': 'list'}),
         name='loan-balance-summary'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/debt-schedule/',
+        DebtScheduleView.as_view(),
+        name='loan-debt-schedule'
     ),
 
     # Budget Variance endpoints

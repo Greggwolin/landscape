@@ -174,7 +174,7 @@ export function ComparablesMap({
               width: 30px;
               height: 30px;
               background-color: #0066cc;
-              border: 2px solid white;
+              border: 2px solid #000;
               border-radius: 50%;
               display: flex;
               align-items: center;

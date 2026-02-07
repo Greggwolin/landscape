@@ -1,0 +1,117 @@
+/* Leveraged Cash Flow Grid — horizontal scrolling DCF with sticky row labels */
+
+.leveraged-cf-container {
+  overflow-x: auto;
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+}
+
+.leveraged-cf-grid {
+  font-size: 0.8125rem;
+  font-family: var(--cui-body-font-family);
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Sticky header row */
+.leveraged-cf-grid thead th {
+  background: var(--cui-tertiary-bg);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--cui-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  white-space: nowrap;
+  color: var(--cui-body-color);
+}
+
+/* Sticky first column (row labels) */
+.leveraged-cf-grid th:first-child,
+.leveraged-cf-grid td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--cui-card-bg);
+  min-width: 220px;
+  max-width: 220px;
+  padding-left: 12px;
+  white-space: nowrap;
+  color: var(--cui-body-color);
+}
+
+.leveraged-cf-grid thead th:first-child {
+  z-index: 4;
+  background: var(--cui-tertiary-bg);
+}
+
+/* Period columns */
+.leveraged-cf-grid th:not(:first-child),
+.leveraged-cf-grid td:not(:first-child) {
+  text-align: right;
+  min-width: 110px;
+  padding: 4px 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--cui-body-color);
+}
+
+.leveraged-cf-grid td {
+  height: 28px;
+  border-bottom: 1px solid var(--cui-border-color-translucent);
+}
+
+/* Row types */
+.leveraged-cf-grid tr.section-header td {
+  font-weight: 700;
+  padding-top: 8px;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.leveraged-cf-grid tr.subtotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.leveraged-cf-grid tr.grand-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--cui-border-color);
+  font-size: 0.875rem;
+}
+
+.leveraged-cf-grid tr.indent td:first-child {
+  padding-left: 28px;
+  color: var(--cui-text-muted);
+}
+
+.leveraged-cf-grid tr.noi-row td {
+  background: rgba(var(--cui-primary-rgb), 0.04);
+  font-weight: 700;
+}
+
+.leveraged-cf-grid tr.noi-row td:first-child {
+  background: rgba(var(--cui-primary-rgb), 0.04);
+}
+
+.leveraged-cf-grid tr.net-cf-row td {
+  font-weight: 700;
+}
+
+.leveraged-cf-grid .positive {
+  color: var(--cui-success);
+}
+
+.leveraged-cf-grid .negative {
+  color: var(--cui-danger);
+}
+
+.leveraged-cf-grid tr.divider td {
+  height: 4px;
+  padding: 0;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+/* Zebra striping for data rows (not special rows) */
+.leveraged-cf-grid tr.indent:nth-child(even) td:not(:first-child) {
+  background: var(--cui-secondary-bg);
+}

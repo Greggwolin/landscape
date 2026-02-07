@@ -145,11 +145,15 @@ export default function DocumentPreviewPanel({
   const parties = profile.parties as string | undefined;
   const dollarAmount = profile.dollar_amount as number | undefined;
 
+  const rowBorderStyle = { borderBottom: '1px solid var(--cui-card-border-color)' };
+  const labelCellStyle = { color: 'var(--cui-secondary-color)' };
+  const valueCellStyle = { color: 'var(--cui-body-color)' };
+
   // Show profile form if editing
   if (showProfileForm) {
     return (
-      <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-        <div className="flex-1 overflow-y-auto p-4">
+      <div className="h-100 d-flex flex-column" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+        <div className="flex-grow-1 overflow-auto p-3">
           <ProfileForm
             docId={parseInt(doc.doc_id)}
             projectId={projectId}
@@ -172,71 +176,82 @@ export default function DocumentPreviewPanel({
   }
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+    <div className="h-100 d-flex flex-column" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-red-600 dark:text-red-400 text-lg flex-shrink-0">📄</span>
-          <span className="font-medium truncate text-gray-900 dark:text-gray-100">
+      <div
+        className="p-3 border-bottom d-flex align-items-center justify-content-between"
+        style={{ borderColor: 'var(--cui-card-border-color)', backgroundColor: 'var(--cui-card-header-bg)' }}
+      >
+        <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+          <span className="flex-shrink-0" style={{ fontSize: '1rem', color: 'var(--cui-danger)' }}>📄</span>
+          <span className="fw-semibold text-truncate" style={{ color: 'var(--cui-body-color)' }}>
             {doc.doc_name}
           </span>
-          <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded flex-shrink-0">
+          <span
+            className="badge rounded-pill flex-shrink-0"
+            style={{
+              backgroundColor: 'var(--cui-primary-bg-subtle)',
+              color: 'var(--cui-primary)',
+              border: '1px solid var(--cui-primary-border-subtle)'
+            }}
+          >
             V{doc.version_no || 1}
           </span>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="d-flex align-items-center gap-2 flex-shrink-0">
           <button
-            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center gap-1"
+            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
             onClick={() => setShowChatModal(true)}
           >
-            <CIcon icon={cilCommentSquare} className="w-4 h-4" />
+            <CIcon icon={cilCommentSquare} />
             Chat
           </button>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+            className="btn btn-link btn-sm p-0"
+            style={{ color: 'var(--cui-secondary-color)' }}
             aria-label="Close preview"
           >
-            <CIcon icon={cilX} className="w-5 h-5" />
+            <CIcon icon={cilX} />
           </button>
         </div>
       </div>
 
       {/* Preview Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-grow-1 overflow-auto p-3">
         {/* Document Metadata - 2-column layout */}
-        <table className="w-full text-sm">
+        <table className="w-100 small">
           <tbody>
             {/* Core Fields */}
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Type</td>
-              <td className="py-2 text-gray-900 dark:text-gray-100">{doc.doc_type || 'Not specified'}</td>
+            <tr style={rowBorderStyle}>
+              <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Type</td>
+              <td className="py-2" style={valueCellStyle}>{doc.doc_type || 'Not specified'}</td>
             </tr>
 
             {doc.status && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Status</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100 capitalize">{doc.status}</td>
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Status</td>
+                <td className="py-2 text-capitalize" style={valueCellStyle}>{doc.status}</td>
               </tr>
             )}
 
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Version</td>
-              <td className="py-2 text-gray-900 dark:text-gray-100">{doc.version_no || 1}</td>
+            <tr style={rowBorderStyle}>
+              <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Version</td>
+              <td className="py-2" style={valueCellStyle}>{doc.version_no || 1}</td>
             </tr>
 
             {doc.discipline && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Discipline</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">{doc.discipline}</td>
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Discipline</td>
+                <td className="py-2" style={valueCellStyle}>{doc.discipline}</td>
               </tr>
             )}
 
             {/* File Info */}
             {(doc.file_size_bytes || doc.mime_type) && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">File Info</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>File Info</td>
+                <td className="py-2" style={valueCellStyle}>
                   {[formatFileSize(doc.file_size_bytes), doc.mime_type].filter(Boolean).join(' • ')}
                 </td>
               </tr>
@@ -244,47 +259,47 @@ export default function DocumentPreviewPanel({
 
             {/* Dates */}
             {doc.doc_date && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Document Date</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Document Date</td>
+                <td className="py-2" style={valueCellStyle}>
                   {new Date(doc.doc_date).toLocaleDateString()}
                 </td>
               </tr>
             )}
 
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Created</td>
-              <td className="py-2 text-gray-900 dark:text-gray-100">
+            <tr style={rowBorderStyle}>
+              <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Created</td>
+              <td className="py-2" style={valueCellStyle}>
                 {new Date(doc.created_at).toLocaleDateString()}
               </td>
             </tr>
 
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Modified</td>
-              <td className="py-2 text-gray-900 dark:text-gray-100">
+            <tr style={rowBorderStyle}>
+              <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Modified</td>
+              <td className="py-2" style={valueCellStyle}>
                 {formatDateTime(doc.updated_at)}
               </td>
             </tr>
 
             {/* Profile Fields */}
             {description && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap align-top">Description</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">{description}</td>
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap align-top" style={labelCellStyle}>Description</td>
+                <td className="py-2" style={valueCellStyle}>{description}</td>
               </tr>
             )}
 
             {parties && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Parties</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">{parties}</td>
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Parties</td>
+                <td className="py-2" style={valueCellStyle}>{parties}</td>
               </tr>
             )}
 
             {(doc.contract_value || dollarAmount) && (
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Amount</td>
-                <td className="py-2 text-gray-900 dark:text-gray-100">
+              <tr style={rowBorderStyle}>
+                <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Amount</td>
+                <td className="py-2" style={valueCellStyle}>
                   {formatCurrency(doc.contract_value || dollarAmount)}
                 </td>
               </tr>
@@ -293,13 +308,18 @@ export default function DocumentPreviewPanel({
             {/* Tags */}
             {doc.tags && doc.tags.length > 0 && (
               <tr>
-                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap align-top">Tags</td>
+                <td className="py-2 pe-3 fw-semibold text-nowrap align-top" style={labelCellStyle}>Tags</td>
                 <td className="py-2">
-                  <div className="flex flex-wrap gap-1">
+                  <div className="d-flex flex-wrap gap-1">
                     {doc.tags.map((tag, idx) => (
                       <span
                         key={idx}
-                        className="inline-block px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs"
+                        className="badge rounded-pill"
+                        style={{
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          color: 'var(--cui-body-color)',
+                          border: '1px solid var(--cui-border-color)'
+                        }}
                       >
                         {tag}
                       </span>
@@ -313,35 +333,40 @@ export default function DocumentPreviewPanel({
       </div>
 
       {/* Action Buttons */}
-      <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-        <button
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-colors"
-          onClick={() => setShowProfileForm(true)}
-        >
-          <CIcon icon={cilSettings} className="w-4 h-4" />
-          <span>Edit Profile</span>
-        </button>
-        <button
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-colors"
-          onClick={handleDownload}
-        >
-          <CIcon icon={cilCloudDownload} className="w-4 h-4" />
-          <span>Download</span>
-        </button>
-        <button
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-colors"
-          onClick={() => setShowRenameModal(true)}
-        >
-          <CIcon icon={cilPencil} className="w-4 h-4" />
-          <span>Rename</span>
-        </button>
-        <button
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 rounded flex items-center gap-2 text-red-600 dark:text-red-400 transition-colors"
-          onClick={() => setShowDeleteModal(true)}
-        >
-          <CIcon icon={cilTrash} className="w-4 h-4" />
-          <span>Delete</span>
-        </button>
+      <div
+        className="p-3 border-top"
+        style={{ borderColor: 'var(--cui-card-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
+      >
+        <div className="d-grid gap-2">
+          <button
+            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 justify-content-start"
+            onClick={() => setShowProfileForm(true)}
+          >
+            <CIcon icon={cilSettings} />
+            <span>Edit Profile</span>
+          </button>
+          <button
+            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 justify-content-start"
+            onClick={handleDownload}
+          >
+            <CIcon icon={cilCloudDownload} />
+            <span>Download</span>
+          </button>
+          <button
+            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 justify-content-start"
+            onClick={() => setShowRenameModal(true)}
+          >
+            <CIcon icon={cilPencil} />
+            <span>Rename</span>
+          </button>
+          <button
+            className="btn btn-outline-danger btn-sm d-flex align-items-center gap-2 justify-content-start"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <CIcon icon={cilTrash} />
+            <span>Delete</span>
+          </button>
+        </div>
       </div>
 
       {/* Modals */}

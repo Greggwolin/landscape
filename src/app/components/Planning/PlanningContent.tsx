@@ -612,7 +612,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   }
 
   return (
-    <div className="p-4 space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+    <div className="space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       {/* Planning Overview with Granularity Controls */}
       <PlanningOverviewControls projectId={projectId} />
 

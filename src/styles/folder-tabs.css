@@ -296,9 +296,11 @@
   padding: 0 1rem;
   background: var(--cui-card-bg, var(--cui-secondary-bg));
   border-bottom: 1px solid var(--cui-border-color);
+  box-shadow: inset 0 -1px 0 var(--cui-border-color);
   min-height: 36px;
   align-items: flex-end;
   width: 100%;
+  position: relative;
 }
 
 /* Hide row 2 when empty (no subtabs) */
@@ -310,8 +312,6 @@
 .folder-tabs-row2::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid var(--cui-border-color);
-  margin-bottom: -1px;
 }
 
 .sub-tab {
@@ -325,7 +325,8 @@
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
-  margin-bottom: -1px;
+  position: relative;
+  bottom: -1px;
 }
 
 .sub-tab:hover {

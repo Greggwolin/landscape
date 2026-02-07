@@ -188,6 +188,61 @@ QUERY_TEMPLATES = {
         """,
         'description': 'Full project details'
     },
+
+    'competitive_projects': {
+        'query': """
+            SELECT
+                cp.comp_name,
+                cp.builder_name,
+                cp.total_units,
+                cp.price_min,
+                cp.price_max,
+                cp.absorption_rate_monthly,
+                cp.data_source,
+                cp.effective_date
+            FROM landscape.market_competitive_projects cp
+            WHERE cp.project_id = %s
+            ORDER BY cp.absorption_rate_monthly DESC NULLS LAST
+        """,
+        'description': 'Competitive projects (Zonda market comps)'
+    },
+
+    'competitive_products': {
+        'query': """
+            SELECT
+                cp.comp_name,
+                cp.builder_name,
+                cpp.price_avg,
+                cpp.unit_size_avg_sf,
+                cpp.price_per_sf_avg,
+                cpp.units_planned,
+                cpp.units_remaining,
+                cpp.sales_rate_monthly,
+                cpp.lot_width_ft
+            FROM landscape.market_competitive_projects cp
+            JOIN landscape.market_competitive_project_products cpp ON cp.id = cpp.competitive_project_id
+            WHERE cp.project_id = %s
+            ORDER BY cp.comp_name
+        """,
+        'description': 'Competitive product-level detail (pricing, SF, absorption by product)'
+    },
+
+    'market_absorption': {
+        'query': """
+            SELECT
+                cp.comp_name,
+                cp.builder_name,
+                cp.total_units,
+                cp.absorption_rate_monthly,
+                cp.price_min,
+                cp.price_max
+            FROM landscape.market_competitive_projects cp
+            WHERE cp.project_id = %s
+              AND cp.absorption_rate_monthly IS NOT NULL
+            ORDER BY cp.absorption_rate_monthly DESC
+        """,
+        'description': 'Market absorption rates from competitive projects'
+    },
 }
 
 
@@ -233,6 +288,22 @@ INTENT_PATTERNS: List[Tuple[str, str, int]] = [
     (r'land\s*use\s+(pricing|prices?)', 'land_use_pricing', 90),
     # "pricing assumptions", "price assumptions"
     (r'(pricing|price)\s+assumptions?', 'land_use_pricing', 90),
+
+    # Market / Competitive questions
+    (r'(competitive|comp)\s+(projects?|data|analysis|set)', 'competitive_projects', 100),
+    (r'(comps?|competitors?)\s+(in|near|around|for)', 'competitive_projects', 95),
+    (r'(show|list|what)\s+.*(comps?|competitive)', 'competitive_projects', 90),
+    (r'(who|which)\s+(builders?|are)\s+(building|competing|selling)', 'competitive_projects', 90),
+    (r'(nearby|surrounding|competing)\s+(projects?|communities|subdivisions?)', 'competitive_projects', 90),
+    (r'zonda\s+(data|stats|report|market)', 'competitive_projects', 100),
+    (r'(market|zonda)\s+(comps?|comparables?|competition)', 'competitive_projects', 100),
+    (r'(what|show|tell).*zonda', 'competitive_projects', 95),
+    (r'(absorption|sales?)\s+(rate|pace|velocity)', 'market_absorption', 95),
+    (r'(how fast|how quickly)\s+.*(selling|absorb)', 'market_absorption', 90),
+    (r'(monthly|annual)\s+(sales?|absorption)', 'market_absorption', 90),
+    (r'(comp|competitive|market)\s+(pricing|prices?|price\s+per)', 'competitive_products', 95),
+    (r'(comp|competitive)\s+(products?|product\s+mix)', 'competitive_products', 95),
+    (r'price\s+per\s+(sq|square)\s*(ft|foot)', 'competitive_products', 90),
 
     # Project overview
     (r'(project|overview|summary)\s+(details?|info)', 'project_details', 70),
@@ -582,6 +653,101 @@ def _format_project_details(results: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_competitive_projects(results: Dict[str, Any]) -> str:
+    """Format competitive projects results."""
+    lines = [f"Competitive Projects ({results['row_count']} comps):"]
+
+    for row in results['rows']:
+        name = row.get('comp_name', 'Unknown')
+        builder = row.get('builder_name', '')
+        units = row.get('total_units')
+        absorption = row.get('absorption_rate_monthly')
+        price_min = row.get('price_min')
+        price_max = row.get('price_max')
+
+        line = f"- {name}"
+        if builder:
+            line += f" ({builder})"
+        if units:
+            line += f": {int(units)} units"
+        if price_min and price_max:
+            line += f", ${float(price_min):,.0f}-${float(price_max):,.0f}"
+        if absorption:
+            line += f", {float(absorption):.1f}/mo absorption"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
+def _format_competitive_products(results: Dict[str, Any]) -> str:
+    """Format competitive product-level results."""
+    lines = ["Competitive Product Detail:"]
+
+    current_comp = None
+    for row in results['rows']:
+        comp = row.get('comp_name', 'Unknown')
+        if comp != current_comp:
+            builder = row.get('builder_name', '')
+            lines.append(f"\n{comp} ({builder}):")
+            current_comp = comp
+
+        avg_price = row.get('price_avg')
+        sqft = row.get('unit_size_avg_sf')
+        ppsf = row.get('price_per_sf_avg')
+        total = row.get('units_planned')
+        remaining = row.get('units_remaining')
+        rate = row.get('sales_rate_monthly')
+        lot_width = row.get('lot_width_ft')
+
+        parts = []
+        if avg_price:
+            parts.append(f"avg ${float(avg_price):,.0f}")
+        if sqft:
+            parts.append(f"{int(sqft)} SF")
+        if ppsf:
+            parts.append(f"${float(ppsf):,.0f}/SF")
+        if remaining is not None and total is not None:
+            parts.append(f"{int(remaining)}/{int(total)} remaining")
+        if rate:
+            parts.append(f"{float(rate):.1f}/mo")
+        if lot_width:
+            parts.append(f"{int(lot_width)}' lot")
+
+        if parts:
+            lines.append(f"  - {', '.join(parts)}")
+
+    return "\n".join(lines)
+
+
+def _format_market_absorption(results: Dict[str, Any]) -> str:
+    """Format market absorption results."""
+    lines = ["Market Absorption Rates:"]
+
+    for row in results['rows']:
+        name = row.get('comp_name', 'Unknown')
+        builder = row.get('builder_name', '')
+        units = row.get('total_units')
+        absorption = row.get('absorption_rate_monthly')
+        price_min = row.get('price_min')
+        price_max = row.get('price_max')
+
+        line = f"- {name} ({builder}): {float(absorption):.1f} units/mo"
+        if units:
+            line += f" ({int(units)} total units)"
+        if price_min and price_max:
+            line += f" at ${float(price_min):,.0f}-${float(price_max):,.0f}"
+        lines.append(line)
+
+    # Calculate market totals
+    total_absorption = sum(float(r.get('absorption_rate_monthly') or 0) for r in results['rows'])
+    if total_absorption:
+        lines.append(f"\nMarket Total: {total_absorption:.1f} units/mo across {len(results['rows'])} comps")
+        avg = total_absorption / len(results['rows'])
+        lines.append(f"Average: {avg:.1f} units/mo per community")
+
+    return "\n".join(lines)
+
+
 def _format_generic(results: Dict[str, Any]) -> str:
     """Generic formatter for unspecified query types."""
     desc = results.get('description', results['query_type'])
@@ -616,6 +782,9 @@ RESULT_FORMATTERS = {
     'budget_by_activity': _format_budget_by_activity,
     'land_use_pricing': _format_land_use_pricing,
     'project_details': _format_project_details,
+    'competitive_projects': _format_competitive_projects,
+    'competitive_products': _format_competitive_products,
+    'market_absorption': _format_market_absorption,
 }
 
 

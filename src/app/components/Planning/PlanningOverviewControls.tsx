@@ -196,8 +196,8 @@ export default function PlanningOverviewControls({ projectId }: Props) {
   if (loading) {
     return (
       <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+        <div className="px-3 py-2 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
         </div>
         <div className="p-6 text-center" style={{ color: 'var(--cui-body-color)' }}>
           Loading...
@@ -215,7 +215,7 @@ export default function PlanningOverviewControls({ projectId }: Props) {
 
   return (
     <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-      <div className="px-4 py-3 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+      <div className="px-3 py-2 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
         <h2 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
       </div>
 

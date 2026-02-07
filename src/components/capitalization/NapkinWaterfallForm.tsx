@@ -34,10 +34,10 @@ const parseNumber = (value: string): number | '' => {
 };
 
 // Styles for input cells (grey background)
-const cellBorder = '1px solid #e5e7eb';
+const cellBorder = '1px solid var(--cui-border-color)';
 
 const inputCellStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--cui-card-bg)',
   border: cellBorder,
   padding: '4px 10px',
   textAlign: 'center',
@@ -46,7 +46,7 @@ const inputCellStyle: React.CSSProperties = {
 
 // Styles for calculated cells (white background)
 const calcCellStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--cui-card-bg)',
   border: cellBorder,
   padding: '4px 10px',
   textAlign: 'center',
@@ -60,7 +60,7 @@ const headerCellStyle: React.CSSProperties = {
   fontWeight: 600,
   color: 'var(--cui-secondary-color)',
   fontSize: '0.75rem',
-  backgroundColor: '#f8fafc',
+  backgroundColor: 'var(--cui-tertiary-bg)',
   borderBottom: cellBorder,
   borderTop: cellBorder,
   borderLeft: cellBorder,
@@ -78,8 +78,8 @@ const labelCellStyle: React.CSSProperties = {
 };
 
 const inputFieldStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #d1d5db',
+  backgroundColor: 'var(--cui-card-bg)',
+  border: '1px solid var(--cui-border-color)',
   borderRadius: 8,
   padding: '8px 10px',
   textAlign: 'center',
@@ -89,7 +89,7 @@ const inputFieldStyle: React.CSSProperties = {
 };
 
 const tableWrapperStyle: React.CSSProperties = {
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--cui-border-color)',
   borderRadius: 10,
   overflow: 'hidden',
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
@@ -99,16 +99,16 @@ const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: '0.8rem',
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--cui-card-bg)',
 };
 
 const headerRowStyle: React.CSSProperties = {
-  backgroundColor: '#f8fafc',
+  backgroundColor: 'var(--cui-tertiary-bg)',
   height: '32px',
 };
 
 const bodyRowStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--cui-card-bg)',
   height: '32px',
 };
 

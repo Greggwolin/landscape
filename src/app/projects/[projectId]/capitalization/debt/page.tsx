@@ -1,248 +1,289 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CButton, CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/react';
+import { CCard, CCardBody, CCardHeader, CCol, CRow } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilPlus } from '@coreui/icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import MetricCard from '@/components/capitalization/MetricCard';
-import DebtFacilitiesTable, { type DebtFacility } from '@/components/capitalization/DebtFacilitiesTable';
-import DebtFacilityModal from '@/components/capitalization/DebtFacilityModal';
-import DrawScheduleTable, { type DrawEvent } from '@/components/capitalization/DrawScheduleTable';
+import ActiveLoansTable from '@/components/capitalization/DebtFacilitiesTable';
+import LoanFormFlyout from '@/components/capitalization/DebtFacilityModal';
+import LoanScheduleGrid from '@/components/capitalization/LoanScheduleGrid';
+import LoanScheduleModal from '@/components/capitalization/LoanScheduleModal';
+import LeveragedCashFlow from '@/components/capitalization/LeveragedCashFlow';
+import type { Loan } from '@/types/assumptions';
+import { useDeleteLoan, useLoans } from '@/hooks/useCapitalization';
 import { useToast } from '@/components/ui/toast';
 import { ExportButton } from '@/components/admin';
 
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || Number.isNaN(value)) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const formatPercent = (value: number | null | undefined, decimals = 3): string => {
+  if (value == null || Number.isNaN(value)) return '0.000%';
+  return `${value.toFixed(decimals)}%`;
+};
+
+const addMonths = (dateStr: string, months: number): Date => {
+  const date = new Date(dateStr);
+  const targetMonth = date.getMonth() + months;
+  const result = new Date(date);
+  result.setMonth(targetMonth);
+  return result;
+};
+
+const formatMonthYear = (date: Date | null): string => {
+  if (!date) return '—';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+};
+
+const getFacilityStructure = (loan: Loan): string => {
+  return loan.facility_structure || loan.structure_type || '';
+};
+
+const getOutstandingBalance = (loan: Loan): number => {
+  const facilityStructure = getFacilityStructure(loan);
+  if (loan.loan_amount != null) return loan.loan_amount;
+  if (facilityStructure === 'TERM') return loan.commitment_amount || 0;
+  return 0;
+};
+
+const calculateMonthlyPayment = (loan: Loan): number => {
+  const balance = getOutstandingBalance(loan);
+  const ratePct = loan.interest_rate_pct ?? null;
+  if (!balance || ratePct == null) return 0;
+
+  const monthlyRate = ratePct / 100 / 12;
+  if (!monthlyRate) return 0;
+
+  if (loan.interest_only_months && loan.interest_only_months > 0) {
+    return balance * monthlyRate;
+  }
+
+  const amortMonths = loan.amortization_months || loan.loan_term_months;
+  if (!amortMonths || amortMonths <= 0) return balance * monthlyRate;
+
+  return (balance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -amortMonths));
+};
+
+const SummaryCard = ({ label, value }: { label: string; value: string }) => (
+  <CCard style={{ background: 'var(--cui-card-bg)' }}>
+    <CCardBody>
+      <div className="small" style={{ color: 'var(--cui-body-color)' }}>
+        {label}
+      </div>
+      <div className="fs-4 fw-semibold" style={{ color: 'var(--cui-primary)' }}>
+        {value}
+      </div>
+    </CCardBody>
+  </CCard>
+);
+
+const LoanSummaryCards = ({ loans }: { loans: Loan[] }) => {
+  const loanTypes = loans.map((loan) => getFacilityStructure(loan));
+  const hasRevolver = loanTypes.includes('REVOLVER');
+  const hasTerm = loanTypes.includes('TERM');
+
+  const totalCommitment = loans.reduce((sum, loan) => sum + (loan.commitment_amount || 0), 0);
+  const totalOutstanding = loans.reduce((sum, loan) => sum + getOutstandingBalance(loan), 0);
+
+  const weightedAvgRate = () => {
+    if (!totalOutstanding) return 0;
+    const weightedSum = loans.reduce((sum, loan) => {
+      const balance = getOutstandingBalance(loan);
+      return sum + balance * (loan.interest_rate_pct || 0);
+    }, 0);
+    return weightedSum / totalOutstanding;
+  };
+
+  const earliestMaturity = () => {
+    const dates = loans
+      .map((loan) => {
+        if (!loan.loan_start_date || !loan.loan_term_months) return null;
+        return addMonths(loan.loan_start_date, Math.max(loan.loan_term_months - 1, 0));
+      })
+      .filter((date): date is Date => Boolean(date));
+
+    if (dates.length === 0) return null;
+    return dates.sort((a, b) => a.getTime() - b.getTime())[0];
+  };
+
+  const totalMonthlyPayment = loans.reduce((sum, loan) => sum + calculateMonthlyPayment(loan), 0);
+
+  const cards = (() => {
+    if (loans.length === 0) {
+      return [
+        { label: 'Loan Amount', value: formatCurrency(0) },
+        { label: 'Outstanding Balance', value: formatCurrency(0) },
+        { label: 'Monthly Payment', value: formatCurrency(0) },
+        { label: 'Maturity Date', value: '—' },
+      ];
+    }
+
+    if (hasTerm && !hasRevolver) {
+      return [
+        { label: 'Loan Amount', value: formatCurrency(totalCommitment) },
+        { label: 'Outstanding Balance', value: formatCurrency(totalOutstanding) },
+        { label: 'Monthly Payment', value: formatCurrency(totalMonthlyPayment) },
+        { label: 'Maturity Date', value: formatMonthYear(earliestMaturity()) },
+      ];
+    }
+
+    if (hasRevolver && !hasTerm) {
+      return [
+        { label: 'Total Debt Capacity', value: formatCurrency(totalCommitment) },
+        { label: 'Outstanding Balance', value: formatCurrency(totalOutstanding) },
+        { label: 'Available to Draw', value: formatCurrency(totalCommitment - totalOutstanding) },
+        { label: 'Weighted Avg Rate', value: formatPercent(weightedAvgRate()) },
+      ];
+    }
+
+    return [
+      { label: 'Total Commitment', value: formatCurrency(totalCommitment) },
+      { label: 'Outstanding Balance', value: formatCurrency(totalOutstanding) },
+      { label: 'Wtd Avg Rate', value: formatPercent(weightedAvgRate()) },
+      { label: 'Next Maturity', value: formatMonthYear(earliestMaturity()) },
+    ];
+  })();
+
+  return (
+    <CRow className="g-3 mb-4">
+      {cards.map((card) => (
+        <CCol key={card.label} xs={12} md={3}>
+          <SummaryCard label={card.label} value={card.value} />
+        </CCol>
+      ))}
+    </CRow>
+  );
+};
+
 export default function DebtPage() {
   const params = useParams();
-  const projectId = parseInt(params.projectId as string);
-  const queryClient = useQueryClient();
+  const projectId = params.projectId as string;
   const { showToast } = useToast();
 
-  const [facilityModalVisible, setFacilityModalVisible] = useState(false);
-  const [editingFacility, setEditingFacility] = useState<DebtFacility | null>(null);
-  const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(null);
+  const [loanFlyoutVisible, setLoanFlyoutVisible] = useState(false);
+  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [scheduleModalLoanId, setScheduleModalLoanId] = useState<number | null>(null);
 
-  const { data: facilities = [] } = useQuery<DebtFacility[]>({
-    queryKey: ['debt-facilities', projectId],
-    queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/debt/facilities`);
-      if (!response.ok) throw new Error('Failed to fetch facilities');
-      const data = await response.json();
-      return data.facilities || [];
-    },
-  });
+  const { data: loansData = [] } = useLoans(projectId);
+  const deleteLoan = useDeleteLoan(projectId);
 
-  const { data: drawEvents = [] } = useQuery<DrawEvent[]>({
-    queryKey: ['draw-events', projectId],
-    queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/debt/draw-events`);
-      if (!response.ok) throw new Error('Failed to fetch draw events');
-      const data = await response.json();
-      return data.drawEvents || [];
-    },
-  });
+  const loans = useMemo<Loan[]>(() => {
+    if (Array.isArray(loansData)) return loansData;
+    if (loansData?.results) return loansData.results as Loan[];
+    if (loansData?.loans) return loansData.loans as Loan[];
+    if (loansData?.facilities) return loansData.facilities as Loan[];
+    if (loansData?.data) return loansData.data as Loan[];
+    return [];
+  }, [loansData]);
 
-  const saveFacilityMutation = useMutation({
-    mutationFn: async (data: Partial<DebtFacility>) => {
-      const url = data.id
-        ? `/api/projects/${projectId}/debt/facilities/${data.id}`
-        : `/api/projects/${projectId}/debt/facilities`;
+  const handleAddLoan = () => {
+    setEditingLoan(null);
+    setLoanFlyoutVisible(true);
+  };
 
-      const response = await fetch(url, {
-        method: data.id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+  const handleEditLoan = (loan: Loan) => {
+    setEditingLoan(loan);
+    setLoanFlyoutVisible(true);
+  };
 
-      if (!response.ok) throw new Error('Failed to save facility');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['debt-facilities', projectId] });
+  const handleDeleteLoan = async (loanId: number) => {
+    if (!confirm('Are you sure you want to delete this loan?')) return;
+
+    try {
+      await deleteLoan.mutateAsync(loanId);
       showToast({
         title: 'Success',
-        message: 'Debt facility saved successfully',
+        message: 'Loan deleted successfully',
         type: 'success',
       });
-    },
-    onError: () => {
+    } catch (error) {
       showToast({
         title: 'Error',
-        message: 'Failed to save debt facility',
+        message: 'Failed to delete loan',
         type: 'error',
       });
-    },
-  });
-
-  const deleteFacilityMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/projects/${projectId}/debt/facilities/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete facility');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['debt-facilities', projectId] });
-      showToast({
-        title: 'Success',
-        message: 'Debt facility deleted successfully',
-        type: 'success',
-      });
-    },
-  });
-
-  const calculateTotalDebtCapacity = (): number => {
-    return facilities.reduce((sum, f) => sum + f.commitmentAmount, 0);
-  };
-
-  const calculateOutstandingBalance = (): number => {
-    return facilities.reduce((sum, f) => sum + f.outstandingBalance, 0);
-  };
-
-  const calculateAvailableToDraw = (): number => {
-    return calculateTotalDebtCapacity() - calculateOutstandingBalance();
-  };
-
-  const calculateWeightedAvgRate = (): number => {
-    const totalBalance = calculateOutstandingBalance();
-    if (totalBalance === 0) return 0;
-
-    const weightedSum = facilities.reduce(
-      (sum, f) => sum + f.outstandingBalance * f.interestRate,
-      0
-    );
-    return weightedSum / totalBalance;
-  };
-
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number): string => {
-    return `${(value * 100).toFixed(2)}%`;
-  };
-
-  const handleAddFacility = () => {
-    setEditingFacility(null);
-    setFacilityModalVisible(true);
-  };
-
-  const handleEditFacility = (facility: DebtFacility) => {
-    setEditingFacility(facility);
-    setFacilityModalVisible(true);
-  };
-
-  const handleSaveFacility = async (data: Partial<DebtFacility>) => {
-    await saveFacilityMutation.mutateAsync(data);
-  };
-
-  const handleDeleteFacility = (id: number) => {
-    if (confirm('Are you sure you want to delete this debt facility?')) {
-      deleteFacilityMutation.mutate(id);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="debt-page" data-schedule-loan-id={scheduleModalLoanId ?? undefined}>
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0">Debt Facilities</h5>
+        <h5 className="mb-0">Loans</h5>
         <div className="d-flex gap-2">
-          <ExportButton tabName="Capitalization" projectId={projectId.toString()} />
-          <CButton
-            color="primary"
-            onClick={handleAddFacility}
-            aria-label="Add debt facility"
-          >
+          <ExportButton tabName="Capitalization" projectId={projectId} />
+          <button type="button" className="btn btn-primary" onClick={handleAddLoan}>
             <CIcon icon={cilPlus} className="me-1" />
-            Add Facility
-          </CButton>
+            Add Loan
+          </button>
         </div>
       </div>
 
-      <CRow className="g-3 mb-4">
-        <CCol xs={12} md={3}>
-          <MetricCard
-            label="Total Debt Capacity"
-            value={formatCurrency(calculateTotalDebtCapacity())}
-            status="info"
-          />
-        </CCol>
-        <CCol xs={12} md={3}>
-          <MetricCard
-            label="Outstanding Balance"
-            value={formatCurrency(calculateOutstandingBalance())}
-            status="primary"
-          />
-        </CCol>
-        <CCol xs={12} md={3}>
-          <MetricCard
-            label="Available to Draw"
-            value={formatCurrency(calculateAvailableToDraw())}
-            status="success"
-          />
-        </CCol>
-        <CCol xs={12} md={3}>
-          <MetricCard
-            label="Weighted Avg Rate"
-            value={formatPercent(calculateWeightedAvgRate())}
-            status="info"
-          />
-        </CCol>
-      </CRow>
+      {/* SECTION 1: Summary Cards */}
+      <LoanSummaryCards loans={loans} />
 
+      {/* SECTION 2: Active Loans Table */}
       <CCard className="mb-4">
         <CCardHeader>
-          <h5 className="mb-0">Active Debt Facilities</h5>
+          <h5 className="mb-0">Active Loans</h5>
         </CCardHeader>
         <CCardBody>
-          <DebtFacilitiesTable
-            facilities={facilities}
-            onSelect={setSelectedFacilityId}
-            selectedId={selectedFacilityId}
-            onEdit={handleEditFacility}
-            onDelete={handleDeleteFacility}
+          <ActiveLoansTable
+            loans={loans}
+            onEdit={handleEditLoan}
+            onDelete={handleDeleteLoan}
+            onViewSchedule={(loanId) => setScheduleModalLoanId(loanId)}
           />
         </CCardBody>
       </CCard>
 
-      <CCard>
-        <CCardHeader className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Draw Schedule</h5>
-          <CButton
-            color="outline-secondary"
-            size="sm"
-            aria-label="Add draw event"
-          >
-            <CIcon icon={cilPlus} className="me-1" />
-            Add Draw Event
-          </CButton>
+      {/* SECTION 3: Loan Schedule Grid */}
+      <CCard className="mb-4">
+        <CCardHeader>
+          <h5 className="mb-0">Loan Schedule</h5>
         </CCardHeader>
         <CCardBody>
-          <p className="text-muted small mb-3">
-            Manually track draw events and timing. Auto-generation from budget timing
-            and milestone triggers will be added in the Debt Enhancement phase.
-          </p>
-          <DrawScheduleTable
-            drawEvents={drawEvents}
-            onEdit={() => {}}
-            onDelete={() => {}}
-          />
+          <LoanScheduleGrid projectId={projectId} loans={loans} />
         </CCardBody>
       </CCard>
 
-      <DebtFacilityModal
-        visible={facilityModalVisible}
-        facility={editingFacility}
-        onClose={() => setFacilityModalVisible(false)}
-        onSave={handleSaveFacility}
+      {/* SECTION 4: Leveraged Cash Flow */}
+      <CCard className="mb-4">
+        <CCardHeader>
+          <h5 className="mb-0">Cash Flow</h5>
+        </CCardHeader>
+        <CCardBody>
+          <LeveragedCashFlow projectId={projectId} loans={loans} />
+        </CCardBody>
+      </CCard>
+
+      {/* Loan Form Flyout */}
+      <LoanFormFlyout
+        visible={loanFlyoutVisible}
+        loan={editingLoan}
+        projectId={projectId}
+        onClose={() => setLoanFlyoutVisible(false)}
       />
+
+      {/* Loan Schedule Modal */}
+      {scheduleModalLoanId && (
+        <LoanScheduleModal
+          projectId={projectId}
+          loanId={scheduleModalLoanId}
+          loan={loans.find((l) => l.loan_id === scheduleModalLoanId)}
+          onClose={() => setScheduleModalLoanId(null)}
+        />
+      )}
     </div>
   );
 }

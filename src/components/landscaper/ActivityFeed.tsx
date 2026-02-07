@@ -102,8 +102,8 @@ export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedPr
         className="w-full flex items-center justify-between transition-colors border-b"
         style={{
           padding: '0.5rem 1rem',
-          backgroundColor: 'var(--surface-card-header)',
-          borderColor: 'var(--cui-border-color)',
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderColor: 'var(--cui-card-border-color)',
           color: 'var(--cui-body-color)',
         }}
       >

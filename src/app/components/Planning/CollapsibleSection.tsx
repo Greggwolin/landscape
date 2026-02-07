@@ -39,7 +39,7 @@ export default function CollapsibleSection({
   return (
     <div className="rounded border overflow-hidden" style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)' }}>
       {/* Header */}
-      <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: 'var(--surface-card-header)' }}>
+      <div className="px-3 py-2 flex items-center justify-between" style={{ backgroundColor: 'var(--surface-card-header)' }}>
         <button
           type="button"
           onClick={toggleSection}

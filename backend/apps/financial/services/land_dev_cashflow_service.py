@@ -25,6 +25,18 @@ from django.db import connection
 import numpy_financial as npf
 import numpy as np
 
+from apps.calculations.engines.debt_service_engine import (
+    DebtServiceEngine,
+    RevolverLoanParams,
+    TermLoanParams,
+    PeriodCosts,
+)
+from apps.calculations.engines.lotbank_engine import (
+    LotbankEngine,
+    LotbankParams,
+    LotbankProduct,
+)
+from apps.financial.models_debt import Loan
 
 class LandDevCashFlowService:
     """
@@ -39,12 +51,17 @@ class LandDevCashFlowService:
         self._project_config: Optional[Dict] = None
         self._dcf_assumptions: Optional[Dict] = None
 
-    def calculate(self, container_ids: Optional[List[int]] = None) -> Dict[str, Any]:
+    def calculate(
+        self,
+        container_ids: Optional[List[int]] = None,
+        include_financing: bool = False,
+    ) -> Dict[str, Any]:
         """
         Main entry point. Returns monthly cash flow projections.
 
         Args:
             container_ids: Optional filter for specific villages/phases (division_ids)
+            include_financing: Optional flag to include debt financing section
 
         Returns:
             {
@@ -65,6 +82,12 @@ class LandDevCashFlowService:
 
         # Step 2: Determine required periods
         required_periods = self._determine_required_periods(container_ids)
+
+        # Step 2b: Extend periods to cover loan terms when financing is included
+        if include_financing:
+            required_periods = self._extend_periods_for_loans(
+                required_periods, project_config['start_date'], container_ids
+            )
 
         # Step 3: Generate monthly periods
         periods = self._generate_periods(
@@ -93,6 +116,25 @@ class LandDevCashFlowService:
             absorption_schedule,
             required_periods
         )
+
+        if include_financing:
+            financing_section = self._build_financing_section(
+                cost_schedule,
+                absorption_schedule,
+                periods,
+                container_ids,
+            )
+            if financing_section:
+                sections.append(financing_section)
+
+        # Step 6b: Add lotbank sections when analysis_type = 'LOTBANK'
+        lotbank_sections = self._build_lotbank_sections(
+            absorption_schedule,
+            periods,
+            container_ids,
+        )
+        if lotbank_sections:
+            sections.extend(lotbank_sections)
 
         # Step 7: Calculate summary metrics
         summary = self._calculate_summary_metrics(
@@ -1273,6 +1315,326 @@ class LandDevCashFlowService:
 
         return sections
 
+    # =========================================================================
+    # FINANCING SECTION
+    # =========================================================================
+
+    def _build_financing_section(
+        self,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+        container_ids: Optional[List[int]],
+    ) -> Optional[Dict]:
+        """Build financing section from loan schedules (revolvers and term loans)."""
+        revolver_loans = self._fetch_loans(structure_type='REVOLVER', container_ids=container_ids)
+        term_loans = self._fetch_loans(structure_type='TERM', container_ids=container_ids)
+
+        if not revolver_loans and not term_loans:
+            return None
+
+        period_data = self._build_period_costs_for_financing(
+            cost_schedule,
+            absorption_schedule,
+            periods,
+        )
+
+        engine = DebtServiceEngine()
+        line_items = []
+        period_count = len(periods)
+
+        for loan in revolver_loans:
+            if loan.takes_out_loan_id:
+                raise NotImplementedError(
+                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
+                )
+
+            params = self._build_revolver_params(loan, periods)
+            revolver_result = engine.calculate_revolver(params, period_data)
+
+            period_amounts = []
+            total_amount = 0.0
+            for period in revolver_result.periods:
+                amount = (
+                    period.cost_draw
+                    - period.accrued_interest
+                    + period.interest_reserve_draw
+                    - period.release_payments
+                    - period.origination_cost
+                )
+                if amount != 0:
+                    period_amounts.append({
+                        'periodIndex': period.period_index,
+                        'periodSequence': period.period_index + 1,
+                        'amount': amount,
+                        'source': 'calculated',
+                    })
+                total_amount += amount
+
+            line_items.append({
+                'lineId': f"financing-loan-{loan.loan_id}",
+                'category': 'financing',
+                'subcategory': 'Debt Service',
+                'description': loan.loan_name,
+                'periods': period_amounts,
+                'total': total_amount,
+                'sourceType': 'debt',
+            })
+
+        for loan in term_loans:
+            if loan.takes_out_loan_id:
+                raise NotImplementedError(
+                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
+                )
+
+            params = self._build_term_params(loan, periods)
+            term_result = engine.calculate_term(params, period_count)
+
+            period_amounts = []
+            total_amount = 0.0
+            for period in term_result.periods:
+                amount = 0.0
+                if period.period_index == params.loan_start_period:
+                    origination_fee = params.loan_amount * params.origination_fee_pct
+                    amount += params.loan_amount - origination_fee
+
+                amount -= period.scheduled_payment
+                if period.is_balloon and period.balloon_amount:
+                    amount -= period.balloon_amount
+
+                if amount != 0:
+                    period_amounts.append({
+                        'periodIndex': period.period_index,
+                        'periodSequence': period.period_index + 1,
+                        'amount': amount,
+                        'source': 'calculated',
+                    })
+                total_amount += amount
+
+            line_items.append({
+                'lineId': f"financing-loan-{loan.loan_id}",
+                'category': 'financing',
+                'subcategory': 'Debt Service',
+                'description': loan.loan_name,
+                'periods': period_amounts,
+                'total': total_amount,
+                'sourceType': 'debt',
+            })
+
+        subtotals = self._calculate_subtotals(line_items, period_count)
+        section_total = sum(item['total'] for item in line_items)
+
+        return {
+            'sectionId': 'financing',
+            'sectionName': 'FINANCING',
+            'lineItems': line_items,
+            'subtotals': subtotals,
+            'sectionTotal': section_total,
+            'sortOrder': 99,
+        }
+
+    def _build_revolver_params(self, loan: Loan, periods: List[Dict]) -> RevolverLoanParams:
+        """Translate Loan model to revolver parameters for calculation engine."""
+        loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
+        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+
+        closing_costs = (
+            float(loan.closing_costs_appraisal or 0)
+            + float(loan.closing_costs_legal or 0)
+            + float(loan.closing_costs_other or 0)
+        )
+
+        return RevolverLoanParams(
+            loan_to_cost_pct=float(loan.loan_to_cost_pct or 0) / 100.0,
+            interest_rate_annual=float(loan.interest_rate_pct or 0) / 100.0,
+            origination_fee_pct=float(loan.origination_fee_pct or 0) / 100.0,
+            interest_reserve_inflator=float(loan.interest_reserve_inflator or 1.0),
+            repayment_acceleration=float(loan.repayment_acceleration or 1.0),
+            release_price_pct=float(loan.release_price_pct or 0) / 100.0,
+            release_price_minimum=float(loan.minimum_release_amount or 0),
+            closing_costs=closing_costs,
+            loan_start_period=loan_start_period,
+            loan_term_months=loan_term_months or len(periods),
+            draw_trigger_type=loan.draw_trigger_type,
+        )
+
+    def _build_term_params(self, loan: Loan, periods: List[Dict]) -> TermLoanParams:
+        """Translate Loan model to term parameters for calculation engine."""
+        loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
+        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+
+        amort_months = self._normalize_term_months(loan.amortization_months, loan.amortization_years)
+
+        return TermLoanParams(
+            loan_amount=float(loan.loan_amount or loan.commitment_amount or 0),
+            interest_rate_annual=float(loan.interest_rate_pct or 0) / 100.0,
+            amortization_months=amort_months or 0,
+            interest_only_months=int(loan.interest_only_months or 0),
+            loan_term_months=loan_term_months or len(periods),
+            origination_fee_pct=float(loan.origination_fee_pct or 0) / 100.0,
+            loan_start_period=loan_start_period,
+            payment_frequency=loan.payment_frequency or 'MONTHLY',
+        )
+
+    def _build_period_costs_for_financing(
+        self,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+    ) -> List[PeriodCosts]:
+        """Build PeriodCosts inputs for the debt service engine."""
+        period_count = len(periods)
+        period_totals = cost_schedule.get('periodTotals', [])
+
+        phase_ids = set()
+        for period_sale in absorption_schedule.get('periodSales', []):
+            for parcel in period_sale.get('parcels', []):
+                phase_id = parcel.get('containerId')
+                if phase_id:
+                    phase_ids.add(phase_id)
+
+        phase_to_division = self._fetch_phase_division_mapping(list(phase_ids))
+
+        lots_by_period: Dict[int, Dict[int, int]] = {}
+        total_lots_by_division: Dict[int, int] = {}
+
+        for period_sale in absorption_schedule.get('periodSales', []):
+            period_idx = period_sale.get('periodIndex')
+            if period_idx is None:
+                continue
+            for parcel in period_sale.get('parcels', []):
+                phase_id = parcel.get('containerId')
+                division_id = phase_to_division.get(phase_id)
+                if division_id is None:
+                    continue
+                units = int(parcel.get('units') or 0)
+                if units <= 0:
+                    continue
+                lots_by_period.setdefault(period_idx, {})
+                lots_by_period[period_idx][division_id] = lots_by_period[period_idx].get(division_id, 0) + units
+                total_lots_by_division[division_id] = total_lots_by_division.get(division_id, 0) + units
+
+        total_costs_by_division: Dict[int, float] = {}
+        for category in cost_schedule.get('categorySummary', {}).values():
+            for item in category.get('items', []):
+                container_id = item.get('containerId')
+                if container_id is None:
+                    continue
+                total_costs_by_division[container_id] = total_costs_by_division.get(container_id, 0.0) + float(
+                    item.get('totalAmount') or 0
+                )
+
+        total_costs_overall = float(cost_schedule.get('totalCosts') or 0)
+        total_lots_overall = sum(total_lots_by_division.values())
+        default_cost_per_lot = total_costs_overall / total_lots_overall if total_lots_overall else 0.0
+
+        cost_per_lot_by_division: Dict[int, float] = {}
+        for division_id, lot_count in total_lots_by_division.items():
+            if lot_count <= 0:
+                cost_per_lot_by_division[division_id] = 0.0
+                continue
+            total_cost = total_costs_by_division.get(division_id)
+            if total_cost is None or total_cost == 0:
+                cost_per_lot_by_division[division_id] = default_cost_per_lot
+            else:
+                cost_per_lot_by_division[division_id] = total_cost / lot_count
+
+        period_data: List[PeriodCosts] = []
+        for idx in range(period_count):
+            period = periods[idx]
+            period_data.append(
+                PeriodCosts(
+                    period_index=idx,
+                    date=period['endDate'].isoformat() if period.get('endDate') else '',
+                    total_costs=float(period_totals[idx]) if idx < len(period_totals) else 0.0,
+                    lots_sold_by_product=lots_by_period.get(idx, {}),
+                    cost_per_lot_by_product=cost_per_lot_by_division,
+                )
+            )
+
+        return period_data
+
+    def _fetch_phase_division_mapping(self, phase_ids: List[int]) -> Dict[int, int]:
+        """Map phase_id to division_id (tier 2) for product grouping."""
+        if not phase_ids:
+            return {}
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT ph.phase_id, d.division_id
+                FROM landscape.tbl_phase ph
+                LEFT JOIN landscape.tbl_division d
+                  ON ph.phase_name = d.display_name
+                  AND ph.project_id = d.project_id
+                  AND d.tier = 2
+                WHERE ph.phase_id = ANY(%s)
+            """, [phase_ids])
+
+            return {row[0]: row[1] for row in cursor.fetchall() if row[1] is not None}
+
+    def _extend_periods_for_loans(
+        self,
+        required_periods: int,
+        start_date: date,
+        container_ids: Optional[List[int]],
+    ) -> int:
+        """Ensure enough periods to cover all loan terms when financing is included."""
+        all_loans = list(Loan.objects.filter(project_id=self.project_id))
+        if container_ids:
+            scoped_ids = set(
+                LoanContainer.objects.filter(
+                    loan__project_id=self.project_id,
+                    division_id__in=container_ids,
+                ).values_list('loan_id', flat=True)
+            )
+            # Include unscoped loans (no container assignment) plus scoped ones
+            unscoped = [l for l in all_loans if not LoanContainer.objects.filter(loan_id=l.loan_id).exists()]
+            scoped = [l for l in all_loans if l.loan_id in scoped_ids]
+            all_loans = unscoped + scoped
+
+        if not all_loans:
+            return required_periods
+
+        # Generate a minimal set of periods for date mapping
+        temp_periods = self._generate_periods(start_date, max(required_periods, 1))
+
+        for loan in all_loans:
+            term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years) or 0
+            loan_start = self._get_period_index_for_date(temp_periods, loan.loan_start_date)
+            min_periods = loan_start + term_months + 1
+            if min_periods > required_periods:
+                required_periods = min_periods
+                # Regenerate temp periods for subsequent date lookups
+                temp_periods = self._generate_periods(start_date, required_periods)
+
+        return required_periods
+
+    def _fetch_loans(self, structure_type: str, container_ids: Optional[List[int]]) -> List[Loan]:
+        """Fetch loans for project, optionally filtered by container assignments."""
+        loans = Loan.objects.filter(project_id=self.project_id, structure_type=structure_type)
+        if container_ids:
+            loans = loans.filter(loan_containers__division_id__in=container_ids).distinct()
+        return list(loans)
+
+    @staticmethod
+    def _get_period_index_for_date(periods: List[Dict], target_date: Optional[date]) -> int:
+        """Map a date to the first period index whose endDate >= target_date."""
+        if not target_date:
+            return 0
+        for idx, period in enumerate(periods):
+            end_date = period.get('endDate')
+            if end_date and end_date >= target_date:
+                return idx
+        return max(len(periods) - 1, 0)
+
+    @staticmethod
+    def _normalize_term_months(months: Optional[int], years: Optional[int]) -> Optional[int]:
+        if months:
+            return int(months)
+        if years:
+            return int(years) * 12
+        return None
+
     def _calculate_subtotals(self, line_items: List[Dict], period_count: int) -> List[Dict]:
         """Calculate subtotals for a set of line items."""
         period_totals = [0.0] * period_count
@@ -1308,6 +1670,305 @@ class LandDevCashFlowService:
             """, [valid_ids])
 
             return {row[0]: row[1] for row in cursor.fetchall()}
+
+    # =========================================================================
+    # LOTBANK SECTION
+    # =========================================================================
+
+    def _build_lotbank_sections(
+        self,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+        container_ids: Optional[List[int]],
+    ) -> List[Dict]:
+        """
+        Build lotbank sections when project analysis_type = 'LOTBANK'.
+
+        Returns a list of sections (OPTION_DEPOSITS, DEPOSIT_CREDITS,
+        MANAGEMENT_FEES, DEFAULT_PROVISION, UNDERWRITING_FEE) or empty
+        list if the project is not a lotbank deal.
+        """
+        # Check if this project is a lotbank deal
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT analysis_type,
+                       lotbank_management_fee_pct,
+                       lotbank_default_provision_pct,
+                       lotbank_underwriting_fee
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [self.project_id])
+            row = cursor.fetchone()
+
+        if not row or (row[0] or '').upper() != 'LOTBANK':
+            return []
+
+        management_fee_pct = float(row[1]) if row[1] else 0.0
+        default_provision_pct = float(row[2]) if row[2] else 0.0
+        underwriting_fee = float(row[3]) if row[3] else 0.0
+
+        # Fetch product-level lotbank params from containers (divisions)
+        products = self._build_lotbank_products(absorption_schedule, periods, container_ids)
+        if not products:
+            return []
+
+        num_periods = len(periods)
+        params = LotbankParams(
+            products=products,
+            management_fee_pct=management_fee_pct,
+            default_provision_pct=default_provision_pct,
+            underwriting_fee=underwriting_fee,
+            num_periods=num_periods,
+        )
+
+        engine = LotbankEngine()
+        result = engine.calculate(params)
+
+        sections = []
+
+        # ── OPTION DEPOSITS section (P0 inflow) ────────────────────
+        deposit_line_items = []
+        if result.initial_deposit_received > 0:
+            deposit_line_items.append({
+                'lineId': 'lotbank-option-deposits',
+                'category': 'lotbank',
+                'subcategory': 'Option Deposits',
+                'description': 'Builder Option Deposits Received',
+                'periods': [{
+                    'periodIndex': 0,
+                    'periodSequence': 1,
+                    'amount': result.initial_deposit_received,
+                    'source': 'calculated',
+                }],
+                'total': result.initial_deposit_received,
+                'sourceType': 'lotbank',
+            })
+            subtotals = self._calculate_subtotals(deposit_line_items, num_periods)
+            sections.append({
+                'sectionId': 'lotbank-option-deposits',
+                'sectionName': 'OPTION DEPOSITS',
+                'lineItems': deposit_line_items,
+                'subtotals': subtotals,
+                'sectionTotal': result.initial_deposit_received,
+                'sortOrder': 93,
+            })
+
+        # ── DEPOSIT CREDITS section (ongoing outflows) ──────────────
+        credit_line_items = []
+        for product in products:
+            period_amounts = []
+            product_total = 0.0
+            for lp in result.periods:
+                for pd in lp.product_details:
+                    if pd.product_id == product.product_id and pd.deposit_credit > 0:
+                        amount = -pd.deposit_credit  # negative = outflow
+                        period_amounts.append({
+                            'periodIndex': lp.period,
+                            'periodSequence': lp.period + 1,
+                            'amount': amount,
+                            'source': 'calculated',
+                        })
+                        product_total += amount
+
+            if period_amounts:
+                credit_line_items.append({
+                    'lineId': f'lotbank-deposit-credit-{product.product_id}',
+                    'category': 'lotbank',
+                    'subcategory': 'Deposit Credits',
+                    'description': f'Deposit Credit — Product {product.product_id}',
+                    'periods': period_amounts,
+                    'total': product_total,
+                    'sourceType': 'lotbank',
+                })
+
+        if credit_line_items:
+            credit_total = sum(item['total'] for item in credit_line_items)
+            subtotals = self._calculate_subtotals(credit_line_items, num_periods)
+            sections.append({
+                'sectionId': 'lotbank-deposit-credits',
+                'sectionName': 'DEPOSIT CREDITS',
+                'lineItems': credit_line_items,
+                'subtotals': subtotals,
+                'sectionTotal': credit_total,
+                'sortOrder': 94,
+            })
+
+        # ── UNDERWRITING FEE section (P0 inflow to lotbanker) ───────
+        if underwriting_fee > 0:
+            uw_line_items = [{
+                'lineId': 'lotbank-underwriting-fee',
+                'category': 'lotbank',
+                'subcategory': 'Underwriting Fee',
+                'description': 'Lotbank Underwriting Fee',
+                'periods': [{
+                    'periodIndex': 0,
+                    'periodSequence': 1,
+                    'amount': -underwriting_fee,  # negative = outflow (cost to project)
+                    'source': 'calculated',
+                }],
+                'total': -underwriting_fee,
+                'sourceType': 'lotbank',
+            }]
+            subtotals = self._calculate_subtotals(uw_line_items, num_periods)
+            sections.append({
+                'sectionId': 'lotbank-underwriting-fee',
+                'sectionName': 'UNDERWRITING FEE',
+                'lineItems': uw_line_items,
+                'subtotals': subtotals,
+                'sectionTotal': -underwriting_fee,
+                'sortOrder': 95,
+            })
+
+        # ── MANAGEMENT FEES section (ongoing outflows) ──────────────
+        if result.total_management_fees > 0:
+            fee_periods = []
+            fee_total = 0.0
+            for lp in result.periods:
+                if lp.management_fee > 0:
+                    amount = -lp.management_fee  # negative = outflow
+                    fee_periods.append({
+                        'periodIndex': lp.period,
+                        'periodSequence': lp.period + 1,
+                        'amount': amount,
+                        'source': 'calculated',
+                    })
+                    fee_total += amount
+
+            mgmt_line_items = [{
+                'lineId': 'lotbank-management-fees',
+                'category': 'lotbank',
+                'subcategory': 'Management Fees',
+                'description': 'Lotbank Management Fees',
+                'periods': fee_periods,
+                'total': fee_total,
+                'sourceType': 'lotbank',
+            }]
+            subtotals = self._calculate_subtotals(mgmt_line_items, num_periods)
+            sections.append({
+                'sectionId': 'lotbank-management-fees',
+                'sectionName': 'MANAGEMENT FEES',
+                'lineItems': mgmt_line_items,
+                'subtotals': subtotals,
+                'sectionTotal': fee_total,
+                'sortOrder': 96,
+            })
+
+        # ── DEFAULT PROVISION section (ongoing outflows) ────────────
+        if result.total_default_provision > 0:
+            prov_periods = []
+            prov_total = 0.0
+            for lp in result.periods:
+                if lp.default_provision > 0:
+                    amount = -lp.default_provision  # negative = outflow
+                    prov_periods.append({
+                        'periodIndex': lp.period,
+                        'periodSequence': lp.period + 1,
+                        'amount': amount,
+                        'source': 'calculated',
+                    })
+                    prov_total += amount
+
+            prov_line_items = [{
+                'lineId': 'lotbank-default-provision',
+                'category': 'lotbank',
+                'subcategory': 'Default Provision',
+                'description': 'Builder Default Provision',
+                'periods': prov_periods,
+                'total': prov_total,
+                'sourceType': 'lotbank',
+            }]
+            subtotals = self._calculate_subtotals(prov_line_items, num_periods)
+            sections.append({
+                'sectionId': 'lotbank-default-provision',
+                'sectionName': 'DEFAULT PROVISION',
+                'lineItems': prov_line_items,
+                'subtotals': subtotals,
+                'sectionTotal': prov_total,
+                'sortOrder': 97,
+            })
+
+        return sections
+
+    def _build_lotbank_products(
+        self,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+        container_ids: Optional[List[int]],
+    ) -> List[LotbankProduct]:
+        """
+        Build LotbankProduct list from container-level lotbank params
+        and the absorption schedule.
+
+        Reads option_deposit_pct, option_deposit_cap_pct, retail_lot_price,
+        premium_pct from tbl_division for each division. Derives
+        lots_remaining_by_period from the absorption schedule.
+        """
+        # Fetch divisions with lotbank fields
+        with connection.cursor() as cursor:
+            sql = """
+                SELECT division_id, display_name,
+                       option_deposit_pct, option_deposit_cap_pct,
+                       retail_lot_price, premium_pct
+                FROM landscape.tbl_division
+                WHERE project_id = %s
+                  AND tier = 1
+                  AND option_deposit_pct IS NOT NULL
+                  AND retail_lot_price IS NOT NULL
+            """
+            params_list = [self.project_id]
+            if container_ids:
+                sql += " AND division_id = ANY(%s)"
+                params_list.append(container_ids)
+            cursor.execute(sql, params_list)
+            rows = cursor.fetchall()
+
+        if not rows:
+            return []
+
+        # Build division-level lot count and lots_sold_by_period from absorption
+        num_periods = len(periods)
+        products = []
+
+        for row in rows:
+            div_id, div_name, dep_pct, cap_pct, price, prem_pct = row
+
+            # Calculate total lot count and lots sold per period for this division
+            total_lots = 0
+            lots_sold_by_period = [0] * num_periods
+
+            for period_sale in absorption_schedule.get('periodSales', []):
+                period_idx = period_sale.get('periodIndex')
+                if period_idx is None or period_idx >= num_periods:
+                    continue
+                for parcel in period_sale.get('parcels', []):
+                    parcel_div_id = parcel.get('containerId')
+                    if parcel_div_id == div_id:
+                        units = int(parcel.get('units') or 0)
+                        lots_sold_by_period[period_idx] += units
+
+            # Total lots = sum of all lots sold over all periods
+            total_lots = sum(lots_sold_by_period)
+            if total_lots <= 0:
+                continue
+
+            # Derive lots_remaining: start with total_lots, subtract cumulative sales
+            lots_remaining = []
+            remaining = total_lots
+            for sold in lots_sold_by_period:
+                remaining -= sold
+                lots_remaining.append(remaining)
+
+            products.append(LotbankProduct(
+                product_id=div_id,
+                lot_count=total_lots,
+                retail_lot_price=float(price),
+                deposit_pct=float(dep_pct),
+                deposit_cap_pct=float(cap_pct),
+                premium_pct=float(prem_pct) if prem_pct else 0.0,
+                lots_remaining_by_period=lots_remaining,
+            ))
+
+        return products
 
     # =========================================================================
     # SUMMARY METRICS

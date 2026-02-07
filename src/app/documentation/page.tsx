@@ -23,6 +23,30 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Debt UI Consolidation — Parts 1-3 (Feb 6, 2026)',
+      path: '/docs/09-session-notes/2026-02-06-debt-ui-consolidation.md',
+      category: 'Component',
+      description: 'Loan Schedule Grid, Loan Schedule Modal, and Leveraged Cash Flow (DCF with debt service). Period toggles (M/Q/A), sticky columns, 3-scenario support, Django serializer fixes',
+      icon: <DollarSign className="w-5 h-5" />,
+      lastModified: '2026-02-06'
+    },
+    {
+      title: 'Rent Roll Extraction Improvements (Feb 5, 2026)',
+      path: '/docs/09-session-notes/2026-02-05-rent-roll-extraction-improvements.md',
+      category: 'AI',
+      description: 'Async background processing, direct Excel parsing, tenant name extraction, cancel extraction, dismissible banners, stuck job detection',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-05'
+    },
+    {
+      title: 'DMS Version Control & Collision Detection (Feb 5, 2026)',
+      path: '/docs/09-session-notes/2026-02-05-dms-version-control-collision-detection.md',
+      category: 'Component',
+      description: 'SHA-256 collision detection for document versions, two-step delete system (soft delete + permanent), restore functionality',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-02-05'
+    },
+    {
       title: 'Property Tab Restructure (Feb 2, 2026)',
       path: '/docs/09_session_notes/2026-02-02-property-tab-restructure.md',
       category: 'Component',

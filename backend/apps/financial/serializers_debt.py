@@ -45,6 +45,11 @@ class LoanFinanceStructureSerializer(serializers.ModelSerializer):
 
 
 class LoanListSerializer(serializers.ModelSerializer):
+    # Return numeric values for JS arithmetic (not Decimal strings)
+    commitment_amount = serializers.FloatField()
+    loan_amount = serializers.FloatField(allow_null=True)
+    interest_rate_pct = serializers.FloatField(allow_null=True)
+
     class Meta:
         model = Loan
         fields = [
@@ -58,7 +63,14 @@ class LoanListSerializer(serializers.ModelSerializer):
             'interest_rate_pct',
             'seniority',
             'status',
+            'loan_start_date',
             'loan_maturity_date',
+            'loan_term_months',
+            'amortization_months',
+            'interest_only_months',
+            'interest_type',
+            'payment_frequency',
+            'origination_fee_pct',
         ]
 
 

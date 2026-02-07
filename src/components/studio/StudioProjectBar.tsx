@@ -67,7 +67,7 @@ export function StudioProjectBar({
         gap: '0.75rem',
         padding: '0.5rem 1rem',
         flexShrink: 0,
-        backgroundColor: 'var(--surface-card-header)',
+        backgroundColor: 'var(--cui-card-header-bg)',
       }}
     >
       {/* Collapse/Expand toggle for Landscaper - leftmost */}

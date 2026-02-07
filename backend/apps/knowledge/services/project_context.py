@@ -71,7 +71,12 @@ class ProjectContextService:
         if sales:
             sections.append(self._format_section("Sales & Absorption", sales))
 
-        # 8. Financial Assumptions
+        # 8. Market / Competitive Data
+        market = self.get_competitive_data()
+        if market:
+            sections.append(self._format_section("Market Competitive Data (Zonda)", market))
+
+        # 9. Financial Assumptions
         assumptions = self.get_financial_assumptions()
         if assumptions:
             sections.append(self._format_section("Financial Assumptions", assumptions))
@@ -558,6 +563,99 @@ class ProjectContextService:
                     months = max(1, (last_sale - first_sale).days / 30)
                     monthly_rate = total_sales / months
                     lines.append(f"  Absorption Rate: {monthly_rate:.1f} units/month")
+
+                return "\n".join(lines)
+            except Exception:
+                return None
+
+    def get_competitive_data(self) -> Optional[str]:
+        """Get competitive market data (Zonda-sourced comps)."""
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute("""
+                    SELECT
+                        cp.id as comp_id,
+                        cp.comp_name,
+                        cp.builder_name,
+                        cp.total_units,
+                        cp.price_min,
+                        cp.price_max,
+                        cp.absorption_rate_monthly,
+                        cp.data_source,
+                        cpp.unit_size_avg_sf,
+                        cpp.price_avg,
+                        cpp.price_per_sf_avg,
+                        cpp.units_planned,
+                        cpp.units_remaining,
+                        cpp.sales_rate_monthly,
+                        cpp.lot_width_ft
+                    FROM landscape.market_competitive_projects cp
+                    LEFT JOIN landscape.market_competitive_project_products cpp
+                        ON cp.id = cpp.competitive_project_id
+                    WHERE cp.project_id = %s
+                    ORDER BY cp.absorption_rate_monthly DESC NULLS LAST, cp.comp_name
+                """, [self.project_id])
+
+                rows = cursor.fetchall()
+                if not rows:
+                    return None
+
+                columns = [col[0] for col in cursor.description]
+                records = [dict(zip(columns, row)) for row in rows]
+
+                # Group by comp
+                comps = {}
+                for r in records:
+                    name = r['comp_name']
+                    if name not in comps:
+                        comps[name] = {
+                            'builder': r['builder_name'],
+                            'total_units': r['total_units'],
+                            'price_min': r['price_min'],
+                            'price_max': r['price_max'],
+                            'absorption': r['absorption_rate_monthly'],
+                            'source': r['data_source'],
+                            'products': []
+                        }
+                    if r.get('price_avg') or r.get('unit_size_avg_sf'):
+                        comps[name]['products'].append({
+                            'avg_price': r['price_avg'],
+                            'avg_sqft': r['unit_size_avg_sf'],
+                            'price_per_sqft': r['price_per_sf_avg'],
+                            'units_planned': r['units_planned'],
+                            'remaining': r['units_remaining'],
+                            'monthly_rate': r['sales_rate_monthly'],
+                            'lot_width': r['lot_width_ft'],
+                        })
+
+                lines = [f"Competitive Projects ({len(comps)} comps, source: Zonda):"]
+
+                for name, comp in comps.items():
+                    builder = comp['builder'] or 'Unknown'
+                    units = comp['total_units'] or '?'
+                    line = f"  {name} ({builder}) - {units} units"
+                    if comp['price_min'] and comp['price_max']:
+                        line += f", ${float(comp['price_min']):,.0f}-${float(comp['price_max']):,.0f}"
+                    if comp['absorption']:
+                        line += f", {float(comp['absorption']):.1f}/mo absorption"
+                    lines.append(line)
+
+                    for p in comp['products']:
+                        parts = []
+                        if p['avg_price']:
+                            parts.append(f"avg ${float(p['avg_price']):,.0f}")
+                        if p['avg_sqft']:
+                            parts.append(f"{int(p['avg_sqft'])} SF")
+                        if p['price_per_sqft']:
+                            parts.append(f"${float(p['price_per_sqft']):,.0f}/SF")
+                        if p['remaining'] is not None and p['units_planned'] is not None:
+                            parts.append(f"{int(p['remaining'])}/{int(p['units_planned'])} remaining")
+                        if p['monthly_rate']:
+                            parts.append(f"{float(p['monthly_rate']):.1f}/mo")
+                        if p['lot_width']:
+                            parts.append(f"{int(p['lot_width'])}' lot")
+                        if parts:
+                            lines.append(f"    Product: {', '.join(parts)}")
 
                 return "\n".join(lines)
             except Exception:

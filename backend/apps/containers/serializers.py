@@ -60,6 +60,11 @@ class ContainerSerializer(serializers.ModelSerializer):
             'sort_order',
             'attributes',
             'is_active',
+            # Lotbank per-product fields (division level)
+            'option_deposit_pct',
+            'option_deposit_cap_pct',
+            'retail_lot_price',
+            'premium_pct',
             'created_at',
             'updated_at',
             'children',

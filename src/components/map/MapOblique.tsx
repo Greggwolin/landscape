@@ -406,6 +406,9 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
           // Handle click for feature selection (separate from popup)
           el.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (marker.getPopup()) {
+              marker.togglePopup();
+            }
             onFeatureClick?.(m.id);
           });
 

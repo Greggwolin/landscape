@@ -24,19 +24,23 @@
 
 .studio-card {
   background: var(--cui-card-bg);
-  border: 1px solid var(--cui-border-color);
-  border-radius: var(--cui-border-radius, 0.375rem);
+  border: 1px solid var(--cui-card-border-color);
+  border-radius: var(--cui-card-border-radius, 0.375rem);
+  overflow: hidden;
+  background-clip: padding-box;
 }
 
 .studio-card-header {
-  background: var(--cui-tertiary-bg);
-  border-bottom: 1px solid var(--cui-border-color);
-  padding: 0.75rem 1rem;
+  background: var(--cui-card-header-bg);
+  border-bottom: 1px solid var(--cui-card-border-color);
+  padding: var(--cui-card-cap-padding-y) var(--cui-card-cap-padding-x);
   font-weight: 600;
+  border-top-left-radius: var(--cui-card-border-radius, 0.375rem);
+  border-top-right-radius: var(--cui-card-border-radius, 0.375rem);
 }
 
 .studio-card-body {
-  padding: 1rem;
+  padding: var(--cui-card-spacer-y) var(--cui-card-spacer-x);
 }
 
 /* ========================================

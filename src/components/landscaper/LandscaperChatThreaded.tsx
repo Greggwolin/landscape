@@ -96,7 +96,7 @@ export function LandscaperChatThreaded({
   });
 
   // Collision handling via context
-  const { pendingCollision, clearCollision, setOnCollisionResolved } = useLandscaperCollision();
+  const { pendingCollision, setOnCollisionResolved } = useLandscaperCollision();
 
   // Mutation handlers for Level 2 autonomy
   const handleConfirmMutation = useCallback(async (mutationId: string) => {
@@ -275,8 +275,8 @@ export function LandscaperChatThreaded({
         className="flex items-center gap-2 border-b"
         style={{
           padding: '0.5rem 1rem',
-          borderColor: 'var(--cui-border-color)',
-          backgroundColor: 'var(--surface-card-header)',
+          borderColor: 'var(--cui-card-border-color)',
+          backgroundColor: 'var(--cui-card-header-bg)',
         }}
       >
         <LandscaperIcon style={{ width: '32px', height: '32px', color: 'var(--landscaper-icon-color)' }} />

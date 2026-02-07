@@ -134,9 +134,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (isLoading) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.5rem 1rem', minHeight: '44px' }}>
+        <CCardHeader className="d-flex align-items-center justify-content-between">
           <div className="d-flex justify-content-between align-items-center">
-            <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile</span>
+            <span className="fw-semibold">Project Profile</span>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -149,9 +149,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   if (error || !profile) {
     return (
       <CCard className="project-profile-tile">
-        <CCardHeader style={{ backgroundColor: 'var(--surface-card-header)', padding: '0.5rem 1rem', minHeight: '44px' }}>
+        <CCardHeader className="d-flex align-items-center justify-content-between">
           <div className="d-flex justify-content-between align-items-center">
-            <span className="fw-semibold" style={{ fontSize: '1rem' }}>Project Profile</span>
+            <span className="fw-semibold">Project Profile</span>
           </div>
         </CCardHeader>
         <CCardBody>
@@ -176,20 +176,8 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           height: '100%'
         }}
       >
-        <CCardHeader
-          className="d-flex align-items-center justify-content-between"
-          style={{
-            backgroundColor: 'var(--cui-card-cap-bg)',
-            color: 'var(--cui-body-color)',
-            borderColor: 'var(--cui-border-color)',
-            padding: '0.5rem 1rem',
-            minHeight: '44px',
-            lineHeight: 1
-          }}
-        >
-          <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>
-            Project Profile
-          </span>
+        <CCardHeader className="d-flex align-items-center justify-content-between">
+          <span className="fw-semibold">Project Profile</span>
           <button
             type="button"
             style={{
