@@ -10,6 +10,7 @@ Historical record of feature and migration completions. For current implementati
 
 | Date | Milestone | Notes |
 |------|-----------|-------|
+| 2026-02-08 | Folder-Tabs UI Overhaul | 25+ legacy pages archived, ProjectContentRouter, ActiveProjectBar, media system (picker/preview/card/classification), location intelligence expansion, property type tokens, Landscaper chat enhancements, income property cashflow service |
 | 2026-02-06 | Debt UI Consolidation (Parts 1-3) | Loan Schedule Grid, Loan Schedule Modal, Leveraged Cash Flow, Django serializer fixes, legacy route cleanup |
 | 2026-02-05 | Rent Roll Extraction Improvements | Async processing, direct Excel parsing, tenant name fix, cancel extraction |
 | 2026-02-05 | DMS Version Control Collision Detection | Fixed AccordionFilters to use real SHA-256 hashing and collision check |

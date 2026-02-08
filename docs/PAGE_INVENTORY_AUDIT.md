@@ -3,6 +3,8 @@
 > **Generated:** 2026-02-07
 > **Scope:** All `page.tsx` and `layout.tsx` files in `src/app/`
 > **Mode:** Read-only audit — no files modified or deleted
+>
+> **Update (2026-02-08):** The Folder-Tabs UI Overhaul (commit `8aaa92c`) archived 25+ legacy routes listed below to `src/app/_archive/`. Routes marked ACTIVE in sections 1C (capitalization/operations, capitalization/waterfall) and 1D (planning/*, development/*, analysis/*, overview, opex, results, valuation/*, documents/files, landscaper, sales-marketing, validation, acquisition) are now served by the folder-tab query-param system (`?folder=X&tab=Y`) via `ProjectContentRouter.tsx`. The `/property/[id]`, `/parcel-test`, and `/properties/[id]/analysis` dead routes have been archived. See `docs/09-session-notes/2026-02-08-folder-tabs-ui-overhaul.md` for full details.
 
 ---
 

@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Folder-Tabs UI Overhaul (Feb 8, 2026)',
+      path: '/docs/09-session-notes/2026-02-08-folder-tabs-ui-overhaul.md',
+      category: 'Component',
+      description: '25+ legacy pages archived, ProjectContentRouter, ActiveProjectBar, media system (picker/preview/card), location intelligence expansion, property type tokens, Landscaper enhancements, income property cashflow service',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-08'
+    },
+    {
+      title: 'Page Inventory & Cleanup Audit (Feb 7, 2026)',
+      path: '/docs/PAGE_INVENTORY_AUDIT.md',
+      category: 'Architecture',
+      description: 'Complete audit of 92 page.tsx files and 7 layouts. Route inventory with status (ACTIVE/SANDBOX/DEAD), folder tab navigation mapping, Landscaper panel integration, dead route candidates',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-02-07'
+    },
+    {
       title: 'Debt UI Consolidation — Parts 1-3 (Feb 6, 2026)',
       path: '/docs/09-session-notes/2026-02-06-debt-ui-consolidation.md',
       category: 'Component',
@@ -362,9 +378,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status including Python migration (Phase 1 complete - 5-10x performance improvement), Property Tab Restructure with Acquisition/Renovation sub-tabs (Feb 2)',
+      description: 'Complete financial engine implementation status v3.7 — Folder-Tabs UI Overhaul (Feb 8), Debt UI Consolidation, Rent Roll Extraction, Python migration, and all prior phases',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-02-02'
+      lastModified: '2026-02-08'
     },
     {
       title: 'CRE Implementation Summary',

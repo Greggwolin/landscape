@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-06
-**Version:** 3.6
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation)
+**Last Updated:** 2026-02-08
+**Version:** 3.7
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul)
 
 ---
 
@@ -9,7 +9,26 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Debt UI Consolidation (February 6, 2026)**
+### 🆕 **Latest Update: Folder-Tabs UI Overhaul (February 8, 2026)**
+
+**Page Consolidation, Media System, Location Intelligence, and Property Type Tokens**
+
+Largest single commit on the `feature/folder-tabs` branch — 148 files changed. Major restructuring of project navigation:
+
+- ✅ **Legacy Page Consolidation** - Removed 25+ legacy page routes, archived to `src/app/_archive/`
+- ✅ **ProjectContentRouter** - Renamed StudioContent → ProjectContentRouter for unified folder-tab content rendering
+- ✅ **ActiveProjectBar** - New project context component replacing StudioProjectBar
+- ✅ **Media Asset System** - MediaPickerModal, MediaPreviewModal, MediaCard, MediaBadgeChips, EntityMediaDisplay
+- ✅ **Media Backend Services** - Django media views, AI classification service, extraction service
+- ✅ **Location Intelligence Expansion** - Expanded map views, demographic hooks, new Django views
+- ✅ **Property Type Tokens** - PropertyTypeBadge component, propertyTypeTokens config for all 7 types
+- ✅ **Landscaper Enhancements** - CollapsedLandscaperStrip moved to landscaper/, MediaSummaryCard, threaded chat improvements
+- ✅ **Capitalization UI** - LeveragedCashFlow expansion, DeveloperFeeModal/OverheadItemModal improvements
+- ✅ **Income Property Cashflow** - New `income_property_cashflow_service.py` in Django
+- ✅ **Style Updates** - folder-tabs, navigation, resizable-panel, leveraged-cf, coreui-theme, tokens
+- 📁 **Location:** See `docs/09-session-notes/2026-02-08-folder-tabs-ui-overhaul.md`
+
+### Previous Update: Debt UI Consolidation (February 6, 2026)
 
 **Loan Schedule Grid, Loan Schedule Modal, and Leveraged Cash Flow**
 
