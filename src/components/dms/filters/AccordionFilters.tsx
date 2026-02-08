@@ -7,6 +7,7 @@ import { useDropzone } from 'react-dropzone';
 import type { DMSDocument } from '@/types/dms';
 import { useUploadThing } from '@/lib/uploadthing';
 import { useLandscaperCollision } from '@/contexts/LandscaperCollisionContext';
+import MediaBadgeChips from '@/components/dms/MediaBadgeChips';
 
 export interface FilterAccordion {
   doc_type: string;
@@ -107,6 +108,7 @@ interface AccordionFiltersProps {
   onUploadComplete?: () => void;
   selectedDocIds?: Set<string>;
   onToggleDocSelection?: (docId: string) => void;
+  onReviewMedia?: (docId: number, docName: string) => void;
 }
 
 const acceptedFileTypes = {
@@ -132,6 +134,7 @@ interface FilterDropRowProps {
   onUploadComplete?: () => void;
   selectedDocIds?: Set<string>;
   onToggleDocSelection?: (docId: string) => void;
+  onReviewMedia?: (docId: number, docName: string) => void;
 }
 
 function FilterDropRow({
@@ -143,7 +146,8 @@ function FilterDropRow({
   onDocumentSelect,
   onUploadComplete,
   selectedDocIds,
-  onToggleDocSelection
+  onToggleDocSelection,
+  onReviewMedia
 }: FilterDropRowProps) {
   const [isUploading, setIsUploading] = useState(false);
   // pendingFiles stores remaining files when collision pauses processing
@@ -431,6 +435,15 @@ function FilterDropRow({
                     }) : 'No date'}
                   </div>
                 </div>
+                {/* Media badge chips — color-coded by media category */}
+                {onReviewMedia && (
+                  <MediaBadgeChips
+                    mediaScanJson={doc.media_scan_json}
+                    scanStatus={doc.media_scan_status}
+                    compact={true}
+                    onClick={() => onReviewMedia(parseInt(doc.doc_id, 10), doc.doc_name)}
+                  />
+                )}
               </div>
             ))
           )}
@@ -451,7 +464,8 @@ export default function AccordionFilters({
   workspaceId,
   onUploadComplete,
   selectedDocIds,
-  onToggleDocSelection
+  onToggleDocSelection,
+  onReviewMedia
 }: AccordionFiltersProps) {
   const renderedFilters = useMemo(() => filters, [filters]);
 
@@ -469,6 +483,7 @@ export default function AccordionFilters({
           onUploadComplete={onUploadComplete}
           selectedDocIds={selectedDocIds}
           onToggleDocSelection={onToggleDocSelection}
+          onReviewMedia={onReviewMedia}
         />
       ))}
     </div>

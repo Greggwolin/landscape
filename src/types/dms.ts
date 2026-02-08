@@ -35,6 +35,15 @@ export interface DMSDocument {
   // Text content fields
   extracted_text?: string;
   word_count?: number;
+
+  // Media scan fields
+  media_scan_status?: string | null;
+  media_scan_json?: {
+    total_detected?: number;
+    total_extracted?: number;
+    by_color?: Record<string, { detected: number; extracted: number }>;
+    by_type?: Record<string, { total: number; extracted: number }>;
+  } | null;
 }
 
 export interface SearchableDocument {

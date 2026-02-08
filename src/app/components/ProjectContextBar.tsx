@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
+import { PropertyTypeBadge } from '@/components/ui/landscape';
 
 /**
  * ProjectContextBar - Project Selector Bar
@@ -90,17 +91,11 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
             ))}
           </select>
           {/* Project type badge */}
-          <span
-            className="px-2 py-1 rounded"
-            style={{
-              backgroundColor: 'var(--cui-primary-bg)',
-              color: 'var(--cui-primary)',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-            }}
-          >
-            {project.project_type_code === 'LAND' ? 'Land Development' : 'Income Property'}
-          </span>
+          <PropertyTypeBadge
+            typeCode={project.project_type_code || project.project_type}
+            className="px-2 py-1"
+            style={{ fontSize: '0.75rem' }}
+          />
         </div>
       </div>
     </div>

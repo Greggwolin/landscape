@@ -113,7 +113,7 @@ export function LandscaperProgress({
 
   return (
     <div
-      className="landscaper-progress px-4 py-2 border-t"
+      className="landscaper-progress px-3 py-2 border-top"
       style={{
         borderColor: 'var(--cui-border-color)',
         backgroundColor: 'var(--cui-tertiary-bg)',
@@ -122,14 +122,14 @@ export function LandscaperProgress({
       }}
     >
       {/* Progress bar container */}
-      <div className="flex items-center gap-3">
+      <div className="d-flex align-items-center gap-3">
         {/* Progress bar */}
         <div
-          className="flex-1 h-2 rounded-full overflow-hidden"
-          style={{ backgroundColor: 'var(--cui-border-color)' }}
+          className="progress flex-grow-1"
+          style={{ backgroundColor: 'var(--cui-border-color)', height: '0.5rem' }}
         >
           <div
-            className="h-full rounded-full"
+            className="progress-bar"
             style={{
               width: `${progress}%`,
               backgroundColor: 'var(--cui-primary)',
@@ -141,41 +141,47 @@ export function LandscaperProgress({
 
         {/* Percentage */}
         <span
-          className="text-xs w-10 text-right"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="small text-end"
+          style={{ color: 'var(--cui-secondary-color)', minWidth: '2.5rem', fontSize: '0.75rem' }}
         >
           {Math.round(progress)}%
         </span>
       </div>
 
       {/* Stage label and elapsed time */}
-      <div className="flex justify-between items-center mt-1">
+      <div className="d-flex justify-content-between align-items-center mt-1">
         <span
-          className="text-xs flex items-center gap-2"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="small d-flex align-items-center gap-2"
+          style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}
         >
           {/* Animated dots */}
           {progress < 100 && (
-            <span className="flex gap-0.5">
+            <span className="d-flex" style={{ gap: '0.125rem' }}>
               <span
-                className="w-1 h-1 rounded-full"
+                className="rounded-circle"
                 style={{
+                  width: '0.25rem',
+                  height: '0.25rem',
                   backgroundColor: 'var(--cui-primary)',
                   animation: 'landscaper-bounce 0.6s infinite',
                   animationDelay: '0ms',
                 }}
               />
               <span
-                className="w-1 h-1 rounded-full"
+                className="rounded-circle"
                 style={{
+                  width: '0.25rem',
+                  height: '0.25rem',
                   backgroundColor: 'var(--cui-primary)',
                   animation: 'landscaper-bounce 0.6s infinite',
                   animationDelay: '150ms',
                 }}
               />
               <span
-                className="w-1 h-1 rounded-full"
+                className="rounded-circle"
                 style={{
+                  width: '0.25rem',
+                  height: '0.25rem',
                   backgroundColor: 'var(--cui-primary)',
                   animation: 'landscaper-bounce 0.6s infinite',
                   animationDelay: '300ms',
@@ -188,8 +194,8 @@ export function LandscaperProgress({
 
         {elapsedTime > 0 && (
           <span
-            className="text-xs"
-            style={{ color: 'var(--cui-tertiary-color)' }}
+            className="small"
+            style={{ color: 'var(--cui-tertiary-color)', fontSize: '0.75rem' }}
           >
             {formatTime(elapsedTime)}
           </span>

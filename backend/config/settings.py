@@ -203,6 +203,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'landscape.media_extraction': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }
 

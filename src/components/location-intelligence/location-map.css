@@ -11,8 +11,8 @@
 
 .location-map-flyout-overlay {
   position: fixed;
-  /* Below the main nav bar (approx 56px) */
-  top: var(--cui-header-height, 56px);
+  /* Align with project content/nav row: below top nav + Active Project Bar + split padding */
+  top: calc(var(--cui-header-height, 56px) + var(--active-project-bar-height, 48px) + 0.5rem);
   right: 12px;
   bottom: 12px;
   /* Position to the right of the Landscaper sidebar (approx 380px) */
@@ -46,7 +46,7 @@
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--cui-border-color, #2d2d3a);
-  background: var(--cui-tertiary-bg, #161622);
+  background: #F0F1F2;
 }
 
 .flyout-title-group {
@@ -59,7 +59,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: var(--cui-body-color, #f8f9fa);
+  color: #1F2A37;
 }
 
 .flyout-subtitle {
@@ -81,16 +81,16 @@
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--cui-body-color, #f8f9fa);
-  background: var(--cui-secondary-bg, #2d2d3a);
-  border: 1px solid var(--cui-border-color, #3d3d4a);
+  color: #1F2A37;
+  background: #FFFFFF;
+  border: 1px solid #D2D6DB;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .flyout-btn:hover {
-  background: var(--cui-tertiary-bg, #3d3d4a);
+  background: #F8FAFC;
 }
 
 .flyout-btn.active {
@@ -108,14 +108,31 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: var(--cui-secondary-color, #9ca3af);
+  color: #667085;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .flyout-close:hover {
-  background: var(--cui-tertiary-bg, #2d2d3a);
-  color: var(--cui-body-color, #f8f9fa);
+  background: #E9ECEF;
+  color: #1F2A37;
+}
+
+[data-coreui-theme="dark"] .flyout-header {
+  background: #1F2A37;
+}
+
+[data-coreui-theme="dark"] .flyout-title {
+  color: #FFFFFF;
+}
+
+[data-coreui-theme="dark"] .flyout-close {
+  color: #D0D5DD;
+}
+
+[data-coreui-theme="dark"] .flyout-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
 }
 
 /* =====================================================
@@ -124,7 +141,7 @@
 
 .flyout-content {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 360px 1fr;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -142,7 +159,7 @@
   padding: 16px;
   overflow-y: auto;
   background: var(--cui-card-bg, #1e1e2d);
-  border-left: 1px solid var(--cui-border-color, #2d2d3a);
+  border-right: 1px solid var(--cui-border-color, #2d2d3a);
 }
 
 /* =====================================================
@@ -806,6 +823,7 @@
 
   .flyout-data-panel {
     border-left: none;
+    border-right: none;
     border-top: 1px solid var(--cui-border-color, #2d2d3a);
     max-height: 300px;
   }

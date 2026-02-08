@@ -56,6 +56,7 @@ export function useDcfAnalysis(projectId: number) {
         queryClient.invalidateQueries({ queryKey: ['cash-flow', projectId] });
         queryClient.invalidateQueries({ queryKey: ['cashflow', projectId] });
         queryClient.invalidateQueries({ queryKey: ['project-cashflow', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['leveraged-cash-flow', String(projectId)] });
 
         // Invalidate SWR cash-flow queries (now pointing to Django)
         swrMutate(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`);
@@ -124,6 +125,7 @@ export function useUpdateDcfAnalysis(projectId: number) {
       queryClient.invalidateQueries({ queryKey: ['cash-flow', projectId] });
       queryClient.invalidateQueries({ queryKey: ['cashflow', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-cashflow', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['leveraged-cash-flow', String(projectId)] });
 
       // Invalidate SWR cash-flow queries (CashFlowAnalysisTab uses SWR)
       // This ensures price growth and cost inflation changes are reflected

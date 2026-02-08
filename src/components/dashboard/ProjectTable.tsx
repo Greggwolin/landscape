@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CompletenessBar } from './CompletenessBar';
 import { CompletenessModal, CompletenessCategory } from './CompletenessModal';
+import { PropertyTypeBadge } from '@/components/ui/landscape';
 
 export interface ProjectWithCompleteness {
   project_id: number;
@@ -22,38 +23,8 @@ interface ProjectTableProps {
   isLoading?: boolean;
 }
 
-/**
- * Type badge colors per the design spec.
- */
-const TYPE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  LAND: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Land' },
-  MPC: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'MPC' },
-  MF: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Multifam' },
-  MULTIFAMILY: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Multifam' },
-  RET: { bg: 'bg-pink-100', text: 'text-pink-700', label: 'Retail' },
-  RETAIL: { bg: 'bg-pink-100', text: 'text-pink-700', label: 'Retail' },
-  COMMERCIAL: { bg: 'bg-pink-100', text: 'text-pink-700', label: 'Commercial' },
-  OFF: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Office' },
-  OFFICE: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Office' },
-  IND: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Industrial' },
-  INDUSTRIAL: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Industrial' },
-  MXU: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Mixed Use' },
-  MIXED_USE: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Mixed Use' },
-  HTL: { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Hotel' },
-};
-
-const DEFAULT_TYPE = { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Other' };
-
 function TypeBadge({ typeCode }: { typeCode: string | null }) {
-  const config = typeCode ? TYPE_COLORS[typeCode.toUpperCase()] || DEFAULT_TYPE : DEFAULT_TYPE;
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.bg} ${config.text}`}
-    >
-      {config.label}
-    </span>
-  );
+  return <PropertyTypeBadge typeCode={typeCode} className="text-xs" />;
 }
 
 export function ProjectTable({ projects, isLoading }: ProjectTableProps) {

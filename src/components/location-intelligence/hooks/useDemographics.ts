@@ -39,7 +39,7 @@ function getAuthHeaders(): Record<string, string> {
       const tokensStr = localStorage.getItem('auth_tokens');
       if (tokensStr) {
         const tokens = JSON.parse(tokensStr);
-        if (tokens?.access) {
+        if (typeof tokens?.access === 'string' && tokens.access.trim()) {
           headers['Authorization'] = `Bearer ${tokens.access}`;
         }
       }
@@ -71,12 +71,34 @@ export function useDemographics({
       // Get Django API URL from environment
       const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
       const headers = getAuthHeaders();
+      const hasAuthHeader = Boolean(headers.Authorization);
+      const publicHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+
+      const fetchWithAuthFallback = async (url: string, init: RequestInit = {}) => {
+        const response = await fetch(url, {
+          ...init,
+          headers: headers,
+          credentials: 'include',
+        });
+
+        // Location intelligence demographics endpoints are public; if JWT is stale/invalid,
+        // retry once without Authorization to avoid blocking the flyout.
+        if ((response.status === 401 || response.status === 403) && hasAuthHeader) {
+          return fetch(url, {
+            ...init,
+            headers: publicHeaders,
+            credentials: 'include',
+          });
+        }
+
+        return response;
+      };
 
       // First try to get cached demographics if projectId is provided
       if (projectId) {
-        const cachedResponse = await fetch(
+        const cachedResponse = await fetchWithAuthFallback(
           `${djangoUrl}${LOCATION_INTELLIGENCE_API_BASE}/demographics/project/${projectId}/`,
-          { headers, credentials: 'include' }
+          { method: 'GET' }
         );
 
         if (cachedResponse.ok) {
@@ -89,9 +111,9 @@ export function useDemographics({
       }
 
       // Calculate fresh demographics
-      const response = await fetch(
+      const response = await fetchWithAuthFallback(
         `${djangoUrl}${LOCATION_INTELLIGENCE_API_BASE}/demographics/?lat=${lat}&lon=${lon}`,
-        { headers, credentials: 'include' }
+        { method: 'GET' }
       );
 
       if (!response.ok) {
@@ -104,10 +126,8 @@ export function useDemographics({
 
       // Cache for project if projectId provided
       if (projectId) {
-        fetch(`${djangoUrl}${LOCATION_INTELLIGENCE_API_BASE}/demographics/project/${projectId}/cache/`, {
+        fetchWithAuthFallback(`${djangoUrl}${LOCATION_INTELLIGENCE_API_BASE}/demographics/project/${projectId}/cache/`, {
           method: 'POST',
-          headers,
-          credentials: 'include',
           body: JSON.stringify({ lat, lon }),
         }).catch((err) => {
           console.warn('Failed to cache demographics:', err);

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { MessageCircle, Send, Loader2 } from 'lucide-react'
+import { Send, Loader2 } from 'lucide-react'
 import type { NewProjectFormData } from './types'
 import NewProjectDropZone from '@/components/projects/onboarding/NewProjectDropZone'
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon'
 
 export interface LandscaperMessage {
   id: string
@@ -476,10 +477,13 @@ const LandscaperPanel = ({
       style={{ borderRadius: 'var(--cui-card-border-radius)' }}
     >
       {/* Header */}
-      <div className={`flex items-center gap-2 border-b px-4 py-3 ${
-        isDark ? 'border-slate-700' : 'border-slate-200'
-      }`}>
-        <MessageCircle className="h-5 w-5 text-blue-600" />
+      <div
+        className={`flex items-center gap-2 border-b px-4 py-3 ${
+          isDark ? 'border-slate-700' : 'border-slate-200'
+        }`}
+        style={{ backgroundColor: 'var(--cui-card-subheader-bg)' }}
+      >
+        <LandscaperIcon className="landscaper-panel-icon" aria-hidden="true" />
         <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Landscaper</span>
         <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
           Online

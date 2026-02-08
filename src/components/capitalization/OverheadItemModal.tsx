@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel,
+  CFormInput,
+  CFormSelect,
+  CFormTextarea,
+  CRow,
+  CCol,
+} from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import {
   ManagementOverhead,
   CreateManagementOverhead,
@@ -237,60 +251,40 @@ export default function OverheadItemModal({
     return null;
   };
 
-  if (!isOpen) return null;
-
-  // Common input styles
-  const inputBase = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const labelBase = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
-  const labelCentered = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 text-center leading-tight";
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {editingItem ? 'Edit Overhead Item' : 'Add Overhead Item'}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="btn btn-sm btn-ghost-secondary"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <CModal visible={isOpen} onClose={handleClose} alignment="center" size="lg" backdrop="static">
+      <CForm onSubmit={handleSubmit}>
+        <CModalHeader closeButton>
+          <CModalTitle>{editingItem ? 'Edit Overhead Item' : 'Add Overhead Item'}</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm">
-              {error}
-            </div>
+            <div className="alert alert-danger py-2 mb-0">{error}</div>
           )}
 
           {/* Item Name */}
           <div>
-            <label className={labelBase}>
+            <CFormLabel htmlFor="overhead-item-name">
               Item Name *
-            </label>
-            <input
+            </CFormLabel>
+            <CFormInput
+              id="overhead-item-name"
               type="text"
               value={formData.item_name}
               onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
               placeholder="e.g., Project Management Salary"
               required
-              className={inputBase}
             />
           </div>
 
           {/* Amount and Frequency - 2 columns */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelBase}>
+          <CRow className="g-3">
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="overhead-item-amount">
                 Amount *
-              </label>
-              <input
+              </CFormLabel>
+              <CFormInput
+                id="overhead-item-amount"
                 type="text"
                 value={amountDisplay}
                 onChange={handleAmountChange}
@@ -298,49 +292,51 @@ export default function OverheadItemModal({
                 onFocus={handleAmountFocus}
                 placeholder="$0.00"
                 required
-                className={`${inputBase} text-right`}
+                className="text-end"
               />
-            </div>
-            <div>
-              <label className={labelBase}>
+            </CCol>
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="overhead-item-frequency">
                 Frequency
-              </label>
-              <select
+              </CFormLabel>
+              <CFormSelect
+                id="overhead-item-frequency"
                 value={formData.frequency}
                 onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                className={inputBase}
               >
                 {FREQUENCY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
-            </div>
-          </div>
+              </CFormSelect>
+            </CCol>
+          </CRow>
 
           {/* Start Period, Duration, Apply to Level - 3 columns with centered 2-line labels */}
           {formData.frequency !== 'one_time' && (
             <>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCentered}>
+              <CRow className="g-3">
+                <CCol xs={12} md={4}>
+                  <CFormLabel htmlFor="overhead-start-period" className="d-block text-center small lh-sm">
                     Start<br />Period
-                  </label>
-                  <input
+                  </CFormLabel>
+                  <CFormInput
+                    id="overhead-start-period"
                     type="number"
                     min="1"
                     max={projectEndPeriod}
                     value={formData.start_period}
                     onChange={(e) => handleStartPeriodChange(parseInt(e.target.value) || 1)}
-                    className={`${inputBase} text-center`}
+                    className="text-center"
                   />
-                </div>
-                <div>
-                  <label className={labelCentered}>
+                </CCol>
+                <CCol xs={12} md={4}>
+                  <CFormLabel htmlFor="overhead-duration-periods" className="d-block text-center small lh-sm">
                     Duration<br />(periods)
-                  </label>
-                  <input
+                  </CFormLabel>
+                  <CFormInput
+                    id="overhead-duration-periods"
                     type="number"
                     min="1"
                     value={formData.duration_periods}
@@ -348,14 +344,15 @@ export default function OverheadItemModal({
                       setThroughEndOfAnalysis(false);
                       setFormData({ ...formData, duration_periods: parseInt(e.target.value) || 1 });
                     }}
-                    className={`${inputBase} text-center`}
+                    className="text-center"
                   />
-                </div>
-                <div>
-                  <label className={labelCentered}>
+                </CCol>
+                <CCol xs={12} md={4}>
+                  <CFormLabel htmlFor="overhead-apply-level" className="d-block text-center small lh-sm">
                     Apply<br />to Level
-                  </label>
-                  <select
+                  </CFormLabel>
+                  <CFormSelect
+                    id="overhead-apply-level"
                     value={formData.container_level || 'project'}
                     onChange={(e) =>
                       setFormData({
@@ -363,26 +360,25 @@ export default function OverheadItemModal({
                         container_level: e.target.value === 'project' ? undefined : e.target.value,
                       })
                     }
-                    className={`${inputBase} text-left`}
                   >
                     {levelOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                  </select>
-                </div>
-              </div>
+                  </CFormSelect>
+                </CCol>
+              </CRow>
               {/* Through end of analysis checkbox */}
-              <div className="flex items-center gap-2">
+              <div className="form-check mb-0">
                 <input
                   type="checkbox"
                   id="throughEndOfAnalysis"
                   checked={throughEndOfAnalysis}
                   onChange={(e) => handleThroughEndToggle(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="form-check-input"
                 />
-                <label htmlFor="throughEndOfAnalysis" className="text-sm text-gray-600 dark:text-gray-400">
+                <label htmlFor="throughEndOfAnalysis" className="form-check-label text-medium-emphasis">
                   Through end of analysis (period {projectEndPeriod})
                 </label>
               </div>
@@ -392,10 +388,11 @@ export default function OverheadItemModal({
           {/* Apply to Level for one-time (show separately since no period/duration) */}
           {formData.frequency === 'one_time' && (
             <div>
-              <label className={labelBase}>
+              <CFormLabel htmlFor="overhead-apply-level-onetime">
                 Apply to Level
-              </label>
-              <select
+              </CFormLabel>
+              <CFormSelect
+                id="overhead-apply-level-onetime"
                 value={formData.container_level || 'project'}
                 onChange={(e) =>
                   setFormData({
@@ -403,27 +400,26 @@ export default function OverheadItemModal({
                     container_level: e.target.value === 'project' ? undefined : e.target.value,
                   })
                 }
-                className={inputBase}
               >
                 {levelOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
+              </CFormSelect>
             </div>
           )}
 
           {/* Calculated Total */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Calculated Total:</span>
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
+          <div className="p-3 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="small text-medium-emphasis">Calculated Total:</span>
+              <span className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
                 {formatCurrency(calculatedTotal)}
               </span>
             </div>
             {getProratedDescription() && (
-              <div className="text-xs text-gray-500 dark:text-gray-400 text-right mt-1">
+              <div className="small text-medium-emphasis text-end mt-1" style={{ fontSize: '0.75rem' }}>
                 {getProratedDescription()}
               </div>
             )}
@@ -431,37 +427,27 @@ export default function OverheadItemModal({
 
           {/* Notes */}
           <div>
-            <label className={labelBase}>
+            <CFormLabel htmlFor="overhead-notes">
               Notes (optional)
-            </label>
-            <textarea
+            </CFormLabel>
+            <CFormTextarea
+              id="overhead-notes"
               value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Additional notes..."
               rows={3}
-              className={inputBase}
             />
           </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="btn btn-outline-secondary btn-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn btn-primary btn-sm"
-            >
-              {saving ? 'Saving...' : editingItem ? 'Update' : 'Add Item'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </CModalBody>
+        <CModalFooter>
+          <SemanticButton intent="secondary-action" type="button" onClick={handleClose} disabled={saving}>
+            Cancel
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={saving}>
+            {saving ? 'Saving...' : editingItem ? 'Update' : 'Add Item'}
+          </SemanticButton>
+        </CModalFooter>
+      </CForm>
+    </CModal>
   );
 }

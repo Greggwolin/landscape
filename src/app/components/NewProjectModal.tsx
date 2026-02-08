@@ -16,7 +16,6 @@ import { usePersistentForm, clearPersistedForm } from './new-project/usePersiste
 import { generateProjectName } from './new-project/utils'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
-import { useTheme } from '@/app/components/CoreUIThemeProvider'
 
 type NewProjectModalProps = {
   isOpen: boolean
@@ -116,8 +115,6 @@ const getSectionForField = (fieldName: string): SectionKey | undefined => {
 const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps) => {
   const router = useRouter()
   const { refreshProjects, selectProject } = useProjectContext()
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
 
   // Debug logging
   console.log('[NewProjectModal] Rendered with:', {
@@ -874,117 +871,168 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
+    <div
+      className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+      style={{ zIndex: 1055 }}
+    >
+      <div
+        className="position-absolute top-0 start-0 w-100 h-100"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(2px)' }}
+        onClick={closeModal}
+      />
 
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative flex max-h-[90vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-2xl border shadow-2xl ${
-          isDark ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
-        }`}
+        className="position-relative d-flex flex-column overflow-hidden border"
+        style={{
+          maxHeight: '90vh',
+          width: '95vw',
+          maxWidth: '80rem',
+          borderRadius: 'var(--cui-card-border-radius)',
+          borderColor: 'var(--cui-border-color)',
+          backgroundColor: '#ffffff',
+          color: '#0f172a',
+          boxShadow: 'var(--cui-box-shadow-lg)',
+        }}
       >
         {/* Header */}
         <header
-          className={`flex items-center justify-between border-b px-6 py-4 ${
-            isDark ? 'border-slate-800 bg-slate-900/70 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-900'
-          }`}
+          className="card-header d-flex align-items-center justify-content-between"
+          style={{
+            borderColor: 'var(--cui-border-color)',
+            color: 'var(--cui-body-color)',
+          }}
         >
           <div>
-            <h2 className="text-xl font-semibold">Create Project</h2>
+            <h2 className="mb-0 fw-bold" style={{ fontSize: '1rem', lineHeight: 1.25 }}>Create Project</h2>
           </div>
           <button
             type="button"
             onClick={closeModal}
             disabled={isSubmitting}
-            className={`rounded-lg p-2 transition ${
-              isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-            }`}
+            className="btn btn-sm p-1 d-flex align-items-center justify-content-center"
+            style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--cui-secondary-color)' }}
           >
-            <X className="h-5 w-5" />
+            <X style={{ width: '1.25rem', height: '1.25rem' }} />
           </button>
         </header>
 
         {/* Two-column layout */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="d-flex flex-grow-1 overflow-hidden">
           {/* Left column - Form (60%) */}
           <div
-            className={`flex-1 overflow-y-auto border-r p-6 ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}
+            className="flex-grow-1 overflow-auto border-end p-4"
             style={{ flexBasis: '60%' }}
           >
-            <div className="space-y-6 max-w-2xl">
+            <div className="d-flex flex-column" style={{ gap: '1rem', maxWidth: '42rem' }}>
               {/* Analysis Type Selector (what the user is doing) */}
               <div ref={assetSectionRef}>
-                <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                <label className="form-label fw-medium mb-3" style={{ color: 'var(--cui-body-color)' }}>
                   Analysis Type
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div
+                  className="w-100"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.375rem' }}
+                >
                   {ANALYSIS_TYPE_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setValue('analysis_type', opt.value as 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY', { shouldDirty: true, shouldValidate: true })}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium transition flex flex-col items-center gap-1 ${
-                        analysisType === opt.value
-                          ? 'bg-blue-600 text-white'
-                          : isDark
-                            ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
+                      className="btn d-flex align-items-center justify-content-center gap-1 px-1 py-1 rounded"
+                      style={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 500,
+                        transition: 'all 150ms ease',
+                        borderColor: analysisType === opt.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                        backgroundColor: analysisType === opt.value ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
+                        color: analysisType === opt.value ? 'var(--cui-primary-text)' : 'var(--cui-body-color)',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
-                      <span className="text-lg">{opt.icon}</span>
+                      <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>{opt.icon}</span>
                       <span>{opt.label}</span>
                     </button>
                   ))}
                 </div>
                 {errors.analysis_type && (
-                  <p className="mt-2 text-xs text-rose-500">{errors.analysis_type.message as string}</p>
+                  <p className="mt-2 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
+                    {errors.analysis_type.message as string}
+                  </p>
                 )}
               </div>
 
               {/* Property Category Toggle (what the asset is) */}
               <div>
-                <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                <label className="form-label fw-medium mb-3" style={{ color: 'var(--cui-body-color)' }}>
                   Property Category
                 </label>
-                <div className="flex gap-2">
+                <div className="d-flex gap-2">
                   <button
                     type="button"
                     onClick={() => setValue('property_category', 'Land Development', { shouldDirty: true, shouldValidate: true })}
-                    className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
-                      propertyCategory === 'Land Development'
-                        ? 'bg-emerald-600 text-white'
-                        : isDark
-                          ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className="btn flex-grow-1 px-4 py-2 rounded"
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 150ms ease',
+                      borderColor:
+                        propertyCategory === 'Land Development'
+                          ? 'var(--cui-success)'
+                          : 'var(--cui-border-color)',
+                      backgroundColor:
+                        propertyCategory === 'Land Development'
+                          ? 'var(--cui-success)'
+                          : 'var(--cui-tertiary-bg)',
+                      color:
+                        propertyCategory === 'Land Development'
+                          ? 'var(--cui-primary-text)'
+                          : 'var(--cui-body-color)',
+                    }}
                   >
                     Land Development
                   </button>
                   <button
                     type="button"
                     onClick={() => setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })}
-                    className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition ${
-                      propertyCategory === 'Income Property'
-                        ? 'bg-emerald-600 text-white'
-                        : isDark
-                          ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className="btn flex-grow-1 px-4 py-2 rounded"
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 150ms ease',
+                      borderColor:
+                        propertyCategory === 'Income Property'
+                          ? 'var(--cui-success)'
+                          : 'var(--cui-border-color)',
+                      backgroundColor:
+                        propertyCategory === 'Income Property'
+                          ? 'var(--cui-success)'
+                          : 'var(--cui-tertiary-bg)',
+                      color:
+                        propertyCategory === 'Income Property'
+                          ? 'var(--cui-primary-text)'
+                          : 'var(--cui-body-color)',
+                    }}
                   >
                     Income Property
                   </button>
                 </div>
                 {errors.property_category && (
-                  <p className="mt-2 text-xs text-rose-500">{errors.property_category.message as string}</p>
+                  <p className="mt-2 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
+                    {errors.property_category.message as string}
+                  </p>
                 )}
               </div>
 
               {/* Property Subtype & Class (Income Property only) */}
               {propertyCategory === 'Income Property' && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div
+                  className="w-100"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}
+                >
                   <div>
-                    <div className="relative">
+                    <div className="position-relative">
                       <select
                         value={formData.property_subtype}
                         onFocus={() => setSubtypeFocused(true)}
@@ -994,9 +1042,15 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                           setValue('property_subtype', value, { shouldDirty: true, shouldValidate: true })
                           setValue('project_type_code', value, { shouldDirty: true })
                         }}
-                        className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                          isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
-                        }`}
+                        className="form-select pe-5"
+                        style={{
+                          borderColor: 'var(--cui-border-color)',
+                          backgroundColor: 'var(--cui-card-bg)',
+                          color: 'var(--cui-body-color)',
+                          fontSize: '0.875rem',
+                          paddingTop: '1rem',
+                          paddingBottom: '0.375rem',
+                        }}
                       >
                         <option value="">Select property type (optional)</option>
                         {subtypeOptions.map((opt) => (
@@ -1006,28 +1060,39 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                         ))}
                       </select>
                       <label
-                        className={`pointer-events-none absolute left-3 transition-all duration-200 ${
-                          subtypeFocused || hasSubtypeValue
-                            ? 'top-1 text-[10px] text-blue-600'
-                            : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
-                        }`}
+                        className="position-absolute start-0 pointer-events-none"
+                        style={{
+                          marginLeft: '0.75rem',
+                          transition: 'all 0.2s ease',
+                          top: subtypeFocused || hasSubtypeValue ? '0.25rem' : '0.625rem',
+                          fontSize: subtypeFocused || hasSubtypeValue ? '0.625rem' : '0.75rem',
+                          color:
+                            subtypeFocused || hasSubtypeValue
+                              ? 'var(--cui-primary)'
+                              : 'var(--cui-secondary-color)',
+                        }}
                       >
                         Property Type
                       </label>
-                      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div
+                        className="pointer-events-none position-absolute top-50 translate-middle-y"
+                        style={{ right: '0.75rem', color: 'var(--cui-secondary-color)' }}
+                      >
+                        <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                       {errors.property_subtype && (
-                        <p className="mt-1 text-xs text-rose-500">{errors.property_subtype.message as string}</p>
+                        <p className="mt-1 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
+                          {errors.property_subtype.message as string}
+                        </p>
                       )}
                     </div>
                   </div>
 
                   {showPropertyClass && (
                     <div>
-                      <div className="relative">
+                      <div className="position-relative">
                         <select
                           value={formData.property_class}
                           onFocus={() => setClassFocused(true)}
@@ -1036,9 +1101,15 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                             const value = event.target.value
                             setValue('property_class', value, { shouldDirty: true, shouldValidate: true })
                           }}
-                          className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm transition appearance-none focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
-                          }`}
+                          className="form-select pe-5"
+                          style={{
+                            borderColor: 'var(--cui-border-color)',
+                            backgroundColor: 'var(--cui-card-bg)',
+                            color: 'var(--cui-body-color)',
+                            fontSize: '0.875rem',
+                            paddingTop: '1rem',
+                            paddingBottom: '0.375rem',
+                          }}
                         >
                           <option value="">Select property class (optional)</option>
                           {PROPERTY_CLASS_OPTIONS.map((opt) => (
@@ -1048,21 +1119,32 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                           ))}
                         </select>
                         <label
-                          className={`pointer-events-none absolute left-3 transition-all duration-200 ${
-                            classFocused || hasClassValue
-                              ? 'top-1 text-[10px] text-blue-600'
-                              : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`
-                          }`}
+                          className="position-absolute start-0 pointer-events-none"
+                          style={{
+                            marginLeft: '0.75rem',
+                            transition: 'all 0.2s ease',
+                            top: classFocused || hasClassValue ? '0.25rem' : '0.625rem',
+                            fontSize: classFocused || hasClassValue ? '0.625rem' : '0.75rem',
+                            color:
+                              classFocused || hasClassValue
+                                ? 'var(--cui-primary)'
+                                : 'var(--cui-secondary-color)',
+                          }}
                         >
                           Property Class
                         </label>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div
+                          className="pointer-events-none position-absolute top-50 translate-middle-y"
+                          style={{ right: '0.75rem', color: 'var(--cui-secondary-color)' }}
+                        >
+                          <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
                         {errors.property_class && (
-                          <p className="mt-1 text-xs text-rose-500">{errors.property_class.message as string}</p>
+                          <p className="mt-1 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
+                            {errors.property_class.message as string}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1071,27 +1153,46 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               )}
 
               {/* Project Name - Floating Label */}
-              <div className="relative">
+              <div className="position-relative">
                 <input
                   {...register('project_name')}
                   id="project-name"
                   placeholder=" "
-                  className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
-                  } ${extractedFieldKeys.has('project_name') ? 'ring-2 ring-blue-300 bg-blue-50/50' : ''}`}
+                  className="form-control"
+                  style={{
+                    borderColor: extractedFieldKeys.has('project_name')
+                      ? 'var(--cui-primary)'
+                      : 'var(--cui-border-color)',
+                    backgroundColor: extractedFieldKeys.has('project_name')
+                      ? 'var(--cui-primary-bg-subtle)'
+                      : 'var(--cui-card-bg)',
+                    color: 'var(--cui-body-color)',
+                    fontSize: '0.875rem',
+                    paddingTop: '1rem',
+                    paddingBottom: '0.375rem',
+                    boxShadow: extractedFieldKeys.has('project_name')
+                      ? '0 0 0 0.125rem rgba(var(--cui-primary-rgb), 0.25)'
+                      : undefined,
+                  }}
                 />
                 <label
                   htmlFor="project-name"
-                  className={`absolute left-3 transition-all duration-200 pointer-events-none ${
-                    watch('project_name')
-                      ? 'top-1 text-[10px] text-blue-600'
-                      : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'} peer-focus:top-1 peer-focus:text-[10px] peer-focus:text-blue-600`
-                  }`}
+                  className="position-absolute start-0 pointer-events-none"
+                  style={{
+                    marginLeft: '0.75rem',
+                    transition: 'all 0.2s ease',
+                    top: watch('project_name') ? '0.25rem' : '0.625rem',
+                    fontSize: watch('project_name') ? '0.625rem' : '0.75rem',
+                    color: watch('project_name') ? 'var(--cui-primary)' : 'var(--cui-secondary-color)',
+                  }}
                 >
                   Project Name (optional)
                 </label>
                 {extractedFieldKeys.has('project_name') && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-600">
+                  <span
+                    className="position-absolute top-50 translate-middle-y end-0 me-3"
+                    style={{ fontSize: '0.75rem', color: 'var(--cui-primary)' }}
+                  >
                     Auto-filled
                   </span>
                 )}
@@ -1099,14 +1200,16 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
 
               {/* Location Section */}
               <div ref={locationSectionRef} className="pt-2">
-                <div className="flex items-baseline gap-2 mb-3">
-                  <h3 className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Location</h3>
-                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Click on the map to place a pin, or drag to adjust</span>
+                <div className="d-flex align-items-baseline gap-2 mb-3">
+                  <h3 className="small fw-medium mb-0" style={{ color: 'var(--cui-body-color)' }}>Location</h3>
+                  <span className="small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                    Click on the map to place a pin, or drag to adjust
+                  </span>
                 </div>
                 <LocationSection
                   form={form}
                   analysisType={analysisType}
-                  isDark={isDark}
+                  isDark={false}
                   hasError={invalidSectionSet.has('location')}
                   extractedFieldKeys={extractedFieldKeys}
                 />
@@ -1114,10 +1217,10 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
 
               {/* Property Data Section */}
               <div ref={propertyDataSectionRef} className="pt-2">
-                <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Property Data</h3>
+                <h3 className="small fw-medium mb-3" style={{ color: 'var(--cui-body-color)' }}>Property Data</h3>
                 <PropertyDataSection
                   form={form}
-                  isDark={isDark}
+                  isDark={false}
                   hasError={invalidSectionSet.has('propertyData')}
                   extractedFieldKeys={extractedFieldKeys}
                 />
@@ -1125,7 +1228,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
 
               {/* Asking Price Field */}
               <div className="pt-2">
-                <div className="relative">
+                <div className="position-relative">
                   <input
                     {...register('asking_price')}
                     id="asking-price"
@@ -1154,44 +1257,65 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                       }
                     }}
                     defaultValue={formData.asking_price ? `$${Number(formData.asking_price).toLocaleString()}` : ''}
-                    className={`peer w-full rounded-md border px-3 pb-1.5 pt-4 text-sm placeholder-transparent transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      isDark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-300 bg-white text-slate-900'
-                    } ${extractedFieldKeys.has('asking_price') ? 'ring-2 ring-blue-300 bg-blue-50/50' : ''}`}
+                    className="form-control"
+                    style={{
+                      borderColor: extractedFieldKeys.has('asking_price')
+                        ? 'var(--cui-primary)'
+                        : 'var(--cui-border-color)',
+                      backgroundColor: extractedFieldKeys.has('asking_price')
+                        ? 'var(--cui-primary-bg-subtle)'
+                        : 'var(--cui-card-bg)',
+                      color: 'var(--cui-body-color)',
+                      fontSize: '0.875rem',
+                      paddingTop: '1rem',
+                      paddingBottom: '0.375rem',
+                      boxShadow: extractedFieldKeys.has('asking_price')
+                        ? '0 0 0 0.125rem rgba(var(--cui-primary-rgb), 0.25)'
+                        : undefined,
+                    }}
                   />
                   <label
                     htmlFor="asking-price"
-                    className={`absolute left-3 transition-all duration-200 pointer-events-none ${
-                      watch('asking_price')
-                        ? 'top-1 text-[10px] text-blue-600'
-                        : `top-2.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'} peer-focus:top-1 peer-focus:text-[10px] peer-focus:text-blue-600`
-                    }`}
+                    className="position-absolute start-0 pointer-events-none"
+                    style={{
+                      marginLeft: '0.75rem',
+                      transition: 'all 0.2s ease',
+                      top: watch('asking_price') ? '0.25rem' : '0.625rem',
+                      fontSize: watch('asking_price') ? '0.625rem' : '0.75rem',
+                      color: watch('asking_price') ? 'var(--cui-primary)' : 'var(--cui-secondary-color)',
+                    }}
                   >
                     Asking Price (optional)
                   </label>
                   {extractedFieldKeys.has('asking_price') && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-600">
+                    <span
+                      className="position-absolute top-50 translate-middle-y end-0 me-3"
+                      style={{ fontSize: '0.75rem', color: 'var(--cui-primary)' }}
+                    >
                       Auto-filled
                     </span>
                   )}
                 </div>
-                <p className={`mt-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
                   Initial estimate. Will be replaced by actual costs once acquisition closes.
                 </p>
               </div>
 
               {/* Implied Density Display */}
               {propertyCategory === 'Land Development' && impliedDensity && (
-                <div className={`rounded-lg px-4 py-3 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Implied Density</span>
-                    <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{impliedDensity} DU/AC</span>
+                <div className="rounded px-4 py-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <span className="small" style={{ color: 'var(--cui-secondary-color)' }}>Implied Density</span>
+                    <span className="fw-semibold" style={{ fontSize: '1.125rem', color: 'var(--cui-body-color)' }}>
+                      {impliedDensity} DU/AC
+                    </span>
                   </div>
                 </div>
               )}
 
               {/* Error Display */}
               {globalError && (
-                <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                <div className="alert alert-danger py-2 mb-0">
                   {globalError}
                 </div>
               )}
@@ -1204,14 +1328,17 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               analysisType={propertyCategory} // Pass property category for extraction context
               formData={formData}
               onDocumentExtracted={handleDocumentExtracted}
-              isDark={isDark}
+              isDark={false}
               initialFiles={initialFiles}
             />
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+        <footer
+          className="d-flex align-items-center justify-content-between border-top px-4 py-3"
+          style={{ borderColor: 'var(--cui-border-color)' }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -1220,11 +1347,12 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               setPendingDocuments([])
             }}
             disabled={isSubmitting}
-            className="text-xs text-slate-400 hover:text-slate-600 transition disabled:opacity-50"
+            className="btn btn-link p-0 small"
+            style={{ color: 'var(--cui-secondary-color)' }}
           >
             Clear form
           </button>
-          <div className="flex items-center gap-3">
+          <div className="d-flex align-items-center gap-3">
             <Button
               type="button"
               variant="ghost"

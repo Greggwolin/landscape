@@ -1645,6 +1645,119 @@ def handle_ingest_document(
     )
 
 
+@register_tool('get_document_media_summary')
+def handle_get_document_media_summary(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get a summary of images and visual assets detected in a document."""
+    doc_id = tool_input.get('doc_id')
+    if not doc_id:
+        return {'success': False, 'error': 'doc_id is required'}
+    return get_document_media_summary(doc_id=doc_id, project_id=project_id)
+
+
+def get_document_media_summary(doc_id: int, project_id: int) -> Dict[str, Any]:
+    """
+    Returns media scan summary for a document: counts by type, by action,
+    and a formatted human-readable breakdown for Landscaper to reference.
+    """
+    from django.db import connection
+
+    with connection.cursor() as c:
+        c.execute("""
+            SELECT d.doc_id, d.doc_name, d.media_scan_status, d.media_scan_json,
+                   d.project_id
+            FROM landscape.core_doc d
+            WHERE d.doc_id = %s AND d.deleted_at IS NULL
+        """, [doc_id])
+        row = c.fetchone()
+
+    if not row:
+        return {'success': False, 'error': f'Document {doc_id} not found'}
+
+    # Verify doc belongs to this project
+    doc_project_id = row[4]
+    if doc_project_id and doc_project_id != project_id:
+        return {'success': False, 'error': 'Document does not belong to this project'}
+
+    doc_name = row[1]
+    scan_status = row[2]
+    scan_json = row[3] if isinstance(row[3], dict) else (
+        json.loads(row[3]) if row[3] else {}
+    )
+
+    if scan_status in (None, 'unscanned', 'not_applicable'):
+        return {
+            'success': True,
+            'doc_id': doc_id,
+            'doc_name': doc_name,
+            'media_scan_status': scan_status or 'unscanned',
+            'total_detected': 0,
+            'message': 'No media scan has been performed on this document.',
+        }
+
+    # Get classified media counts
+    with connection.cursor() as c:
+        c.execute("""
+            SELECT
+                lc.classification_code,
+                lc.classification_name,
+                lc.badge_color,
+                lc.content_intent,
+                lc.default_action,
+                COUNT(*) as cnt
+            FROM landscape.core_doc_media m
+            LEFT JOIN landscape.lu_media_classification lc
+                ON m.classification_id = lc.classification_id
+            WHERE m.doc_id = %s AND m.deleted_at IS NULL
+            GROUP BY lc.classification_code, lc.classification_name,
+                     lc.badge_color, lc.content_intent, lc.default_action
+            ORDER BY cnt DESC
+        """, [doc_id])
+        type_rows = c.fetchall()
+
+    total_detected = scan_json.get('total_detected', 0)
+    total_extracted = scan_json.get('total_extracted', 0)
+
+    # Build by_type summary
+    by_type = {}
+    type_descriptions = []
+    for code, name, color, intent, action, cnt in type_rows:
+        code = code or 'unclassified'
+        name = name or 'Unclassified'
+        by_type[code] = {
+            'name': name,
+            'count': cnt,
+            'badge_color': color or 'secondary',
+            'content_intent': intent,
+            'default_action': action,
+        }
+        type_descriptions.append(f"{cnt} {name.lower()}{'s' if cnt != 1 else ''}")
+
+    # Build human-readable summary
+    if type_descriptions:
+        human_summary = (
+            f"Found {total_detected} images in \"{doc_name}\": "
+            + ", ".join(type_descriptions) + "."
+        )
+    else:
+        human_summary = f"Found {total_detected} images in \"{doc_name}\" (not yet classified)."
+
+    return {
+        'success': True,
+        'doc_id': doc_id,
+        'doc_name': doc_name,
+        'media_scan_status': scan_status,
+        'total_detected': total_detected,
+        'total_extracted': total_extracted,
+        'by_type': by_type,
+        'human_summary': human_summary,
+        'review_url': f'/api/dms/documents/{doc_id}/media/',
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Financial Assumptions Tool Handlers
 # ─────────────────────────────────────────────────────────────────────────────

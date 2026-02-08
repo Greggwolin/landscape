@@ -55,6 +55,19 @@ export interface ChatMessage {
     }>;
     error?: string;
     traceback?: string;
+    // Media asset detection (Phase 4 DMS)
+    media_summary?: {
+      doc_id: number;
+      doc_name: string;
+      total_detected: number;
+      by_type: Record<string, {
+        name: string;
+        count: number;
+        badge_color: string;
+        content_intent?: string;
+        default_action?: string;
+      }>;
+    };
   };
 }
 

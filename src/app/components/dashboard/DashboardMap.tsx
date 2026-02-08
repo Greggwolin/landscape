@@ -3,6 +3,7 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { MapOblique, MapObliqueRef } from '@/components/map/MapOblique';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
+import { getPropertyTypeLabel, getPropertyTypeTokenRef } from '@/config/propertyTypeTokens';
 
 interface DashboardMapProps {
   projects: ProjectSummary[];
@@ -63,62 +64,20 @@ const filterOutliers = (coords: Array<{ lat: number; lon: number }>) => {
   return keep.map(({ lat, lon }) => ({ lat, lon }));
 };
 
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  LAND: 'Land Development',
-  MF: 'Multifamily',
-  OFF: 'Office',
-  RET: 'Retail',
-  IND: 'Industrial',
-  HTL: 'Hotel',
-  MXU: 'Mixed-Use',
-  MPC: 'Master Planned Community',
-  MULTIFAMILY: 'Multifamily',
-  COMMERCIAL: 'Commercial',
-  OFFICE: 'Office',
-  RETAIL: 'Retail',
-  INDUSTRIAL: 'Industrial',
-  HOTEL: 'Hotel',
-  MIXED_USE: 'Mixed Use',
-  SUBDIVISION: 'Subdivision'
-};
-
-const PROPERTY_TYPE_COLORS: Record<string, string> = {
-  LAND: 'var(--cui-primary)',
-  MF: 'var(--cui-success)',
-  OFF: 'var(--cui-warning)',
-  RET: 'var(--cui-danger)',
-  IND: 'var(--cui-secondary-color)',
-  HTL: 'var(--cui-dark)',
-  MXU: 'var(--cui-info)',
-  MPC: 'var(--cui-primary)',
-  MULTIFAMILY: 'var(--cui-success)',
-  COMMERCIAL: 'var(--cui-info)',
-  OFFICE: 'var(--cui-warning)',
-  RETAIL: 'var(--cui-danger)',
-  INDUSTRIAL: 'var(--cui-secondary-color)',
-  HOTEL: 'var(--cui-dark)',
-  MIXED_USE: 'var(--cui-primary)',
-  SUBDIVISION: 'var(--cui-info)'
-};
+const toTypeCode = (project: ProjectSummary) =>
+  project.project_type_code?.toUpperCase() ||
+  project.project_type?.toUpperCase() ||
+  project.property_subtype?.toUpperCase() ||
+  null;
 
 const getTypeLabel = (project: ProjectSummary) => {
-  const code =
-    project.project_type_code?.toUpperCase() ||
-    project.project_type?.toUpperCase() ||
-    project.property_subtype?.toUpperCase() ||
-    null;
-  if (code && PROPERTY_TYPE_LABELS[code]) return PROPERTY_TYPE_LABELS[code];
-  return project.project_type || project.project_type_code || 'Type N/A';
+  const code = toTypeCode(project);
+  return getPropertyTypeLabel(code || project.project_type || project.project_type_code || 'Type N/A');
 };
 
 const getTypeColor = (project: ProjectSummary) => {
-  const code =
-    project.project_type_code?.toUpperCase() ||
-    project.project_type?.toUpperCase() ||
-    project.property_subtype?.toUpperCase() ||
-    null;
-  if (code && PROPERTY_TYPE_COLORS[code]) return PROPERTY_TYPE_COLORS[code];
-  return '#000000';
+  const tokenRef = getPropertyTypeTokenRef(toTypeCode(project));
+  return tokenRef?.bgVar || 'var(--cui-primary)';
 };
 
 export default function DashboardMap({ projects, selectedProjectId, onProjectSelect }: DashboardMapProps) {
@@ -219,17 +178,17 @@ export default function DashboardMap({ projects, selectedProjectId, onProjectSel
   }, [bounds, markers]);
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-100 w-100 position-relative">
       {markers.length === 0 ? (
         <div
-          className="flex items-center justify-center h-full rounded-lg border text-center"
+          className="d-flex align-items-center justify-content-center h-100 rounded border text-center"
           style={{
             backgroundColor: 'var(--cui-tertiary-bg)',
             borderColor: 'var(--cui-border-color)',
             color: 'var(--cui-secondary-color)'
           }}
         >
-          <p className="text-sm">Add project coordinates to display on map</p>
+          <p className="small mb-0">Add project coordinates to display on map</p>
         </div>
       ) : (
         <MapOblique

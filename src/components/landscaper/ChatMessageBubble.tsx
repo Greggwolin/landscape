@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { ChatMessage } from '@/hooks/useLandscaper';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
+import MediaSummaryCard from './MediaSummaryCard';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface ChatMessageBubbleProps {
@@ -10,6 +11,7 @@ interface ChatMessageBubbleProps {
   onConfirmMutation?: (mutationId: string) => Promise<void>;
   onRejectMutation?: (mutationId: string) => Promise<void>;
   onConfirmBatch?: (batchId: string) => Promise<void>;
+  onReviewMedia?: (docId: number, docName: string) => void;
 }
 
 export function ChatMessageBubble({
@@ -17,6 +19,7 @@ export function ChatMessageBubble({
   onConfirmMutation,
   onRejectMutation,
   onConfirmBatch,
+  onReviewMedia,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
 
@@ -33,20 +36,23 @@ export function ChatMessageBubble({
   }, [message.content, isUser]);
 
   return (
-    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+    <div
+      className={`d-flex flex-column ${isUser ? 'align-items-end' : 'align-items-start'}`}
+    >
       {/* Main message bubble */}
       <div
-        className={`rounded-2xl px-4 py-3 ${isUser ? 'max-w-[80%]' : 'max-w-full'}`}
+        className="rounded px-3 py-2"
         style={{
+          maxWidth: isUser ? '80%' : '100%',
           backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
-          color: isUser ? 'white' : 'var(--cui-body-color)',
+          color: isUser ? 'var(--cui-primary-text)' : 'var(--cui-body-color)',
         }}
       >
-        <div className="whitespace-pre-wrap">{displayContent}</div>
+        <div style={{ whiteSpace: 'pre-wrap' }}>{displayContent}</div>
 
         {!isUser && message.metadata?.sources && message.metadata.sources.length > 0 && (
-          <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>
-            <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div className="mt-3 border-top pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>
+            <div className="small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
               Sources:{' '}
               {message.metadata.sources
                 .slice(0, 3)
@@ -59,33 +65,43 @@ export function ChatMessageBubble({
         )}
 
         {!isUser && message.metadata?.fieldUpdates && !hasProposals && (
-          <div className="mt-2 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div className="mt-2 small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
             Contains recommendations
           </div>
         )}
 
         {!isUser && message.metadata?.error && (
-          <div className="mt-2 text-xs" style={{ color: '#b91c1c' }}>
+          <div className="mt-2 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
             Error: {message.metadata.error}
           </div>
         )}
 
         {!isUser && message.metadata?.traceback && (
-          <details className="mt-2 text-xs" style={{ color: '#6b7280' }}>
+          <details className="mt-2 small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
             <summary>Traceback</summary>
-            <pre className="whitespace-pre-wrap">{message.metadata.traceback}</pre>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{message.metadata.traceback}</pre>
           </details>
         )}
       </div>
 
       {/* Mutation proposals card (below assistant message) */}
       {!isUser && hasProposals && onConfirmMutation && onRejectMutation && (
-        <div className="mt-2 w-full max-w-[90%]">
+        <div className="mt-2 w-100" style={{ maxWidth: '90%' }}>
           <MutationProposalCard
             proposals={proposals}
             onConfirm={onConfirmMutation}
             onReject={onRejectMutation}
             onConfirmAll={onConfirmBatch}
+          />
+        </div>
+      )}
+
+      {/* Media summary card (below assistant message when media detected) */}
+      {!isUser && message.metadata?.media_summary && onReviewMedia && (
+        <div className="mt-2" style={{ maxWidth: '90%' }}>
+          <MediaSummaryCard
+            summary={message.metadata.media_summary}
+            onReview={onReviewMedia}
           />
         </div>
       )}

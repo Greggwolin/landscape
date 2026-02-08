@@ -1,0 +1,1792 @@
+{
+  "project_name": "Star Valley",
+  "closing_date": "2025-05-30",
+  "products": [
+    {
+      "id": 1,
+      "dimensions": "45x120",
+      "lots": 152,
+      "total_cost": 11000000,
+      "option_price": 91210
+    },
+    {
+      "id": 2,
+      "dimensions": "47x120",
+      "lots": 150,
+      "total_cost": 11000000,
+      "option_price": 92280
+    },
+    {
+      "id": 3,
+      "dimensions": "40x115",
+      "lots": 104,
+      "total_cost": 7500000,
+      "option_price": 89660
+    },
+    {
+      "id": 4,
+      "dimensions": "40x115",
+      "lots": 86,
+      "total_cost": 8250000,
+      "option_price": 116535
+    }
+  ],
+  "loan_params": {
+    "ltc_pct": 60.0,
+    "interest_rate_pct": 8.5,
+    "origination_fee_pct": 1.0,
+    "interest_reserve_inflator": 1.2,
+    "repayment_acceleration_pct": 1.2,
+    "closing_costs": {
+      "appraisal": 10000,
+      "legal": 15000,
+      "closing": 5000,
+      "other": 2500
+    }
+  },
+  "expected_totals": {
+    "commitment": 25173350.51,
+    "interest_reserve": 3921350.67,
+    "origination_fee": 251733.51,
+    "total_interest": 3139829.42,
+    "total_releases": 24391829.26,
+    "peak_balance": 21432241.61,
+    "total_cost_draws": 20967766.33
+  },
+  "release_prices_per_lot": {
+    "1": 58557.34,
+    "2": 59244.29,
+    "3": 57562.24,
+    "4": 74816.14
+  },
+  "periods": [
+    {
+      "period": 0,
+      "date": "2025-05-31",
+      "costs_by_product": [
+        -4400000,
+        -4400000,
+        -3000000,
+        -3300000,
+        0
+      ],
+      "total_cost": -15100000,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 1,
+      "date": "2025-06-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 2,
+      "date": "2025-07-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 3921350.67,
+        "orig_cost": 284233.51,
+        "cost_draw": 205266.33,
+        "release_payments": 0,
+        "end_balance": 489499.83
+      }
+    },
+    {
+      "period": 3,
+      "date": "2025-08-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 489499.83,
+        "interest": 3467.29,
+        "int_reserve_draw": -3467.29,
+        "int_reserve_balance": 3917883.38,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 2380467.13
+      }
+    },
+    {
+      "period": 4,
+      "date": "2025-09-30",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 2380467.13,
+        "interest": 16861.64,
+        "int_reserve_draw": -16861.64,
+        "int_reserve_balance": 3901021.74,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 4284828.77
+      }
+    },
+    {
+      "period": 5,
+      "date": "2025-10-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 4284828.77,
+        "interest": 30350.87,
+        "int_reserve_draw": -30350.87,
+        "int_reserve_balance": 3870670.87,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 6202679.64
+      }
+    },
+    {
+      "period": 6,
+      "date": "2025-11-30",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 6202679.64,
+        "interest": 43935.65,
+        "int_reserve_draw": -43935.65,
+        "int_reserve_balance": 3826735.22,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 8134115.29
+      }
+    },
+    {
+      "period": 7,
+      "date": "2025-12-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 8134115.29,
+        "interest": 57616.65,
+        "int_reserve_draw": -57616.65,
+        "int_reserve_balance": 3769118.57,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 10079231.94
+      }
+    },
+    {
+      "period": 8,
+      "date": "2026-01-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 10079231.94,
+        "interest": 71394.56,
+        "int_reserve_draw": -71394.56,
+        "int_reserve_balance": 3697724.01,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 12038126.49
+      }
+    },
+    {
+      "period": 9,
+      "date": "2026-02-28",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 12038126.49,
+        "interest": 85270.06,
+        "int_reserve_draw": -85270.06,
+        "int_reserve_balance": 3612453.95,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 14010896.56
+      }
+    },
+    {
+      "period": 10,
+      "date": "2026-03-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 14010896.56,
+        "interest": 99243.85,
+        "int_reserve_draw": -99243.85,
+        "int_reserve_balance": 3513210.1,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 15997640.41
+      }
+    },
+    {
+      "period": 11,
+      "date": "2026-04-30",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        3,
+        3,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        273630,
+        276840,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 15997640.41,
+        "interest": 113316.62,
+        "int_reserve_draw": -113316.62,
+        "int_reserve_balance": 3399893.48,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": -750540.03,
+        "end_balance": 17247916.99
+      }
+    },
+    {
+      "period": 12,
+      "date": "2026-05-31",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 17247916.99,
+        "interest": 122172.75,
+        "int_reserve_draw": -122172.75,
+        "int_reserve_balance": 3277720.73,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 19257589.74
+      }
+    },
+    {
+      "period": 13,
+      "date": "2026-06-30",
+      "costs_by_product": [
+        -550000,
+        -550000,
+        -375000,
+        -412500,
+        0
+      ],
+      "total_cost": -1887500,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 19257589.74,
+        "interest": 136407.93,
+        "int_reserve_draw": -136407.93,
+        "int_reserve_balance": 3141312.81,
+        "orig_cost": 0,
+        "cost_draw": 1887500,
+        "release_payments": 0,
+        "end_balance": 21281497.67
+      }
+    },
+    {
+      "period": 14,
+      "date": "2026-07-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 21281497.67,
+        "interest": 150743.94,
+        "int_reserve_draw": -150743.94,
+        "int_reserve_balance": 2990568.86,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 21432241.61
+      }
+    },
+    {
+      "period": 15,
+      "date": "2026-08-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 21432241.61,
+        "interest": 151811.71,
+        "int_reserve_draw": -151811.71,
+        "int_reserve_balance": 2838757.15,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 20715711.65
+      }
+    },
+    {
+      "period": 16,
+      "date": "2026-09-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 20715711.65,
+        "interest": 146736.29,
+        "int_reserve_draw": -146736.29,
+        "int_reserve_balance": 2692020.86,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 19994106.27
+      }
+    },
+    {
+      "period": 17,
+      "date": "2026-10-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 19994106.27,
+        "interest": 141624.92,
+        "int_reserve_draw": -141624.92,
+        "int_reserve_balance": 2550395.94,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 19267389.52
+      }
+    },
+    {
+      "period": 18,
+      "date": "2026-11-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 19267389.52,
+        "interest": 136477.34,
+        "int_reserve_draw": -136477.34,
+        "int_reserve_balance": 2413918.6,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 18535525.19
+      }
+    },
+    {
+      "period": 19,
+      "date": "2026-12-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 18535525.19,
+        "interest": 131293.3,
+        "int_reserve_draw": -131293.3,
+        "int_reserve_balance": 2282625.3,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 17798476.82
+      }
+    },
+    {
+      "period": 20,
+      "date": "2027-01-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 17798476.82,
+        "interest": 126072.54,
+        "int_reserve_draw": -126072.54,
+        "int_reserve_balance": 2156552.75,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 17056207.7
+      }
+    },
+    {
+      "period": 21,
+      "date": "2027-02-28",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 17056207.7,
+        "interest": 120814.8,
+        "int_reserve_draw": -120814.8,
+        "int_reserve_balance": 2035737.95,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 16308680.83
+      }
+    },
+    {
+      "period": 22,
+      "date": "2027-03-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 16308680.83,
+        "interest": 115519.82,
+        "int_reserve_draw": -115519.82,
+        "int_reserve_balance": 1920218.12,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 15555858.98
+      }
+    },
+    {
+      "period": 23,
+      "date": "2027-04-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 15555858.98,
+        "interest": 110187.33,
+        "int_reserve_draw": -110187.33,
+        "int_reserve_balance": 1810030.79,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 14797704.65
+      }
+    },
+    {
+      "period": 24,
+      "date": "2027-05-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 14797704.65,
+        "interest": 104817.07,
+        "int_reserve_draw": -104817.07,
+        "int_reserve_balance": 1705213.72,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 14034180.05
+      }
+    },
+    {
+      "period": 25,
+      "date": "2027-06-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 14034180.05,
+        "interest": 99408.78,
+        "int_reserve_draw": -99408.78,
+        "int_reserve_balance": 1605804.94,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 13265247.16
+      }
+    },
+    {
+      "period": 26,
+      "date": "2027-07-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 13265247.16,
+        "interest": 93962.17,
+        "int_reserve_draw": -93962.17,
+        "int_reserve_balance": 1511842.77,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 12490867.65
+      }
+    },
+    {
+      "period": 27,
+      "date": "2027-08-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 12490867.65,
+        "interest": 88476.98,
+        "int_reserve_draw": -88476.98,
+        "int_reserve_balance": 1423365.79,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 11711002.96
+      }
+    },
+    {
+      "period": 28,
+      "date": "2027-09-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 11711002.96,
+        "interest": 82952.94,
+        "int_reserve_draw": -82952.94,
+        "int_reserve_balance": 1340412.86,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 10925614.23
+      }
+    },
+    {
+      "period": 29,
+      "date": "2027-10-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 10925614.23,
+        "interest": 77389.77,
+        "int_reserve_draw": -77389.77,
+        "int_reserve_balance": 1263023.09,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 10134662.33
+      }
+    },
+    {
+      "period": 30,
+      "date": "2027-11-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 10134662.33,
+        "interest": 71787.19,
+        "int_reserve_draw": -71787.19,
+        "int_reserve_balance": 1191235.9,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 9338107.85
+      }
+    },
+    {
+      "period": 31,
+      "date": "2027-12-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 9338107.85,
+        "interest": 66144.93,
+        "int_reserve_draw": -66144.93,
+        "int_reserve_balance": 1125090.97,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 8535911.11
+      }
+    },
+    {
+      "period": 32,
+      "date": "2028-01-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 8535911.11,
+        "interest": 60462.7,
+        "int_reserve_draw": -60462.7,
+        "int_reserve_balance": 1064628.26,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 7728032.14
+      }
+    },
+    {
+      "period": 33,
+      "date": "2028-02-29",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 7728032.14,
+        "interest": 54740.23,
+        "int_reserve_draw": -54740.23,
+        "int_reserve_balance": 1009888.04,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 6914430.7
+      }
+    },
+    {
+      "period": 34,
+      "date": "2028-03-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 6914430.7,
+        "interest": 48977.22,
+        "int_reserve_draw": -48977.22,
+        "int_reserve_balance": 960910.82,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 6095066.24
+      }
+    },
+    {
+      "period": 35,
+      "date": "2028-04-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 6095066.24,
+        "interest": 43173.39,
+        "int_reserve_draw": -43173.39,
+        "int_reserve_balance": 917737.43,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 5269897.96
+      }
+    },
+    {
+      "period": 36,
+      "date": "2028-05-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 5269897.96,
+        "interest": 37328.44,
+        "int_reserve_draw": -37328.44,
+        "int_reserve_balance": 880408.99,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 4438884.73
+      }
+    },
+    {
+      "period": 37,
+      "date": "2028-06-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 4438884.73,
+        "interest": 31442.1,
+        "int_reserve_draw": -31442.1,
+        "int_reserve_balance": 848966.89,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 3601985.16
+      }
+    },
+    {
+      "period": 38,
+      "date": "2028-07-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 3601985.16,
+        "interest": 25514.06,
+        "int_reserve_draw": -25514.06,
+        "int_reserve_balance": 823452.83,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 2759157.55
+      }
+    },
+    {
+      "period": 39,
+      "date": "2028-08-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 2759157.55,
+        "interest": 19544.03,
+        "int_reserve_draw": -19544.03,
+        "int_reserve_balance": 803908.79,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 1910359.92
+      }
+    },
+    {
+      "period": 40,
+      "date": "2028-09-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 1910359.92,
+        "interest": 13531.72,
+        "int_reserve_draw": -13531.72,
+        "int_reserve_balance": 790377.08,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 1055549.96
+      }
+    },
+    {
+      "period": 41,
+      "date": "2028-10-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        3,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        349605,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 1055549.96,
+        "interest": 7476.81,
+        "int_reserve_draw": -7476.81,
+        "int_reserve_balance": 782900.27,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -868341.67,
+        "end_balance": 194685.1
+      }
+    },
+    {
+      "period": 42,
+      "date": "2028-11-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        2,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        233070,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 194685.1,
+        "interest": 1379.02,
+        "int_reserve_draw": -1379.02,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": -196064.12,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 43,
+      "date": "2028-12-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 44,
+      "date": "2029-01-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 45,
+      "date": "2029-02-28",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 46,
+      "date": "2029-03-31",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        4,
+        4,
+        3,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        364840,
+        369120,
+        268980,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    },
+    {
+      "period": 47,
+      "date": "2029-04-30",
+      "costs_by_product": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_cost": 0,
+      "lots_sold": [
+        21,
+        19,
+        5,
+        0,
+        0
+      ],
+      "revenue_by_product": [
+        1915410,
+        1753320,
+        448300,
+        0,
+        0
+      ],
+      "expected_loan": {
+        "beg_balance": 0,
+        "interest": 0,
+        "int_reserve_draw": 0,
+        "int_reserve_balance": 0,
+        "orig_cost": 0,
+        "cost_draw": 0,
+        "release_payments": 0,
+        "end_balance": 0
+      }
+    }
+  ]
+}

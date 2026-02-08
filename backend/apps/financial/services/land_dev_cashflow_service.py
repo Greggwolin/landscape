@@ -79,15 +79,22 @@ class LandDevCashFlowService:
         # Step 1: Load project configuration and DCF assumptions
         project_config = self._get_project_config()
         dcf_assumptions = self._get_dcf_assumptions()
+        hold_period_months = self._get_dcf_hold_period_months()
 
         # Step 2: Determine required periods
         required_periods = self._determine_required_periods(container_ids)
 
         # Step 2b: Extend periods to cover loan terms when financing is included
         if include_financing:
+            # Debt-tab schedules should align to the DCF sale horizon.
+            # Ensure we have at least the hold window, then prevent extending past it.
+            if hold_period_months:
+                required_periods = max(required_periods, hold_period_months)
             required_periods = self._extend_periods_for_loans(
                 required_periods, project_config['start_date'], container_ids
             )
+            if hold_period_months:
+                required_periods = min(required_periods, hold_period_months)
 
         # Step 3: Generate monthly periods
         periods = self._generate_periods(
@@ -209,6 +216,7 @@ class LandDevCashFlowService:
             # Get DCF analysis record
             cursor.execute("""
                 SELECT
+                    hold_period_years,
                     discount_rate,
                     selling_costs_pct,
                     price_growth_set_id,
@@ -220,11 +228,13 @@ class LandDevCashFlowService:
             row = cursor.fetchone()
 
             if row:
-                discount_rate = float(row[0]) if row[0] else 0.10
-                selling_costs_pct = float(row[1]) if row[1] else 0.0
-                price_growth_set_id = row[2]
-                cost_inflation_set_id = row[3]
+                hold_period_years = int(row[0]) if row[0] else None
+                discount_rate = float(row[1]) if row[1] else 0.10
+                selling_costs_pct = float(row[2]) if row[2] else 0.0
+                price_growth_set_id = row[3]
+                cost_inflation_set_id = row[4]
             else:
+                hold_period_years = None
                 discount_rate = 0.10
                 selling_costs_pct = 0.0
                 price_growth_set_id = None
@@ -278,6 +288,7 @@ class LandDevCashFlowService:
                     cost_inflation_rate = float(rate_row[0])
 
             self._dcf_assumptions = {
+                'hold_period_years': hold_period_years,
                 'discount_rate': discount_rate,
                 'price_growth_rate': price_growth_rate,
                 'cost_inflation_rate': cost_inflation_rate,
@@ -287,6 +298,18 @@ class LandDevCashFlowService:
             }
 
         return self._dcf_assumptions
+
+    def _get_dcf_hold_period_months(self) -> Optional[int]:
+        """Resolve DCF hold horizon as months for schedule cutoff."""
+        assumptions = self._get_dcf_assumptions()
+        hold_years = assumptions.get('hold_period_years')
+        if hold_years is None:
+            return None
+        try:
+            hold_months = int(hold_years) * 12
+        except (TypeError, ValueError):
+            return None
+        return hold_months if hold_months > 0 else None
 
     # =========================================================================
     # PERIOD GENERATION

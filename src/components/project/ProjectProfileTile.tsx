@@ -17,6 +17,8 @@ import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
+import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
+import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
 
 // Acquisition price summary types
 interface AcquisitionPriceSummary {
@@ -41,6 +43,7 @@ const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
 
 export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectId }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const { refreshProjects } = useProjectContext();
 
   const { data: profile, error, isLoading, mutate } = useSWR<ProjectProfile>(
@@ -197,6 +200,18 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           </button>
         </CCardHeader>
         <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+          {/* Project Hero Image */}
+          <div style={{ marginBottom: '12px' }}>
+            <EntityMediaDisplay
+              entityType="project"
+              entityId={projectId}
+              projectId={projectId}
+              variant="hero"
+              editable={true}
+              onAttach={() => setShowMediaPicker(true)}
+            />
+          </div>
+
           <div className="d-flex flex-column">
             <ProfileField
               label="Analysis Type"
@@ -260,6 +275,19 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           isOpen={isEditModalOpen}
           onClose={handleModalClose}
           onSaveSuccess={handleSaveSuccess}
+        />
+      )}
+
+      {showMediaPicker && (
+        <MediaPickerModal
+          isOpen={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          projectId={projectId}
+          entityType="project"
+          entityId={projectId}
+          linkPurpose="hero_image"
+          singleSelect={true}
+          onSelect={() => setShowMediaPicker(false)}
         />
       )}
     </>

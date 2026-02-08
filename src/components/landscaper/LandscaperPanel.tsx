@@ -18,12 +18,16 @@ import {
   type RentRollExtractionMap,
 } from './RentRollUpdateReviewModal';
 import FieldMappingInterface from './FieldMappingInterface';
+import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
   projectId: number;
   activeTab?: string;
   pageContext?: string;
+  contextPillLabel?: string;
+  contextPillColor?: string;
+  onToggleCollapse?: () => void;
 }
 
 interface UploadResult {
@@ -72,6 +76,9 @@ export function LandscaperPanel({
   projectId,
   activeTab = 'home',
   pageContext,
+  contextPillLabel,
+  contextPillColor,
+  onToggleCollapse,
 }: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
   const queryClient = useQueryClient();
@@ -100,6 +107,11 @@ export function LandscaperPanel({
   const [showFieldMappingModal, setShowFieldMappingModal] = useState(false);
   const [fieldMappingDocId, setFieldMappingDocId] = useState<number | null>(null);
   const [fieldMappingDocName, setFieldMappingDocName] = useState<string>('');
+
+  // Media preview modal state
+  const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [mediaPreviewDocId, setMediaPreviewDocId] = useState<number | null>(null);
+  const [mediaPreviewDocName, setMediaPreviewDocName] = useState<string>('');
 
   // Extraction job status
   const { rentRollJob, cancelJob: cancelExtractionJob } = useExtractionJobStatus(projectId);
@@ -726,6 +738,13 @@ export function LandscaperPanel({
     }
   }, [projectId, queryClient, rentRollComparison, refreshPendingExtractions]);
 
+  // Media preview modal handler (triggered from Landscaper chat MediaSummaryCard)
+  const handleReviewMedia = useCallback((docId: number, docName: string) => {
+    setMediaPreviewDocId(docId);
+    setMediaPreviewDocName(docName);
+    setShowMediaPreview(true);
+  }, []);
+
   // Use react-dropzone for more reliable drag and drop
   // Supports multiple files for OM packages (rent roll + T-12 + OM together)
   const {
@@ -908,11 +927,15 @@ export function LandscaperPanel({
           <LandscaperChatThreaded
             projectId={projectId}
             pageContext={pageContext || activeTab}
+            contextPillLabel={contextPillLabel}
+            contextPillColor={contextPillColor}
             isIngesting={isUploading || uploadThingIsUploading}
             ingestionProgress={uploadProgress}
             ingestionMessage={uploadMessage}
             isExpanded={!isActivityExpanded}
             onToggleExpand={handleActivityToggle}
+            onCollapsePanel={onToggleCollapse}
+            onReviewMedia={handleReviewMedia}
           />
         </CCard>
 
@@ -1067,6 +1090,27 @@ export function LandscaperPanel({
             setFieldMappingDocName('');
           }}
           onComplete={handleFieldMappingComplete}
+        />
+      )}
+
+      {/* Media Preview Modal — triggered from Landscaper chat MediaSummaryCard */}
+      {showMediaPreview && mediaPreviewDocId && (
+        <MediaPreviewModal
+          isOpen={showMediaPreview}
+          onClose={() => {
+            setShowMediaPreview(false);
+            setMediaPreviewDocId(null);
+            setMediaPreviewDocName('');
+          }}
+          docId={mediaPreviewDocId}
+          docName={mediaPreviewDocName}
+          projectId={projectId}
+          onComplete={() => {
+            setShowMediaPreview(false);
+            setMediaPreviewDocId(null);
+            setMediaPreviewDocName('');
+            setDropNotice('Media review completed. Actions applied successfully.');
+          }}
         />
       )}
     </div>

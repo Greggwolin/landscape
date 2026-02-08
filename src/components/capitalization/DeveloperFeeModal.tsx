@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel,
+  CFormInput,
+  CFormSelect,
+  CFormTextarea,
+  CRow,
+  CCol,
+} from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
 import {
   DeveloperFee,
   CreateDeveloperFee,
@@ -108,90 +122,75 @@ export default function DeveloperFeeModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {editingFee ? 'Edit Developer Fee' : 'Add Developer Fee'}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="btn btn-sm btn-ghost-secondary"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <CModal visible={isOpen} onClose={handleClose} alignment="center" size="lg" backdrop="static">
+      <CForm onSubmit={handleSubmit}>
+        <CModalHeader closeButton>
+          <CModalTitle>{editingFee ? 'Edit Developer Fee' : 'Add Developer Fee'}</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm">
-              {error}
-            </div>
+            <div className="alert alert-danger py-2 mb-0">{error}</div>
           )}
 
           {/* Fee Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-type">
               Fee Type *
-            </label>
-            <select
+            </CFormLabel>
+            <CFormSelect
+              id="developer-fee-type"
               value={formData.fee_type}
               onChange={(e) => setFormData({ ...formData, fee_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {FEE_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </CFormSelect>
           </div>
 
           {/* Fee Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-description">
               Description
-            </label>
-            <input
+            </CFormLabel>
+            <CFormInput
+              id="developer-fee-description"
               type="text"
               value={formData.fee_description || ''}
               onChange={(e) => setFormData({ ...formData, fee_description: e.target.value })}
               placeholder="e.g., 4% of total project cost"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {/* Basis Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-basis-type">
               Basis Type *
-            </label>
-            <select
+            </CFormLabel>
+            <CFormSelect
+              id="developer-fee-basis-type"
               value={formData.basis_type}
               onChange={(e) => setFormData({ ...formData, basis_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {BASIS_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </CFormSelect>
           </div>
 
           {/* Basis Value and Calculated Amount */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <CRow className="g-3">
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="developer-fee-basis-value">
                 Basis Value
-              </label>
-              <input
+              </CFormLabel>
+              <CFormInput
+                id="developer-fee-basis-value"
                 type="number"
                 step="0.01"
                 value={formData.basis_value ?? ''}
@@ -202,17 +201,17 @@ export default function DeveloperFeeModal({
                   })
                 }
                 placeholder={formData.basis_type.startsWith('percent') ? '4.0' : '100000'}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="small text-medium-emphasis mt-1 mb-0" style={{ fontSize: '0.75rem' }}>
                 {formData.basis_type.startsWith('percent') ? 'Percentage (e.g., 4.0 = 4%)' : 'Dollar amount'}
               </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            </CCol>
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="developer-fee-calculated-amount">
                 Calculated Amount
-              </label>
-              <input
+              </CFormLabel>
+              <CFormInput
+                id="developer-fee-calculated-amount"
                 type="number"
                 step="0.01"
                 value={formData.calculated_amount ?? ''}
@@ -223,32 +222,32 @@ export default function DeveloperFeeModal({
                   })
                 }
                 placeholder="500000"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-          </div>
+            </CCol>
+          </CRow>
 
           {/* Payment Timing */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-payment-timing">
               Payment Timing
-            </label>
-            <input
+            </CFormLabel>
+            <CFormInput
+              id="developer-fee-payment-timing"
               type="text"
               value={formData.payment_timing || ''}
               onChange={(e) => setFormData({ ...formData, payment_timing: e.target.value })}
               placeholder="e.g., 50% at closing, 50% at CO"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {/* Timing - Start Period and Duration */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <CRow className="g-3">
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="developer-fee-start-period">
                 Start Period
-              </label>
-              <input
+              </CFormLabel>
+              <CFormInput
+                id="developer-fee-start-period"
                 type="number"
                 min="1"
                 value={formData.timing_start_period ?? 1}
@@ -258,17 +257,17 @@ export default function DeveloperFeeModal({
                     timing_start_period: parseInt(e.target.value) || 1,
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="small text-medium-emphasis mt-1 mb-0" style={{ fontSize: '0.75rem' }}>
                 Period when fee payment begins
               </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            </CCol>
+            <CCol xs={12} md={6}>
+              <CFormLabel htmlFor="developer-fee-duration">
                 Duration (periods)
-              </label>
-              <input
+              </CFormLabel>
+              <CFormInput
+                id="developer-fee-duration"
                 type="number"
                 min="1"
                 value={formData.timing_duration_periods ?? 1}
@@ -278,65 +277,54 @@ export default function DeveloperFeeModal({
                     timing_duration_periods: parseInt(e.target.value) || 1,
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="small text-medium-emphasis mt-1 mb-0" style={{ fontSize: '0.75rem' }}>
                 Number of periods to distribute fee over
               </p>
-            </div>
-          </div>
+            </CCol>
+          </CRow>
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-status">
               Status
-            </label>
-            <select
+            </CFormLabel>
+            <CFormSelect
+              id="developer-fee-status"
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </CFormSelect>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <CFormLabel htmlFor="developer-fee-notes">
               Notes
-            </label>
-            <textarea
+            </CFormLabel>
+            <CFormTextarea
+              id="developer-fee-notes"
               value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Additional notes..."
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="btn btn-outline-secondary btn-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn btn-primary btn-sm"
-            >
-              {saving ? 'Saving...' : editingFee ? 'Update' : 'Add Fee'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </CModalBody>
+        <CModalFooter>
+          <SemanticButton intent="secondary-action" type="button" onClick={handleClose} disabled={saving}>
+            Cancel
+          </SemanticButton>
+          <SemanticButton intent="primary-action" type="submit" disabled={saving}>
+            {saving ? 'Saving...' : editingFee ? 'Update' : 'Add Fee'}
+          </SemanticButton>
+        </CModalFooter>
+      </CForm>
+    </CModal>
   );
 }

@@ -109,6 +109,7 @@
 
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #080A0C;
+  --landscaper-panel-icon-size: 2rem;
 }
 
 /* v1.0 · Dark header contrast fix — keep near other CoreUI var bridges */
@@ -184,6 +185,7 @@
   --validation-unit-price-color: #07FF8A;
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #FFFFFF;
+  --landscaper-panel-icon-size: 2rem;
   --cui-primary-text: #ffffff;
   --cui-danger-text: #ffffff;
 }
@@ -488,6 +490,7 @@ body {
 CCardHeader {
   background-color: var(--cui-card-header-bg) !important;
   border-bottom-color: var(--cui-border-color);
+  font-weight: 700;
 }
 
 /* Consistent CoreUI card corner rounding */
@@ -613,28 +616,28 @@ thead th,
 .btn-primary {
   background-color: var(--cui-primary);
   border-color: var(--cui-primary);
-  color: #ffffff;
+  color: #FFFFFF;
 }
 
 .btn-primary:hover {
   background-color: var(--cui-primary-ramp-04);
   border-color: var(--cui-primary-ramp-04);
-  color: #ffffff;
+  color: #FFFFFF;
 }
 
 /* Canonical palette overrides for CoreUI button variables */
 .btn-primary {
-  --cui-btn-color: #ffffff;
+  --cui-btn-color: #FFFFFF;
   --cui-btn-bg: var(--cui-primary);
   --cui-btn-border-color: var(--cui-primary);
-  --cui-btn-hover-color: #ffffff;
+  --cui-btn-hover-color: #FFFFFF;
   --cui-btn-hover-bg: var(--cui-primary-ramp-04);
   --cui-btn-hover-border-color: var(--cui-primary-ramp-04);
   --cui-btn-focus-shadow-rgb: var(--cui-primary-rgb);
-  --cui-btn-active-color: #ffffff;
+  --cui-btn-active-color: #FFFFFF;
   --cui-btn-active-bg: var(--cui-primary-ramp-02);
   --cui-btn-active-border-color: var(--cui-primary-ramp-02);
-  --cui-btn-disabled-color: #ffffff;
+  --cui-btn-disabled-color: #FFFFFF;
   --cui-btn-disabled-bg: var(--cui-primary);
   --cui-btn-disabled-border-color: var(--cui-primary);
 }
@@ -656,17 +659,17 @@ thead th,
 }
 
 .btn-success {
-  --cui-btn-color: #080a0c;
+  --cui-btn-color: #FFFFFF;
   --cui-btn-bg: var(--cui-success);
   --cui-btn-border-color: var(--cui-success);
-  --cui-btn-hover-color: #080a0c;
+  --cui-btn-hover-color: #FFFFFF;
   --cui-btn-hover-bg: color-mix(in srgb, var(--cui-success) 92%, #0f172a);
   --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-success) 92%, #0f172a);
   --cui-btn-focus-shadow-rgb: var(--cui-success-rgb);
-  --cui-btn-active-color: #080a0c;
+  --cui-btn-active-color: #FFFFFF;
   --cui-btn-active-bg: var(--cui-success-dark);
   --cui-btn-active-border-color: var(--cui-success-dark);
-  --cui-btn-disabled-color: #080a0c;
+  --cui-btn-disabled-color: #FFFFFF;
   --cui-btn-disabled-bg: var(--cui-success);
   --cui-btn-disabled-border-color: var(--cui-success);
 }
@@ -688,17 +691,17 @@ thead th,
 }
 
 .btn-warning {
-  --cui-btn-color: #080a0c;
+  --cui-btn-color: #FFFFFF;
   --cui-btn-bg: var(--cui-warning);
   --cui-btn-border-color: var(--cui-warning);
-  --cui-btn-hover-color: #080a0c;
+  --cui-btn-hover-color: #FFFFFF;
   --cui-btn-hover-bg: color-mix(in srgb, var(--cui-warning) 92%, #0f1220);
   --cui-btn-hover-border-color: color-mix(in srgb, var(--cui-warning) 92%, #0f1220);
   --cui-btn-focus-shadow-rgb: var(--cui-warning-rgb);
-  --cui-btn-active-color: #080a0c;
+  --cui-btn-active-color: #FFFFFF;
   --cui-btn-active-bg: var(--cui-warning-dark);
   --cui-btn-active-border-color: var(--cui-warning-dark);
-  --cui-btn-disabled-color: #080a0c;
+  --cui-btn-disabled-color: #FFFFFF;
   --cui-btn-disabled-bg: var(--cui-warning);
   --cui-btn-disabled-border-color: var(--cui-warning);
 }
@@ -723,7 +726,7 @@ thead th,
 .btn-primary:focus-visible {
   background-color: var(--cui-primary-ramp-02);
   border-color: var(--cui-primary-ramp-02);
-  color: #ffffff;
+  color: #FFFFFF;
 }
 
 .btn-secondary {
@@ -901,4 +904,11 @@ thead th,
 
 .landscaper-icon-themed svg {
   fill: var(--landscaper-icon-color);
+}
+
+.landscaper-panel-icon {
+  width: var(--landscaper-panel-icon-size);
+  height: var(--landscaper-panel-icon-size);
+  flex: 0 0 var(--landscaper-panel-icon-size);
+  color: var(--landscaper-icon-color);
 }

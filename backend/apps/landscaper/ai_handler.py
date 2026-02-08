@@ -855,6 +855,32 @@ By default, only populates empty fields. Set overwrite_existing=true to update a
             "required": ["doc_id"]
         }
     },
+    {
+        "name": "get_document_media_summary",
+        "description": """Get a summary of images and visual assets detected in a document.
+
+Returns counts of detected media by classification type (property photos, site plans, maps, charts, logos, etc.)
+along with suggested actions for each type (save_image, extract_data, ignore).
+
+Use this after a document is uploaded to report what images were found.
+The user can then open the Media Preview modal to review and confirm actions.
+
+Returns:
+- total_detected: number of images found
+- by_type: breakdown by classification (property_photo, site_plan, chart, logo, etc.)
+- human_summary: formatted text describing findings
+- review_url: API endpoint for full media list""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "Document ID to get media summary for"
+                }
+            },
+            "required": ["doc_id"]
+        }
+    },
     # ─────────────────────────────────────────────────────────────────────────
     # Operating Expense Tools
     # ─────────────────────────────────────────────────────────────────────────
@@ -5008,6 +5034,7 @@ def get_landscaper_response(
         field_updates = []
         tool_calls_made = []
         tool_executions = []  # Track full tool execution details for frontend events
+        media_summary = None  # Track media summary for inline chat card
         final_content = ""
         total_input_tokens = response.usage.input_tokens
         total_output_tokens = response.usage.output_tokens
@@ -5079,6 +5106,15 @@ def get_landscaper_response(
                                 'change': result.get('change', {}),
                                 'updated': 1,
                             })
+                    elif tool_name == 'get_document_media_summary':
+                        # Track media summary for inline MediaSummaryCard in chat
+                        if result.get('success') and result.get('total_detected', 0) > 0:
+                            media_summary = {
+                                'doc_id': result.get('doc_id'),
+                                'doc_name': result.get('doc_name', ''),
+                                'total_detected': result.get('total_detected', 0),
+                                'by_type': result.get('by_type', {}),
+                            }
 
                     tool_results.append({
                         "type": "tool_result",
@@ -5141,6 +5177,7 @@ def get_landscaper_response(
                 'stop_reason': response.stop_reason,
                 'system_prompt_category': project_type or 'default',
                 'tool_executions': _sanitize_for_json(tool_executions),
+                **(({'media_summary': _sanitize_for_json(media_summary)}) if media_summary else {}),
             },
             'tool_calls': _sanitize_for_json(tool_calls_made),
             'field_updates': _sanitize_for_json(field_updates)

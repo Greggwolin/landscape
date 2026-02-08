@@ -61,5 +61,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'updated_by',
             'created_at',
             'updated_at',
+            'media_scan_status',
+            'media_scan_json',
         ]
-        read_only_fields = ['doc_id', 'sha256_hash', 'created_at', 'updated_at']
+        read_only_fields = ['doc_id', 'sha256_hash', 'created_at', 'updated_at', 'media_scan_status', 'media_scan_json']

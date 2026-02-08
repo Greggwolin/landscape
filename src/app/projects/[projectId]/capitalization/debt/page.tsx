@@ -202,17 +202,9 @@ export default function DebtPage() {
 
     try {
       await deleteLoan.mutateAsync(loanId);
-      showToast({
-        title: 'Success',
-        message: 'Loan deleted successfully',
-        type: 'success',
-      });
+      showToast('Loan deleted successfully', 'success');
     } catch (error) {
-      showToast({
-        title: 'Error',
-        message: 'Failed to delete loan',
-        type: 'error',
-      });
+      showToast('Failed to delete loan', 'error');
     }
   };
 

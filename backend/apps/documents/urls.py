@@ -15,6 +15,17 @@ from .views import (
     restore_document,
     permanent_delete_document,
 )
+from .media_views import (
+    scan_document_media,
+    extract_document_media,
+    classify_document_media,
+    list_document_media,
+    submit_media_actions,
+    media_links,
+    delete_media_link,
+    reorder_media_links,
+    available_media,
+)
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
 
@@ -37,4 +48,15 @@ urlpatterns = [
     path('projects/<int:project_id>/docs/<int:doc_id>/rename/', rename_document, name='rename_document'),
     path('projects/<int:project_id>/docs/<int:doc_id>/restore/', restore_document, name='restore_document'),
     path('projects/<int:project_id>/docs/<int:doc_id>/permanent-delete/', permanent_delete_document, name='permanent_delete_document'),
+    # Media extraction and classification endpoints
+    path('documents/<int:doc_id>/media/', list_document_media, name='list_document_media'),
+    path('documents/<int:doc_id>/media/scan/', scan_document_media, name='scan_document_media'),
+    path('documents/<int:doc_id>/media/extract/', extract_document_media, name='extract_document_media'),
+    path('documents/<int:doc_id>/media/classify/', classify_document_media, name='classify_document_media'),
+    path('documents/<int:doc_id>/media/actions/', submit_media_actions, name='submit_media_actions'),
+    # Media entity linking endpoints
+    path('media/links/', media_links, name='media_links'),
+    path('media/links/<int:link_id>/', delete_media_link, name='delete_media_link'),
+    path('media/links/reorder/', reorder_media_links, name='reorder_media_links'),
+    path('media/available/', available_media, name='available_media'),
 ]

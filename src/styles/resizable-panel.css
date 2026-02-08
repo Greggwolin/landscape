@@ -1,56 +1,74 @@
 /**
  * Resizable Panel Styles
  *
- * Styles for the Studio resizable split layout:
+ * Styles for the project resizable split layout:
  * - Splitter hover/active states
  * - Collapsed Landscaper strip
- * - Toggle button states
  * - Smooth transitions
  *
  * All colors use CoreUI CSS variables for theme compatibility.
  *
- * @version 1.0
+ * @version 2.1
  * @created 2026-01-28
+ * @updated 2026-02-08 - Workspace gradient background, renamed studio- to project- prefixes
  */
 
 /* ==========================================================================
-   Studio Layout Container
+   Project Layout Container
    ========================================================================== */
 
-.studio-layout-container {
+.project-layout-container {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background-color: var(--surface-bg);
+  /* Break out of app-shell padding so gradient spans full viewport width */
+  margin-left: calc(-1 * var(--app-padding, 0.75rem));
+  margin-right: calc(-1 * var(--app-padding, 0.75rem));
+  margin-top: calc(-1 * var(--app-padding, 0.75rem));
+  width: calc(100% + 2 * var(--app-padding, 0.75rem));
+  padding: 0 var(--app-padding, 0.75rem);
+  background: linear-gradient(to bottom, var(--cui-body-bg), var(--cui-secondary-bg));
 }
 
 /* ==========================================================================
    Resizable Splitter
    ========================================================================== */
 
-.studio-resizable-splitter {
+.project-resizable-splitter {
   position: relative;
   z-index: 10;
   touch-action: none;
 }
 
-.studio-resizable-splitter:hover {
+.project-resizable-splitter:hover {
   background-color: var(--cui-tertiary-bg);
 }
 
-.studio-resizable-splitter:hover .studio-splitter-handle {
+.project-resizable-splitter:hover .project-splitter-handle {
   background-color: var(--cui-primary);
   height: 64px;
 }
 
-.studio-resizable-splitter:active {
+.project-resizable-splitter:active {
   background-color: var(--cui-tertiary-bg);
 }
 
-.studio-resizable-splitter:active .studio-splitter-handle {
+.project-resizable-splitter:active .project-splitter-handle {
   background-color: var(--cui-primary);
   height: 80px;
+}
+
+/* ==========================================================================
+   Active Project Bar
+   ========================================================================== */
+
+.active-project-bar {
+  background-color: #F0F1F2;
+}
+
+[data-coreui-theme="dark"] .active-project-bar {
+  background-color: var(--cui-body-bg);
 }
 
 /* ==========================================================================
@@ -62,55 +80,20 @@
 }
 
 /* ==========================================================================
-   Project Bar Toggle Button
-   ========================================================================== */
-
-.studio-collapse-toggle:hover {
-  background-color: var(--cui-tertiary-bg) !important;
-  color: var(--cui-body-color) !important;
-  border-color: var(--cui-primary) !important;
-}
-
-.studio-collapse-toggle:active {
-  background-color: var(--cui-secondary-bg) !important;
-}
-
-/* ==========================================================================
    Loading States
    ========================================================================== */
 
-.studio-loading-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--cui-card-bg);
-  border-radius: var(--cui-card-border-radius);
-  border: 1px solid var(--cui-border-color);
-}
-
-.studio-loading-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--cui-card-bg);
-  border-radius: var(--cui-card-border-radius);
-  border: 1px solid var(--cui-border-color);
-  color: var(--cui-secondary-color);
-}
-
-.studio-project-bar-placeholder {
-  height: 52px;
-  margin-bottom: 0.5rem;
+.project-bar-placeholder {
+  height: 48px;
   background-color: var(--cui-tertiary-bg);
-  border-radius: var(--cui-card-border-radius);
+  border-bottom: 1px solid var(--cui-border-color);
 }
 
 /* ==========================================================================
    Landscaper Panel Container
    ========================================================================== */
 
-.studio-landscaper-panel {
+.project-landscaper-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -120,7 +103,7 @@
    Content Card
    ========================================================================== */
 
-.studio-content-card {
+.project-content-card {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -131,7 +114,7 @@
    ========================================================================== */
 
 @media (max-width: 768px) {
-  .studio-landscaper-panel {
+  .project-landscaper-panel {
     min-width: 56px !important;
     max-width: 280px !important;
   }
@@ -142,7 +125,7 @@
    ========================================================================== */
 
 /* CoreUI handles dark mode via CSS variables, but we can add subtle enhancements */
-[data-coreui-theme="dark"] .studio-resizable-splitter:hover {
+[data-coreui-theme="dark"] .project-resizable-splitter:hover {
   background-color: rgba(255, 255, 255, 0.05);
 }
 

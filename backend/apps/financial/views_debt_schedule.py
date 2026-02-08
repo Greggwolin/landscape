@@ -38,6 +38,10 @@ class DebtScheduleView(APIView):
         project_config = service._get_project_config()
         dcf_assumptions = service._get_dcf_assumptions()
         required_periods = service._determine_required_periods(container_ids)
+        hold_period_years = dcf_assumptions.get('hold_period_years')
+        hold_period_months = int(hold_period_years) * 12 if hold_period_years else None
+        if hold_period_months:
+            required_periods = max(required_periods, hold_period_months)
 
         # Ensure enough periods to cover the loan term (especially for
         # standalone TERM loans on projects without budget/parcel data).
@@ -50,6 +54,8 @@ class DebtScheduleView(APIView):
         )
         min_periods_for_loan = loan_start_period + loan_term_months + 1
         required_periods = max(required_periods, min_periods_for_loan)
+        if hold_period_months:
+            required_periods = min(required_periods, hold_period_months)
 
         periods = service._generate_periods(project_config['start_date'], required_periods)
         cost_schedule = service._generate_cost_schedule(

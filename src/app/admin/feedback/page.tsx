@@ -75,6 +75,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   question: 'Question',
 };
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface FeedbackDetailModalProps {
   item: FeedbackItem | null;
   isOpen: boolean;
@@ -285,6 +287,9 @@ function FeedbackAdminContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchFeedback = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
     try {
       let accessToken: string | null = null;
       try {
@@ -299,15 +304,24 @@ function FeedbackAdminContent() {
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/`,
-        { headers }
+      const response = await fetch(`${DJANGO_API_URL}/api/feedback/`, { headers });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const detail =
+          data && typeof data === 'object' && 'detail' in data && typeof data.detail === 'string'
+            ? ` ${data.detail}`
+            : '';
+        throw new Error(`Failed to fetch feedback (${response.status}).${detail}`);
+      }
+
+      setFeedback(
+        Array.isArray(data)
+          ? data
+          : data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)
+            ? data.results
+            : []
       );
-
-      if (!response.ok) throw new Error('Failed to fetch feedback');
-
-      const data = await response.json();
-      setFeedback(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
       console.error('Fetch error:', err);
       setError('Failed to load feedback');
@@ -337,16 +351,23 @@ function FeedbackAdminContent() {
       headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/${id}/`,
-      {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(data),
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/feedback/${id}/`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(data),
+    });
+    const responseData = await response.json().catch(() => null);
 
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) {
+      const detail =
+        responseData &&
+        typeof responseData === 'object' &&
+        'detail' in responseData &&
+        typeof responseData.detail === 'string'
+          ? ` ${responseData.detail}`
+          : '';
+      throw new Error(`Failed to update feedback (${response.status}).${detail}`);
+    }
 
     await fetchFeedback();
   };

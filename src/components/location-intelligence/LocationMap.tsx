@@ -6,15 +6,18 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
-import type { LocationMapProps, UserMapPoint } from './types';
+import type { LocationMapProps } from './types';
 import { RING_COLORS, POINT_CATEGORIES } from './constants';
 
-// Miles to meters conversion
-const MILES_TO_METERS = 1609.34;
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+const CENTER_SOURCE_ID = 'center-point';
+const BLOCK_GROUP_SOURCE_ID = 'location-intel-block-groups';
+const BLOCK_GROUP_FILL_LAYER_ID = 'location-intel-block-groups-fill';
+const BLOCK_GROUP_LINE_LAYER_ID = 'location-intel-block-groups-line';
 
 export function LocationMap({
   center,
@@ -31,6 +34,7 @@ export function LocationMap({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const onMapClickRef = useRef(onMapClick);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [blockGroupFeatures, setBlockGroupFeatures] = useState<GeoJSON.FeatureCollection | null>(null);
 
   // Keep the callback ref up to date
   useEffect(() => {
@@ -41,43 +45,52 @@ export function LocationMap({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const mapStyle: maplibregl.StyleSpecification = layers.satellite
-      ? {
-          version: 8,
-          sources: {
-            satellite: {
-              type: 'raster',
-              tiles: [
-                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-              ],
-              tileSize: 256,
-              attribution: 'Tiles © Esri',
-            },
-            labels: {
-              type: 'raster',
-              tiles: [
-                'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-              ],
-              tileSize: 256,
-            },
-          },
-          layers: [
-            { id: 'satellite', type: 'raster', source: 'satellite' },
-            { id: 'labels', type: 'raster', source: 'labels' },
+    const mapStyle: maplibregl.StyleSpecification = {
+      version: 8,
+      sources: {
+        satellite: {
+          type: 'raster',
+          tiles: [
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           ],
-        }
-      : {
-          version: 8,
-          sources: {
-            osm: {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-            },
-          },
-          layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-        };
+          tileSize: 256,
+          attribution: 'Tiles © Esri',
+        },
+        labels: {
+          type: 'raster',
+          tiles: [
+            'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+          ],
+          tileSize: 256,
+        },
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors',
+        },
+      },
+      layers: [
+        {
+          id: 'osm',
+          type: 'raster',
+          source: 'osm',
+          layout: { visibility: layers.satellite ? 'none' : 'visible' },
+        },
+        {
+          id: 'satellite',
+          type: 'raster',
+          source: 'satellite',
+          layout: { visibility: layers.satellite ? 'visible' : 'none' },
+        },
+        {
+          id: 'labels',
+          type: 'raster',
+          source: 'labels',
+          layout: { visibility: layers.satellite ? 'visible' : 'none' },
+        },
+      ],
+    };
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
@@ -103,7 +116,13 @@ export function LocationMap({
       map.current = null;
       setMapLoaded(false);
     };
-  }, []);
+  }, [center, layers.satellite]);
+
+  // Keep map centered on active project location
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    map.current.easeTo({ center, duration: 250 });
+  }, [mapLoaded, center]);
 
   // Update cursor for add point mode
   useEffect(() => {
@@ -111,18 +130,59 @@ export function LocationMap({
     map.current.getCanvas().style.cursor = isAddingPoint ? 'crosshair' : '';
   }, [isAddingPoint]);
 
+  // Keep center marker in sync
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    const centerPointData = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Point',
+        coordinates: center,
+      },
+    } as GeoJSON.Feature;
+
+    const existingSource = map.current.getSource(CENTER_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+    if (existingSource) {
+      existingSource.setData(centerPointData);
+      return;
+    }
+
+    map.current.addSource(CENTER_SOURCE_ID, {
+      type: 'geojson',
+      data: centerPointData,
+    });
+
+    map.current.addLayer({
+      id: CENTER_SOURCE_ID,
+      type: 'circle',
+      source: CENTER_SOURCE_ID,
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#fbbf24',
+        'circle-stroke-color': '#000',
+        'circle-stroke-width': 2,
+      },
+    });
+  }, [mapLoaded, center]);
+
   // Draw ring circles using Turf.js
   useEffect(() => {
-    if (!map.current || !mapLoaded || !layers.rings) return;
+    if (!map.current || !mapLoaded) return;
 
     // Remove existing ring layers
     [1, 3, 5].forEach((radius) => {
       const fillId = `ring-${radius}-fill`;
+      const whiteStrokeId = `ring-${radius}-stroke-white`;
       const strokeId = `ring-${radius}-stroke`;
       if (map.current?.getLayer(fillId)) map.current.removeLayer(fillId);
+      if (map.current?.getLayer(whiteStrokeId)) map.current.removeLayer(whiteStrokeId);
       if (map.current?.getLayer(strokeId)) map.current.removeLayer(strokeId);
       if (map.current?.getSource(`ring-${radius}`)) map.current.removeSource(`ring-${radius}`);
     });
+
+    if (!layers.rings) return;
 
     // Add ring circles
     rings.forEach((ring) => {
@@ -150,7 +210,21 @@ export function LocationMap({
         source: sourceId,
         paint: {
           'fill-color': colors.stroke,
-          'fill-opacity': selectedRadius === radius ? 0.25 : 0.1,
+          'fill-opacity': selectedRadius === radius ? 0.42 : 0.26,
+        },
+      });
+
+      const ringLineWidth = selectedRadius === radius ? 3.4 : 1.9;
+
+      // White halo stroke for stronger contrast on aerial imagery
+      map.current?.addLayer({
+        id: `ring-${radius}-stroke-white`,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': '#FFFFFF',
+          'line-width': ringLineWidth + 2,
+          'line-opacity': 1,
         },
       });
 
@@ -160,40 +234,101 @@ export function LocationMap({
         type: 'line',
         source: sourceId,
         paint: {
-          'line-color': colors.stroke,
-          'line-width': selectedRadius === radius ? 3 : 1.5,
-          'line-opacity': selectedRadius === radius ? 1 : 0.7,
+          'line-color': '#000000',
+          'line-width': ringLineWidth,
+          'line-opacity': 1,
         },
       });
     });
-
-    // Add center marker
-    if (!map.current?.getSource('center-point')) {
-      map.current?.addSource('center-point', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'Point',
-            coordinates: center,
-          },
-        },
-      });
-
-      map.current?.addLayer({
-        id: 'center-point',
-        type: 'circle',
-        source: 'center-point',
-        paint: {
-          'circle-radius': 8,
-          'circle-color': '#fbbf24',
-          'circle-stroke-color': '#000',
-          'circle-stroke-width': 2,
-        },
-      });
-    }
   }, [mapLoaded, rings, layers.rings, selectedRadius, center]);
+
+  // Fetch nearby block-group boundaries
+  useEffect(() => {
+    if (!mapLoaded) return;
+
+    const controller = new AbortController();
+
+    const fetchBlockGroups = async () => {
+      try {
+        const response = await fetch(
+          `${DJANGO_API_URL}/api/v1/location-intelligence/block-groups/?lat=${center[1]}&lon=${center[0]}&radius=5`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          setBlockGroupFeatures({ type: 'FeatureCollection', features: [] });
+          return;
+        }
+
+        const payload = await response.json();
+        if (payload?.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+          setBlockGroupFeatures(payload as GeoJSON.FeatureCollection);
+        } else {
+          setBlockGroupFeatures({ type: 'FeatureCollection', features: [] });
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn('Failed to fetch block group boundaries:', error);
+          setBlockGroupFeatures({ type: 'FeatureCollection', features: [] });
+        }
+      }
+    };
+
+    void fetchBlockGroups();
+
+    return () => controller.abort();
+  }, [mapLoaded, center]);
+
+  // Render block-group boundaries on map
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    if (map.current.getLayer(BLOCK_GROUP_FILL_LAYER_ID)) {
+      map.current.removeLayer(BLOCK_GROUP_FILL_LAYER_ID);
+    }
+    if (map.current.getLayer(BLOCK_GROUP_LINE_LAYER_ID)) {
+      map.current.removeLayer(BLOCK_GROUP_LINE_LAYER_ID);
+    }
+    if (map.current.getSource(BLOCK_GROUP_SOURCE_ID)) {
+      map.current.removeSource(BLOCK_GROUP_SOURCE_ID);
+    }
+
+    if (!blockGroupFeatures || !Array.isArray(blockGroupFeatures.features) || blockGroupFeatures.features.length === 0) {
+      return;
+    }
+
+    map.current.addSource(BLOCK_GROUP_SOURCE_ID, {
+      type: 'geojson',
+      data: blockGroupFeatures,
+    });
+
+    map.current.addLayer({
+      id: BLOCK_GROUP_FILL_LAYER_ID,
+      type: 'fill',
+      source: BLOCK_GROUP_SOURCE_ID,
+      paint: {
+        'fill-color': '#4B5563',
+        'fill-opacity': 0.12,
+      },
+      layout: {
+        visibility: layers.blockGroups ? 'visible' : 'none',
+      },
+    });
+
+    map.current.addLayer({
+      id: BLOCK_GROUP_LINE_LAYER_ID,
+      type: 'line',
+      source: BLOCK_GROUP_SOURCE_ID,
+      paint: {
+        'line-color': '#6B7280',
+        'line-width': 0.8,
+        'line-opacity': 0.75,
+      },
+      layout: {
+        visibility: layers.blockGroups ? 'visible' : 'none',
+      },
+    });
+  }, [mapLoaded, blockGroupFeatures, layers.blockGroups]);
 
   // Update user point markers
   useEffect(() => {
@@ -253,11 +388,24 @@ export function LocationMap({
     if (!map.current || !mapLoaded) return;
 
     const satelliteLayer = map.current.getLayer('satellite');
-    if (satelliteLayer) {
+    const labelsLayer = map.current.getLayer('labels');
+    const osmLayer = map.current.getLayer('osm');
+
+    if (satelliteLayer && labelsLayer && osmLayer) {
       map.current.setLayoutProperty(
         'satellite',
         'visibility',
         layers.satellite ? 'visible' : 'none'
+      );
+      map.current.setLayoutProperty(
+        'labels',
+        'visibility',
+        layers.satellite ? 'visible' : 'none'
+      );
+      map.current.setLayoutProperty(
+        'osm',
+        'visibility',
+        layers.satellite ? 'none' : 'visible'
       );
     }
   }, [mapLoaded, layers.satellite]);

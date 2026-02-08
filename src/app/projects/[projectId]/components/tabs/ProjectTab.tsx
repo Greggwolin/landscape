@@ -449,6 +449,7 @@ export default function ProjectTab({
         {showLocationIntel && hasCoordinates && (
           <LocationMapFlyout
             projectId={String(project.project_id)}
+            projectName={project.project_name || 'Project'}
             center={[lon!, lat!]}
             isOpen={showLocationIntel}
             onClose={() => setShowLocationIntel(false)}

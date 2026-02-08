@@ -9,6 +9,8 @@ import {
   CSpinner,
 } from '@coreui/react';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface ChangelogEntry {
   changelog_id: number;
   version: string;
@@ -30,6 +32,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     if (!isOpen) return;
 
     setLoading(true);
+    setError(null);
     try {
       let accessToken: string | null = null;
       try {
@@ -44,12 +47,22 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/`,
-        { headers }
-      );
+      let response = await fetch(`${DJANGO_API_URL}/api/changelog/`, { headers });
+      if ((response.status === 401 || response.status === 403) && accessToken) {
+        response = await fetch(`${DJANGO_API_URL}/api/changelog/`);
+      }
 
-      if (!response.ok) throw new Error('Failed to fetch changelog');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const detail =
+          errorData &&
+          typeof errorData === 'object' &&
+          'detail' in errorData &&
+          typeof errorData.detail === 'string'
+            ? ` ${errorData.detail}`
+            : '';
+        throw new Error(`Failed to fetch changelog (${response.status}).${detail}`);
+      }
 
       const data = await response.json();
       // Filter to only published entries for non-admin users

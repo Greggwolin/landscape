@@ -31,17 +31,17 @@ export default function MetricCard({ label, value, status = 'info', subtitle }: 
   return (
     <CCard>
       <CCardBody>
-        <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+        <div className="small mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
           {label}
         </div>
         <div
-          className="text-2xl font-bold mb-1"
-          style={{ color: getStatusColor() }}
+          className="fw-bold mb-1"
+          style={{ color: getStatusColor(), fontSize: '1.5rem' }}
         >
           {value}
         </div>
         {subtitle && (
-          <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div className="small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
             {subtitle}
           </div>
         )}

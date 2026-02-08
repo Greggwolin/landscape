@@ -143,9 +143,9 @@ function aggregateTermPeriods(
       dateLabel: periodDateLabel(p.period_index, startDate),
       beginningBalance: p.beginning_balance,
       endingBalance: p.ending_balance,
-      payment: p.scheduled_payment,
+      payment: p.scheduled_payment + (p.is_balloon ? p.balloon_amount : 0),
       interest: p.interest_component,
-      principal: p.principal_component,
+      principal: p.principal_component + (p.is_balloon ? p.balloon_amount : 0),
       paymentType: getPaymentType(p),
       isBalloon: p.is_balloon,
       balloonAmount: p.balloon_amount,
@@ -168,9 +168,15 @@ function aggregateTermPeriods(
     const first = group[0];
     const last = group[group.length - 1];
 
-    const totalPayment = group.reduce((s, p) => s + p.scheduled_payment, 0);
+    const totalPayment = group.reduce(
+      (s, p) => s + p.scheduled_payment + (p.is_balloon ? p.balloon_amount : 0),
+      0
+    );
     const totalInterest = group.reduce((s, p) => s + p.interest_component, 0);
-    const totalPrincipal = group.reduce((s, p) => s + p.principal_component, 0);
+    const totalPrincipal = group.reduce(
+      (s, p) => s + p.principal_component + (p.is_balloon ? p.balloon_amount : 0),
+      0
+    );
     const hasBalloon = group.some((p) => p.is_balloon);
     const balloonAmount = group.reduce((s, p) => s + p.balloon_amount, 0);
 

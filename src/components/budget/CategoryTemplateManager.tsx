@@ -17,11 +17,10 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CBadge,
   CFormCheck,
 } from '@coreui/react';
 import type { BudgetCategoryTemplate } from '@/types/budget-categories';
-import { SemanticButton } from '@/components/ui/landscape';
+import { PropertyTypeBadge, SemanticButton } from '@/components/ui/landscape';
 
 interface CategoryTemplateManagerProps {
   selectedProjectId: number | null;
@@ -199,7 +198,7 @@ export default function CategoryTemplateManager({
                 <CCardHeader className="d-flex justify-content-between align-items-start">
                   <div>
                     <h6 className="mb-1">{template.template_name}</h6>
-                    <CBadge color="secondary">{template.project_type_code}</CBadge>
+                    <PropertyTypeBadge typeCode={template.project_type_code} />
                   </div>
                 </CCardHeader>
 
@@ -268,7 +267,7 @@ export default function CategoryTemplateManager({
                 {selectedTemplate.description}
               </p>
               <div className="d-flex gap-3 mb-3">
-                <CBadge color="secondary">{selectedTemplate.project_type_code}</CBadge>
+                <PropertyTypeBadge typeCode={selectedTemplate.project_type_code} />
                 <span className="text-medium-emphasis small">
                   {selectedTemplate.category_count} categories across {' '}
                   {[

@@ -7,6 +7,7 @@ import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
+import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import type { DMSDocument } from '@/types/dms';
 
 interface DMSViewProps {
@@ -41,6 +42,11 @@ export default function DMSView({
   const [isLoadingTrash, setIsLoadingTrash] = useState(false);
 
   const [panelExpanded, setPanelExpanded] = useState(true);
+
+  // Media preview modal state
+  const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [mediaPreviewDocId, setMediaPreviewDocId] = useState<number | null>(null);
+  const [mediaPreviewDocName, setMediaPreviewDocName] = useState<string>('');
 
   // Fetch filter data
   useEffect(() => {
@@ -203,6 +209,13 @@ export default function DMSView({
   // Handle closing document preview
   const handleCloseDocumentPreview = () => {
     setSelectedDocument(null);
+  };
+
+  // Handle opening media preview modal from document row
+  const handleReviewMedia = (docId: number, docName: string) => {
+    setMediaPreviewDocId(docId);
+    setMediaPreviewDocName(docName);
+    setShowMediaPreview(true);
   };
 
   // Handle document changes (refresh filters)
@@ -673,6 +686,7 @@ export default function DMSView({
                                   onUploadComplete={handleDocumentChange}
                                   selectedDocIds={selectedDocIds}
                                   onToggleDocSelection={handleToggleDocSelection}
+                                  onReviewMedia={handleReviewMedia}
                                 />
                               </div>
 
@@ -688,6 +702,7 @@ export default function DMSView({
                                   onUploadComplete={handleDocumentChange}
                                   selectedDocIds={selectedDocIds}
                                   onToggleDocSelection={handleToggleDocSelection}
+                                  onReviewMedia={handleReviewMedia}
                                 />
                               </div>
                             </div>
@@ -813,6 +828,28 @@ export default function DMSView({
           projectId={projectId}
           onDelete={handleBulkPermanentDelete}
           isPermanentDelete={true}
+        />
+      )}
+
+      {/* Media Preview Modal */}
+      {showMediaPreview && mediaPreviewDocId && (
+        <MediaPreviewModal
+          isOpen={showMediaPreview}
+          onClose={() => {
+            setShowMediaPreview(false);
+            setMediaPreviewDocId(null);
+            setMediaPreviewDocName('');
+          }}
+          docId={mediaPreviewDocId}
+          docName={mediaPreviewDocName}
+          projectId={projectId}
+          onComplete={() => {
+            setShowMediaPreview(false);
+            setMediaPreviewDocId(null);
+            setMediaPreviewDocName('');
+            // Refresh filters to update media counts
+            void loadFilters();
+          }}
         />
       )}
     </div>

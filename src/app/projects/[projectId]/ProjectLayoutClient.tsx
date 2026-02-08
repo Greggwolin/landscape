@@ -2,15 +2,15 @@
  * ProjectLayoutClient
  *
  * Resizable split-panel layout with ARGUS-style folder tab navigation:
- * - Full-width project bar at top (project selector + collapse toggle)
+ * - Full-width ActiveProjectBar at top (project selector + type pills)
  * - Left panel: Resizable Landscaper (collapses to icon strip)
  * - Right panel: Folder tabs + content area
  * - Draggable splitter between panels with auto-collapse behavior
  *
  * URL pattern: /projects/[projectId]?folder=valuation&tab=sales
  *
- * @version 3.0
- * @updated 2026-01-28 - Resizable split layout with collapsible Landscaper
+ * @version 4.0
+ * @updated 2026-02-08 - ActiveProjectBar at full width, chevron moved to Landscaper panel
  */
 
 'use client';
@@ -26,8 +26,8 @@ import {
 } from '@/components/landscaper/RentRollUpdateReviewModal';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
-import { StudioProjectBar } from '@/components/studio/StudioProjectBar';
-import { CollapsedLandscaperStrip } from '@/components/studio/CollapsedLandscaperStrip';
+import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
+import { ActiveProjectBar } from './components/ActiveProjectBar';
 import { AlphaAssistantFlyout } from '@/components/alpha';
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
@@ -35,6 +35,7 @@ import { useResizablePanel } from '@/hooks/useResizablePanel';
 import { FileDropProvider, useFileDrop } from '@/contexts/FileDropContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { DropZoneWrapper } from '@/components/ui/DropZoneWrapper';
+import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import '@/styles/folder-tabs.css';
 import '@/styles/resizable-panel.css';
 
@@ -247,16 +248,22 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // Alpha Assistant flyout state
   const [isAlphaFlyoutOpen, setIsAlphaFlyoutOpen] = useState(false);
   const pageContext = `${currentFolder}/${currentTab}`;
+  const activeFolderConfig = folderConfig.folders.find((folder) => folder.id === currentFolder);
+  const activeSubTabConfig = activeFolderConfig?.subTabs.find((tab) => tab.id === currentTab);
+  const landscaperContextLabel = activeSubTabConfig?.label || (
+    activeFolderConfig ? formatFolderLabel(activeFolderConfig.label) : currentFolder
+  );
+  const landscaperContextColor = activeFolderConfig?.color || 'var(--cui-tertiary-bg)';
 
   if (isLoading) {
     return (
-      <div className="studio-layout-container">
-        <div className="studio-project-bar-placeholder" />
-        <div className="studio-split-container">
-          <div className="studio-loading-panel" style={{ width: DEFAULT_LANDSCAPER_WIDTH }}>
-            <p style={{ color: 'var(--cui-secondary-color)' }}>Loading...</p>
+      <div className="project-layout-container">
+        <div className="project-bar-placeholder" style={{ height: '48px', borderBottom: '1px solid var(--cui-border-color)' }} />
+        <div className="project-split-container" style={{ display: 'flex', flex: 1, minHeight: 0, gap: '0.5rem', paddingTop: '0.5rem' }}>
+          <div style={{ width: DEFAULT_LANDSCAPER_WIDTH, flexShrink: 0, backgroundColor: 'var(--cui-card-bg)', borderRadius: 'var(--cui-card-border-radius)' }}>
+            <p style={{ color: 'var(--cui-secondary-color)', padding: '1rem' }}>Loading...</p>
           </div>
-          <div className="studio-loading-content">
+          <div style={{ flex: 1, backgroundColor: 'var(--cui-card-bg)', borderRadius: 'var(--cui-card-border-radius)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <p>Loading project...</p>
           </div>
         </div>
@@ -265,118 +272,125 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="studio-layout-container"
-      style={{
-        display: 'flex',
-        flexDirection: 'row',
-        flex: 1,
-        minHeight: 0,
-        width: '100%',
-        padding: '0.5rem',
-        gap: 0,
-      }}
-    >
-      {/* Left Panel - Landscaper (resizable or collapsed) - full height */}
+    <div className="project-layout-container">
+      {/* Full-width Active Project Bar - sticky below top nav */}
+      <ActiveProjectBar
+        projectId={projectId}
+        onAlphaAssistantClick={() => setIsAlphaFlyoutOpen(true)}
+      />
+
+      {/* Two-column split below the project bar */}
       <div
-        className="studio-landscaper-panel"
+        ref={containerRef}
+        className="project-split-container"
         style={{
-          width: landscaperWidth,
-          minWidth: isCollapsed ? COLLAPSED_WIDTH : MIN_LANDSCAPER_WIDTH,
-          maxWidth: isCollapsed ? COLLAPSED_WIDTH : `${MAX_WIDTH_PERCENT}%`,
-          flexShrink: 0,
-          height: 'calc(100vh - 80px)',
-          transition: isResizing ? 'none' : 'width 0.2s ease',
+          display: 'flex',
+          flexDirection: 'row',
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          paddingTop: '0.5rem',
+          gap: 0,
         }}
       >
-        {isCollapsed ? (
-          <CollapsedLandscaperStrip onExpand={toggleCollapsed} />
-        ) : (
-          <LandscaperPanel projectId={projectId} activeTab={currentFolder} />
-        )}
-      </div>
-
-      {/* Resizable Splitter - always visible when not collapsed */}
-      {!isCollapsed && (
+        {/* Left Panel - Landscaper (resizable or collapsed) - full height */}
         <div
-          className="studio-resizable-splitter"
-          onPointerDown={handleResizeStart}
+          className="project-landscaper-panel"
           style={{
-            width: '12px',
-            cursor: 'col-resize',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'transparent',
+            width: landscaperWidth,
+            minWidth: isCollapsed ? COLLAPSED_WIDTH : MIN_LANDSCAPER_WIDTH,
+            maxWidth: isCollapsed ? COLLAPSED_WIDTH : `${MAX_WIDTH_PERCENT}%`,
             flexShrink: 0,
+            height: 'calc(100vh - 128px)', // 58px top nav + 48px project bar + gap
+            transition: isResizing ? 'none' : 'width 0.2s ease',
           }}
         >
-          <div
-            className="studio-splitter-handle"
-            style={{
-              width: '2px',
-              height: '48px',
-              borderRadius: '1px',
-              backgroundColor: 'var(--cui-border-color)',
-            }}
-          />
+          {isCollapsed ? (
+            <CollapsedLandscaperStrip onExpand={toggleCollapsed} />
+          ) : (
+            <LandscaperPanel
+              projectId={projectId}
+              activeTab={currentFolder}
+              contextPillLabel={landscaperContextLabel}
+              contextPillColor={landscaperContextColor}
+              onToggleCollapse={toggleCollapsed}
+            />
+          )}
         </div>
-      )}
 
-      {/* Right Column - Project Bar + Folder Tabs + Content */}
-      <div
-        className="studio-right-column"
-        data-folder={currentFolder}
-        style={{
-          flex: '1 1 0%',
-          minWidth: '400px',
-          display: 'flex',
-          flexDirection: 'column',
-          marginLeft: isCollapsed ? '0.5rem' : '0',
-          transition: isResizing ? 'none' : 'margin-left 0.2s ease',
-          gap: '0.25rem',
-        }}
-      >
-        {/* Project Bar - above folder tabs */}
-        <StudioProjectBar
-          projectId={projectId}
-          isLandscaperCollapsed={isCollapsed}
-          onToggleLandscaper={toggleCollapsed}
-          onAlphaAssistantClick={() => setIsAlphaFlyoutOpen(true)}
-        />
+        {/* Resizable Splitter - always visible when not collapsed */}
+        {!isCollapsed && (
+          <div
+            className="project-resizable-splitter"
+            onPointerDown={handleResizeStart}
+            style={{
+              width: '12px',
+              cursor: 'col-resize',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              flexShrink: 0,
+            }}
+          >
+            <div
+              className="project-splitter-handle"
+              style={{
+                width: '2px',
+                height: '48px',
+                borderRadius: '1px',
+                backgroundColor: 'var(--cui-border-color)',
+              }}
+            />
+          </div>
+        )}
 
-        {/* Content Card - Folder Tabs + Content */}
-        <CCard
-          className="studio-content-card shadow-lg"
+        {/* Right Column - Folder Tabs + Content */}
+        <div
+          className="project-right-column"
+          data-folder={currentFolder}
           style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
+            flex: '1 1 0%',
+            minWidth: '400px',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            // Use white background for sales tab to avoid grey card bg
-            ...(currentTab === 'sales' && { backgroundColor: 'var(--surface-bg)' }),
+            marginLeft: isCollapsed ? '0.5rem' : '0',
+            transition: isResizing ? 'none' : 'margin-left 0.2s ease',
+            gap: '0.25rem',
           }}
         >
-          {/* Folder Tabs Navigation */}
-          <FolderTabs
-            folders={folderConfig.folders}
-            currentFolder={currentFolder}
-            currentTab={currentTab}
-            onNavigate={handleNavigate}
-            subTabBadgeStates={{ 'rent-roll': rentRollBadgeState }}
-            onSubTabBadgeClick={handleSubTabBadgeClick}
-          />
+          {/* Content Card - Folder Tabs + Content */}
+          <CCard
+            className="project-content-card shadow-lg"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              // Use white background for sales tab to avoid grey card bg
+              ...(currentTab === 'sales' && { backgroundColor: 'var(--surface-bg)' }),
+            }}
+          >
+            {/* Folder Tabs Navigation */}
+            <FolderTabs
+              folders={folderConfig.folders}
+              currentFolder={currentFolder}
+              currentTab={currentTab}
+              onNavigate={handleNavigate}
+              subTabBadgeStates={{ 'rent-roll': rentRollBadgeState }}
+              onSubTabBadgeClick={handleSubTabBadgeClick}
+            />
 
-          {/* Content Area - with drop zone for file uploads */}
-          <DropZoneWrapper className="studio-folder-content-wrapper">
-            <div className="studio-folder-content" data-subtab={currentTab}>
-              {children}
-            </div>
-          </DropZoneWrapper>
-        </CCard>
+            {/* Content Area - with drop zone for file uploads */}
+            <DropZoneWrapper className="project-folder-content-wrapper">
+              <div className="project-folder-content" data-subtab={currentTab}>
+                {children}
+              </div>
+            </DropZoneWrapper>
+          </CCard>
+        </div>
       </div>
 
       {/* Alpha Assistant Flyout */}
@@ -432,13 +446,12 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
     <Suspense
       fallback={
         <div
-          className="studio-layout-container"
+          className="project-layout-container"
           style={{
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
             minHeight: 0,
-            padding: '0.25rem 0.5rem 0.5rem 0.25rem',
           }}
         >
           <div
@@ -455,6 +468,7 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
               flex: 1,
               minHeight: 0,
               gap: '0.5rem',
+              paddingTop: '0.5rem',
             }}
           >
             <div

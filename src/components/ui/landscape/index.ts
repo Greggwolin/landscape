@@ -15,6 +15,8 @@ export { StatusChip, Status } from './StatusChip';
 export type { StatusChipProps, StatusType } from './StatusChip';
 export { SemanticBadge } from './SemanticBadge';
 export type { SemanticBadgeProps, SemanticIntent } from './SemanticBadge';
+export { PropertyTypeBadge } from './PropertyTypeBadge';
+export type { PropertyTypeBadgeProps } from './PropertyTypeBadge';
 export { SemanticCategoryChip } from './SemanticCategoryChip';
 export type { SemanticCategoryChipProps, CategoryIntent } from './SemanticCategoryChip';
 

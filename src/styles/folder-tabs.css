@@ -438,7 +438,7 @@
   overflow: hidden;
 }
 
-.studio-folder-content {
+.project-folder-content {
   flex: 1;
   overflow-y: auto;
   padding: var(--cui-spacer-3, 1rem);
@@ -446,30 +446,30 @@
 }
 
 /* Sales tab - use white background throughout */
-.studio-folder-content[data-subtab="sales"] {
+.project-folder-content[data-subtab="sales"] {
   background-color: var(--surface-bg) !important;
   padding: 0.75rem !important;
 }
 
-.studio-folder-content[data-subtab="sales"] .app-content {
+.project-folder-content[data-subtab="sales"] .app-content {
   width: 100%;
   margin: 0;
 }
 
 /* Override light-theme page grey for studio layout */
-.light-theme .studio-layout-container {
+.light-theme .project-layout-container {
   background-color: var(--surface-bg) !important;
 }
 
 /* Budget folder with sales subtab - override card grey background */
-.studio-right-column[data-folder="budget"] .studio-content-card,
-.studio-right-column[data-folder="budget"] .studio-content-card.card,
-.studio-right-column[data-folder="budget"] .card.studio-content-card {
+.project-right-column[data-folder="budget"] .project-content-card,
+.project-right-column[data-folder="budget"] .project-content-card.card,
+.project-right-column[data-folder="budget"] .card.project-content-card {
   background-color: var(--surface-bg) !important;
   background: var(--surface-bg) !important;
 }
 
-.studio-folder-content[data-subtab="sales"] .sales-tab-content {
+.project-folder-content[data-subtab="sales"] .sales-tab-content {
   width: 100%;
 }
 

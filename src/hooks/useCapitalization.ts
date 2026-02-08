@@ -91,15 +91,33 @@ export function useLoanSchedule(projectId: string, loanId: string | number | nul
   });
 }
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 export function useLeveragedCashFlow(projectId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['leveraged-cash-flow', projectId],
     queryFn: () =>
-      fetch(`/api/projects/${projectId}/cash-flow/generate`, {
+      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ includeFinancing: true }),
       }).then((r) => r.json()),
+    enabled: !!projectId && enabled,
+  });
+}
+
+export function useIncomeApproachMonthlyDCF(projectId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['income-approach-monthly-dcf', projectId],
+    queryFn: async () => {
+      const response = await fetch(
+        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch monthly DCF data: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: !!projectId && enabled,
   });
 }

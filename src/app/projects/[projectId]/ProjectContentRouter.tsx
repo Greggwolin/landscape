@@ -1,5 +1,5 @@
 /**
- * StudioContent Component
+ * ProjectContentRouter Component
  *
  * Routes folder/tab combinations to the appropriate content components.
  * Subtab structure matches the INTERNAL navigation of main branch components:
@@ -8,9 +8,9 @@
  * Operations (Income): Single unified P&L page (no subtabs) → OperationsTab
  * Valuation (Income): sales-comparison, cost, income → ValuationTab (has internal tabs)
  *
- * @version 2.2
+ * @version 2.3
  * @created 2026-01-23
- * @updated 2026-01-23 - Fixed to match main branch COMPONENT internal navigation
+ * @updated 2026-02-08 - Renamed from StudioContent to ProjectContentRouter
  */
 
 'use client';
@@ -45,7 +45,7 @@ interface Project {
   [key: string]: unknown;
 }
 
-interface StudioContentProps {
+interface ProjectContentRouterProps {
   project: Project;
   currentFolder: string;
   currentTab: string;
@@ -103,12 +103,12 @@ function ContentLoading() {
  * Main content router - maps folder/tab to appropriate component
  * Subtabs MUST match main branch tileConfig.ts EXACTLY
  */
-function StudioContent({
+function ProjectContentRouter({
   project,
   currentFolder,
   currentTab,
   setFolderTab,
-}: StudioContentProps) {
+}: ProjectContentRouterProps) {
   // Route based on folder and tab combination
   const renderContent = () => {
     switch (currentFolder) {
@@ -294,4 +294,4 @@ function StudioContent({
   );
 }
 
-export default memo(StudioContent);
+export default memo(ProjectContentRouter);

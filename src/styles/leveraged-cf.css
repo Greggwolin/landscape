@@ -111,6 +111,25 @@
   border-bottom: 1px solid var(--cui-border-color);
 }
 
+/* Reversion row */
+.leveraged-cf-grid tr.reversion-row td {
+  font-weight: 700;
+  padding-top: 6px;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.leveraged-cf-grid .reversion-value {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--cui-primary);
+  color: var(--cui-primary);
+  padding-bottom: 1px;
+}
+
+.leveraged-cf-grid .reversion-value:hover {
+  color: var(--cui-primary-emphasis);
+  border-bottom-style: solid;
+}
+
 /* Zebra striping for data rows (not special rows) */
 .leveraged-cf-grid tr.indent:nth-child(even) td:not(:first-child) {
   background: var(--cui-secondary-bg);

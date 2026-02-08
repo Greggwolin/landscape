@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ChangelogModal } from './ChangelogModal';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface VersionBadgeProps {
   className?: string;
 }
@@ -26,10 +28,10 @@ export function VersionBadge({ className = '' }: VersionBadgeProps) {
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/current-version/`,
-        { headers }
-      );
+      let response = await fetch(`${DJANGO_API_URL}/api/changelog/current-version/`, { headers });
+      if ((response.status === 401 || response.status === 403) && accessToken) {
+        response = await fetch(`${DJANGO_API_URL}/api/changelog/current-version/`);
+      }
 
       if (response.ok) {
         const data = await response.json();

@@ -1,11 +1,14 @@
 """
-Land Development Cash Flow API Views
+Cash Flow API Views
 
-Provides endpoint for generating Land Dev cash flow projections.
+Provides unified cash flow endpoint for all project types.
+Routes to the appropriate service based on project_type_code:
+- LAND → LandDevCashFlowService (budget + absorption)
+- MF/OFF/RET/IND/HTL/MXU → IncomePropertyCashFlowService (DCF NOI)
 
 POST /api/projects/{project_id}/cash-flow/calculate/
 
-Session: Land Dev Cash Flow Consolidation
+Session: Land Dev Cash Flow Consolidation, Income Approach Integration
 """
 
 from rest_framework.views import APIView
@@ -19,11 +22,19 @@ from apps.projects.models import Project
 from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
 
 
+def _is_land_dev(project: Project) -> bool:
+    """Check if a project uses the land development cash flow pipeline."""
+    return getattr(project, 'project_type_code', '') == 'LAND'
+
+
 class LandDevCashFlowView(APIView):
     """
     GET/POST /api/projects/{project_id}/cash-flow/calculate/
 
-    Returns monthly cash flow projections for Land Development projects.
+    Returns monthly cash flow projections.
+    Routes to LandDevCashFlowService for LAND projects,
+    IncomePropertyCashFlowService for income-producing properties.
+
     Frontend aggregates to quarterly/annual/overall as needed for display.
 
     GET: Simple request, no filtering (used by cash-flow/summary endpoint)
@@ -32,7 +43,7 @@ class LandDevCashFlowView(APIView):
     {
         "containerIds": [1, 2, 3],  // Optional: filter by specific villages/phases
         "periodType": "month",      // Optional: always monthly (frontend aggregates)
-        "includeFinancing": false,  // Optional: not yet implemented
+        "includeFinancing": false,  // Optional: include debt service section
         "discountRate": 0.10        // Optional: override for NPV calculation
     }
 
@@ -59,11 +70,14 @@ class LandDevCashFlowView(APIView):
         start_time = time.time()
 
         try:
-            # Verify project exists
             project = get_object_or_404(Project, pk=project_id)
 
-            # Generate cash flow (no filtering for GET requests)
-            service = LandDevCashFlowService(project_id)
+            if _is_land_dev(project):
+                service = LandDevCashFlowService(project_id)
+            else:
+                from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+                service = IncomePropertyCashFlowService(project_id)
+
             result = service.calculate()
 
             duration_ms = int((time.time() - start_time) * 1000)
@@ -102,7 +116,6 @@ class LandDevCashFlowView(APIView):
         start_time = time.time()
 
         try:
-            # Verify project exists
             project = get_object_or_404(Project, pk=project_id)
 
             # Parse request body
@@ -123,12 +136,19 @@ class LandDevCashFlowView(APIView):
             else:
                 include_financing = bool(include_financing)
 
-            # Generate cash flow
-            service = LandDevCashFlowService(project_id)
-            result = service.calculate(
-                container_ids=container_ids,
-                include_financing=include_financing,
-            )
+            # Route to correct service based on project type
+            if _is_land_dev(project):
+                service = LandDevCashFlowService(project_id)
+                result = service.calculate(
+                    container_ids=container_ids,
+                    include_financing=include_financing,
+                )
+            else:
+                from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+                service = IncomePropertyCashFlowService(project_id)
+                result = service.calculate(
+                    include_financing=include_financing,
+                )
 
             duration_ms = int((time.time() - start_time) * 1000)
 

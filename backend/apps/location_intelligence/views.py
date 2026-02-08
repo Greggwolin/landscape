@@ -280,6 +280,128 @@ def delete_project_demographics(request, project_id):
 
 
 @extend_schema(
+    summary="Get nearby block group boundaries",
+    description="""
+    Returns block group boundaries as GeoJSON features near a coordinate.
+
+    Used by the Location Intelligence flyout to render optional block group
+    boundary overlays around the selected site.
+    """,
+    parameters=[
+        OpenApiParameter(
+            name="lat",
+            type=float,
+            location=OpenApiParameter.QUERY,
+            required=True,
+            description="Center latitude"
+        ),
+        OpenApiParameter(
+            name="lon",
+            type=float,
+            location=OpenApiParameter.QUERY,
+            required=True,
+            description="Center longitude"
+        ),
+        OpenApiParameter(
+            name="radius",
+            type=float,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search radius in miles (default: 5, max: 10)"
+        ),
+    ],
+    tags=["Location Intelligence"]
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_block_groups(request):
+    """
+    GET /api/v1/location-intelligence/block-groups/
+
+    Returns nearby block group boundaries as a GeoJSON FeatureCollection.
+    """
+    lat = request.query_params.get("lat")
+    lon = request.query_params.get("lon")
+    radius = request.query_params.get("radius", "5")
+
+    if not lat or not lon:
+        return Response(
+            {"error": "lat and lon are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        lat = float(lat)
+        lon = float(lon)
+        radius_miles = float(radius)
+    except ValueError:
+        return Response(
+            {"error": "lat, lon, and radius must be numbers"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not (-90 <= lat <= 90):
+        return Response(
+            {"error": "lat must be between -90 and 90"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not (-180 <= lon <= 180):
+        return Response(
+            {"error": "lon must be between -180 and 180"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if radius_miles <= 0:
+        return Response(
+            {"error": "radius must be greater than 0"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Keep geometry payload bounded for UI performance.
+    radius_miles = min(radius_miles, 10.0)
+    radius_meters = radius_miles * 1609.34
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                WITH center AS (
+                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography AS center_geog
+                )
+                SELECT
+                    bg.geoid,
+                    ST_AsGeoJSON(ST_SimplifyPreserveTopology(bg.geometry, 0.00008))::json AS geometry
+                FROM location_intelligence.block_groups bg
+                CROSS JOIN center c
+                WHERE ST_DWithin(bg.centroid::geography, c.center_geog, %s)
+                ORDER BY ST_Distance(bg.centroid::geography, c.center_geog)
+                LIMIT 1200
+            """, [lon, lat, radius_meters])
+
+            rows = cursor.fetchall()
+
+        features = [
+            {
+                "type": "Feature",
+                "properties": {"geoid": row[0]},
+                "geometry": row[1],
+            }
+            for row in rows
+        ]
+
+        return Response({
+            "type": "FeatureCollection",
+            "features": features,
+            "count": len(features),
+        })
+
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to fetch block groups: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@extend_schema(
     summary="Get block group statistics",
     description="Get statistics about loaded block groups and demographics data.",
     responses={200: BlockGroupStatsSerializer},

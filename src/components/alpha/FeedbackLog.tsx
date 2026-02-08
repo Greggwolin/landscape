@@ -5,6 +5,8 @@ import { CSpinner, CBadge, CCollapse, CCard, CCardBody } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilCommentSquare, cilChevronBottom, cilChevronRight } from '@coreui/icons';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface FeedbackItem {
   id: number;
   affected_module: string | null;
@@ -158,6 +160,9 @@ export function FeedbackLog() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchFeedback = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
     try {
       let accessToken: string | null = null;
       try {
@@ -167,22 +172,57 @@ export function FeedbackLog() {
         accessToken = null;
       }
 
+      // Feedback log is user-scoped; no token means no visible items.
+      if (!accessToken) {
+        setFeedback([]);
+        return;
+      }
+
       const headers: HeadersInit = {};
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/my/`,
-        { headers }
-      );
+      const fetchFeedbackEndpoint = async (url: string) => {
+        const response = await fetch(url, { headers });
+        let data: unknown = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+        return { response, data };
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch feedback');
+      // Preferred endpoint for user feedback log.
+      let { response, data } = await fetchFeedbackEndpoint(`${DJANGO_API_URL}/api/feedback/my/`);
+
+      // Compatibility fallback for environments that only expose /api/feedback/.
+      if (response.status === 404) {
+        ({ response, data } = await fetchFeedbackEndpoint(`${DJANGO_API_URL}/api/feedback/`));
       }
 
-      const data = await response.json();
-      setFeedback(Array.isArray(data) ? data : []);
+      // If auth is missing/expired, treat as empty instead of raising a hard UI error.
+      if (response.status === 401 || response.status === 403) {
+        setFeedback([]);
+        return;
+      }
+
+      if (!response.ok) {
+        const detail =
+          data && typeof data === 'object' && 'detail' in data && typeof data.detail === 'string'
+            ? ` ${data.detail}`
+            : '';
+        throw new Error(`Failed to fetch feedback (${response.status}).${detail}`);
+      }
+
+      const items = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)
+          ? data.results
+          : [];
+
+      setFeedback(items as FeedbackItem[]);
     } catch (err) {
       console.error('Failed to fetch feedback:', err);
       setError('Unable to load your feedback history.');

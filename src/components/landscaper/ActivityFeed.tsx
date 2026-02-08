@@ -94,38 +94,47 @@ export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedPr
 
   return (
     <div
-      className={`flex flex-col h-full ${isExpanded ? 'flex-1' : 'flex-none'}`}
+      className={`d-flex flex-column h-100 ${isExpanded ? 'flex-grow-1' : 'flex-shrink-0'}`}
     >
       {/* Header - always visible, styled like card header */}
       <button
+        type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between transition-colors border-b"
+        className="w-100 d-flex align-items-center justify-content-between border-bottom"
         style={{
           padding: '0.5rem 1rem',
           backgroundColor: 'var(--cui-card-header-bg)',
           borderColor: 'var(--cui-card-border-color)',
           color: 'var(--cui-body-color)',
+          transition: 'background-color 150ms ease',
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="d-flex align-items-center gap-2">
           <CIcon
             icon={isExpanded ? cilChevronBottom : cilChevronTop}
             size="sm"
-            className="transition-transform"
+            style={{ transition: 'transform 150ms ease' }}
           />
-          <span className="font-medium text-sm">Activity Feed</span>
+          <span className="fw-medium small">Activity Feed</span>
           {unreadCount > 0 && (
-            <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 rounded-full">
+            <span
+              className="badge rounded-pill"
+              style={{
+                backgroundColor: 'rgba(var(--cui-success-rgb), 0.15)',
+                color: 'var(--cui-success)',
+                fontSize: '0.75rem',
+              }}
+            >
               {unreadCount}
             </span>
           )}
           {isLoading && (
-            <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            <span className="small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
               Loading...
             </span>
           )}
         </div>
-        <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+        <span className="small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
           {activities.length} items
         </span>
       </button>
@@ -133,11 +142,11 @@ export function ActivityFeed({ projectId, isExpanded, onToggle }: ActivityFeedPr
       {/* Content - only when expanded */}
       {isExpanded && (
         <div
-          className="flex-1 overflow-y-auto px-3 pb-3 pt-2 space-y-2"
+          className="flex-grow-1 overflow-auto px-3 pb-3 pt-2 d-flex flex-column gap-2"
           style={{ backgroundColor: 'var(--cui-body-bg)' }}
         >
           {error && (
-            <div className="text-xs text-red-500 p-2">
+            <div className="small p-2" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
               Using cached data - API unavailable
             </div>
           )}

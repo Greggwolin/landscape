@@ -153,7 +153,7 @@ export function ThreadList({
 
   return (
     <div
-      className="flex flex-col border-b"
+      className="d-flex flex-column border-bottom"
       style={{
         borderColor: 'var(--cui-border-color)',
         backgroundColor: 'var(--cui-tertiary-bg)',
@@ -162,22 +162,25 @@ export function ThreadList({
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 py-2 border-b"
+        className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
         style={{ borderColor: 'var(--cui-border-color)' }}
       >
         <span
-          className="text-xs font-medium"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          className="small fw-medium"
+          style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}
         >
           {showAllPages ? 'All Threads' : 'Threads'}
         </span>
         <button
+          type="button"
           onClick={onNewThread}
           disabled={isLoading}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors"
+          className="btn btn-sm d-flex align-items-center gap-1 px-2 py-1"
           style={{
             color: 'var(--cui-primary)',
             backgroundColor: 'transparent',
+            border: 'none',
+            fontSize: '0.75rem',
           }}
           title="Start new thread"
         >
@@ -187,11 +190,11 @@ export function ThreadList({
       </div>
 
       {/* Thread List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-grow-1 overflow-auto">
         {filteredThreads.length === 0 ? (
           <div
-            className="px-3 py-4 text-center text-xs"
-            style={{ color: 'var(--cui-secondary-color)' }}
+            className="px-3 py-4 text-center small"
+            style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}
           >
             {isLoading ? 'Loading...' : 'No threads yet. Send a message to start.'}
           </div>
@@ -205,14 +208,14 @@ export function ThreadList({
               <div
                 key={thread.threadId}
                 onClick={() => !isEditing && onSelectThread(thread.threadId)}
-                className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-                  isActive ? 'border-l-2' : ''
-                }`}
+                className="d-flex align-items-center gap-2 px-3 py-2"
                 style={{
+                  cursor: isEditing ? 'default' : 'pointer',
+                  transition: 'background-color 150ms ease',
                   backgroundColor: isActive
                     ? 'var(--cui-body-bg)'
                     : 'transparent',
-                  borderLeftColor: isActive ? 'var(--cui-primary)' : 'transparent',
+                  borderLeft: isActive ? '2px solid var(--cui-primary)' : '2px solid transparent',
                 }}
               >
                 {/* Thread icon */}
@@ -223,43 +226,47 @@ export function ThreadList({
                 />
 
                 {/* Title (editable) */}
-                <div className="flex-1 min-w-0">
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
                   {isEditing ? (
-                    <div className="flex items-center gap-1">
+                    <div className="d-flex align-items-center gap-1">
                       <input
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         onKeyDown={(e) => handleKeyDown(thread.threadId, e)}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-1 px-1 py-0.5 text-xs rounded border"
+                        className="form-control form-control-sm flex-grow-1"
                         style={{
-                          borderColor: 'var(--cui-border-color)',
                           backgroundColor: 'var(--cui-body-bg)',
                           color: 'var(--cui-body-color)',
+                          fontSize: '0.75rem',
                         }}
                         autoFocus
                       />
                       <button
+                        type="button"
                         onClick={(e) => handleSaveEdit(thread.threadId, e)}
-                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+                        style={{ border: 'none', backgroundColor: 'transparent' }}
                         title="Save"
                       >
                         <CIcon icon={cilCheck} size="sm" style={{ color: 'var(--cui-success)' }} />
                       </button>
                       <button
+                        type="button"
                         onClick={handleCancelEdit}
-                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+                        style={{ border: 'none', backgroundColor: 'transparent' }}
                         title="Cancel"
                       >
                         <CIcon icon={cilX} size="sm" style={{ color: 'var(--cui-danger)' }} />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1">
+                    <div className="d-flex align-items-center gap-1">
                       <span
-                        className="text-xs truncate"
-                        style={{ color: 'var(--cui-body-color)' }}
+                        className="small text-truncate d-inline-block"
+                        style={{ color: 'var(--cui-body-color)', fontSize: '0.75rem', maxWidth: '160px' }}
                         title={displayTitle}
                       >
                         {displayTitle}
@@ -267,10 +274,11 @@ export function ThreadList({
                       {/* Page context badge (only shown when viewing all pages) */}
                       {showAllPages && (
                         <span
-                          className="text-[10px] px-1 py-0.5 rounded"
+                          className="badge rounded-pill"
                           style={{
                             backgroundColor: 'var(--cui-tertiary-bg)',
                             color: 'var(--cui-secondary-color)',
+                            fontSize: '0.625rem',
                           }}
                         >
                           {getPageContextLabel(thread.pageContext)}
@@ -278,9 +286,10 @@ export function ThreadList({
                       )}
                       {/* Edit button (on hover) */}
                       <button
+                        type="button"
                         onClick={(e) => handleStartEdit(thread, e)}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 ml-auto"
-                        style={{ transition: 'opacity 150ms' }}
+                        className="btn btn-sm d-flex align-items-center justify-content-center p-1 ms-auto"
+                        style={{ border: 'none', backgroundColor: 'transparent' }}
                         title="Edit title"
                       >
                         <CIcon
@@ -296,8 +305,8 @@ export function ThreadList({
                 {/* Timestamp */}
                 {!isEditing && (
                   <span
-                    className="text-[10px] whitespace-nowrap"
-                    style={{ color: 'var(--cui-secondary-color)' }}
+                    className="small text-nowrap"
+                    style={{ color: 'var(--cui-secondary-color)', fontSize: '0.625rem' }}
                   >
                     {formatRelativeTime(thread.updatedAt)}
                   </span>

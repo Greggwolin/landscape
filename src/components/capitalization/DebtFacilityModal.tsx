@@ -183,22 +183,17 @@ export function LoanFormFlyout({ visible, loan, projectId, onClose }: LoanFormFl
       } else {
         await createLoan.mutateAsync(payload);
       }
-      showToast({
-        title: 'Success',
-        message: isEditMode ? 'Loan updated successfully' : 'Loan created successfully',
-        type: 'success',
-      });
+      showToast(
+        isEditMode ? 'Loan updated successfully' : 'Loan created successfully',
+        'success'
+      );
       onClose();
     } catch (error) {
       const fieldErrors = await parseErrorResponse(error);
       if (Object.keys(fieldErrors).length > 0) {
         setErrors(fieldErrors);
       }
-      showToast({
-        title: 'Error',
-        message: 'Failed to save loan',
-        type: 'error',
-      });
+      showToast('Failed to save loan', 'error');
     } finally {
       setSaving(false);
     }
@@ -210,18 +205,10 @@ export function LoanFormFlyout({ visible, loan, projectId, onClose }: LoanFormFl
 
     try {
       await deleteLoan.mutateAsync(formData.loan_id);
-      showToast({
-        title: 'Success',
-        message: 'Loan deleted successfully',
-        type: 'success',
-      });
+      showToast('Loan deleted successfully', 'success');
       onClose();
     } catch (error) {
-      showToast({
-        title: 'Error',
-        message: 'Failed to delete loan',
-        type: 'error',
-      });
+      showToast('Failed to delete loan', 'error');
     }
   };
 

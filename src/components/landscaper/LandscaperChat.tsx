@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
 import CIcon from '@coreui/icons-react';
 import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
@@ -18,6 +18,7 @@ interface LandscaperChatProps {
   ingestionMessage?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  onReviewMedia?: (docId: number, docName: string) => void;
 }
 
 /**
@@ -36,7 +37,7 @@ function getTabContextHint(tab: string): string {
   return hints[tab] || 'General';
 }
 
-export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand }: LandscaperChatProps) {
+export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand, onReviewMedia }: LandscaperChatProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -139,29 +140,39 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     });
   };
 
+  const hoverNeutralBackground = {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'transparent';
+    },
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="d-flex h-100 flex-column">
       {/* Header - matches CoreUI card header padding (0.5rem 1rem) */}
       <div
-        className="flex items-center gap-2 border-b"
+        className="d-flex align-items-center gap-2 border-bottom"
         style={{
           padding: '0.5rem 1rem',
           borderColor: 'var(--cui-border-color)',
           backgroundColor: 'var(--surface-card-header)',
         }}
       >
-        <Image src="/landscaper-icon.png" alt="Landscaper icon" width={20} height={20} />
-        <span className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
+        <LandscaperIcon className="landscaper-panel-icon" aria-hidden="true" />
+        <span className="fw-bold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
           Landscaper
         </span>
 
         {/* Context indicator - shows which tab Landscaper is focused on */}
         {!isIngesting && (
           <span
-            className="ml-auto text-xs px-2 py-0.5 rounded"
+            className="ms-auto badge rounded-pill"
             style={{
               color: 'var(--cui-secondary-color)',
               backgroundColor: 'var(--cui-tertiary-bg)',
+              fontSize: '0.75rem',
             }}
           >
             {tabContextHint}
@@ -170,14 +181,14 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
 
         {/* Ingestion Progress Gauge */}
         {isIngesting && (
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="d-flex align-items-center gap-2 ms-auto">
             <div
-              className="relative"
+              className="position-relative"
               style={{ width: '32px', height: '32px' }}
               title={ingestionMessage || 'Processing...'}
             >
               {/* Background circle */}
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <svg style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
                 <circle
                   cx="18"
                   cy="18"
@@ -201,15 +212,15 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
               </svg>
               {/* Percentage text in center */}
               <div
-                className="absolute inset-0 flex items-center justify-center text-xs font-medium"
-                style={{ color: 'var(--cui-body-color)' }}
+                className="position-absolute top-0 start-0 d-flex align-items-center justify-content-center fw-medium"
+                style={{ color: 'var(--cui-body-color)', width: '100%', height: '100%', fontSize: '0.75rem' }}
               >
                 {Math.round(ingestionProgress)}
               </div>
             </div>
             <span
-              className="text-xs truncate max-w-[120px]"
-              style={{ color: 'var(--cui-secondary-color)' }}
+              className="small text-truncate d-inline-block"
+              style={{ color: 'var(--cui-secondary-color)', maxWidth: '120px' }}
             >
               {ingestionMessage || 'Ingesting...'}
             </span>
@@ -219,9 +230,12 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
         {/* Collapse/Expand toggle */}
         {onToggleExpand && (
           <button
+            type="button"
             onClick={onToggleExpand}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+            style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
             title={isExpanded ? 'Collapse chat' : 'Expand chat'}
+            {...hoverNeutralBackground}
           >
             <CIcon
               icon={isExpanded ? cilChevronTop : cilChevronBottom}
@@ -234,13 +248,13 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto p-4 space-y-3"
+        className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-3"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
         {messages.length === 0 ? (
-          <div className="py-8 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
-            <p className="text-sm">{promptCopy}</p>
-            <p className="text-xs mt-1">Budget, market analysis, assumptions, documents...</p>
+          <div className="py-4 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+            <p className="small mb-1">{promptCopy}</p>
+            <p style={{ fontSize: '0.75rem', marginBottom: 0 }}>Budget, market analysis, assumptions, documents...</p>
           </div>
         ) : (
           messages.map((msg: ChatMessage) => (
@@ -250,12 +264,13 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
               onConfirmMutation={handleConfirmMutation}
               onRejectMutation={handleRejectMutation}
               onConfirmBatch={handleConfirmBatch}
+              onReviewMedia={onReviewMedia}
             />
           ))
         )}
 
         {error && !isLoading && (
-          <div className="rounded-md border px-3 py-2 text-sm" style={{
+          <div className="rounded border px-3 py-2 small" style={{
             borderColor: 'var(--cui-danger-border-subtle)',
             color: 'var(--cui-danger)',
             backgroundColor: 'var(--cui-danger-bg-subtle)',
@@ -271,10 +286,10 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
 
       {/* Input */}
       <div
-        className="border-t p-3"
+        className="border-top p-3"
         style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
       >
-        <div className="flex gap-2">
+        <div className="d-flex gap-2 align-items-end">
           <textarea
             ref={textareaRef}
             value={input}
@@ -287,20 +302,20 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
             }}
             placeholder={promptCopy}
             rows={1}
-            className="flex-1 rounded-lg border px-3 py-2 text-sm resize-none"
+            className="form-control flex-grow-1"
             style={{
-              borderColor: 'var(--cui-border-color)',
               backgroundColor: 'var(--cui-body-bg)',
               color: 'var(--cui-body-color)',
               maxHeight: '200px',
+              resize: 'none',
             }}
             disabled={isLoading}
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
-            style={{ backgroundColor: 'var(--cui-primary)' }}
+            className="btn btn-primary"
           >
             Send
           </button>

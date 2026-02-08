@@ -13,6 +13,7 @@ import {
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilPencil, cilCheckCircle, cilXCircle } from '@coreui/icons';
+import { PropertyTypeBadge } from '@/components/ui/landscape';
 
 export type PicklistValue = {
   picklist_id: number;
@@ -69,21 +70,6 @@ export function PicklistEditor({ values, hasParent, parentOptions, onEdit, onTog
     return null;
   };
 
-  // Color mapping for property type codes
-  const getParentBadgeColor = (item: PicklistValue): string => {
-    const code = item.parent_code || '';
-    switch (code) {
-      case 'MF': return 'primary';      // Blue - Multifamily
-      case 'OFF': return 'info';        // Cyan - Office
-      case 'RET': return 'success';     // Green - Retail
-      case 'IND': return 'warning';     // Yellow - Industrial
-      case 'HTL': return 'danger';      // Red - Hotel
-      case 'LAND': return 'dark';       // Dark - Land
-      case 'MXU': return 'secondary';   // Gray - Mixed-Use
-      default: return 'info';
-    }
-  };
-
   return (
     <CTable hover responsive size="sm" className="mb-0">
       <CTableHead>
@@ -113,9 +99,13 @@ export function PicklistEditor({ values, hasParent, parentOptions, onEdit, onTog
                 {(() => {
                   const parentDisplay = getParentDisplay(item);
                   return parentDisplay ? (
-                    <CBadge color={getParentBadgeColor(item)} shape="rounded-pill">
-                      {parentDisplay}
-                    </CBadge>
+                    item.parent_code ? (
+                      <PropertyTypeBadge typeCode={item.parent_code} label={parentDisplay} />
+                    ) : (
+                      <CBadge color="secondary" shape="rounded-pill">
+                        {parentDisplay}
+                      </CBadge>
+                    )
                   ) : (
                     <span className="text-muted">—</span>
                   );

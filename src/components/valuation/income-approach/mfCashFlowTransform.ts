@@ -92,6 +92,21 @@ export interface MFDcfMonthlyApiResponse {
 // ============================================================================
 
 /**
+ * Build the display projection window from hold period assumptions.
+ * Backend may include a forward year for terminal NOI/reversion calculations;
+ * the grid should only render hold period months.
+ */
+function getDisplayProjections(data: MFDcfMonthlyApiResponse): MFDcfProjection[] {
+  const holdPeriodYears = data.assumptions?.hold_period_years ?? 10;
+  const holdPeriodMonths = Math.max(1, holdPeriodYears) * 12;
+
+  const filtered = data.projections.filter((p) => p.periodIndex <= holdPeriodMonths);
+
+  // Fallback to all projections if periodIndex is unavailable/unexpected.
+  return filtered.length > 0 ? filtered : data.projections;
+}
+
+/**
  * Transform MF DCF monthly API response to CashFlowGrid format
  */
 export function transformMFDcfToGrid(
@@ -435,25 +450,31 @@ export function aggregateMFCashFlow(
   data: MFDcfMonthlyApiResponse,
   timeScale: TimeScale
 ): { periods: CashFlowPeriod[]; sections: CashFlowSection[] } {
+  const displayProjections = getDisplayProjections(data);
+  const displayData: MFDcfMonthlyApiResponse = {
+    ...data,
+    projections: displayProjections,
+  };
+
   // First transform to grid format
-  const { sections } = transformMFDcfToGrid(data);
+  const { sections } = transformMFDcfToGrid(displayData);
 
   switch (timeScale) {
     case 'monthly':
       // Return as-is (just transform format)
-      return transformMFDcfToGrid(data);
+      return transformMFDcfToGrid(displayData);
 
     case 'quarterly':
-      return aggregateToQuarters(data.projections, sections);
+      return aggregateToQuarters(displayProjections, sections);
 
     case 'annual':
-      return aggregateToYears(data.projections, sections);
+      return aggregateToYears(displayProjections, sections);
 
     case 'overall':
-      return aggregateToOverall(data.projections, sections);
+      return aggregateToOverall(displayProjections, sections);
 
     default:
-      return transformMFDcfToGrid(data);
+      return transformMFDcfToGrid(displayData);
   }
 }
 

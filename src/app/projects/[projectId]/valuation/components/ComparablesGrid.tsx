@@ -16,6 +16,8 @@ import type {
 import { AdjustmentCell } from './AdjustmentCell';
 import { updateSalesComparable, updateUserAdjustment } from '@/lib/api/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
+import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
+import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
 
 interface SubjectPropertyInfo {
   city?: string | null;
@@ -76,6 +78,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     property: true
   });
   const [deleteModalOpen, setDeleteModalOpen] = useState<{ compId: number; comp: SalesComparable } | null>(null);
+  const [mediaPickerComp, setMediaPickerComp] = useState<SalesComparable | null>(null);
   const [pendingValues, setPendingValues] = useState<Record<number, Record<string, string>>>({});
   const [subjectAdjustments, setSubjectAdjustments] = useState<Record<string, string>>({});
   const [ownershipOptions, setOwnershipOptions] = useState<Array<{ value: string; label: string }>>([]);
@@ -1036,6 +1039,43 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
             </thead>
 
             <tbody>
+              {/* Photo Row */}
+              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+                <td
+                  className="py-1 px-4 font-medium sticky left-0 z-10"
+                  style={{
+                    color: 'var(--cui-secondary-color)',
+                    backgroundColor: 'var(--cui-card-bg)',
+                  }}
+                >
+                  Photo
+                </td>
+                <td
+                  className="py-1 px-4 text-center border-l"
+                  style={{ borderColor: 'var(--cui-border-color)' }}
+                >
+                  {/* Subject — no photo */}
+                </td>
+                {comparables.map((comp) => (
+                  <td
+                    key={`photo-${comp.comparable_id}`}
+                    className="py-1 px-2 text-center border-l"
+                    style={{ borderColor: 'var(--cui-border-color)' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <EntityMediaDisplay
+                        entityType="comp_sale"
+                        entityId={comp.comparable_id}
+                        projectId={projectId}
+                        variant="single-thumb"
+                        editable={true}
+                        onAttach={() => setMediaPickerComp(comp)}
+                      />
+                    </div>
+                  </td>
+                ))}
+              </tr>
+
               {/* Location - Distance and Bearing */}
               <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                 <td
@@ -1660,6 +1700,21 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
           background-color: transparent !important;
         }
       `}</style>
+
+      {/* Media Picker Modal for comps */}
+      {mediaPickerComp && (
+        <MediaPickerModal
+          isOpen={!!mediaPickerComp}
+          onClose={() => setMediaPickerComp(null)}
+          projectId={projectId}
+          entityType="comp_sale"
+          entityId={mediaPickerComp.comparable_id}
+          linkPurpose="hero_image"
+          singleSelect={true}
+          filterClassification={['property_photo', 'aerial_photo']}
+          onSelect={() => setMediaPickerComp(null)}
+        />
+      )}
     </>
   );
 }

@@ -19,6 +19,7 @@ import './location-map.css';
 
 export function LocationMapFlyout({
   projectId,
+  projectName,
   center,
   isOpen,
   onClose,
@@ -94,10 +95,7 @@ export function LocationMapFlyout({
         {/* Header */}
         <div className="flyout-header">
           <div className="flyout-title-group">
-            <h2 className="flyout-title">Location Intelligence</h2>
-            <span className="flyout-subtitle">
-              {center[1].toFixed(4)}, {center[0].toFixed(4)}
-            </span>
+            <h2 className="flyout-title">{projectName} - Location Intelligence</h2>
           </div>
           <div className="flyout-actions">
             <button
@@ -138,27 +136,7 @@ export function LocationMapFlyout({
 
         {/* Content */}
         <div className="flyout-content">
-          {/* Left panel - Map */}
-          <div className="flyout-map-panel">
-            <LocationMap
-              center={center}
-              rings={demographics?.rings || []}
-              userPoints={userPoints}
-              layers={layers}
-              selectedRadius={selectedRadius}
-              onMapClick={handleMapClick}
-              onPointClick={(point) => {
-                // Could open edit dialog here
-                console.log('Point clicked:', point);
-              }}
-              isAddingPoint={isAddingPoint}
-            />
-            <div className="map-controls">
-              <MapLayerToggle layers={layers} onToggle={handleLayerToggle} />
-            </div>
-          </div>
-
-          {/* Right panel - Demographics */}
+          {/* Left panel - Demographics */}
           <div className="flyout-data-panel">
             <DemographicsPanel
               demographics={demographics}
@@ -193,6 +171,26 @@ export function LocationMapFlyout({
                 </ul>
               </div>
             )}
+          </div>
+
+          {/* Right panel - Map */}
+          <div className="flyout-map-panel">
+            <LocationMap
+              center={center}
+              rings={demographics?.rings || []}
+              userPoints={userPoints}
+              layers={layers}
+              selectedRadius={selectedRadius}
+              onMapClick={handleMapClick}
+              onPointClick={(point) => {
+                // Could open edit dialog here
+                console.log('Point clicked:', point);
+              }}
+              isAddingPoint={isAddingPoint}
+            />
+            <div className="map-controls">
+              <MapLayerToggle layers={layers} onToggle={handleLayerToggle} />
+            </div>
           </div>
         </div>
 

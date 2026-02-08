@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { cilChevronBottom, cilChevronTop, cilOptions } from '@coreui/icons';
+import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
@@ -21,11 +21,15 @@ interface LandscaperChatThreadedProps {
   projectId: number;
   pageContext: string;
   subtabContext?: string;
+  contextPillLabel?: string;
+  contextPillColor?: string;
   isIngesting?: boolean;
   ingestionProgress?: number;
   ingestionMessage?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  onCollapsePanel?: () => void;
+  onReviewMedia?: (docId: number, docName: string) => void;
 }
 
 /**
@@ -61,11 +65,15 @@ export function LandscaperChatThreaded({
   projectId,
   pageContext,
   subtabContext,
+  contextPillLabel,
+  contextPillColor,
   isIngesting,
   ingestionProgress = 0,
   ingestionMessage,
   isExpanded = true,
   onToggleExpand,
+  onCollapsePanel,
+  onReviewMedia,
 }: LandscaperChatThreadedProps) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -75,7 +83,7 @@ export function LandscaperChatThreaded({
   const prevMessageCount = useRef(0);
   const promptCopy =
     'Ask Landscaper anything about this project or drop a document and we\'ll get the model updated.';
-  const pageContextHint = getPageContextHint(pageContext);
+  const pageContextHint = contextPillLabel || getPageContextHint(pageContext);
 
   const {
     threads,
@@ -268,37 +276,70 @@ export function LandscaperChatThreaded({
     setShowThreadList(false);
   };
 
+  const hoverNeutralBackground = {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'transparent';
+    },
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="d-flex h-100 flex-column">
       {/* Header */}
       <div
-        className="flex items-center gap-2 border-b"
+        className="d-flex align-items-center gap-2 border-bottom"
         style={{
           padding: '0.5rem 1rem',
           borderColor: 'var(--cui-card-border-color)',
           backgroundColor: 'var(--cui-card-header-bg)',
         }}
       >
-        <LandscaperIcon style={{ width: '32px', height: '32px', color: 'var(--landscaper-icon-color)' }} />
+        <LandscaperIcon className="landscaper-panel-icon" aria-hidden="true" />
 
         {/* Panel title - static "Landscaper" */}
         <span
-          className="font-semibold"
-          style={{ color: 'var(--cui-body-color)', fontSize: '0.9rem' }}
+          className="fw-bold"
+          style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}
         >
           Landscaper
         </span>
 
+        {/* Collapse panel chevron */}
+        {onCollapsePanel && (
+          <button
+            onClick={onCollapsePanel}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              color: 'var(--cui-body-color)',
+              opacity: 0.6,
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'opacity 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+            aria-label="Collapse Landscaper panel"
+          >
+            <CIcon icon={cilChevronLeft} size="sm" />
+          </button>
+        )}
+
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-grow-1" />
 
         {/* Context indicator */}
         {!isIngesting && (
           <span
-            className="text-xs px-2 py-0.5 rounded"
+            className="badge rounded-pill"
             style={{
-              color: 'var(--cui-secondary-color)',
-              backgroundColor: 'var(--cui-tertiary-bg)',
+              color: contextPillColor ? 'var(--nav-tab-text)' : 'var(--cui-secondary-color)',
+              backgroundColor: contextPillColor || 'var(--cui-tertiary-bg)',
+              fontSize: '0.75rem',
             }}
           >
             {pageContextHint}
@@ -307,13 +348,13 @@ export function LandscaperChatThreaded({
 
         {/* Ingestion Progress Gauge */}
         {isIngesting && (
-          <div className="flex items-center gap-2">
+          <div className="d-flex align-items-center gap-2">
             <div
-              className="relative"
+              className="position-relative"
               style={{ width: '32px', height: '32px' }}
               title={ingestionMessage || 'Processing...'}
             >
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <svg style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
                 <circle
                   cx="18"
                   cy="18"
@@ -335,15 +376,15 @@ export function LandscaperChatThreaded({
                 />
               </svg>
               <div
-                className="absolute inset-0 flex items-center justify-center text-xs font-medium"
-                style={{ color: 'var(--cui-body-color)' }}
+                className="position-absolute top-0 start-0 d-flex align-items-center justify-content-center fw-medium"
+                style={{ color: 'var(--cui-body-color)', width: '100%', height: '100%', fontSize: '0.75rem' }}
               >
                 {Math.round(ingestionProgress)}
               </div>
             </div>
             <span
-              className="text-xs truncate max-w-[120px]"
-              style={{ color: 'var(--cui-secondary-color)' }}
+              className="small text-truncate d-inline-block"
+              style={{ color: 'var(--cui-secondary-color)', maxWidth: '120px' }}
             >
               {ingestionMessage || 'Ingesting...'}
             </span>
@@ -352,9 +393,12 @@ export function LandscaperChatThreaded({
 
         {/* Thread list toggle */}
         <button
+          type="button"
           onClick={() => setShowThreadList(!showThreadList)}
-          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+          style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
           title={showThreadList ? 'Hide threads' : 'Show threads'}
+          {...hoverNeutralBackground}
         >
           <CIcon
             icon={cilOptions}
@@ -366,9 +410,12 @@ export function LandscaperChatThreaded({
         {/* Collapse/Expand toggle */}
         {onToggleExpand && (
           <button
+            type="button"
             onClick={onToggleExpand}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+            style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
             title={isExpanded ? 'Collapse chat' : 'Expand chat'}
+            {...hoverNeutralBackground}
           >
             <CIcon
               icon={isExpanded ? cilChevronTop : cilChevronBottom}
@@ -395,17 +442,17 @@ export function LandscaperChatThreaded({
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto p-4 space-y-3"
+        className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-3"
         style={{ backgroundColor: 'var(--cui-body-bg)' }}
       >
         {messages.length === 0 ? (
-          <div className="py-8 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div className="py-4 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
             {isThreadLoading ? (
-              <p className="text-sm">Loading conversation...</p>
+              <p className="small mb-0">Loading conversation...</p>
             ) : (
               <>
-                <p className="text-sm">{promptCopy}</p>
-                <p className="text-xs mt-1">Budget, market analysis, assumptions, documents...</p>
+                <p className="small mb-1">{promptCopy}</p>
+                <p style={{ fontSize: '0.75rem', marginBottom: 0 }}>Budget, market analysis, assumptions, documents...</p>
               </>
             )}
           </div>
@@ -417,13 +464,14 @@ export function LandscaperChatThreaded({
               onConfirmMutation={handleConfirmMutation}
               onRejectMutation={handleRejectMutation}
               onConfirmBatch={handleConfirmBatch}
+              onReviewMedia={onReviewMedia}
             />
           ))
         )}
 
         {error && !isLoading && (
           <div
-            className="rounded-md border px-3 py-2 text-sm"
+            className="rounded border px-3 py-2 small"
             style={{
               borderColor: 'var(--cui-danger-border-subtle)',
               color: 'var(--cui-danger)',
@@ -441,10 +489,10 @@ export function LandscaperChatThreaded({
 
       {/* Input */}
       <div
-        className="border-t p-3"
+        className="border-top p-3"
         style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
       >
-        <div className="flex gap-2">
+        <div className="d-flex gap-2 align-items-end">
           <textarea
             ref={textareaRef}
             value={input}
@@ -457,20 +505,20 @@ export function LandscaperChatThreaded({
             }}
             placeholder={promptCopy}
             rows={1}
-            className="flex-1 rounded-lg border px-3 py-2 text-sm resize-none"
+            className="form-control flex-grow-1"
             style={{
-              borderColor: 'var(--cui-border-color)',
               backgroundColor: 'var(--cui-body-bg)',
               color: 'var(--cui-body-color)',
               maxHeight: '200px',
+              resize: 'none',
             }}
             disabled={isLoading || isThreadLoading}
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!input.trim() || isLoading || isThreadLoading}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
-            style={{ backgroundColor: 'var(--cui-primary)' }}
+            className="btn btn-primary"
           >
             Send
           </button>

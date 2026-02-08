@@ -72,7 +72,7 @@ export default function WaterfallStructureTable({ tiers }: WaterfallStructureTab
               </CTableDataCell>
               <CTableDataCell>
                 {tier.splits.map((split, idx) => (
-                  <div key={idx} className="text-sm mb-1">
+                  <div key={idx} className="small mb-1">
                     <span className="fw-medium">{split.partnerName}:</span>{' '}
                     {formatPercent(split.percent)}
                   </div>

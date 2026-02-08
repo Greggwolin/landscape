@@ -28,6 +28,13 @@ urlpatterns = [
         name="location-intelligence-project-demographics-delete"
     ),
 
+    # Nearby block-group boundaries (GeoJSON)
+    path(
+        "block-groups/",
+        views.get_block_groups,
+        name="location-intelligence-block-groups"
+    ),
+
     # Stats/health check
     path(
         "stats/",

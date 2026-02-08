@@ -89,7 +89,7 @@ export default function EquityPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="d-flex flex-column gap-3">
       <div className="d-flex flex-column flex-lg-row gap-3 gap-lg-4 mb-3">
         <div className="flex-fill" style={{ minWidth: 0 }}>
           <NapkinWaterfallForm

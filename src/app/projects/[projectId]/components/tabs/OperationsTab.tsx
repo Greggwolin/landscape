@@ -12,6 +12,7 @@ import {
   OperationsHeader,
   LineItemRow
 } from '@/components/operations';
+import { getProjectCategory, isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/operations-tab.css';
 import { useOperationsData } from '@/hooks/useOperationsData';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
@@ -21,6 +22,8 @@ interface Project {
   project_id: number;
   project_name: string;
   project_type_code?: string;
+  project_type?: string;
+  property_subtype?: string;
 }
 
 interface OperationsTabProps {
@@ -30,9 +33,13 @@ interface OperationsTabProps {
 }
 
 function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
-  // Check project type
-  const isMultifamily = project.project_type_code === 'MF';
-  const isLand = project.project_type_code === 'LAND';
+  // Align project-type resolution with folder tabs/navigation
+  const effectiveProjectType =
+    project.property_subtype || project.project_type || project.project_type_code;
+  const projectCategory = getProjectCategory(effectiveProjectType);
+  const isIncome = isIncomeProperty(effectiveProjectType);
+  const isLand = !isIncome;
+  const isMultifamily = projectCategory === 'multifamily';
 
   // Use the operations data hook
   const {

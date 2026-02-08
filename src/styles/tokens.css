@@ -42,6 +42,25 @@
   --chip-error: #dc2626;
   --chip-muted: #4b5563;
 
+  /* ==========================================================================
+     PROPERTY TYPE TOKENS (domain-level, governed)
+     These are canonical domain colors, not semantic intent colors.
+     ========================================================================== */
+  --pt-land-dev-bg: #1f2a37;
+  --pt-land-dev-text: #ffffff;
+  --pt-multifamily-bg: #f37021;
+  --pt-multifamily-text: #ffffff;
+  --pt-retail-bg: #cc004c;
+  --pt-retail-text: #ffffff;
+  --pt-office-bg: #6460aa;
+  --pt-office-text: #ffffff;
+  --pt-industrial-bg: #0089d0;
+  --pt-industrial-text: #ffffff;
+  --pt-hospitality-bg: #0db14b;
+  --pt-hospitality-text: #ffffff;
+  --pt-mixed-use-bg: #fcb711;
+  --pt-mixed-use-text: #000000;
+
   /* Semantic category chips */
   --chip-horizontal-bg: rgba(37, 99, 235, 0.12);
   --chip-horizontal-border: rgba(37, 99, 235, 0.45);

@@ -17,7 +17,7 @@ import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
-import StudioContent from './StudioContent';
+import ProjectContentRouter from './ProjectContentRouter';
 
 function ProjectPageInner() {
   const params = useParams();
@@ -61,7 +61,7 @@ function ProjectPageInner() {
 
   // Route content based on folder/tab
   return (
-    <StudioContent
+    <ProjectContentRouter
       project={currentProject}
       currentFolder={currentFolder}
       currentTab={currentTab}

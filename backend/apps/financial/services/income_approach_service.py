@@ -68,12 +68,36 @@ class IncomeApproachDataService:
 
     def get_dcf_parameters(self) -> Dict[str, Any]:
         """
-        Pull DCF params from tbl_cre_dcf_analysis.
-        Falls back to tbl_project_assumption for exit cap rate, then defaults.
-        Gracefully handles missing tables.
+        Pull DCF params with cascading lookup:
+        1. tbl_dcf_analysis (Django ORM model, primary source)
+        2. tbl_cre_dcf_analysis (legacy CRE-specific table)
+        3. tbl_project_assumption (key-value fallback)
+        4. Defaults
         """
         with connection.cursor() as cursor:
-            # Check if tbl_cre_dcf_analysis exists before querying
+            # 1. Try tbl_dcf_analysis first (unified Django model)
+            try:
+                cursor.execute("""
+                    SELECT hold_period_years, discount_rate,
+                           exit_cap_rate, selling_costs_pct
+                    FROM landscape.tbl_dcf_analysis
+                    WHERE project_id = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, [self.project_id])
+                row = cursor.fetchone()
+
+                if row:
+                    return {
+                        'hold_period_years': row[0] or self.DEFAULTS['hold_period_years'],
+                        'discount_rate': self._decimal_to_float(row[1], self.DEFAULTS['discount_rate']),
+                        'terminal_cap_rate': self._decimal_to_float(row[2], self.DEFAULTS['terminal_cap_rate']),
+                        'selling_costs_pct': self._decimal_to_float(row[3], self.DEFAULTS['selling_costs_pct']),
+                    }
+            except Exception:
+                pass
+
+            # 2. Try tbl_cre_dcf_analysis (legacy CRE-specific)
             try:
                 cursor.execute("""
                     SELECT EXISTS (
@@ -85,7 +109,6 @@ class IncomeApproachDataService:
                 table_exists = cursor.fetchone()[0]
 
                 if table_exists:
-                    # Try tbl_cre_dcf_analysis first (via cre_property)
                     cursor.execute("""
                         SELECT
                             dcf.hold_period_years,
@@ -108,11 +131,9 @@ class IncomeApproachDataService:
                             'selling_costs_pct': self._decimal_to_float(row[3], self.DEFAULTS['selling_costs_pct']),
                         }
             except Exception:
-                # Table doesn't exist or query failed - fall through to defaults
                 pass
 
-            # Fallback to project assumptions for DCF parameters
-            # Keys match what update_dcf_parameters saves when tbl_cre_property doesn't exist
+            # 3. Fallback to project assumptions (key-value store)
             try:
                 cursor.execute("""
                     SELECT assumption_key, assumption_value
@@ -381,92 +402,61 @@ class IncomeApproachDataService:
 
     def update_dcf_parameters(self, updates: Dict[str, Any]) -> bool:
         """
-        Update DCF parameters in tbl_cre_dcf_analysis.
-        Creates record if it doesn't exist.
-        Falls back to storing in tbl_project_assumption if tables don't exist.
+        Update DCF parameters with cascading write:
+        1. tbl_dcf_analysis (primary, Django ORM model)
+        2. tbl_project_assumption (fallback key-value store, for legacy reads)
         """
+        field_mapping = {
+            'hold_period_years': 'hold_period_years',
+            'discount_rate': 'discount_rate',
+            'terminal_cap_rate': 'exit_cap_rate',
+            'selling_costs_pct': 'selling_costs_pct',
+        }
+
+        set_clauses = []
+        values = []
+        for key, col in field_mapping.items():
+            if key in updates:
+                set_clauses.append(f"{col} = %s")
+                values.append(updates[key])
+
+        if not set_clauses:
+            return False
+
         with connection.cursor() as cursor:
-            # Check if the required tables exist
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'landscape'
-                    AND table_name = 'tbl_cre_property'
-                )
-            """)
-            tables_exist = cursor.fetchone()[0]
-
-            if not tables_exist:
-                # Fall back to storing DCF params in project assumptions
-                assumption_mapping = {
-                    'hold_period_years': 'dcf_hold_period_years',
-                    'discount_rate': 'dcf_discount_rate',
-                    'terminal_cap_rate': 'cap_rate_exit',
-                    'selling_costs_pct': 'dcf_selling_costs_pct',
-                }
-                for key, assumption_key in assumption_mapping.items():
-                    if key in updates:
-                        self.update_project_assumption(assumption_key, updates[key])
-                return True
-
-            # Find or create cre_property for this project
-            cursor.execute("""
-                SELECT cre_property_id
-                FROM landscape.tbl_cre_property
-                WHERE project_id = %s
-                LIMIT 1
-            """, [self.project_id])
-            prop_row = cursor.fetchone()
-
-            if not prop_row:
-                # Create a CRE property record
-                cursor.execute("""
-                    INSERT INTO landscape.tbl_cre_property (project_id, created_at, updated_at)
-                    VALUES (%s, NOW(), NOW())
-                    RETURNING cre_property_id
-                """, [self.project_id])
-                prop_row = cursor.fetchone()
-
-            cre_property_id = prop_row[0]
-
-            # Update or insert DCF analysis
-            set_clauses = []
-            values = []
-
-            field_mapping = {
-                'hold_period_years': 'hold_period_years',
-                'discount_rate': 'discount_rate',
-                'terminal_cap_rate': 'terminal_cap_rate',
-                'selling_costs_pct': 'selling_costs_pct',
-            }
-
-            for key, col in field_mapping.items():
-                if key in updates:
-                    set_clauses.append(f"{col} = %s")
-                    values.append(updates[key])
-
-            if not set_clauses:
-                return False
-
-            # Try update first
-            cursor.execute(f"""
-                UPDATE landscape.tbl_cre_dcf_analysis
-                SET {', '.join(set_clauses)}, updated_at = NOW()
-                WHERE cre_property_id = %s
-                RETURNING dcf_analysis_id
-            """, values + [cre_property_id])
-
-            if cursor.fetchone() is None:
-                # Insert if no existing record
-                columns = [field_mapping[k] for k in updates.keys() if k in field_mapping]
-                placeholders = ', '.join(['%s'] * len(columns))
+            # 1. Write to tbl_dcf_analysis (primary)
+            try:
                 cursor.execute(f"""
-                    INSERT INTO landscape.tbl_cre_dcf_analysis
-                    (cre_property_id, {', '.join(columns)}, created_at, updated_at)
-                    VALUES (%s, {placeholders}, NOW(), NOW())
-                """, [cre_property_id] + [updates[k] for k in updates.keys() if k in field_mapping])
+                    UPDATE landscape.tbl_dcf_analysis
+                    SET {', '.join(set_clauses)}, updated_at = NOW()
+                    WHERE project_id = %s
+                    RETURNING dcf_analysis_id
+                """, values + [self.project_id])
 
-            return True
+                if cursor.fetchone() is None:
+                    # No existing record — insert
+                    columns = [field_mapping[k] for k in updates.keys() if k in field_mapping]
+                    placeholders = ', '.join(['%s'] * len(columns))
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_dcf_analysis
+                        (project_id, {', '.join(columns)}, created_at, updated_at)
+                        VALUES (%s, {placeholders}, NOW(), NOW())
+                    """, [self.project_id] + [updates[k] for k in updates.keys() if k in field_mapping])
+            except Exception:
+                pass
+
+        # 2. Also write to tbl_project_assumption (for legacy reads)
+        assumption_mapping = {
+            'hold_period_years': 'dcf_hold_period_years',
+            'discount_rate': 'dcf_discount_rate',
+            'terminal_cap_rate': 'cap_rate_exit',
+            'selling_costs_pct': 'dcf_selling_costs_pct',
+        }
+        for key, assumption_key in assumption_mapping.items():
+            if key in updates:
+                self.update_project_assumption(assumption_key, updates[key])
+
+        return True
 
     def update_project_assumption(self, key: str, value: Any) -> bool:
         """

@@ -1,0 +1,234 @@
+'use client';
+
+/**
+ * MediaCard — Individual media asset card for the MediaPreviewModal grid.
+ *
+ * Shows thumbnail, classification badge, confidence indicator, page reference,
+ * and an action dropdown (Save Image, Extract Data, Both, Ignore).
+ *
+ * @version 1.0
+ * @created 2026-02-08
+ */
+
+import React, { useState, useCallback } from 'react';
+import { CBadge } from '@coreui/react';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MediaItemClassification {
+  code: string;
+  name: string;
+  badge_color: string;
+  content_intent: string;
+  confidence: number | null;
+}
+
+export interface MediaItem {
+  media_id: number;
+  source_page: number;
+  extraction_method: 'embedded' | 'page_capture' | 'region' | 'upload';
+  thumbnail_uri: string | null;
+  storage_uri: string | null;
+  classification: MediaItemClassification | null;
+  suggested_action: 'save_image' | 'extract_data' | 'both' | 'ignore';
+  user_action: 'save_image' | 'extract_data' | 'both' | 'ignore' | null;
+  status: string;
+  width_px: number;
+  height_px: number;
+  ai_description: string | null;
+}
+
+export type MediaAction = 'save_image' | 'extract_data' | 'both' | 'ignore';
+
+interface MediaCardProps {
+  item: MediaItem;
+  selectedAction: MediaAction;
+  onActionChange: (mediaId: number, action: MediaAction) => void;
+  onThumbnailClick?: (item: MediaItem) => void;
+  djangoBaseUrl: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ACTION_OPTIONS: { value: MediaAction; label: string; icon: string }[] = [
+  { value: 'save_image', label: 'Save Image', icon: '\uD83D\uDCBE' },
+  { value: 'extract_data', label: 'Extract Data', icon: '\uD83D\uDCCA' },
+  { value: 'both', label: 'Both', icon: '\uD83D\uDCBE\uD83D\uDCCA' },
+  { value: 'ignore', label: 'Ignore', icon: '\u2298' },
+];
+
+/** Short type labels for compact display */
+const TYPE_LABELS: Record<string, string> = {
+  property_photo: 'Photo',
+  aerial_photo: 'Aerial',
+  site_plan: 'Site Plan',
+  floor_plan: 'Floor Plan',
+  aerial_map: 'Aerial Map',
+  zoning_map: 'Zoning Map',
+  location_map: 'Location Map',
+  planning_map: 'Planning Map',
+  chart: 'Chart',
+  infographic: 'Infographic',
+  rendering: 'Rendering',
+  before_after: 'Before/After',
+  logo: 'Logo',
+  other: 'Other',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function MediaCard({
+  item,
+  selectedAction,
+  onActionChange,
+  onThumbnailClick,
+  djangoBaseUrl,
+}: MediaCardProps) {
+  const [imgError, setImgError] = useState(false);
+
+  const isIgnored = selectedAction === 'ignore';
+  const confidence = item.classification?.confidence ?? null;
+  const badgeColor = item.classification?.badge_color ?? 'secondary';
+  const typeLabel = item.classification
+    ? TYPE_LABELS[item.classification.code] ?? item.classification.name
+    : 'Unclassified';
+
+  // Build thumbnail URL
+  const thumbnailSrc = item.thumbnail_uri
+    ? item.thumbnail_uri.startsWith('http')
+      ? item.thumbnail_uri
+      : `${djangoBaseUrl}/media/${item.thumbnail_uri}`
+    : null;
+
+  const handleSelect = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onActionChange(item.media_id, e.target.value as MediaAction);
+    },
+    [item.media_id, onActionChange]
+  );
+
+  // Confidence dot color
+  let confidenceColor = 'var(--cui-secondary)';
+  if (confidence !== null) {
+    if (confidence >= 0.8) confidenceColor = 'var(--cui-success)';
+    else if (confidence >= 0.5) confidenceColor = 'var(--cui-warning)';
+    else confidenceColor = 'var(--cui-danger)';
+  }
+
+  return (
+    <div
+      className="card h-100"
+      style={{
+        opacity: isIgnored ? 0.5 : 1,
+        transition: 'opacity 0.2s ease',
+        backgroundColor: 'var(--cui-body-bg)',
+        borderColor: 'var(--cui-border-color)',
+      }}
+    >
+      {/* Thumbnail area */}
+      <div
+        className="card-img-top d-flex align-items-center justify-content-center"
+        style={{
+          height: 160,
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          cursor: thumbnailSrc && !imgError ? 'pointer' : 'default',
+          overflow: 'hidden',
+        }}
+        onClick={() => thumbnailSrc && !imgError && onThumbnailClick?.(item)}
+      >
+        {thumbnailSrc && !imgError ? (
+          <img
+            src={thumbnailSrc}
+            alt={typeLabel}
+            onError={() => setImgError(true)}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+            }}
+          />
+        ) : (
+          <div
+            className="d-flex flex-column align-items-center justify-content-center"
+            style={{ color: 'var(--cui-secondary-color)' }}
+          >
+            <span style={{ fontSize: '2rem' }}>
+              {item.status === 'pending' ? '\uD83D\uDCC4' : '\uD83D\uDDBC\uFE0F'}
+            </span>
+            <span className="small mt-1">pg. {item.source_page}</span>
+            {item.status === 'pending' && (
+              <span className="small" style={{ color: 'var(--cui-warning)' }}>
+                Not yet extracted
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div className="card-body p-2">
+        {/* Classification badge + page */}
+        <div className="d-flex align-items-center justify-content-between mb-1">
+          <CBadge
+            color={badgeColor as any}
+            shape="rounded-pill"
+            className="small"
+          >
+            {typeLabel}
+          </CBadge>
+          <span
+            className="small"
+            style={{ color: 'var(--cui-secondary-color)' }}
+          >
+            pg. {item.source_page}
+          </span>
+        </div>
+
+        {/* Confidence indicator */}
+        {confidence !== null && (
+          <div
+            className="d-flex align-items-center gap-1 mb-2"
+            style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: confidenceColor,
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            <span>{Math.round(confidence * 100)}%</span>
+          </div>
+        )}
+
+        {/* Action dropdown */}
+        <select
+          className="form-select form-select-sm"
+          value={selectedAction}
+          onChange={handleSelect}
+          style={{
+            backgroundColor: 'var(--cui-body-bg)',
+            borderColor: 'var(--cui-border-color)',
+            color: 'var(--cui-body-color)',
+            fontSize: '0.8rem',
+          }}
+        >
+          {ACTION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.icon} {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}

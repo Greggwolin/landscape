@@ -82,6 +82,9 @@ class Document(models.Model):
     updated_by = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Media scan fields
+    media_scan_status = models.CharField(max_length=20, default='unscanned')
+    media_scan_json = models.JSONField(null=True, blank=True)
     # Soft delete fields
     deleted_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.CharField(max_length=255, null=True, blank=True)

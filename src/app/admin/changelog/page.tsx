@@ -19,6 +19,8 @@ import { cilPlus, cilPencil, cilTrash } from '@coreui/icons';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface ChangelogEntry {
   changelog_id: number;
   version: string;
@@ -178,13 +180,23 @@ function ChangelogAdminContent() {
   };
 
   const fetchEntries = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/`,
-        { headers: getAuthHeaders() }
-      );
+    setLoading(true);
+    setError(null);
 
-      if (!response.ok) throw new Error('Failed to fetch changelog');
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/changelog/`, { headers: getAuthHeaders() });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const detail =
+          errorData &&
+          typeof errorData === 'object' &&
+          'detail' in errorData &&
+          typeof errorData.detail === 'string'
+            ? ` ${errorData.detail}`
+            : '';
+        throw new Error(`Failed to fetch changelog (${response.status}).${detail}`);
+      }
 
       const data = await response.json();
       setEntries(Array.isArray(data) ? data : data.results || []);
@@ -201,14 +213,11 @@ function ChangelogAdminContent() {
   }, [fetchEntries]);
 
   const handleCreate = async (data: ChangelogFormData) => {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/changelog/`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) throw new Error('Failed to create');
     await fetchEntries();
@@ -217,14 +226,11 @@ function ChangelogAdminContent() {
   const handleUpdate = async (data: ChangelogFormData) => {
     if (!selectedEntry) return;
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/${selectedEntry.changelog_id}/`,
-      {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/changelog/${selectedEntry.changelog_id}/`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) throw new Error('Failed to update');
     await fetchEntries();
@@ -233,13 +239,10 @@ function ChangelogAdminContent() {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this changelog entry?')) return;
 
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/changelog/${id}/`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/changelog/${id}/`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) throw new Error('Failed to delete');
     await fetchEntries();

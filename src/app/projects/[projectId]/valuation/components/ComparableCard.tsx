@@ -6,16 +6,21 @@
 
 'use client';
 
+import React, { useState } from 'react';
 import type { SalesComparable } from '@/types/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
+import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
+import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
 
 interface ComparableCardProps {
   comparable: SalesComparable;
+  projectId: number;
   onEdit?: (comp: SalesComparable) => void;
   onDelete?: (id: number) => void;
 }
 
-export function ComparableCard({ comparable, onEdit, onDelete }: ComparableCardProps) {
+export function ComparableCard({ comparable, projectId, onEdit, onDelete }: ComparableCardProps) {
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const formatCurrency = (value: number | null | undefined) => {
     if (!value) return 'N/A';
     return `$${value.toLocaleString()}`;
@@ -43,9 +48,19 @@ export function ComparableCard({ comparable, onEdit, onDelete }: ComparableCardP
         borderColor: 'var(--cui-border-color)'
       }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
+      {/* Header with thumbnail */}
+      <div className="flex items-start gap-3 mb-4">
+        {/* Comp photo thumbnail */}
+        <EntityMediaDisplay
+          entityType="comp_sale"
+          entityId={comparable.comparable_id}
+          projectId={projectId}
+          variant="single-thumb"
+          editable={true}
+          onAttach={() => setShowMediaPicker(true)}
+        />
+
+        <div className="flex-1" style={{ minWidth: 0 }}>
           <div className="flex items-center gap-2 mb-1">
             <h3
               className="text-lg font-semibold"
@@ -73,6 +88,21 @@ export function ComparableCard({ comparable, onEdit, onDelete }: ComparableCardP
           </p>
         </div>
       </div>
+
+      {/* Media Picker Modal */}
+      {showMediaPicker && (
+        <MediaPickerModal
+          isOpen={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          projectId={projectId}
+          entityType="comp_sale"
+          entityId={comparable.comparable_id}
+          linkPurpose="hero_image"
+          singleSelect={true}
+          filterClassification={['property_photo', 'aerial_photo']}
+          onSelect={() => setShowMediaPicker(false)}
+        />
+      )}
 
       {/* Metrics Table - 2 Column Format */}
       <div className="mb-4">

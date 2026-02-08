@@ -175,6 +175,16 @@ def upload_document(request):
             # Log but don't fail - document is saved, processing can be retried
             logger.warning(f"RAG processing failed for doc_id={doc.doc_id}: {process_error}")
 
+        # Trigger media scan (detect embedded images — scan only, not extract)
+        from apps.knowledge.services.media_extraction_service import MediaExtractionService
+        try:
+            media_svc = MediaExtractionService()
+            scan_result = media_svc.scan_document(doc.doc_id, saved_path)
+            detected = scan_result.get('total_detected', 0) if scan_result else 0
+            logger.info(f"Media scan complete for doc_id={doc.doc_id}: {detected} assets detected")
+        except Exception as scan_error:
+            logger.warning(f"Media scan failed for doc_id={doc.doc_id}: {scan_error}")
+
         return Response({
             'success': True,
             'doc_id': doc.doc_id,

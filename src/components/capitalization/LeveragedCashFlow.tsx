@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CSpinner } from '@coreui/react';
-import { useLeveragedCashFlow, useLoanSchedule } from '@/hooks/useCapitalization';
+import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody } from '@coreui/react';
+import {
+  useIncomeApproachMonthlyDCF,
+  useLeveragedCashFlow,
+  useLoanSchedule,
+} from '@/hooks/useCapitalization';
 import type { Loan } from '@/types/assumptions';
 
 /* ---------- Types ---------- */
@@ -54,6 +58,18 @@ interface DebtSchedulePeriod {
   ending_balance: number;
 }
 
+interface ExitAnalysis {
+  terminalNOI: number;
+  exitCapRate: number;
+  grossReversionPrice: number;
+  sellingCosts: number;
+  sellingCostsPct: number;
+  netReversion: number;
+  loanPayoff: number;
+  netReversionAfterDebt: number;
+  holdPeriodMonths: number;
+}
+
 interface CashFlowResponse {
   success: boolean;
   data: {
@@ -65,13 +81,23 @@ interface CashFlowResponse {
     periods: CashFlowPeriodLabel[];
     sections: CashFlowSection[];
     summary: Record<string, unknown>;
+    exitAnalysis?: ExitAnalysis;
   };
+}
+
+interface IncomeApproachMonthlyProjection {
+  periodIndex: number; // 1-based
+  noi: number;
+}
+
+interface IncomeApproachMonthlyResponse {
+  projections?: IncomeApproachMonthlyProjection[];
 }
 
 /* Row model for display */
 interface DisplayRow {
   label: string;
-  rowType: 'section-header' | 'indent' | 'subtotal' | 'noi' | 'divider' | 'net-cf' | 'grand-total' | 'info';
+  rowType: 'section-header' | 'indent' | 'subtotal' | 'noi' | 'divider' | 'net-cf' | 'grand-total' | 'info' | 'reversion';
   values: number[]; // one per aggregated period
   showSign?: boolean;
 }
@@ -149,6 +175,7 @@ export default function LeveragedCashFlow({
   const [periodView, setPeriodView] = useState<PeriodView>('monthly');
 
   const { data: cfResponse, isLoading: cfLoading, error: cfError } = useLeveragedCashFlow(projectId);
+  const { data: incomeApproachMonthly } = useIncomeApproachMonthlyDCF(projectId, Boolean(projectId));
 
   // Get first loan's debt schedule for interest/principal breakdown
   const firstLoanId = loans.length > 0 ? loans[0].loan_id : null;
@@ -161,14 +188,37 @@ export default function LeveragedCashFlow({
   /* Determine what data is available */
   const revenueSection = sections.find((s) => s.sectionId === 'revenue-gross');
   const deductionsSection = sections.find((s) => s.sectionId === 'revenue-deductions');
+  const opexSection = sections.find((s) => s.sectionId === 'income-opex');
   const netRevenueSection = sections.find((s) => s.sectionId === 'revenue-net');
   const financingSection = sections.find((s) => s.sectionId === 'financing');
 
   const hasIncomeData =
     (revenueSection && revenueSection.sectionTotal !== 0) ||
     (netRevenueSection && netRevenueSection.sectionTotal !== 0);
+  const hasSectionIncomeData = Boolean(hasIncomeData);
+  const hasOpExData = opexSection && opexSection.sectionTotal !== 0;
   const hasDebtData =
     financingSection && (financingSection.lineItems.length > 0 || financingSection.subtotals.length > 0);
+
+  const fallbackNoiByPeriod = useMemo(() => {
+    const projections = (incomeApproachMonthly as IncomeApproachMonthlyResponse | undefined)?.projections || [];
+    if (!projections.length) return [] as number[];
+
+    const maxIdx = projections.reduce((max, p) => Math.max(max, p.periodIndex || 0), 0);
+    if (maxIdx <= 0) return [] as number[];
+
+    const values = new Array(maxIdx).fill(0);
+    projections.forEach((p) => {
+      const idx = (p.periodIndex || 1) - 1;
+      if (idx >= 0 && idx < values.length) {
+        values[idx] = Number(p.noi || 0);
+      }
+    });
+    return values;
+  }, [incomeApproachMonthly]);
+
+  const hasFallbackIncomeData = fallbackNoiByPeriod.some((v) => v !== 0);
+  const hasAnyIncomeData = hasSectionIncomeData || hasFallbackIncomeData;
 
   /* Debt schedule breakdown */
   const debtSchedulePeriods = (scheduleData as { periods?: DebtSchedulePeriod[] })?.periods || [];
@@ -187,7 +237,7 @@ export default function LeveragedCashFlow({
     const zeroes = new Array(totalPeriods).fill(0);
 
     /* ---- NOI Section ---- */
-    if (hasIncomeData) {
+    if (hasSectionIncomeData) {
       // GPI row
       const gpiPeriodValues = zeroes.map((_, i) => {
         const sub = revenueSection?.subtotals.find((s) => s.periodIndex === i);
@@ -218,14 +268,43 @@ export default function LeveragedCashFlow({
         values: aggregatePeriods(egiValues, periodView),
       });
 
-      // TODO: Operating Expenses (need opex section)
-      // For now skip if not available
+      // Operating Expenses (income properties only)
+      if (hasOpExData && opexSection) {
+        for (const item of opexSection.lineItems) {
+          const itemValues = zeroes.map((_, i) => {
+            const pv = item.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: item.description,
+            rowType: 'indent',
+            values: aggregatePeriods(itemValues, periodView),
+          });
+        }
+
+        const totalOpexValues = zeroes.map((_, i) => {
+          const sub = opexSection.subtotals.find((s) => s.periodIndex === i);
+          return sub ? sub.amount : 0;
+        });
+        displayRows.push({
+          label: 'Total Operating Expenses',
+          rowType: 'subtotal',
+          values: aggregatePeriods(totalOpexValues, periodView),
+        });
+      }
 
       // NOI row
       const noiValues = zeroes.map((_, i) => {
         const sub = netRevenueSection?.subtotals.find((s) => s.periodIndex === i);
         return sub ? sub.amount : 0;
       });
+      displayRows.push({
+        label: 'Net Operating Income (NOI)',
+        rowType: 'noi',
+        values: aggregatePeriods(noiValues, periodView),
+      });
+    } else if (hasFallbackIncomeData) {
+      const noiValues = zeroes.map((_, i) => fallbackNoiByPeriod[i] || 0);
       displayRows.push({
         label: 'Net Operating Income (NOI)',
         rowType: 'noi',
@@ -347,7 +426,7 @@ export default function LeveragedCashFlow({
     });
 
     /* ---- Net Cash Flow ---- */
-    if (hasIncomeData && hasDebtData) {
+    if (hasAnyIncomeData && hasDebtData) {
       // Net CF = NOI + total debt service (debt service is negative)
       const noiRow = displayRows.find((r) => r.rowType === 'noi');
       const debtRow = displayRows.find((r) => r.label === 'Total Debt Service');
@@ -360,7 +439,7 @@ export default function LeveragedCashFlow({
           showSign: true,
         });
       }
-    } else if (hasIncomeData && !hasDebtData) {
+    } else if (hasAnyIncomeData && !hasDebtData) {
       // Net CF = NOI (no debt)
       const noiRow = displayRows.find((r) => r.rowType === 'noi');
       if (noiRow && noiRow.values.length > 0) {
@@ -383,21 +462,70 @@ export default function LeveragedCashFlow({
       });
     }
 
+    /* ---- Reversion & Grand Total ---- */
+    const exitAnalysis = cfData.exitAnalysis;
+    if (exitAnalysis && exitAnalysis.netReversionAfterDebt !== 0) {
+      // Divider before reversion
+      displayRows.push({
+        label: '',
+        rowType: 'divider',
+        values: [],
+      });
+
+      // Reversion row: value only in the last aggregated period
+      const netCFRow = displayRows.find((r) => r.rowType === 'net-cf');
+      const aggPeriodCount = netCFRow ? netCFRow.values.length : hdrs.length;
+      const reversionValues = new Array(aggPeriodCount).fill(0);
+      if (aggPeriodCount > 0) {
+        reversionValues[aggPeriodCount - 1] = exitAnalysis.netReversionAfterDebt;
+      }
+      displayRows.push({
+        label: 'Reversion (Net of Debt)',
+        rowType: 'reversion',
+        values: reversionValues,
+      });
+
+      // Grand Total row: Net CF + Reversion in final period
+      if (netCFRow && netCFRow.values.length > 0) {
+        const grandTotalValues = netCFRow.values.map((ncf, i) => {
+          if (i === aggPeriodCount - 1) {
+            return ncf + exitAnalysis.netReversionAfterDebt;
+          }
+          return ncf;
+        });
+        displayRows.push({
+          label: 'Total Cash Flow',
+          rowType: 'grand-total',
+          values: grandTotalValues,
+          showSign: true,
+        });
+      }
+    }
+
     return { rows: displayRows, headers: hdrs };
   }, [
     cfData,
     periodLabels,
     periodView,
-    hasIncomeData,
+    hasAnyIncomeData,
+    hasSectionIncomeData,
+    hasFallbackIncomeData,
+    hasOpExData,
     hasDebtData,
+    fallbackNoiByPeriod,
     debtSchedulePeriods,
     sections,
     revenueSection,
     deductionsSection,
+    opexSection,
     netRevenueSection,
     financingSection,
     loans,
   ]);
+
+  /* Reversion modal state */
+  const [showReversionModal, setShowReversionModal] = useState(false);
+  const exitAnalysis = cfData?.exitAnalysis;
 
   /* ---------- Render ---------- */
 
@@ -532,6 +660,35 @@ export default function LeveragedCashFlow({
                 );
               }
 
+              /* Reversion row — value only in last period, clickable */
+              if (row.rowType === 'reversion') {
+                return (
+                  <tr key={rowIdx} className="reversion-row">
+                    <td>{row.label}</td>
+                    {row.values.map((val, colIdx) => {
+                      if (val === 0) {
+                        return <td key={colIdx}>—</td>;
+                      }
+                      return (
+                        <td key={colIdx}>
+                          <span
+                            className="reversion-value"
+                            onClick={() => setShowReversionModal(true)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') setShowReversionModal(true);
+                            }}
+                          >
+                            {formatLCFCurrency(val)}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              }
+
               /* Standard data rows */
               const rowClass = row.rowType === 'noi'
                 ? 'noi-row'
@@ -559,7 +716,7 @@ export default function LeveragedCashFlow({
                         : '';
                     return (
                       <td key={colIdx} className={signClass}>
-                        {val === 0 && row.rowType === 'net-cf' && !hasIncomeData
+                        {val === 0 && row.rowType === 'net-cf' && !hasAnyIncomeData
                           ? '—'
                           : formatLCFCurrency(val)}
                       </td>
@@ -573,7 +730,7 @@ export default function LeveragedCashFlow({
       </div>
 
       {/* Info message for missing income data */}
-      {!hasIncomeData && hasDebtData && (
+      {!hasAnyIncomeData && hasDebtData && (
         <div
           className="d-flex align-items-center gap-2 mt-2"
           style={{
@@ -589,6 +746,97 @@ export default function LeveragedCashFlow({
             Add income assumptions in the Operations tab to see the full leveraged cash flow.
           </span>
         </div>
+      )}
+
+      {/* Reversion Breakdown Modal */}
+      {exitAnalysis && (
+        <CModal
+          visible={showReversionModal}
+          onClose={() => setShowReversionModal(false)}
+          size="sm"
+        >
+          <CModalHeader>
+            <CModalTitle style={{ fontSize: '0.9375rem' }}>
+              Reversion Analysis
+            </CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <table
+              style={{
+                width: '100%',
+                fontSize: '0.8125rem',
+                borderCollapse: 'collapse',
+              }}
+            >
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6px 0', color: 'var(--cui-secondary-color)' }}>
+                    Terminal NOI (Fwd 12-Mo)
+                  </td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 500 }}>
+                    {formatLCFCurrency(exitAnalysis.terminalNOI)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6px 0', color: 'var(--cui-secondary-color)' }}>
+                    Reversion Price @ {(exitAnalysis.exitCapRate * 100).toFixed(2)}% Cap
+                  </td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 500 }}>
+                    {formatLCFCurrency(exitAnalysis.grossReversionPrice)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6px 0', color: 'var(--cui-secondary-color)' }}>
+                    Less: Selling Costs ({(exitAnalysis.sellingCostsPct * 100).toFixed(1)}%)
+                  </td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 500, color: 'var(--cui-danger)' }}>
+                    ({formatLCFCurrency(exitAnalysis.sellingCosts)})
+                  </td>
+                </tr>
+                <tr
+                  style={{
+                    borderTop: '1px solid var(--cui-border-color)',
+                  }}
+                >
+                  <td style={{ padding: '6px 0', fontWeight: 600 }}>Net Reversion</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>
+                    {formatLCFCurrency(exitAnalysis.netReversion)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6px 0', color: 'var(--cui-secondary-color)' }}>
+                    Less: Loan Payoff
+                  </td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 500, color: 'var(--cui-danger)' }}>
+                    ({formatLCFCurrency(exitAnalysis.loanPayoff)})
+                  </td>
+                </tr>
+                <tr
+                  style={{
+                    borderTop: '2px solid var(--cui-border-color)',
+                  }}
+                >
+                  <td style={{ padding: '8px 0', fontWeight: 700, fontSize: '0.875rem' }}>
+                    Net Proceeds to Equity
+                  </td>
+                  <td
+                    style={{
+                      padding: '8px 0',
+                      textAlign: 'right',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      color: exitAnalysis.netReversionAfterDebt >= 0
+                        ? 'var(--cui-success)'
+                        : 'var(--cui-danger)',
+                    }}
+                  >
+                    {formatLCFCurrency(exitAnalysis.netReversionAfterDebt)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </CModalBody>
+        </CModal>
       )}
     </div>
   );

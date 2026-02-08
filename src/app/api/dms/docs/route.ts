@@ -296,6 +296,8 @@ export async function GET(request: NextRequest) {
         d.profile_json,
         d.created_at,
         d.updated_at,
+        d.media_scan_status,
+        d.media_scan_json,
         p.project_name
       FROM landscape.core_doc d
       LEFT JOIN landscape.tbl_project p ON d.project_id = p.project_id

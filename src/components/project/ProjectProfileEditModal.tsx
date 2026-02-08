@@ -27,7 +27,7 @@ import useSWR from 'swr';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile, ProjectProfileFormData, MSA } from '@/types/project-profile';
 import { OWNERSHIP_TYPES, validateTargetUnits, validateGrossAcres } from '@/types/project-profile';
-import { ANALYSIS_TYPES, getSubtypesForAnalysisType, type AnalysisType } from '@/types/project-taxonomy';
+import { ANALYSIS_TYPES, ANALYSIS_TYPE_LABELS, getSubtypesForAnalysisType, type AnalysisType } from '@/types/project-taxonomy';
 
 const toInputDate = (value?: string | null) => {
   if (!value) return '';
@@ -292,7 +292,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               >
                 <option value="" disabled hidden></option>
                 {ANALYSIS_TYPES.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>{ANALYSIS_TYPE_LABELS[type]}</option>
                 ))}
               </CFormSelect>
               {errors.analysis_type && (

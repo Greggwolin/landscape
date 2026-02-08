@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   IncomeApproachData,
   IncomeApproachAssumptions,
@@ -47,6 +48,7 @@ interface UseIncomeApproachReturn {
 }
 
 export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
+  const queryClient = useQueryClient();
   const [data, setData] = useState<IncomeApproachData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -292,9 +294,13 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
       if (monthlyDcfData) {
         fetchMonthlyDCF();
       }
+      // Invalidate leveraged cash flow cache so the Debt tab picks up changes
+      queryClient.invalidateQueries({ queryKey: ['leveraged-cash-flow', String(projectId)] });
+      // Also invalidate dcf-analysis cache (tbl_dcf_analysis was updated)
+      queryClient.invalidateQueries({ queryKey: ['dcf-analysis', projectId] });
     }
     prevIsSaving.current = isSaving;
-  }, [isSaving, dcfData, fetchDCF, monthlyDcfData, fetchMonthlyDCF]);
+  }, [isSaving, dcfData, fetchDCF, monthlyDcfData, fetchMonthlyDCF, queryClient, projectId]);
 
   return {
     data,

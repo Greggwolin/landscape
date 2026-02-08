@@ -89,7 +89,9 @@ async function databaseSearch(params: any) {
         searchable_text,
         storage_uri,
         mime_type,
-        file_size_bytes
+        file_size_bytes,
+        media_scan_status,
+        media_scan_json
       FROM landscape.mv_doc_search
       ${whereClause}
       ORDER BY updated_at DESC

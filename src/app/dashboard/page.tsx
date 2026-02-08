@@ -9,65 +9,17 @@ import DashboardMap from '@/app/components/dashboard/DashboardMap';
 import TriageModal from '@/app/components/dashboard/TriageModal';
 import { ActivityFeed } from '@/components/landscaper/ActivityFeed';
 import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
-import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
+import { LandscapeButton, PropertyTypeBadge } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
-import { CollapsedLandscaperStrip } from '@/components/studio/CollapsedLandscaperStrip';
+import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
+import {
+  type CanonicalPropertyTypeCode,
+  getPropertyTypeLabel,
+  getPropertyTypeTokenRef,
+  resolveCanonicalPropertyTypeCode,
+} from '@/config/propertyTypeTokens';
 
 type PropertyFilterKey = 'ALL' | 'LAND' | 'MF' | 'COMMERCIAL' | 'RET' | 'OFF' | 'IND';
-
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  LAND: 'Land Development',
-  MF: 'Multifamily',
-  OFF: 'Office',
-  RET: 'Retail',
-  IND: 'Industrial',
-  HTL: 'Hotel',
-  MXU: 'Mixed-Use',
-  MPC: 'Master Planned Community',
-  MULTIFAMILY: 'Multifamily',
-  OFFICE: 'Office',
-  RETAIL: 'Retail',
-  INDUSTRIAL: 'Industrial',
-  HOTEL: 'Hotel',
-  MIXED_USE: 'Mixed Use',
-  SUBDIVISION: 'Subdivision'
-};
-
-const PROPERTY_TYPE_COLORS: Record<string, string> = {
-  LAND: 'primary',
-  MF: 'success',
-  OFF: 'warning',
-  RET: 'danger',
-  IND: 'secondary',
-  HTL: 'dark',
-  MXU: 'info',
-  MPC: 'primary',
-  MULTIFAMILY: 'success',
-  OFFICE: 'warning',
-  RETAIL: 'danger',
-  INDUSTRIAL: 'secondary',
-  HOTEL: 'dark',
-  MIXED_USE: 'info',
-  SUBDIVISION: 'info'
-};
-
-const PROPERTY_TYPE_COLOR_HEX: Record<string, string> = {
-  LAND: '#0d6efd',
-  MF: '#198754',
-  OFF: '#ffc107',
-  RET: '#dc3545',
-  IND: '#6c757d',
-  HTL: '#212529',
-  MXU: '#0dcaf0',
-  MPC: '#0d6efd',
-  MULTIFAMILY: '#198754',
-  OFFICE: '#ffc107',
-  RETAIL: '#dc3545',
-  INDUSTRIAL: '#6c757d',
-  HOTEL: '#212529',
-  MIXED_USE: '#0dcaf0',
-  SUBDIVISION: '#0dcaf0'
-};
 
 const PROPERTY_FILTERS: Array<{ key: PropertyFilterKey; label: string; codes: string[] }> = [
   { key: 'ALL', label: 'All Projects', codes: [] },
@@ -79,16 +31,24 @@ const PROPERTY_FILTERS: Array<{ key: PropertyFilterKey; label: string; codes: st
   { key: 'IND', label: 'Industrial', codes: ['IND', 'INDUSTRIAL'] }
 ];
 
+const FILTER_COLOR_BY_KEY: Record<Exclude<PropertyFilterKey, 'ALL'>, CanonicalPropertyTypeCode> = {
+  LAND: 'LAND',
+  MF: 'MF',
+  COMMERCIAL: 'MXU',
+  RET: 'RET',
+  OFF: 'OFF',
+  IND: 'IND',
+};
+
 const getFilterColors = (filterKey: PropertyFilterKey) => {
   if (filterKey === 'ALL') {
-    return { varColor: 'var(--cui-primary)', hexColor: '#0d6efd' };
+    return { bgVar: 'var(--cui-primary)', textVar: 'var(--text-inverse)' };
   }
-  const filter = PROPERTY_FILTERS.find((f) => f.key === filterKey);
-  const colorKey = filter?.codes[0] ? PROPERTY_TYPE_COLORS[filter.codes[0]] : 'primary';
-  const hexColor = filter?.codes[0]
-    ? PROPERTY_TYPE_COLOR_HEX[filter.codes[0]] || '#0d6efd'
-    : '#0d6efd';
-  return { varColor: `var(--cui-${colorKey})`, hexColor };
+  const tokenRef = getPropertyTypeTokenRef(FILTER_COLOR_BY_KEY[filterKey]);
+  return {
+    bgVar: tokenRef?.bgVar || 'var(--cui-primary)',
+    textVar: tokenRef?.textVar || 'var(--text-inverse)',
+  };
 };
 
 const toTypeCode = (project: ProjectSummary) =>
@@ -107,21 +67,21 @@ const formatLocation = (project: ProjectSummary) => {
 };
 
 const formatUnits = (project: ProjectSummary) => {
-  const typeCode = toTypeCode(project);
+  const canonicalCode = resolveCanonicalPropertyTypeCode(toTypeCode(project));
   const units = project.total_residential_units ?? null;
   const acreage = project.acreage ?? project.acres_gross ?? null;
   const commercialSqft = project.total_commercial_sqft ?? null;
 
-  if (typeCode === 'LAND' || typeCode === 'MPC' || typeCode === 'SUBDIVISION') {
+  if (canonicalCode === 'LAND') {
     if (units && units > 0) return `${units.toLocaleString()}`;
     if (acreage) return `${acreage} Acres`;
   }
 
-  if (typeCode === 'MF' || typeCode === 'MULTIFAMILY') {
+  if (canonicalCode === 'MF') {
     if (units && units > 0) return `${units.toLocaleString()}`;
   }
 
-  if (typeCode && ['COMMERCIAL', 'MXU', 'RET', 'OFF', 'OFFICE', 'IND', 'INDUSTRIAL'].includes(typeCode)) {
+  if (canonicalCode && ['MXU', 'RET', 'OFF', 'IND', 'HTL'].includes(canonicalCode)) {
     if (commercialSqft && commercialSqft > 0) return `${commercialSqft.toLocaleString()} SF`;
   }
 
@@ -136,15 +96,7 @@ const matchesFilter = (project: ProjectSummary, filterKey: PropertyFilterKey) =>
 };
 
 const getTypeLabel = (project: ProjectSummary) => {
-  const typeCode = toTypeCode(project);
-  if (typeCode && PROPERTY_TYPE_LABELS[typeCode]) return PROPERTY_TYPE_LABELS[typeCode];
-  return typeCode || 'Not specified';
-};
-
-const getTypeColor = (project: ProjectSummary) => {
-  const typeCode = toTypeCode(project);
-  if (typeCode && PROPERTY_TYPE_COLORS[typeCode]) return PROPERTY_TYPE_COLORS[typeCode];
-  return 'secondary';
+  return getPropertyTypeLabel(toTypeCode(project));
 };
 
 function ProjectAccordion({
@@ -176,22 +128,24 @@ function ProjectAccordion({
   return (
     <CCard>
       <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="d-flex align-items-center justify-content-between gap-3">
+          <div className="d-flex align-items-center gap-2">
             <button
               type="button"
               onClick={onToggleLandscaper}
-              className="text-xs font-semibold tracking-wide rounded-full px-2 py-1"
+              className="rounded-pill px-2 py-1 fw-semibold"
               style={{
                 border: 'none',
                 backgroundColor: 'transparent',
                 color: 'var(--cui-body-color)',
+                fontSize: '0.75rem',
+                letterSpacing: '0.03em',
               }}
               aria-label="Toggle Landscaper panel"
             >
               {isLandscaperCollapsed ? '>>' : '<<'}
             </button>
-            <span className="text-base font-semibold">Projects</span>
+            <span>Projects</span>
           </div>
           <LandscapeButton color="primary" size="sm" onClick={onNewProject}>
             + New Project
@@ -199,7 +153,7 @@ function ProjectAccordion({
         </div>
       </CCardHeader>
       <CCardBody className="p-0">
-        <div className="divide-y" style={{ borderColor: 'var(--cui-border-color)' }}>
+        <div>
           {projects.map((project) => {
             const isSelected = selectedProjectId === project.project_id;
             const isHovered = hoveredId === project.project_id;
@@ -211,37 +165,37 @@ function ProjectAccordion({
                 onClick={() => onProjectClick(project)}
                 onMouseEnter={() => setHoveredId(project.project_id)}
                 onMouseLeave={() => setHoveredId(null)}
-                className="w-full text-left transition-colors"
+                className="w-100 text-start"
                 style={{
                   padding: '12px 16px',
+                  transition: 'background-color 150ms ease',
                   backgroundColor: isSelected
                     ? 'var(--cui-tertiary-bg)'
                     : isHovered
                       ? 'var(--cui-card-cap-bg)'
                       : 'transparent',
-                  borderLeft: isSelected ? '3px solid var(--cui-primary)' : '3px solid transparent'
+                  borderLeft: isSelected ? '3px solid var(--cui-primary)' : '3px solid transparent',
+                  borderTop: project === projects[0] ? 'none' : '1px solid var(--cui-border-color)',
                 }}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="d-flex align-items-start justify-content-between gap-3">
                   <div>
-                    <div className="font-semibold leading-tight">{project.project_name}</div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
-                      <SemanticBadge
-                        intent="category"
-                        value={getTypeLabel(project)}
-                      >
-                        {getTypeLabel(project)}
-                      </SemanticBadge>
+                    <div className="fw-semibold lh-sm">{project.project_name}</div>
+                    <div className="d-flex flex-wrap align-items-center gap-2 mt-1 small">
+                      <PropertyTypeBadge typeCode={toTypeCode(project)} label={getTypeLabel(project)} />
                       <span style={{ color: 'var(--cui-secondary-color)' }}>
                         {formatLocation(project)}
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--cui-secondary-color)' }}>
+                  <div className="text-end">
+                    <div
+                      className="small text-uppercase"
+                      style={{ color: 'var(--cui-secondary-color)', letterSpacing: '0.03em', fontSize: '0.75rem' }}
+                    >
                       Units
                     </div>
-                    <div className="font-semibold text-base">{formatUnits(project)}</div>
+                    <div className="fw-semibold" style={{ fontSize: '1rem' }}>{formatUnits(project)}</div>
                   </div>
                 </div>
               </button>
@@ -250,8 +204,8 @@ function ProjectAccordion({
         </div>
 
         {projects.length === 0 && (
-          <div className="text-center py-6">
-            <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div className="text-center py-4">
+            <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
               No projects found for this filter.
             </p>
           </div>
@@ -271,35 +225,53 @@ function ProjectCountTiles({
   onFilterChange: (filter: PropertyFilterKey) => void;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div
+      className="w-100"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gap: '0.375rem',
+      }}
+    >
       {PROPERTY_FILTERS.map((filter) => {
         const isActive = activeFilter === filter.key || (filter.key === 'ALL' && activeFilter === 'ALL');
         const count =
           filter.key === 'ALL'
             ? projects.length
             : projects.filter((project) => matchesFilter(project, filter.key)).length;
-        const { varColor, hexColor } = getFilterColors(filter.key);
-        const textColor = isActive ? '#ffffff' : hexColor;
-        const inactiveBg = `${hexColor}1a`; // ~10% opacity on hex
+        const { bgVar, textVar } = getFilterColors(filter.key);
 
         return (
           <button
             key={filter.key}
             type="button"
-            className="cursor-pointer transition-all rounded-md px-2 py-1.5 text-center"
+            className="rounded px-2 py-1 text-center w-100"
             onClick={() => onFilterChange(filter.key)}
             style={{
-              border: `1px solid ${isActive ? varColor : hexColor}`,
-              boxShadow: isActive ? `0 0 0 1px ${hexColor}` : undefined,
-              backgroundColor: isActive ? hexColor : inactiveBg,
-              color: textColor
+              cursor: 'pointer',
+              transition: 'all 150ms ease',
+              border: isActive
+                ? `1px solid ${bgVar}`
+                : `1px solid color-mix(in srgb, ${bgVar} 70%, var(--cui-border-color))`,
+              boxShadow: isActive ? `0 0 0 1px ${bgVar}` : undefined,
+              background: isActive
+                ? bgVar
+                : `color-mix(in srgb, ${bgVar} 14%, transparent)`,
+              color: isActive ? textVar : bgVar
             }}
           >
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="text-sm font-semibold" style={{ color: textColor }}>
+            <div className="d-flex align-items-center justify-content-center" style={{ gap: '0.375rem' }}>
+              <span className="small fw-semibold" style={{ color: isActive ? textVar : bgVar }}>
                 {count}
               </span>
-              <span className="text-xs truncate" style={{ color: isActive ? '#f8f9fa' : 'var(--cui-secondary-color)' }}>
+              <span
+                className="small text-truncate d-inline-block"
+                style={{
+                  color: isActive ? textVar : 'var(--cui-secondary-color)',
+                  fontSize: '0.75rem',
+                  maxWidth: '120px'
+                }}
+              >
                 {filter.label}
               </span>
             </div>
@@ -453,12 +425,16 @@ export default function DashboardPage() {
   const toggleLandscaperCollapsed = () => setLandscaperCollapsed((prev) => !prev);
 
   return (
-    <CContainer fluid className="space-y-2" style={{ padding: '0.25rem 0.5rem 0.5rem 0.25rem' }}>
+    <CContainer
+      fluid
+      className="d-flex flex-column"
+      style={{ padding: '0.25rem 0.5rem 0.5rem 0.25rem', gap: '0.5rem' }}
+    >
       {/* Three-column layout: Activity+Landscaper | Projects | Map with Filters */}
-      <div className="flex flex-1 min-h-0 gap-2" style={{ alignItems: 'flex-start' }}>
+      <div className="d-flex flex-grow-1 gap-2" style={{ alignItems: 'flex-start', minHeight: 0 }}>
         {/* Left Column: Activity Feed (top) + Landscaper Chat (bottom) */}
         <div
-          className="flex-shrink-0 sticky top-0 flex flex-col gap-1"
+          className="flex-shrink-0 position-sticky top-0 d-flex flex-column gap-1"
           style={{
             width: isLandscaperCollapsed ? '56px' : '30%',
             minWidth: isLandscaperCollapsed ? '56px' : '350px',
@@ -472,7 +448,7 @@ export default function DashboardPage() {
             <>
               {/* Landscaper Chat - Top */}
               <CCard
-                className="flex-1 shadow-lg overflow-hidden transition-all"
+                className="flex-grow-1 shadow overflow-hidden"
                 style={{
                   minHeight: '200px',
                 }}
@@ -487,7 +463,7 @@ export default function DashboardPage() {
 
               {/* Activity Feed - Bottom */}
               <CCard
-                className="shadow-lg overflow-hidden transition-all"
+                className="shadow overflow-hidden"
                 style={{
                   height: isActivityExpanded ? '45%' : '48px',
                   minHeight: isActivityExpanded ? '200px' : '48px',
@@ -526,29 +502,26 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Right Column: Filter Tiles + Map */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2">
-          <div className="px-3">
-            <span className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-              Project Locations
-            </span>
-          </div>
-          <div className="px-1">
-            <ProjectCountTiles
-              projects={projects}
-              activeFilter={activeFilter}
-              onFilterChange={handleFilterChange}
-            />
-          </div>
-
-          {/* Map */}
-          <CCard style={{ height: 'calc(100vh - 180px)', minHeight: '400px' }}>
-            <CCardBody style={{ height: '100%', padding: 0 }}>
-              <DashboardMap
-                projects={filteredProjects}
-                selectedProjectId={selectedProjectId}
-                onProjectSelect={handleProjectSelect}
+        {/* Right Column: Project Locations */}
+        <div className="flex-grow-1" style={{ minWidth: 0 }}>
+          <CCard>
+            <CCardHeader style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+              <span>Project Locations</span>
+            </CCardHeader>
+            <CCardBody className="d-flex flex-column gap-2" style={{ padding: '0.5rem' }}>
+              <ProjectCountTiles
+                projects={projects}
+                activeFilter={activeFilter}
+                onFilterChange={handleFilterChange}
               />
+
+              <div style={{ height: 'calc(100vh - 230px)', minHeight: '400px' }}>
+                <DashboardMap
+                  projects={filteredProjects}
+                  selectedProjectId={selectedProjectId}
+                  onProjectSelect={handleProjectSelect}
+                />
+              </div>
             </CCardBody>
           </CCard>
         </div>

@@ -8,6 +8,7 @@ import { ButtonIntentsSection } from './ButtonIntentsSection';
 import { BadgeIntentsSection } from './BadgeIntentsSection';
 import { NavTabsSection } from './NavTabsSection';
 import { CardHeadersSection } from './CardHeadersSection';
+import { PropertyTypeTokensSection } from './PropertyTypeTokensSection';
 import { buttonIntentRegistry, badgeIntentRegistry } from '@/config/semanticIntentRegistry';
 
 const DEFAULT_PATH = 'docs/design-system/style-catalog.md';
@@ -548,6 +549,14 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
           <h2 className="style-catalog-section-title">Card & Accordion Headers — Canonical Colors</h2>
         </div>
         <CardHeadersSection />
+      </section>
+
+      <section className="style-catalog-section">
+        <div className="style-catalog-section-header">
+          <h2 className="style-catalog-section-title">Property Type Color Tokens</h2>
+          <span className="style-catalog-section-count">7 types</span>
+        </div>
+        <PropertyTypeTokensSection />
       </section>
 
       <section className="style-catalog-section">

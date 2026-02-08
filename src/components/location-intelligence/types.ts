@@ -61,6 +61,8 @@ export interface LayerVisibility {
 // Props for the main flyout component
 export interface LocationMapFlyoutProps {
   projectId: string;
+  projectName: string;
+  anchorLeft?: number;
   center: [number, number]; // [lng, lat]
   isOpen: boolean;
   onClose: () => void;
