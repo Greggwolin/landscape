@@ -30,6 +30,21 @@ from .models_valuation import (
 # Import budget category models
 from .models_budget_categories import BudgetCategory
 
+# Import benchmark models (UnitCostCategory referenced by acquisition.AcquisitionEvent FK)
+from .models_benchmarks import (
+    CategoryTagLibrary,
+    UnitCostCategory,
+    CategoryActivity,
+    UnitCostItem,
+    GlobalBenchmark,
+    ItemBenchmarkLink,
+    PlanningStandard,
+    GlobalBenchmarkRegistry,
+    BenchmarkUnitCost,
+    BenchmarkTransactionCost,
+    BenchmarkAISuggestion,
+)
+
 
 class BudgetItem(models.Model):
     """
