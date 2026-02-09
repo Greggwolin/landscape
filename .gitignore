@@ -94,8 +94,9 @@ data/external/**/*.parquet
 *.old
 *.old2
 
-# Backend uploads (user data should not be committed)
+# Backend uploads and media (user data should not be committed)
 backend/uploads/
+backend/media/
 
 # Test/debug data files
 backend/*_extraction.json
