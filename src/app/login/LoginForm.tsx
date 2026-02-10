@@ -297,32 +297,6 @@ export default function LoginForm() {
             keeps confidential insights locked to your private workspace.
           </p>
         </div>
-        <div className="rounded-2xl border border-line-soft p-6 space-y-3" style={{ backgroundColor: 'var(--surface-card)' }}>
-          <div className="flex items-start gap-3">
-            <input
-              id="tos"
-              type="checkbox"
-              checked={tosAccepted}
-              onChange={(e) => setTosAccepted(e.target.checked)}
-              className="h-4 w-4 rounded border"
-              style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
-            />
-            <label htmlFor="tos" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-              I accept the{' '}
-              <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                Alpha Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                Privacy Policy
-              </Link>
-              .
-            </label>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-            These documents will appear during sign in so you always know how Landscape keeps your insights private.
-          </p>
-        </div>
       </div>
     </div>
   );
