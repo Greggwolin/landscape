@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     // Check if project exists
     const projectResult = await sql`
-      SELECT project_id FROM tbl_project WHERE project_id = ${projectIdNum}
+      SELECT project_id FROM landscape.tbl_project WHERE project_id = ${projectIdNum}
     `;
 
     if (projectResult.length === 0) {
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         units_to_renovate,
         created_at,
         updated_at
-      FROM tbl_value_add_assumptions
+      FROM landscape.tbl_value_add_assumptions
       WHERE project_id = ${projectIdNum}
     `;
 
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Check if project exists
     const projectResult = await sql`
-      SELECT project_id FROM tbl_project WHERE project_id = ${projectIdNum}
+      SELECT project_id FROM landscape.tbl_project WHERE project_id = ${projectIdNum}
     `;
 
     if (projectResult.length === 0) {
@@ -135,7 +135,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Upsert: insert or update on conflict
     const result = await sql`
-      INSERT INTO tbl_value_add_assumptions (
+      INSERT INTO landscape.tbl_value_add_assumptions (
         project_id,
         is_enabled,
         reno_start_month,
