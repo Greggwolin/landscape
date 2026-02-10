@@ -187,6 +187,29 @@ export function useLandscaperThreads({
     }
   }, []);
 
+  const getAuthHeaders = useCallback((includeContentType = true): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('auth_tokens');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.access) {
+            headers.Authorization = `Bearer ${parsed.access}`;
+          }
+        }
+      } catch (error) {
+        console.warn('[LandscaperThreads] Failed to parse auth token:', error);
+      }
+    }
+
+    return headers;
+  }, []);
+
   /**
    * Load all threads for the current project/page context.
    */
@@ -197,7 +220,9 @@ export function useLandscaperThreads({
       url.searchParams.set('page_context', pageContext);
       url.searchParams.set('include_closed', 'true');
 
-      const response = await fetchWithTimeout(url.toString());
+      const response = await fetchWithTimeout(url.toString(), {
+        headers: getAuthHeaders(false),
+      });
       const data = await response.json();
 
       if (data.success && data.threads) {
@@ -209,7 +234,7 @@ export function useLandscaperThreads({
       console.error('[LandscaperThreads] Failed to load threads:', err);
       return [];
     }
-  }, [projectId, pageContext, fetchWithTimeout]);
+  }, [projectId, pageContext, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Load messages for a specific thread.
@@ -217,7 +242,10 @@ export function useLandscaperThreads({
   const loadThreadMessages = useCallback(async (threadId: string) => {
     try {
       const response = await fetchWithTimeout(
-        `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/messages/`
+        `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/messages/`,
+        {
+          headers: getAuthHeaders(false),
+        }
       );
       const data = await response.json();
 
@@ -227,7 +255,7 @@ export function useLandscaperThreads({
     } catch (err) {
       console.error('[LandscaperThreads] Failed to load messages:', err);
     }
-  }, [fetchWithTimeout]);
+  }, [fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Get or create an active thread for the current page context.
@@ -250,7 +278,7 @@ export function useLandscaperThreads({
         // Create new thread
         const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             project_id: parseInt(projectId),
             page_context: pageContext,
@@ -273,7 +301,7 @@ export function useLandscaperThreads({
       setIsThreadLoading(false);
       initializingRef.current = false;
     }
-  }, [projectId, pageContext, subtabContext, loadThreads, loadThreadMessages, fetchWithTimeout]);
+  }, [projectId, pageContext, subtabContext, loadThreads, loadThreadMessages, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Select a different thread.
@@ -295,7 +323,7 @@ export function useLandscaperThreads({
     try {
       const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/new/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           project_id: parseInt(projectId),
           page_context: pageContext,
@@ -315,7 +343,7 @@ export function useLandscaperThreads({
     } finally {
       setIsThreadLoading(false);
     }
-  }, [projectId, pageContext, subtabContext, loadThreads, fetchWithTimeout]);
+  }, [projectId, pageContext, subtabContext, loadThreads, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Update a thread's title.
@@ -326,7 +354,7 @@ export function useLandscaperThreads({
         `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ title }),
         }
       );
@@ -344,7 +372,7 @@ export function useLandscaperThreads({
     } catch (err) {
       console.error('[LandscaperThreads] Failed to update title:', err);
     }
-  }, [activeThread, fetchWithTimeout]);
+  }, [activeThread, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Send a message in the current thread.
@@ -373,7 +401,7 @@ export function useLandscaperThreads({
           `${DJANGO_API_URL}/api/landscaper/threads/${activeThread.threadId}/messages/`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
               content: message,
               page_context: pageContext,  // Pass for context-aware tool filtering
@@ -419,7 +447,7 @@ export function useLandscaperThreads({
         setIsLoading(false);
       }
     },
-    [activeThread, projectId, onFieldUpdate, loadThreads, fetchWithTimeout]
+    [activeThread, projectId, pageContext, onFieldUpdate, loadThreads, fetchWithTimeout, getAuthHeaders]
   );
 
   // Initialize thread when page context changes

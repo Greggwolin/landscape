@@ -41,9 +41,18 @@ export function AlphaLandscaperChat({ projectId, pageContext }: AlphaLandscaperC
     setLoading(true);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const tokens = localStorage.getItem('auth_tokens');
+      if (tokens) {
+        const accessToken = JSON.parse(tokens)?.access;
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+      }
+
       const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           message: userMessage,
           page_context: 'alpha_assistant',

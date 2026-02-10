@@ -230,9 +230,22 @@ export function HelpFeedbackAgent({
       }
 
       // Regular chat - send to Landscaper
+      let accessToken: string | null = null;
+      try {
+        const tokens = localStorage.getItem('auth_tokens');
+        accessToken = tokens ? JSON.parse(tokens).access : null;
+      } catch {
+        accessToken = null;
+      }
+
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           message: userMessage,
           page_context: 'alpha_assistant',

@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
+function buildForwardHeaders(request: NextRequest): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader) {
+    headers.Authorization = authHeader;
+  }
+
+  return headers;
+}
+
 /**
  * Chat history retrieval.
  * Pass-through to Django knowledge service.
@@ -25,9 +38,7 @@ export async function GET(
 
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: buildForwardHeaders(request),
     });
 
     const data = await response.json();
@@ -68,9 +79,7 @@ export async function POST(
       `${DJANGO_API_URL}/api/knowledge/chat/${projectId}/`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: buildForwardHeaders(request),
         body: JSON.stringify(payload),
       }
     );
@@ -101,9 +110,7 @@ export async function DELETE(
       `${DJANGO_API_URL}/api/knowledge/chat/${projectId}/clear/`,
       {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: buildForwardHeaders(request),
       }
     );
 

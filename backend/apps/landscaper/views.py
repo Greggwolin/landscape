@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q, Count, Avg
 from django.db import connection
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from decimal import Decimal
 from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
 from .serializers import (
@@ -35,6 +37,36 @@ from .serializers import (
 )
 from .ai_handler import get_landscaper_response
 from .tool_executor import execute_tool
+from apps.projects.models import Project
+
+
+def _user_can_access_project(user, project: Project) -> bool:
+    """
+    Minimal project access check until explicit membership model exists.
+
+    Rules:
+    - Admin/staff can access all projects
+    - Project owner can access
+    - Legacy projects without owner are allowed for authenticated users
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin':
+        return True
+
+    owner_id = getattr(project, 'created_by_id', None)
+    if owner_id is None:
+        return True
+
+    return owner_id == user.id
+
+
+def _require_project_access(user, project_id: int) -> Project:
+    """Load a project and enforce basic user authorization."""
+    project = get_object_or_404(Project, project_id=project_id)
+    if not _user_can_access_project(user, project):
+        raise PermissionDenied("You do not have access to this project.")
+    return project
 
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
@@ -48,7 +80,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
     queryset = ChatMessage.objects.select_related('project', 'user')
     serializer_class = ChatMessageSerializer
-    permission_classes = [AllowAny]  # Called from Next.js backend
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter messages by project_id from URL."""
@@ -62,6 +94,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """GET chat history for a project."""
+        _require_project_access(request.user, int(self.kwargs.get('project_id')))
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response({
@@ -88,6 +121,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
         }
         """
         project_id = self.kwargs.get('project_id')
+        project = _require_project_access(request.user, int(project_id))
 
         try:
             # Create user message
@@ -109,8 +143,6 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             ]
 
             # Get project context with full details
-            from apps.projects.models import Project
-            project = Project.objects.get(project_id=project_id)
             project_context = {
                 'project_id': project.project_id,
                 'project_name': project.project_name,
@@ -971,7 +1003,13 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
 
     queryset = ChatThread.objects.all()
     serializer_class = ChatThreadSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        """Retrieve a thread and enforce project-level access."""
+        instance = super().get_object()
+        _require_project_access(self.request.user, int(instance.project_id))
+        return instance
 
     def get_queryset(self):
         """Filter threads based on query params."""
@@ -982,6 +1020,7 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         # Filter by project_id (required for list)
         project_id = self.request.query_params.get('project_id')
         if project_id:
+            _require_project_access(self.request.user, int(project_id))
             queryset = queryset.filter(project_id=project_id)
 
         # Filter by page_context
@@ -1041,6 +1080,8 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'error': 'project_id and page_context are required',
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        _require_project_access(request.user, int(project_id))
 
         try:
             # Get or create active thread for this context
@@ -1115,6 +1156,8 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                 'error': 'project_id and page_context are required',
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        _require_project_access(request.user, int(project_id))
+
         try:
             thread = ThreadService.start_new_thread(
                 project_id=int(project_id),
@@ -1148,17 +1191,24 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
 
     queryset = ThreadMessage.objects.all()
     serializer_class = ThreadMessageSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    def _get_authorized_thread(self):
+        """Load thread and enforce project access."""
+        from .models import ChatThread
+
+        thread_id = self.kwargs.get('thread_id')
+        thread = get_object_or_404(ChatThread, id=thread_id)
+        _require_project_access(self.request.user, int(thread.project_id))
+        return thread
 
     def get_queryset(self):
         """Filter messages by thread_id from URL."""
         from .models import ThreadMessage
 
-        thread_id = self.kwargs.get('thread_id')
-        if thread_id:
-            return ThreadMessage.objects.filter(
-                thread_id=thread_id
-            ).order_by('created_at')
+        if self.kwargs.get('thread_id'):
+            thread = self._get_authorized_thread()
+            return ThreadMessage.objects.filter(thread_id=thread.id).order_by('created_at')
         return ThreadMessage.objects.none()
 
     def list(self, request, *args, **kwargs):
@@ -1191,7 +1241,7 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             "assistant_message": {...}
         }
         """
-        from .models import ChatThread, ThreadMessage
+        from .models import ThreadMessage
         from .serializers import ThreadMessageSerializer
         from .ai_handler import get_landscaper_response
         from .tool_executor import execute_tool
@@ -1199,13 +1249,10 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
         from .services.embedding_service import EmbeddingService
         from apps.projects.models import Project
 
-        thread_id = self.kwargs.get('thread_id')
         page_context = request.data.get('page_context')
+        thread = self._get_authorized_thread()
 
         try:
-            # Get thread
-            thread = ChatThread.objects.get(id=thread_id)
-
             # Create user message
             user_message = ThreadMessage.objects.create(
                 thread=thread,
@@ -1300,11 +1347,6 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
 
             return Response(response_data, status=status.HTTP_201_CREATED)
 
-        except ChatThread.DoesNotExist:
-            return Response({
-                'success': False,
-                'error': 'Thread not found',
-            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception(f"Error in thread message creation: {e}")
             return Response({

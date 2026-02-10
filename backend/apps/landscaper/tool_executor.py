@@ -16,6 +16,7 @@ import logging
 import math
 import operator
 import os
+from contextlib import contextmanager
 from functools import wraps
 from typing import Dict, Any, List, Optional, Callable
 from decimal import Decimal, InvalidOperation
@@ -23,9 +24,21 @@ from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 from django.db import connection, transaction
 from django.utils import timezone
+from psycopg2.extras import RealDictCursor
 from .opex_mapping import OPEX_ACCOUNT_MAPPING
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def get_db_connection():
+    """
+    Return a DB-API connection that supports psycopg cursor factories.
+
+    Uses Django's managed connection to avoid duplicating credentials/config.
+    """
+    connection.ensure_connection()
+    yield connection.connection
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -9454,11 +9467,64 @@ def get_knowledge_entities(
     entity_subtype = kwargs.get('entity_subtype') or kwargs.get('subtype')
     search = kwargs.get('search') or kwargs.get('name')
 
+    # Security: In global/no-project contexts, do not expose shared graph data.
+    if not project_id or int(project_id) <= 0:
+        return {
+            'success': True,
+            'entities': [],
+            'count': 0,
+            'entity_types': {},
+            'message': 'No project context provided; knowledge entities are project-scoped.'
+        }
+
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = "SELECT * FROM landscape.knowledge_entities WHERE 1=1"
-                params = []
+                cursor.execute(
+                    """
+                    SELECT entity_id
+                    FROM landscape.knowledge_entities
+                    WHERE canonical_name = %s
+                    LIMIT 1
+                    """,
+                    [f'project:{int(project_id)}']
+                )
+                project_entity = cursor.fetchone()
+                if not project_entity:
+                    return {
+                        'success': True,
+                        'entities': [],
+                        'count': 0,
+                        'entity_types': {},
+                        'message': f'No knowledge graph project entity found for project_id={project_id}.'
+                    }
+
+                project_entity_id = int(project_entity['entity_id'])
+
+                query = """
+                    WITH scoped_entities AS (
+                        SELECT %s::bigint AS entity_id
+                        UNION
+                        SELECT f.subject_entity_id
+                        FROM landscape.knowledge_facts f
+                        WHERE f.subject_entity_id = %s OR f.object_entity_id = %s
+                        UNION
+                        SELECT f.object_entity_id
+                        FROM landscape.knowledge_facts f
+                        WHERE (f.subject_entity_id = %s OR f.object_entity_id = %s)
+                          AND f.object_entity_id IS NOT NULL
+                    )
+                    SELECT e.*
+                    FROM landscape.knowledge_entities e
+                    WHERE e.entity_id IN (SELECT entity_id FROM scoped_entities)
+                """
+                params = [
+                    project_entity_id,
+                    project_entity_id,
+                    project_entity_id,
+                    project_entity_id,
+                    project_entity_id,
+                ]
 
                 if entity_id:
                     query += " AND entity_id = %s"
@@ -9478,11 +9544,33 @@ def get_knowledge_entities(
                 rows = cursor.fetchall()
 
                 # Get entity type breakdown
-                cursor.execute("""
-                    SELECT entity_type, COUNT(*) as count
-                    FROM landscape.knowledge_entities
-                    GROUP BY entity_type
-                """)
+                cursor.execute(
+                    """
+                    WITH scoped_entities AS (
+                        SELECT %s::bigint AS entity_id
+                        UNION
+                        SELECT f.subject_entity_id
+                        FROM landscape.knowledge_facts f
+                        WHERE f.subject_entity_id = %s OR f.object_entity_id = %s
+                        UNION
+                        SELECT f.object_entity_id
+                        FROM landscape.knowledge_facts f
+                        WHERE (f.subject_entity_id = %s OR f.object_entity_id = %s)
+                          AND f.object_entity_id IS NOT NULL
+                    )
+                    SELECT e.entity_type, COUNT(*) as count
+                    FROM landscape.knowledge_entities e
+                    WHERE e.entity_id IN (SELECT entity_id FROM scoped_entities)
+                    GROUP BY e.entity_type
+                    """,
+                    [
+                        project_entity_id,
+                        project_entity_id,
+                        project_entity_id,
+                        project_entity_id,
+                        project_entity_id,
+                    ]
+                )
                 type_counts = {r['entity_type']: r['count'] for r in cursor.fetchall()}
 
                 return {
@@ -9511,9 +9599,38 @@ def get_knowledge_facts(
     is_current = kwargs.get('is_current', True)
     min_confidence = kwargs.get('min_confidence')
 
+    # Security: In global/no-project contexts, do not expose shared graph data.
+    if not project_id or int(project_id) <= 0:
+        return {
+            'success': True,
+            'facts': [],
+            'count': 0,
+            'message': 'No project context provided; knowledge facts are project-scoped.'
+        }
+
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT entity_id
+                    FROM landscape.knowledge_entities
+                    WHERE canonical_name = %s
+                    LIMIT 1
+                    """,
+                    [f'project:{int(project_id)}']
+                )
+                project_entity = cursor.fetchone()
+                if not project_entity:
+                    return {
+                        'success': True,
+                        'facts': [],
+                        'count': 0,
+                        'message': f'No knowledge graph project entity found for project_id={project_id}.'
+                    }
+
+                project_entity_id = int(project_entity['entity_id'])
+
                 query = """
                     SELECT f.*,
                            se.canonical_name as subject_name, se.entity_type as subject_type,
@@ -9521,9 +9638,21 @@ def get_knowledge_facts(
                     FROM landscape.knowledge_facts f
                     LEFT JOIN landscape.knowledge_entities se ON f.subject_entity_id = se.entity_id
                     LEFT JOIN landscape.knowledge_entities oe ON f.object_entity_id = oe.entity_id
-                    WHERE 1=1
+                    WHERE (
+                        f.subject_entity_id = %s
+                        OR f.object_entity_id = %s
+                        OR (
+                            f.source_type = 'document_extract'
+                            AND EXISTS (
+                                SELECT 1
+                                FROM landscape.core_doc d
+                                WHERE d.doc_id = f.source_id
+                                  AND d.project_id = %s
+                            )
+                        )
+                    )
                 """
-                params = []
+                params = [project_entity_id, project_entity_id, int(project_id)]
 
                 if fact_id:
                     query += " AND f.fact_id = %s"
@@ -9572,17 +9701,82 @@ def get_knowledge_insights(
     severity = kwargs.get('severity')
     acknowledged = kwargs.get('acknowledged')
 
+    # Security: In global/no-project contexts, do not expose shared graph data.
+    if not project_id or int(project_id) <= 0:
+        return {
+            'success': True,
+            'insights': [],
+            'count': 0,
+            'unacknowledged_by_severity': {},
+            'message': 'No project context provided; knowledge insights are project-scoped.'
+        }
+
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT entity_id
+                    FROM landscape.knowledge_entities
+                    WHERE canonical_name = %s
+                    LIMIT 1
+                    """,
+                    [f'project:{int(project_id)}']
+                )
+                project_entity = cursor.fetchone()
+                if not project_entity:
+                    return {
+                        'success': True,
+                        'insights': [],
+                        'count': 0,
+                        'unacknowledged_by_severity': {},
+                        'message': f'No knowledge graph project entity found for project_id={project_id}.'
+                    }
+
+                project_entity_id = int(project_entity['entity_id'])
+
                 query = """
                     SELECT i.*,
                            e.canonical_name as subject_name, e.entity_type as subject_type
                     FROM landscape.knowledge_insights i
                     LEFT JOIN landscape.knowledge_entities e ON i.subject_entity_id = e.entity_id
-                    WHERE 1=1
+                    WHERE (
+                        i.subject_entity_id = %s
+                        OR EXISTS (
+                            SELECT 1
+                            FROM landscape.knowledge_entities se
+                            WHERE se.entity_id = i.subject_entity_id
+                              AND se.metadata ? 'project_id'
+                              AND (se.metadata->>'project_id') ~ '^[0-9]+$'
+                              AND (se.metadata->>'project_id')::bigint = %s
+                        )
+                        OR EXISTS (
+                            SELECT 1
+                            FROM unnest(i.supporting_facts) AS sf(fact_id)
+                            JOIN landscape.knowledge_facts f ON f.fact_id = sf.fact_id
+                            WHERE (
+                                f.subject_entity_id = %s
+                                OR f.object_entity_id = %s
+                                OR (
+                                    f.source_type = 'document_extract'
+                                    AND EXISTS (
+                                        SELECT 1
+                                        FROM landscape.core_doc d
+                                        WHERE d.doc_id = f.source_id
+                                          AND d.project_id = %s
+                                    )
+                                )
+                            )
+                        )
+                    )
                 """
-                params = []
+                params = [
+                    project_entity_id,
+                    int(project_id),
+                    project_entity_id,
+                    project_entity_id,
+                    int(project_id),
+                ]
 
                 if insight_id:
                     query += " AND i.insight_id = %s"
@@ -9605,12 +9799,50 @@ def get_knowledge_insights(
                 rows = cursor.fetchall()
 
                 # Get severity breakdown
-                cursor.execute("""
-                    SELECT severity, COUNT(*) as count
-                    FROM landscape.knowledge_insights
-                    WHERE acknowledged = false OR acknowledged IS NULL
-                    GROUP BY severity
-                """)
+                cursor.execute(
+                    """
+                    SELECT i.severity, COUNT(*) as count
+                    FROM landscape.knowledge_insights i
+                    WHERE (
+                        i.subject_entity_id = %s
+                        OR EXISTS (
+                            SELECT 1
+                            FROM landscape.knowledge_entities se
+                            WHERE se.entity_id = i.subject_entity_id
+                              AND se.metadata ? 'project_id'
+                              AND (se.metadata->>'project_id') ~ '^[0-9]+$'
+                              AND (se.metadata->>'project_id')::bigint = %s
+                        )
+                        OR EXISTS (
+                            SELECT 1
+                            FROM unnest(i.supporting_facts) AS sf(fact_id)
+                            JOIN landscape.knowledge_facts f ON f.fact_id = sf.fact_id
+                            WHERE (
+                                f.subject_entity_id = %s
+                                OR f.object_entity_id = %s
+                                OR (
+                                    f.source_type = 'document_extract'
+                                    AND EXISTS (
+                                        SELECT 1
+                                        FROM landscape.core_doc d
+                                        WHERE d.doc_id = f.source_id
+                                          AND d.project_id = %s
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    AND (i.acknowledged = false OR i.acknowledged IS NULL)
+                    GROUP BY i.severity
+                    """,
+                    [
+                        project_entity_id,
+                        int(project_id),
+                        project_entity_id,
+                        project_entity_id,
+                        int(project_id),
+                    ]
+                )
                 severity_counts = {r['severity']: r['count'] for r in cursor.fetchall()}
 
                 return {

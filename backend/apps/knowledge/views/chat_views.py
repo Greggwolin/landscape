@@ -10,7 +10,8 @@ import time
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from ..services.rag_retrieval import RAGRetriever
 from ..services.landscaper_ai import get_landscaper_response
@@ -30,12 +31,41 @@ from apps.landscaper.services.message_storage import (
     clear_history,
     get_recent_context
 )
+from apps.projects.models import Project
 
 logger = logging.getLogger(__name__)
 
 
+def _user_can_access_project(user, project: Project) -> bool:
+    """Mirror landscaper project access policy for canonical knowledge chat."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin':
+        return True
+
+    owner_id = getattr(project, 'created_by_id', None)
+    if owner_id is None:
+        return True
+
+    return owner_id == user.id
+
+
+def _enforce_project_access(user, project_id: int):
+    """Return JsonResponse on denial, otherwise None."""
+    try:
+        project = Project.objects.get(project_id=project_id)
+    except Project.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Project not found'}, status=404)
+
+    if not _user_can_access_project(user, project):
+        return JsonResponse({'success': False, 'error': 'Access denied for this project'}, status=403)
+
+    return None
+
+
 @csrf_exempt
-@require_http_methods(["GET", "POST"])
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def chat(request, project_id: int):
     """
     Unified chat endpoint.
@@ -45,6 +75,10 @@ def chat(request, project_id: int):
 
     Response shapes are defined in contracts.py - Next.js passes through as-is.
     """
+    access_error = _enforce_project_access(request.user, project_id)
+    if access_error:
+        return access_error
+
     if request.method == "GET":
         return _get_chat_history(request, project_id)
     return _send_message(request, project_id)
@@ -229,9 +263,14 @@ def _send_message(request, project_id: int) -> JsonResponse:
 
 
 @csrf_exempt
-@require_http_methods(["DELETE"])
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
 def clear_chat(request, project_id: int):
     """Clear chat history for project."""
+    access_error = _enforce_project_access(request.user, project_id)
+    if access_error:
+        return access_error
+
     try:
         deleted_count = clear_history(project_id)
         return JsonResponse({
@@ -248,7 +287,8 @@ def clear_chat(request, project_id: int):
 # =====================================================
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def document_chat(request, project_id: int, doc_id: int):
     """
     Chat with Landscaper about a specific document.
@@ -262,6 +302,10 @@ def document_chat(request, project_id: int, doc_id: int):
 
     Response: Same structure as regular chat, but context limited to single doc.
     """
+    access_error = _enforce_project_access(request.user, project_id)
+    if access_error:
+        return access_error
+
     try:
         from apps.documents.models import Document
         from ..services.embedding_service import generate_embedding

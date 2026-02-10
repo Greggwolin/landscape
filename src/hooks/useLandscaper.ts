@@ -181,6 +181,29 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
     }
   }, []);
 
+  const getAuthHeaders = useCallback((includeContentType = true): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('auth_tokens');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.access) {
+            headers.Authorization = `Bearer ${parsed.access}`;
+          }
+        }
+      } catch (error) {
+        console.warn('[useLandscaper] Failed to parse auth token:', error);
+      }
+    }
+
+    return headers;
+  }, []);
+
   // Determine if this is a global (non-project) context
   const isGlobalContext = projectId === null;
 
@@ -204,7 +227,9 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
 
       console.log('[Landscaper] Loading chat history for', isGlobalContext ? 'global' : 'project', 'context:', activeTab, url.toString());
 
-      const response = await fetchWithTimeout(url.toString());
+      const response = await fetchWithTimeout(url.toString(), {
+        headers: getAuthHeaders(false),
+      });
       const data = await response.json();
 
       if (data.success && data.messages) {
@@ -214,7 +239,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
-  }, [projectId, activeTab, fetchWithTimeout, isGlobalContext]);
+  }, [projectId, activeTab, fetchWithTimeout, isGlobalContext, getAuthHeaders]);
 
   // Reload history when project or tab changes - clear immediately for responsive UX
   useEffect(() => {
@@ -255,7 +280,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
 
         const response = await fetchWithTimeout(requestUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(requestBody),
         });
 
@@ -307,7 +332,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
         setIsLoading(false);
       }
     },
-    [projectId, activeTab, onFieldUpdate, fetchWithTimeout, isGlobalContext]
+    [projectId, activeTab, onFieldUpdate, fetchWithTimeout, isGlobalContext, getAuthHeaders]
   );
 
   const clearChat = useCallback(async () => {
@@ -319,6 +344,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
 
       const response = await fetchWithTimeout(requestUrl, {
         method: 'DELETE',
+        headers: getAuthHeaders(false),
       });
 
       const data = await response.json();
@@ -332,7 +358,7 @@ export function useLandscaper({ projectId, activeTab = 'home', onFieldUpdate }: 
       console.error('Failed to clear chat:', err);
       throw err;
     }
-  }, [projectId, fetchWithTimeout, isGlobalContext]);
+  }, [projectId, fetchWithTimeout, isGlobalContext, getAuthHeaders]);
 
   return {
     messages,

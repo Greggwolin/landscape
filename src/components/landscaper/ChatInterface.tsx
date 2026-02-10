@@ -175,6 +175,25 @@ export default function ChatInterface({
     }
   };
 
+  const getAuthHeaders = (includeContentType = true): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+    try {
+      const raw = localStorage.getItem('auth_tokens');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access) {
+          headers.Authorization = `Bearer ${parsed.access}`;
+        }
+      }
+    } catch (error) {
+      console.warn('[ChatInterface] Failed to parse auth token:', error);
+    }
+    return headers;
+  };
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -193,7 +212,9 @@ export default function ChatInterface({
         url.searchParams.set('active_tab', activeTab);
       }
 
-      const response = await fetchWithTimeout(url.toString());
+      const response = await fetchWithTimeout(url.toString(), {
+        headers: getAuthHeaders(false),
+      });
 
       if (!response.ok) {
         throw new Error('Failed to load messages');
@@ -219,9 +240,7 @@ export default function ChatInterface({
         `/api/projects/${projectId}/landscaper/chat`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             message: inputValue.trim(),
             clientRequestId,
