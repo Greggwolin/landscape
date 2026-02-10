@@ -38,6 +38,9 @@ export interface UserMapPoint {
   coordinates: [number, number]; // [lng, lat]
   notes?: string;
   created_at?: string;
+  markerColor?: string;
+  markerLabel?: string;
+  popupHtml?: string;
 }
 
 // Reverse geocoding result
@@ -58,18 +61,6 @@ export interface LayerVisibility {
   satellite: boolean;
 }
 
-// Props for the main flyout component
-export interface LocationMapFlyoutProps {
-  projectId: string;
-  projectName: string;
-  anchorLeft?: number;
-  center: [number, number]; // [lng, lat]
-  isOpen: boolean;
-  onClose: () => void;
-  onPointAdded?: (point: UserMapPoint) => void;
-  onPointRemoved?: (pointId: string) => void;
-}
-
 // Props for the LocationMap component
 export interface LocationMapProps {
   center: [number, number];
@@ -80,6 +71,7 @@ export interface LocationMapProps {
   onMapClick?: (lngLat: [number, number]) => void;
   onPointClick?: (point: UserMapPoint) => void;
   isAddingPoint?: boolean;
+  resizeToken?: number;
 }
 
 // Props for demographics panel

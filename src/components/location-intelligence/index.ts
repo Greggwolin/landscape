@@ -4,10 +4,6 @@
  * Export all location intelligence components and hooks
  */
 
-// Main component
-export { LocationMapFlyout } from './LocationMapFlyout';
-export { default as LocationMapFlyoutDefault } from './LocationMapFlyout';
-
 // Sub-components
 export { LocationMap } from './LocationMap';
 export { DemographicsPanel } from './DemographicsPanel';
@@ -25,7 +21,6 @@ export type {
   UserMapPoint,
   ReverseGeocodeResult,
   LayerVisibility,
-  LocationMapFlyoutProps,
   LocationMapProps,
   DemographicsPanelProps,
   MapLayerToggleProps,

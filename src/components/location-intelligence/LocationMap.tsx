@@ -28,6 +28,7 @@ export function LocationMap({
   onMapClick,
   onPointClick,
   isAddingPoint = false,
+  resizeToken = 0,
 }: LocationMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -41,7 +42,7 @@ export function LocationMap({
     onMapClickRef.current = onMapClick;
   }, [onMapClick]);
 
-  // Initialize map
+  // Initialize map once; subsequent center/layer changes are handled by dedicated effects.
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -116,7 +117,7 @@ export function LocationMap({
       map.current = null;
       setMapLoaded(false);
     };
-  }, [center, layers.satellite]);
+  }, []);
 
   // Keep map centered on active project location
   useEffect(() => {
@@ -134,112 +135,150 @@ export function LocationMap({
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    const centerPointData = {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'Point',
-        coordinates: center,
-      },
-    } as GeoJSON.Feature;
-
-    const existingSource = map.current.getSource(CENTER_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
-    if (existingSource) {
-      existingSource.setData(centerPointData);
-      return;
+    // Ensure style is loaded before adding sources/layers
+    if (!map.current.isStyleLoaded()) {
+      const styleLoadHandler = () => {
+        if (map.current) {
+          addCenterMarker();
+        }
+      };
+      map.current.once('styledata', styleLoadHandler);
+      return () => {
+        map.current?.off('styledata', styleLoadHandler);
+      };
     }
 
-    map.current.addSource(CENTER_SOURCE_ID, {
-      type: 'geojson',
-      data: centerPointData,
-    });
+    addCenterMarker();
 
-    map.current.addLayer({
-      id: CENTER_SOURCE_ID,
-      type: 'circle',
-      source: CENTER_SOURCE_ID,
-      paint: {
-        'circle-radius': 8,
-        'circle-color': '#fbbf24',
-        'circle-stroke-color': '#000',
-        'circle-stroke-width': 2,
-      },
-    });
+    function addCenterMarker() {
+      if (!map.current) return;
+
+      const centerPointData = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Point',
+          coordinates: center,
+        },
+      } as GeoJSON.Feature;
+
+      const existingSource = map.current.getSource(CENTER_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+      if (existingSource) {
+        existingSource.setData(centerPointData);
+        return;
+      }
+
+      map.current.addSource(CENTER_SOURCE_ID, {
+        type: 'geojson',
+        data: centerPointData,
+      });
+
+      map.current.addLayer({
+        id: CENTER_SOURCE_ID,
+        type: 'circle',
+        source: CENTER_SOURCE_ID,
+        paint: {
+          'circle-radius': 8,
+          'circle-color': '#fbbf24',
+          'circle-stroke-color': '#000',
+          'circle-stroke-width': 2,
+        },
+      });
+    }
   }, [mapLoaded, center]);
 
   // Draw ring circles using Turf.js
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Remove existing ring layers
-    [1, 3, 5].forEach((radius) => {
-      const fillId = `ring-${radius}-fill`;
-      const whiteStrokeId = `ring-${radius}-stroke-white`;
-      const strokeId = `ring-${radius}-stroke`;
-      if (map.current?.getLayer(fillId)) map.current.removeLayer(fillId);
-      if (map.current?.getLayer(whiteStrokeId)) map.current.removeLayer(whiteStrokeId);
-      if (map.current?.getLayer(strokeId)) map.current.removeLayer(strokeId);
-      if (map.current?.getSource(`ring-${radius}`)) map.current.removeSource(`ring-${radius}`);
-    });
+    // Ensure style is loaded before adding sources/layers
+    if (!map.current.isStyleLoaded()) {
+      const styleLoadHandler = () => {
+        if (map.current) {
+          updateRings();
+        }
+      };
+      map.current.once('styledata', styleLoadHandler);
+      return () => {
+        map.current?.off('styledata', styleLoadHandler);
+      };
+    }
 
-    if (!layers.rings) return;
+    updateRings();
 
-    // Add ring circles
-    rings.forEach((ring) => {
-      const radius = ring.radius_miles;
-      const colors = RING_COLORS[radius];
-      if (!colors) return;
+    function updateRings() {
+      if (!map.current) return;
 
-      // Create circle using Turf.js
-      const circleGeoJSON = turf.circle(center, radius, {
-        steps: 64,
-        units: 'miles',
+      // Remove existing ring layers
+      [1, 3, 5].forEach((radius) => {
+        const fillId = `ring-${radius}-fill`;
+        const whiteStrokeId = `ring-${radius}-stroke-white`;
+        const strokeId = `ring-${radius}-stroke`;
+        if (map.current?.getLayer(fillId)) map.current.removeLayer(fillId);
+        if (map.current?.getLayer(whiteStrokeId)) map.current.removeLayer(whiteStrokeId);
+        if (map.current?.getLayer(strokeId)) map.current.removeLayer(strokeId);
+        if (map.current?.getSource(`ring-${radius}`)) map.current.removeSource(`ring-${radius}`);
       });
 
-      const sourceId = `ring-${radius}`;
+      if (!layers.rings) return;
 
-      map.current?.addSource(sourceId, {
-        type: 'geojson',
-        data: circleGeoJSON,
+      // Add ring circles
+      rings.forEach((ring) => {
+        const radius = ring.radius_miles;
+        const colors = RING_COLORS[radius];
+        if (!colors) return;
+
+        // Create circle using Turf.js
+        const circleGeoJSON = turf.circle(center, radius, {
+          steps: 64,
+          units: 'miles',
+        });
+
+        const sourceId = `ring-${radius}`;
+
+        map.current?.addSource(sourceId, {
+          type: 'geojson',
+          data: circleGeoJSON,
+        });
+
+        // Fill layer
+        map.current?.addLayer({
+          id: `ring-${radius}-fill`,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': colors.stroke,
+            'fill-opacity': selectedRadius === radius ? 0.42 : 0.26,
+          },
+        });
+
+        const ringLineWidth = selectedRadius === radius ? 3.4 : 1.9;
+
+        // White halo stroke for stronger contrast on aerial imagery
+        map.current?.addLayer({
+          id: `ring-${radius}-stroke-white`,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': '#FFFFFF',
+            'line-width': ringLineWidth + 2,
+            'line-opacity': 1,
+          },
+        });
+
+        // Stroke layer
+        map.current?.addLayer({
+          id: `ring-${radius}-stroke`,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': '#000000',
+            'line-width': ringLineWidth,
+            'line-opacity': 1,
+          },
+        });
       });
-
-      // Fill layer
-      map.current?.addLayer({
-        id: `ring-${radius}-fill`,
-        type: 'fill',
-        source: sourceId,
-        paint: {
-          'fill-color': colors.stroke,
-          'fill-opacity': selectedRadius === radius ? 0.42 : 0.26,
-        },
-      });
-
-      const ringLineWidth = selectedRadius === radius ? 3.4 : 1.9;
-
-      // White halo stroke for stronger contrast on aerial imagery
-      map.current?.addLayer({
-        id: `ring-${radius}-stroke-white`,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': '#FFFFFF',
-          'line-width': ringLineWidth + 2,
-          'line-opacity': 1,
-        },
-      });
-
-      // Stroke layer
-      map.current?.addLayer({
-        id: `ring-${radius}-stroke`,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': '#000000',
-          'line-width': ringLineWidth,
-          'line-opacity': 1,
-        },
-      });
-    });
+    }
   }, [mapLoaded, rings, layers.rings, selectedRadius, center]);
 
   // Fetch nearby block-group boundaries
@@ -283,54 +322,73 @@ export function LocationMap({
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    if (map.current.getLayer(BLOCK_GROUP_FILL_LAYER_ID)) {
-      map.current.removeLayer(BLOCK_GROUP_FILL_LAYER_ID);
-    }
-    if (map.current.getLayer(BLOCK_GROUP_LINE_LAYER_ID)) {
-      map.current.removeLayer(BLOCK_GROUP_LINE_LAYER_ID);
-    }
-    if (map.current.getSource(BLOCK_GROUP_SOURCE_ID)) {
-      map.current.removeSource(BLOCK_GROUP_SOURCE_ID);
+    // Ensure style is loaded before adding sources/layers
+    if (!map.current.isStyleLoaded()) {
+      const styleLoadHandler = () => {
+        if (map.current) {
+          updateBlockGroups();
+        }
+      };
+      map.current.once('styledata', styleLoadHandler);
+      return () => {
+        map.current?.off('styledata', styleLoadHandler);
+      };
     }
 
-    if (!blockGroupFeatures || !Array.isArray(blockGroupFeatures.features) || blockGroupFeatures.features.length === 0) {
-      return;
+    updateBlockGroups();
+
+    function updateBlockGroups() {
+      if (!map.current) return;
+
+      if (map.current.getLayer(BLOCK_GROUP_FILL_LAYER_ID)) {
+        map.current.removeLayer(BLOCK_GROUP_FILL_LAYER_ID);
+      }
+      if (map.current.getLayer(BLOCK_GROUP_LINE_LAYER_ID)) {
+        map.current.removeLayer(BLOCK_GROUP_LINE_LAYER_ID);
+      }
+      if (map.current.getSource(BLOCK_GROUP_SOURCE_ID)) {
+        map.current.removeSource(BLOCK_GROUP_SOURCE_ID);
+      }
+
+      if (!blockGroupFeatures || !Array.isArray(blockGroupFeatures.features) || blockGroupFeatures.features.length === 0) {
+        return;
+      }
+
+      map.current.addSource(BLOCK_GROUP_SOURCE_ID, {
+        type: 'geojson',
+        data: blockGroupFeatures,
+      });
+
+      map.current.addLayer({
+        id: BLOCK_GROUP_FILL_LAYER_ID,
+        type: 'fill',
+        source: BLOCK_GROUP_SOURCE_ID,
+        paint: {
+          'fill-color': '#4B5563',
+          'fill-opacity': 0.12,
+        },
+        layout: {
+          visibility: layers.blockGroups ? 'visible' : 'none',
+        },
+      });
+
+      map.current.addLayer({
+        id: BLOCK_GROUP_LINE_LAYER_ID,
+        type: 'line',
+        source: BLOCK_GROUP_SOURCE_ID,
+        paint: {
+          'line-color': '#6B7280',
+          'line-width': 0.8,
+          'line-opacity': 0.75,
+        },
+        layout: {
+          visibility: layers.blockGroups ? 'visible' : 'none',
+        },
+      });
     }
-
-    map.current.addSource(BLOCK_GROUP_SOURCE_ID, {
-      type: 'geojson',
-      data: blockGroupFeatures,
-    });
-
-    map.current.addLayer({
-      id: BLOCK_GROUP_FILL_LAYER_ID,
-      type: 'fill',
-      source: BLOCK_GROUP_SOURCE_ID,
-      paint: {
-        'fill-color': '#4B5563',
-        'fill-opacity': 0.12,
-      },
-      layout: {
-        visibility: layers.blockGroups ? 'visible' : 'none',
-      },
-    });
-
-    map.current.addLayer({
-      id: BLOCK_GROUP_LINE_LAYER_ID,
-      type: 'line',
-      source: BLOCK_GROUP_SOURCE_ID,
-      paint: {
-        'line-color': '#6B7280',
-        'line-width': 0.8,
-        'line-opacity': 0.75,
-      },
-      layout: {
-        visibility: layers.blockGroups ? 'visible' : 'none',
-      },
-    });
   }, [mapLoaded, blockGroupFeatures, layers.blockGroups]);
 
-  // Update user point markers
+  // Update overlay markers (rental comparables)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
@@ -340,42 +398,45 @@ export function LocationMap({
 
     if (!layers.userPoints) return;
 
-    // Add new markers
+    // Add markers
     userPoints.forEach((point) => {
       const categoryConfig = POINT_CATEGORIES.find((c) => c.value === point.category);
-      const color = categoryConfig?.color || '#3b82f6';
+      const color = point.markerColor || categoryConfig?.color || 'var(--cui-primary)';
 
       const el = document.createElement('div');
-      el.className = 'location-map-marker';
-      el.style.width = '24px';
-      el.style.height = '24px';
+      el.className = 'location-map-marker map-marker';
+      el.style.width = '30px';
+      el.style.height = '30px';
       el.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="${color}" stroke="#000000" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       `;
       el.style.cursor = 'pointer';
 
       // Create popup
-      const popup = new maplibregl.Popup({
-        offset: [0, -24],
-        closeButton: true,
-        closeOnClick: true,
-        className: 'location-map-popup',
-      }).setHTML(`
+      const popupHtml = point.popupHtml || `
         <div style="padding: 8px;">
           <strong style="color: ${color};">${point.label}</strong>
-          ${point.notes ? `<p style="margin: 4px 0 0; font-size: 12px; color: #9ca3af;">${point.notes}</p>` : ''}
+          ${point.notes ? `<p style="margin: 4px 0 0; font-size: 12px; color: var(--cui-secondary-color);">${point.notes}</p>` : ''}
         </div>
-      `);
+      `;
+      const popup = new maplibregl.Popup({
+        offset: [0, -30],
+        closeButton: true,
+        closeOnClick: true,
+        className: 'map-marker-popup',
+      }).setHTML(popupHtml);
 
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat(point.coordinates)
-        .setPopup(popup)
-        .addTo(map.current!);
+      const marker = new maplibregl.Marker({ element: el }).setLngLat(point.coordinates);
+      marker.setPopup(popup);
+      marker.addTo(map.current!);
 
       el.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (marker.getPopup()) {
+          marker.togglePopup();
+        }
         onPointClick?.(point);
       });
 
@@ -410,17 +471,37 @@ export function LocationMap({
     }
   }, [mapLoaded, layers.satellite]);
 
-  // Resize map when container changes (e.g., flyout opens)
+  // Resize map when the container dimensions change (e.g., accordion expand)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Trigger resize after a short delay to let layout settle
-    const resizeTimeout = setTimeout(() => {
+    const forceResize = () => {
       map.current?.resize();
-    }, 100);
+      map.current?.triggerRepaint();
+    };
 
-    return () => clearTimeout(resizeTimeout);
-  }, [mapLoaded]);
+    // Trigger initial resize after a short delay to let layout settle
+    const resizeTimeout = setTimeout(forceResize, 60);
+
+    // Re-run resize a few times because some collapsible layouts report transient sizes.
+    const followUpTimeout = setTimeout(forceResize, 240);
+    const finalTimeout = setTimeout(forceResize, 520);
+
+    let observer: ResizeObserver | null = null;
+    if (mapContainer.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        forceResize();
+      });
+      observer.observe(mapContainer.current);
+    }
+
+    return () => {
+      clearTimeout(resizeTimeout);
+      clearTimeout(followUpTimeout);
+      clearTimeout(finalTimeout);
+      observer?.disconnect();
+    };
+  }, [mapLoaded, resizeToken]);
 
   return (
     <div className="location-map-container">

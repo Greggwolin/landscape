@@ -147,6 +147,7 @@
   overflow: hidden;
 }
 
+
 .flyout-map-panel {
   position: relative;
   background: var(--cui-tertiary-bg, #161622);
@@ -439,6 +440,8 @@
 .comparison-table th:first-child,
 .comparison-table td:first-child {
   text-align: left;
+  min-width: 170px;
+  white-space: nowrap;
 }
 
 .comparison-table th {
@@ -455,6 +458,7 @@
 .metric-label {
   font-size: 12px;
   color: var(--cui-secondary-color, #9ca3af);
+  white-space: nowrap;
 }
 
 .metric-value {
@@ -470,6 +474,99 @@
 .calculated-at {
   font-size: 11px;
   color: var(--cui-secondary-color, #9ca3af);
+}
+
+/* =====================================================
+   Market Card Layout
+   ===================================================== */
+
+.location-intelligence-card-body {
+  background: var(--cui-card-bg);
+  color: var(--cui-body-color);
+  display: flex;
+  flex-direction: column;
+  min-height: 680px;
+  height: clamp(680px, 74vh, 920px);
+}
+
+.location-intelligence-map-shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.location-intelligence-map-frame {
+  flex: 1 1 auto;
+  min-height: clamp(560px, 68vh, 860px);
+  display: flex;
+}
+
+.location-intelligence-map-frame .location-map-container {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 100%;
+}
+
+.location-intelligence-map-frame .location-map {
+  height: 100%;
+}
+
+.location-intelligence-overlay-stack {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: min(390px, calc(100% - 24px));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+.location-intelligence-overlay-card {
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-card-bg);
+}
+
+.location-intelligence-overlay-card-top {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.location-intelligence-overlay-card-bottom {
+  margin-top: -1px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.location-intelligence-overlay-header {
+  cursor: pointer;
+  user-select: none;
+  background: var(--surface-card-header, var(--cui-secondary-bg));
+  color: var(--cui-body-color);
+}
+
+.location-intelligence-overlay-card .demographics-panel {
+  background: var(--cui-secondary-bg);
+  border: 1px solid var(--cui-border-color);
+}
+
+.location-intelligence-overlay-card .location-map-layer-toggle {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.location-intelligence-overlay-card .layer-toggle-header {
+  display: none;
+}
+
+.location-intelligence-overlay-body {
+  background: var(--cui-card-bg);
+}
+
+.location-intelligence-overlay-demographics-body {
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
 }
 
 /* =====================================================
@@ -826,6 +923,17 @@
     border-right: none;
     border-top: 1px solid var(--cui-border-color, #2d2d3a);
     max-height: 300px;
+  }
+}
+
+@media (max-width: 992px) {
+  .location-intelligence-overlay-stack {
+    width: min(420px, calc(100% - 24px));
+  }
+
+  .location-intelligence-overlay-card .demographics-panel {
+    max-height: 52vh;
+    overflow-y: auto;
   }
 }
 

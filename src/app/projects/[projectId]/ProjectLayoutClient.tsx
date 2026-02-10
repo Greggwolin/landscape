@@ -49,7 +49,7 @@ const DEFAULT_LANDSCAPER_WIDTH = 320;
 const MIN_LANDSCAPER_WIDTH = 280;
 const MAX_WIDTH_PERCENT = 50;
 const COLLAPSE_THRESHOLD = 100;
-const COLLAPSED_WIDTH = 56;
+const COLLAPSED_WIDTH = 64;
 
 function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientProps) {
   const { projects, activeProject, isLoading } = useProjectContext();

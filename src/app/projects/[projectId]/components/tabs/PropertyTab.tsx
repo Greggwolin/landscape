@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
-import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { PhysicalDescription } from '../property';
 import { formatNumber, formatCurrency, formatDecimal } from '@/utils/formatNumber';
 import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-react';
@@ -10,6 +9,7 @@ import { CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@c
 import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
 import { useCallback, useRef } from 'react';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
+import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 interface Project {
   project_id: number;
@@ -17,6 +17,10 @@ interface Project {
   project_type_code?: string;
   project_type?: string;
   property_subtype?: string;
+  location_lat?: number | string | null;
+  location_lon?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
 interface PropertyTabProps {
@@ -1261,20 +1265,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
   const renderMarketContent = () => (
     <div className="space-y-4">
-      {/* Competitive Market Rentals Chart - Full Width */}
-      {comparables.length > 0 && (
-        <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: 'var(--cui-card-bg)', borderRadius: '8px', width: '100%' }}>
-          <h4 style={{ color: 'var(--cui-body-color)', marginBottom: '12px' }}>Competitive Market Rentals</h4>
-          <CompetitiveMarketCharts
-            comparables={comparables}
-            floorPlans={floorPlans}
-            subjectPropertyName={project.project_name}
-            onPropertyClick={handlePropertyClick}
-            onColorsAssigned={handleColorsAssigned}
-            selectedProperty={highlightedProperty}
-          />
-        </div>
-      )}
+      <LocationIntelligenceCard
+        projectId={project.project_id}
+        projectName={project.project_name}
+        latitude={project.location_lat ?? project.latitude}
+        longitude={project.location_lon ?? project.longitude}
+        rentalComparables={comparables}
+        comparableColors={propertyColors}
+      />
 
       {/* Comparable Rentals with Map */}
       <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
@@ -1423,16 +1421,34 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               )}
             </div>
 
-            {/* Right: Map */}
-            <div className="rounded-lg overflow-hidden" style={{ flex: '1 1 auto', minHeight: '500px' }}>
-              <ProjectTabMap
-                projectId={projectId.toString()}
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-                tabId="property"
-                rentalComparables={comparables}
-                comparableColors={propertyColors}
-                onMarkerClick={handlePropertyClick}
-              />
+            {/* Right: Competitive Market Graph (old map panel archived at tabs/archive/ComparableRentalsMapTemplate.tsx) */}
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{
+                flex: '1 1 50%',
+                minHeight: '500px',
+                backgroundColor: 'var(--cui-tertiary-bg)',
+                border: '1px solid var(--cui-border-color)',
+                padding: '0.75rem',
+              }}
+            >
+              {comparables.length > 0 ? (
+                <CompetitiveMarketCharts
+                  comparables={comparables}
+                  floorPlans={floorPlans}
+                  subjectPropertyName={project.project_name}
+                  onPropertyClick={handlePropertyClick}
+                  onColorsAssigned={handleColorsAssigned}
+                  selectedProperty={highlightedProperty}
+                />
+              ) : (
+                <div
+                  className="h-100 d-flex align-items-center justify-content-center"
+                  style={{ color: 'var(--cui-secondary-color)' }}
+                >
+                  No chart data available.
+                </div>
+              )}
             </div>
           </div>
         </div>

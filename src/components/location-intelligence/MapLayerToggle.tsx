@@ -40,7 +40,7 @@ const LAYER_OPTIONS: LayerOption[] = [
   },
   {
     key: 'blockGroups',
-    label: 'Block Groups',
+    label: 'Parcels / Block Groups',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="3" width="7" height="7" />
@@ -52,11 +52,12 @@ const LAYER_OPTIONS: LayerOption[] = [
   },
   {
     key: 'userPoints',
-    label: 'User Points',
+    label: 'Rental Comparables',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-        <circle cx="12" cy="10" r="3" />
+        <path d="M3 21h18" />
+        <path d="M5 21V9l4-4 4 4v12" />
+        <path d="M15 21V6l3-2 1 1v16" />
       </svg>
     ),
   },
