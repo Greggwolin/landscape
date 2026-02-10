@@ -33,6 +33,9 @@ const PROJECT_SUBTYPE_MAP: Record<string, ProjectTypeCategory> = {
   // Land Development subtypes
   'master planned community': 'land_development',
   'subdivision': 'land_development',
+  'infill development': 'land_development',
+  'entitled land': 'land_development',
+  'raw land': 'land_development',
   'multifamily development': 'land_development',
   'commercial development': 'land_development',
   'industrial development': 'land_development',
@@ -40,11 +43,16 @@ const PROJECT_SUBTYPE_MAP: Record<string, ProjectTypeCategory> = {
 
   // Multifamily Income subtypes
   'garden multifamily': 'multifamily',
+  'garden-style apartment': 'multifamily',
   'mid-rise multifamily': 'multifamily',
+  'mid-rise apartment': 'multifamily',
   'high-rise multifamily': 'multifamily',
+  'high-rise apartment': 'multifamily',
   'student housing': 'multifamily',
   'senior housing': 'multifamily',
   'affordable housing': 'multifamily',
+  'workforce housing': 'multifamily',
+  'luxury apartment': 'multifamily',
 
   // Office Income subtypes
   'class a office': 'office',
@@ -53,14 +61,19 @@ const PROJECT_SUBTYPE_MAP: Record<string, ProjectTypeCategory> = {
   'medical office': 'office',
   'flex/r&d': 'office',
   'coworking': 'office',
+  'government': 'office',
 
   // Retail Income subtypes
   'neighborhood retail': 'retail',
+  'neighborhood center': 'retail',
   'community retail': 'retail',
+  'community center': 'retail',
   'power center': 'retail',
   'lifestyle center': 'retail',
   'strip center': 'retail',
   'regional mall': 'retail',
+  'single-tenant retail': 'retail',
+  'outlet center': 'retail',
 
   // Industrial Income subtypes
   'warehouse/distribution': 'industrial',
@@ -68,12 +81,26 @@ const PROJECT_SUBTYPE_MAP: Record<string, ProjectTypeCategory> = {
   'flex space': 'industrial',
   'cold storage': 'industrial',
   'self-storage': 'industrial',
+  'data center': 'industrial',
+  'last-mile delivery': 'industrial',
 
-  // Other Income subtypes
+  // Hotel subtypes
   'hotel': 'hotel',
+  'full-service hotel': 'hotel',
+  'limited-service hotel': 'hotel',
+  'extended stay': 'hotel',
+  'boutique hotel': 'hotel',
+  'resort': 'hotel',
+  'casino hotel': 'hotel',
+
+  // Mixed-Use subtypes
   'mixed-use office/retail': 'mixed_use',
   'mixed-use office/multifamily': 'mixed_use',
   'mixed-use retail/multifamily': 'mixed_use',
+  'vertical mixed-use': 'mixed_use',
+  'horizontal mixed-use': 'mixed_use',
+  'transit-oriented development': 'mixed_use',
+  'live-work': 'mixed_use',
 };
 
 /**

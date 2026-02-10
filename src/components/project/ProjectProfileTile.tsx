@@ -17,8 +17,8 @@ import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
-import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
-import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
+import ProjectPhotosModal from './ProjectPhotosModal';
+import { useQuery } from '@tanstack/react-query';
 
 // Acquisition price summary types
 interface AcquisitionPriceSummary {
@@ -43,8 +43,23 @@ const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
 
 export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectId }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showPhotosModal, setShowPhotosModal] = useState(false);
   const { refreshProjects } = useProjectContext();
+
+  // Check if project has any linked photos (for pill label)
+  const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+  const { data: mediaData } = useQuery<{ links: Array<{ link_id: number }> }>({
+    queryKey: ['entity-media', 'project', projectId],
+    queryFn: async () => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
+      );
+      if (!res.ok) throw new Error('Failed to fetch project media');
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+  const photoCount = mediaData?.links?.length ?? 0;
 
   const { data: profile, error, isLoading, mutate } = useSWR<ProjectProfile>(
     `/api/projects/${projectId}/profile`,
@@ -53,9 +68,8 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   );
 
   // Fetch acquisition price summary
-  const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
   const { data: priceSummary, mutate: mutatePriceSummary } = useSWR<AcquisitionPriceSummary>(
-    `${apiUrl}/api/projects/${projectId}/acquisition/price-summary/`,
+    `${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`,
     (url: string) => fetch(url).then(res => res.ok ? res.json() : null),
     { revalidateOnFocus: false }
   );
@@ -200,18 +214,6 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           </button>
         </CCardHeader>
         <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
-          {/* Project Hero Image */}
-          <div style={{ marginBottom: '12px' }}>
-            <EntityMediaDisplay
-              entityType="project"
-              entityId={projectId}
-              projectId={projectId}
-              variant="hero"
-              editable={true}
-              onAttach={() => setShowMediaPicker(true)}
-            />
-          </div>
-
           <div className="d-flex flex-column">
             <ProfileField
               label="Analysis Type"
@@ -262,8 +264,35 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             <ProfileField
               label="Ownership Type"
               value={profile.ownership_type}
-              isLast={true}
             />
+            {/* Property Photos row */}
+            <div
+              className="d-flex gap-3 py-2"
+              style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
+            >
+              <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
+                Property Photos
+              </span>
+              <span>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotosModal(true)}
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.2rem 0.7rem',
+                    borderRadius: '999px',
+                    lineHeight: 1,
+                    fontWeight: 600,
+                    backgroundColor: photoCount > 0 ? 'var(--cui-primary)' : 'transparent',
+                    color: photoCount > 0 ? '#FFFFFF' : 'var(--cui-primary)',
+                    border: photoCount > 0 ? 'none' : '1px solid var(--cui-primary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {photoCount > 0 ? `Photos (${photoCount})` : 'Add Photo'}
+                </button>
+              </span>
+            </div>
           </div>
         </CCardBody>
       </CCard>
@@ -278,16 +307,11 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
         />
       )}
 
-      {showMediaPicker && (
-        <MediaPickerModal
-          isOpen={showMediaPicker}
-          onClose={() => setShowMediaPicker(false)}
+      {showPhotosModal && (
+        <ProjectPhotosModal
+          isOpen={showPhotosModal}
+          onClose={() => setShowPhotosModal(false)}
           projectId={projectId}
-          entityType="project"
-          entityId={projectId}
-          linkPurpose="hero_image"
-          singleSelect={true}
-          onSelect={() => setShowMediaPicker(false)}
         />
       )}
     </>

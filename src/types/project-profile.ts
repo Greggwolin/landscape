@@ -4,7 +4,7 @@
  * Type definitions for project profile metadata displayed in the Project Profile tile
  */
 
-import type { AnalysisType, PropertySubtype, PropertyClass } from './project-taxonomy';
+import type { AnalysisType, PropertyClass } from './project-taxonomy';
 
 // ============================================================================
 // Core Types
@@ -14,8 +14,9 @@ export interface ProjectProfile {
   project_id: number;
   project_name: string;
   analysis_type?: AnalysisType;
-  property_subtype?: PropertySubtype;
-  project_type?: string; // LAND, MF, OFF, etc.
+  property_subtype?: string;
+  project_type?: string; // LAND, MF, OFF, etc. (legacy alias)
+  project_type_code?: string; // LAND, MF, OFF, RET, IND, HTL, MXU
   target_units?: number; // For development projects (planned units at build-out)
   total_units?: number; // For operating projects (actual units)
   calculated_units?: number; // Calculated from tbl_multifamily_unit (rent roll)
@@ -58,7 +59,8 @@ export interface MSA {
 export interface ProjectProfileFormData {
   project_name?: string;
   analysis_type: AnalysisType;
-  property_subtype?: PropertySubtype;
+  property_type_code?: string; // LAND, MF, OFF, RET, IND, HTL, MXU
+  property_subtype?: string;
   target_units?: number;
   gross_acres?: number;
   asking_price?: number;

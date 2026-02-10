@@ -61,6 +61,7 @@ export async function GET(
         p.analysis_type,
         p.property_subtype,
         p.project_type,
+        p.project_type_code,
         p.target_units,
         p.total_units,
         (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,
@@ -132,6 +133,7 @@ export async function PATCH(
     const fieldMapping: Record<string, string> = {
       'project_name': 'project_name',
       'analysis_type': 'analysis_type',
+      'property_type_code': 'project_type_code',
       'property_subtype': 'property_subtype',
       'target_units': 'target_units',
       'gross_acres': 'acres_gross',
@@ -155,47 +157,6 @@ export async function PATCH(
         values.push(body[frontendField]);
         paramCount++;
       }
-    }
-
-    // Auto-sync project_type_code when analysis_type or property_subtype changes
-    // This ensures data consistency between Dashboard and Profile views
-    if (body.analysis_type !== undefined || body.property_subtype !== undefined) {
-      // Fetch current values if needed
-      const current = await sql<{ analysis_type: string; property_subtype: string | null }[]>`
-        SELECT analysis_type, property_subtype
-        FROM landscape.tbl_project
-        WHERE project_id = ${projectId}::bigint
-      `;
-
-      const analysisType = body.analysis_type || current[0]?.analysis_type;
-      const propertySubtype = body.property_subtype || current[0]?.property_subtype;
-
-      // Determine correct project_type_code based on analysis_type and property_subtype
-      let projectTypeCode = 'LAND'; // default
-
-      if (analysisType === 'Income Property') {
-        // Map property_subtype to project_type_code for income properties
-        if (propertySubtype?.toLowerCase().includes('office')) {
-          projectTypeCode = 'OFF';
-        } else if (propertySubtype?.toLowerCase().includes('multifamily') || propertySubtype?.toLowerCase().includes('garden')) {
-          projectTypeCode = 'MF';
-        } else if (propertySubtype?.toLowerCase().includes('retail')) {
-          projectTypeCode = 'RET';
-        } else if (propertySubtype?.toLowerCase().includes('industrial') || propertySubtype?.toLowerCase().includes('warehouse')) {
-          projectTypeCode = 'IND';
-        } else if (propertySubtype?.toLowerCase().includes('hotel') || propertySubtype?.toLowerCase().includes('hospitality')) {
-          projectTypeCode = 'HTL';
-        } else if (propertySubtype?.toLowerCase().includes('mixed')) {
-          projectTypeCode = 'MXU';
-        }
-      } else if (analysisType === 'Land Development') {
-        projectTypeCode = 'LAND';
-      }
-
-      // Add project_type_code to updates
-      updates.push(`project_type_code = $${paramCount}`);
-      values.push(projectTypeCode);
-      paramCount++;
     }
 
     // Auto-geocode when address, city, or county changes
@@ -285,6 +246,7 @@ export async function PATCH(
         p.analysis_type,
         p.property_subtype,
         p.project_type,
+        p.project_type_code,
         p.target_units,
         p.total_units,
         (SELECT COUNT(*)::integer FROM landscape.tbl_multifamily_unit u WHERE u.project_id = p.project_id) as calculated_units,

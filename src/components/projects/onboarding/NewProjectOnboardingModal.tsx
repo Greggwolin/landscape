@@ -112,9 +112,20 @@ export default function NewProjectOnboardingModal({
     try {
       // If we have a project ID, use the real Landscaper endpoint
       if (projectId) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          const tokens = localStorage.getItem('auth_tokens');
+          const accessToken = tokens ? JSON.parse(tokens).access : null;
+          if (accessToken) {
+            headers.Authorization = `Bearer ${accessToken}`;
+          }
+        } catch {
+          // Best-effort auth header injection; request may still succeed in dev modes.
+        }
+
         const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             message: content,
             activeTab: 'documents',  // Onboarding focuses on document upload/extraction
