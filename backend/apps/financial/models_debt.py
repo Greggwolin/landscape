@@ -33,6 +33,12 @@ class Loan(models.Model):
     loan_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     loan_to_cost_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     loan_to_value_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    commitment_sizing_method = models.CharField(max_length=30, null=True, blank=True, default='MANUAL')
+    ltv_basis_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    ltc_basis_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    calculated_commitment_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    governing_constraint = models.CharField(max_length=10, null=True, blank=True)
+    net_loan_proceeds = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
     # Interest Rate
     interest_rate_pct = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True)

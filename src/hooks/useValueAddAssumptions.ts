@@ -208,7 +208,13 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      // Flush any pending save on unmount so changes aren't lost
+      if (pendingStateRef.current) {
+        saveState(pendingStateRef.current);
+        pendingStateRef.current = null;
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const calculated = useMemo<CalculatedValues>(() => {

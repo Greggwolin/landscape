@@ -77,13 +77,28 @@ class CalculationService:
         return rows
 
     @staticmethod
-    def _fetch_cashflows_from_django_service(project_id: int):
+    def _fetch_cashflows_from_django_service(project_id: int, project_type_code: Optional[str] = None):
         """
-        Fetch cash flows from the Django LandDevCashFlowService.
+        Fetch project cash flows from authoritative Django services.
+
+        LAND projects:
+        - Use LandDevCashFlowService
+        - net_cf = revenue - costs + financing
+
+        Non-LAND projects:
+        - Use IncomePropertyCashFlowService
+        - net_cf = NOI - Debt Service
+        - Add net reversion in the final period
 
         Returns list of (period_id, period_date, net_cash_flow) tuples.
-        Net cash flow is negative for costs (contributions) and positive for revenue (distributions).
         """
+        if (project_type_code or '').upper() == 'LAND':
+            return CalculationService._fetch_landdev_cashflows_from_django_service(project_id)
+        return CalculationService._fetch_income_property_cashflows_from_django_service(project_id)
+
+    @staticmethod
+    def _fetch_landdev_cashflows_from_django_service(project_id: int):
+        """Fetch LAND project cash flows from LandDevCashFlowService."""
         from datetime import datetime
         from collections import defaultdict
         from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
@@ -99,7 +114,7 @@ class CalculationService:
             # Validate totals
             total_costs = summary.get('totalCosts', 0)
             total_net_revenue = summary.get('totalNetRevenue', 0)
-            print(f"[waterfall] Django engine: costs=${total_costs:,.2f}, net_revenue=${total_net_revenue:,.2f}")
+            print(f"[waterfall] LAND Django engine: costs=${total_costs:,.2f}, net_revenue=${total_net_revenue:,.2f}")
 
             if not periods:
                 return []
@@ -120,7 +135,6 @@ class CalculationService:
                 sname = section.get('sectionName', '').lower()
                 is_cost = sname in cost_section_names
                 is_revenue = sname in revenue_section_names
-
                 is_financing = sname in financing_section_names
 
                 if is_cost or is_revenue or is_financing:
@@ -182,13 +196,112 @@ class CalculationService:
             # Log summary
             total_contrib = sum(r[2] for r in rows if r[2] < 0)
             total_dist = sum(r[2] for r in rows if r[2] > 0)
-            print(f"[waterfall] Parsed {len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}")
+            print(f"[waterfall] LAND parsed {len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}")
 
             return rows
 
         except Exception as e:
             import traceback
-            print(f"[waterfall] Error fetching from Django service: {e}")
+            print(f"[waterfall] Error fetching LAND cash flows from Django service: {e}")
+            traceback.print_exc()
+            return []
+
+    @staticmethod
+    def _fetch_income_property_cashflows_from_django_service(project_id: int):
+        """Fetch non-LAND project cash flows from IncomePropertyCashFlowService."""
+        from datetime import datetime
+        from collections import defaultdict
+        from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+
+        try:
+            service = IncomePropertyCashFlowService(project_id)
+            cf_data = service.calculate(include_financing=True)
+
+            periods = cf_data.get('periods', [])
+            sections = cf_data.get('sections', [])
+            exit_analysis = cf_data.get('exitAnalysis', {}) or {}
+
+            if not periods:
+                return []
+
+            # Income-property levered CF for waterfall:
+            #   net_cf(period) = NOI - Debt Service
+            # Then add terminal reversion in the final hold period.
+            period_noi = defaultdict(float)
+            period_debt_service = defaultdict(float)
+
+            for section in sections:
+                sname = section.get('sectionName', '').strip().lower()
+
+                if sname == 'net operating income':
+                    for pv in section.get('subtotals', []):
+                        ps = pv.get('periodSequence')
+                        if ps is None:
+                            continue
+                        period_noi[ps] += float(pv.get('amount', 0) or 0)
+
+                if sname == 'financing':
+                    for pv in section.get('subtotals', []):
+                        ps = pv.get('periodSequence')
+                        if ps is None:
+                            continue
+                        amt = float(pv.get('amount', 0) or 0)
+                        # Ignore loan funding inflows; debt service is cash out only.
+                        if amt < 0:
+                            period_debt_service[ps] += abs(amt)
+
+            # Get period dates from response
+            period_dates = {}
+            for p in periods:
+                ps = p.get('periodSequence', 0)
+                end_date_str = p.get('endDate', '')
+                if end_date_str:
+                    try:
+                        period_dates[ps] = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')).date()
+                    except ValueError:
+                        pass
+
+            max_period = max(
+                max(period_noi.keys()) if period_noi else 0,
+                max(period_debt_service.keys()) if period_debt_service else 0,
+                len(periods),
+            )
+            if max_period == 0:
+                return []
+
+            terminal_reversion = float(exit_analysis.get('netReversion', 0) or 0)
+
+            rows = []
+            for period_seq in range(1, max_period + 1):
+                noi = period_noi.get(period_seq, 0)
+                debt_service = period_debt_service.get(period_seq, 0)
+                net_cf = noi - debt_service
+
+                if period_seq == max_period and terminal_reversion:
+                    net_cf += terminal_reversion
+
+                if period_seq in period_dates:
+                    period_date = period_dates[period_seq]
+                else:
+                    from dateutil.relativedelta import relativedelta
+                    from datetime import date
+                    period_date = date(2025, 1, 31) + relativedelta(months=period_seq - 1)
+
+                rows.append((period_seq, period_date, net_cf))
+
+            total_contrib = sum(r[2] for r in rows if r[2] < 0)
+            total_dist = sum(r[2] for r in rows if r[2] > 0)
+            print(
+                "[waterfall] Non-LAND parsed "
+                f"{len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}, "
+                f"terminal_reversion=${terminal_reversion:,.0f}"
+            )
+
+            return rows
+
+        except Exception as e:
+            import traceback
+            print(f"[waterfall] Error fetching non-LAND cash flows from Django service: {e}")
             traceback.print_exc()
             return []
 
@@ -607,27 +720,49 @@ class CalculationService:
         from django.db import connection
 
         try:
+            # Resolve project type first so cash flow source can branch correctly.
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT project_type_code
+                    FROM landscape.tbl_project
+                    WHERE project_id = %s
+                    LIMIT 1
+                """, [project_id])
+                project_row = cursor.fetchone()
+                project_type_code = (project_row[0] or '').upper() if project_row else ''
+
             # Load tier configuration from database (authoritative tables)
             with connection.cursor() as cursor:
                 cursor.execute("""
                     SELECT
-                        tier_number,
-                        tier_name,
-                        COALESCE(irr_threshold_pct, hurdle_rate) AS irr_hurdle,
-                        equity_multiple_threshold AS emx_hurdle,
-                        lp_split_pct,
-                        gp_split_pct
-                    FROM landscape.tbl_waterfall_tier
-                    WHERE project_id = %s
-                      AND (is_active IS NULL OR is_active = TRUE)
-                    ORDER BY COALESCE(display_order, tier_number)
+                        wt.tier_number,
+                        wt.tier_name,
+                        COALESCE(wt.irr_threshold_pct, wt.hurdle_rate) AS irr_hurdle,
+                        wt.equity_multiple_threshold AS emx_hurdle,
+                        wt.lp_split_pct,
+                        wt.gp_split_pct
+                    FROM landscape.tbl_waterfall_tier wt
+                    LEFT JOIN landscape.tbl_equity_structure es
+                      ON es.equity_structure_id = wt.equity_structure_id
+                    WHERE COALESCE(wt.project_id, es.project_id) = %s
+                      AND (wt.is_active IS NULL OR wt.is_active = TRUE)
+                    ORDER BY COALESCE(wt.display_order, wt.tier_number)
                 """, [project_id])
                 tier_rows = cursor.fetchall()
 
             if not tier_rows:
                 return {
-                    'error': f'No waterfall tiers found for project {project_id}',
+                    'error': (
+                        f'No waterfall tiers configured for project {project_id}. '
+                        'Configure and save tiers in Capitalization > Equity, then rerun waterfall.'
+                    ),
                     'project_id': project_id,
+                    'project_type_code': project_type_code or None,
+                    'hint': (
+                        'If tiers appear in the UI but this persists, verify they are saved to '
+                        'landscape.tbl_waterfall_tier with either project_id set or an '
+                        'equity_structure_id linked to this project.'
+                    ),
                 }
 
             # Convert to tier dicts with sensible defaults for EMx mode
@@ -654,9 +789,13 @@ class CalculationService:
                     'gp_split_pct': float(row[5]) if row[5] else 10,
                 })
 
-            # Fetch cash flows from Django LandDevCashFlowService (authoritative source)
-            # Uses pre-computed allocations from tbl_budget_timing + parcel sales
-            cf_rows = CalculationService._fetch_cashflows_from_django_service(project_id)
+            # Fetch cash flows from authoritative Django service based on project type.
+            # LAND: LandDevCashFlowService
+            # Non-LAND: IncomePropertyCashFlowService (NOI - Debt Service + terminal reversion)
+            cf_rows = CalculationService._fetch_cashflows_from_django_service(
+                project_id,
+                project_type_code=project_type_code,
+            )
 
             if not cf_rows:
                 # Fallback to pre-populated summary table if exists

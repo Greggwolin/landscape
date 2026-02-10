@@ -8,7 +8,9 @@ from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from apps.calculations.loan_sizing_service import LoanSizingService
 from apps.projects.models import Project
 from .models_debt import Loan, LoanContainer, LoanFinanceStructure, DebtDrawSchedule
 from .serializers_debt import (
@@ -54,10 +56,37 @@ class LoanViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, project_id=project_id)
-        serializer.save(project=project, created_at=timezone.now(), updated_at=timezone.now())
+        loan = serializer.save(project=project, created_at=timezone.now(), updated_at=timezone.now())
+        self._apply_sizing(loan, project)
 
     def perform_update(self, serializer):
-        serializer.save(updated_at=timezone.now())
+        loan = serializer.save(updated_at=timezone.now())
+        self._apply_sizing(loan, loan.project)
+
+    @staticmethod
+    def _apply_sizing(loan: Loan, project: Project) -> None:
+        sizing = LoanSizingService.calculate_commitment(loan, project)
+        loan.commitment_amount = sizing['commitment_amount']
+        loan.loan_amount = sizing['loan_amount']
+        loan.calculated_commitment_amount = sizing['calculated_commitment_amount']
+        loan.commitment_sizing_method = sizing['commitment_sizing_method']
+        loan.governing_constraint = sizing['governing_constraint']
+        loan.ltv_basis_amount = sizing['ltv_basis_amount']
+        loan.ltc_basis_amount = sizing['ltc_basis_amount']
+        loan.net_loan_proceeds = sizing['net_loan_proceeds']
+        loan.save(
+            update_fields=[
+                'commitment_amount',
+                'loan_amount',
+                'calculated_commitment_amount',
+                'commitment_sizing_method',
+                'governing_constraint',
+                'ltv_basis_amount',
+                'ltc_basis_amount',
+                'net_loan_proceeds',
+                'updated_at',
+            ]
+        )
 
 
 class DebtDrawScheduleViewSet(viewsets.ModelViewSet):
@@ -188,3 +217,28 @@ class LoanFinanceStructureViewSet(
         loan_id = self.kwargs.get('loan_id')
         loan = get_object_or_404(Loan, loan_id=loan_id, project_id=project_id)
         serializer.save(loan=loan)
+
+
+class LoanBudgetSummaryView(APIView):
+    """Read-only budget breakdown for a single loan."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, project_id: int, loan_id: int):
+        project = get_object_or_404(Project, project_id=project_id)
+        loan = get_object_or_404(Loan, project_id=project_id, loan_id=loan_id)
+        summary = LoanSizingService.build_budget_summary(loan, project)
+        return Response(summary, status=status.HTTP_200_OK)
+
+
+class InterestReserveCalculationView(APIView):
+    """Calculate recommended interest reserve for a loan."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, project_id: int, loan_id: int):
+        project = get_object_or_404(Project, project_id=project_id)
+        loan = get_object_or_404(Loan, project_id=project_id, loan_id=loan_id)
+
+        result = LoanSizingService.calculate_interest_reserve_recommendation(loan, project)
+        return Response(result, status=status.HTTP_200_OK)

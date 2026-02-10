@@ -49,6 +49,14 @@ class LoanListSerializer(serializers.ModelSerializer):
     commitment_amount = serializers.FloatField()
     loan_amount = serializers.FloatField(allow_null=True)
     interest_rate_pct = serializers.FloatField(allow_null=True)
+    calculated_commitment_amount = serializers.FloatField(allow_null=True)
+    ltv_basis_amount = serializers.FloatField(allow_null=True)
+    ltc_basis_amount = serializers.FloatField(allow_null=True)
+    net_loan_proceeds = serializers.FloatField(allow_null=True)
+    interest_reserve_amount = serializers.FloatField(allow_null=True)
+    closing_costs_appraisal = serializers.FloatField(allow_null=True)
+    closing_costs_legal = serializers.FloatField(allow_null=True)
+    closing_costs_other = serializers.FloatField(allow_null=True)
 
     class Meta:
         model = Loan
@@ -60,6 +68,14 @@ class LoanListSerializer(serializers.ModelSerializer):
             'lender_name',
             'commitment_amount',
             'loan_amount',
+            'loan_to_cost_pct',
+            'loan_to_value_pct',
+            'commitment_sizing_method',
+            'ltv_basis_amount',
+            'ltc_basis_amount',
+            'calculated_commitment_amount',
+            'governing_constraint',
+            'net_loan_proceeds',
             'interest_rate_pct',
             'seniority',
             'status',
@@ -71,6 +87,10 @@ class LoanListSerializer(serializers.ModelSerializer):
             'interest_type',
             'payment_frequency',
             'origination_fee_pct',
+            'interest_reserve_amount',
+            'closing_costs_appraisal',
+            'closing_costs_legal',
+            'closing_costs_other',
         ]
 
 
@@ -90,7 +110,15 @@ class LoanDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Loan
         fields = '__all__'
-        read_only_fields = ['loan_id']
+        read_only_fields = [
+            'loan_id',
+            'commitment_sizing_method',
+            'ltv_basis_amount',
+            'ltc_basis_amount',
+            'calculated_commitment_amount',
+            'governing_constraint',
+            'net_loan_proceeds',
+        ]
 
 
 class LoanCreateUpdateSerializer(serializers.ModelSerializer):
@@ -108,7 +136,17 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Loan
         fields = '__all__'
-        read_only_fields = ['loan_id', 'created_at', 'updated_at']
+        read_only_fields = [
+            'loan_id',
+            'created_at',
+            'updated_at',
+            'commitment_sizing_method',
+            'ltv_basis_amount',
+            'ltc_basis_amount',
+            'calculated_commitment_amount',
+            'governing_constraint',
+            'net_loan_proceeds',
+        ]
 
     def _sync_containers(self, loan, container_ids):
         LoanContainer.objects.filter(loan=loan).delete()

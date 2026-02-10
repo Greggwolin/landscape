@@ -55,6 +55,8 @@ from .views_debt import (
     LoanContainerViewSet,
     LoanFinanceStructureViewSet,
     DebtBalanceSummaryViewSet,
+    LoanBudgetSummaryView,
+    InterestReserveCalculationView,
 )
 from .views_debt_schedule import DebtScheduleView
 
@@ -167,6 +169,16 @@ urlpatterns = [
         'projects/<int:project_id>/loans/<int:loan_id>/debt-schedule/',
         DebtScheduleView.as_view(),
         name='loan-debt-schedule'
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/budget-summary/',
+        LoanBudgetSummaryView.as_view(),
+        name='loan-budget-summary',
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/interest-reserve/calculate/',
+        InterestReserveCalculationView.as_view(),
+        name='loan-interest-reserve-calculate',
     ),
 
     # Budget Variance endpoints

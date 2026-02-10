@@ -273,6 +273,12 @@ export interface Loan {
   loan_amount: number | null;
   loan_to_cost_pct: number | null;
   loan_to_value_pct: number | null;
+  commitment_sizing_method?: 'MANUAL' | 'LTV' | 'LTC' | 'MIN_LTV_LTC' | string | null;
+  ltv_basis_amount?: number | null;
+  ltc_basis_amount?: number | null;
+  calculated_commitment_amount?: number | null;
+  governing_constraint?: 'LTV' | 'LTC' | 'MANUAL' | string | null;
+  net_loan_proceeds?: number | null;
   interest_rate_pct: number | null;
   interest_type: 'Fixed' | 'Floating' | string | null;
   interest_index?: 'SOFR' | 'PRIME' | 'FIXED' | string | null;
@@ -297,6 +303,7 @@ export interface Loan {
   origination_fee_pct: number | null;
   exit_fee_pct: number | null;
   unused_fee_pct?: number | null;
+  interest_reserve_amount?: number | null;
   interest_reserve_inflator?: number | null;
   repayment_acceleration?: number | null;
   draw_trigger_type?: 'COST_INCURRED' | 'MANUAL' | string | null;

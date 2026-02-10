@@ -1412,14 +1412,14 @@ class LandDevCashFlowService:
 
             params = self._build_term_params(loan, periods)
             term_result = engine.calculate_term(params, period_count)
+            initial_net_proceeds = self._resolve_net_loan_proceeds(loan, params.loan_amount)
 
             period_amounts = []
             total_amount = 0.0
             for period in term_result.periods:
                 amount = 0.0
                 if period.period_index == params.loan_start_period:
-                    origination_fee = params.loan_amount * params.origination_fee_pct
-                    amount += params.loan_amount - origination_fee
+                    amount += initial_net_proceeds
 
                 amount -= period.scheduled_payment
                 if period.is_balloon and period.balloon_amount:
@@ -1498,6 +1498,20 @@ class LandDevCashFlowService:
             loan_start_period=loan_start_period,
             payment_frequency=loan.payment_frequency or 'MONTHLY',
         )
+
+    @staticmethod
+    def _resolve_net_loan_proceeds(loan: Loan, loan_amount: float) -> float:
+        if loan.net_loan_proceeds is not None:
+            return float(loan.net_loan_proceeds)
+
+        origination_fee = loan_amount * (float(loan.origination_fee_pct or 0) / 100.0)
+        interest_reserve = float(loan.interest_reserve_amount or 0)
+        closing_costs = (
+            float(loan.closing_costs_appraisal or 0)
+            + float(loan.closing_costs_legal or 0)
+            + float(loan.closing_costs_other or 0)
+        )
+        return loan_amount - origination_fee - interest_reserve - closing_costs
 
     def _build_period_costs_for_financing(
         self,

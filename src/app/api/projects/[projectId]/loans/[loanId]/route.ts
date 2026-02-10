@@ -14,6 +14,31 @@ const getAuthHeaders = (request: NextRequest) => {
 
 type Params = { params: Promise<{ projectId: string; loanId: string }> };
 
+export async function GET(request: NextRequest, { params }: Params) {
+  try {
+    const { projectId, loanId } = await params;
+    const { searchParams } = new URL(request.url);
+
+    const djangoUrl = buildUrl(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`,
+      searchParams
+    );
+
+    const response = await fetch(djangoUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { projectId, loanId } = await params;
@@ -34,7 +59,35 @@ export async function PUT(request: NextRequest, { params }: Params) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Django proxy error:', error);
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  try {
+    const { projectId, loanId } = await params;
+    const { searchParams } = new URL(request.url);
+    const body = await request.json();
+
+    const djangoUrl = buildUrl(
+      `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`,
+      searchParams
+    );
+
+    const response = await fetch(djangoUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(request),
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json().catch(() => ({}));
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error('Django proxy error:', error);
@@ -60,7 +113,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       },
     });
 
-    const data = await response.json();
+    const data = response.status === 204 ? null : await response.json().catch(() => null);
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error('Django proxy error:', error);
