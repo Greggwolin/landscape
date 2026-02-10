@@ -2,10 +2,13 @@
 
 import React, { useMemo, useState } from 'react';
 import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody } from '@coreui/react';
+import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
+import PendingRenoOffsetModal from '@/components/capitalization/PendingRenoOffsetModal';
 import {
   useIncomeApproachMonthlyDCF,
   useLeveragedCashFlow,
   useLoanSchedule,
+  useAcquisitionPriceSummary,
 } from '@/hooks/useCapitalization';
 import type { Loan } from '@/types/assumptions';
 
@@ -68,6 +71,12 @@ interface ExitAnalysis {
   loanPayoff: number;
   netReversionAfterDebt: number;
   holdPeriodMonths: number;
+  // Value-add fields
+  isValueAdd?: boolean;
+  forwardStabilizedNOI?: number;
+  stabilizedValue?: number;
+  pendingRenoOffset?: number;
+  adjustedExitValue?: number;
 }
 
 interface CashFlowResponse {
@@ -97,9 +106,12 @@ interface IncomeApproachMonthlyResponse {
 /* Row model for display */
 interface DisplayRow {
   label: string;
-  rowType: 'section-header' | 'indent' | 'subtotal' | 'noi' | 'divider' | 'net-cf' | 'grand-total' | 'info' | 'reversion';
+  rowType: 'section-header' | 'indent' | 'subtotal' | 'noi' | 'divider' | 'net-cf' | 'grand-total' | 'info' | 'reversion' | 'time0' | 'loan-proceeds';
   values: number[]; // one per aggregated period
+  time0Value?: number;
   showSign?: boolean;
+  loanId?: number;
+  loanName?: string;
 }
 
 /* ---------- Props ---------- */
@@ -123,6 +135,36 @@ function formatLCFCurrency(value: number): string {
   const formatted = new Intl.NumberFormat('en-US', opts).format(abs);
   if (value < 0) return `(${formatted})`;
   return formatted;
+}
+
+function toNumber(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[$,%\s,]/g, '');
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function resolveLoanNetProceeds(loan: Loan): number {
+  const gross = toNumber(loan.net_loan_proceeds != null ? loan.net_loan_proceeds : null)
+    || toNumber(loan.commitment_amount || loan.loan_amount || 0);
+
+  if (loan.net_loan_proceeds != null) {
+    return toNumber(loan.net_loan_proceeds);
+  }
+
+  const feePct = toNumber(loan.origination_fee_pct);
+  const originationFee = (gross * feePct) / 100;
+  const interestReserve = toNumber(loan.interest_reserve_amount);
+  const closingCosts =
+    toNumber(loan.closing_costs_appraisal) +
+    toNumber(loan.closing_costs_legal) +
+    toNumber(loan.closing_costs_other);
+
+  return gross - originationFee - interestReserve - closingCosts;
 }
 
 function aggregatePeriods(
@@ -172,10 +214,13 @@ export default function LeveragedCashFlow({
   projectId,
   loans = [],
 }: LeveragedCashFlowProps) {
-  const [periodView, setPeriodView] = useState<PeriodView>('monthly');
+  const [periodView, setPeriodView] = useState<PeriodView>('annual');
+  const [budgetModalLoan, setBudgetModalLoan] = useState<{ loanId: number; loanName?: string } | null>(null);
+  const [showPendingRenoModal, setShowPendingRenoModal] = useState(false);
 
   const { data: cfResponse, isLoading: cfLoading, error: cfError } = useLeveragedCashFlow(projectId);
   const { data: incomeApproachMonthly } = useIncomeApproachMonthlyDCF(projectId, Boolean(projectId));
+  const { data: acquisitionSummary } = useAcquisitionPriceSummary(projectId, Boolean(projectId));
 
   // Get first loan's debt schedule for interest/principal breakdown
   const firstLoanId = loans.length > 0 ? loans[0].loan_id : null;
@@ -235,30 +280,153 @@ export default function LeveragedCashFlow({
 
     /* Zero-filled arrays for empty data */
     const zeroes = new Array(totalPeriods).fill(0);
+    const zeroesAgg = new Array(hdrs.length).fill(0);
+
+    const acquisitionPrice = toNumber(acquisitionSummary?.effective_acquisition_price);
+    const initialAcquisitionOutflow = acquisitionPrice > 0 ? -acquisitionPrice : 0;
+    const acquisitionRowLabel =
+      acquisitionSummary?.price_source === 'asking'
+        ? 'Asking Price'
+        : 'Acquisition Price (Incl Costs)';
+
+    const perLoanNetProceeds = loans
+      .map((loan) => ({
+        loanId: loan.loan_id,
+        loanName: loan.loan_name || `Loan ${loan.loan_id}`,
+        amount: resolveLoanNetProceeds(loan),
+      }))
+      .filter((entry) => entry.amount !== 0);
+
+    const initialNetLoanProceeds = perLoanNetProceeds.reduce((sum, entry) => sum + entry.amount, 0);
+    const netTimeZero = initialAcquisitionOutflow + initialNetLoanProceeds;
+
+    if (initialAcquisitionOutflow !== 0 || initialNetLoanProceeds !== 0) {
+      displayRows.push({
+        label: 'Initial Capitalization',
+        rowType: 'section-header',
+        values: zeroesAgg,
+      });
+
+      if (initialAcquisitionOutflow !== 0) {
+        displayRows.push({
+          label: acquisitionRowLabel,
+          rowType: 'time0',
+          values: zeroesAgg,
+          time0Value: initialAcquisitionOutflow,
+          showSign: true,
+        });
+      }
+
+      perLoanNetProceeds.forEach((entry) => {
+        displayRows.push({
+          label: `Net Loan Proceeds - ${entry.loanName}`,
+          rowType: 'loan-proceeds',
+          values: zeroesAgg,
+          time0Value: entry.amount,
+          showSign: true,
+          loanId: entry.loanId,
+          loanName: entry.loanName,
+        });
+      });
+
+      displayRows.push({
+        label: '',
+        rowType: 'divider',
+        values: [],
+      });
+    }
 
     /* ---- NOI Section ---- */
     if (hasSectionIncomeData) {
-      // GPI row
+      // Check if this is a value-add project with split GPR
+      const hasGprExisting = revenueSection?.lineItems?.some((item) => item.lineId === 'gpr-existing');
+      const hasGprRenovated = revenueSection?.lineItems?.some((item) => item.lineId === 'gpr-renovated');
+      const isValueAdd = hasGprExisting && hasGprRenovated;
+
+      // GPI rows — either split or single
       const gpiPeriodValues = zeroes.map((_, i) => {
         const sub = revenueSection?.subtotals.find((s) => s.periodIndex === i);
         return sub ? sub.amount : 0;
       });
-      displayRows.push({
-        label: 'Gross Potential Income',
-        rowType: 'section-header',
-        values: aggregatePeriods(gpiPeriodValues, periodView),
-      });
 
-      // Vacancy/deductions
+      if (isValueAdd) {
+        // Value-add: show split GPR lines
+        displayRows.push({
+          label: 'Gross Potential Income',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        // GPR - Existing
+        const gprExistingItem = revenueSection?.lineItems.find((item) => item.lineId === 'gpr-existing');
+        if (gprExistingItem) {
+          const gprExistingValues = zeroes.map((_, i) => {
+            const pv = gprExistingItem.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: 'Gross Potential Rent – Existing',
+            rowType: 'indent',
+            values: aggregatePeriods(gprExistingValues, periodView),
+          });
+        }
+
+        // GPR - Renovated
+        const gprRenovatedItem = revenueSection?.lineItems.find((item) => item.lineId === 'gpr-renovated');
+        if (gprRenovatedItem) {
+          const gprRenovatedValues = zeroes.map((_, i) => {
+            const pv = gprRenovatedItem.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: 'Gross Potential Rent – Renovated',
+            rowType: 'indent',
+            values: aggregatePeriods(gprRenovatedValues, periodView),
+          });
+        }
+
+        // GPR Total
+        displayRows.push({
+          label: 'Gross Potential Rent (Total)',
+          rowType: 'subtotal',
+          values: aggregatePeriods(gpiPeriodValues, periodView),
+        });
+      } else {
+        // Standard: single GPR line
+        displayRows.push({
+          label: 'Gross Potential Income',
+          rowType: 'section-header',
+          values: aggregatePeriods(gpiPeriodValues, periodView),
+        });
+      }
+
+      // Vacancy/deductions — show individual lines if value-add, else aggregate
       const deductionValues = zeroes.map((_, i) => {
         const sub = deductionsSection?.subtotals.find((s) => s.periodIndex === i);
         return sub ? sub.amount : 0;
       });
-      displayRows.push({
-        label: 'Less: Vacancy & Credit Loss',
-        rowType: 'indent',
-        values: aggregatePeriods(deductionValues, periodView),
-      });
+
+      if (isValueAdd && deductionsSection?.lineItems) {
+        // Show individual deduction lines
+        for (const item of deductionsSection.lineItems) {
+          const itemValues = zeroes.map((_, i) => {
+            const pv = item.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: item.description,
+            rowType: 'indent',
+            values: aggregatePeriods(itemValues, periodView),
+          });
+        }
+      } else {
+        // Standard: aggregate deductions
+        displayRows.push({
+          label: 'Less: Vacancy & Credit Loss',
+          rowType: 'indent',
+          values: aggregatePeriods(deductionValues, periodView),
+        });
+      }
 
       // EGI = GPI - deductions
       const egiValues = gpiPeriodValues.map((gpi, i) => gpi + deductionValues[i]);
@@ -317,6 +485,76 @@ export default function LeveragedCashFlow({
         rowType: 'noi',
         values: [],
       });
+    }
+
+    const exitAnalysis = cfData.exitAnalysis;
+    if (exitAnalysis && exitAnalysis.netReversion !== 0) {
+      const reversionValues = new Array(hdrs.length).fill(0);
+      if (reversionValues.length > 0) {
+        reversionValues[reversionValues.length - 1] = exitAnalysis.netReversion;
+      }
+
+      if (exitAnalysis.isValueAdd) {
+        // Value-add: show expanded reversion breakdown
+        displayRows.push({
+          label: 'Reversion (Exit Analysis)',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        // These are info rows showing the calculation, not cash flows
+        displayRows.push({
+          label: `Forward Stabilized NOI`,
+          rowType: 'info',
+          values: [],
+        });
+
+        displayRows.push({
+          label: `Stabilized Value @ ${((exitAnalysis.exitCapRate || 0) * 100).toFixed(2)}% Cap`,
+          rowType: 'info',
+          values: [],
+        });
+
+        // Pending Reno Offset — clickable row with value in last period
+        const pendingOffsetValues = new Array(hdrs.length).fill(0);
+        if (pendingOffsetValues.length > 0 && exitAnalysis.pendingRenoOffset) {
+          pendingOffsetValues[pendingOffsetValues.length - 1] = -exitAnalysis.pendingRenoOffset;
+        }
+        displayRows.push({
+          label: 'Less: Pending Reno Offset',
+          rowType: 'reversion', // Will be clickable
+          values: pendingOffsetValues,
+        });
+
+        displayRows.push({
+          label: 'Adjusted Exit Value',
+          rowType: 'info',
+          values: [],
+        });
+
+        const sellingCostsValues = new Array(hdrs.length).fill(0);
+        if (sellingCostsValues.length > 0) {
+          sellingCostsValues[sellingCostsValues.length - 1] = -exitAnalysis.sellingCosts;
+        }
+        displayRows.push({
+          label: `Less: Selling Costs (${((exitAnalysis.sellingCostsPct || 0) * 100).toFixed(1)}%)`,
+          rowType: 'indent',
+          values: sellingCostsValues,
+        });
+
+        displayRows.push({
+          label: 'Net Reversion',
+          rowType: 'subtotal',
+          values: reversionValues,
+        });
+      } else {
+        // Standard: single reversion row
+        displayRows.push({
+          label: 'Net Sale Proceeds (before Loan Payoff)',
+          rowType: 'reversion',
+          values: reversionValues,
+        });
+      }
     }
 
     // Divider
@@ -436,6 +674,7 @@ export default function LeveragedCashFlow({
           label: 'Net Cash Flow (After Debt)',
           rowType: 'net-cf',
           values: netCF,
+          time0Value: netTimeZero,
           showSign: true,
         });
       }
@@ -447,6 +686,7 @@ export default function LeveragedCashFlow({
           label: 'Net Cash Flow (After Debt)',
           rowType: 'net-cf',
           values: [...noiRow.values],
+          time0Value: netTimeZero,
           showSign: true,
         });
       }
@@ -458,13 +698,16 @@ export default function LeveragedCashFlow({
         label: 'Net Cash Flow (After Debt)',
         rowType: 'net-cf',
         values: emptyValues,
+        time0Value: netTimeZero,
         showSign: true,
       });
     }
 
     /* ---- Reversion & Grand Total ---- */
-    const exitAnalysis = cfData.exitAnalysis;
-    if (exitAnalysis && exitAnalysis.netReversionAfterDebt !== 0) {
+    const netCFRow = displayRows.find((r) => r.rowType === 'net-cf');
+    const aggPeriodCount = netCFRow ? netCFRow.values.length : hdrs.length;
+
+    if (exitAnalysis && exitAnalysis.netReversion !== 0) {
       // Divider before reversion
       displayRows.push({
         label: '',
@@ -472,24 +715,12 @@ export default function LeveragedCashFlow({
         values: [],
       });
 
-      // Reversion row: value only in the last aggregated period
-      const netCFRow = displayRows.find((r) => r.rowType === 'net-cf');
-      const aggPeriodCount = netCFRow ? netCFRow.values.length : hdrs.length;
-      const reversionValues = new Array(aggPeriodCount).fill(0);
-      if (aggPeriodCount > 0) {
-        reversionValues[aggPeriodCount - 1] = exitAnalysis.netReversionAfterDebt;
-      }
-      displayRows.push({
-        label: 'Reversion (Net of Debt)',
-        rowType: 'reversion',
-        values: reversionValues,
-      });
-
       // Grand Total row: Net CF + Reversion in final period
       if (netCFRow && netCFRow.values.length > 0) {
+        const reversionRow = displayRows.find((r) => r.rowType === 'reversion');
         const grandTotalValues = netCFRow.values.map((ncf, i) => {
           if (i === aggPeriodCount - 1) {
-            return ncf + exitAnalysis.netReversionAfterDebt;
+            return ncf + (reversionRow?.values[i] || 0);
           }
           return ncf;
         });
@@ -497,9 +728,18 @@ export default function LeveragedCashFlow({
           label: 'Total Cash Flow',
           rowType: 'grand-total',
           values: grandTotalValues,
+          time0Value: netTimeZero,
           showSign: true,
         });
       }
+    } else if (netCFRow && netCFRow.values.length > 0) {
+      displayRows.push({
+        label: 'Total Cash Flow',
+        rowType: 'grand-total',
+        values: [...netCFRow.values],
+        time0Value: netTimeZero,
+        showSign: true,
+      });
     }
 
     return { rows: displayRows, headers: hdrs };
@@ -521,6 +761,7 @@ export default function LeveragedCashFlow({
     netRevenueSection,
     financingSection,
     loans,
+    acquisitionSummary,
   ]);
 
   /* Reversion modal state */
@@ -593,6 +834,7 @@ export default function LeveragedCashFlow({
           <thead>
             <tr>
               <th>Line Item</th>
+              <th>Time 0</th>
               {headers.map((h, i) => (
                 <th key={i}>{h}</th>
               ))}
@@ -604,7 +846,7 @@ export default function LeveragedCashFlow({
               if (row.rowType === 'divider') {
                 return (
                   <tr key={rowIdx} className="divider">
-                    <td colSpan={headers.length + 1} />
+                    <td colSpan={headers.length + 2} />
                   </tr>
                 );
               }
@@ -615,7 +857,7 @@ export default function LeveragedCashFlow({
                   <tr key={rowIdx} className="section-header">
                     <td>{row.label}</td>
                     <td
-                      colSpan={headers.length}
+                      colSpan={headers.length + 1}
                       style={{
                         textAlign: 'center',
                         color: 'var(--cui-text-muted)',
@@ -635,7 +877,7 @@ export default function LeveragedCashFlow({
                   <tr key={rowIdx} className="noi-row">
                     <td>{row.label}</td>
                     <td
-                      colSpan={headers.length}
+                      colSpan={headers.length + 1}
                       style={{
                         textAlign: 'center',
                         color: 'var(--cui-text-muted)',
@@ -653,6 +895,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx} className="section-header">
                     <td>{row.label}</td>
+                    <td />
                     {headers.map((_, i) => (
                       <td key={i} />
                     ))}
@@ -662,9 +905,15 @@ export default function LeveragedCashFlow({
 
               /* Reversion row — value only in last period, clickable */
               if (row.rowType === 'reversion') {
+                const isPendingOffset = row.label.includes('Pending Reno Offset');
+                const handleClick = isPendingOffset
+                  ? () => setShowPendingRenoModal(true)
+                  : () => setShowReversionModal(true);
+
                 return (
                   <tr key={rowIdx} className="reversion-row">
                     <td>{row.label}</td>
+                    <td>{row.time0Value ? formatLCFCurrency(row.time0Value) : '—'}</td>
                     {row.values.map((val, colIdx) => {
                       if (val === 0) {
                         return <td key={colIdx}>—</td>;
@@ -673,11 +922,11 @@ export default function LeveragedCashFlow({
                         <td key={colIdx}>
                           <span
                             className="reversion-value"
-                            onClick={() => setShowReversionModal(true)}
+                            onClick={handleClick}
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') setShowReversionModal(true);
+                              if (e.key === 'Enter' || e.key === ' ') handleClick();
                             }}
                           >
                             {formatLCFCurrency(val)}
@@ -685,6 +934,32 @@ export default function LeveragedCashFlow({
                         </td>
                       );
                     })}
+                  </tr>
+                );
+              }
+
+              if (row.rowType === 'loan-proceeds') {
+                return (
+                  <tr key={rowIdx} className="time0-row">
+                    <td>{row.label}</td>
+                    <td className={row.time0Value && row.time0Value > 0 ? 'positive' : ''}>
+                      {row.loanId ? (
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm p-0"
+                          onClick={() =>
+                            setBudgetModalLoan({ loanId: row.loanId as number, loanName: row.loanName })
+                          }
+                        >
+                          {row.time0Value != null ? formatLCFCurrency(row.time0Value) : '—'}
+                        </button>
+                      ) : (
+                        row.time0Value != null ? formatLCFCurrency(row.time0Value) : '—'
+                      )}
+                    </td>
+                    {headers.map((_, i) => (
+                      <td key={i}>—</td>
+                    ))}
                   </tr>
                 );
               }
@@ -707,6 +982,17 @@ export default function LeveragedCashFlow({
               return (
                 <tr key={rowIdx} className={rowClass}>
                   <td>{row.label}</td>
+                  <td
+                    className={
+                      row.showSign && row.time0Value && row.time0Value !== 0
+                        ? row.time0Value > 0
+                          ? 'positive'
+                          : 'negative'
+                        : ''
+                    }
+                  >
+                    {row.time0Value && row.time0Value !== 0 ? formatLCFCurrency(row.time0Value) : '—'}
+                  </td>
                   {row.values.map((val, colIdx) => {
                     const signClass =
                       row.showSign && val !== 0
@@ -838,6 +1124,22 @@ export default function LeveragedCashFlow({
           </CModalBody>
         </CModal>
       )}
+
+      <LoanBudgetModal
+        projectId={projectId}
+        loanId={budgetModalLoan?.loanId ?? null}
+        loanName={budgetModalLoan?.loanName}
+        visible={Boolean(budgetModalLoan)}
+        onClose={() => setBudgetModalLoan(null)}
+      />
+
+      <PendingRenoOffsetModal
+        projectId={projectId}
+        exitMonth={exitAnalysis?.holdPeriodMonths || 48}
+        pendingRenoOffset={exitAnalysis?.pendingRenoOffset || 0}
+        visible={showPendingRenoModal}
+        onClose={() => setShowPendingRenoModal(false)}
+      />
     </div>
   );
 }
