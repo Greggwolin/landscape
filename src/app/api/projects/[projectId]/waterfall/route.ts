@@ -18,25 +18,27 @@ export async function GET(
     const [tiers, equityPartners] = await Promise.all([
       sql`
         SELECT
-          tier_id,
-          project_id,
-          tier_number,
-          tier_name,
-          tier_description,
-          hurdle_type,
-          hurdle_rate,
-          irr_threshold_pct,
-          equity_multiple_threshold,
-          lp_split_pct,
-          gp_split_pct,
-          is_pari_passu,
-          is_lookback_tier,
-          display_order,
-          is_active,
-          created_at,
-          updated_at
-        FROM landscape.tbl_waterfall_tier
-        WHERE project_id = ${id}
+          wt.tier_id,
+          COALESCE(wt.project_id, es.project_id) AS project_id,
+          wt.tier_number,
+          wt.tier_name,
+          wt.tier_description,
+          wt.hurdle_type,
+          wt.hurdle_rate,
+          wt.irr_threshold_pct,
+          wt.equity_multiple_threshold,
+          wt.lp_split_pct,
+          wt.gp_split_pct,
+          wt.is_pari_passu,
+          wt.is_lookback_tier,
+          wt.display_order,
+          wt.is_active,
+          wt.created_at,
+          wt.updated_at
+        FROM landscape.tbl_waterfall_tier wt
+        LEFT JOIN landscape.tbl_equity_structure es
+          ON es.equity_structure_id = wt.equity_structure_id
+        WHERE COALESCE(wt.project_id, es.project_id) = ${id}
         ORDER BY COALESCE(display_order, tier_number) ASC
       `,
       sql`

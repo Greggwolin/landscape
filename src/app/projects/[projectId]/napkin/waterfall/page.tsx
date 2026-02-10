@@ -6,6 +6,24 @@ import WaterfallResults, { WaterfallApiResponse } from '@/components/capitalizat
 
 type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
 
+const parseWaterfallError = async (res: Response): Promise<string> => {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text);
+    const error = parsed?.error;
+    const hint = parsed?.hint;
+    if (typeof error === 'string' && error.trim().length > 0) {
+      return hint ? `${error} ${hint}` : error;
+    }
+    if (typeof parsed?.details === 'string' && parsed.details.trim().length > 0) {
+      return parsed.details;
+    }
+  } catch {
+    // fall through to raw text
+  }
+  return text || `Request failed with status ${res.status}`;
+};
+
 interface NapkinWaterfallPageProps {
   params: Promise<{
     projectId: string;
@@ -46,8 +64,8 @@ export default function NapkinWaterfallPage({ params }: NapkinWaterfallPageProps
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Request failed with status ${res.status}`);
+        const message = await parseWaterfallError(res);
+        throw new Error(message);
       }
 
       const json = (await res.json()) as WaterfallApiResponse;

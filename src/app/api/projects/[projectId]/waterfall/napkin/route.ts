@@ -111,6 +111,7 @@ export async function POST(
     await sql`
       DELETE FROM landscape.tbl_waterfall_tier
       WHERE project_id = ${id}
+         OR equity_structure_id = ${equityStructureId}
     `;
 
     const waterfallTiers = [];

@@ -3,16 +3,10 @@
 import React, { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CCard, CCardBody, CCardHeader, CCol, CRow } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilPlus } from '@coreui/icons';
-import ActiveLoansTable from '@/components/capitalization/DebtFacilitiesTable';
-import LoanFormFlyout from '@/components/capitalization/DebtFacilityModal';
-import LoanScheduleGrid from '@/components/capitalization/LoanScheduleGrid';
-import LoanScheduleModal from '@/components/capitalization/LoanScheduleModal';
+import LoanCard from '@/components/capitalization/LoanCard';
 import LeveragedCashFlow from '@/components/capitalization/LeveragedCashFlow';
 import type { Loan } from '@/types/assumptions';
-import { useDeleteLoan, useLoans } from '@/hooks/useCapitalization';
-import { useToast } from '@/components/ui/toast';
+import { useLoans } from '@/hooks/useCapitalization';
 import { ExportButton } from '@/components/admin';
 
 const formatCurrency = (value: number | null | undefined): string => {
@@ -169,14 +163,10 @@ const LoanSummaryCards = ({ loans }: { loans: Loan[] }) => {
 export default function DebtPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const { showToast } = useToast();
 
-  const [loanFlyoutVisible, setLoanFlyoutVisible] = useState(false);
-  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
-  const [scheduleModalLoanId, setScheduleModalLoanId] = useState<number | null>(null);
+  const [newLoanMode, setNewLoanMode] = useState(false);
 
-  const { data: loansData = [] } = useLoans(projectId);
-  const deleteLoan = useDeleteLoan(projectId);
+  const { data: loansData = [], refetch: refetchLoans } = useLoans(projectId);
 
   const loans = useMemo<Loan[]>(() => {
     if (Array.isArray(loansData)) return loansData;
@@ -187,69 +177,61 @@ export default function DebtPage() {
     return [];
   }, [loansData]);
 
-  const handleAddLoan = () => {
-    setEditingLoan(null);
-    setLoanFlyoutVisible(true);
-  };
-
-  const handleEditLoan = (loan: Loan) => {
-    setEditingLoan(loan);
-    setLoanFlyoutVisible(true);
-  };
-
-  const handleDeleteLoan = async (loanId: number) => {
-    if (!confirm('Are you sure you want to delete this loan?')) return;
-
-    try {
-      await deleteLoan.mutateAsync(loanId);
-      showToast('Loan deleted successfully', 'success');
-    } catch (error) {
-      showToast('Failed to delete loan', 'error');
-    }
-  };
-
   return (
-    <div className="debt-page" data-schedule-loan-id={scheduleModalLoanId ?? undefined}>
+    <div className="debt-page">
+      <LoanSummaryCards loans={loans} />
+
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">Loans</h5>
         <div className="d-flex gap-2">
           <ExportButton tabName="Capitalization" projectId={projectId} />
-          <button type="button" className="btn btn-primary" onClick={handleAddLoan}>
-            <CIcon icon={cilPlus} className="me-1" />
-            Add Loan
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setNewLoanMode(true)}
+            disabled={newLoanMode}
+          >
+            + Add Loan
           </button>
         </div>
       </div>
 
-      {/* SECTION 1: Summary Cards */}
-      <LoanSummaryCards loans={loans} />
+      {loans.map((loan) => (
+        <LoanCard
+          key={loan.loan_id}
+          loan={loan}
+          projectId={projectId}
+          onSave={() => {
+            void refetchLoans();
+          }}
+          onDelete={() => {
+            void refetchLoans();
+          }}
+        />
+      ))}
 
-      {/* SECTION 2: Active Loans Table */}
-      <CCard className="mb-4">
-        <CCardHeader>
-          <h5 className="mb-0">Active Loans</h5>
-        </CCardHeader>
-        <CCardBody>
-          <ActiveLoansTable
-            loans={loans}
-            onEdit={handleEditLoan}
-            onDelete={handleDeleteLoan}
-            onViewSchedule={(loanId) => setScheduleModalLoanId(loanId)}
-          />
-        </CCardBody>
-      </CCard>
+      {newLoanMode && (
+        <LoanCard
+          loan={null}
+          projectId={projectId}
+          onSave={() => {
+            setNewLoanMode(false);
+            void refetchLoans();
+          }}
+          onDelete={() => {}}
+          onCancel={() => setNewLoanMode(false)}
+          defaultExpanded
+        />
+      )}
 
-      {/* SECTION 3: Loan Schedule Grid */}
-      <CCard className="mb-4">
-        <CCardHeader>
-          <h5 className="mb-0">Loan Schedule</h5>
-        </CCardHeader>
-        <CCardBody>
-          <LoanScheduleGrid projectId={projectId} loans={loans} />
-        </CCardBody>
-      </CCard>
+      {(!loans || loans.length === 0) && !newLoanMode && (
+        <CCard className="mb-3">
+          <CCardBody className="text-center py-5 text-muted">
+            No loans defined. Click &ldquo;+ Add Loan&rdquo; to begin.
+          </CCardBody>
+        </CCard>
+      )}
 
-      {/* SECTION 4: Leveraged Cash Flow */}
       <CCard className="mb-4">
         <CCardHeader>
           <h5 className="mb-0">Cash Flow</h5>
@@ -258,24 +240,6 @@ export default function DebtPage() {
           <LeveragedCashFlow projectId={projectId} loans={loans} />
         </CCardBody>
       </CCard>
-
-      {/* Loan Form Flyout */}
-      <LoanFormFlyout
-        visible={loanFlyoutVisible}
-        loan={editingLoan}
-        projectId={projectId}
-        onClose={() => setLoanFlyoutVisible(false)}
-      />
-
-      {/* Loan Schedule Modal */}
-      {scheduleModalLoanId && (
-        <LoanScheduleModal
-          projectId={projectId}
-          loanId={scheduleModalLoanId}
-          loan={loans.find((l) => l.loan_id === scheduleModalLoanId)}
-          onClose={() => setScheduleModalLoanId(null)}
-        />
-      )}
     </div>
   );
 }

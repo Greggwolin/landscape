@@ -279,6 +279,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         text,
       });
       console.error(`Django waterfall returned ${response.status}: ${text}`);
+      if (parsed?.error) {
+        return NextResponse.json(parsed, { status: response.status });
+      }
       return NextResponse.json(
         { error: 'Failed to calculate waterfall', details: parsed || text || response.statusText },
         { status: response.status }
