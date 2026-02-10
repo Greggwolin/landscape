@@ -168,7 +168,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             effective_cost_per_unit = (reno_cost_per_sf * avg_unit_sf) + relocation_incentive
             total_renovation_cost = effective_cost_per_unit * units_in_program
 
-            reno_pace = int(assumptions.reno_pace_per_month or 0)
+            reno_pace = int(assumptions.reno_starts_per_month or 0)
             renovation_duration_months = math.ceil(units_in_program / reno_pace) if reno_pace > 0 else 0
 
             monthly_premium_per_unit = avg_current_rent * rent_premium_pct
@@ -194,11 +194,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     project=project,
                     is_enabled=False,
                     reno_cost_per_sf=Decimal('8.00'),
+                    reno_cost_basis='sf',
                     relocation_incentive=Decimal('1500.00'),
                     renovate_all=True,
                     units_to_renovate=None,
-                    reno_pace_per_month=4,
+                    reno_starts_per_month=4,
                     reno_start_month=3,
+                    months_to_complete=3,
                     rent_premium_pct=Decimal('0.15'),
                     relet_lag_months=2,
                 )
@@ -215,11 +217,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     project=project,
                     is_enabled=False,
                     reno_cost_per_sf=Decimal('8.00'),
+                    reno_cost_basis='sf',
                     relocation_incentive=Decimal('1500.00'),
                     renovate_all=True,
                     units_to_renovate=None,
-                    reno_pace_per_month=4,
+                    reno_starts_per_month=4,
                     reno_start_month=3,
+                    months_to_complete=3,
                     rent_premium_pct=Decimal('0.15'),
                     relet_lag_months=2,
                 )

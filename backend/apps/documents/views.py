@@ -575,6 +575,18 @@ def commit_staging_data_internal(
                     create_data['is_section8'] = True
                 if extra_data:
                     create_data['extra_data'] = extra_data
+
+                # Derive clean unit_type from bedrooms/bathrooms if available
+                from apps.multifamily.models import derive_unit_type, parse_unit_category, parse_unit_designation
+                raw_type = create_data.get('unit_type', '')
+                br = create_data.get('bedrooms')
+                ba = create_data.get('bathrooms')
+                derived = derive_unit_type(br, ba)
+                if derived != 'Unknown':
+                    create_data['unit_type'] = derived
+                create_data['unit_category'] = parse_unit_category(raw_type)
+                create_data['unit_designation'] = parse_unit_designation(raw_type)
+
                 unit = MultifamilyUnit.objects.create(**create_data)
 
             lease_start = _parse_date_value(value_to_apply.get('lease_start'))

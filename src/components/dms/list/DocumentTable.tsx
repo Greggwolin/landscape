@@ -82,9 +82,20 @@ export default function DocumentTable({
     setLoadingChat(true);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const tokens = localStorage.getItem('auth_tokens');
+        const accessToken = tokens ? JSON.parse(tokens).access : null;
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+      } catch {
+        // Best-effort auth header injection; request may still succeed in dev modes.
+      }
+
       const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           message,
           doc_ids: [parseInt(docId, 10)]

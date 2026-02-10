@@ -214,11 +214,13 @@ class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
             'project_id',
             'is_enabled',
             'reno_cost_per_sf',
+            'reno_cost_basis',
             'relocation_incentive',
             'renovate_all',
             'units_to_renovate',
-            'reno_pace_per_month',
+            'reno_starts_per_month',
             'reno_start_month',
+            'months_to_complete',
             'rent_premium_pct',
             'relet_lag_months',
             'created_at',
@@ -230,21 +232,25 @@ class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
         """Enforce basic field constraints."""
         reno_cost_per_sf = attrs.get('reno_cost_per_sf')
         relocation_incentive = attrs.get('relocation_incentive')
-        reno_pace_per_month = attrs.get('reno_pace_per_month')
+        reno_starts_per_month = attrs.get('reno_starts_per_month')
         reno_start_month = attrs.get('reno_start_month')
+        months_to_complete = attrs.get('months_to_complete')
         rent_premium_pct = attrs.get('rent_premium_pct')
         relet_lag_months = attrs.get('relet_lag_months')
         renovate_all = attrs.get('renovate_all')
         units_to_renovate = attrs.get('units_to_renovate')
+        reno_cost_basis = attrs.get('reno_cost_basis')
 
         if reno_cost_per_sf is not None and reno_cost_per_sf <= 0:
             raise serializers.ValidationError({'reno_cost_per_sf': 'Must be greater than 0.'})
         if relocation_incentive is not None and relocation_incentive < 0:
             raise serializers.ValidationError({'relocation_incentive': 'Must be 0 or greater.'})
-        if reno_pace_per_month is not None and reno_pace_per_month <= 0:
-            raise serializers.ValidationError({'reno_pace_per_month': 'Must be greater than 0.'})
+        if reno_starts_per_month is not None and reno_starts_per_month <= 0:
+            raise serializers.ValidationError({'reno_starts_per_month': 'Must be greater than 0.'})
         if reno_start_month is not None and reno_start_month < 1:
             raise serializers.ValidationError({'reno_start_month': 'Must be 1 or greater.'})
+        if months_to_complete is not None and months_to_complete < 1:
+            raise serializers.ValidationError({'months_to_complete': 'Must be 1 or greater.'})
         if rent_premium_pct is not None and (rent_premium_pct < 0 or rent_premium_pct > 1):
             raise serializers.ValidationError({'rent_premium_pct': 'Must be between 0 and 1.'})
         if relet_lag_months is not None and relet_lag_months < 0:
@@ -252,6 +258,8 @@ class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
         if renovate_all is False:
             if units_to_renovate is None or units_to_renovate <= 0:
                 raise serializers.ValidationError({'units_to_renovate': 'Enter a positive unit count.'})
+        if reno_cost_basis is not None and reno_cost_basis not in ('sf', 'unit'):
+            raise serializers.ValidationError({'reno_cost_basis': 'Must be "sf" or "unit".'})
 
         return attrs
 

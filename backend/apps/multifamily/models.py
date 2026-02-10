@@ -47,6 +47,79 @@ class MultifamilyUnitType(models.Model):
         return f"{self.unit_type_code} ({self.bedrooms}BR/{self.bathrooms}BA)"
 
 
+def derive_unit_type(bedrooms, bathrooms):
+    """
+    Derive a clean display unit type from bedroom/bathroom counts.
+
+    Args:
+        bedrooms: Number of bedrooms (Decimal, int, or None)
+        bathrooms: Number of bathrooms (Decimal, int, or None)
+
+    Returns:
+        str: e.g., 'Studio/1BA', '1BR/1BA', '2BR/2BA', '3BR/2BA'
+             or 'Unknown' if data is missing
+    """
+    if bedrooms is None or bathrooms is None:
+        return 'Unknown'
+    br = int(bedrooms)
+    ba = int(bathrooms)
+    if br == 0 and ba == 0:
+        return 'Unknown'
+    if br == 0:
+        return f'Studio/{ba}BA'
+    return f'{br}BR/{ba}BA'
+
+
+def parse_unit_category(raw_type):
+    """
+    Parse the raw OM 'Type' field into a unit category.
+
+    Args:
+        raw_type: Raw type string from the rent roll (e.g., 'residential',
+                  'Residential Unit, Sec. 8', 'commercial', 'retail')
+
+    Returns:
+        str: 'residential', 'commercial', 'office', or 'other'
+    """
+    if not raw_type:
+        return 'other'
+    lower = raw_type.lower().strip()
+    if 'commercial' in lower or 'retail' in lower:
+        return 'commercial'
+    if 'office' in lower or 'leasing office' in lower:
+        return 'office'
+    if 'residential' in lower or 'unit' in lower:
+        return 'residential'
+    return 'other'
+
+
+def parse_unit_designation(raw_type):
+    """
+    Parse descriptive qualifiers from the raw OM 'Type' field.
+
+    Args:
+        raw_type: Raw type string from the rent roll
+
+    Returns:
+        str or None: e.g., 'section_8', 'manager', 'payment_plan', etc.
+    """
+    if not raw_type:
+        return None
+    lower = raw_type.lower().strip()
+    designations = []
+    if 'sec. 8' in lower or 'section 8' in lower or 'sec 8' in lower:
+        designations.append('section_8')
+    if 'manager' in lower:
+        designations.append('manager')
+    if 'payment plan' in lower:
+        designations.append('payment_plan')
+    if 'downtown women' in lower:
+        designations.append('downtown_women')
+    if 'vacant' in lower:
+        designations.append('vacant')
+    return ','.join(designations) if designations else None
+
+
 class MultifamilyUnit(models.Model):
     """
     Model for multifamily units.
@@ -95,6 +168,8 @@ class MultifamilyUnit(models.Model):
     )
     renovation_date = models.DateField(null=True, blank=True)
     renovation_cost = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    unit_category = models.CharField(max_length=50, null=True, blank=True)
+    unit_designation = models.CharField(max_length=100, null=True, blank=True)
     other_features = models.TextField(null=True, blank=True)
     extra_data = models.JSONField(
         null=True,
@@ -223,6 +298,11 @@ class ValueAddAssumptions(models.Model):
     Maps to landscape.tbl_value_add_assumptions
     """
 
+    RENO_COST_BASIS_CHOICES = [
+        ('sf', 'Per Square Foot'),
+        ('unit', 'Per Unit'),
+    ]
+
     value_add_id = models.AutoField(primary_key=True)
     project = models.OneToOneField(
         Project,
@@ -232,11 +312,13 @@ class ValueAddAssumptions(models.Model):
     )
     is_enabled = models.BooleanField(default=False)
     reno_cost_per_sf = models.DecimalField(max_digits=8, decimal_places=2, default=8.00)
+    reno_cost_basis = models.CharField(max_length=10, choices=RENO_COST_BASIS_CHOICES, default='sf')
     relocation_incentive = models.DecimalField(max_digits=10, decimal_places=2, default=1500.00)
     renovate_all = models.BooleanField(default=True)
     units_to_renovate = models.IntegerField(null=True, blank=True)
-    reno_pace_per_month = models.IntegerField(default=4)
+    reno_starts_per_month = models.IntegerField(default=4, db_column='reno_starts_per_month')
     reno_start_month = models.IntegerField(default=3)
+    months_to_complete = models.IntegerField(default=3)
     rent_premium_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0.15)
     relet_lag_months = models.IntegerField(default=2)
     created_at = models.DateTimeField(null=True, blank=True)
