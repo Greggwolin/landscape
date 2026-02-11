@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions } from '@coreui/icons';
@@ -16,6 +16,10 @@ import {
 } from '@/contexts/LandscaperCollisionContext';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+export interface LandscaperChatHandle {
+  sendMessage: (msg: string) => Promise<void>;
+}
 
 interface LandscaperChatThreadedProps {
   projectId: number;
@@ -61,20 +65,21 @@ function getPageContextHint(context: string): string {
   return hints[context] || 'General';
 }
 
-export function LandscaperChatThreaded({
-  projectId,
-  pageContext,
-  subtabContext,
-  contextPillLabel,
-  contextPillColor,
-  isIngesting,
-  ingestionProgress = 0,
-  ingestionMessage,
-  isExpanded = true,
-  onToggleExpand,
-  onCollapsePanel,
-  onReviewMedia,
-}: LandscaperChatThreadedProps) {
+export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, LandscaperChatThreadedProps>(
+  function LandscaperChatThreaded({
+    projectId,
+    pageContext,
+    subtabContext,
+    contextPillLabel,
+    contextPillColor,
+    isIngesting,
+    ingestionProgress = 0,
+    ingestionMessage,
+    isExpanded = true,
+    onToggleExpand,
+    onCollapsePanel,
+    onReviewMedia,
+  }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -102,6 +107,9 @@ export function LandscaperChatThreaded({
     pageContext,
     subtabContext,
   });
+
+  // Expose sendMessage to parent via imperative handle (for programmatic chat injection)
+  useImperativeHandle(ref, () => ({ sendMessage }), [sendMessage]);
 
   // Collision handling via context
   const { pendingCollision, setOnCollisionResolved } = useLandscaperCollision();
@@ -526,4 +534,4 @@ export function LandscaperChatThreaded({
       </div>
     </div>
   );
-}
+});

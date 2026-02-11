@@ -645,3 +645,180 @@ def discovery_result_to_dict(result: DiscoveryResult) -> Dict[str, Any]:
         "parse_warnings": result.parse_warnings,
         "is_structured": result.is_structured,
     }
+
+
+def apply_column_mapping(
+    project_id: int,
+    document_id: int,
+    mappings: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Apply column mapping decisions and queue an extraction job.
+
+    Shared logic used by both the HTTP endpoint (extraction_views.apply_rent_roll_mapping)
+    and the Landscaper tool handler (confirm_column_mapping).
+
+    Args:
+        project_id: Project ID
+        document_id: Document ID of the rent roll file
+        mappings: List of mapping decision dicts, each with:
+            - source_column: str (required)
+            - target_field: str|null (standard field name)
+            - create_dynamic: bool (optional)
+            - dynamic_column_name: str (optional, if create_dynamic)
+            - data_type: str (optional, if create_dynamic)
+
+    Returns:
+        Dict with: success, job_id, job_status, dynamic_columns_created,
+        standard_mappings, skipped_columns, error (if any)
+    """
+    import logging
+    import threading
+    from django.utils import timezone
+
+    logger = logging.getLogger(__name__)
+
+    # Lazy imports to avoid circular dependencies
+    from apps.dynamic.models import DynamicColumnDefinition
+    from apps.knowledge.models import ExtractionJob
+
+    # Separate standard field mappings from dynamic column creations
+    standard_mappings = {}
+    dynamic_columns_to_create = []
+    skipped_columns = []
+
+    for mapping in mappings:
+        source_col = mapping.get('source_column')
+        if not source_col:
+            continue
+
+        if mapping.get('create_dynamic'):
+            dynamic_columns_to_create.append({
+                'source_column': source_col,
+                'name': mapping.get('dynamic_column_name', source_col),
+                'data_type': mapping.get('data_type', 'text'),
+            })
+        elif mapping.get('target_field'):
+            standard_mappings[source_col] = mapping['target_field']
+        else:
+            skipped_columns.append(source_col)
+
+    # Create dynamic column definitions (immediately active, not proposed)
+    created_columns = []
+    for dc in dynamic_columns_to_create:
+        col_key = dc['name'].lower().replace(' ', '_').replace('-', '_')
+
+        col_def, created = DynamicColumnDefinition.objects.get_or_create(
+            project_id=project_id,
+            table_name='multifamily_unit',
+            column_key=col_key,
+            defaults={
+                'display_label': dc['name'],
+                'data_type': dc['data_type'],
+                'source': 'user',
+                'is_proposed': False,
+                'proposed_from_document_id': document_id,
+            }
+        )
+        created_columns.append({
+            'id': col_def.id,
+            'column_key': col_def.column_key,
+            'display_label': col_def.display_label,
+            'source_column': dc['source_column'],
+            'created': created,
+        })
+
+    # Check for existing active job for this document
+    existing_job = ExtractionJob.objects.filter(
+        project_id=project_id,
+        document_id=document_id,
+        scope='rent_roll',
+        status__in=['queued', 'processing']
+    ).first()
+
+    if existing_job:
+        return {
+            'success': False,
+            'error': 'An extraction job is already in progress for this document',
+            'existing_job_id': existing_job.job_id,
+        }
+
+    # Create extraction job with mapping metadata
+    job = ExtractionJob.objects.create(
+        project_id=project_id,
+        document_id=document_id,
+        scope='rent_roll',
+        status='queued',
+        result_summary={
+            'standard_mappings': standard_mappings,
+            'dynamic_columns': [c for c in created_columns],
+            'skipped_columns': skipped_columns,
+        }
+    )
+
+    def run_extraction_async(job_id: int, proj_id: int, doc_id: int):
+        """Background thread to run extraction without blocking."""
+        import django
+        django.db.connections.close_all()
+
+        try:
+            from apps.knowledge.services.extraction_service import ChunkedRentRollExtractor
+            from apps.knowledge.models import ExtractionJob as EJ
+
+            job = EJ.objects.get(job_id=job_id)
+            logger.info(f"[async_extraction] Starting extraction for job {job_id}, doc {doc_id}")
+
+            job.status = 'processing'
+            job.started_at = timezone.now()
+            job.save()
+
+            extractor = ChunkedRentRollExtractor(
+                project_id=proj_id,
+                property_type='multifamily'
+            )
+
+            extract_result = extractor.extract_rent_roll_chunked(
+                doc_id=doc_id,
+                user_id=None
+            )
+
+            job.status = 'completed'
+            job.completed_at = timezone.now()
+            job.result_summary.update({
+                'units_extracted': extract_result.get('units_extracted', 0),
+                'staged_count': extract_result.get('staged_count', 0),
+            })
+            job.save()
+            logger.info(f"[async_extraction] Completed job {job_id}: {extract_result.get('units_extracted', 0)} units")
+
+        except Exception as e:
+            logger.exception(f"[async_extraction] Failed for job {job_id}: {e}")
+            try:
+                job = EJ.objects.get(job_id=job_id)
+                job.status = 'failed'
+                job.error_message = str(e)
+                job.completed_at = timezone.now()
+                job.save()
+            except Exception as save_err:
+                logger.exception(f"[async_extraction] Failed to save error state: {save_err}")
+
+    # Start background thread
+    thread = threading.Thread(
+        target=run_extraction_async,
+        args=(job.job_id, project_id, document_id),
+        daemon=False,
+        name=f"extraction-job-{job.job_id}"
+    )
+    thread.start()
+
+    logger.info(f"[apply_column_mapping] Started async extraction job {job.job_id}")
+
+    return {
+        'success': True,
+        'job_id': job.job_id,
+        'job_status': 'queued',
+        'dynamic_columns_created': len([c for c in created_columns if c.get('created')]),
+        'standard_mappings': len(standard_mappings),
+        'skipped_columns': len(skipped_columns),
+        'message': 'Extraction started. Poll job status for progress.',
+    }

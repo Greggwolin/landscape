@@ -31,6 +31,8 @@ EXTRACTION_TOOLS = [
     "get_extraction_corrections",
     "log_extraction_correction",
     "extract_and_save_contacts",
+    "analyze_rent_roll_columns",
+    "confirm_column_mapping",
 ]
 
 # Tier 3: Admin/Config tools - only in admin context

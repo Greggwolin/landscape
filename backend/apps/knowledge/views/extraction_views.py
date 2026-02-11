@@ -2550,155 +2550,17 @@ def apply_rent_roll_mapping(request, project_id: int):
     except Document.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
-    # Separate standard field mappings from dynamic column creations
-    standard_mappings = {}
-    dynamic_columns_to_create = []
-    skipped_columns = []
+    # Delegate to shared service function
+    from ..services.column_discovery import apply_column_mapping
 
-    for mapping in mappings:
-        source_col = mapping.get('source_column')
-        if not source_col:
-            continue
-
-        if mapping.get('create_dynamic'):
-            dynamic_columns_to_create.append({
-                'source_column': source_col,
-                'name': mapping.get('dynamic_column_name', source_col),
-                'data_type': mapping.get('data_type', 'text'),
-            })
-        elif mapping.get('target_field'):
-            standard_mappings[source_col] = mapping['target_field']
-        else:
-            skipped_columns.append(source_col)
-
-    # Create dynamic column definitions (immediately active, not proposed)
-    created_columns = []
-    for dc in dynamic_columns_to_create:
-        col_key = dc['name'].lower().replace(' ', '_').replace('-', '_')
-
-        col_def, created = DynamicColumnDefinition.objects.get_or_create(
-            project_id=project_id,
-            table_name='multifamily_unit',
-            column_key=col_key,
-            defaults={
-                'display_label': dc['name'],
-                'data_type': dc['data_type'],
-                'source': 'user',
-                'is_proposed': False,  # User explicitly created it
-                'proposed_from_document_id': document_id,
-            }
-        )
-        created_columns.append({
-            'id': col_def.id,
-            'column_key': col_def.column_key,
-            'display_label': col_def.display_label,
-            'source_column': dc['source_column'],
-            'created': created,
-        })
-
-    # Check for existing active job for this document
-    existing_job = ExtractionJob.objects.filter(
-        project_id=project_id,
-        document_id=document_id,
-        scope='rent_roll',
-        status__in=['queued', 'processing']
-    ).first()
-
-    if existing_job:
-        return JsonResponse({
-            'success': False,
-            'error': 'An extraction job is already in progress for this document',
-            'existing_job_id': existing_job.job_id
-        }, status=409)
-
-    # Create extraction job with mapping metadata
-    job = ExtractionJob.objects.create(
-        project_id=project_id,
-        document_id=document_id,
-        scope='rent_roll',
-        status='queued',
-        result_summary={
-            'standard_mappings': standard_mappings,
-            'dynamic_columns': [c for c in created_columns],
-            'skipped_columns': skipped_columns,
-        }
+    result = apply_column_mapping(
+        project_id=int(project_id),
+        document_id=int(document_id),
+        mappings=mappings,
     )
 
-    # Run extraction asynchronously to avoid HTTP timeout
-    # The frontend should poll the job status endpoint
-    import threading
+    if not result.get('success'):
+        status_code = 409 if result.get('existing_job_id') else 400
+        return JsonResponse(result, status=status_code)
 
-    def run_extraction_async(job_id: int, project_id: int, document_id: int):
-        """Background thread to run extraction without blocking HTTP request."""
-        import django
-        django.db.connections.close_all()  # Close inherited connections
-
-        try:
-            from ..services.extraction_service import ChunkedRentRollExtractor
-            from ..models import ExtractionJob
-
-            # Re-fetch job in this thread's DB connection
-            job = ExtractionJob.objects.get(job_id=job_id)
-
-            logger.info(f"[async_extraction] Starting extraction for job {job_id}, doc {document_id}")
-
-            # Update job status
-            job.status = 'processing'
-            job.started_at = timezone.now()
-            job.save()
-
-            # Create extractor and run
-            extractor = ChunkedRentRollExtractor(
-                project_id=project_id,
-                property_type='multifamily'
-            )
-
-            extract_result = extractor.extract_rent_roll_chunked(
-                doc_id=document_id,
-                user_id=None
-            )
-
-            # Update job with results
-            job.status = 'completed'
-            job.completed_at = timezone.now()
-            job.result_summary.update({
-                'units_extracted': extract_result.get('units_extracted', 0),
-                'staged_count': extract_result.get('staged_count', 0),
-            })
-            job.save()
-            logger.info(f"[async_extraction] Completed job {job_id}: {extract_result.get('units_extracted', 0)} units")
-
-        except Exception as e:
-            logger.exception(f"[async_extraction] Failed for job {job_id}: {e}")
-            try:
-                job = ExtractionJob.objects.get(job_id=job_id)
-                job.status = 'failed'
-                job.error_message = str(e)
-                job.completed_at = timezone.now()
-                job.save()
-            except Exception as save_err:
-                logger.exception(f"[async_extraction] Failed to save error state: {save_err}")
-
-    # Start background thread
-    # Note: Using daemon=False so the thread survives Django dev server restarts
-    # In production, use Celery or a task queue instead
-    thread = threading.Thread(
-        target=run_extraction_async,
-        args=(job.job_id, project_id, document_id),
-        daemon=False,
-        name=f"extraction-job-{job.job_id}"
-    )
-    thread.start()
-
-    logger.info(f"[apply_rent_roll_mapping] Started async extraction job {job.job_id}")
-
-    # Return immediately with job_id for polling
-    return JsonResponse({
-        'success': True,
-        'job_id': job.job_id,
-        'job_status': 'queued',  # Will transition to 'processing' in background
-        'dynamic_columns_created': len([c for c in created_columns if c.get('created')]),
-        'standard_mappings': len(standard_mappings),
-        'skipped_columns': len(skipped_columns),
-        'message': 'Extraction started. Poll job status for progress.',
-    })
+    return JsonResponse(result)

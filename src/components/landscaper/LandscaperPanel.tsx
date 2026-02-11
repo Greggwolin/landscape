@@ -6,7 +6,7 @@ import { CCard, CAlert, CButton, CSpinner } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilCheckCircle, cilWarning, cilX } from '@coreui/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { LandscaperChatThreaded } from './LandscaperChatThreaded';
+import { LandscaperChatThreaded, type LandscaperChatHandle } from './LandscaperChatThreaded';
 import { ActivityFeed } from './ActivityFeed';
 import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
@@ -89,6 +89,7 @@ export function LandscaperPanel({
   const [splitContainerHeight, setSplitContainerHeight] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const chatRef = useRef<LandscaperChatHandle>(null);
   const splitRatioRef = useRef(splitRatio);
   const expandedSplitRef = useRef(expandedSplitRatio);
   const collapsedSplitRef = useRef(collapsedSplitRatio);
@@ -374,11 +375,10 @@ export function LandscaperPanel({
             const fileExt = files[0]?.name?.split('.').pop()?.toLowerCase() || '';
             const isStructuredFile = ['xlsx', 'xls', 'csv'].includes(fileExt);
 
-            // For structured rent roll files, use the Field Mapping Interface
+            // For structured rent roll files, use conversational column mapping via Landscaper chat
             if (isRentRoll && isStructuredFile) {
-              setFieldMappingDocId(docId);
-              setFieldMappingDocName(files[0].name);
-              setShowFieldMappingModal(true);
+              const chatMsg = `I've uploaded "${files[0].name}" (document ID: ${docId}). Please analyze the columns for rent roll mapping.`;
+              chatRef.current?.sendMessage(chatMsg);
               setDropNotice(null);
               setIsUploading(false);
               setUploadProgress(0);
@@ -925,6 +925,7 @@ export function LandscaperPanel({
           }}
         >
           <LandscaperChatThreaded
+            ref={chatRef}
             projectId={projectId}
             pageContext={pageContext || activeTab}
             contextPillLabel={contextPillLabel}

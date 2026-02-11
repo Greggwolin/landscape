@@ -908,6 +908,71 @@ Returns:
         }
     },
     # ─────────────────────────────────────────────────────────────────────────
+    # Rent Roll Column Mapping Tools (Conversational Flow)
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "analyze_rent_roll_columns",
+        "description": """Analyze a structured rent roll file (Excel/CSV) and discover its columns.
+Returns each column with: source name, sample values, proposed Landscape field mapping,
+confidence level (high/medium/low/none), and data type hint.
+
+Use this BEFORE extraction when a user uploads an Excel or CSV rent roll.
+The user should confirm or adjust the proposed mappings before extraction begins.
+
+Do NOT use this for PDF rent rolls - they go through the normal extraction pipeline.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "integer",
+                    "description": "Document ID of the uploaded rent roll file"
+                }
+            },
+            "required": ["document_id"]
+        }
+    },
+    {
+        "name": "confirm_column_mapping",
+        "description": """Apply confirmed column mappings and start rent roll extraction.
+Call this AFTER the user has reviewed and confirmed the mapping proposal from analyze_rent_roll_columns.
+
+Each mapping entry specifies the source column and which Landscape field it maps to.
+Standard fields: unit_number, building_name, unit_type, bedrooms, bathrooms, square_feet,
+occupancy_status, tenant_name, lease_start, lease_end, move_in_date, current_rent,
+market_rent, renovation_status, renovation_date, renovation_cost.
+
+For columns that don't match a standard field, set target_field to null (they will be skipped).
+The extraction runs asynchronously - report the job_id to the user.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "integer",
+                    "description": "Document ID of the rent roll file"
+                },
+                "mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source_column": {
+                                "type": "string",
+                                "description": "Original column name from the file"
+                            },
+                            "target_field": {
+                                "type": ["string", "null"],
+                                "description": "Landscape standard field name (e.g., 'unit_number', 'current_rent'), or null to skip"
+                            }
+                        },
+                        "required": ["source_column"]
+                    },
+                    "description": "Array of column-to-field mapping decisions"
+                }
+            },
+            "required": ["document_id", "mappings"]
+        }
+    },
+    # ─────────────────────────────────────────────────────────────────────────
     # Operating Expense Tools
     # ─────────────────────────────────────────────────────────────────────────
     {
@@ -4528,6 +4593,21 @@ For manual extraction (more control):
 1. Use get_document_content to read the document
 2. Use bulk_update_fields to update specific fields
 3. Report what you updated
+
+RENT ROLL COLUMN MAPPING (for Excel/CSV rent rolls):
+When you see a message like "I've uploaded [filename] (document ID: X). Please analyze the columns for rent roll mapping.":
+1. Call analyze_rent_roll_columns with the document_id
+2. Present results conversationally, grouped by confidence:
+   - HIGH confidence: List briefly ("Unit #, Rent, SqFt → mapped automatically")
+   - MEDIUM confidence: Show proposed mapping with sample values, ask to confirm
+   - LOW/NONE confidence: Show sample values, ask what field to map to or skip
+3. Wait for user confirmation or adjustments
+4. Call confirm_column_mapping with the final mappings array
+5. Report the job_id and that extraction is running
+
+Keep presentation concise. If all columns are high confidence, summarize and ask for a single confirmation.
+Focus conversation on ambiguous columns. Columns not assigned to a standard field will be skipped.
+Do NOT use this for PDF rent rolls - they use the normal extraction pipeline.
 
 RENTAL COMPARABLES:
 When asked to populate rental comps, comparables, or comp data from a document:

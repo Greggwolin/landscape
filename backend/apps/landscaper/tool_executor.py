@@ -9454,6 +9454,93 @@ def log_extraction_correction(
         return {'success': False, 'error': str(e)}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Rent Roll Column Mapping Tools (Conversational Flow)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('analyze_rent_roll_columns')
+def handle_analyze_rent_roll_columns(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Analyze columns in a structured rent roll file and propose mappings."""
+    document_id = tool_input.get('document_id')
+    if not document_id:
+        return {'success': False, 'error': 'document_id is required'}
+
+    try:
+        from apps.documents.models import Document
+        from apps.knowledge.services.column_discovery import discover_columns, discovery_result_to_dict
+
+        try:
+            document = Document.objects.get(doc_id=document_id, project_id=project_id)
+        except Document.DoesNotExist:
+            return {'success': False, 'error': f'Document {document_id} not found in this project'}
+
+        if not document.storage_uri:
+            return {'success': False, 'error': 'Document has no storage URI'}
+
+        result = discover_columns(
+            storage_uri=document.storage_uri,
+            mime_type=document.mime_type,
+            file_name=document.doc_name,
+            project_id=project_id,
+        )
+
+        response = discovery_result_to_dict(result)
+        response['success'] = True
+        response['document_id'] = document_id
+
+        # Trim sample_values to 3 per column to stay within tool result truncation limit
+        for col in response.get('columns', []):
+            if len(col.get('sample_values', [])) > 3:
+                col['sample_values'] = col['sample_values'][:3]
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error analyzing rent roll columns for doc {document_id}: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('confirm_column_mapping', is_mutation=True)
+def handle_confirm_column_mapping(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = False,
+    **kwargs
+) -> Dict[str, Any]:
+    """Apply confirmed column mappings and start rent roll extraction."""
+    document_id = tool_input.get('document_id')
+    mappings = tool_input.get('mappings', [])
+
+    if not document_id:
+        return {'success': False, 'error': 'document_id is required'}
+    if not mappings:
+        return {'success': False, 'error': 'mappings array is required'}
+
+    try:
+        from apps.documents.models import Document
+        from apps.knowledge.services.column_discovery import apply_column_mapping
+
+        # Verify document exists
+        try:
+            Document.objects.get(doc_id=document_id, project_id=project_id)
+        except Document.DoesNotExist:
+            return {'success': False, 'error': f'Document {document_id} not found in this project'}
+
+        return apply_column_mapping(
+            project_id=project_id,
+            document_id=int(document_id),
+            mappings=mappings,
+        )
+
+    except Exception as e:
+        logger.error(f"Error confirming column mapping for doc {document_id}: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool("get_knowledge_entities")
 def get_knowledge_entities(
     project_id: int,
@@ -10189,6 +10276,7 @@ AUTO_EXECUTE_TOOLS = {
     'update_leases',      # Rent roll batch - populate leases from document
     'update_unit_types',  # Rent roll batch - populate floorplan/unit types
     'update_operating_expenses',  # OpEx batch - populate from OM/T12/operating statement
+    'confirm_column_mapping',  # Column mapping - user confirmed in chat
 }
 
 
