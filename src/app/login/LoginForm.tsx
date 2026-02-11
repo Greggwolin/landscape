@@ -21,6 +21,7 @@ export default function LoginForm() {
   const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [tosMap, setTosMap] = useState<Record<string, string>>({});
+  const normalizedUsername = useMemo(() => username.trim().toLowerCase(), [username]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !redirecting) {
@@ -41,15 +42,17 @@ export default function LoginForm() {
   }, []);
 
   const currentTosTimestamp = useMemo(() => {
-    return username ? tosMap[username.toLowerCase()] || null : null;
-  }, [tosMap, username]);
+    return normalizedUsername ? tosMap[normalizedUsername] || null : null;
+  }, [normalizedUsername, tosMap]);
 
   useEffect(() => {
     setTosAcceptedAt(currentTosTimestamp);
-    if (currentTosTimestamp && !tosAccepted) {
+    if (currentTosTimestamp) {
       setTosAccepted(true);
+      return;
     }
-  }, [currentTosTimestamp]);
+    setTosAccepted(false);
+  }, [currentTosTimestamp, normalizedUsername]);
 
   const formattedAcceptedDate = useMemo(() => {
     if (!tosAcceptedAt) return null;
@@ -63,11 +66,26 @@ export default function LoginForm() {
     });
   }, [tosAcceptedAt]);
 
-  const requiresTos = !tosAcceptedAt;
+  const requiresTos = Boolean(normalizedUsername) && !currentTosTimestamp;
+
+  const persistAcceptedTos = (usernameKey: string, acceptedAt: string) => {
+    setTosMap((prev) => {
+      const newMap = {
+        ...prev,
+        [usernameKey]: acceptedAt,
+      };
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('tosAcceptedByUser', JSON.stringify(newMap));
+      }
+      return newMap;
+    });
+    setTosAcceptedAt(acceptedAt);
+    setTosAccepted(true);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!tosAccepted) {
+    if (requiresTos && !tosAccepted) {
       setError('Please accept the Terms of Service before logging in.');
       return;
     }
@@ -76,8 +94,17 @@ export default function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const result = await login({ username, password });
-      await createLandscaperProfile({ tos_accepted_at: new Date().toISOString() });
+      const loginUsername = username.trim();
+      const loginUsernameKey = loginUsername.toLowerCase();
+      const result = await login({ username: loginUsername, password });
+      let acceptedAt: string | null = null;
+
+      if (requiresTos) {
+        acceptedAt = new Date().toISOString();
+        await createLandscaperProfile({ tos_accepted_at: acceptedAt });
+        persistAcceptedTos(loginUsernameKey, acceptedAt);
+      }
+
       const isAdmin = result.user?.role === 'admin';
       if (isAdmin) {
         setRedirecting(true);
@@ -88,14 +115,11 @@ export default function LoginForm() {
       const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
       setRedirecting(true);
       router.push(target);
-      if (profile.tos_accepted_at) {
-        const newMap = {
-          ...tosMap,
-          [username.toLowerCase()]: profile.tos_accepted_at,
-        };
-        setTosMap(newMap);
-        window.localStorage.setItem('tosAcceptedByUser', JSON.stringify(newMap));
-        setTosAcceptedAt(profile.tos_accepted_at);
+
+      const resolvedAcceptedAt = profile.tos_accepted_at ?? acceptedAt;
+      if (resolvedAcceptedAt) {
+        const profileUsername = result.user?.username?.toLowerCase?.() || loginUsernameKey;
+        persistAcceptedTos(profileUsername, resolvedAcceptedAt);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -106,15 +130,14 @@ export default function LoginForm() {
 
   return (
     <div
-      className="min-h-screen flex flex-col md:flex-row"
+      className="min-h-screen flex items-center justify-center px-6 py-10"
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         color: 'var(--cui-body-color)',
       }}
     >
       <div
-        className="w-full md:w-2/5 flex flex-col justify-center px-6 py-10"
-        style={{ backgroundColor: 'var(--surface-card)' }}
+        className="w-full max-w-xl"
       >
         <div className="flex justify-center mb-6">
           <Image
@@ -239,39 +262,37 @@ export default function LoginForm() {
               )}
             </button>
           </form>
-            {requiresTos ? (
-              <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
-                <label className="flex items-center text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={tosAccepted}
-                    onChange={(e) => setTosAccepted(e.target.checked)}
-                    className="h-4 w-4 rounded border"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
-                  />
-                  <span>
-                    I accept the{' '}
-                    <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                      Alpha Terms of Service
-                    </Link>{' '}
-                    and{' '}
-                    <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
-                      Privacy Policy
-                    </Link>
-                    .
-                  </span>
-                </label>
-                <p className="text-xs mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
-                  These documents explain how Landscape keeps your insights private during onboarding.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
-                <p className="text-sm" style={{ color: 'var(--text-primary)', margin: 0 }}>
-                  Terms accepted on {formattedAcceptedDate}
-                </p>
-              </div>
-            )}
+          {requiresTos && (
+            <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+              <label className="flex items-center text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={tosAccepted}
+                  onChange={(e) => setTosAccepted(e.target.checked)}
+                  className="h-4 w-4 rounded border"
+                  style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
+                />
+                <span>
+                  I accept the{' '}
+                  <Link href="/terms" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                    Alpha Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+            </div>
+          )}
+          {!requiresTos && formattedAcceptedDate && (
+            <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-primary)', margin: 0 }}>
+                Terms accepted on {formattedAcceptedDate}
+              </p>
+            </div>
+          )}
           <p className="mt-6 text-xs text-center" style={{ color: 'var(--cui-secondary-color)' }}>
             Need an account?{' '}
             <Link href="/register" className="font-medium" style={{ color: 'var(--cui-primary)' }}>
@@ -279,16 +300,14 @@ export default function LoginForm() {
             </Link>
           </p>
         </div>
-      </div>
-      <div
-        className="hidden md:flex w-full md:w-3/5 flex-col justify-center px-10 py-14 space-y-8"
-        style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
-      >
-        <div>
+        <div
+          className="mt-6 rounded-3xl border border-line-soft p-6"
+          style={{ backgroundColor: 'var(--surface-card)', borderColor: 'var(--cui-border-color)' }}
+        >
           <p className="text-sm uppercase tracking-[0.2em] mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
-            Alpha experience
+            Guidance
           </p>
-          <h1 className="text-4xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
             A better Landscaper onboarding
           </h1>
           <p className="text-base leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>

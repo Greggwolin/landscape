@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface ThemeContextValue {
   theme: 'light' | 'dark';
@@ -9,11 +10,15 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+const AUTH_DARK_ROUTES = ['/login'];
 
 export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark'); // Phase 1: Changed default to dark
   const [mounted, setMounted] = useState(false);
   const themeRef = useRef(theme);
+  const pathname = usePathname();
+  const forceDarkAuthTheme = AUTH_DARK_ROUTES.some(route => pathname?.startsWith(route));
+  const appliedTheme: 'light' | 'dark' = forceDarkAuthTheme ? 'dark' : theme;
 
   // Load theme from localStorage on mount
   useEffect(() => {
@@ -48,18 +53,21 @@ export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
     root.classList.remove('light-theme', 'dark-theme');
 
     // Add the current theme class
-    root.classList.add(`${theme}-theme`);
+    root.classList.add(`${appliedTheme}-theme`);
 
     // Set data attributes for tokens + CoreUI
-    root.setAttribute('data-coreui-theme', theme);
-    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-coreui-theme', appliedTheme);
+    root.setAttribute('data-theme', appliedTheme);
 
-    // Persist to localStorage
-    localStorage.setItem('coreui-theme', theme);
-  }, [theme, mounted]);
+    // Do not persist forced auth-route theming to user preference.
+    if (!forceDarkAuthTheme) {
+      localStorage.setItem('coreui-theme', theme);
+    }
+  }, [theme, appliedTheme, forceDarkAuthTheme, mounted]);
 
   useEffect(() => {
     if (!mounted) return;
+    if (forceDarkAuthTheme) return;
 
     const root = document.documentElement;
     const observer = new MutationObserver(() => {
@@ -71,7 +79,7 @@ export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
-  }, [mounted]);
+  }, [forceDarkAuthTheme, mounted]);
 
   const toggleTheme = () => {
     setThemeState(prev => prev === 'light' ? 'dark' : 'light');
