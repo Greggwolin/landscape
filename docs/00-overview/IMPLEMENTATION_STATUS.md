@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-08
-**Version:** 3.7
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul)
+**Last Updated:** 2026-02-10
+**Version:** 3.8
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility)
 
 ---
 
@@ -9,7 +9,32 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Folder-Tabs UI Overhaul (February 8, 2026)**
+### 🆕 **Latest Update: Landscaper Stability & Rent Roll Visibility (February 10, 2026)**
+
+**Tool Execution Fixes, Document Extraction Improvements, Dynamic Columns in Rent Roll UI**
+
+Critical stability fixes for the Landscaper AI system and rent roll data pipeline:
+
+- ✅ **Landscaper Tool Hang Fix** - Added tool result truncation (4K cap), loop iteration limit (5), time budget (75s), graceful break with final summary call
+- ✅ **Batch SQL for Mutations** - Replaced N+1 per-unit queries (200 queries) with UNNEST batch operations (~5 queries)
+- ✅ **Anthropic Timeout/Tokens** - Timeout 60s→120s, max_tokens 2048→16384, stop_reason warning
+- ✅ **Frontend Timeout** - 90s→150s across all chat hooks, always-visible error display
+- ✅ **Auto-Refresh After Mutations** - PropertyTab, ValuationTab, ProjectTab now auto-refresh via `useLandscaperRefresh`
+- ✅ **Document Extraction Truncation Fix** - Full rent roll now visible (was showing 10/113 units); `max_length` 15K→40K
+- ✅ **Excel Raw Text Generation** - `RentRollExtractor._generate_raw_text()` so Excel files populate `extracted_text`
+- ✅ **Dynamic Columns in Configure Columns** - EAV dynamic columns appear in rent roll modal under "Additional Fields" with green "Extra" badge
+- ✅ **Floor Plan Column Editable** - Changed from calculated to user-editable input
+- ✅ **Infinite Re-render Fix** - Stable fingerprints prevent `Maximum update depth exceeded` from SWR object references
+- 📁 **Location:** See `docs/09-session-notes/2026-02-10-landscaper-stability-and-rent-roll-visibility.md`
+
+**Key Files Modified:**
+- `backend/apps/landscaper/ai_handler.py` - Tool loop guards, truncation, logging
+- `backend/apps/landscaper/services/mutation_service.py` - Batch SQL with UNNEST
+- `backend/apps/landscaper/tool_executor.py` - Full unit/lease display, 40K cap
+- `backend/services/extraction/rent_roll_extractor.py` - raw_text generation
+- `src/app/projects/[projectId]/components/tabs/PropertyTab.tsx` - Dynamic columns, editable plan, auto-hide fix
+
+### Previous Update: Folder-Tabs UI Overhaul (February 8, 2026)
 
 **Page Consolidation, Media System, Location Intelligence, and Property Type Tokens**
 

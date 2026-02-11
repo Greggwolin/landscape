@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-const REQUEST_TIMEOUT_MS = 90000;
+const REQUEST_TIMEOUT_MS = 150000;
 
 /**
  * Represents a chat thread.
@@ -438,7 +438,7 @@ export function useLandscaperThreads({
         setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setError('Request timed out. Please try again.');
+          setError('Request timed out — the operation may still be processing. If you were updating many records, the changes may have been saved. Please refresh and try again.');
         } else {
           setError(errorMessage);
         }

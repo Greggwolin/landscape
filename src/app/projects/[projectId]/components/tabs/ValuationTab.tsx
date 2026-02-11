@@ -11,13 +11,14 @@
 
 'use client';
 
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { CCard, CCardBody } from '@coreui/react';
 import { getValuationSummary } from '@/lib/api/valuation';
 import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from '../../valuation/components/SalesComparisonApproach';
 import { CostApproachTab } from '../../valuation/components/CostApproach/CostApproachTab';
 import { IncomeApproachContent } from './IncomeApproachContent';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface ValuationTabProps {
   project: any;
@@ -55,7 +56,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
   const normalizedTab = normalizeTab(activeTab);
 
   // Fetch valuation data
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -67,13 +68,20 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
       fetchData();
     }
-  }, [projectId]);
+  }, [projectId, fetchData]);
+
+  // Auto-refresh when Landscaper mutates relevant data
+  useLandscaperRefresh(
+    projectId,
+    ['units', 'leases', 'unit_types', 'operating_expenses', 'dcf_analysis', 'cashflow', 'rental_comps', 'sales_comps', 'project'],
+    fetchData
+  );
 
   // Loading state
   if (loading) {

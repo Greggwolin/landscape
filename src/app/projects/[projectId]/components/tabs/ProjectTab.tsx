@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ChangeEvent, useEffect, useState } from 'react';
+import React, { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { CCard, CCardHeader, CCardBody, CRow, CCol, CButton, CFormInput, CFormFloating, CFormTextarea, CCollapse } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilPencil, cilCheck, cilX, cilChevronBottom, cilChevronTop } from '@coreui/icons';
@@ -10,6 +10,7 @@ import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface Project {
   project_id: number;
@@ -117,28 +118,35 @@ export default function ProjectTab({
   const [loadingProject, setLoadingProject] = useState(true);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchProjectDetails = async () => {
-      try {
-        setLoadingProject(true);
-        const response = await fetch(`/api/projects/${initialProject.project_id}/details`);
-        if (response.ok) {
-          const data = await response.json();
-          setProject(normalizeProject(data));
-        } else {
-          // Fallback to initial project if API fails
-          setProject(normalizeProject(initialProject));
-        }
-      } catch (error) {
-        console.error('Error fetching project details:', error);
+  const fetchProjectDetails = useCallback(async () => {
+    try {
+      setLoadingProject(true);
+      const response = await fetch(`/api/projects/${initialProject.project_id}/details`);
+      if (response.ok) {
+        const data = await response.json();
+        setProject(normalizeProject(data));
+      } else {
+        // Fallback to initial project if API fails
         setProject(normalizeProject(initialProject));
-      } finally {
-        setLoadingProject(false);
       }
-    };
-
-    fetchProjectDetails();
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      setProject(normalizeProject(initialProject));
+    } finally {
+      setLoadingProject(false);
+    }
   }, [initialProject.project_id]);
+
+  useEffect(() => {
+    fetchProjectDetails();
+  }, [fetchProjectDetails]);
+
+  // Auto-refresh when Landscaper mutates project fields
+  useLandscaperRefresh(
+    initialProject.project_id,
+    ['project', 'units', 'operating_expenses'],
+    fetchProjectDetails
+  );
 
   // Helper functions for formatting
   const formatCurrency = (value?: number | string | null) => {

@@ -83,22 +83,35 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
   const [error, setError] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingStateRef = useRef<ValueAddState | null>(null);
+  // Cache the raw API response so we can re-derive state when stats change
+  const rawDataRef = useRef<Record<string, unknown> | null>(null);
 
-  const normalizeState = useCallback((data: Record<string, unknown>): ValueAddState => ({
-    isEnabled: Boolean(data.is_enabled ?? DEFAULT_STATE.isEnabled),
-    renoStartMonth: Number(data.reno_start_month ?? DEFAULT_STATE.renoStartMonth),
-    renoStartsPerMonth: Number(data.reno_starts_per_month ?? data.reno_pace_per_month ?? DEFAULT_STATE.renoStartsPerMonth),
-    monthsToComplete: Number(data.months_to_complete ?? DEFAULT_STATE.monthsToComplete),
-    renoCost: Number(data.reno_cost ?? data.reno_cost_per_sf ?? DEFAULT_STATE.renoCost),
-    renoCostBasis: (data.reno_cost_basis as RenoCostBasis) || DEFAULT_STATE.renoCostBasis,
-    relocationIncentive: Number(data.relocation_incentive ?? DEFAULT_STATE.relocationIncentive),
-    rentPremiumPct: Number(data.rent_premium_pct ?? DEFAULT_STATE.rentPremiumPct),
-    reletMonths: Number(data.relet_months ?? data.relet_lag_months ?? DEFAULT_STATE.reletMonths),
-    renovateAll: Boolean(data.renovate_all ?? DEFAULT_STATE.renovateAll),
-    unitsToRenovate: data.units_to_renovate === null || data.units_to_renovate === undefined
-      ? null
-      : Number(data.units_to_renovate),
-  }), []);
+  // Derive UI state from raw API data. The DB always stores cost as $/SF.
+  // When basis is 'unit', multiply by avgUnitSf to get the per-unit value the user expects.
+  const deriveState = useCallback(
+    (data: Record<string, unknown>, avgSf: number): ValueAddState => {
+      const basis = (data.reno_cost_basis as RenoCostBasis) || DEFAULT_STATE.renoCostBasis;
+      const storedPerSf = Number(data.reno_cost_per_sf ?? DEFAULT_STATE.renoCost);
+      const renoCost = basis === 'unit' ? Math.round(storedPerSf * avgSf) : storedPerSf;
+
+      return {
+        isEnabled: Boolean(data.is_enabled ?? DEFAULT_STATE.isEnabled),
+        renoStartMonth: Number(data.reno_start_month ?? DEFAULT_STATE.renoStartMonth),
+        renoStartsPerMonth: Number(data.reno_starts_per_month ?? data.reno_pace_per_month ?? DEFAULT_STATE.renoStartsPerMonth),
+        monthsToComplete: Number(data.months_to_complete ?? DEFAULT_STATE.monthsToComplete),
+        renoCost,
+        renoCostBasis: basis,
+        relocationIncentive: Number(data.relocation_incentive ?? DEFAULT_STATE.relocationIncentive),
+        rentPremiumPct: Number(data.rent_premium_pct ?? DEFAULT_STATE.rentPremiumPct),
+        reletMonths: Number(data.relet_months ?? data.relet_lag_months ?? DEFAULT_STATE.reletMonths),
+        renovateAll: Boolean(data.renovate_all ?? DEFAULT_STATE.renovateAll),
+        unitsToRenovate: data.units_to_renovate === null || data.units_to_renovate === undefined
+          ? null
+          : Number(data.units_to_renovate),
+      };
+    },
+    []
+  );
 
   const serializeState = useCallback((nextState: ValueAddState) => ({
     is_enabled: nextState.isEnabled,
@@ -166,6 +179,7 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
     });
   }, [scheduleSave]);
 
+  // Fetch once on mount (projectId only)
   useEffect(() => {
     if (!projectId) return;
     let isMounted = true;
@@ -182,7 +196,8 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
         }
         const data = await response.json();
         if (isMounted) {
-          setState(normalizeState(data));
+          rawDataRef.current = data;
+          setState(deriveState(data, stats.avgUnitSf));
         }
       } catch (err) {
         if (isMounted) {
@@ -201,7 +216,16 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
     return () => {
       isMounted = false;
     };
-  }, [projectId, normalizeState]);
+    // Only re-fetch when projectId changes, NOT when stats change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Re-derive state from cached raw data when avgUnitSf arrives/changes
+  useEffect(() => {
+    if (rawDataRef.current && stats.avgUnitSf > 0) {
+      setState(deriveState(rawDataRef.current, stats.avgUnitSf));
+    }
+  }, [stats.avgUnitSf, deriveState]);
 
   useEffect(() => {
     return () => {

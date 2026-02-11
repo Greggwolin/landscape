@@ -33,7 +33,7 @@ interface ChatInterfaceProps {
   activeTab?: string;  // Page context for tool filtering (e.g., 'property', 'operations', 'valuation')
 }
 
-const REQUEST_TIMEOUT_MS = 90000;
+const REQUEST_TIMEOUT_MS = 150000;
 
 /**
  * Emit mutation events for successful tool executions.

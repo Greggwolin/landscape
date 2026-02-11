@@ -57,6 +57,9 @@ class RentRollExtractor:
         # Step 6: Validate and score
         validation = self._validate_extraction(unit_types, units, leases)
 
+        # Step 7: Generate raw_text so Landscaper can see full document content
+        raw_text = self._generate_raw_text(df, property_info)
+
         return {
             'unit_types': unit_types,
             'units': units,
@@ -69,7 +72,8 @@ class RentRollExtractor:
                 'occupied_units': len(leases),
                 'vacancy_rate': 1 - (len(leases) / len(units)) if len(units) > 0 else 0,
                 'extracted_at': datetime.now().isoformat()
-            }
+            },
+            'raw_text': raw_text,
         }
 
     def _load_rent_roll(self, file_path: str, metadata: Dict) -> pd.DataFrame:
@@ -365,6 +369,45 @@ Respond with ONLY a JSON object:
             })
 
         return leases
+
+    def _generate_raw_text(self, df: pd.DataFrame, property_info: Dict) -> str:
+        """
+        Generate a tab-separated text representation of the full DataFrame
+        so Landscaper can read the complete rent roll (not just first N rows).
+        """
+        lines = []
+
+        # Property header
+        prop_name = property_info.get('property_name') or 'Unknown Property'
+        prop_addr = property_info.get('property_address') or ''
+        report_date = property_info.get('report_date') or ''
+        lines.append(f"RENT ROLL: {prop_name}")
+        if prop_addr:
+            lines.append(f"Address: {prop_addr}")
+        if report_date:
+            lines.append(f"Report Date: {report_date}")
+        lines.append("")
+
+        # Column headers
+        cols = list(df.columns)
+        lines.append("\t".join(str(c) for c in cols))
+        lines.append("-" * 80)
+
+        # All data rows
+        for _, row in df.iterrows():
+            values = []
+            for col in cols:
+                val = row[col]
+                if pd.isna(val):
+                    values.append("")
+                else:
+                    values.append(str(val))
+            lines.append("\t".join(values))
+
+        lines.append("")
+        lines.append(f"Total rows: {len(df)}")
+
+        return "\n".join(lines)
 
     def _validate_extraction(self, unit_types: List, units: List, leases: List) -> Dict:
         """

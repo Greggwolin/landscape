@@ -9,6 +9,8 @@ import { CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@c
 import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
 import { useCallback, useRef } from 'react';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
+import { useDynamicColumns, formatDynamicValue, type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 interface Project {
@@ -66,10 +68,14 @@ interface Unit {
 interface ColumnConfig {
   id: string;
   label: string;
-  category: 'unit' | 'tenant' | 'lease' | 'financial' | 'floorplan';
+  category: 'unit' | 'tenant' | 'lease' | 'financial' | 'floorplan' | 'dynamic';
   visible: boolean;
-  type: 'input' | 'calculated';
+  type: 'input' | 'calculated' | 'dynamic';
   description?: string;
+  /** For dynamic columns: the underlying data type for formatting */
+  dataType?: DynamicColumnDataType;
+  /** For dynamic columns: the definition ID from tbl_dynamic_column_definition */
+  dynamicColumnId?: number;
 }
 
 const isEmptyColumnValue = (value: unknown) => {
@@ -83,7 +89,11 @@ const isEmptyColumnValue = (value: unknown) => {
   return false;
 };
 
-const getUnitValueForColumn = (unit: Unit, columnId: string) => {
+const getUnitValueForColumn = (
+  unit: Unit,
+  columnId: string,
+  dynamicValues?: Record<string, Record<string, unknown>>
+) => {
   switch (columnId) {
     case 'unitNumber':
       return unit.unitNumber;
@@ -120,6 +130,10 @@ const getUnitValueForColumn = (unit: Unit, columnId: string) => {
     case 'notes':
       return unit.notes;
     default:
+      // Dynamic column lookup: columnId is the column_key, unit.id is the row_id
+      if (dynamicValues) {
+        return dynamicValues[unit.id]?.[columnId] ?? null;
+      }
       return null;
   }
 };
@@ -296,7 +310,7 @@ const mockUnits: Unit[] = [
 const defaultColumns: ColumnConfig[] = [
   // Unit Info
   { id: 'unitNumber', label: 'Unit', category: 'unit', visible: true, type: 'input', description: 'Unit number or identifier' },
-  { id: 'floorPlan', label: 'Plan', category: 'floorplan', visible: true, type: 'calculated', description: 'Floor plan type (auto-generated from bed/bath)' },
+  { id: 'floorPlan', label: 'Plan', category: 'floorplan', visible: true, type: 'input', description: 'Floor plan / unit type code (e.g. A1, B2)' },
   { id: 'bedrooms', label: 'Bed', category: 'unit', visible: true, type: 'input', description: 'Number of bedrooms' },
   { id: 'bathrooms', label: 'Bath', category: 'unit', visible: true, type: 'input', description: 'Number of bathrooms' },
   { id: 'sqft', label: 'SF', category: 'unit', visible: true, type: 'input', description: 'Square footage of the unit' },
@@ -345,6 +359,45 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
   const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
   const propertyListRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic columns from EAV system (additional rent roll fields)
+  const unitIds = useMemo(() => units.map(u => Number(u.id)), [units]);
+  const {
+    columns: dynamicColumnDefs,
+    values: dynamicValues,
+    refresh: refreshDynamicColumns,
+  } = useDynamicColumns(isMultifamily ? projectId : undefined, 'multifamily_unit', unitIds);
+
+  // Merge active dynamic columns into the column config list.
+  // Uses a stable fingerprint to prevent infinite re-render loops.
+  const dynColFingerprint = useMemo(
+    () => dynamicColumnDefs.filter(d => d.is_active && !d.is_proposed).map(d => d.id).join(','),
+    [dynamicColumnDefs]
+  );
+  const lastDynFingerprint = useRef('');
+  useEffect(() => {
+    if (!dynColFingerprint || dynColFingerprint === lastDynFingerprint.current) return;
+    lastDynFingerprint.current = dynColFingerprint;
+    setColumns(prev => {
+      // Remove any previously-merged dynamic columns
+      const staticCols = prev.filter(c => c.category !== 'dynamic');
+      // Build ColumnConfig entries from active dynamic definitions
+      const dynCols: ColumnConfig[] = dynamicColumnDefs
+        .filter(d => d.is_active && !d.is_proposed)
+        .map(d => ({
+          id: `dyn_${d.column_key}`,
+          label: d.display_label,
+          category: 'dynamic' as const,
+          visible: true,
+          type: 'dynamic' as const,
+          description: `Custom field (${d.data_type}) from ${d.source}`,
+          dataType: d.data_type,
+          dynamicColumnId: d.id,
+        }));
+      if (dynCols.length === 0) return prev; // No dynamic cols to add
+      return [...staticCols, ...dynCols];
+    });
+  }, [dynColFingerprint, dynamicColumnDefs]);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -546,114 +599,142 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setPropertyColors(colors);
   }, []);
 
-  // Load real data from database
-  useEffect(() => {
-    const loadData = async () => {
-      // Skip data loading for non-multifamily projects
-      if (!isMultifamily) {
-        setLoading(false);
-        return;
-      }
+  // Load real data from database (extracted as callback so useLandscaperRefresh can trigger it)
+  const loadData = useCallback(async () => {
+    // Skip data loading for non-multifamily projects
+    if (!isMultifamily) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        // Fetch unit types (floor plans)
-        const unitTypesData = await unitTypesAPI.list(projectId);
-        const transformedFloorPlans: FloorPlan[] = unitTypesData.map(ut => ({
-          id: ut.unit_type_id.toString(),
-          name: ut.unit_type_code,
-          bedrooms: Number(ut.bedrooms),
-          bathrooms: Number(ut.bathrooms),
-          sqft: ut.avg_square_feet,
-          unitCount: ut.total_units,
-          currentRent: Math.round(ut.current_market_rent || 0),
-          marketRent: Math.round(ut.current_market_rent || 0),
-          aiEstimate: 0 // Will be populated from comparables
-        }));
+      // Fetch unit types (floor plans)
+      const unitTypesData = await unitTypesAPI.list(projectId);
+      const transformedFloorPlans: FloorPlan[] = unitTypesData.map(ut => ({
+        id: ut.unit_type_id.toString(),
+        name: ut.unit_type_code,
+        bedrooms: Number(ut.bedrooms),
+        bathrooms: Number(ut.bathrooms),
+        sqft: ut.avg_square_feet,
+        unitCount: ut.total_units,
+        currentRent: Math.round(ut.current_market_rent || 0),
+        marketRent: Math.round(ut.current_market_rent || 0),
+        aiEstimate: 0 // Will be populated from comparables
+      }));
 
-        // Fetch units
-        const unitsData = await unitsAPI.list(projectId);
+      // Fetch units
+      const unitsData = await unitsAPI.list(projectId);
 
-        // Fetch leases to get tenant info
-        const leasesData = await leasesAPI.list(projectId);
-        const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
+      // Fetch leases to get tenant info
+      const leasesData = await leasesAPI.list(projectId);
+      const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
 
-        const normalizeStatus = (status?: string | null): Unit['status'] => {
-          if (!status) return 'Unknown';
-          const normalized = status.toLowerCase();
-          if (normalized === 'occupied') return 'Occupied';
-          if (normalized === 'vacant') return 'Vacant';
-          if (normalized === 'notice') return 'Notice';
-          if (normalized === 'renewal') return 'Renewal';
-          return 'Unknown';
+      const normalizeStatus = (status?: string | null): Unit['status'] => {
+        if (!status) return 'Unknown';
+        const normalized = status.toLowerCase();
+        if (normalized === 'occupied') return 'Occupied';
+        if (normalized === 'vacant') return 'Vacant';
+        if (normalized === 'notice') return 'Notice';
+        if (normalized === 'renewal') return 'Renewal';
+        return 'Unknown';
+      };
+
+      const transformedUnits: Unit[] = unitsData.map(u => {
+        const lease = leasesByUnit.get(u.unit_id);
+        const unitRent = Math.round(u.current_rent ?? 0);
+        const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
+        const marketRent = Math.round(u.market_rent || 0);
+        const unitStatus = normalizeStatus(u.occupancy_status);
+        const leaseStatus = lease?.lease_status === 'ACTIVE' ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
+        return {
+          id: u.unit_id.toString(),
+          unitNumber: u.unit_number,
+          floorPlan: u.unit_type,
+          sqft: u.square_feet,
+          bedrooms: Number(u.bedrooms || 0),
+          bathrooms: Number(u.bathrooms || 0),
+          currentRent: baseRent,
+          marketRent: marketRent,
+          proformaRent: Math.round(marketRent * 1.05),
+          leaseStart: lease?.lease_start_date || '',
+          leaseEnd: lease?.lease_end_date || '',
+          tenantName: lease?.resident_name || '',
+          status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
+          deposit: Math.round(lease?.security_deposit || 0),
+          monthlyIncome: baseRent,
+          rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
+          proformaRentPerSF: u.square_feet > 0 && marketRent ? marketRent / u.square_feet : 0,
+          notes: u.other_features || ''
         };
+      });
 
-        const transformedUnits: Unit[] = unitsData.map(u => {
-          const lease = leasesByUnit.get(u.unit_id);
-          const unitRent = Math.round(u.current_rent ?? 0);
-          const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
-          const marketRent = Math.round(u.market_rent || 0);
-          const unitStatus = normalizeStatus(u.occupancy_status);
-          const leaseStatus = lease?.lease_status === 'ACTIVE' ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
-          return {
-            id: u.unit_id.toString(),
-            unitNumber: u.unit_number,
-            floorPlan: u.unit_type,
-            sqft: u.square_feet,
-            bedrooms: Number(u.bedrooms || 0),
-            bathrooms: Number(u.bathrooms || 0),
-            currentRent: baseRent,
-            marketRent: marketRent,
-            proformaRent: Math.round(marketRent * 1.05),
-            leaseStart: lease?.lease_start_date || '',
-            leaseEnd: lease?.lease_end_date || '',
-            tenantName: lease?.resident_name || '',
-            status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
-            deposit: Math.round(lease?.security_deposit || 0),
-            monthlyIncome: baseRent,
-            rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
-            proformaRentPerSF: u.square_feet > 0 && marketRent ? marketRent / u.square_feet : 0,
-            notes: u.other_features || ''
-          };
-        });
-
-        // Fetch rental comparables
-        const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`);
-        if (compsResponse.ok) {
-          const compsData = await compsResponse.json();
-          if (compsData.success && compsData.data) {
-            setComparables(compsData.data);
-          }
+      // Fetch rental comparables
+      const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`);
+      if (compsResponse.ok) {
+        const compsData = await compsResponse.json();
+        if (compsData.success && compsData.data) {
+          setComparables(compsData.data);
         }
-
-        // Always use real data (even if empty)
-        setFloorPlans(transformedFloorPlans);
-        setUnits(transformedUnits);
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Failed to load data:', error);
-        // On error, set empty arrays instead of mock data
-        setFloorPlans([]);
-        setUnits([]);
-        setComparables([]);
-        setLoading(false);
       }
-    };
 
-    loadData();
+      // Always use real data (even if empty)
+      setFloorPlans(transformedFloorPlans);
+      setUnits(transformedUnits);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      // On error, set empty arrays instead of mock data
+      setFloorPlans([]);
+      setUnits([]);
+      setComparables([]);
+      setLoading(false);
+    }
   }, [projectId, isMultifamily]);
 
+  // Initial data load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Auto-refresh when Landscaper mutates units, leases, or unit types
+  const refreshAll = useCallback(() => {
+    loadData();
+    refreshDynamicColumns();
+  }, [loadData, refreshDynamicColumns]);
+  useLandscaperRefresh(
+    projectId,
+    ['units', 'leases', 'unit_types', 'project'],
+    refreshAll
+  );
+
+  // Auto-hide columns that have no data — runs once when units load, not on every render.
+  // Uses a ref to track whether we've already auto-hidden for the current unit set.
+  const autoHideRanForRef = useRef<string>('');
   useEffect(() => {
     if (!units.length || hasCustomizedColumns) return;
-    setColumns((prev) =>
-      prev.map((col) => {
+    // Build a stable fingerprint so we only auto-hide once per unit set
+    const fingerprint = units.map(u => u.id).join(',');
+    if (autoHideRanForRef.current === fingerprint) return;
+    autoHideRanForRef.current = fingerprint;
+
+    setColumns((prev) => {
+      let changed = false;
+      const next = prev.map((col) => {
         if (!col.visible) return col;
+        // Skip dynamic columns entirely — they default to visible and are
+        // managed by the merge effect. Don't auto-hide them here.
+        if (col.category === 'dynamic') return col;
+        // Static columns: hide if no unit has data
         const hasAnyValue = units.some((unit) => !isEmptyColumnValue(getUnitValueForColumn(unit, col.id)));
-        return hasAnyValue ? col : { ...col, visible: false };
-      })
-    );
+        if (hasAnyValue) return col;
+        changed = true;
+        return { ...col, visible: false };
+      });
+      return changed ? next : prev; // Only update state if something actually changed
+    });
   }, [units, hasCustomizedColumns]);
 
   // Get visible columns
@@ -669,7 +750,17 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       case 'unitNumber':
         return <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>{unit.unitNumber}</span>;
       case 'floorPlan':
-        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.floorPlan}</span>;
+        return isEdit ? (
+          <input
+            type="text"
+            className="w-20 rounded px-2 py-1 text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.floorPlan || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, floorPlan: e.target.value } : null)}
+          />
+        ) : (
+          <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.floorPlan || '—'}</span>
+        );
       case 'bedrooms':
         return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</span>;
       case 'bathrooms':
@@ -795,8 +886,18 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         ) : (
           <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
         );
-      default:
+      default: {
+        // Dynamic column: look up value from the EAV dynamic values map
+        const colConfig = columns.find(c => c.id === columnId);
+        if (colConfig?.category === 'dynamic') {
+          const colKey = columnId.replace(/^dyn_/, '');
+          const rawValue = dynamicValues[unit.id]?.[colKey];
+          if (rawValue === null || rawValue === undefined) return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+          const formatted = formatDynamicValue(rawValue, colConfig.dataType || 'text');
+          return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatted}</span>;
+        }
         return null;
+      }
     }
   };
 
@@ -804,7 +905,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const getColumnAlign = (columnId: string): string => {
     const centerAlign = ['bedrooms', 'bathrooms', 'sqft', 'currentRent', 'marketRent', 'proformaRent',
                          'status', 'leaseEnd', 'deposit', 'monthlyIncome', 'rentPerSF', 'proformaRentPerSF'];
-    return centerAlign.includes(columnId) ? 'text-center' : 'text-left';
+    if (centerAlign.includes(columnId)) return 'text-center';
+    // Dynamic columns: center-align numeric types
+    const colConfig = columns.find(c => c.id === columnId);
+    if (colConfig?.category === 'dynamic' && colConfig.dataType && ['number', 'currency', 'percent', 'boolean'].includes(colConfig.dataType)) {
+      return 'text-center';
+    }
+    return 'text-left';
   };
 
   // Calculate total statistics
@@ -1672,15 +1779,32 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     </span>
                     <span style={{ color: 'var(--cui-secondary-color)' }}>Auto-calculated</span>
                   </div>
+                  {columns.some(c => c.category === 'dynamic') && (
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="px-1.5 py-0.5 rounded font-medium text-[10px]"
+                        style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981' }}
+                      >
+                        Extra
+                      </span>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>From extraction</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Column categories */}
-              {['unit', 'floorplan', 'tenant', 'lease', 'financial'].map(category => (
+              {/* Column categories — include 'dynamic' only when dynamic columns exist */}
+              {(['unit', 'floorplan', 'tenant', 'lease', 'financial'] as const)
+                .concat(columns.some(c => c.category === 'dynamic') ? ['dynamic' as const] : [])
+                .map(category => {
+                  const categoryCols = columns.filter(col => col.category === category);
+                  if (categoryCols.length === 0) return null;
+                  const categoryLabel = category === 'dynamic' ? 'Additional Fields' : `${category} Info`;
+                  return (
                 <div key={category} className="mb-3">
-                  <h4 className="text-xs font-semibold mb-1 capitalize" style={{ color: 'var(--cui-info, #3b82f6)' }}>{category} Info</h4>
+                  <h4 className="text-xs font-semibold mb-1 capitalize" style={{ color: category === 'dynamic' ? '#10b981' : 'var(--cui-info, #3b82f6)' }}>{categoryLabel}</h4>
                   <div className="space-y-0.5 ml-5">
-                    {columns.filter(col => col.category === category).map(col => (
+                    {categoryCols.map(col => (
                       <label
                         key={col.id}
                         htmlFor={`field-${col.id}`}
@@ -1702,12 +1826,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                         />
                         <span
                           className="px-1.5 py-0.5 text-[10px] rounded font-medium flex-shrink-0"
-                          style={col.type === 'input'
-                            ? { backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }
-                            : { backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }
+                          style={col.type === 'dynamic'
+                            ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981' }
+                            : col.type === 'input'
+                              ? { backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }
+                              : { backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }
                           }
                         >
-                          {col.type === 'input' ? 'Input' : 'Calc'}
+                          {col.type === 'dynamic' ? 'Extra' : col.type === 'input' ? 'Input' : 'Calc'}
                         </span>
                         <span className="font-medium w-28 flex-shrink-0" style={{ color: 'var(--cui-body-color)' }}>{col.label}</span>
                         <span className="flex-1" style={{ color: 'var(--cui-secondary-color)' }}>{col.description}</span>
@@ -1715,7 +1841,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     ))}
                   </div>
                 </div>
-              ))}
+                  );
+              })}
             </div>
 
             {/* Modal Footer */}
@@ -1726,7 +1853,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               <button
                 onClick={() => {
                   setHasCustomizedColumns(false);
-                  setColumns(defaultColumns);
+                  // Reset static columns to defaults, keep dynamic columns with data visible
+                  setColumns(prev => {
+                    const dynCols = prev.filter(c => c.category === 'dynamic').map(c => ({ ...c, visible: true }));
+                    return [...defaultColumns, ...dynCols];
+                  });
                 }}
                 className="px-3 py-1.5 text-xs rounded transition-colors"
                 style={{ backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-body-color)' }}

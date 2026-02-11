@@ -79,7 +79,7 @@ interface UseLandscaperOptions {
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
 }
 
-const REQUEST_TIMEOUT_MS = 90000;
+const REQUEST_TIMEOUT_MS = 150000;
 
 // Map tool names to the tables they affect
 const TOOL_TABLE_MAP: Record<string, string[]> = {

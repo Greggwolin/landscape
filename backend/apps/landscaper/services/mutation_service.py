@@ -1085,13 +1085,14 @@ class MutationService:
                             results.append({"unit_type_id": row[0], "code": rec.get("unit_type_code")})
 
                     elif table_name == "tbl_multifamily_unit":
-                        # Track unit types for aggregation
+                        # Batched upsert: prepare all records first, then execute
+                        # in bulk to minimize DB round-trips (was N+1 per unit)
                         unit_type_stats = {}
 
+                        # Phase 1: Normalize all records
+                        normalized = []
                         for rec in records:
-                            # Map unit_type from various possible field names
                             unit_type = rec.get("unit_type") or rec.get("unit_type_code") or rec.get("unit_type_name", "")
-                            # Build unit_type string from bedrooms/bathrooms if not provided
                             if not unit_type and (rec.get("bedrooms") is not None or rec.get("bathrooms") is not None):
                                 br = rec.get("bedrooms", 0)
                                 ba = rec.get("bathrooms", 1)
@@ -1104,86 +1105,19 @@ class MutationService:
                             market_rent = rec.get("market_rent", 0)
                             occupancy_status = rec.get("occupancy_status") or rec.get("status", "occupied")
 
-                            print(f"=== MUTATION_SERVICE UNIT INSERT ===")
-                            print(f"WRITING UNIT: {rec.get('unit_number')}, rent={current_rent}, status={occupancy_status}")
-                            print(f"FULL RECORD: {rec}")
-
-                            cursor.execute("""
-                                INSERT INTO landscape.tbl_multifamily_unit
-                                (project_id, unit_number, unit_type, bedrooms, bathrooms, square_feet,
-                                 current_rent, market_rent, occupancy_status, created_at, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                                ON CONFLICT (project_id, unit_number)
-                                DO UPDATE SET
-                                    unit_type = EXCLUDED.unit_type,
-                                    bedrooms = EXCLUDED.bedrooms,
-                                    bathrooms = EXCLUDED.bathrooms,
-                                    square_feet = EXCLUDED.square_feet,
-                                    current_rent = EXCLUDED.current_rent,
-                                    market_rent = EXCLUDED.market_rent,
-                                    occupancy_status = EXCLUDED.occupancy_status,
-                                    updated_at = NOW()
-                                RETURNING unit_id, (xmax = 0) as is_insert
-                            """, [
-                                project_id,
-                                rec.get("unit_number"),
-                                unit_type,
-                                bedrooms,
-                                bathrooms,
-                                square_feet,
-                                current_rent,
-                                market_rent,
-                                occupancy_status,
-                            ])
-                            row = cursor.fetchone()
-                            unit_id = row[0]
-                            is_insert = row[1]
-
-                            if is_insert:
-                                created_count += 1
-                            else:
-                                updated_count += 1
-                            results.append({"unit_id": unit_id, "unit_number": rec.get("unit_number")})
-
-                            # Also create/update a lease for this unit so it shows in RentRollGrid
-                            # The grid reads from leases table, not units directly
-                            lease_status = "ACTIVE" if occupancy_status.lower() in ("occupied", "active") else "CANCELLED"
-
-                            # Check if lease exists for this unit
-                            cursor.execute("""
-                                SELECT lease_id FROM landscape.tbl_multifamily_lease
-                                WHERE unit_id = %s
-                                ORDER BY created_at DESC LIMIT 1
-                            """, [unit_id])
-                            existing_lease = cursor.fetchone()
-
-                            # Get lease dates from source data ONLY - never invent dates
-                            # If source document doesn't have dates, they should be NULL
-                            lease_start = rec.get("lease_start_date")
-                            lease_end = rec.get("lease_end_date")
-                            lease_term = rec.get("lease_term_months")
-
-                            if existing_lease:
-                                # Update existing lease
-                                cursor.execute("""
-                                    UPDATE landscape.tbl_multifamily_lease
-                                    SET base_rent_monthly = %s,
-                                        effective_rent_monthly = %s,
-                                        lease_status = %s,
-                                        lease_start_date = COALESCE(%s, lease_start_date),
-                                        lease_end_date = COALESCE(%s, lease_end_date),
-                                        lease_term_months = COALESCE(%s, lease_term_months),
-                                        updated_at = NOW()
-                                    WHERE lease_id = %s
-                                """, [current_rent, current_rent, lease_status, lease_start, lease_end, lease_term, existing_lease[0]])
-                            else:
-                                # Create new lease - use NULL for dates if not in source
-                                cursor.execute("""
-                                    INSERT INTO landscape.tbl_multifamily_lease
-                                    (unit_id, base_rent_monthly, effective_rent_monthly, lease_status,
-                                     lease_start_date, lease_end_date, lease_term_months, created_at, updated_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                                """, [unit_id, current_rent, current_rent, lease_status, lease_start, lease_end, lease_term])
+                            normalized.append({
+                                "unit_number": rec.get("unit_number"),
+                                "unit_type": unit_type,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "square_feet": square_feet,
+                                "current_rent": current_rent,
+                                "market_rent": market_rent,
+                                "occupancy_status": occupancy_status,
+                                "lease_start_date": rec.get("lease_start_date"),
+                                "lease_end_date": rec.get("lease_end_date"),
+                                "lease_term_months": rec.get("lease_term_months"),
+                            })
 
                             # Aggregate unit type stats for floorplan table
                             if unit_type:
@@ -1199,18 +1133,162 @@ class MutationService:
                                 unit_type_stats[unit_type]["square_feet_total"] += (square_feet or 0)
                                 unit_type_stats[unit_type]["market_rent_total"] += (market_rent or 0)
 
-                        # Create/update unit_types (floorplan mix) from aggregated stats
+                        logger.info(f"[Mutation] Batch upserting {len(normalized)} units for project {project_id}")
+
+                        # Phase 2: Batch upsert all units in one query using UNNEST
+                        unit_numbers = [r["unit_number"] for r in normalized]
+                        unit_types = [r["unit_type"] for r in normalized]
+                        bedrooms_list = [r["bedrooms"] for r in normalized]
+                        bathrooms_list = [r["bathrooms"] for r in normalized]
+                        sqft_list = [r["square_feet"] for r in normalized]
+                        current_rent_list = [r["current_rent"] for r in normalized]
+                        market_rent_list = [r["market_rent"] for r in normalized]
+                        status_list = [r["occupancy_status"] for r in normalized]
+
+                        cursor.execute("""
+                            INSERT INTO landscape.tbl_multifamily_unit
+                            (project_id, unit_number, unit_type, bedrooms, bathrooms, square_feet,
+                             current_rent, market_rent, occupancy_status, created_at, updated_at)
+                            SELECT
+                                %s,
+                                unnest(%s::text[]),
+                                unnest(%s::text[]),
+                                unnest(%s::integer[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::text[]),
+                                NOW(), NOW()
+                            ON CONFLICT (project_id, unit_number)
+                            DO UPDATE SET
+                                unit_type = EXCLUDED.unit_type,
+                                bedrooms = EXCLUDED.bedrooms,
+                                bathrooms = EXCLUDED.bathrooms,
+                                square_feet = EXCLUDED.square_feet,
+                                current_rent = EXCLUDED.current_rent,
+                                market_rent = EXCLUDED.market_rent,
+                                occupancy_status = EXCLUDED.occupancy_status,
+                                updated_at = NOW()
+                            RETURNING unit_id, unit_number, (xmax = 0) as is_insert
+                        """, [
+                            project_id,
+                            unit_numbers,
+                            unit_types,
+                            bedrooms_list,
+                            bathrooms_list,
+                            sqft_list,
+                            current_rent_list,
+                            market_rent_list,
+                            status_list,
+                        ])
+
+                        unit_rows = cursor.fetchall()
+                        unit_id_map = {}  # unit_number -> unit_id
+                        for row in unit_rows:
+                            unit_id, unit_number, is_insert = row[0], row[1], row[2]
+                            unit_id_map[unit_number] = unit_id
+                            if is_insert:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                            results.append({"unit_id": unit_id, "unit_number": unit_number})
+
+                        logger.info(f"[Mutation] Units upserted: {created_count} created, {updated_count} updated")
+
+                        # Phase 3: Batch lease upsert
+                        # Get all existing leases for these units in one query
+                        all_unit_ids = list(unit_id_map.values())
+                        cursor.execute("""
+                            SELECT DISTINCT ON (unit_id) unit_id, lease_id
+                            FROM landscape.tbl_multifamily_lease
+                            WHERE unit_id = ANY(%s)
+                            ORDER BY unit_id, created_at DESC
+                        """, [all_unit_ids])
+                        existing_leases = {row[0]: row[1] for row in cursor.fetchall()}
+
+                        # Split into updates vs inserts
+                        leases_to_update = []
+                        leases_to_insert = []
+                        for rec in normalized:
+                            unit_number = rec["unit_number"]
+                            unit_id = unit_id_map.get(unit_number)
+                            if not unit_id:
+                                continue
+                            occ = rec["occupancy_status"]
+                            lease_status = "ACTIVE" if occ.lower() in ("occupied", "active") else "CANCELLED"
+                            rent = rec["current_rent"]
+                            lease_start = rec["lease_start_date"]
+                            lease_end = rec["lease_end_date"]
+                            lease_term = rec["lease_term_months"]
+
+                            if unit_id in existing_leases:
+                                leases_to_update.append((
+                                    rent, rent, lease_status, lease_start, lease_end, lease_term,
+                                    existing_leases[unit_id]
+                                ))
+                            else:
+                                leases_to_insert.append((
+                                    unit_id, rent, rent, lease_status, lease_start, lease_end, lease_term
+                                ))
+
+                        if leases_to_update:
+                            cursor.executemany("""
+                                UPDATE landscape.tbl_multifamily_lease
+                                SET base_rent_monthly = %s,
+                                    effective_rent_monthly = %s,
+                                    lease_status = %s,
+                                    lease_start_date = COALESCE(%s, lease_start_date),
+                                    lease_end_date = COALESCE(%s, lease_end_date),
+                                    lease_term_months = COALESCE(%s, lease_term_months),
+                                    updated_at = NOW()
+                                WHERE lease_id = %s
+                            """, leases_to_update)
+
+                        if leases_to_insert:
+                            cursor.executemany("""
+                                INSERT INTO landscape.tbl_multifamily_lease
+                                (unit_id, base_rent_monthly, effective_rent_monthly, lease_status,
+                                 lease_start_date, lease_end_date, lease_term_months, created_at, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                            """, leases_to_insert)
+
+                        logger.info(f"[Mutation] Leases: {len(leases_to_update)} updated, {len(leases_to_insert)} created")
+
+                        # Phase 4: Batch upsert unit types (floorplan mix)
                         floorplan_count = 0
-                        for ut_code, stats in unit_type_stats.items():
-                            avg_sf = stats["square_feet_total"] / stats["count"] if stats["count"] > 0 else 0
-                            avg_market = stats["market_rent_total"] / stats["count"] if stats["count"] > 0 else 0
+                        if unit_type_stats:
+                            ut_codes = []
+                            ut_bedrooms = []
+                            ut_bathrooms = []
+                            ut_avg_sf = []
+                            ut_avg_rent = []
+                            ut_counts = []
+                            for ut_code, stats in unit_type_stats.items():
+                                ut_codes.append(ut_code)
+                                ut_bedrooms.append(stats["bedrooms"])
+                                ut_bathrooms.append(stats["bathrooms"])
+                                avg_sf = stats["square_feet_total"] / stats["count"] if stats["count"] > 0 else 0
+                                avg_market = stats["market_rent_total"] / stats["count"] if stats["count"] > 0 else 0
+                                ut_avg_sf.append(avg_sf)
+                                ut_avg_rent.append(avg_market)
+                                ut_counts.append(stats["count"])
 
                             try:
                                 cursor.execute("""
                                     INSERT INTO landscape.tbl_multifamily_unit_type
                                     (project_id, unit_type_code, unit_type_name, bedrooms, bathrooms,
                                      avg_square_feet, current_market_rent, total_units, created_at, updated_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                                    SELECT
+                                        %s,
+                                        unnest(%s::text[]),
+                                        unnest(%s::text[]),
+                                        unnest(%s::integer[]),
+                                        unnest(%s::numeric[]),
+                                        unnest(%s::numeric[]),
+                                        unnest(%s::numeric[]),
+                                        unnest(%s::integer[]),
+                                        NOW(), NOW()
                                     ON CONFLICT (project_id, unit_type_code)
                                     DO UPDATE SET
                                         bedrooms = EXCLUDED.bedrooms,
@@ -1221,19 +1299,19 @@ class MutationService:
                                         updated_at = NOW()
                                 """, [
                                     project_id,
-                                    ut_code,
-                                    ut_code,  # unit_type_name = code
-                                    stats["bedrooms"],
-                                    stats["bathrooms"],
-                                    avg_sf,
-                                    avg_market,
-                                    stats["count"],
+                                    ut_codes,
+                                    ut_codes,  # unit_type_name = code
+                                    ut_bedrooms,
+                                    ut_bathrooms,
+                                    ut_avg_sf,
+                                    ut_avg_rent,
+                                    ut_counts,
                                 ])
-                                floorplan_count += 1
+                                floorplan_count = len(ut_codes)
                             except Exception as fp_err:
-                                logger.warning(f"Failed to create floorplan {ut_code}: {fp_err}")
+                                logger.warning(f"[Mutation] Failed to batch upsert floorplans: {fp_err}")
 
-                        logger.info(f"Created/updated {floorplan_count} floorplan types from {len(records)} units")
+                        logger.info(f"[Mutation] Created/updated {floorplan_count} floorplan types from {len(records)} units")
 
                     else:
                         return {"success": False, "error": f"Unsupported table for rent_roll_batch: {table_name}"}

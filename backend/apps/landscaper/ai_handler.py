@@ -7,8 +7,16 @@ Uses Claude API (Anthropic) with context-aware system prompts and tool use.
 
 import logging
 import os
+import time
 from decimal import Decimal
 from typing import Dict, List, Any, Optional
+
+from dotenv import load_dotenv
+
+# Load .env from backend directory
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+# Also try repo root
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.env'))
 
 import anthropic
 from django.conf import settings
@@ -23,6 +31,24 @@ def _sanitize_for_json(obj):
     if isinstance(obj, (list, tuple)):
         return [_sanitize_for_json(item) for item in obj]
     return obj
+
+
+def _truncate_tool_result(result, max_chars=4000):
+    """Truncate tool results to prevent context bloat on continuation calls.
+
+    Large tool results (e.g., 40+ unit batch operations) can push the Claude
+    continuation call over context/timeout limits. This keeps the essential
+    summary while trimming per-record detail arrays.
+    """
+    result_str = str(result)
+    if len(result_str) <= max_chars:
+        return result_str
+    keep_chars = max_chars // 2 - 50
+    return (
+        result_str[:keep_chars]
+        + f"\n\n... [TRUNCATED — {len(result_str)} total chars, showing first and last {keep_chars}] ...\n\n"
+        + result_str[-keep_chars:]
+    )
 
 from .tool_registry import (
     get_tools_for_page,
@@ -536,10 +562,10 @@ def _needs_user_knowledge(message: str) -> bool:
 
 # Model to use for responses
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
-ANTHROPIC_TIMEOUT_SECONDS = 60
+ANTHROPIC_TIMEOUT_SECONDS = 120
 
 # Maximum tokens for response
-MAX_TOKENS = 2048
+MAX_TOKENS = 16384
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5041,8 +5067,30 @@ def get_landscaper_response(
 
         logger.info(f"[AI_HANDLER] Initial response stop_reason={response.stop_reason}, tool_executor={'present' if tool_executor else 'None'}")
 
+        # Tool loop safeguards
+        MAX_TOOL_ITERATIONS = 5
+        MAX_TOOL_LOOP_SECONDS = 75  # Leave buffer for frontend's 150s timeout
+        tool_loop_start = time.time()
+        tool_iteration = 0
+        loop_broke_early = False
+
         # Handle tool use loop
         while response.stop_reason == "tool_use" and tool_executor:
+            tool_iteration += 1
+
+            # Guard: iteration limit
+            if tool_iteration > MAX_TOOL_ITERATIONS:
+                logger.warning(f"[Tool Loop] Hit iteration limit ({MAX_TOOL_ITERATIONS}), breaking")
+                loop_broke_early = True
+                break
+
+            # Guard: time budget
+            elapsed = time.time() - tool_loop_start
+            if elapsed > MAX_TOOL_LOOP_SECONDS:
+                logger.warning(f"[Tool Loop] Exceeded time budget ({elapsed:.1f}s > {MAX_TOOL_LOOP_SECONDS}s), breaking")
+                loop_broke_early = True
+                break
+
             # Extract tool calls and text from response
             tool_use_blocks = []
             for block in response.content:
@@ -5051,6 +5099,8 @@ def get_landscaper_response(
                 elif hasattr(block, 'text'):
                     final_content += block.text
 
+            logger.info(f"[Tool Loop] Iteration {tool_iteration}: {len(tool_use_blocks)} tool(s), {elapsed:.1f}s elapsed")
+
             # Execute each tool call
             tool_results = []
             for tool_block in tool_use_blocks:
@@ -5058,7 +5108,7 @@ def get_landscaper_response(
                 tool_input = tool_block.input
                 tool_id = tool_block.id
 
-                logger.info(f"[AI_HANDLER] Executing tool: {tool_name} with input: {tool_input}")
+                logger.info(f"[Tool Loop] Executing: {tool_name}")
                 tool_calls_made.append({
                     'tool': tool_name,
                     'input': tool_input
@@ -5066,11 +5116,16 @@ def get_landscaper_response(
 
                 # Execute the tool
                 try:
+                    tool_exec_start = time.time()
                     result = tool_executor(
                         tool_name=tool_name,
                         tool_input=tool_input,
                         project_id=project_context.get('project_id')
                     )
+                    tool_exec_time = time.time() - tool_exec_start
+                    result_str = _truncate_tool_result(result)
+
+                    logger.info(f"[Tool Loop] {tool_name} completed in {tool_exec_time:.1f}s, result: {len(result_str)} chars")
 
                     # Track field updates
                     if tool_name in ('update_project_field', 'bulk_update_fields'):
@@ -5119,7 +5174,7 @@ def get_landscaper_response(
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tool_id,
-                        "content": str(result)
+                        "content": result_str
                     })
 
                     # Track tool execution for frontend mutation events
@@ -5130,7 +5185,7 @@ def get_landscaper_response(
                         'result': _sanitize_for_json(result)
                     })
                 except Exception as e:
-                    logger.error(f"Tool execution error: {e}")
+                    logger.error(f"[Tool Loop] {tool_name} failed: {e}")
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tool_id,
@@ -5155,6 +5210,9 @@ def get_landscaper_response(
             })
 
             # Get next response
+            total_msg_chars = sum(len(str(m.get('content', ''))) for m in claude_messages)
+            logger.info(f"[Tool Loop] Sending continuation to Claude: {len(claude_messages)} messages, ~{total_msg_chars} chars")
+
             response = client.messages.create(**{
                 **api_kwargs,
                 'messages': claude_messages
@@ -5162,11 +5220,43 @@ def get_landscaper_response(
 
             total_input_tokens += response.usage.input_tokens
             total_output_tokens += response.usage.output_tokens
+            logger.info(f"[Tool Loop] Continuation response: stop_reason={response.stop_reason}, tokens={response.usage.output_tokens}")
+
+        # If loop broke early, make one final call WITHOUT tools to get a summary
+        if loop_broke_early and tool_executor:
+            logger.info("[Tool Loop] Making final summary call (no tools)")
+            claude_messages.append({
+                "role": "assistant",
+                "content": response.content
+            })
+            claude_messages.append({
+                "role": "user",
+                "content": "Tool call limit reached. Please summarize what was accomplished with the information gathered so far. Do not call any more tools."
+            })
+            try:
+                summary_kwargs = {k: v for k, v in api_kwargs.items() if k != 'tools'}
+                summary_kwargs['messages'] = claude_messages
+                response = client.messages.create(**summary_kwargs)
+                total_input_tokens += response.usage.input_tokens
+                total_output_tokens += response.usage.output_tokens
+            except Exception as e:
+                logger.error(f"[Tool Loop] Final summary call failed: {e}")
 
         # Extract final text content
         for block in response.content:
             if hasattr(block, 'text'):
                 final_content += block.text
+
+        total_elapsed = time.time() - tool_loop_start
+        logger.info(f"[Tool Loop] Complete: {tool_iteration} iterations, {total_elapsed:.1f}s total, {len(tool_calls_made)} tool calls")
+
+        # Check if response was truncated due to max_tokens limit
+        if response.stop_reason == "max_tokens":
+            logger.warning(f"[AI_HANDLER] Response truncated by max_tokens ({MAX_TOKENS}). Output tokens used: {total_output_tokens}")
+            final_content += (
+                "\n\n---\n⚠️ My response was too long and got cut off. "
+                "Try breaking this into smaller steps (e.g., \"update units 100–110 first\")."
+            )
 
         return {
             'content': final_content,

@@ -10492,7 +10492,7 @@ def get_project_documents(
 def get_document_content(
     doc_id: int,
     project_id: int,
-    max_length: int = 15000,  # Reduced from 50K to prevent token explosion
+    max_length: int = 40000,
     focus: str = None,
     doc_type: str = None,
     doc_name: str = None
@@ -10503,13 +10503,14 @@ def get_document_content(
     The content comes from the extracted_data JSONB field in dms_extract_queue,
     which contains the structured extraction result.
 
-    IMPORTANT: max_length is capped at 15K chars (~3-4K tokens) to prevent
-    the tool loop from timing out due to massive context windows.
+    max_length is capped at 40K chars (~10K tokens). This is safe because
+    _truncate_tool_result() in ai_handler.py will truncate before sending
+    to Claude if needed.
 
     Args:
         doc_id: Document ID to retrieve content from
         project_id: Project ID for authorization check
-        max_length: Maximum characters to return (capped at 15000)
+        max_length: Maximum characters to return (capped at 40000)
         focus: Optional focus area to prioritize:
             - "rental_comps": Prioritize rental comparable sections
             - "operating_expenses": Prioritize T-12 / expense sections
@@ -10518,8 +10519,8 @@ def get_document_content(
     Returns:
         Dict with document metadata and extracted content
     """
-    # Hard cap to prevent token explosion in tool loops
-    max_length = min(max_length, 15000)
+    # Cap to prevent runaway output; _truncate_tool_result() provides secondary safety net
+    max_length = min(max_length, 40000)
     import json
     try:
         with connection.cursor() as cursor:
@@ -10669,33 +10670,39 @@ def get_document_content(
                         else:
                             content_parts.append(f"- {ut}")
 
-                # Units
+                # Units — show ALL units so Landscaper can process the full rent roll
                 if 'units' in extracted_data and extracted_data['units']:
                     content_parts.append(f"\n## Units ({len(extracted_data['units'])} total)")
-                    for unit in extracted_data['units'][:10]:  # First 10 units
+                    content_parts.append("Unit | Bed | Bath | SqFt | Status")
+                    content_parts.append("--- | --- | --- | --- | ---")
+                    for unit in extracted_data['units']:
                         if isinstance(unit, dict):
                             unit_num = unit.get('unit_number', '?')
-                            sqft = unit.get('sqft', unit.get('square_feet', '?'))
-                            content_parts.append(f"- Unit {unit_num}: {sqft} sqft")
+                            beds = unit.get('bedroom_count', unit.get('bedrooms', ''))
+                            baths = unit.get('bathroom_count', unit.get('bathrooms', ''))
+                            sqft = unit.get('sqft', unit.get('square_feet', ''))
+                            stat = unit.get('status', unit.get('occupancy_status', ''))
+                            content_parts.append(f"{unit_num} | {beds} | {baths} | {sqft} | {stat}")
                         else:
                             content_parts.append(f"- {unit}")
-                    if len(extracted_data['units']) > 10:
-                        content_parts.append(f"... and {len(extracted_data['units']) - 10} more units")
 
-                # Leases
+                # Leases — show ALL leases so Landscaper can process the full rent roll
                 if 'leases' in extracted_data and extracted_data['leases']:
                     content_parts.append(f"\n## Leases ({len(extracted_data['leases'])} total)")
-                    for lease in extracted_data['leases'][:10]:  # First 10 leases
+                    content_parts.append("Unit | Tenant | Rent | Start | End | Type")
+                    content_parts.append("--- | --- | --- | --- | --- | ---")
+                    for lease in extracted_data['leases']:
                         if isinstance(lease, dict):
                             unit_num = lease.get('unit_number', '?')
                             rent = lease.get('base_rent_monthly', lease.get('monthly_rent', '?'))
                             tenant = lease.get('resident_name', lease.get('tenant_name', ''))
                             rent_str = f"${rent:,.0f}" if isinstance(rent, (int, float)) else rent
-                            content_parts.append(f"- Unit {unit_num}: {rent_str}/mo {tenant}")
+                            start = lease.get('lease_start_date', '')
+                            end = lease.get('lease_end_date', '')
+                            ltype = lease.get('lease_type', '')
+                            content_parts.append(f"{unit_num} | {tenant} | {rent_str} | {start} | {end} | {ltype}")
                         else:
                             content_parts.append(f"- {lease}")
-                    if len(extracted_data['leases']) > 10:
-                        content_parts.append(f"... and {len(extracted_data['leases']) - 10} more leases")
 
                 # Extraction metadata
                 if 'extraction_metadata' in extracted_data:

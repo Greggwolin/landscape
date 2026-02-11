@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Landscaper Stability & Rent Roll Visibility (Feb 10, 2026)',
+      path: '/docs/09-session-notes/2026-02-10-landscaper-stability-and-rent-roll-visibility.md',
+      category: 'AI',
+      description: 'Landscaper tool hang fix (truncation, loop limits, batch SQL), document extraction truncation fix (full rent roll visibility), dynamic columns in Configure Columns modal, auto-refresh after mutations, floor plan editable',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-10'
+    },
+    {
       title: 'Folder-Tabs UI Overhaul (Feb 8, 2026)',
       path: '/docs/09-session-notes/2026-02-08-folder-tabs-ui-overhaul.md',
       category: 'Component',

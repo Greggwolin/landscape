@@ -469,7 +469,7 @@ export function LandscaperChatThreaded({
           ))
         )}
 
-        {error && !isLoading && (
+        {error && (
           <div
             className="rounded border px-3 py-2 small"
             style={{
