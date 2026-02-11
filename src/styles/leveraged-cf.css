@@ -120,14 +120,12 @@
 
 .leveraged-cf-grid .reversion-value {
   cursor: pointer;
-  border-bottom: 1px dotted var(--cui-primary);
-  color: var(--cui-primary);
-  padding-bottom: 1px;
+  text-decoration: underline;
+  color: var(--cui-link-color);
 }
 
 .leveraged-cf-grid .reversion-value:hover {
-  color: var(--cui-primary-emphasis);
-  border-bottom-style: solid;
+  color: var(--cui-link-hover-color);
 }
 
 /* Zebra striping for data rows (not special rows) */

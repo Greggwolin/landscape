@@ -19,6 +19,7 @@ from .media_views import (
     scan_document_media,
     extract_document_media,
     classify_document_media,
+    reclassify_document_media,
     list_document_media,
     submit_media_actions,
     media_links,
@@ -53,6 +54,7 @@ urlpatterns = [
     path('documents/<int:doc_id>/media/scan/', scan_document_media, name='scan_document_media'),
     path('documents/<int:doc_id>/media/extract/', extract_document_media, name='extract_document_media'),
     path('documents/<int:doc_id>/media/classify/', classify_document_media, name='classify_document_media'),
+    path('documents/<int:doc_id>/media/reclassify/', reclassify_document_media, name='reclassify_document_media'),
     path('documents/<int:doc_id>/media/actions/', submit_media_actions, name='submit_media_actions'),
     # Media entity linking endpoints
     path('media/links/', media_links, name='media_links'),

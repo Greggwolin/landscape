@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilLayers, cilTrash, cilActionRedo } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
@@ -431,66 +432,44 @@ export default function DMSView({
       <div className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
         <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
           <div className="px-3 lg:px-4 py-4 lg:py-6">
-            <div
-              className="rounded-lg border shadow-sm overflow-hidden"
-              style={{
-                borderColor: 'var(--cui-border-color)',
-                backgroundColor: 'var(--cui-card-bg)'
-              }}
-            >
-              <button
-                className="w-full px-4 py-3 text-left"
-                style={{ color: 'var(--cui-body-color)', backgroundColor: 'var(--cui-card-bg)' }}
+            <CCard className="mb-3 shadow-sm">
+              <CCardHeader
                 onClick={() => setPanelExpanded((prev) => !prev)}
-                aria-expanded={panelExpanded}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                className="d-flex align-items-center justify-content-between py-2"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5" style={{ color: 'var(--cui-secondary-color)' }}>
-                      {panelExpanded ? '▾' : '▸'}
-                    </span>
-                    <div>
-                      <div className="text-xs font-semibold uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-                        Project Documents
-                      </div>
-                      <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                        {projectName}
-                      </div>
-                      <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                        Filtered to project #{projectId} • {totalItemCount} items
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <a
-                      href="/dms"
-                      className="px-3 py-2 rounded border transition-colors"
-                      style={{
-                        borderColor: 'var(--cui-border-color)',
-                        color: 'var(--cui-primary)'
-                      }}
-                    >
-                      Open Global DMS
-                    </a>
-                    <a
-                      href={`/projects/${projectId}/documents?tab=upload`}
-                      className="px-3 py-2 rounded text-white"
-                      style={{ backgroundColor: 'var(--cui-primary)' }}
-                    >
-                      Upload Documents
-                    </a>
-                  </div>
+                <div className="d-flex align-items-center gap-2">
+                  <span style={{ fontSize: '0.75rem', transition: 'transform 0.2s', transform: panelExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                  <strong>Project Documents</strong>
+                  <span className="text-body-secondary" style={{ fontSize: '0.8rem' }}>
+                    {totalItemCount} items
+                  </span>
                 </div>
-              </button>
-
+                <div className="d-flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <a
+                    href="/dms"
+                    className="px-3 py-1 rounded border transition-colors"
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      color: 'var(--cui-primary)',
+                      fontSize: '0.85rem',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Open Global DMS
+                  </a>
+                  <a
+                    href={`/projects/${projectId}/documents?tab=upload`}
+                    className="px-3 py-1 rounded text-white"
+                    style={{ backgroundColor: 'var(--cui-primary)', fontSize: '0.85rem', textDecoration: 'none' }}
+                  >
+                    Upload Documents
+                  </a>
+                </div>
+              </CCardHeader>
               {panelExpanded && (
-                <div
-                  className="border-t"
-                  style={{
-                    borderColor: 'var(--cui-border-color)',
-                    backgroundColor: 'var(--cui-body-bg)'
-                  }}
-                >
+                <CCardBody className="p-0">
+                  <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                   {/* Breadcrumb */}
                   <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
                     <div className="flex items-center gap-2 text-sm">
@@ -505,10 +484,10 @@ export default function DMSView({
                   </div>
 
                   {/* Toolbar */}
-                  <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-                    <div className="flex items-center gap-4">
-                      <button style={{ color: 'var(--cui-primary)' }}>🔻</button>
-                      <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                  <div className="px-4 py-1 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                    <div className="flex items-center gap-3">
+                      <button style={{ color: 'var(--cui-primary)', fontSize: '0.75rem' }}>🔻</button>
+                      <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>
                         {viewingTrash ? `${trashCount} in trash` : `${totalItemCount} items`} | {selectedDocIds.size} selected
                       </span>
 
@@ -733,9 +712,10 @@ export default function DMSView({
                       </>
                     )}
                   </div>
-                </div>
+                  </div>
+                </CCardBody>
               )}
-            </div>
+            </CCard>
           </div>
         </div>
       </div>

@@ -155,6 +155,7 @@ class IncomePropertyCashFlowService:
             'sections': sections,
             'summary': summary,
             'exitAnalysis': exit_analysis_response,
+            'reversion': self._build_reversion_response(exit_analysis_response),
             'generatedAt': date.today().isoformat(),
         }
 
@@ -720,6 +721,49 @@ class IncomePropertyCashFlowService:
             for i in range(period_count)
             if period_totals[i] != 0
         ]
+
+    @staticmethod
+    def _build_reversion_response(exit_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Provide a normalized reversion payload in snake_case while preserving
+        the legacy exitAnalysis object used by existing frontend code.
+        """
+        is_value_add = bool(exit_analysis.get('isValueAdd'))
+        exit_month = int(exit_analysis.get('holdPeriodMonths') or 0)
+
+        # Non-value-add uses grossReversionPrice in the legacy payload.
+        stabilized_value = float(
+            exit_analysis.get('stabilizedValue')
+            if is_value_add
+            else exit_analysis.get('grossReversionPrice', 0)
+            or 0
+        )
+        adjusted_exit_value = float(
+            exit_analysis.get('adjustedExitValue')
+            if is_value_add
+            else exit_analysis.get('grossReversionPrice', 0)
+            or 0
+        )
+
+        return {
+            'exit_month': exit_month,
+            'forward_stabilized_noi': float(
+                exit_analysis.get('forwardStabilizedNOI')
+                if is_value_add
+                else exit_analysis.get('terminalNOI', 0)
+                or 0
+            ),
+            'exit_cap_rate': float(exit_analysis.get('exitCapRate', 0) or 0),
+            'stabilized_value': stabilized_value,
+            'pending_reno_offset': float(
+                exit_analysis.get('pendingRenoOffset', 0) or 0
+            ) if is_value_add else 0.0,
+            'adjusted_exit_value': adjusted_exit_value,
+            'selling_costs': float(exit_analysis.get('sellingCosts', 0) or 0),
+            'selling_costs_pct': float(exit_analysis.get('sellingCostsPct', 0) or 0),
+            'net_reversion': float(exit_analysis.get('netReversion', 0) or 0),
+            'is_value_add': is_value_add,
+        }
 
     # =========================================================================
     # FINANCING SECTION

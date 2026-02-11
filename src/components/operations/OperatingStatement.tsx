@@ -324,16 +324,16 @@ function DroppableParentRow({
           </span>
         </span>
         {isOver && canDrop && <span className="ops-drop-hint">Drop here</span>}
-        {hasSelectedChildren && (
-          <div className="ops-category-actions">
-            <button
-              type="button"
-              className="ops-action-btn ops-action-add"
-              onClick={(e) => { e.stopPropagation(); onAddClick(); }}
-              title="Add expense item"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-            </button>
+        <div className="ops-category-actions">
+          <button
+            type="button"
+            className="ops-action-btn ops-action-add"
+            onClick={(e) => { e.stopPropagation(); onAddClick(); }}
+            title="Add expense item"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+          </button>
+          {hasSelectedChildren && (
             <button
               type="button"
               className="ops-action-btn ops-action-delete"
@@ -342,8 +342,8 @@ function DroppableParentRow({
             >
               <MinusIcon className="w-3.5 h-3.5" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       <div className="ops-cell num"></div>
       <div className="ops-cell num">
@@ -555,11 +555,15 @@ export function OperatingStatement({
     const fetchCategories = async () => {
       setIsLoadingCategories(true);
       try {
-        const response = await fetch(`/api/opex/categories?include_all=true`);
+        // Fetch subcategories filtered by parent category so the picklist
+        // only shows line items relevant to the selected expense group
+        const response = await fetch(
+          `/api/lookups/opex-categories?parent_category=${encodeURIComponent(addingToCategory)}&flat=true`
+        );
         if (response.ok) {
           const data = await response.json();
-          // Filter to relevant expense categories
-          setCategoryOptions(data.categories || []);
+          // Lookup endpoint returns flat array directly
+          setCategoryOptions(Array.isArray(data) ? data : []);
         }
       } catch (error) {
         console.error('Failed to fetch categories:', error);
@@ -804,26 +808,6 @@ export function OperatingStatement({
             <div className="ops-cell ops-header-cell num">Loss to Lease</div>
             <div className="ops-cell ops-header-cell num ops-col-post">Post-Reno</div>
             <div className="ops-cell ops-header-cell num ops-col-reno">Reno Total</div>
-          </div>
-
-          <div className="ops-row ops-section-row ops-income-header">
-            <div className="ops-cell ops-section-cell">
-              <div className="ops-section-heading">
-                <span className="ops-section-label">
-                  Rental Income
-                  <span className="ops-section-tooltip">
-                    {hasDetailedRentRoll ? 'from Rent Roll' : 'from Floor Plan Matrix'}
-                  </span>
-                </span>
-              </div>
-            </div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill ops-col-post"></div>
-            <div className="ops-cell ops-section-fill ops-col-reno"></div>
           </div>
 
           {rentalRows.map((row) => {

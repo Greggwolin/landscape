@@ -343,7 +343,9 @@ class MediaClassificationService:
         if width < 200 and height < 200:
             return 'logo', 0.65
 
-        # Rule 2: Page captures are likely maps or plans
+        # Rule 2: Page captures with strong keyword signals → maps or plans
+        # Only match when specific keywords are present; unmatched page captures
+        # fall through to Rules 3-6 for dimension/content-based classification
         if method == 'page_capture':
             text_lower = nearby_text.lower() if nearby_text else ''
             if any(kw in text_lower for kw in ['zoning', 'zone', 'cr-', 'cb-', 'mu-', 'r-1', 'r-2', 'c-1', 'c-2']):
@@ -352,12 +354,11 @@ class MediaClassificationService:
                 return 'site_plan', 0.60
             if any(kw in text_lower for kw in ['floor plan', 'floorplan', 'unit plan', 'unit layout']):
                 return 'floor_plan', 0.60
-            if any(kw in text_lower for kw in ['aerial', 'satellite', 'location', 'submarket', 'vicinity']):
-                return 'aerial_map', 0.55
             if any(kw in text_lower for kw in ['chart', 'graph', 'trend', 'historical', 'comparison', 'summary']):
                 return 'chart', 0.50
-            # Default for page captures with lots of content
-            return 'planning_map', 0.45
+            if any(kw in text_lower for kw in ['master plan', 'planning area', 'land use plan', 'density']):
+                return 'planning_map', 0.55
+            # No strong keyword match — fall through to dimension-based rules
 
         # Rule 3: Very wide/panoramic images are likely aerial photos
         if width > 1000 and height > 0 and (width / height) > 2.5:

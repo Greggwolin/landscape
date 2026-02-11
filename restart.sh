@@ -17,22 +17,36 @@ echo "🚀 Starting Django backend..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Start Django in background (logs to backend/logs/django.log)
+# Start Django in detached background (logs to backend/logs/django.log)
 cd backend
 mkdir -p logs
 source venv/bin/activate
-python manage.py runserver 8000 >> logs/django.log 2>&1 &
+nohup python manage.py runserver 8000 >> logs/django.log 2>&1 &
 
 echo "✅ Django running on http://localhost:8000"
 echo ""
 echo "🚀 Starting Next.js frontend..."
 
-# Start Next.js in background (back to project root)
+# Start Next.js in detached background (back to project root)
 cd "$SCRIPT_DIR"
-npm run dev > /dev/null 2>&1 &
+nohup npm run dev > /dev/null 2>&1 &
 
 echo "✅ Next.js running on http://localhost:3000"
 echo ""
 echo "🎉 All servers are running!"
 echo "   Frontend: http://localhost:3000"
 echo "   Backend:  http://localhost:8000"
+
+# Quick readiness check (best effort)
+sleep 2
+if curl -s "http://127.0.0.1:8000/" > /dev/null 2>&1; then
+  echo "✅ Backend health check passed"
+else
+  echo "⚠️  Backend not reachable yet (may still be starting)"
+fi
+
+if curl -s "http://127.0.0.1:3000/" > /dev/null 2>&1; then
+  echo "✅ Frontend health check passed"
+else
+  echo "⚠️  Frontend not reachable yet (may still be starting)"
+fi

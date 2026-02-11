@@ -49,7 +49,7 @@ export function RentalIncomeSection({
   const roundToNearest5 = (value: number): number => Math.round(value / 5) * 5;
   const usePremiumCalc = valueAddEnabled && rentPremiumPct !== undefined && rentPremiumPct !== null;
 
-  // Calculate totals for current rent, market rent (for LTL calc), and loss to lease
+  // Calculate totals for current rent, post-reno rent, and loss to lease
   const totals = rows.reduce(
     (acc, row) => {
       const count = row.as_is.count || 0;
@@ -57,14 +57,16 @@ export function RentalIncomeSection({
       const marketRate = row.as_is.market_rate || currentRate;
       const currentTotal = row.as_is.total || 0;
       const marketTotal = row.as_is.market_total || currentTotal;
-      // Loss to Lease = (Market Annual - Current Annual) per unit type
-      const lossToLease = marketTotal - currentTotal;
       const postRenoRate = usePremiumCalc
         ? roundToNearest5(currentRate * (1 + rentPremiumPct))
         : (row.post_reno?.rate || marketRate);
       const postRenoTotal = usePremiumCalc
         ? postRenoRate * count * 12
         : (row.post_reno?.total || marketTotal);
+      // Loss to Lease: when value-add enabled, use post-reno spread; otherwise market spread
+      const lossToLease = usePremiumCalc
+        ? postRenoTotal - currentTotal
+        : marketTotal - currentTotal;
 
       return {
         current_total: acc.current_total + currentTotal,
@@ -120,21 +122,23 @@ export function RentalIncomeSection({
             const marketRate = row.as_is.market_rate || currentRate;
             const currentTotal = row.as_is.total || 0;
             const marketTotal = row.as_is.market_total || currentTotal;
-            // Loss to Lease = Market Annual - Current Annual for this unit type
-            const lossToLease = marketTotal - currentTotal;
             const postRenoRate = usePremiumCalc
               ? roundToNearest5(currentRate * (1 + rentPremiumPct))
               : (row.post_reno?.rate || marketRate);
             const postRenoTotal = usePremiumCalc
               ? postRenoRate * (row.as_is.count || 0) * 12
               : (row.post_reno?.total || marketTotal);
+            // Loss to Lease: when value-add enabled, use post-reno spread; otherwise market spread
+            const lossToLease = usePremiumCalc
+              ? postRenoTotal - currentTotal
+              : marketTotal - currentTotal;
 
             return (
               <tr key={row.line_item_key}>
                 <td>{row.label}</td>
                 <td className="num">{row.as_is.count ?? '—'}</td>
                 <td className="num ops-calc">
-                  <span className="text-sm font-medium">{formatCurrency(currentRate)}</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{formatCurrency(currentRate)}</span>
                 </td>
                 <td className="num ops-calc">{formatPerSF(row.as_is.per_sf)}</td>
                 <td className="num ops-calc">{formatCurrency(currentTotal)}</td>

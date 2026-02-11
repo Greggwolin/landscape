@@ -805,14 +805,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const replacementReserves = reservesPerUnit * unitCount;
 
     // Create calculated expense rows for Management Fee and Replacement Reserves
+    // NOTE: is_calculated must be false so the UI renders these as flat child rows,
+    // not as collapsible parent/accordion rows. is_readonly prevents editing.
     const calculatedExpenseRows = [
       {
         line_item_key: 'calculated_management_fee',
         label: `Management Fee (${(managementFeePct * 100).toFixed(1)}%)`,
         level: 1,
-        is_calculated: true,
+        is_calculated: false,
         is_readonly: true,
-        parent_category: 'management',
+        is_percentage: true,
+        parent_category: 'management_reserves',
         calculation_base: 'egi',
         as_is: {
           rate: managementFeePct,
@@ -829,9 +832,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         line_item_key: 'calculated_replacement_reserves',
         label: `Replacement Reserves ($${reservesPerUnit.toFixed(0)}/unit)`,
         level: 1,
-        is_calculated: true,
+        is_calculated: false,
         is_readonly: true,
-        parent_category: 'reserves',
+        parent_category: 'management_reserves',
         as_is: {
           rate: reservesPerUnit,
           total: replacementReserves
@@ -979,14 +982,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const coaReplacementReserves = coaReservesPerUnit * unitCount;
 
     // Create calculated expense rows for Management Fee and Replacement Reserves
+    // NOTE: is_calculated must be false so the UI renders these as flat child rows,
+    // not as collapsible parent/accordion rows. is_readonly prevents editing.
     const coaCalculatedExpenseRows = [
       {
         line_item_key: 'calculated_management_fee',
         label: `Management Fee (${(coaManagementFeePct * 100).toFixed(1)}%)`,
         level: 1,
-        is_calculated: true,
+        is_calculated: false,
         is_readonly: true,
-        parent_category: 'management',
+        is_percentage: true,
+        parent_category: 'management_reserves',
         calculation_base: 'egi',
         as_is: {
           rate: coaManagementFeePct,
@@ -1003,9 +1009,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         line_item_key: 'calculated_replacement_reserves',
         label: `Replacement Reserves ($${coaReservesPerUnit.toFixed(0)}/unit)`,
         level: 1,
-        is_calculated: true,
+        is_calculated: false,
         is_readonly: true,
-        parent_category: 'reserves',
+        parent_category: 'management_reserves',
         as_is: {
           rate: coaReservesPerUnit,
           total: coaReplacementReserves

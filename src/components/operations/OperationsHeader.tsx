@@ -9,8 +9,6 @@ interface OperationsHeaderProps {
   totalSF: number;
   isSaving?: boolean;
   isDirty?: boolean;
-  valueAddEnabled?: boolean;
-  onValueAddToggle?: () => void;
   onSave?: () => void;
 }
 
@@ -25,26 +23,12 @@ export function OperationsHeader({
   totalSF,
   isSaving = false,
   isDirty = false,
-  valueAddEnabled = false,
-  onValueAddToggle,
   onSave
 }: OperationsHeaderProps) {
   return (
     <CCardHeader className="ops-header d-flex justify-content-between align-items-center">
       <span className="fw-semibold">Operating Statement · {projectName}</span>
       <div className="ops-header-right">
-        {/* Value-Add Toggle */}
-        <div className="ops-header-toggle">
-          <button
-            type="button"
-            className={`va-toggle-compact ${valueAddEnabled ? 'on' : ''}`}
-            onClick={onValueAddToggle}
-            aria-pressed={valueAddEnabled}
-          >
-            <span className="va-toggle-slider" />
-          </button>
-          <span className="va-toggle-label">Value-Add</span>
-        </div>
         <div className="ops-header-pills">
           <span className="ops-pill">
             Units: <b>{unitCount.toLocaleString()}</b>

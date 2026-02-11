@@ -208,6 +208,69 @@ def classify_document_media(request, doc_id):
         )
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reclassify_document_media(request, doc_id):
+    """
+    POST /api/dms/documents/{doc_id}/media/reclassify/
+
+    Resets existing classifications and re-runs classification.
+    Useful when the classifier has been improved and old labels need updating.
+
+    Body:
+        { "strategy": "auto" }   — auto (default): heuristic + AI vision
+
+    Returns:
+        Classification summary with breakdown by type and action.
+    """
+    try:
+        from apps.knowledge.services.media_classification_service import MediaClassificationService
+
+        strategy = request.data.get('strategy', 'auto') if request.data else 'auto'
+        if strategy not in ('auto', 'ai_vision', 'heuristic'):
+            return Response(
+                {'error': f"Invalid strategy '{strategy}'. Use 'auto', 'ai_vision', or 'heuristic'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Reset existing classifications so they get re-processed
+        with connection.cursor() as c:
+            c.execute("""
+                UPDATE landscape.core_doc_media
+                SET classification_id = NULL,
+                    ai_classification = NULL,
+                    ai_confidence = NULL,
+                    suggested_action = NULL,
+                    status = 'extracted',
+                    updated_at = NOW()
+                WHERE doc_id = %s
+                  AND deleted_at IS NULL
+                  AND status IN ('classified', 'verified')
+                  AND storage_uri IS NOT NULL
+                  AND storage_uri != ''
+            """, [doc_id])
+            reset_count = c.rowcount
+
+        logger.info(f"[doc_id={doc_id}] Reset {reset_count} classifications for re-classify")
+
+        # Re-run classification
+        svc = MediaClassificationService()
+        result = svc.classify_document_media(doc_id, strategy=strategy)
+
+        return Response({
+            'success': True,
+            'reset_count': reset_count,
+            **result,
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception(f"Media reclassification failed for doc_id={doc_id}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_document_media(request, doc_id):

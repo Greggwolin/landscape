@@ -112,6 +112,8 @@ interface DisplayRow {
   showSign?: boolean;
   loanId?: number;
   loanName?: string;
+  valueFormat?: 'currency' | 'percent';
+  showDashForZero?: boolean;
 }
 
 /* ---------- Props ---------- */
@@ -135,6 +137,10 @@ function formatLCFCurrency(value: number): string {
   const formatted = new Intl.NumberFormat('en-US', opts).format(abs);
   if (value < 0) return `(${formatted})`;
   return formatted;
+}
+
+function formatLCFPercent(value: number): string {
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 function toNumber(value: unknown): number {
@@ -494,58 +500,71 @@ export default function LeveragedCashFlow({
         reversionValues[reversionValues.length - 1] = exitAnalysis.netReversion;
       }
 
+      const terminalValue = (value: number): number[] => {
+        const values = new Array(hdrs.length).fill(0);
+        if (values.length > 0) {
+          values[values.length - 1] = value;
+        }
+        return values;
+      };
+
       if (exitAnalysis.isValueAdd) {
         // Value-add: show expanded reversion breakdown
         displayRows.push({
-          label: 'Reversion (Exit Analysis)',
+          label: `Reversion (Exit Month ${exitAnalysis.holdPeriodMonths || totalPeriods})`,
           rowType: 'section-header',
           values: zeroesAgg,
         });
 
-        // These are info rows showing the calculation, not cash flows
         displayRows.push({
-          label: `Forward Stabilized NOI`,
-          rowType: 'info',
-          values: [],
+          label: 'Forward Stabilized NOI',
+          rowType: 'indent',
+          values: terminalValue(exitAnalysis.forwardStabilizedNOI || 0),
+          showDashForZero: true,
         });
 
         displayRows.push({
-          label: `Stabilized Value @ ${((exitAnalysis.exitCapRate || 0) * 100).toFixed(2)}% Cap`,
-          rowType: 'info',
-          values: [],
+          label: 'Exit Cap Rate',
+          rowType: 'indent',
+          values: terminalValue(exitAnalysis.exitCapRate || 0),
+          valueFormat: 'percent',
+          showDashForZero: true,
+        });
+
+        displayRows.push({
+          label: 'Stabilized Value',
+          rowType: 'indent',
+          values: terminalValue(exitAnalysis.stabilizedValue || 0),
+          showDashForZero: true,
         });
 
         // Pending Reno Offset — clickable row with value in last period
-        const pendingOffsetValues = new Array(hdrs.length).fill(0);
-        if (pendingOffsetValues.length > 0 && exitAnalysis.pendingRenoOffset) {
-          pendingOffsetValues[pendingOffsetValues.length - 1] = -exitAnalysis.pendingRenoOffset;
-        }
         displayRows.push({
           label: 'Less: Pending Reno Offset',
           rowType: 'reversion', // Will be clickable
-          values: pendingOffsetValues,
+          values: terminalValue(-(exitAnalysis.pendingRenoOffset || 0)),
+          showDashForZero: true,
         });
 
         displayRows.push({
           label: 'Adjusted Exit Value',
-          rowType: 'info',
-          values: [],
+          rowType: 'indent',
+          values: terminalValue(exitAnalysis.adjustedExitValue || 0),
+          showDashForZero: true,
         });
 
-        const sellingCostsValues = new Array(hdrs.length).fill(0);
-        if (sellingCostsValues.length > 0) {
-          sellingCostsValues[sellingCostsValues.length - 1] = -exitAnalysis.sellingCosts;
-        }
         displayRows.push({
           label: `Less: Selling Costs (${((exitAnalysis.sellingCostsPct || 0) * 100).toFixed(1)}%)`,
           rowType: 'indent',
-          values: sellingCostsValues,
+          values: terminalValue(-(exitAnalysis.sellingCosts || 0)),
+          showDashForZero: true,
         });
 
         displayRows.push({
           label: 'Net Reversion',
           rowType: 'subtotal',
           values: reversionValues,
+          showDashForZero: true,
         });
       } else {
         // Standard: single reversion row
@@ -553,6 +572,7 @@ export default function LeveragedCashFlow({
           label: 'Net Sale Proceeds (before Loan Payoff)',
           rowType: 'reversion',
           values: reversionValues,
+          showDashForZero: true,
         });
       }
     }
@@ -715,12 +735,11 @@ export default function LeveragedCashFlow({
         values: [],
       });
 
-      // Grand Total row: Net CF + Reversion in final period
+      // Grand Total row: Net CF + Net Reversion in final period
       if (netCFRow && netCFRow.values.length > 0) {
-        const reversionRow = displayRows.find((r) => r.rowType === 'reversion');
         const grandTotalValues = netCFRow.values.map((ncf, i) => {
           if (i === aggPeriodCount - 1) {
-            return ncf + (reversionRow?.values[i] || 0);
+            return ncf + (exitAnalysis.netReversion || 0);
           }
           return ncf;
         });
@@ -915,7 +934,7 @@ export default function LeveragedCashFlow({
                     <td>{row.label}</td>
                     <td>{row.time0Value ? formatLCFCurrency(row.time0Value) : '—'}</td>
                     {row.values.map((val, colIdx) => {
-                      if (val === 0) {
+                      if (row.showDashForZero && val === 0) {
                         return <td key={colIdx}>—</td>;
                       }
                       return (
@@ -929,7 +948,7 @@ export default function LeveragedCashFlow({
                               if (e.key === 'Enter' || e.key === ' ') handleClick();
                             }}
                           >
-                            {formatLCFCurrency(val)}
+                            {row.valueFormat === 'percent' ? formatLCFPercent(val) : formatLCFCurrency(val)}
                           </span>
                         </td>
                       );
@@ -1004,7 +1023,11 @@ export default function LeveragedCashFlow({
                       <td key={colIdx} className={signClass}>
                         {val === 0 && row.rowType === 'net-cf' && !hasAnyIncomeData
                           ? '—'
-                          : formatLCFCurrency(val)}
+                          : row.showDashForZero && val === 0
+                            ? '—'
+                            : row.valueFormat === 'percent'
+                              ? formatLCFPercent(val)
+                              : formatLCFCurrency(val)}
                       </td>
                     );
                   })}
@@ -1134,7 +1157,7 @@ export default function LeveragedCashFlow({
       />
 
       <PendingRenoOffsetModal
-        projectId={projectId}
+        projectId={Number.isFinite(Number(projectId)) ? Number(projectId) : 0}
         exitMonth={exitAnalysis?.holdPeriodMonths || 48}
         pendingRenoOffset={exitAnalysis?.pendingRenoOffset || 0}
         visible={showPendingRenoModal}

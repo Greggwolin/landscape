@@ -1198,7 +1198,7 @@
 
 .va-panel-header {
   padding: 0.65rem 0.75rem;
-  background: #F0F1F2;
+  background: var(--cui-secondary-bg);
   border-bottom: 1px solid var(--cui-border-color);
 }
 

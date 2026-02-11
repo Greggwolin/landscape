@@ -12,7 +12,7 @@ import {
 } from '@coreui/react';
 
 interface PendingRenoOffsetModalProps {
-  projectId: string;
+  projectId: number;
   exitMonth: number;
   pendingRenoOffset: number;
   visible: boolean;
@@ -67,12 +67,17 @@ function formatCurrency(value: number): string {
   }).format(value || 0);
 }
 
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US').format(value || 0);
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
     'RENOVATED': 'success',
     'RELET_LAG': 'warning',
     'IN_PROGRESS': 'info',
     'ORIGINAL': 'secondary',
+    'NOT_STARTED': 'secondary',
   };
 
   const labelMap: Record<string, string> = {
@@ -80,6 +85,7 @@ function StatusBadge({ status }: { status: string }) {
     'RELET_LAG': 'Relet Lag',
     'IN_PROGRESS': 'In Construction',
     'ORIGINAL': 'Not Started',
+    'NOT_STARTED': 'Not Started',
   };
 
   return (
@@ -130,9 +136,43 @@ export default function PendingRenoOffsetModal({
     fetchData();
   }, [visible, projectId, exitMonth]);
 
+  const sortedUnitDetail = React.useMemo(() => {
+    if (!data) return [];
+    return [...data.unit_detail].sort((a, b) => {
+      if (a.reno_start_month !== b.reno_start_month) {
+        return a.reno_start_month - b.reno_start_month;
+      }
+      return (a.unit_number || '').localeCompare(b.unit_number || '');
+    });
+  }, [data]);
+
+  const unitTotals = React.useMemo(() => {
+    return sortedUnitDetail.reduce(
+      (acc, unit) => {
+        acc.reno += unit.remaining_reno_cost || 0;
+        acc.vacancy += unit.remaining_vacancy_loss || 0;
+        acc.relocation += unit.remaining_relocation || 0;
+        acc.total += unit.total_remaining || 0;
+        return acc;
+      },
+      { reno: 0, vacancy: 0, relocation: 0, total: 0 }
+    );
+  }, [sortedUnitDetail]);
+
+  const categoryTotal = React.useMemo(() => {
+    if (!data) return 0;
+    return data.by_category.reduce((sum, cat) => sum + (cat.amount || 0), 0);
+  }, [data]);
+
   return (
     <CModal visible={visible} onClose={onClose} size="xl">
-      <CModalHeader>
+      <CModalHeader
+        style={{
+          background: 'var(--cui-dark)',
+          color: 'var(--cui-light)',
+          borderBottom: '1px solid rgba(var(--cui-light-rgb), 0.2)',
+        }}
+      >
         <CModalTitle style={{ fontSize: '0.9375rem' }}>
           Pending Reno Offset Detail — Exit Month {exitMonth}
         </CModalTitle>
@@ -236,6 +276,13 @@ export default function PendingRenoOffsetModal({
                   </tr>
                 </tbody>
               </CTable>
+              <div
+                className="d-flex justify-content-end gap-4"
+                style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}
+              >
+                <span>Category Total: {formatCurrency(categoryTotal)}</span>
+                <span>DCF Pending Offset: {formatCurrency(pendingRenoOffset)}</span>
+              </div>
             </div>
 
             {/* Section 3: Unit-by-Unit Detail */}
@@ -257,12 +304,13 @@ export default function PendingRenoOffsetModal({
                       <th className="text-end">Complete</th>
                       <th className="text-end">Relet</th>
                       <th className="text-end">Rem. Reno</th>
+                      <th className="text-end">Rem. Relocation</th>
                       <th className="text-end">Rem. Vacancy</th>
                       <th className="text-end">Total Rem.</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.unit_detail.map((unit) => (
+                    {sortedUnitDetail.map((unit) => (
                       <tr key={unit.unit_id}>
                         <td>{unit.unit_number}</td>
                         <td>{unit.unit_type}</td>
@@ -271,10 +319,23 @@ export default function PendingRenoOffsetModal({
                         <td className="text-end">Mo {unit.reno_complete_month}</td>
                         <td className="text-end">Mo {unit.relet_month}</td>
                         <td className="text-end">{formatCurrency(unit.remaining_reno_cost)}</td>
+                        <td className="text-end">{formatCurrency(unit.remaining_relocation)}</td>
                         <td className="text-end">{formatCurrency(unit.remaining_vacancy_loss)}</td>
                         <td className="text-end fw-semibold">{formatCurrency(unit.total_remaining)}</td>
                       </tr>
                     ))}
+                    <tr className="fw-semibold" style={{ borderTop: '2px solid var(--cui-border-color)' }}>
+                      <td>TOTAL</td>
+                      <td>{formatNumber(sortedUnitDetail.length)} units</td>
+                      <td />
+                      <td />
+                      <td />
+                      <td />
+                      <td className="text-end">{formatCurrency(unitTotals.reno)}</td>
+                      <td className="text-end">{formatCurrency(unitTotals.relocation)}</td>
+                      <td className="text-end">{formatCurrency(unitTotals.vacancy)}</td>
+                      <td className="text-end">{formatCurrency(unitTotals.total)}</td>
+                    </tr>
                   </tbody>
                 </CTable>
               </div>

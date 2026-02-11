@@ -3,6 +3,8 @@ URL configuration for Landscape Platform Backend.
 
 Main URL routing for the Django REST API.
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from apps.knowledge.views import alpha_views
@@ -55,4 +57,4 @@ urlpatterns = [
     path("api/alpha/feedback/", alpha_views.AlphaFeedbackView.as_view(), name='alpha_feedback'),
     path("api/", include('apps.valuation.urls')),  # Valuation approaches
     path("api/", include('apps.dynamic.urls')),  # Dynamic columns (EAV pattern)
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

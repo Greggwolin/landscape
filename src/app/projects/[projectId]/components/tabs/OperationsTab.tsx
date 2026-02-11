@@ -391,8 +391,6 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         totalSF={totalSF}
         isSaving={isSaving}
         isDirty={isDirty}
-        valueAddEnabled={showPostRehab}
-        onValueAddToggle={handleValueAddToggle}
         onSave={saveAll}
       />
       <CCardBody className="p-0">

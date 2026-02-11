@@ -105,13 +105,14 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
       <CCard>
         <CCardBody>
           <div
-            className="rounded-lg px-4 py-3 border"
             style={{
+              borderRadius: '0.5rem',
+              padding: '0.75rem 1rem',
+              border: '1px solid var(--cui-danger)',
               backgroundColor: 'var(--cui-danger-bg)',
-              borderColor: 'var(--cui-danger)',
             }}
           >
-            <p className="mb-0" style={{ color: 'var(--cui-danger)' }}>
+            <p style={{ margin: 0, color: 'var(--cui-danger)' }}>
               {opsError || valueAddError}
             </p>
           </div>
@@ -125,17 +126,19 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
     return (
       <CCard>
         <CCardHeader>
-          <h5 className="mb-0">Renovation Assumptions</h5>
+          <h5 style={{ margin: 0 }}>Renovation Assumptions</h5>
         </CCardHeader>
         <CCardBody>
           <div
-            className="rounded-lg px-4 py-6 text-center"
             style={{
+              borderRadius: '0.5rem',
+              padding: '1.5rem 1rem',
+              textAlign: 'center',
               backgroundColor: 'var(--cui-tertiary-bg)',
             }}
           >
-            <div className="text-4xl mb-3">🏠</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>
+            <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>🏠</div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cui-body-color)' }}>
               No Unit Data Available
             </h3>
             <p style={{ color: 'var(--cui-secondary-color)' }}>
@@ -148,7 +151,7 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* Value Add Card */}
       <ValueAddCard
         state={valueAddState}
@@ -161,7 +164,7 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
 
       {/* Save Status Indicator */}
       {isValueAddSaving && (
-        <div className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+        <div style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
           <CSpinner size="sm" className="me-2" />
           Saving changes...
         </div>

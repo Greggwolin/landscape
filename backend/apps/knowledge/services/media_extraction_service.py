@@ -704,15 +704,23 @@ class MediaExtractionService:
             """, [json.dumps(scan_json), doc_id])
 
     def _delete_pending_records(self, doc_id: int):
-        """Delete pending (not yet extracted) media records for a re-scan."""
+        """Delete pending or unextracted media records for a re-scan.
+
+        Removes records that are pending OR classified/scanned but never
+        extracted (empty storage_uri).  This handles the case where a
+        previous scan+classify ran without an extract step in between.
+        """
         with connection.cursor() as c:
             c.execute("""
                 DELETE FROM landscape.core_doc_media
-                WHERE doc_id = %s AND status = 'pending'
+                WHERE doc_id = %s
+                  AND (status = 'pending'
+                       OR (storage_uri IS NULL OR storage_uri = '')
+                      )
             """, [doc_id])
             count = c.rowcount
         if count > 0:
-            logger.info(f"[doc_id={doc_id}] Deleted {count} existing pending records for re-scan")
+            logger.info(f"[doc_id={doc_id}] Deleted {count} existing unextracted records for re-scan")
 
     def _create_pending_record(self, doc_id: int, project_id: int,
                                 source_page: int, extraction_method: str,
