@@ -240,6 +240,7 @@ def reclassify_document_media(request, doc_id):
                 SET classification_id = NULL,
                     ai_classification = NULL,
                     ai_confidence = NULL,
+                    ai_description = NULL,
                     suggested_action = NULL,
                     status = 'extracted',
                     updated_at = NOW()
@@ -968,3 +969,248 @@ def available_media(request):
         'total': len(items),
         'items': items,
     })
+
+
+# ------------------------------------------------------------------ #
+#  SINGLE-ITEM RECLASSIFY
+# ------------------------------------------------------------------ #
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def reclassify_single_media(request, media_id):
+    """
+    PATCH /api/dms/media/{media_id}/reclassify/
+
+    Update the classification for a single media item (user override).
+
+    Body: { "classification_id": 5 }
+    """
+    try:
+        classification_id = request.data.get('classification_id')
+        if classification_id is None:
+            return Response(
+                {'error': 'classification_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate classification_id exists
+        cls_lookup = _get_classification_lookup()
+        if int(classification_id) not in cls_lookup:
+            return Response(
+                {'error': f'Invalid classification_id: {classification_id}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cls_info = cls_lookup[int(classification_id)]
+
+        with connection.cursor() as c:
+            c.execute("""
+                UPDATE landscape.core_doc_media
+                SET classification_id = %s,
+                    ai_classification = %s,
+                    user_action = 'save_image',
+                    status = CASE WHEN status = 'rejected' THEN 'classified' ELSE status END,
+                    updated_at = NOW()
+                WHERE media_id = %s AND deleted_at IS NULL
+                RETURNING media_id, classification_id, ai_classification, user_action
+            """, [int(classification_id), cls_info['code'], int(media_id)])
+            row = c.fetchone()
+
+        if not row:
+            return Response(
+                {'error': f'Media item {media_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            'success': True,
+            'media_id': row[0],
+            'classification': {
+                'code': cls_info['code'],
+                'name': cls_info['name'],
+                'badge_color': cls_info['badge_color'],
+                'classification_id': int(classification_id),
+            },
+            'user_action': row[3],
+        })
+
+    except Exception as e:
+        logger.exception(f"Single-item reclassify failed for media_id={media_id}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ------------------------------------------------------------------ #
+#  DISCARD MEDIA ITEM
+# ------------------------------------------------------------------ #
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def discard_media(request, media_id):
+    """
+    PATCH /api/dms/media/{media_id}/discard/
+
+    Mark a media item as discarded with a reason.
+
+    Body: { "reason_code": "decorative", "custom_reason": null }
+    """
+    try:
+        reason_code = request.data.get('reason_code')
+        custom_reason = request.data.get('custom_reason')
+
+        if not reason_code:
+            return Response(
+                {'error': 'reason_code is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with connection.cursor() as c:
+            c.execute("""
+                UPDATE landscape.core_doc_media
+                SET user_action = 'ignore',
+                    discard_reason_code = %s,
+                    discard_reason_text = %s,
+                    discarded_at = NOW(),
+                    updated_at = NOW()
+                WHERE media_id = %s AND deleted_at IS NULL
+                RETURNING media_id
+            """, [reason_code, custom_reason, int(media_id)])
+            row = c.fetchone()
+
+        if not row:
+            return Response(
+                {'error': f'Media item {media_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            'discarded': True,
+            'media_id': row[0],
+        })
+
+    except Exception as e:
+        logger.exception(f"Discard failed for media_id={media_id}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ------------------------------------------------------------------ #
+#  RESET DOCUMENT MEDIA (delete all + reset status)
+# ------------------------------------------------------------------ #
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_document_media(request, doc_id):
+    """
+    POST /api/dms/documents/{doc_id}/media/reset/
+
+    Deletes all core_doc_media records for a document, removes files from
+    disk, and resets the document's media scan status.
+    """
+    import shutil
+    from pathlib import Path
+
+    try:
+        # Get project_id for file path
+        with connection.cursor() as c:
+            c.execute("""
+                SELECT project_id FROM landscape.core_doc
+                WHERE doc_id = %s AND deleted_at IS NULL
+            """, [doc_id])
+            row = c.fetchone()
+
+        if not row:
+            return Response(
+                {'error': f'Document {doc_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        project_id = row[0]
+
+        # Delete media records
+        with connection.cursor() as c:
+            c.execute("""
+                DELETE FROM landscape.core_doc_media
+                WHERE doc_id = %s
+            """, [doc_id])
+            deleted_count = c.rowcount
+
+        # Reset scan status and json
+        with connection.cursor() as c:
+            c.execute("""
+                UPDATE landscape.core_doc
+                SET media_scan_status = NULL,
+                    media_scan_json = NULL,
+                    updated_at = NOW()
+                WHERE doc_id = %s
+            """, [doc_id])
+
+        # Remove files from disk
+        base_media = getattr(settings, 'MEDIA_ROOT', None)
+        if not base_media:
+            base_media = str(settings.BASE_DIR / 'media')
+        media_dir = Path(base_media) / 'media_assets' / str(project_id) / str(doc_id)
+        if media_dir.exists():
+            shutil.rmtree(str(media_dir), ignore_errors=True)
+            logger.info(f"[doc_id={doc_id}] Removed media directory: {media_dir}")
+
+        logger.info(f"[doc_id={doc_id}] Reset complete — deleted {deleted_count} media records")
+
+        return Response({
+            'reset': True,
+            'doc_id': doc_id,
+            'deleted_count': deleted_count,
+        })
+
+    except Exception as e:
+        logger.exception(f"Media reset failed for doc_id={doc_id}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ------------------------------------------------------------------ #
+#  LOOKUP ITEMS (generic)
+# ------------------------------------------------------------------ #
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def lookup_items(request, list_code):
+    """
+    GET /api/lookups/{list_code}/items/
+
+    Returns items from core_lookup_item for a given list code.
+    """
+    try:
+        with connection.cursor() as c:
+            c.execute("""
+                SELECT i.item_id, i.code, i.label, i.sort_order
+                FROM landscape.core_lookup_item i
+                JOIN landscape.core_lookup_list l ON l.list_key = i.list_key
+                WHERE l.list_key = %s AND i.is_active = true
+                ORDER BY i.sort_order
+            """, [list_code])
+            rows = c.fetchall()
+
+        items = [
+            {
+                'item_id': row[0],
+                'code': row[1],
+                'label': row[2],
+                'sort_order': row[3],
+            }
+            for row in rows
+        ]
+
+        return Response({
+            'list_code': list_code,
+            'items': items,
+        })
+
+    except Exception as e:
+        logger.exception(f"Lookup items fetch failed for list_code={list_code}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

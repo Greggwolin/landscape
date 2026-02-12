@@ -4,6 +4,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import useSWR from 'swr'
 import { useAuth } from '@/contexts/AuthContext'
 
+interface AnalysisTypeTileConfig {
+  analysis_type: string
+  tile_hbu: boolean
+  tile_valuation: boolean
+  tile_capitalization: boolean
+  tile_returns: boolean
+  tile_development_budget: boolean
+}
+
 interface ProjectSummary {
   project_id: number
   project_name: string
@@ -26,6 +35,7 @@ interface ProjectSummary {
   property_subtype?: string | null
   property_class?: string | null
   analysis_mode?: 'napkin' | 'developer' | null
+  tile_config?: AnalysisTypeTileConfig | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
   updated_at?: string | null

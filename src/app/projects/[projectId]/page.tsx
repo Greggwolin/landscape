@@ -37,6 +37,7 @@ function ProjectPageInner() {
   const { currentFolder, currentTab, setFolderTab } = useFolderNavigation({
     propertyType: effectivePropertyType,
     analysisType: currentProject?.analysis_type,
+    tileConfig: currentProject?.tile_config,
   });
 
   // Show loading state while projects are being fetched

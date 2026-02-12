@@ -5,7 +5,7 @@ import type { ContainerNode } from '@/types/containers';
 import type {
   ContainerCostMetadata,
   CostApproachDepreciationRecord,
-  LandComparable,
+  SalesComparable,
 } from '@/types/valuation';
 import {
   getLandComparables,
@@ -22,20 +22,26 @@ interface CostApproachTabProps {
 }
 
 export function CostApproachTab({ projectId }: CostApproachTabProps) {
-  const [landComparables, setLandComparables] = useState<LandComparable[]>([]);
+  const [landComparables, setLandComparables] = useState<SalesComparable[]>([]);
   const [containers, setContainers] = useState<ContainerNode[]>([]);
   const [metadataByContainer, setMetadataByContainer] = useState<Record<number, ContainerCostMetadata | null>>({});
   const [depreciation, setDepreciation] = useState<CostApproachDepreciationRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchContainers = useCallback(async () => {
-    const response = await fetch(`/api/projects/${projectId}/containers?level=2`);
-    if (!response.ok) {
-      throw new Error('Failed to load building hierarchy');
+  const fetchContainers = useCallback(async (): Promise<ContainerNode[]> => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/containers?level=2`);
+      if (!response.ok) {
+        console.warn(`Container fetch returned ${response.status} – rendering with empty list`);
+        return [];
+      }
+      const data = await response.json();
+      return (data?.containers ?? []) as ContainerNode[];
+    } catch (err) {
+      console.warn('Container fetch failed – rendering with empty list', err);
+      return [];
     }
-    const data = await response.json();
-    return (data?.containers ?? []) as ContainerNode[];
   }, [projectId]);
 
   const loadMetadata = useCallback(async (items: ContainerNode[]) => {
@@ -94,41 +100,12 @@ export function CostApproachTab({ projectId }: CostApproachTabProps) {
   }, [metadataByContainer]);
 
   return (
-    <div className="space-y-6">
-      <div
-        className="rounded-lg border p-5"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          borderColor: 'var(--cui-border-color)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-              Cost Approach
-            </h2>
-            <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-              Land + Improvements - Depreciation = Indicated Value
-            </p>
-          </div>
-          <button
-            onClick={loadData}
-            className="px-4 py-2 text-sm font-medium rounded"
-            style={{
-              backgroundColor: 'var(--cui-tertiary-bg)',
-              border: '1px solid var(--cui-border-color)',
-              color: 'var(--cui-body-color)',
-            }}
-          >
-            Refresh Data
-          </button>
+    <div className="d-flex flex-column" style={{ gap: '1.5rem' }}>
+      {error && (
+        <div className="alert alert-danger mb-0">
+          {error}
         </div>
-        {error && (
-          <div className="px-4 py-3 rounded" style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}>
-            {error}
-          </div>
-        )}
-      </div>
+      )}
 
       <LandValueSection
         comparables={landComparables}

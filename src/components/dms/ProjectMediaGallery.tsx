@@ -1,12 +1,16 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   CCard,
   CCardHeader,
   CCardBody,
   CBadge,
   CSpinner,
+  CDropdown,
+  CDropdownToggle,
+  CDropdownMenu,
+  CDropdownItem,
 } from '@coreui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -25,12 +29,29 @@ interface MediaItem {
   status?: string;
   suggested_action?: string;
   user_action?: string;
+  ai_confidence?: number;
+  ai_description?: string | null;
   classification: {
     code: string;
     name: string;
     badge_color: string;
+    classification_id?: number;
   } | null;
   source_doc_name?: string;
+}
+
+interface Classification {
+  classification_id: number;
+  code: string;
+  name: string;
+  badge_color: string;
+}
+
+interface DiscardReason {
+  item_id: number;
+  code: string;
+  label: string;
+  sort_order: number;
 }
 
 interface DocMediaResponse {
@@ -49,6 +70,7 @@ interface DocListItem {
   doc_id: number | string;
   file_name?: string;
   doc_name?: string;
+  storage_uri?: string | null;
   mime_type?: string;
   media_scan_status?: string | null;
 }
@@ -85,6 +107,27 @@ const FILTER_LABELS: { key: FilterKey; label: string }[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// All 14 classification types (from lu_media_classification)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ALL_CLASSIFICATIONS: Classification[] = [
+  { classification_id: 1, code: 'property_photo', name: 'Property Photo', badge_color: 'success' },
+  { classification_id: 2, code: 'aerial_photo', name: 'Aerial Photo', badge_color: 'info' },
+  { classification_id: 3, code: 'site_plan', name: 'Site Plan', badge_color: 'primary' },
+  { classification_id: 4, code: 'floor_plan', name: 'Floor Plan', badge_color: 'primary' },
+  { classification_id: 5, code: 'rendering', name: 'Rendering', badge_color: 'warning' },
+  { classification_id: 6, code: 'aerial_map', name: 'Aerial Map', badge_color: 'info' },
+  { classification_id: 7, code: 'zoning_map', name: 'Zoning Map', badge_color: 'dark' },
+  { classification_id: 8, code: 'location_map', name: 'Location Map', badge_color: 'secondary' },
+  { classification_id: 9, code: 'planning_map', name: 'Planning Map', badge_color: 'dark' },
+  { classification_id: 10, code: 'chart', name: 'Chart / Graph', badge_color: 'warning' },
+  { classification_id: 11, code: 'infographic', name: 'Infographic', badge_color: 'warning' },
+  { classification_id: 12, code: 'before_after', name: 'Before / After', badge_color: 'success' },
+  { classification_id: 13, code: 'logo', name: 'Logo / Branding', badge_color: 'light' },
+  { classification_id: 14, code: 'other', name: 'Other', badge_color: 'secondary' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -100,8 +143,15 @@ export default function ProjectMediaGallery({
   const [filter, setFilter] = useState<FilterKey>('all');
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [activeEditorMediaId, setActiveEditorMediaId] = useState<number | null>(null);
+  const [savingMediaId, setSavingMediaId] = useState<number | null>(null);
+  const [editorStateByMediaId, setEditorStateByMediaId] = useState<
+    Record<number, {
+      classificationId: number | null;
+      discardReasonCode: string | null;
+      otherReason: string;
+    }>
+  >({});
 
   // ── Data fetching ──────────────────────────────────────────────────────
 
@@ -131,6 +181,14 @@ export default function ProjectMediaGallery({
 
   const totalPDFs = allPDFs.length;
 
+  const docsById = useMemo(() => {
+    const map = new Map<string, DocListItem>();
+    for (const doc of docsData?.results || []) {
+      map.set(String(doc.doc_id), doc);
+    }
+    return map;
+  }, [docsData]);
+
   // PDFs that have been scanned (have media records to show)
   const scannedDocIds = useMemo(() => {
     return allPDFs
@@ -143,15 +201,17 @@ export default function ProjectMediaGallery({
       .map((d) => d.doc_id);
   }, [allPDFs]);
 
-  // PDFs eligible for scanning (anything not complete)
-  const scannablePDFs = useMemo(() => {
+  // PDFs not yet scanned (for "Scan New")
+  const unscannedPDFs = useMemo(() => {
     return allPDFs.filter(
-      (d) => d.media_scan_status !== 'complete'
+      (d) =>
+        !d.media_scan_status ||
+        d.media_scan_status === 'pending' ||
+        d.media_scan_status === 'error'
     );
   }, [allPDFs]);
 
   // Fetch media items for all scanned documents
-  // This aggregates the per-doc /media/ endpoint across all scanned docs
   const {
     data: allMediaItems,
     isLoading: mediaLoading,
@@ -169,11 +229,9 @@ export default function ProjectMediaGallery({
           );
           if (!res.ok) continue;
           const data: DocMediaResponse = await res.json();
-          // Only include items that have been extracted (have a storage_uri)
           const extracted = (data.items || []).filter(
             (item) => item.storage_uri && item.status !== 'pending'
           );
-          // Attach source doc name to each item
           for (const item of extracted) {
             item.source_doc_name = item.source_doc_name || data.doc_name;
           }
@@ -187,7 +245,26 @@ export default function ProjectMediaGallery({
     enabled: scannedDocIds.length > 0,
   });
 
-  const mediaItems = allMediaItems ?? [];
+  // Fetch discard reasons for inline discard controls
+  const { data: discardReasons = [] } = useQuery<DiscardReason[]>({
+    queryKey: ['discard-reasons', djangoBaseUrl],
+    queryFn: async () => {
+      const res = await fetch(
+        `${djangoBaseUrl}/api/lookups/media_discard_reason/items/`
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || [];
+    },
+    staleTime: Infinity,
+  });
+
+  // Filter out discarded / rejected items
+  const mediaItems = useMemo(() => {
+    return (allMediaItems ?? []).filter(
+      (item) => item.user_action !== 'ignore' && item.status !== 'rejected'
+    );
+  }, [allMediaItems]);
 
   // ── Filtering ──────────────────────────────────────────────────────────
 
@@ -230,22 +307,18 @@ export default function ProjectMediaGallery({
     return counts;
   }, [mediaItems]);
 
-  // ── Scan action ────────────────────────────────────────────────────────
-  // Full pipeline: scan → extract → classify → auto-confirm actions
+  // ── Pipeline helper ──────────────────────────────────────────────────
+  // Runs scan → extract → classify → auto-confirm for a list of docs
 
-  const handleScanPDFs = useCallback(async () => {
-    setScanning(true);
-    setScanProgress('Preparing scan...');
-
-    try {
-      const toScan = scannablePDFs;
-      for (let i = 0; i < toScan.length; i++) {
-        const doc = toScan[i];
+  const runPipelineForDocs = useCallback(
+    async (docs: DocListItem[]) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
         const name = doc.doc_name || doc.file_name || `Document ${doc.doc_id}`;
 
-        // Step 1: Scan (detect images)
-        setScanProgress(`Scanning ${i + 1} of ${toScan.length}: ${name}`);
         try {
+          // Step 1: Scan (detect images)
+          setScanProgress(`Scanning ${i + 1} of ${docs.length}: ${name}`);
           await fetch(
             `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/scan/`,
             {
@@ -256,7 +329,7 @@ export default function ProjectMediaGallery({
           );
 
           // Step 2: Extract (write images to disk)
-          setScanProgress(`Extracting ${i + 1} of ${toScan.length}: ${name}`);
+          setScanProgress(`Extracting ${i + 1} of ${docs.length}: ${name}`);
           await fetch(
             `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/extract/`,
             {
@@ -267,18 +340,25 @@ export default function ProjectMediaGallery({
           );
 
           // Step 3: Classify
-          setScanProgress(`Classifying ${i + 1} of ${toScan.length}: ${name}`);
+          setScanProgress(`Classifying ${i + 1} of ${docs.length}: ${name}`);
+          const classifyController = new AbortController();
+          const classifyTimeout = setTimeout(
+            () => classifyController.abort(),
+            5 * 60 * 1000
+          );
           await fetch(
             `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/classify/`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ strategy: 'auto' }),
+              signal: classifyController.signal,
             }
           );
+          clearTimeout(classifyTimeout);
 
           // Step 4: Auto-confirm with suggested actions
-          setScanProgress(`Saving ${i + 1} of ${toScan.length}: ${name}`);
+          setScanProgress(`Saving ${i + 1} of ${docs.length}: ${name}`);
           const mediaListRes = await fetch(
             `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/`
           );
@@ -300,11 +380,28 @@ export default function ProjectMediaGallery({
             }
           }
         } catch (err) {
-          console.error(`Media pipeline failed for doc ${doc.doc_id}:`, err);
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            console.warn(`Classify timed out for doc ${doc.doc_id}, continuing...`);
+          } else {
+            console.error(`Media pipeline failed for doc ${doc.doc_id}:`, err);
+          }
         }
       }
+    },
+    [djangoBaseUrl]
+  );
 
-      // Refresh all data
+  // ── Scan New action ──────────────────────────────────────────────────
+  // Only scans PDFs that haven't been scanned yet
+
+  const handleScanNew = useCallback(async () => {
+    if (unscannedPDFs.length === 0) return;
+    setScanning(true);
+    setScanProgress('Preparing scan...');
+
+    try {
+      await runPipelineForDocs(unscannedPDFs);
+
       queryClient.invalidateQueries({
         queryKey: ['project-docs-for-scan', projectId],
       });
@@ -316,34 +413,38 @@ export default function ProjectMediaGallery({
       setScanning(false);
       setScanProgress('');
     }
-  }, [scannablePDFs, djangoBaseUrl, refetchMedia, queryClient, projectId]);
+  }, [unscannedPDFs, runPipelineForDocs, refetchMedia, queryClient, projectId]);
 
-  // ── Re-classify action ────────────────────────────────────────────────
-  // Resets classifications and re-runs with AI vision (auto strategy)
+  // ── Rescan All action ────────────────────────────────────────────────
+  // Resets all documents and re-runs full pipeline
 
-  const handleReclassify = useCallback(async () => {
+  const handleRescanAll = useCallback(async () => {
+    if (allPDFs.length === 0) return;
     setScanning(true);
-    setScanProgress('Re-classifying media with AI vision...');
+    setScanProgress('Resetting media...');
 
     try {
-      for (let i = 0; i < scannedDocIds.length; i++) {
-        const docId = scannedDocIds[i];
-        setScanProgress(`Re-classifying ${i + 1} of ${scannedDocIds.length}...`);
+      // Step 0: Reset each previously-scanned doc (delete media records & files)
+      for (const docId of scannedDocIds) {
         try {
           await fetch(
-            `${djangoBaseUrl}/api/dms/documents/${docId}/media/reclassify/`,
+            `${djangoBaseUrl}/api/dms/documents/${docId}/media/reset/`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ strategy: 'auto' }),
             }
           );
         } catch (err) {
-          console.error(`Reclassify failed for doc ${docId}:`, err);
+          console.error(`Reset failed for doc ${docId}:`, err);
         }
       }
 
-      // Refresh media data
+      // Now run full pipeline on all PDFs
+      await runPipelineForDocs(allPDFs);
+
+      queryClient.invalidateQueries({
+        queryKey: ['project-docs-for-scan', projectId],
+      });
       queryClient.invalidateQueries({
         queryKey: ['project-all-media', projectId],
       });
@@ -352,26 +453,279 @@ export default function ProjectMediaGallery({
       setScanning(false);
       setScanProgress('');
     }
-  }, [scannedDocIds, djangoBaseUrl, refetchMedia, queryClient, projectId]);
+  }, [allPDFs, scannedDocIds, djangoBaseUrl, runPipelineForDocs, refetchMedia, queryClient, projectId]);
 
-  // ── Lightbox nav ───────────────────────────────────────────────────────
+  // ── Single-item reclassify ───────────────────────────────────────────
 
-  const handleLightboxPrev = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setLightboxIndex((i) => Math.max(0, i - 1));
+  const handleSingleReclassify = useCallback(
+    async (mediaId: number, classificationId: number, classInfo: Classification): Promise<boolean> => {
+      try {
+        const res = await fetch(
+          `${djangoBaseUrl}/api/dms/media/${mediaId}/reclassify/`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ classification_id: classificationId }),
+          }
+        );
+        if (!res.ok) {
+          console.error('Reclassify failed:', await res.text());
+          return false;
+        }
+
+        // Optimistic update in query cache
+        queryClient.setQueryData<MediaItem[]>(
+          ['project-all-media', projectId, scannedDocIds.join(',')],
+          (old) => {
+            if (!old) return old;
+            return old.map((item) =>
+              item.media_id === mediaId
+                ? {
+                    ...item,
+                    classification: {
+                      code: classInfo.code,
+                      name: classInfo.name,
+                      badge_color: classInfo.badge_color,
+                      classification_id: classInfo.classification_id,
+                    },
+                  }
+                : item
+            );
+          }
+        );
+        return true;
+      } catch (err) {
+        console.error('Reclassify error:', err);
+        return false;
+      }
+    },
+    [djangoBaseUrl, queryClient, projectId, scannedDocIds]
+  );
+
+  // ── Discard ──────────────────────────────────────────────────────────
+
+  const handleDiscard = useCallback(
+    async (mediaId: number, reasonCode: string, customReason?: string): Promise<boolean> => {
+      try {
+        const res = await fetch(
+          `${djangoBaseUrl}/api/dms/media/${mediaId}/discard/`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reason_code: reasonCode,
+              reason_text: customReason,
+            }),
+          }
+        );
+        if (!res.ok) {
+          console.error('Discard failed:', await res.text());
+          return false;
+        }
+
+        // Optimistic: remove from cache
+        queryClient.setQueryData<MediaItem[]>(
+          ['project-all-media', projectId, scannedDocIds.join(',')],
+          (old) => {
+            if (!old) return old;
+            return old.map((item) =>
+              item.media_id === mediaId
+                ? { ...item, user_action: 'ignore', status: 'rejected' }
+                : item
+            );
+          }
+        );
+        return true;
+      } catch (err) {
+        console.error('Discard error:', err);
+        return false;
+      }
+    },
+    [djangoBaseUrl, queryClient, projectId, scannedDocIds]
+  );
+
+  const getClassificationIdForItem = useCallback((item: MediaItem): number | null => {
+    if (item.classification?.classification_id) {
+      return item.classification.classification_id;
+    }
+    return (
+      ALL_CLASSIFICATIONS.find(
+        (cls) => cls.code === item.classification?.code
+      )?.classification_id ?? null
+    );
+  }, []);
+
+  const getCompactHint = useCallback((hint: string | null | undefined): string | null => {
+    if (!hint) return null;
+    const compact = hint
+      .replace(/^this\s+(image|photo)\s+(shows|is)\s*/i, '')
+      .replace(/^likely\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!compact) return null;
+    if (compact.length > 90) return `${compact.slice(0, 90).trim()}...`;
+    return compact;
+  }, []);
+
+  const getDisplayHint = useCallback(
+    (item: MediaItem, compactHint: string | null): string => {
+      if (compactHint) return compactHint;
+      if (item.source_doc_name && item.source_page) {
+        return `${item.source_doc_name} · pg ${item.source_page}`;
+      }
+      if (item.classification?.name) {
+        return item.classification.name;
+      }
+      return `Page ${item.source_page}`;
     },
     []
   );
 
-  const handleLightboxNext = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setLightboxIndex((i) =>
-        Math.min(filteredItems.length - 1, i + 1)
-      );
+  const openEditorForItem = useCallback(
+    (item: MediaItem) => {
+      const mediaId = item.media_id;
+      setActiveEditorMediaId(mediaId);
+      setEditorStateByMediaId((prev) => ({
+        ...prev,
+        [mediaId]: {
+          classificationId: getClassificationIdForItem(item),
+          discardReasonCode: null,
+          otherReason: '',
+        },
+      }));
     },
-    [filteredItems.length]
+    [getClassificationIdForItem]
+  );
+
+  const closeEditor = useCallback((mediaId?: number) => {
+    setActiveEditorMediaId((current) => {
+      if (typeof mediaId === 'number') {
+        return current === mediaId ? null : current;
+      }
+      return null;
+    });
+    if (typeof mediaId === 'number') {
+      setEditorStateByMediaId((prev) => {
+        const next = { ...prev };
+        delete next[mediaId];
+        return next;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeEditorMediaId == null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeEditor(activeEditorMediaId);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [activeEditorMediaId, closeEditor]);
+
+  const setEditorClassification = useCallback((mediaId: number, classificationId: number) => {
+    setEditorStateByMediaId((prev) => ({
+      ...prev,
+      [mediaId]: {
+        classificationId,
+        discardReasonCode: null,
+        otherReason: '',
+      },
+    }));
+  }, []);
+
+  const toggleDiscardReason = useCallback((mediaId: number, reasonCode: string) => {
+    setEditorStateByMediaId((prev) => {
+      const existing = prev[mediaId] ?? {
+        classificationId: null,
+        discardReasonCode: null,
+        otherReason: '',
+      };
+      const requestedReason = reasonCode === 'keep' ? null : reasonCode;
+      const nextReason = existing.discardReasonCode === requestedReason ? null : requestedReason;
+      return {
+        ...prev,
+        [mediaId]: {
+          ...existing,
+          discardReasonCode: nextReason,
+          otherReason: nextReason === 'other' ? existing.otherReason : '',
+        },
+      };
+    });
+  }, []);
+
+  const setEditorOtherReason = useCallback((mediaId: number, value: string) => {
+    setEditorStateByMediaId((prev) => {
+      const existing = prev[mediaId] ?? {
+        classificationId: null,
+        discardReasonCode: 'other',
+        otherReason: '',
+      };
+      return {
+        ...prev,
+        [mediaId]: {
+          ...existing,
+          discardReasonCode: 'other',
+          otherReason: value,
+        },
+      };
+    });
+  }, []);
+
+  const handleApplyTileUpdate = useCallback(
+    async (item: MediaItem) => {
+      const mediaId = item.media_id;
+      const state = editorStateByMediaId[mediaId];
+      if (!state || savingMediaId === mediaId) return;
+
+      setSavingMediaId(mediaId);
+      try {
+        const discardReasonCode = state.discardReasonCode;
+        if (discardReasonCode) {
+          if (discardReasonCode === 'other' && !state.otherReason.trim()) {
+            return;
+          }
+          const discarded = await handleDiscard(
+            mediaId,
+            discardReasonCode,
+            discardReasonCode === 'other' ? state.otherReason.trim() : undefined
+          );
+          if (discarded) {
+            closeEditor(mediaId);
+          }
+          return;
+        }
+
+        const currentId = getClassificationIdForItem(item);
+        const nextId = state.classificationId;
+        if (!nextId || nextId === currentId) {
+          closeEditor(mediaId);
+          return;
+        }
+
+        const classInfo = ALL_CLASSIFICATIONS.find(
+          (cls) => cls.classification_id === nextId
+        );
+        if (!classInfo) return;
+
+        const reclassified = await handleSingleReclassify(mediaId, nextId, classInfo);
+        if (reclassified) {
+          closeEditor(mediaId);
+        }
+      } finally {
+        setSavingMediaId((prev) => (prev === mediaId ? null : prev));
+      }
+    },
+    [
+      closeEditor,
+      editorStateByMediaId,
+      getClassificationIdForItem,
+      handleDiscard,
+      handleSingleReclassify,
+      savingMediaId,
+    ]
   );
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -380,266 +734,303 @@ export default function ProjectMediaGallery({
     (uri: string | undefined | null): string => {
       if (!uri) return '';
       if (uri.startsWith('http')) return uri;
-      // storage_uri values are like "media_assets/17/58/thumb.jpg"
-      // Django serves media at /media/ prefix, so prepend it
       if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
       return `${djangoBaseUrl}/media/${uri}`;
     },
     [djangoBaseUrl]
   );
 
+  const buildSourcePdfHref = useCallback(
+    (storageUri: string | null | undefined, sourcePage?: number): string => {
+      if (!storageUri) return '';
+      if (!sourcePage || sourcePage <= 0) return storageUri;
+
+      if (storageUri.includes('#')) {
+        if (storageUri.includes('page=')) {
+          return storageUri.replace(/page=\d+/i, `page=${sourcePage}`);
+        }
+        return `${storageUri}&page=${sourcePage}`;
+      }
+
+      return `${storageUri}#page=${sourcePage}`;
+    },
+    []
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   const hasMedia = mediaItems.length > 0;
-  const hasScannablePDFs = scannablePDFs.length > 0;
+  const hasUnscannedPDFs = unscannedPDFs.length > 0;
+  const hasAnyPDFs = allPDFs.length > 0;
 
   return (
-    <>
-      <CCard className="mb-3 shadow-sm">
-        <CCardHeader
-          onClick={() => setMediaOpen((prev) => !prev)}
-          style={{ cursor: 'pointer', userSelect: 'none' }}
-          className="d-flex align-items-center justify-content-between py-2"
-        >
-          <div className="d-flex align-items-center gap-2">
+    <CCard className="mb-3 shadow-sm">
+      <CCardHeader
+        onClick={() => setMediaOpen((prev) => !prev)}
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        className="d-flex align-items-center justify-content-between py-2"
+      >
+        <div className="d-flex align-items-center gap-2">
+          <span
+            style={{
+              fontSize: '0.75rem',
+              transition: 'transform 0.2s',
+              transform: mediaOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            }}
+          >
+            &#9654;
+          </span>
+          <strong>Project Media</strong>
+          {hasMedia && (
             <span
-              style={{
-                fontSize: '0.75rem',
-                transition: 'transform 0.2s',
-                transform: mediaOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-              }}
+              className="text-body-secondary"
+              style={{ fontSize: '0.8rem' }}
             >
-              &#9654;
+              {mediaItems.length} items
             </span>
-            <strong>Project Media</strong>
-            {hasMedia && (
+          )}
+        </div>
+        <div
+          className="d-flex gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {hasAnyPDFs && !scanning && (
+            <CDropdown variant="btn-group">
+              <CDropdownToggle
+                color="primary"
+                size="sm"
+                style={{ fontSize: '0.85rem' }}
+              >
+                {hasUnscannedPDFs
+                  ? `Scan New (${unscannedPDFs.length})`
+                  : 'Scan PDFs'}
+              </CDropdownToggle>
+              <CDropdownMenu>
+                {hasUnscannedPDFs && (
+                  <CDropdownItem onClick={handleScanNew}>
+                    Scan New PDFs ({unscannedPDFs.length})
+                  </CDropdownItem>
+                )}
+                <CDropdownItem onClick={handleRescanAll}>
+                  Rescan All PDFs ({allPDFs.length})
+                </CDropdownItem>
+              </CDropdownMenu>
+            </CDropdown>
+          )}
+        </div>
+      </CCardHeader>
+
+      {mediaOpen && (
+        <CCardBody className="p-3">
+          {/* Loading state */}
+          {mediaLoading && (
+            <div
+              className="d-flex align-items-center justify-content-center"
+              style={{ minHeight: '120px' }}
+            >
+              <CSpinner size="sm" className="me-2" />
               <span
                 className="text-body-secondary"
-                style={{ fontSize: '0.8rem' }}
+                style={{ fontSize: '0.85rem' }}
               >
-                {mediaItems.length} items
+                Loading media...
               </span>
-            )}
-          </div>
-          <div
-            className="d-flex gap-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {hasMedia && !scanning && (
-              <button
-                onClick={handleReclassify}
-                className="px-3 py-1 rounded border"
-                style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--cui-secondary-color)',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Re-classify
-              </button>
-            )}
-            {hasScannablePDFs && !scanning && (
-              <button
-                onClick={handleScanPDFs}
-                className="px-3 py-1 rounded text-white border-0"
-                style={{
-                  backgroundColor: 'var(--cui-primary)',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Scan PDFs
-              </button>
-            )}
-          </div>
-        </CCardHeader>
+            </div>
+          )}
 
-        {mediaOpen && (
-          <CCardBody className="p-3">
-            {/* Loading state */}
-            {mediaLoading && (
+          {/* Scanning progress */}
+          {scanning && (
+            <div
+              className="d-flex align-items-center justify-content-center flex-column"
+              style={{ minHeight: '120px' }}
+            >
+              <CSpinner size="sm" className="mb-2" />
+              <span style={{ fontSize: '0.85rem', color: 'var(--cui-primary)' }}>
+                {scanProgress}
+              </span>
+            </div>
+          )}
+
+          {/* Empty state — no media, but scannable PDFs exist */}
+          {!mediaLoading &&
+            !scanning &&
+            !hasMedia &&
+            hasUnscannedPDFs && (
               <div
-                className="d-flex align-items-center justify-content-center"
-                style={{ minHeight: '120px' }}
+                className="d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: '160px' }}
               >
-                <CSpinner size="sm" className="me-2" />
-                <span
-                  className="text-body-secondary"
-                  style={{ fontSize: '0.85rem' }}
-                >
-                  Loading media...
-                </span>
-              </div>
-            )}
-
-            {/* Scanning progress */}
-            {scanning && (
-              <div
-                className="d-flex align-items-center justify-content-center flex-column"
-                style={{ minHeight: '120px' }}
-              >
-                <CSpinner size="sm" className="mb-2" />
-                <span style={{ fontSize: '0.85rem', color: 'var(--cui-primary)' }}>
-                  {scanProgress}
-                </span>
-              </div>
-            )}
-
-            {/* Empty state — no media, but scannable PDFs exist */}
-            {!mediaLoading &&
-              !scanning &&
-              !hasMedia &&
-              hasScannablePDFs && (
-                <div
-                  className="d-flex flex-column align-items-center justify-content-center text-center"
-                  style={{ minHeight: '160px' }}
-                >
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-                    &#128444;
-                  </div>
-                  <div
-                    className="fw-semibold mb-1"
-                    style={{ color: 'var(--cui-body-color)' }}
-                  >
-                    No media extracted yet
-                  </div>
-                  <div
-                    className="mb-3"
-                    style={{
-                      color: 'var(--cui-secondary-color)',
-                      fontSize: '0.85rem',
-                      maxWidth: '360px',
-                    }}
-                  >
-                    This project has {totalPDFs} PDF document
-                    {totalPDFs !== 1 ? 's' : ''} that may contain photos, maps,
-                    and plans.
-                  </div>
-                  <button
-                    onClick={handleScanPDFs}
-                    className="px-4 py-2 rounded text-white border-0"
-                    style={{
-                      backgroundColor: 'var(--cui-primary)',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    Scan PDFs for Images
-                  </button>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+                  &#128444;
                 </div>
-              )}
-
-            {/* Empty state — no PDFs at all */}
-            {!mediaLoading &&
-              !scanning &&
-              !hasMedia &&
-              !hasScannablePDFs &&
-              totalPDFs === 0 && (
                 <div
-                  className="d-flex flex-column align-items-center justify-content-center text-center"
-                  style={{ minHeight: '120px' }}
+                  className="fw-semibold mb-1"
+                  style={{ color: 'var(--cui-body-color)' }}
                 >
-                  <div
-                    style={{
-                      color: 'var(--cui-secondary-color)',
-                      fontSize: '0.85rem',
-                      maxWidth: '360px',
-                    }}
-                  >
-                    No PDF documents to scan. Upload documents with embedded
-                    images to build your project media library.
-                  </div>
+                  No media extracted yet
                 </div>
-              )}
-
-            {/* Media gallery */}
-            {!mediaLoading && !scanning && hasMedia && (
-              <>
-                {/* Filter bar */}
                 <div
-                  className="d-flex flex-wrap gap-1 mb-3"
-                  style={{ borderBottom: '1px solid var(--cui-border-color)', paddingBottom: '0.5rem' }}
-                >
-                  {FILTER_LABELS.map(({ key, label }) => {
-                    const count = filterCounts[key];
-                    if (key !== 'all' && count === 0) return null;
-                    const isActive = filter === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setFilter(key)}
-                        className={`px-2 py-1 rounded border-0 ${
-                          isActive ? 'text-white' : ''
-                        }`}
-                        style={{
-                          fontSize: '0.8rem',
-                          cursor: 'pointer',
-                          backgroundColor: isActive
-                            ? 'var(--cui-primary)'
-                            : 'transparent',
-                          color: isActive
-                            ? '#fff'
-                            : 'var(--cui-secondary-color)',
-                        }}
-                      >
-                        {label}
-                        {key !== 'all' && (
-                          <span style={{ marginLeft: '0.25rem', opacity: 0.8 }}>
-                            ({count})
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Thumbnail grid */}
-                <div
+                  className="mb-3"
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                    gap: '0.5rem',
+                    color: 'var(--cui-secondary-color)',
+                    fontSize: '0.85rem',
+                    maxWidth: '360px',
                   }}
                 >
-                  {filteredItems.map((item, idx) => {
-                    const thumbSrc = resolveImageSrc(item.thumbnail_uri || item.storage_uri);
-                    return (
+                  This project has {totalPDFs} PDF document
+                  {totalPDFs !== 1 ? 's' : ''} that may contain photos, maps,
+                  and plans.
+                </div>
+                <button
+                  onClick={handleScanNew}
+                  className="px-4 py-2 rounded text-white border-0"
+                  style={{
+                    backgroundColor: 'var(--cui-primary)',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  Scan PDFs for Images
+                </button>
+              </div>
+            )}
+
+          {/* Empty state — no PDFs at all */}
+          {!mediaLoading &&
+            !scanning &&
+            !hasMedia &&
+            !hasAnyPDFs && (
+              <div
+                className="d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: '120px' }}
+              >
+                <div
+                  style={{
+                    color: 'var(--cui-secondary-color)',
+                    fontSize: '0.85rem',
+                    maxWidth: '360px',
+                  }}
+                >
+                  No PDF documents to scan. Upload documents with embedded
+                  images to build your project media library.
+                </div>
+              </div>
+            )}
+
+          {/* ── Gallery grid view ── */}
+          {!mediaLoading && !scanning && hasMedia && (
+            <>
+              {/* Filter bar */}
+              <div
+                className="d-flex flex-wrap gap-1 mb-3"
+                style={{ borderBottom: '1px solid var(--cui-border-color)', paddingBottom: '0.5rem' }}
+              >
+                {FILTER_LABELS.map(({ key, label }) => {
+                  const count = filterCounts[key];
+                  if (key !== 'all' && count === 0) return null;
+                  const isActive = filter === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setFilter(key)}
+                      className={`px-2 py-1 rounded border-0 ${
+                        isActive ? 'text-white' : ''
+                      }`}
+                      style={{
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        backgroundColor: isActive
+                          ? 'var(--cui-primary)'
+                          : 'transparent',
+                        color: isActive
+                          ? '#fff'
+                          : 'var(--cui-secondary-color)',
+                      }}
+                    >
+                      {label}
+                      {key !== 'all' && (
+                        <span style={{ marginLeft: '0.25rem', opacity: 0.8 }}>
+                          ({count})
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Thumbnail grid */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fill, minmax(min(100%, 630px), 1fr))',
+                  gap: '1rem',
+                }}
+              >
+                {filteredItems.map((item) => {
+                  const thumbSrc = resolveImageSrc(item.thumbnail_uri || item.storage_uri);
+                  const sourceDoc = docsById.get(String(item.doc_id));
+                  const sourcePdfHref = buildSourcePdfHref(
+                    sourceDoc?.storage_uri,
+                    item.source_page
+                  );
+                  const currentClassificationId = getClassificationIdForItem(item);
+                  const draft = editorStateByMediaId[item.media_id] ?? {
+                    classificationId: currentClassificationId,
+                    discardReasonCode: null,
+                    otherReason: '',
+                  };
+                  const compactHint = getCompactHint(item.ai_description);
+                  const displayHint = getDisplayHint(item, compactHint);
+                  const isEditorOpen = activeEditorMediaId === item.media_id;
+                  const saveDisabled =
+                    savingMediaId === item.media_id ||
+                    (draft.discardReasonCode === 'other' && !draft.otherReason.trim());
+
+                  return (
+                    <div
+                      key={item.media_id}
+                      style={{
+                        cursor: 'default',
+                        borderRadius: '4px',
+                        overflow: isEditorOpen ? 'visible' : 'hidden',
+                        border: '1px solid var(--cui-border-color)',
+                        backgroundColor: 'var(--cui-card-bg)',
+                        transition: 'box-shadow 0.15s',
+                        position: 'relative',
+                        zIndex: isEditorOpen ? 10 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.boxShadow =
+                          '0 2px 8px rgba(0,0,0,0.15)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.boxShadow =
+                          'none';
+                      }}
+                    >
+                      {/* Thumbnail + slideout editor */}
                       <div
-                        key={item.media_id}
-                        onClick={() => {
-                          setLightboxIndex(idx);
-                          setLightboxOpen(true);
-                        }}
                         style={{
-                          cursor: 'pointer',
-                          borderRadius: '4px',
-                          overflow: 'hidden',
-                          border: '1px solid var(--cui-border-color)',
-                          backgroundColor: 'var(--cui-card-bg)',
-                          transition: 'box-shadow 0.15s',
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLDivElement).style.boxShadow =
-                            '0 2px 8px rgba(0,0,0,0.15)';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLDivElement).style.boxShadow =
-                            'none';
+                          width: '100%',
+                          height: '405px',
+                          overflow: 'visible',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          position: 'relative',
                         }}
                       >
-                        {/* Thumbnail image */}
                         <div
                           style={{
-                            width: '100%',
-                            height: '90px',
+                            position: 'absolute',
+                            inset: 0,
                             overflow: 'hidden',
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             backgroundColor: 'var(--cui-tertiary-bg)',
                           }}
+                          onClick={() => openEditorForItem(item)}
                         >
                           {thumbSrc ? (
                             <img
@@ -653,149 +1044,255 @@ export default function ProjectMediaGallery({
                               }}
                             />
                           ) : (
-                            <span style={{ fontSize: '1.5rem', opacity: 0.4 }}>&#128444;</span>
+                            <span style={{ fontSize: '2rem', opacity: 0.4 }}>&#128444;</span>
                           )}
                         </div>
-                        {/* Info row */}
-                        <div style={{ padding: '0.35rem 0.5rem' }}>
-                          {item.classification && (
-                            <CBadge
-                              color={item.classification.badge_color || 'secondary'}
+
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: '100%',
+                            width: '225%',
+                            minHeight: '608px',
+                            transform: isEditorOpen ? 'translateX(0)' : 'translateX(16px)',
+                            opacity: isEditorOpen ? 1 : 0,
+                            transition: 'transform 0.2s ease, opacity 0.2s ease',
+                            backgroundColor: 'var(--cui-body-bg)',
+                            border: '1px solid var(--cui-border-color)',
+                            boxShadow: '0 8px 18px rgba(0,0,0,0.14)',
+                            borderRadius: '4px',
+                            padding: '0.55rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.45rem',
+                            pointerEvents: isEditorOpen ? 'auto' : 'none',
+                            zIndex: 20,
+                          }}
+                        >
+                          <div className="d-flex align-items-start justify-content-between gap-2">
+                            <div
                               style={{
-                                fontSize: '0.65rem',
-                                marginBottom: '0.15rem',
+                                fontSize: '0.72rem',
+                                lineHeight: 1.3,
+                                color: 'var(--cui-body-color)',
                               }}
                             >
-                              {item.classification.name}
-                            </CBadge>
+                              Hint: {displayHint}
+                            </div>
+                            <button
+                              type="button"
+                              className="border-0 bg-transparent"
+                              onClick={() => closeEditor(item.media_id)}
+                              style={{
+                                fontSize: '0.9rem',
+                                lineHeight: 1,
+                                color: 'var(--cui-secondary-color)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                flexShrink: 0,
+                              }}
+                            >
+                              &#10005;
+                            </button>
+                          </div>
+
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.66rem',
+                                color: 'var(--cui-secondary-color)',
+                                marginBottom: '0.2rem',
+                              }}
+                            >
+                              Tags
+                            </div>
+                            <div className="d-flex flex-wrap gap-1">
+                              {ALL_CLASSIFICATIONS.map((classification) => {
+                                const isActive = draft.classificationId === classification.classification_id;
+                                return (
+                                  <button
+                                    key={classification.classification_id}
+                                    type="button"
+                                    onClick={() =>
+                                      setEditorClassification(
+                                        item.media_id,
+                                        classification.classification_id
+                                      )
+                                    }
+                                    className="border rounded-pill px-2 py-1"
+                                    style={{
+                                      fontSize: '0.66rem',
+                                      lineHeight: 1.2,
+                                      cursor: 'pointer',
+                                      borderColor: isActive
+                                        ? 'var(--cui-primary)'
+                                        : 'var(--cui-border-color)',
+                                      backgroundColor: isActive
+                                        ? 'var(--cui-primary)'
+                                        : 'transparent',
+                                      color: isActive ? '#fff' : 'var(--cui-body-color)',
+                                    }}
+                                  >
+                                    {classification.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.66rem',
+                                color: 'var(--cui-secondary-color)',
+                                marginBottom: '0.2rem',
+                              }}
+                            >
+                              Discard
+                            </div>
+                            <div className="d-flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleDiscardReason(item.media_id, 'keep')}
+                                className="border rounded-pill px-2 py-1"
+                                style={{
+                                  fontSize: '0.66rem',
+                                  lineHeight: 1.2,
+                                  cursor: 'pointer',
+                                  borderColor: !draft.discardReasonCode
+                                    ? 'var(--cui-success)'
+                                    : 'var(--cui-border-color)',
+                                  backgroundColor: !draft.discardReasonCode
+                                    ? 'var(--cui-success)'
+                                    : 'transparent',
+                                  color: !draft.discardReasonCode ? '#fff' : 'var(--cui-body-color)',
+                                }}
+                              >
+                                Keep
+                              </button>
+                              {discardReasons.map((reason) => {
+                                const isActive = draft.discardReasonCode === reason.code;
+                                return (
+                                  <button
+                                    key={reason.item_id}
+                                    type="button"
+                                    onClick={() => toggleDiscardReason(item.media_id, reason.code)}
+                                    className="border rounded-pill px-2 py-1"
+                                    style={{
+                                      fontSize: '0.66rem',
+                                      lineHeight: 1.2,
+                                      cursor: 'pointer',
+                                      borderColor: isActive
+                                        ? 'var(--cui-danger)'
+                                        : 'var(--cui-border-color)',
+                                      backgroundColor: isActive
+                                        ? 'var(--cui-danger)'
+                                        : 'transparent',
+                                      color: isActive ? '#fff' : 'var(--cui-body-color)',
+                                    }}
+                                  >
+                                    {reason.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {draft.discardReasonCode === 'other' && (
+                            <input
+                              type="text"
+                              value={draft.otherReason}
+                              onChange={(e) =>
+                                setEditorOtherReason(item.media_id, e.target.value)
+                              }
+                              placeholder="Discard reason"
+                              className="form-control form-control-sm"
+                              style={{ fontSize: '0.72rem' }}
+                            />
                           )}
+
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${
+                              draft.discardReasonCode ? 'btn-danger' : 'btn-primary'
+                            }`}
+                            disabled={saveDisabled}
+                            onClick={() => {
+                              void handleApplyTileUpdate(item);
+                            }}
+                            style={{ marginTop: 'auto', fontSize: '0.74rem' }}
+                          >
+                            {savingMediaId === item.media_id
+                              ? 'Saving...'
+                              : draft.discardReasonCode
+                                ? 'Save Discard'
+                                : 'Save / Update'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Info row */}
+                      <div style={{ padding: '0.6rem 0.7rem 0.7rem' }}>
+                        {item.classification && (
+                          <CBadge
+                            color={item.classification.badge_color || 'secondary'}
+                            style={{
+                              fontSize: '0.7rem',
+                              marginBottom: '0.25rem',
+                            }}
+                          >
+                            {item.classification.name}
+                          </CBadge>
+                        )}
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--cui-secondary-color)',
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          pg. {item.source_page}
+                        </div>
+                        {item.source_doc_name && (
                           <div
                             style={{
                               fontSize: '0.7rem',
                               color: 'var(--cui-secondary-color)',
-                              lineHeight: 1.3,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
                             }}
                           >
-                            pg. {item.source_page}
+                            {item.source_doc_name}
                           </div>
-                          {item.source_doc_name && (
-                            <div
-                              style={{
-                                fontSize: '0.65rem',
-                                color: 'var(--cui-secondary-color)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
-                              {item.source_doc_name}
-                            </div>
-                          )}
-                        </div>
+                        )}
+                        {sourcePdfHref && (
+                          <a
+                            href={sourcePdfHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--cui-primary)',
+                              textDecoration: 'none',
+                              display: 'inline-block',
+                              marginTop: '0.25rem',
+                            }}
+                          >
+                            Open source PDF (pg {item.source_page})
+                          </a>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </CCardBody>
-        )}
-      </CCard>
-
-      {/* Lightbox */}
-      {lightboxOpen && filteredItems[lightboxIndex] && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-          onClick={() => setLightboxOpen(false)}
-        >
-          <img
-            src={resolveImageSrc(filteredItems[lightboxIndex].storage_uri)}
-            style={{
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-            }}
-            alt={
-              filteredItems[lightboxIndex].classification?.name ?? 'Media'
-            }
-          />
-          {/* Caption */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '2rem',
-              color: 'white',
-              textAlign: 'center',
-              fontSize: '0.85rem',
-            }}
-          >
-            {filteredItems[lightboxIndex].classification?.name ??
-              'Unclassified'}{' '}
-            — Page {filteredItems[lightboxIndex].source_page}
-            {filteredItems[lightboxIndex].source_doc_name && (
-              <>
-                <br />
-                {filteredItems[lightboxIndex].source_doc_name}
-              </>
-            )}
-          </div>
-
-          {/* Navigation arrows */}
-          {filteredItems.length > 1 && (
-            <>
-              {lightboxIndex > 0 && (
-                <button
-                  onClick={handleLightboxPrev}
-                  style={{
-                    position: 'absolute',
-                    left: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '2rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  &#8249;
-                </button>
-              )}
-              {lightboxIndex < filteredItems.length - 1 && (
-                <button
-                  onClick={handleLightboxNext}
-                  style={{
-                    position: 'absolute',
-                    right: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '2rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  &#8250;
-                </button>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
-        </div>
+        </CCardBody>
       )}
-    </>
+    </CCard>
   );
 }

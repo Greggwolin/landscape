@@ -9458,49 +9458,97 @@ def log_extraction_correction(
 # Rent Roll Column Mapping Tools (Conversational Flow)
 # ─────────────────────────────────────────────────────────────────────────────
 
+RENT_ROLL_BEHAVIORAL_RULES = """
+---
+RESPONSE RULES (follow exactly):
+- Present the analysis above in ONE concise message. Use short labels, not paragraphs.
+- BD/BA splits into Bed (integer) + Bath (decimal). Plan auto-derives from those. Do NOT map BD/BA to Plan directly.
+- Default for Tags/Additional Tags: combine into single "Other" column, comma-separated. Only split into booleans if user asks.
+- End with 2-3 clear options (A/B/C). Include column creation and Plan derivation in the recommended option.
+- AFTER user picks an option: EXECUTE IMMEDIATELY. One-sentence confirmation only. Do NOT restate the analysis. Do NOT ask "should I proceed?"
+- NEVER say "You're absolutely right" or "You're correct."
+- If unit count doesn't match file total, recommend cleanup FIRST. Name the specific units to delete.
+"""
+
+CONFIRM_BEHAVIORAL_NUDGE = """
+---
+RESPONSE RULE: Report what you did in 1-2 sentences max. Do NOT restate the original analysis.
+Example: "Done. Updated 113 units, derived 9 Plans, created Other and Delinquency columns."
+"""
+
+
 @register_tool('analyze_rent_roll_columns')
 def handle_analyze_rent_roll_columns(
     tool_input: Dict[str, Any],
     project_id: int,
     **kwargs
 ) -> Dict[str, Any]:
-    """Analyze columns in a structured rent roll file and propose mappings."""
+    """Analyze columns in a structured rent roll file, check existing data, and propose mappings."""
     document_id = tool_input.get('document_id')
+
+    # DIAGNOSTIC LOGGING — remove after diagnosis
+    logger.info(f"=== RENT ROLL ANALYZE TOOL CALLED === doc_id={document_id}, project_id={project_id}")
+    print(f"=== RENT ROLL ANALYZE TOOL CALLED === doc_id={document_id}, project_id={project_id}")
+
     if not document_id:
         return {'success': False, 'error': 'document_id is required'}
 
     try:
         from apps.documents.models import Document
-        from apps.knowledge.services.column_discovery import discover_columns, discovery_result_to_dict
+        from apps.knowledge.services.column_discovery import (
+            discover_columns_enhanced,
+            format_discovery_for_chat,
+        )
 
         try:
             document = Document.objects.get(doc_id=document_id, project_id=project_id)
         except Document.DoesNotExist:
+            logger.warning(f"=== RENT ROLL: Document {document_id} not found in project {project_id} ===")
             return {'success': False, 'error': f'Document {document_id} not found in this project'}
 
         if not document.storage_uri:
+            logger.warning(f"=== RENT ROLL: Document {document_id} has no storage_uri ===")
             return {'success': False, 'error': 'Document has no storage URI'}
 
-        result = discover_columns(
+        logger.info(f"=== RENT ROLL: Calling discover_columns_enhanced for {document.doc_name} (uri={document.storage_uri[:80]}...) ===")
+
+        # Get full analysis
+        full_result = discover_columns_enhanced(
             storage_uri=document.storage_uri,
+            project_id=project_id,
             mime_type=document.mime_type,
             file_name=document.doc_name,
-            project_id=project_id,
         )
 
-        response = discovery_result_to_dict(result)
-        response['success'] = True
-        response['document_id'] = document_id
+        logger.info(f"=== RENT ROLL: discover_columns_enhanced returned keys: {list(full_result.keys()) if isinstance(full_result, dict) else type(full_result)} ===")
+        print(f"=== RENT ROLL: discover_columns_enhanced returned keys: {list(full_result.keys()) if isinstance(full_result, dict) else type(full_result)} ===")
 
-        # Trim sample_values to 3 per column to stay within tool result truncation limit
-        for col in response.get('columns', []):
-            if len(col.get('sample_values', [])) > 3:
-                col['sample_values'] = col['sample_values'][:3]
+        # Format as compact summary for Claude + append behavioral rules
+        summary = format_discovery_for_chat(full_result)
 
-        return response
+        logger.info(f"=== RENT ROLL: Compact summary ({len(summary)} chars):\n{summary}\n===")
+        print(f"=== RENT ROLL: Compact summary ({len(summary)} chars) ===")
+
+        chat_display = f"{summary}\n{RENT_ROLL_BEHAVIORAL_RULES}"
+
+        logger.info(f"=== RENT ROLL: Final tool response: {len(chat_display)} chars ===")
+        print(f"=== RENT ROLL: Final tool response: {len(chat_display)} chars ===")
+
+        # Return dict (needed for result.get('success') in ai_handler tool tracking)
+        # The chat_display string is the primary content Claude will see via str(result)
+        return {
+            'success': True,
+            'document_id': document_id,
+            'document_name': document.doc_name,
+            'analysis': chat_display,
+            'is_structured': full_result.get('is_structured', True),
+        }
 
     except Exception as e:
-        logger.error(f"Error analyzing rent roll columns for doc {document_id}: {e}", exc_info=True)
+        logger.error(f"=== RENT ROLL ANALYZE TOOL FAILED: {e} ===", exc_info=True)
+        print(f"=== RENT ROLL ANALYZE TOOL FAILED: {e} ===")
+        import traceback
+        traceback.print_exc()
         return {'success': False, 'error': str(e)}
 
 
@@ -9530,11 +9578,16 @@ def handle_confirm_column_mapping(
         except Document.DoesNotExist:
             return {'success': False, 'error': f'Document {document_id} not found in this project'}
 
-        return apply_column_mapping(
+        result = apply_column_mapping(
             project_id=project_id,
             document_id=int(document_id),
             mappings=mappings,
         )
+
+        # Append behavioral nudge so Claude responds concisely
+        result['response_rules'] = CONFIRM_BEHAVIORAL_NUDGE.strip()
+
+        return result
 
     except Exception as e:
         logger.error(f"Error confirming column mapping for doc {document_id}: {e}", exc_info=True)

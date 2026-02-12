@@ -1,13 +1,25 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-10
-**Version:** 3.8
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility)
+**Last Updated:** 2026-02-11
+**Version:** 3.9
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + Rich Schema Refresh)
 
 ---
 
 ## 🎯 Executive Summary
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
+
+### 🆕 **Latest Update: Rich Schema Export Refresh (February 11, 2026)**
+
+**Schema Documentation Synced to Live Database**
+
+Refreshed the canonical rich schema snapshot to reflect live Neon DB state as of February 11, 2026.
+
+- ✅ **New export generated** - `docs/schema/landscape_rich_schema_2026-02-11.json`
+- ✅ **Current object counts captured** - 334 tables, 41 views, 1121 indexes, 956 constraints, 363 foreign keys, 61 triggers, 995 routines
+- ✅ **Delta vs prior snapshot (2026-02-09)** - +1 index (`core_doc_media.idx_doc_media_hash`), no table/view removals
+- ✅ **Export command verified** - `./scripts/export_schema.sh --verbose`
+- 📁 **Location:** `docs/schema/landscape_rich_schema_2026-02-11.json`
 
 ### 🆕 **Latest Update: Landscaper Stability & Rent Roll Visibility (February 10, 2026)**
 
@@ -339,7 +351,7 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-01-27)
+## Current State Snapshot (2026-02-11)
 
 ### 🆕 Latest Updates
 

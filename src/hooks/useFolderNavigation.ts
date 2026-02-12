@@ -21,6 +21,7 @@ import {
   getDefaultSubTabId,
   getFolderById,
   isValidFolderTab,
+  type AnalysisTypeTileConfig,
 } from '@/lib/utils/folderTabConfig';
 
 export interface UseFolderNavigationOptions {
@@ -28,6 +29,8 @@ export interface UseFolderNavigationOptions {
   propertyType?: string;
   /** Analysis type (e.g., 'Land Development', 'Income Property') - kept for compatibility */
   analysisType?: string;
+  /** Tile visibility config resolved from tbl_analysis_type_config */
+  tileConfig?: AnalysisTypeTileConfig | null;
 }
 
 export interface UseFolderNavigationReturn {
@@ -64,7 +67,7 @@ export interface UseFolderNavigationReturn {
 export function useFolderNavigation(
   options: UseFolderNavigationOptions = {}
 ): UseFolderNavigationReturn {
-  const { propertyType, analysisType } = options;
+  const { propertyType, analysisType, tileConfig } = options;
 
   const router = useRouter();
   const pathname = usePathname();
@@ -72,8 +75,8 @@ export function useFolderNavigation(
 
   // Get folder configuration for this property type and analysis type
   const folderConfig = useMemo(
-    () => createFolderConfig(propertyType, analysisType),
-    [propertyType, analysisType]
+    () => createFolderConfig(propertyType, analysisType, tileConfig),
+    [propertyType, analysisType, tileConfig]
   );
 
   // Get default values
@@ -88,18 +91,18 @@ export function useFolderNavigation(
     }
 
     // Validate folder exists in config
-    const folder = getFolderById(urlFolder, propertyType, analysisType);
+    const folder = getFolderById(urlFolder, propertyType, analysisType, tileConfig);
     if (!folder) {
       return defaultFolder;
     }
 
     return urlFolder;
-  }, [searchParams, defaultFolder, propertyType, analysisType]);
+  }, [searchParams, defaultFolder, propertyType, analysisType, tileConfig]);
 
   // Get default tab for current folder
   const defaultTab = useMemo(
-    () => getDefaultSubTabId(currentFolder, propertyType, analysisType),
-    [currentFolder, propertyType, analysisType]
+    () => getDefaultSubTabId(currentFolder, propertyType, analysisType, tileConfig),
+    [currentFolder, propertyType, analysisType, tileConfig]
   );
 
   // Read current tab from URL, validate, and fallback to default
@@ -111,34 +114,34 @@ export function useFolderNavigation(
     }
 
     // Validate tab exists in current folder
-    if (!isValidFolderTab(currentFolder, urlTab, propertyType, analysisType)) {
+    if (!isValidFolderTab(currentFolder, urlTab, propertyType, analysisType, tileConfig)) {
       return defaultTab;
     }
 
     return urlTab;
-  }, [searchParams, currentFolder, defaultTab, propertyType, analysisType]);
+  }, [searchParams, currentFolder, defaultTab, propertyType, analysisType, tileConfig]);
 
   // Check if a folder/tab combination is valid
   const isValid = useCallback(
-    (folder: string, tab: string) => isValidFolderTab(folder, tab, propertyType, analysisType),
-    [propertyType, analysisType]
+    (folder: string, tab: string) => isValidFolderTab(folder, tab, propertyType, analysisType, tileConfig),
+    [propertyType, analysisType, tileConfig]
   );
 
   // Navigate to a folder/tab combination
   const setFolderTab = useCallback(
     (folder: string, tab?: string) => {
       // Validate folder
-      const folderObj = getFolderById(folder, propertyType, analysisType);
+      const folderObj = getFolderById(folder, propertyType, analysisType, tileConfig);
       if (!folderObj) {
         console.warn(`Invalid folder: ${folder}`);
         return;
       }
 
       // If tab not provided, use default for this folder
-      const targetTab = tab || getDefaultSubTabId(folder, propertyType, analysisType);
+      const targetTab = tab || getDefaultSubTabId(folder, propertyType, analysisType, tileConfig);
 
       // Validate tab
-      if (!isValidFolderTab(folder, targetTab, propertyType, analysisType)) {
+      if (!isValidFolderTab(folder, targetTab, propertyType, analysisType, tileConfig)) {
         console.warn(`Invalid tab: ${targetTab} for folder: ${folder}`);
         return;
       }
@@ -151,7 +154,7 @@ export function useFolderNavigation(
       const newUrl = `${pathname}?${params.toString()}`;
       router.push(newUrl);
     },
-    [pathname, router, propertyType, analysisType]
+    [pathname, router, propertyType, analysisType, tileConfig]
   );
 
   // Navigate to a specific tab within the current folder

@@ -1,5 +1,10 @@
-import type { ComparableLocation } from '@/components/valuation/AddComparableModal';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
+
+export interface ComparableLocation {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+}
 
 export function buildSubjectLocationFromProject(project?: ProjectSummary): ComparableLocation | undefined {
   if (!project) return undefined;

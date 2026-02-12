@@ -193,7 +193,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
         zoom,
         pitch,
         bearing,
-        antialias: true
+        antialias: true,
+        scrollZoom: false,
       });
 
       map.on('load', () => {

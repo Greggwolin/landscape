@@ -103,33 +103,46 @@ export async function GET(_req: NextRequest, context: Params) {
     const { projectId } = await context.params
     if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
 
-    // Select all relevant fields including new template_id
+    // Select all relevant fields including tile visibility config
     const rows = await sql`
       SELECT
-        project_id,
-        project_name,
-        description,
-        location_description,
-        jurisdiction_city,
-        jurisdiction_county,
-        jurisdiction_state,
-        developer_owner,
-        acres_gross,
-        location_lat,
-        location_lon,
-        start_date,
-        analysis_start_date,
-        analysis_end_date,
-        analysis_type,
-        project_type_code,
-        project_type,
-        template_id,
-        planning_efficiency,
-        is_active,
-        created_at,
-        updated_at
-      FROM landscape.tbl_project
-      WHERE project_id = ${projectId}::bigint
+        p.project_id,
+        p.project_name,
+        p.description,
+        p.location_description,
+        p.jurisdiction_city,
+        p.jurisdiction_county,
+        p.jurisdiction_state,
+        p.developer_owner,
+        p.acres_gross,
+        p.location_lat,
+        p.location_lon,
+        p.start_date,
+        p.analysis_start_date,
+        p.analysis_end_date,
+        p.analysis_type,
+        p.project_type_code,
+        p.project_type,
+        p.template_id,
+        p.planning_efficiency,
+        CASE
+          WHEN c.analysis_type IS NULL THEN NULL
+          ELSE json_build_object(
+            'analysis_type', c.analysis_type,
+            'tile_hbu', c.tile_hbu,
+            'tile_valuation', c.tile_valuation,
+            'tile_capitalization', c.tile_capitalization,
+            'tile_returns', c.tile_returns,
+            'tile_development_budget', c.tile_development_budget
+          )
+        END AS tile_config,
+        p.is_active,
+        p.created_at,
+        p.updated_at
+      FROM landscape.tbl_project p
+      LEFT JOIN landscape.tbl_analysis_type_config c
+        ON c.analysis_type = p.analysis_type
+      WHERE p.project_id = ${projectId}::bigint
       LIMIT 1
     `
 

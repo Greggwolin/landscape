@@ -18,6 +18,7 @@ import base64
 import json
 import logging
 import os
+import re
 import tempfile
 import time
 from typing import Optional
@@ -59,7 +60,13 @@ OTHER:
 - other: None of the above
 
 Respond with ONLY a JSON object:
-{"classification": "<code>", "confidence": 0.XX, "reasoning": "<brief explanation>"}
+{"classification": "<code>", "confidence": 0.XX, "subject_hint": "<what this image is of>", "reasoning": "<brief explanation>"}
+
+subject_hint guidance:
+- Use a terse noun phrase only (NOT a sentence).
+- Prefer property/comparable name or street address.
+- No prefixes like "This image shows" or "Likely".
+- Keep subject_hint under 80 characters.
 
 Do not include any other text."""
 
@@ -147,21 +154,22 @@ class MediaClassificationService:
         for item in items:
             code = None
             confidence = 0.0
+            ai_description = None
             used_strategy = 'heuristic'
 
             if strategy in ('ai_vision', 'auto') and ai_count < self.AI_VISION_BATCH_LIMIT:
                 # Try AI vision
-                code, confidence = self._classify_ai_vision(item, doc_context)
+                code, confidence, ai_description = self._classify_ai_vision(item, doc_context)
                 if code and confidence >= self.MIN_AI_CONFIDENCE:
                     used_strategy = 'ai_vision'
                     ai_count += 1
                 else:
                     # AI failed or low confidence — fall back to heuristic
-                    code, confidence = self._classify_heuristic(item, doc_context)
+                    code, confidence, ai_description = self._classify_heuristic(item, doc_context)
                     used_strategy = 'heuristic'
             else:
                 # Heuristic only
-                code, confidence = self._classify_heuristic(item, doc_context)
+                code, confidence, ai_description = self._classify_heuristic(item, doc_context)
 
             # Validate code
             if code not in VALID_CODES:
@@ -180,6 +188,7 @@ class MediaClassificationService:
                 ai_classification=code,
                 ai_confidence=round(confidence, 4),
                 suggested_action=suggested_action,
+                ai_description=ai_description,
             )
 
             # Track summary
@@ -213,7 +222,7 @@ class MediaClassificationService:
     #  AI VISION CLASSIFICATION
     # ------------------------------------------------------------------ #
     def _classify_ai_vision(self, item: dict,
-                             doc_context: dict) -> tuple[Optional[str], float]:
+                             doc_context: dict) -> tuple[Optional[str], float, Optional[str]]:
         """
         Classify a single image using Claude vision API.
 
@@ -298,25 +307,29 @@ class MediaClassificationService:
             result = json.loads(result_text)
             code = result.get('classification', 'other')
             confidence = float(result.get('confidence', 0.5))
+            subject_hint = str(result.get('subject_hint') or '').strip()
+            ai_description = subject_hint or None
+            if ai_description:
+                ai_description = ai_description[:120]
 
             if code not in VALID_CODES:
                 code = 'other'
                 confidence = min(confidence, 0.30)
 
-            return code, confidence
+            return code, confidence, ai_description
 
         except json.JSONDecodeError:
             logger.warning(f"[media_id={item['media_id']}] AI vision returned non-JSON response")
-            return None, 0.0
+            return None, 0.0, None
         except Exception:
             logger.exception(f"[media_id={item['media_id']}] AI vision classification failed")
-            return None, 0.0
+            return None, 0.0, None
 
     # ------------------------------------------------------------------ #
     #  HEURISTIC CLASSIFICATION
     # ------------------------------------------------------------------ #
     def _classify_heuristic(self, item: dict,
-                             doc_context: dict) -> tuple[str, float]:
+                             doc_context: dict) -> tuple[str, float, Optional[str]]:
         """
         Classify using image metadata and page context.
 
@@ -338,10 +351,11 @@ class MediaClassificationService:
         nearby_text = ''
         if doc_context and page_num:
             nearby_text = doc_context.get('page_texts', {}).get(page_num, '')
+        heuristic_hint = self._build_subject_hint(nearby_text)
 
         # Rule 1: Very small images are likely logos/icons
         if width < 200 and height < 200:
-            return 'logo', 0.65
+            return 'logo', 0.65, heuristic_hint
 
         # Rule 2: Page captures with strong keyword signals → maps or plans
         # Only match when specific keywords are present; unmatched page captures
@@ -349,20 +363,20 @@ class MediaClassificationService:
         if method == 'page_capture':
             text_lower = nearby_text.lower() if nearby_text else ''
             if any(kw in text_lower for kw in ['zoning', 'zone', 'cr-', 'cb-', 'mu-', 'r-1', 'r-2', 'c-1', 'c-2']):
-                return 'zoning_map', 0.60
+                return 'zoning_map', 0.60, heuristic_hint
             if any(kw in text_lower for kw in ['site plan', 'plat', 'parcel', 'lot layout']):
-                return 'site_plan', 0.60
+                return 'site_plan', 0.60, heuristic_hint
             if any(kw in text_lower for kw in ['floor plan', 'floorplan', 'unit plan', 'unit layout']):
-                return 'floor_plan', 0.60
+                return 'floor_plan', 0.60, heuristic_hint
             if any(kw in text_lower for kw in ['chart', 'graph', 'trend', 'historical', 'comparison', 'summary']):
-                return 'chart', 0.50
+                return 'chart', 0.50, heuristic_hint
             if any(kw in text_lower for kw in ['master plan', 'planning area', 'land use plan', 'density']):
-                return 'planning_map', 0.55
+                return 'planning_map', 0.55, heuristic_hint
             # No strong keyword match — fall through to dimension-based rules
 
         # Rule 3: Very wide/panoramic images are likely aerial photos
         if width > 1000 and height > 0 and (width / height) > 2.5:
-            return 'aerial_photo', 0.55
+            return 'aerial_photo', 0.55, heuristic_hint
 
         # Rule 4: Square-ish large images — distinguish photos from graphics
         if width > 400 and height > 400:
@@ -372,36 +386,75 @@ class MediaClassificationService:
                 area = max(width * height, 1)
                 bytes_per_pixel = file_size / area if file_size else 0
                 if bytes_per_pixel > 0.5:
-                    return 'property_photo', 0.55
+                    return 'property_photo', 0.55, heuristic_hint
                 else:
-                    return 'rendering', 0.40
+                    return 'rendering', 0.40, heuristic_hint
 
         # Rule 5: Text-keyword matching from surrounding content
         if nearby_text:
             text_lower = nearby_text.lower()
             if any(kw in text_lower for kw in ['floor plan', 'floorplan', 'unit plan', 'layout']):
-                return 'floor_plan', 0.60
+                return 'floor_plan', 0.60, heuristic_hint
             if any(kw in text_lower for kw in ['before', 'after', 'renovation', 'rehab']):
-                return 'before_after', 0.50
+                return 'before_after', 0.50, heuristic_hint
             if any(kw in text_lower for kw in ['chart', 'graph', 'trend', 'historical']):
-                return 'chart', 0.55
+                return 'chart', 0.55, heuristic_hint
             if any(kw in text_lower for kw in ['render', 'concept', 'proposed', 'architect']):
-                return 'rendering', 0.50
+                return 'rendering', 0.50, heuristic_hint
             if any(kw in text_lower for kw in ['site plan', 'plat', 'master plan']):
-                return 'site_plan', 0.55
+                return 'site_plan', 0.55, heuristic_hint
             if any(kw in text_lower for kw in ['aerial', 'drone', 'bird']):
-                return 'aerial_photo', 0.50
+                return 'aerial_photo', 0.50, heuristic_hint
             if any(kw in text_lower for kw in ['zoning', 'zone map']):
-                return 'zoning_map', 0.50
+                return 'zoning_map', 0.50, heuristic_hint
             if any(kw in text_lower for kw in ['location', 'submarket', 'vicinity']):
-                return 'location_map', 0.50
+                return 'location_map', 0.50, heuristic_hint
 
         # Rule 6: Medium-sized images with no context — likely property photos
         if width > 300 and height > 200:
-            return 'property_photo', 0.35
+            return 'property_photo', 0.35, heuristic_hint
 
         # Rule 7: Fallback
-        return 'other', 0.30
+        return 'other', 0.30, heuristic_hint
+
+    def _build_subject_hint(self, nearby_text: str) -> Optional[str]:
+        """Create a compact hint only when high-confidence tokens are present."""
+        if not nearby_text:
+            return None
+
+        cleaned = ' '.join(nearby_text.replace('\n', ' ').split())
+        if len(cleaned) < 8:
+            return None
+
+        # Address-like pattern (e.g., 123 Main St, 5000 N 7th Ave)
+        address_match = re.search(
+            r'\b\d{2,6}\s+[A-Za-z0-9.\- ]{2,40}\s(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Ct|Court|Pkwy|Parkway)\b',
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        if address_match:
+            return address_match.group(0)[:80].strip()
+
+        # Comparable-like token (e.g., "Comp 3", "Comparable 2")
+        comp_match = re.search(
+            r'\b(?:Comp|Comparable)\s*(?:Sale|Rent|Rental)?\s*#?\s*[A-Za-z0-9\-]{1,8}\b',
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        if comp_match:
+            return comp_match.group(0)[:80].strip()
+
+        # Subject-property references
+        subject_match = re.search(
+            r'\b(?:Subject Property|Property Name|Project Name)\b[:\s-]*([A-Za-z0-9&\-. ]{3,60})',
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        if subject_match:
+            return subject_match.group(1).strip()[:80]
+
+        # Avoid noisy narrative snippets when no strong pattern is found.
+        return None
 
     # ------------------------------------------------------------------ #
     #  PAGE CONTEXT
@@ -645,7 +698,8 @@ class MediaClassificationService:
 
     def _update_classification(self, media_id: int, classification_id: int,
                                 ai_classification: str, ai_confidence: float,
-                                suggested_action: str):
+                                suggested_action: str,
+                                ai_description: Optional[str] = None):
         """Update a core_doc_media record with classification results."""
         with connection.cursor() as c:
             c.execute("""
@@ -654,11 +708,12 @@ class MediaClassificationService:
                     ai_classification = %s,
                     ai_confidence = %s,
                     suggested_action = %s,
+                    ai_description = %s,
                     status = 'classified',
                     updated_at = NOW()
                 WHERE media_id = %s
             """, [classification_id, ai_classification, ai_confidence,
-                  suggested_action, media_id])
+                  suggested_action, ai_description, media_id])
 
     def _set_media_scan_status(self, doc_id: int, status: str):
         """Update media_scan_status on core_doc."""

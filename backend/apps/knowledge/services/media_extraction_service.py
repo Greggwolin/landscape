@@ -7,6 +7,7 @@ Two operational modes:
   - scan_only (scan_document):  Detect images, populate media_scan_json, create 'pending' records
   - extract  (extract_media):   Actually extract images, store files, create 'extracted' records
 """
+import hashlib
 import json
 import logging
 import os
@@ -182,12 +183,13 @@ class MediaExtractionService:
             return []
 
         results = []
+        seen_hashes: set[str] = set()  # SHA-256 dedup within this document
         try:
             doc = fitz.open(tmp_path)
             try:
                 for record in pending:
                     try:
-                        result = self._extract_single(doc, record, project_id, doc_id)
+                        result = self._extract_single(doc, record, project_id, doc_id, seen_hashes)
                         results.append(result)
                     except Exception:
                         logger.exception(
@@ -378,7 +380,8 @@ class MediaExtractionService:
     #  INTERNAL: _extract_single
     # ------------------------------------------------------------------ #
     def _extract_single(self, doc: fitz.Document, record: dict,
-                        project_id: int, doc_id: int) -> dict:
+                        project_id: int, doc_id: int,
+                        seen_hashes: set[str] = None) -> dict:
         """Extract a single media item (embedded or page capture)."""
         media_id = record['media_id']
         method = record['extraction_method']
@@ -387,11 +390,11 @@ class MediaExtractionService:
         if method == 'embedded':
             return self._extract_single_embedded(
                 doc, page_num, record.get('source_region', {}),
-                project_id, doc_id, media_id
+                project_id, doc_id, media_id, seen_hashes
             )
         elif method == 'page_capture':
             return self._render_page_capture(
-                doc, page_num, project_id, doc_id, media_id
+                doc, page_num, project_id, doc_id, media_id, seen_hashes
             )
         else:
             return {'media_id': media_id, 'status': 'error', 'error': f'Unknown method: {method}'}
@@ -402,7 +405,8 @@ class MediaExtractionService:
     def _extract_single_embedded(self, doc: fitz.Document, page_num: int,
                                   source_region: dict,
                                   project_id: int, doc_id: int,
-                                  media_id: int) -> dict:
+                                  media_id: int,
+                                  seen_hashes: set[str] = None) -> dict:
         """Extract a single embedded image from a PDF."""
         xref = source_region.get('xref')
         if not xref:
@@ -445,6 +449,19 @@ class MediaExtractionService:
         if ext == 'jpg':
             mime_type = 'image/jpeg'
 
+        # Compute SHA-256 hash for deduplication
+        image_hash = hashlib.sha256(image_bytes).hexdigest()
+        if seen_hashes is not None:
+            if image_hash in seen_hashes:
+                logger.info(f"[media_id={media_id}] Skipping duplicate image (hash={image_hash[:12]}...)")
+                self._update_media_record(
+                    media_id=media_id, status='rejected',
+                    image_hash=image_hash,
+                    discard_reason_code='duplicate',
+                )
+                return {'media_id': media_id, 'status': 'skipped', 'reason': 'duplicate'}
+            seen_hashes.add(image_hash)
+
         # Build output paths (relative to media_root)
         rel_dir = f"{project_id}/{doc_id}/embedded"
         output_dir = self.media_root / rel_dir
@@ -476,6 +493,7 @@ class MediaExtractionService:
             file_size_bytes=file_size,
             width_px=width,
             height_px=height,
+            image_hash=image_hash,
             status='extracted',
         )
 
@@ -499,7 +517,8 @@ class MediaExtractionService:
     # ------------------------------------------------------------------ #
     def _render_page_capture(self, doc: fitz.Document, page_num: int,
                               project_id: int, doc_id: int,
-                              media_id: int, dpi: int = None) -> dict:
+                              media_id: int, seen_hashes: set[str] = None,
+                              dpi: int = None) -> dict:
         """Render an entire PDF page as a high-res PNG image."""
         dpi = dpi or self.PAGE_CAPTURE_DPI
         page = doc[page_num - 1]  # Convert 1-indexed to 0-indexed
@@ -512,6 +531,19 @@ class MediaExtractionService:
         image_bytes = pix.tobytes('png')
         width = pix.width
         height = pix.height
+
+        # Compute SHA-256 hash for deduplication
+        image_hash = hashlib.sha256(image_bytes).hexdigest()
+        if seen_hashes is not None:
+            if image_hash in seen_hashes:
+                logger.info(f"[media_id={media_id}] Skipping duplicate page capture (hash={image_hash[:12]}...)")
+                self._update_media_record(
+                    media_id=media_id, status='rejected',
+                    image_hash=image_hash,
+                    discard_reason_code='duplicate',
+                )
+                return {'media_id': media_id, 'status': 'skipped', 'reason': 'duplicate'}
+            seen_hashes.add(image_hash)
 
         # Build output paths
         rel_dir = f"{project_id}/{doc_id}/pages"
@@ -543,6 +575,7 @@ class MediaExtractionService:
             file_size_bytes=file_size,
             width_px=width,
             height_px=height,
+            image_hash=image_hash,
             dpi=dpi,
             status='extracted',
         )

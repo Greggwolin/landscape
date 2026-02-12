@@ -31,6 +31,7 @@ type RawProjectRow = {
   property_subtype?: string | null
   property_class?: string | null
   analysis_mode?: string | null
+  tile_config?: AnalysisTypeTileConfig | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
   updated_at?: string | null
@@ -39,6 +40,23 @@ type RawProjectRow = {
 type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
 
 type PostgresError = Error & { code?: string }
+type AnalysisTypeConfigRow = {
+  analysis_type: string
+  tile_hbu: boolean
+  tile_valuation: boolean
+  tile_capitalization: boolean
+  tile_returns: boolean
+  tile_development_budget: boolean
+}
+
+type AnalysisTypeTileConfig = {
+  analysis_type: string
+  tile_hbu: boolean
+  tile_valuation: boolean
+  tile_capitalization: boolean
+  tile_returns: boolean
+  tile_development_budget: boolean
+}
 
 const PROPERTY_TYPE_FALLBACKS: Array<[RegExp, string]> = [
   [/retail/i, 'COMMERCIAL'],
@@ -83,6 +101,51 @@ function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: s
   if (!projectType) return null
   const match = PROPERTY_TYPE_FALLBACKS.find(([pattern]) => pattern.test(projectType))
   return match ? match[1] : null
+}
+
+async function queryAnalysisTypeConfigs(): Promise<Map<string, AnalysisTypeTileConfig>> {
+  try {
+    const rows = await sql<AnalysisTypeConfigRow[]>`
+      SELECT
+        analysis_type,
+        tile_hbu,
+        tile_valuation,
+        tile_capitalization,
+        tile_returns,
+        tile_development_budget
+      FROM landscape.tbl_analysis_type_config
+    `
+
+    return new Map(
+      rows.map((row) => [
+        row.analysis_type?.toUpperCase(),
+        {
+          analysis_type: row.analysis_type?.toUpperCase() ?? '',
+          tile_hbu: Boolean(row.tile_hbu),
+          tile_valuation: Boolean(row.tile_valuation),
+          tile_capitalization: Boolean(row.tile_capitalization),
+          tile_returns: Boolean(row.tile_returns),
+          tile_development_budget: Boolean(row.tile_development_budget),
+        },
+      ])
+    )
+  } catch (error) {
+    console.warn('Failed to query analysis type configs:', error)
+    return new Map()
+  }
+}
+
+function attachTileConfigToProjects(
+  projects: RawProjectRow[],
+  analysisTypeConfigs: Map<string, AnalysisTypeTileConfig>
+): RawProjectRow[] {
+  return projects.map((project) => {
+    const key = project.analysis_type?.toUpperCase() ?? ''
+    return {
+      ...project,
+      tile_config: key ? analysisTypeConfigs.get(key) ?? null : null,
+    }
+  })
 }
 
 async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]> {
@@ -164,6 +227,7 @@ export async function GET(request: NextRequest) {
   const propertyTypeFilter = searchParams.get('property_type')
   const includeInactiveParam = searchParams.get('include_inactive')
   const includeInactive = includeInactiveParam === null || includeInactiveParam === 'true'
+  const analysisTypeConfigs = await queryAnalysisTypeConfigs()
 
   // Check for Authorization header - if present, proxy to Django for user-scoped filtering
   const authHeader = request.headers.get('Authorization')
@@ -195,10 +259,11 @@ export async function GET(request: NextRequest) {
           is_active: project.is_active ?? true,
           analysis_mode: project.analysis_mode ?? 'napkin',
         }))
+        const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
         const filtered = propertyTypeFilter
-          ? normalized.filter((project: RawProjectRow) => project.project_type_code === propertyTypeFilter.toUpperCase())
-          : normalized
+          ? withTileConfig.filter((project: RawProjectRow) => project.project_type_code === propertyTypeFilter.toUpperCase())
+          : withTileConfig
 
         console.log(`Django returned ${filtered.length} projects for authenticated user`)
         return NextResponse.json(filtered)
@@ -233,10 +298,11 @@ export async function GET(request: NextRequest) {
       is_active: project.is_active ?? true,
       analysis_mode: project.analysis_mode ?? 'napkin',
     }))
+    const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
     const filtered = propertyTypeFilter
-      ? normalized.filter((project) => project.project_type_code === propertyTypeFilter.toUpperCase())
-      : normalized
+      ? withTileConfig.filter((project) => project.project_type_code === propertyTypeFilter.toUpperCase())
+      : withTileConfig
 
     console.log('Found projects:', filtered.length)
     return NextResponse.json(filtered)

@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ComparablesGrid } from '../ComparablesGrid';
 import { ComparablesMap } from '../ComparablesMap';
-import { AddComparableModal } from '@/components/valuation/AddComparableModal';
+import { SalesCompDetailModal } from '../SalesCompDetailModal';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { buildSubjectLocationFromProject } from '@/lib/valuation/subjectLocation';
-import type { LandComparable, SalesComparable } from '@/types/valuation';
+import { deleteSalesComparable } from '@/lib/api/valuation';
+import type { SalesComparable } from '@/types/valuation';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -13,45 +15,10 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-const numberFormatter = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 2,
-});
-
-function buildMapComparables(comparables: LandComparable[]): SalesComparable[] {
-  return comparables.map((comp) => ({
-    comparable_id: comp.land_comparable_id,
-    project_id: comp.project_id,
-    comp_number: comp.comp_number ?? 0,
-    property_name: comp.address,
-    address: comp.address,
-    city: comp.city,
-    state: comp.state,
-    zip: comp.zip,
-    sale_date: comp.sale_date,
-    sale_price: comp.sale_price,
-    price_per_unit: comp.price_per_sf,
-    price_per_sf: comp.price_per_sf,
-    year_built: null,
-    units: null,
-    building_sf: comp.land_area_sf,
-    cap_rate: null,
-    grm: null,
-    distance_from_subject: null,
-    latitude: comp.latitude,
-    longitude: comp.longitude,
-    unit_mix: null,
-    notes: comp.notes,
-    adjustments: [],
-    ai_suggestions: [],
-    adjusted_price_per_unit: comp.price_per_sf,
-    total_adjustment_pct: 0,
-    created_at: comp.created_at,
-    updated_at: comp.updated_at,
-  }));
-}
+const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 
 interface LandValueSectionProps {
-  comparables: LandComparable[];
+  comparables: SalesComparable[];
   loading: boolean;
   onRefresh?: () => void;
   projectId: number;
@@ -64,167 +31,178 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
     [activeProject]
   );
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const mapComparables = buildMapComparables(comparables);
+  const [editingComp, setEditingComp] = useState<SalesComparable | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
   const hasEntries = comparables.length > 0;
-  const totalAcres = comparables.reduce((sum, comp) => sum + (comp.land_area_acres ?? 0), 0);
+
+  const totalAcres = comparables.reduce(
+    (sum, comp) => sum + (comp.land_area_acres ?? (comp.units != null ? Number(comp.units) : 0)),
+    0
+  );
   const avgPricePerSf = comparables.length
     ? comparables.reduce((sum, comp) => sum + (comp.price_per_sf ?? 0), 0) / comparables.length
     : 0;
-  const indicatedValue = Math.round(avgPricePerSf * (comparables.reduce((sum, comp) => sum + (comp.land_area_sf ?? 0), 0)));
+  const totalLandSf = comparables.reduce((sum, comp) => {
+    if (comp.land_area_sf != null) return sum + Number(comp.land_area_sf);
+    if (comp.land_area_acres != null) return sum + (Number(comp.land_area_acres) * 43560);
+    if (comp.units != null) return sum + (Number(comp.units) * 43560);
+    return sum;
+  }, 0);
+  const indicatedValue = Math.round(
+    avgPricePerSf * totalLandSf
+  );
+
+  const handleDeleteComp = useCallback(async (compId: number) => {
+    try {
+      await deleteSalesComparable(projectId, compId);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete land comparable:', err);
+    }
+  }, [projectId, onRefresh]);
+
+  const handleEditComp = useCallback((comp: SalesComparable) => {
+    setEditingComp(comp);
+    setIsAddModalOpen(true);
+  }, []);
+
+  const subjectMapProperty = useMemo(() => {
+    if (!subjectLocation) return undefined;
+    return {
+      latitude: subjectLocation.latitude,
+      longitude: subjectLocation.longitude,
+      name: activeProject?.project_name ?? 'Subject',
+    };
+  }, [subjectLocation, activeProject]);
 
   return (
-    <section className="rounded-lg border p-5" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-      <div className="flex items-center justify-between mb-4">
+    <div
+      className="card"
+      style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        borderColor: 'var(--cui-border-color)',
+      }}
+    >
+      <div
+        className="card-header d-flex align-items-center justify-content-between"
+        style={{ backgroundColor: 'var(--cui-card-header-bg)' }}
+      >
         <div>
-          <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+          <h5 className="mb-0" style={{ color: 'var(--cui-body-color)' }}>
             Land Value
-          </h3>
-          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
-            Use the newest land comps to derive the indicated land value.
-          </p>
+          </h5>
+          <small style={{ color: 'var(--cui-secondary-color)' }}>
+            Comparable land sales and adjustments
+          </small>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-3 py-1 rounded text-sm font-medium"
-            style={{
-              backgroundColor: 'var(--cui-primary)',
-              border: '1px solid transparent',
-              color: 'white',
-            }}
-          >
-            Add Land Comparable
-          </button>
+        <div className="d-flex gap-2">
           <button
             onClick={onRefresh}
-            className="px-3 py-1 rounded text-sm"
-            style={{
-              backgroundColor: 'var(--cui-tertiary-bg)',
-              border: '1px solid var(--cui-border-color)',
-              color: 'var(--cui-body-color)',
-            }}
+            className="btn btn-sm btn-outline-secondary"
           >
             Refresh
           </button>
         </div>
       </div>
 
-      {loading && !hasEntries && (
-        <div className="text-center py-10" style={{ color: 'var(--cui-secondary-color)' }}>
-          Loading land comparables...
-        </div>
-      )}
-
-      {!loading && !hasEntries && (
-        <div className="text-center py-8" style={{ color: 'var(--cui-secondary-color)' }}>
-          No land comparables yet.
-        </div>
-      )}
-
-      {hasEntries && (
-        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <div className="overflow-auto rounded border" style={{ borderColor: 'var(--cui-border-color)' }}>
-              <table className="w-full text-sm" style={{ color: 'var(--cui-body-color)' }}>
-                <thead>
-                  <tr>
-                    <th className="py-2 px-2 text-left">#</th>
-                    <th className="py-2 px-2 text-left">Address</th>
-                    <th className="py-2 px-2 text-left">City/State</th>
-                    <th className="py-2 px-2 text-left">Sale Date</th>
-                    <th className="py-2 px-2 text-right">Sale Price</th>
-                    <th className="py-2 px-2 text-right">Land SF</th>
-                    <th className="py-2 px-2 text-right">Acres</th>
-                    <th className="py-2 px-2 text-right">$/SF</th>
-                    <th className="py-2 px-2 text-right">$/Acre</th>
-                    <th className="py-2 px-2 text-left">Zoning</th>
-                    <th className="py-2 px-2 text-left">Source</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparables.map((comp) => (
-                    <tr key={comp.land_comparable_id}>
-                      <td className="py-2 px-2 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                        {comp.comp_number ?? comp.land_comparable_id}
-                      </td>
-                      <td className="py-2 px-2 text-sm">{comp.address}</td>
-                      <td className="py-2 px-2 text-sm">
-                        {[comp.city, comp.state].filter(Boolean).join(', ')}
-                      </td>
-                      <td className="py-2 px-2 text-sm">{comp.sale_date ?? '—'}</td>
-                      <td className="py-2 px-2 text-right">{comp.sale_price ? currencyFormatter.format(comp.sale_price) : '—'}</td>
-                      <td className="py-2 px-2 text-right">{comp.land_area_sf ? numberFormatter.format(comp.land_area_sf) : '—'}</td>
-                      <td className="py-2 px-2 text-right">{comp.land_area_acres ? numberFormatter.format(comp.land_area_acres) : '—'}</td>
-                      <td className="py-2 px-2 text-right">{comp.price_per_sf ? currencyFormatter.format(comp.price_per_sf) : '—'}</td>
-                      <td className="py-2 px-2 text-right">{comp.price_per_acre ? currencyFormatter.format(comp.price_per_acre) : '—'}</td>
-                      <td className="py-2 px-2 text-sm">{comp.zoning || '—'}</td>
-                      <td className="py-2 px-2 text-sm">{comp.source || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      <div className="card-body p-0">
+        {loading && !hasEntries && (
+          <div className="text-center py-5" style={{ color: 'var(--cui-secondary-color)' }}>
+            Loading land comparables...
           </div>
-          <div>
-            <div className="rounded border" style={{ borderColor: 'var(--cui-border-color)', minHeight: '340px' }}>
-              <ComparablesMap
-                comparables={mapComparables}
-                height="360px"
-                subjectProperty={
-                  mapComparables[0] && mapComparables[0].latitude && mapComparables[0].longitude
-                    ? {
-                        latitude: mapComparables[0].latitude,
-                        longitude: mapComparables[0].longitude,
-                        name: mapComparables[0].property_name ?? 'Subject'
-                      }
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-        </div>
-      )}
+        )}
 
-      {hasEntries && (
-        <div className="mt-4 rounded border p-4" style={{ borderColor: 'var(--cui-border-color)' }}>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-xs uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-                Avg $/SF (adjusted)
-              </div>
-              <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                {currencyFormatter.format(avgPricePerSf)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-                Subject Land Acres
-              </div>
-              <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                {numberFormatter.format(totalAcres)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
-                Indicated Value
-              </div>
-              <div className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                {currencyFormatter.format(indicatedValue)}
-              </div>
-            </div>
+        {!loading && !hasEntries && (
+          <div className="text-center py-5" style={{ color: 'var(--cui-secondary-color)' }}>
+            <div style={{ fontSize: 48, marginBottom: 8, opacity: 0.4 }}>🏗</div>
+            <p className="mb-2">No land comparables yet.</p>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="btn btn-sm btn-primary"
+            >
+              Add First Comparable
+            </button>
           </div>
-        </div>
-      )}
-      <AddComparableModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={() => {
-          onRefresh?.();
-        }}
+        )}
+
+        {hasEntries && (
+          <>
+            {/* Grid + Map side-by-side — matches Sales Comparison tab layout */}
+            <div
+              className="d-grid"
+              style={{ gridTemplateColumns: 'auto 1fr', alignItems: 'stretch', gap: '1rem', padding: '1rem 1rem 0' }}
+            >
+              <div ref={gridRef}>
+                <ComparablesGrid
+                  comparables={comparables}
+                  projectId={projectId}
+                  onEdit={handleEditComp}
+                  onDelete={handleDeleteComp}
+                  onRefresh={onRefresh}
+                  onAddComp={() => setIsAddModalOpen(true)}
+                  mode="land"
+                />
+              </div>
+              <div style={{ paddingBottom: '1rem' }}>
+                <ComparablesMap
+                  comparables={comparables}
+                  height="100%"
+                  subjectProperty={subjectMapProperty}
+                />
+              </div>
+            </div>
+
+            {/* Indicated Value Summary */}
+            <div
+              className="p-3"
+              style={{ borderTop: '1px solid var(--cui-border-color)' }}
+            >
+              <div className="row g-3 small">
+                <div className="col-4">
+                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                    Avg $/SF (Adjusted)
+                  </div>
+                  <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {currencyFormatter.format(avgPricePerSf)}
+                  </div>
+                </div>
+                <div className="col-4">
+                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                    Subject Land Acres
+                  </div>
+                  <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {numberFormatter.format(totalAcres)}
+                  </div>
+                </div>
+                <div className="col-4">
+                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                    Indicated Value
+                  </div>
+                  <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                    {currencyFormatter.format(indicatedValue)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <SalesCompDetailModal
         projectId={projectId}
-        compType="land"
+        comparableId={editingComp?.comparable_id}
+        propertyType="LAND"
+        isOpen={isAddModalOpen}
+        onClose={() => { setIsAddModalOpen(false); setEditingComp(null); }}
+        onSaved={() => { onRefresh?.(); }}
+        compNumber={editingComp
+          ? (editingComp.comp_number ?? comparables.indexOf(editingComp) + 1)
+          : comparables.length + 1
+        }
+        allComparables={comparables}
         subjectLocation={subjectLocation}
       />
-    </section>
+    </div>
   );
 }

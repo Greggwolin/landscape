@@ -9,6 +9,14 @@ from .models_finance_structure import (
     ParticipationPayment,
 )
 from .models_valuation import (
+    SalesComparable,
+    SalesCompUnitMix,
+    SalesCompTenant,
+    SalesCompAdjustment,
+    LkpSaleType,
+    LkpPriceStatus,
+    LkpBuyerSellerType,
+    LkpBuildingClass,
     HBUAnalysis,
     HBUComparableUse,
     HBUZoningDocument,
@@ -17,6 +25,122 @@ from .models_valuation import (
 
 # Import scenario admin (registers itself with @admin.register decorators)
 from . import admin_scenario  # noqa: F401
+
+
+class SalesCompUnitMixInline(admin.TabularInline):
+    """Inline admin for multifamily unit mix rows."""
+
+    model = SalesCompUnitMix
+    extra = 0
+
+
+class SalesCompTenantInline(admin.TabularInline):
+    """Inline admin for tenant roster rows."""
+
+    model = SalesCompTenant
+    extra = 0
+
+
+class SalesCompAdjustmentInline(admin.TabularInline):
+    """Inline admin for sales comp adjustments."""
+
+    model = SalesCompAdjustment
+    extra = 0
+
+
+@admin.register(SalesComparable)
+class SalesComparableAdmin(admin.ModelAdmin):
+    """Admin interface for sales comparables."""
+
+    list_display = [
+        'comparable_id',
+        'property_name',
+        'address',
+        'city',
+        'state',
+        'sale_date',
+        'sale_price',
+        'property_type',
+    ]
+    list_filter = ['property_type', 'building_class', 'sale_type', 'state']
+    search_fields = ['costar_comp_id', 'property_name', 'address', 'city']
+    date_hierarchy = 'sale_date'
+    autocomplete_fields = ['project']
+    inlines = [SalesCompUnitMixInline, SalesCompTenantInline, SalesCompAdjustmentInline]
+
+    fieldsets = (
+        ('Identification', {
+            'fields': ('project', 'comp_number', 'costar_comp_id', 'property_name', 'address', 'city', 'state', 'zip')
+        }),
+        ('Transaction', {
+            'fields': ('sale_date', 'sale_price', 'asking_price', 'price_per_unit', 'price_per_sf', 'actual_cap_rate', 'sale_type')
+        }),
+        ('Property', {
+            'fields': ('property_type', 'property_subtype', 'building_class', 'year_built', 'unit_count', 'building_sf')
+        }),
+    )
+
+
+@admin.register(SalesCompUnitMix)
+class SalesCompUnitMixAdmin(admin.ModelAdmin):
+    """Admin interface for unit mix rows."""
+
+    list_display = ['unit_mix_id', 'comparable', 'bed_count', 'bath_count', 'unit_count', 'avg_unit_sf']
+    list_filter = ['bed_count', 'is_rent_regulated']
+    search_fields = ['comparable__property_name', 'comparable__address', 'unit_type']
+    autocomplete_fields = ['comparable']
+
+
+@admin.register(SalesCompTenant)
+class SalesCompTenantAdmin(admin.ModelAdmin):
+    """Admin interface for tenant rows."""
+
+    list_display = ['tenant_id', 'tenant_name', 'comparable', 'leased_sf', 'lease_expiration_date', 'is_anchor']
+    list_filter = ['is_anchor', 'lease_type', 'tenant_type']
+    search_fields = ['tenant_name', 'comparable__property_name', 'comparable__address']
+    autocomplete_fields = ['comparable']
+
+
+@admin.register(SalesCompAdjustment)
+class SalesCompAdjustmentAdmin(admin.ModelAdmin):
+    """Admin interface for adjustment rows."""
+
+    list_display = ['adjustment_id', 'comparable', 'adjustment_type', 'adjustment_pct', 'adjustment_amount']
+    list_filter = ['adjustment_type', 'ai_accepted']
+    search_fields = ['comparable__property_name', 'comparable__address', 'justification']
+    autocomplete_fields = ['comparable']
+
+
+@admin.register(LkpSaleType)
+class LkpSaleTypeAdmin(admin.ModelAdmin):
+    """Admin interface for sale type lookup rows."""
+
+    list_display = ['code', 'display_name', 'sort_order']
+    search_fields = ['code', 'display_name']
+
+
+@admin.register(LkpPriceStatus)
+class LkpPriceStatusAdmin(admin.ModelAdmin):
+    """Admin interface for price status lookup rows."""
+
+    list_display = ['code', 'display_name', 'reliability_score']
+    search_fields = ['code', 'display_name']
+
+
+@admin.register(LkpBuyerSellerType)
+class LkpBuyerSellerTypeAdmin(admin.ModelAdmin):
+    """Admin interface for buyer/seller type lookup rows."""
+
+    list_display = ['code', 'display_name', 'sort_order']
+    search_fields = ['code', 'display_name']
+
+
+@admin.register(LkpBuildingClass)
+class LkpBuildingClassAdmin(admin.ModelAdmin):
+    """Admin interface for building class lookup rows."""
+
+    list_display = ['code', 'display_name']
+    search_fields = ['code', 'display_name']
 
 
 # BudgetItem and ActualItem admin temporarily disabled

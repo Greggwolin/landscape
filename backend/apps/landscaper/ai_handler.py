@@ -913,11 +913,15 @@ Returns:
     {
         "name": "analyze_rent_roll_columns",
         "description": """Analyze a structured rent roll file (Excel/CSV) and discover its columns.
-Returns each column with: source name, sample values, proposed Landscape field mapping,
-confidence level (high/medium/low/none), and data type hint.
+Returns comprehensive analysis including:
+- Column mappings with confidence levels and sample values
+- Existing data comparison (how many units already exist, field gaps)
+- Plan/Type field status (can Plan be derived from Bed/Bath?)
+- Dynamic column offers for valuable unmapped data (Tags, Delinquency, etc.)
+- Suggested import action (create all, fill blanks, update, etc.)
 
 Use this BEFORE extraction when a user uploads an Excel or CSV rent roll.
-The user should confirm or adjust the proposed mappings before extraction begins.
+Present the full analysis conversationally and wait for user confirmation.
 
 Do NOT use this for PDF rent rolls - they go through the normal extraction pipeline.""",
         "input_schema": {
@@ -933,16 +937,21 @@ Do NOT use this for PDF rent rolls - they go through the normal extraction pipel
     },
     {
         "name": "confirm_column_mapping",
-        "description": """Apply confirmed column mappings and start rent roll extraction.
-Call this AFTER the user has reviewed and confirmed the mapping proposal from analyze_rent_roll_columns.
+        "description": """Execute the confirmed column mapping and start rent roll extraction.
+Call this IMMEDIATELY when user confirms their choice (e.g., says 'A', 'proceed', 'go ahead', 'yes').
+Do NOT re-present the analysis or ask for confirmation again before calling this tool.
 
 Each mapping entry specifies the source column and which Landscape field it maps to.
 Standard fields: unit_number, building_name, unit_type, bedrooms, bathrooms, square_feet,
 occupancy_status, tenant_name, lease_start, lease_end, move_in_date, current_rent,
 market_rent, renovation_status, renovation_date, renovation_cost.
 
-For columns that don't match a standard field, set target_field to null (they will be skipped).
-The extraction runs asynchronously - report the job_id to the user.""",
+BD/BA columns should be split into bedrooms (integer) and bathrooms (decimal).
+Plan (unit_type) auto-derives from Bed/Bath — do not map BD/BA to unit_type directly.
+
+For unmapped columns with valuable data, set create_dynamic=true with a dynamic_column_name
+and data_type to create new columns. For columns to skip, set target_field to null.
+The extraction runs asynchronously - report the job_id in 1-2 sentences.""",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -962,6 +971,18 @@ The extraction runs asynchronously - report the job_id to the user.""",
                             "target_field": {
                                 "type": ["string", "null"],
                                 "description": "Landscape standard field name (e.g., 'unit_number', 'current_rent'), or null to skip"
+                            },
+                            "create_dynamic": {
+                                "type": "boolean",
+                                "description": "If true, create a new dynamic column for this data"
+                            },
+                            "dynamic_column_name": {
+                                "type": "string",
+                                "description": "Display name for the new dynamic column (required if create_dynamic=true)"
+                            },
+                            "data_type": {
+                                "type": "string",
+                                "description": "Data type for dynamic column: text, number, currency, boolean, date, percent"
                             }
                         },
                         "required": ["source_column"]
@@ -4594,19 +4615,74 @@ For manual extraction (more control):
 2. Use bulk_update_fields to update specific fields
 3. Report what you updated
 
-RENT ROLL COLUMN MAPPING (for Excel/CSV rent rolls):
-When you see a message like "I've uploaded [filename] (document ID: X). Please analyze the columns for rent roll mapping.":
-1. Call analyze_rent_roll_columns with the document_id
-2. Present results conversationally, grouped by confidence:
-   - HIGH confidence: List briefly ("Unit #, Rent, SqFt → mapped automatically")
-   - MEDIUM confidence: Show proposed mapping with sample values, ask to confirm
-   - LOW/NONE confidence: Show sample values, ask what field to map to or skip
-3. Wait for user confirmation or adjustments
-4. Call confirm_column_mapping with the final mappings array
-5. Report the job_id and that extraction is running
+RENT ROLL EXTRACTION BEHAVIOR:
 
-Keep presentation concise. If all columns are high confidence, summarize and ask for a single confirmation.
-Focus conversation on ambiguous columns. Columns not assigned to a standard field will be skipped.
+When the user uploads a rent roll file and you call analyze_rent_roll_columns, follow these rules strictly:
+
+ANALYSIS PHASE (one response only):
+Present your analysis in a SINGLE concise message with these sections. Use short labels, not full paragraphs:
+
+  EXISTING DATA: [count] units in DB, [count] in file. [X matching, Y new, Z DB-only].
+  If counts don't match the file's stated total, flag it: "File says 113 total but I found [X]. [Y] units may need cleanup."
+
+  COLUMN MAPPING:
+  Auto-mapped: Unit, Tenant, Status, Sqft, Rent, Lease From, Lease To
+  BD/BA → splits into Bed (integer) + Bath (decimal). Plan auto-derives from Bed/Bath — no manual mapping needed.
+  [List any columns that need user decision]
+
+  UNMAPPED COLUMNS: Tags, Additional Tags, Delinquent Rent, etc.
+  Default recommendation: Combine Tags + Additional Tags into single "Other" column (comma-separated).
+  Delinquent Rent → currency column.
+  Only offer to split into separate boolean columns if user specifically requests it.
+
+  OPTIONS:
+  A) [recommended action — e.g., "Fill blanks + derive Plans + create Other and Delinquency columns"]
+  B) [alternative]
+  C) Let me customize
+
+That's it. One message. Wait for user response.
+
+EXECUTION PHASE — CRITICAL RULES:
+
+1. WHEN USER CONFIRMS, EXECUTE IMMEDIATELY.
+   - "A" means do option A. Call confirm_column_mapping with the appropriate parameters. Do NOT restate the plan. Do NOT ask "should I proceed?" Do NOT re-present the analysis.
+   - "delete them" or "remove the extras" means execute the deletion. Confirm with ONE sentence after: "Deleted [X] units. Ready to proceed with import."
+   - "proceed" or "go ahead" or "yes" means execute. Not ask again.
+
+2. NEVER restate the full analysis after user has seen it once.
+   - After user confirms: execute and report result in 1-2 sentences.
+   - After user gives specific instructions: acknowledge in 1 sentence, then execute.
+   - WRONG: "You're absolutely right! The system has 121 units but there should be 113..." (user already knows this)
+   - RIGHT: "Deleted 8 extra units (322-329). 113 units remaining. Running import now."
+
+3. NEVER say "You're absolutely right" or "You're correct" — just do what was asked.
+
+4. FOLLOW USER INSTRUCTIONS EXACTLY.
+   - If user says "combine into a single Other column" — do that. Don't offer alternatives.
+   - If user says "skip delinquency" — skip it. Don't argue.
+   - If user corrects you — accept the correction in one sentence and adjust. Don't re-explain.
+
+5. BD/BA AND PLAN LOGIC (memorize this):
+   - BD/BA like "3/2.00" splits into: Bed=3, Bath=2.0
+   - Plan auto-derives when Bed and Bath are populated (e.g., "3BR/2BA")
+   - NEVER suggest mapping BD/BA directly to Plan
+   - NEVER suggest creating separate "bedrooms" and "bathrooms" columns — Bed and Bath ARE the standard fields
+   - If Plan has blanks and Bed/Bath data exists, say: "[X] Plans can be auto-derived from Bed/Bath data."
+
+6. RESPONSE LENGTH:
+   - Initial analysis: Can be detailed (the one-time presentation above)
+   - All subsequent responses: 1-3 sentences max
+   - Confirmations: 1 sentence ("Done. [what happened].")
+   - Corrections: 1 sentence acknowledgment + adjusted action
+
+7. UNIT COUNT DISCREPANCIES:
+   - The total at the bottom of the rent roll file is authoritative
+   - If DB count ≠ file total, recommend cleanup FIRST before import
+   - Present specific unit numbers to delete if identifiable
+   - After user confirms deletion, execute immediately — do not ask again
+
+Note: For rent roll extraction, the analysis phase IS the confirmation step. When the user responds to the analysis with a choice, that IS their confirmation. Do not add additional confirmation steps.
+
 Do NOT use this for PDF rent rolls - they use the normal extraction pipeline.
 
 RENTAL COMPARABLES:
@@ -5127,11 +5203,18 @@ def get_landscaper_response(
                 if tool.get('name') in available_tool_names
             ]
             api_kwargs['tools'] = filtered_tools
+            # DIAGNOSTIC: Log which tools are sent to Claude
+            tool_names_sent = [t.get('name', '?') for t in filtered_tools]
             logger.info(
                 f"[TOOL_FILTER] Page: {page_context!r} -> {normalized_context}, "
                 f"Tools: {len(filtered_tools)}/{len(LANDSCAPER_TOOLS)}, "
                 f"Extraction: {include_extraction}"
             )
+            logger.info(f"[DIAGNOSTIC] TOOLS SENT TO CLAUDE: {tool_names_sent}")
+            if 'analyze_rent_roll_columns' in tool_names_sent:
+                print(f"=== DIAGNOSTIC: analyze_rent_roll_columns IS in tools list ({len(filtered_tools)} tools) ===")
+            else:
+                print(f"=== DIAGNOSTIC: analyze_rent_roll_columns NOT in tools list. Tools: {tool_names_sent} ===")
 
         logger.info(f"[AI_HANDLER] Calling Claude with {len(claude_messages)} messages, last message: {claude_messages[-1]['content'][:100] if claude_messages else 'none'}...")
         response = client.messages.create(**api_kwargs)
@@ -5146,6 +5229,14 @@ def get_landscaper_response(
         total_output_tokens = response.usage.output_tokens
 
         logger.info(f"[AI_HANDLER] Initial response stop_reason={response.stop_reason}, tool_executor={'present' if tool_executor else 'None'}")
+        # DIAGNOSTIC: Log what Claude's initial response contains
+        for _diag_block in response.content:
+            if _diag_block.type == 'tool_use':
+                logger.info(f"[DIAGNOSTIC] CLAUDE USED TOOL: {_diag_block.name} (input keys: {list(_diag_block.input.keys()) if isinstance(_diag_block.input, dict) else '?'})")
+                print(f"=== DIAGNOSTIC: CLAUDE USED TOOL: {_diag_block.name} ===")
+            elif hasattr(_diag_block, 'text'):
+                logger.info(f"[DIAGNOSTIC] CLAUDE TEXT (first 300 chars): {_diag_block.text[:300]}")
+                print(f"=== DIAGNOSTIC: CLAUDE TEXT RESPONSE (first 200 chars): {_diag_block.text[:200]} ===")
 
         # Tool loop safeguards
         MAX_TOOL_ITERATIONS = 5
@@ -5206,6 +5297,10 @@ def get_landscaper_response(
                     result_str = _truncate_tool_result(result)
 
                     logger.info(f"[Tool Loop] {tool_name} completed in {tool_exec_time:.1f}s, result: {len(result_str)} chars")
+                    # DIAGNOSTIC: Log what's being sent back to Claude for rent roll tools
+                    if tool_name in ('analyze_rent_roll_columns', 'confirm_column_mapping'):
+                        logger.info(f"[DIAGNOSTIC] TOOL RESULT for {tool_name} ({len(result_str)} chars):\n{result_str[:1500]}")
+                        print(f"=== DIAGNOSTIC: TOOL RESULT for {tool_name}: {len(result_str)} chars ===")
 
                     # Track field updates
                     if tool_name in ('update_project_field', 'bulk_update_fields'):

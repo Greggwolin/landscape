@@ -72,6 +72,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   } = useFolderNavigation({
     propertyType: effectivePropertyType,
     analysisType: currentProject?.analysis_type,
+    tileConfig: currentProject?.tile_config,
   });
 
   // Use the pending rent roll extractions hook

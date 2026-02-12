@@ -4,7 +4,7 @@
  * Defines the ARGUS-style stacked folder tab navigation structure.
  * EXACTLY matches the subtab structure from main branch tileConfig.ts.
  *
- * Row 1: Top-level folder tabs (7 folders, always visible)
+ * Row 1: Top-level folder tabs (base set with analysis-type visibility)
  * Row 2: Sub-tabs that change dynamically based on selected folder
  *
  * @version 2.1
@@ -26,6 +26,15 @@ import {
 /** Analysis type codes used in the application */
 export type AnalysisTypeCode = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPMENT' | 'FEASIBILITY';
 
+export interface AnalysisTypeTileConfig {
+  analysis_type: string;
+  tile_hbu: boolean;
+  tile_valuation: boolean;
+  tile_capitalization: boolean;
+  tile_returns: boolean;
+  tile_development_budget: boolean;
+}
+
 export interface SubTab {
   id: string;
   label: string;
@@ -46,6 +55,11 @@ export interface FolderTab {
 
 export interface FolderTabConfig {
   folders: FolderTab[];
+}
+
+interface FolderVisibilityOptions {
+  isIncome: boolean;
+  tileConfig?: AnalysisTypeTileConfig | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +90,45 @@ function filterSubtabsByType(
   });
 }
 
+function shouldShowValuationOrFeasibilityFolder(
+  tileConfig: AnalysisTypeTileConfig
+): boolean {
+  return Boolean(
+    tileConfig.tile_hbu
+      || tileConfig.tile_valuation
+      || tileConfig.tile_returns
+  );
+}
+
+function applyFolderVisibilityByAnalysisType(
+  folders: FolderTab[],
+  options: FolderVisibilityOptions
+): FolderTab[] {
+  const { isIncome, tileConfig } = options;
+
+  // Without analysis config, preserve legacy behavior (all folders visible).
+  if (!tileConfig) {
+    return folders;
+  }
+
+  const alwaysVisible = new Set(['home', 'property', 'reports', 'documents', 'map']);
+  const visibleFolderIds = new Set<string>(alwaysVisible);
+
+  if (isIncome || tileConfig.tile_development_budget) {
+    visibleFolderIds.add(isIncome ? 'operations' : 'budget');
+  }
+
+  if (shouldShowValuationOrFeasibilityFolder(tileConfig)) {
+    visibleFolderIds.add(isIncome ? 'valuation' : 'feasibility');
+  }
+
+  if (tileConfig.tile_capitalization) {
+    visibleFolderIds.add('capital');
+  }
+
+  return folders.filter((folder) => visibleFolderIds.has(folder.id));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: Format label for display
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,8 +147,8 @@ export function isTwoLineLabel(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7-Folder Configuration Generator
-// MUST MATCH main branch tileConfig.ts EXACTLY
+// Folder Configuration Generator
+// Base structure matches main branch tileConfig.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -113,7 +166,11 @@ export function isTwoLineLabel(
  * @param projectType - Project type code (e.g., 'MF', 'LAND')
  * @param analysisType - Analysis type code (e.g., 'VALUE_ADD', 'INVESTMENT')
  */
-export function createFolderConfig(projectType?: string, analysisType?: string): FolderTabConfig {
+export function createFolderConfig(
+  projectType?: string,
+  analysisType?: string,
+  tileConfig?: AnalysisTypeTileConfig | null
+): FolderTabConfig {
   const isIncome = isIncomeProperty(projectType);
 
   const folders: FolderTab[] = [
@@ -291,7 +348,12 @@ export function createFolderConfig(projectType?: string, analysisType?: string):
     },
   ];
 
-  return { folders };
+  return {
+    folders: applyFolderVisibilityByAnalysisType(folders, {
+      isIncome,
+      tileConfig,
+    }),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,9 +365,10 @@ export function createFolderConfig(projectType?: string, analysisType?: string):
  */
 export function getFolderTabsForPropertyType(
   propertyType?: string,
-  analysisType?: string
+  analysisType?: string,
+  tileConfig?: AnalysisTypeTileConfig | null
 ): FolderTabConfig {
-  return createFolderConfig(propertyType, analysisType);
+  return createFolderConfig(propertyType, analysisType, tileConfig);
 }
 
 /**
@@ -325,6 +388,7 @@ export function isLandDevelopmentProject(
   propertyType?: string,
   _analysisType?: string
 ): boolean {
+  void _analysisType;
   return !isIncomeProperty(propertyType);
 }
 
@@ -338,9 +402,10 @@ export function isLandDevelopmentProject(
 export function getFolderById(
   folderId: string,
   projectType?: string,
-  analysisType?: string
+  analysisType?: string,
+  tileConfig?: AnalysisTypeTileConfig | null
 ): FolderTab | undefined {
-  const config = createFolderConfig(projectType, analysisType);
+  const config = createFolderConfig(projectType, analysisType, tileConfig);
   return config.folders.find((folder) => folder.id === folderId);
 }
 
@@ -362,9 +427,10 @@ export function getDefaultFolderId(): string {
 export function getDefaultSubTabId(
   folderId: string,
   projectType?: string,
-  analysisType?: string
+  analysisType?: string,
+  tileConfig?: AnalysisTypeTileConfig | null
 ): string {
-  const folder = getFolderById(folderId, projectType, analysisType);
+  const folder = getFolderById(folderId, projectType, analysisType, tileConfig);
   // If folder has no subtabs (like home), return empty string
   if (!folder?.subTabs.length) return '';
 
@@ -398,9 +464,10 @@ export function isValidFolderTab(
   folderId: string,
   tabId: string,
   projectType?: string,
-  analysisType?: string
+  analysisType?: string,
+  tileConfig?: AnalysisTypeTileConfig | null
 ): boolean {
-  const folder = getFolderById(folderId, projectType, analysisType);
+  const folder = getFolderById(folderId, projectType, analysisType, tileConfig);
   if (!folder) return false;
   // If folder has no subtabs, any tab is "valid" (we just show the folder content)
   if (!folder.subTabs.length) return true;

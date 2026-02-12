@@ -26,6 +26,10 @@ from .media_views import (
     delete_media_link,
     reorder_media_links,
     available_media,
+    reclassify_single_media,
+    discard_media,
+    reset_document_media,
+    lookup_items,
 )
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
@@ -56,6 +60,10 @@ urlpatterns = [
     path('documents/<int:doc_id>/media/classify/', classify_document_media, name='classify_document_media'),
     path('documents/<int:doc_id>/media/reclassify/', reclassify_document_media, name='reclassify_document_media'),
     path('documents/<int:doc_id>/media/actions/', submit_media_actions, name='submit_media_actions'),
+    path('documents/<int:doc_id>/media/reset/', reset_document_media, name='reset_document_media'),
+    # Single media-item endpoints
+    path('media/<int:media_id>/reclassify/', reclassify_single_media, name='reclassify_single_media'),
+    path('media/<int:media_id>/discard/', discard_media, name='discard_media'),
     # Media entity linking endpoints
     path('media/links/', media_links, name='media_links'),
     path('media/links/<int:link_id>/', delete_media_link, name='delete_media_link'),
