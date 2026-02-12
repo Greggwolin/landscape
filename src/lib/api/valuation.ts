@@ -17,16 +17,28 @@ import type {
   ContainerCostMetadata,
   ContainerCostMetadataForm,
   IncomeApproach,
-  LandComparable,
-  LandComparableForm,
-  LandCompAdjustment,
-  LandCompAdjustmentForm,
   ValuationReconciliation,
   ValuationReconciliationForm,
   ValuationSummary,
 } from '@/types/valuation';
 
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+const normalizeComparablesPayload = (payload: unknown): SalesComparable[] => {
+  if (Array.isArray(payload)) {
+    return payload as SalesComparable[];
+  }
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    if (Array.isArray(record.results)) {
+      return record.results as SalesComparable[];
+    }
+    if (Array.isArray(record.comparables)) {
+      return record.comparables as SalesComparable[];
+    }
+  }
+  return [];
+};
 
 // ============================================================================
 // SALES COMPARISON APPROACH API
@@ -35,12 +47,13 @@ const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localh
 /**
  * Get all sales comparables for a project
  */
-export async function getSalesComparables(projectId: number): Promise<{
-  comparables: SalesComparable[];
-  summary: Record<string, unknown>;
-}> {
+export async function getSalesComparables(
+  projectId: number,
+  propertyType?: string
+): Promise<SalesComparable[]> {
+  const query = propertyType ? `?property_type=${encodeURIComponent(propertyType)}` : '';
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/by_project/${projectId}/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${query}`,
     {
       method: 'GET',
       headers: {
@@ -53,15 +66,19 @@ export async function getSalesComparables(projectId: number): Promise<{
     throw new Error(`Failed to fetch sales comparables: ${response.statusText}`);
   }
 
-  return response.json();
+  const payload = await response.json();
+  return normalizeComparablesPayload(payload);
 }
 
 /**
  * Get a single sales comparable by ID
  */
-export async function getSalesComparable(comparableId: number): Promise<SalesComparable> {
+export async function getSalesComparable(
+  projectId: number,
+  comparableId: number
+): Promise<SalesComparable> {
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/${comparableId}/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'GET',
       headers: {
@@ -81,16 +98,18 @@ export async function getSalesComparable(comparableId: number): Promise<SalesCom
  * Create a new sales comparable
  */
 export async function createSalesComparable(
+  projectId: number,
   data: SalesComparableForm
 ): Promise<SalesComparable> {
+  const { price_per_unit, price_per_sf, cap_rate, grm, ...payload } = data;
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     }
   );
 
@@ -106,17 +125,19 @@ export async function createSalesComparable(
  * Update a sales comparable
  */
 export async function updateSalesComparable(
+  projectId: number,
   comparableId: number,
   data: Partial<SalesComparableForm>
 ): Promise<SalesComparable> {
+  const { price_per_unit, price_per_sf, cap_rate, grm, ...payload } = data;
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/${comparableId}/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     }
   );
 
@@ -131,9 +152,9 @@ export async function updateSalesComparable(
 /**
  * Delete a sales comparable
  */
-export async function deleteSalesComparable(comparableId: number): Promise<void> {
+export async function deleteSalesComparable(projectId: number, comparableId: number): Promise<void> {
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/${comparableId}/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'DELETE',
       headers: {
@@ -151,11 +172,12 @@ export async function deleteSalesComparable(comparableId: number): Promise<void>
  * Add an adjustment to a sales comparable
  */
 export async function addAdjustment(
+  projectId: number,
   comparableId: number,
   data: Omit<SalesCompAdjustmentForm, 'comparable_id'>
 ): Promise<SalesComparable> {
   const response = await fetch(
-    `${DJANGO_API_BASE}/api/valuation/sales-comps/${comparableId}/add_adjustment/`,
+    `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/add_adjustment/`,
     {
       method: 'POST',
       headers: {
@@ -276,175 +298,27 @@ export async function saveCostApproach(
 // LAND COMPARABLES API
 // ============================================================================
 
-export async function getLandComparables(projectId: number): Promise<LandComparable[]> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/`,
-    {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch land comparables: ${response.statusText}`);
-  }
-
-  return response.json();
+export async function getLandComparables(projectId: number): Promise<SalesComparable[]> {
+  return getSalesComparables(projectId, 'LAND');
 }
 
 export async function createLandComparable(
   projectId: number,
-  data: LandComparableForm
-): Promise<LandComparable> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Failed to create land comparable: ${JSON.stringify(errorData)}`);
-  }
-
-  return response.json();
+  data: SalesComparableForm
+): Promise<SalesComparable> {
+  return createSalesComparable(projectId, { ...data, property_type: 'LAND' });
 }
 
 export async function updateLandComparable(
   projectId: number,
-  compId: number,
-  data: LandComparableForm
-): Promise<LandComparable> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Failed to update land comparable: ${JSON.stringify(errorData)}`);
-  }
-
-  return response.json();
+  comparableId: number,
+  data: Partial<SalesComparableForm>
+): Promise<SalesComparable> {
+  return updateSalesComparable(projectId, comparableId, { ...data, property_type: 'LAND' });
 }
 
-export async function deleteLandComparable(projectId: number, compId: number): Promise<void> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/`,
-    {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete land comparable: ${response.statusText}`);
-  }
-}
-
-export async function getLandComparableAdjustments(
-  projectId: number,
-  compId: number
-): Promise<LandCompAdjustment[]> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/`,
-    {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch land comp adjustments: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export async function createLandComparableAdjustment(
-  projectId: number,
-  compId: number,
-  data: LandCompAdjustmentForm
-): Promise<LandCompAdjustment> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Failed to save adjustment: ${JSON.stringify(errorData)}`);
-  }
-
-  return response.json();
-}
-
-export async function updateLandComparableAdjustment(
-  projectId: number,
-  compId: number,
-  adjustmentId: number,
-  data: LandCompAdjustmentForm
-): Promise<LandCompAdjustment> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/${adjustmentId}/`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Failed to update adjustment: ${JSON.stringify(errorData)}`);
-  }
-
-  return response.json();
-}
-
-export async function deleteLandComparableAdjustment(
-  projectId: number,
-  compId: number,
-  adjustmentId: number
-): Promise<void> {
-  const response = await fetch(
-    `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/land-comps/${compId}/adjustments/${adjustmentId}/`,
-    {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete adjustment: ${response.statusText}`);
-  }
+export async function deleteLandComparable(projectId: number, comparableId: number): Promise<void> {
+  return deleteSalesComparable(projectId, comparableId);
 }
 
 // ============================================================================

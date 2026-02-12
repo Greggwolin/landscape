@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { SalesComparable } from '@/types/valuation';
+import { COMP_MARKER_COLORS, getCompMarkerColor } from '@/lib/valuation/compMarkerUtils';
 
 interface ComparablesMapProps {
   comparables: SalesComparable[];
@@ -115,7 +116,8 @@ export function ComparablesMap({
           ]
         },
         center: bounds.getCenter(),
-        zoom: 11
+        zoom: 11,
+        scrollZoom: false,
       });
 
       map.current = newMap;
@@ -168,22 +170,23 @@ export function ComparablesMap({
 
         // Add comparable markers with numbers
         validComps.forEach((comp, idx) => {
+          const { bg: markerColor, text: textColor } = getCompMarkerColor(idx + 1);
           const compEl = document.createElement('div');
           compEl.innerHTML = `
             <div style="
               width: 30px;
               height: 30px;
-              background-color: #0066cc;
-              border: 2px solid #000;
+              background-color: ${markerColor};
+              border: 2.5px solid #000;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
               font-weight: bold;
-              color: white;
+              color: ${textColor};
               font-size: 14px;
               cursor: pointer;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             ">${idx + 1}</div>
           `;
 
@@ -194,7 +197,7 @@ export function ComparablesMap({
             .setPopup(
               new maplibregl.Popup({ offset: 25 }).setHTML(
                 `<div style="padding: 8px; min-width: 200px; line-height: 1.3;">
-                  <div style="font-weight: 600; font-size: 1.1em; color: #0066cc; margin-bottom: 2px;">Comp ${idx + 1} - ${comp.property_name || 'Unnamed'}</div>
+                  <div style="font-weight: 600; font-size: 1.1em; color: ${markerColor}; margin-bottom: 2px;">Comp ${idx + 1} - ${comp.property_name || 'Unnamed'}</div>
                   <div style="font-size: 0.85em; color: #495057;">
                     ${comp.address || ''}
                   </div>
@@ -254,19 +257,20 @@ export function ComparablesMap({
   if (error) {
     return (
       <div
-        className={`rounded flex flex-col items-center justify-center ${className}`}
+        className={`card d-flex align-items-center justify-content-center ${className}`}
         style={{
           height,
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          border: '1px solid var(--cui-border-color)'
+          backgroundColor: 'var(--cui-card-bg)',
+          borderColor: 'var(--cui-border-color)',
+          marginBottom: 0,
         }}
       >
-        <div className="text-center p-6">
-          <div className="text-4xl mb-3">🗺️</div>
-          <div className="text-lg font-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>
+        <div className="text-center" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: 8 }}>🗺️</div>
+          <div className="fw-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>
             Map Unavailable
           </div>
-          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>{error}</p>
+          <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>{error}</p>
         </div>
       </div>
     );
@@ -274,56 +278,58 @@ export function ComparablesMap({
 
   return (
     <div
-      className={`rounded-lg border overflow-hidden flex flex-col ${className}`}
+      className={`card d-flex flex-column ${className}`}
       style={{
         backgroundColor: 'var(--cui-card-bg)',
         borderColor: 'var(--cui-border-color)',
-        height: height
+        height: height,
+        marginBottom: 0,
+        overflow: 'hidden',
       }}
     >
-      {/* Header */}
+      {/* Header — mirrors ValuationSalesCompMap */}
       <div
-        className="px-4 py-3 border-b flex-shrink-0"
-        style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
-        }}
+        className="card-header flex-shrink-0"
+        style={{ backgroundColor: 'var(--cui-card-header-bg)' }}
       >
-        <h3
-          className="text-sm font-semibold"
-          style={{ color: 'var(--cui-body-color)' }}
+        <h5
+          className="mb-0"
+          style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem', fontWeight: 600 }}
         >
           Comparable Locations
-        </h3>
-        <p
-          className="text-xs mt-1"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
+        </h5>
+        <small style={{ color: 'var(--cui-secondary-color)' }}>
           {comparables.filter(c => c.latitude && c.longitude).length} of {comparables.length} comps with location data
-        </p>
+        </small>
       </div>
 
       {/* Map Container */}
       <div
         ref={mapContainer}
-        className="flex-1"
+        className="flex-grow-1"
         style={{ minHeight: 0 }}
       />
 
       {/* Legend */}
       <div
-        className="px-4 py-2 border-t flex items-center gap-4 text-xs flex-shrink-0"
+        className="card-footer d-flex align-items-center gap-3 flex-shrink-0"
         style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderColor: 'var(--cui-border-color)',
+          fontSize: '0.75rem',
+          padding: '0.5rem 1rem',
         }}
       >
-        <div className="flex items-center gap-2">
-          <div style={{ width: '12px', height: '12px', backgroundColor: '#dc3545', borderRadius: '50%' }} />
+        <div className="d-flex align-items-center gap-2">
+          <div style={{ width: 12, height: 12, backgroundColor: '#dc3545', borderRadius: '50%' }} />
           <span style={{ color: 'var(--cui-secondary-color)' }}>Subject Property</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div style={{ width: '12px', height: '12px', backgroundColor: '#0066cc', borderRadius: '50%' }} />
+        <div className="d-flex align-items-center gap-2">
+          <div style={{ display: 'flex', gap: 2 }}>
+            {COMP_MARKER_COLORS.slice(0, 5).map((c, i) => (
+              <div key={i} style={{ width: 8, height: 8, backgroundColor: c, borderRadius: '50%', border: '1px solid #000' }} />
+            ))}
+          </div>
           <span style={{ color: 'var(--cui-secondary-color)' }}>Comparables</span>
         </div>
       </div>

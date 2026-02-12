@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-12T17:15:45.014698Z",
+  "generated_at": "2026-02-12T17:38:17.084420Z",
   "database": "ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech",
   "schema": "landscape",
   "tables": [
@@ -52075,6 +52075,17 @@
           "is_nullable": "YES",
           "column_default": null,
           "column_comment": null
+        },
+        {
+          "column_name": "property_rights",
+          "ordinal_position": 125,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": "Fee Simple, Leased Fee, Leasehold, Partial Interest, etc."
         }
       ]
     },
@@ -77143,14 +77154,14 @@
       "table_name": "tbl_lease",
       "constraint_name": "chk_lease_dates",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK ((lease_expiration_date >= lease_commencement_date))"
+      "constraint_definition": "CHECK ((lease_end_date > lease_start_date))"
     },
     {
       "object_type": "constraint",
       "table_name": "tbl_lease",
       "constraint_name": "chk_lease_dates",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK ((lease_end_date > lease_start_date))"
+      "constraint_definition": "CHECK ((lease_expiration_date >= lease_commencement_date))"
     },
     {
       "object_type": "constraint",
@@ -78438,14 +78449,14 @@
       "table_name": "tbl_project_inventory_columns",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
+      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
     },
     {
       "object_type": "constraint",
       "table_name": "tbl_project_inventory_columns",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
+      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
     },
     {
       "object_type": "constraint",
@@ -79174,13 +79185,6 @@
       "constraint_name": "tbl_sales_comp_unit_mix_pkey",
       "constraint_type": "PRIMARY KEY",
       "constraint_definition": "PRIMARY KEY (unit_mix_id)"
-    },
-    {
-      "object_type": "constraint",
-      "table_name": "tbl_sales_comparables",
-      "constraint_name": "check_price_per_unit",
-      "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((price_per_unit IS NULL) OR (price_per_unit > (100000)::numeric)))"
     },
     {
       "object_type": "constraint",

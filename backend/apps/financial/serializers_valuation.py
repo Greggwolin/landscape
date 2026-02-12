@@ -8,10 +8,28 @@ Provides serialization for comprehensive property appraisal including:
 - Valuation Reconciliation
 """
 
+from django.db import transaction
 from rest_framework import serializers
 from .models_valuation import (
     SalesComparable,
+    SalesCompUnitMix,
+    SalesCompTenant,
+    SalesCompHistory,
     SalesCompAdjustment,
+    SalesCompIndustrial,
+    SalesCompHospitality,
+    SalesCompLand,
+    SalesCompSelfStorage,
+    SalesCompStorageUnitMix,
+    SalesCompSpecialtyHousing,
+    SalesCompManufactured,
+    SalesCompRetail,
+    SalesCompOffice,
+    SalesCompMarketConditions,
+    LkpSaleType,
+    LkpPriceStatus,
+    LkpBuyerSellerType,
+    LkpBuildingClass,
     AIAdjustmentSuggestion,
     CostApproach,
     IncomeApproach,
@@ -23,7 +41,7 @@ from .models_valuation import (
     PropertyAttributeDef,
 )
 from apps.projects.models import Project
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 class AIAdjustmentSuggestionSerializer(serializers.ModelSerializer):
@@ -45,11 +63,82 @@ class AIAdjustmentSuggestionSerializer(serializers.ModelSerializer):
         read_only_fields = ['ai_suggestion_id', 'created_at', 'updated_at']
 
 
+class LkpSaleTypeSerializer(serializers.ModelSerializer):
+    """Lookup serializer for sale types."""
+
+    class Meta:
+        model = LkpSaleType
+        fields = '__all__'
+        read_only_fields = ['code', 'display_name', 'description', 'sort_order']
+
+
+class LkpPriceStatusSerializer(serializers.ModelSerializer):
+    """Lookup serializer for price statuses."""
+
+    class Meta:
+        model = LkpPriceStatus
+        fields = '__all__'
+        read_only_fields = ['code', 'display_name', 'description', 'reliability_score']
+
+
+class LkpBuyerSellerTypeSerializer(serializers.ModelSerializer):
+    """Lookup serializer for buyer/seller types."""
+
+    class Meta:
+        model = LkpBuyerSellerType
+        fields = '__all__'
+        read_only_fields = ['code', 'display_name', 'sort_order']
+
+
+class LkpBuildingClassSerializer(serializers.ModelSerializer):
+    """Lookup serializer for building classes."""
+
+    class Meta:
+        model = LkpBuildingClass
+        fields = '__all__'
+        read_only_fields = ['code', 'display_name', 'description']
+
+
+class SalesCompUnitMixSerializer(serializers.ModelSerializer):
+    """Nested serializer for multifamily unit mix rows."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompUnitMix
+        exclude = ['comparable']
+        read_only_fields = ['unit_mix_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompTenantSerializer(serializers.ModelSerializer):
+    """Nested serializer for tenant roster rows."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompTenant
+        exclude = ['comparable']
+        read_only_fields = ['tenant_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompHistorySerializer(serializers.ModelSerializer):
+    """Nested serializer for prior sale history rows."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompHistory
+        exclude = ['comparable']
+        read_only_fields = ['history_id', 'created_at', 'comparable_id']
+
+
 class SalesCompAdjustmentSerializer(serializers.ModelSerializer):
     """
     Serializer for SalesCompAdjustment model.
+    Used for both standalone adjustment endpoints and nested comp writes.
     """
 
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
     adjustment_type_display = serializers.CharField(
         source='get_adjustment_type_display',
         read_only=True
@@ -57,21 +146,318 @@ class SalesCompAdjustmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SalesCompAdjustment
+        exclude = ['comparable']
+        read_only_fields = ['adjustment_id', 'created_at', 'comparable_id']
+
+
+class SalesCompIndustrialSerializer(serializers.ModelSerializer):
+    """Serializer for industrial extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompIndustrial
+        exclude = ['comparable']
+        read_only_fields = ['industrial_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompHospitalitySerializer(serializers.ModelSerializer):
+    """Serializer for hospitality extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompHospitality
+        exclude = ['comparable']
+        read_only_fields = ['hospitality_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompLandSerializer(serializers.ModelSerializer):
+    """Serializer for land extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompLand
+        exclude = ['comparable']
+        read_only_fields = ['land_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompStorageUnitMixSerializer(serializers.ModelSerializer):
+    """Serializer for self-storage unit mix rows."""
+
+    storage_comp_id = serializers.IntegerField(source='storage_comp.storage_id', read_only=True)
+
+    class Meta:
+        model = SalesCompStorageUnitMix
+        exclude = ['storage_comp']
+        read_only_fields = ['unit_mix_id', 'created_at', 'storage_comp_id']
+
+
+class SalesCompSelfStorageSerializer(serializers.ModelSerializer):
+    """Serializer for self-storage extension table with nested unit mix rows."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+    storage_unit_mix = SalesCompStorageUnitMixSerializer(source='unit_mix', many=True, required=False)
+
+    class Meta:
+        model = SalesCompSelfStorage
+        exclude = ['comparable']
+        read_only_fields = ['storage_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompSpecialtyHousingSerializer(serializers.ModelSerializer):
+    """Serializer for specialty housing extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompSpecialtyHousing
+        exclude = ['comparable']
+        read_only_fields = ['specialty_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompManufacturedSerializer(serializers.ModelSerializer):
+    """Serializer for manufactured housing extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompManufactured
+        exclude = ['comparable']
+        read_only_fields = ['manufactured_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompRetailSerializer(serializers.ModelSerializer):
+    """Serializer for retail extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompRetail
+        exclude = ['comparable']
+        read_only_fields = ['retail_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompOfficeSerializer(serializers.ModelSerializer):
+    """Serializer for office extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompOffice
+        exclude = ['comparable']
+        read_only_fields = ['office_id', 'created_at', 'updated_at', 'comparable_id']
+
+
+class SalesCompMarketConditionsSerializer(serializers.ModelSerializer):
+    """Serializer for market conditions extension table."""
+
+    comparable_id = serializers.IntegerField(source='comparable.comparable_id', read_only=True)
+
+    class Meta:
+        model = SalesCompMarketConditions
+        exclude = ['comparable']
+        read_only_fields = ['market_id', 'created_at', 'comparable_id']
+
+
+class SalesComparableListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for project-scoped list endpoints."""
+
+    adjustment_count = serializers.SerializerMethodField()
+    has_unit_mix = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SalesComparable
         fields = [
-            'adjustment_id',
             'comparable_id',
-            'adjustment_type',
-            'adjustment_type_display',
-            'adjustment_pct',
-            'adjustment_amount',
-            'justification',
-            'user_adjustment_pct',
-            'ai_accepted',
-            'user_notes',
-            'last_modified_by',
-            'created_at',
+            'project',
+            'comp_number',
+            'property_name',
+            'address',
+            'city',
+            'state',
+            'zip',
+            'sale_date',
+            'sale_price',
+            'sale_conditions',
+            'property_rights',
+            'price_per_unit',
+            'price_per_sf',
+            'land_area_sf',
+            'land_area_acres',
+            'cap_rate',
+            'grm',
+            'units',
+            'building_sf',
+            'zoning',
+            'entitlements',
+            'year_built',
+            'property_type',
+            'latitude',
+            'longitude',
+            'distance_from_subject',
+            'verification_status',
+            'adjustment_count',
+            'has_unit_mix',
         ]
-        read_only_fields = ['adjustment_id', 'created_at']
+
+    def get_adjustment_count(self, obj):
+        return obj.adjustments.count()
+
+    def get_has_unit_mix(self, obj):
+        return obj.unit_mix_details.exists()
+
+
+class SalesComparableDetailSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for create/retrieve/update with nested 1:many child writes.
+    1:1 extension tables are exposed read-only in this pass.
+    """
+
+    unit_mix = SalesCompUnitMixSerializer(source='unit_mix_details', many=True, required=False)
+    tenants = SalesCompTenantSerializer(many=True, required=False)
+    history = SalesCompHistorySerializer(source='sale_history', many=True, required=False)
+    adjustments = SalesCompAdjustmentSerializer(many=True, required=False)
+
+    industrial_details = SalesCompIndustrialSerializer(read_only=True)
+    hospitality_details = SalesCompHospitalitySerializer(read_only=True)
+    land_details = SalesCompLandSerializer(read_only=True)
+    self_storage_details = SalesCompSelfStorageSerializer(read_only=True)
+    specialty_housing_details = SalesCompSpecialtyHousingSerializer(read_only=True)
+    manufactured_details = SalesCompManufacturedSerializer(read_only=True)
+    retail_details = SalesCompRetailSerializer(read_only=True)
+    office_details = SalesCompOfficeSerializer(read_only=True)
+    market_conditions = SalesCompMarketConditionsSerializer(read_only=True)
+
+    class Meta:
+        model = SalesComparable
+        fields = [field.name for field in SalesComparable._meta.fields] + [
+            'unit_mix',
+            'tenants',
+            'history',
+            'adjustments',
+            'industrial_details',
+            'hospitality_details',
+            'land_details',
+            'self_storage_details',
+            'specialty_housing_details',
+            'manufactured_details',
+            'retail_details',
+            'office_details',
+            'market_conditions',
+        ]
+        read_only_fields = [
+            'comparable_id',
+            'created_at',
+            'updated_at',
+            'price_per_unit',
+            'price_per_sf',
+            'cap_rate',
+            'grm',
+        ]
+        extra_kwargs = {
+            'project': {'required': False},
+        }
+
+    @staticmethod
+    def _to_decimal(value):
+        if value in (None, ''):
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+
+    def _recalculate_derived_fields(self, instance):
+        sale_price = self._to_decimal(instance.sale_price)
+        units = self._to_decimal(instance.units)
+        building_sf = self._to_decimal(instance.building_sf)
+
+        if sale_price is not None and units is not None and units > 0:
+            instance.price_per_unit = sale_price / units
+        else:
+            instance.price_per_unit = None
+
+        if sale_price is not None and building_sf is not None and building_sf > 0:
+            instance.price_per_sf = sale_price / building_sf
+        else:
+            instance.price_per_sf = None
+
+        instance.save(update_fields=['price_per_unit', 'price_per_sf'])
+
+    def _create_unit_mix_rows(self, comparable, rows):
+        if not rows:
+            return
+        SalesCompUnitMix.objects.bulk_create(
+            [SalesCompUnitMix(comparable=comparable, **row) for row in rows]
+        )
+
+    def _create_tenant_rows(self, comparable, rows):
+        if not rows:
+            return
+        SalesCompTenant.objects.bulk_create(
+            [SalesCompTenant(comparable=comparable, **row) for row in rows]
+        )
+
+    def _create_history_rows(self, comparable, rows):
+        if not rows:
+            return
+        SalesCompHistory.objects.bulk_create(
+            [SalesCompHistory(comparable=comparable, **row) for row in rows]
+        )
+
+    def _create_adjustment_rows(self, comparable, rows):
+        if not rows:
+            return
+        SalesCompAdjustment.objects.bulk_create(
+            [SalesCompAdjustment(comparable=comparable, **row) for row in rows]
+        )
+
+    @transaction.atomic
+    def create(self, validated_data):
+        unit_mix_data = validated_data.pop('unit_mix_details', [])
+        tenant_data = validated_data.pop('tenants', [])
+        history_data = validated_data.pop('sale_history', [])
+        adjustment_data = validated_data.pop('adjustments', [])
+
+        comparable = SalesComparable.objects.create(**validated_data)
+        self._recalculate_derived_fields(comparable)
+        self._create_unit_mix_rows(comparable, unit_mix_data)
+        self._create_tenant_rows(comparable, tenant_data)
+        self._create_history_rows(comparable, history_data)
+        self._create_adjustment_rows(comparable, adjustment_data)
+        return comparable
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        unit_mix_data = validated_data.pop('unit_mix_details', None)
+        tenant_data = validated_data.pop('tenants', None)
+        history_data = validated_data.pop('sale_history', None)
+        adjustment_data = validated_data.pop('adjustments', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        self._recalculate_derived_fields(instance)
+
+        if unit_mix_data is not None:
+            instance.unit_mix_details.all().delete()
+            self._create_unit_mix_rows(instance, unit_mix_data)
+
+        if tenant_data is not None:
+            instance.tenants.all().delete()
+            self._create_tenant_rows(instance, tenant_data)
+
+        if history_data is not None:
+            instance.sale_history.all().delete()
+            self._create_history_rows(instance, history_data)
+
+        if adjustment_data is not None:
+            instance.adjustments.all().delete()
+            self._create_adjustment_rows(instance, adjustment_data)
+
+        return instance
 
 
 class SalesComparableSerializer(serializers.ModelSerializer):
@@ -98,6 +484,7 @@ class SalesComparableSerializer(serializers.ModelSerializer):
         fields = [
             'comparable_id',
             'project_id',
+            'property_type',
             'comp_number',
             'property_name',
             'address',
@@ -106,11 +493,17 @@ class SalesComparableSerializer(serializers.ModelSerializer):
             'zip',
             'sale_date',
             'sale_price',
+            'sale_conditions',
+            'property_rights',
             'price_per_unit',
             'price_per_sf',
             'year_built',
             'units',
             'building_sf',
+            'land_area_sf',
+            'land_area_acres',
+            'zoning',
+            'entitlements',
             'cap_rate',
             'grm',
             'distance_from_subject',
@@ -118,6 +511,7 @@ class SalesComparableSerializer(serializers.ModelSerializer):
             'longitude',
             'unit_mix',
             'notes',
+            'extra_data',
             'adjustments',
             'ai_suggestions',
             'adjusted_price_per_unit',
@@ -125,7 +519,15 @@ class SalesComparableSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['comparable_id', 'created_at', 'updated_at']
+        read_only_fields = [
+            'comparable_id',
+            'created_at',
+            'updated_at',
+            'price_per_unit',
+            'price_per_sf',
+            'cap_rate',
+            'grm',
+        ]
 
     def get_total_adjustment_pct(self, obj):
         """Calculate total adjustment percentage from all adjustments.
@@ -138,6 +540,42 @@ class SalesComparableSerializer(serializers.ModelSerializer):
             elif adj.adjustment_pct is not None:
                 total += float(adj.adjustment_pct)
         return round(total, 3)
+
+    @staticmethod
+    def _to_decimal(value):
+        if value in (None, ''):
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+
+    def _recalculate_derived_fields(self, instance):
+        sale_price = self._to_decimal(instance.sale_price)
+        units = self._to_decimal(instance.units)
+        building_sf = self._to_decimal(instance.building_sf)
+
+        if sale_price is not None and units is not None and units > 0:
+            instance.price_per_unit = sale_price / units
+        else:
+            instance.price_per_unit = None
+
+        if sale_price is not None and building_sf is not None and building_sf > 0:
+            instance.price_per_sf = sale_price / building_sf
+        else:
+            instance.price_per_sf = None
+
+        instance.save(update_fields=['price_per_unit', 'price_per_sf'])
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        self._recalculate_derived_fields(instance)
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        self._recalculate_derived_fields(instance)
+        return instance
 
 
 class CostApproachSerializer(serializers.ModelSerializer):

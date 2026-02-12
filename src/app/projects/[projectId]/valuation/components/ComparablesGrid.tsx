@@ -41,11 +41,10 @@ interface ComparablesGridProps {
 
 type AdjustmentSectionKey = 'transaction' | 'property';
 
-const ADJUSTMENT_SECTIONS: {
-  key: AdjustmentSectionKey;
-  label: string;
-  adjustments: { type: string; label: string; indent: number; source: 'backend' | 'local' }[];
-}[] = [
+type AdjustmentDef = { type: string; label: string; indent: number; source: 'backend' | 'local' };
+type AdjustmentSectionDef = { key: AdjustmentSectionKey; label: string; adjustments: AdjustmentDef[] };
+
+const ADJUSTMENT_SECTIONS_MF: AdjustmentSectionDef[] = [
   {
     key: 'transaction',
     label: 'Transaction',
@@ -72,7 +71,33 @@ const ADJUSTMENT_SECTIONS: {
   }
 ];
 
+const ADJUSTMENT_SECTIONS_LAND: AdjustmentSectionDef[] = [
+  {
+    key: 'transaction',
+    label: 'Transaction',
+    adjustments: [
+      { type: 'property_rights', label: 'Property Rights', indent: 1, source: 'backend' },
+      { type: 'financing', label: 'Financing', indent: 1, source: 'backend' },
+      { type: 'conditions_of_sale', label: 'Conditions of Sale', indent: 1, source: 'backend' },
+      { type: 'market_conditions', label: 'Market Conditions', indent: 1, source: 'backend' },
+      { type: 'other', label: 'Other', indent: 1, source: 'backend' },
+    ]
+  },
+  {
+    key: 'property',
+    label: 'Property',
+    adjustments: [
+      { type: 'location', label: 'Location', indent: 2, source: 'backend' },
+      { type: 'size_acres', label: 'Size (Acres)', indent: 2, source: 'local' },
+      { type: 'shape', label: 'Shape', indent: 2, source: 'local' },
+      { type: 'topography', label: 'Topography', indent: 2, source: 'local' },
+      { type: 'property_other', label: 'Other', indent: 2, source: 'local' },
+    ]
+  }
+];
+
 export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdit, onDelete, onRefresh, onAddComp, mode = 'multifamily' }: ComparablesGridProps) {
+  const ADJUSTMENT_SECTIONS = mode === 'land' ? ADJUSTMENT_SECTIONS_LAND : ADJUSTMENT_SECTIONS_MF;
   const [openSections, setOpenSections] = useState<Record<AdjustmentSectionKey, boolean>>({
     transaction: true,
     property: true
@@ -422,7 +447,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     };
 
     try {
-      await updateSalesComparable(comp.comparable_id, payload);
+      await updateSalesComparable(comp.project_id, comp.comparable_id, payload);
       clearPendingField(comp.comparable_id, field);
       onRefresh?.();
     } catch (error) {
@@ -1010,6 +1035,20 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                     <div className="flex flex-col items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
                       <span className="flex items-center gap-2">
                         Comp {idx + 1}
+                        {onEdit && (
+                          <LandscapeButton
+                            variant="ghost"
+                            color="secondary"
+                            size="sm"
+                            onClick={() => onEdit(comp)}
+                            className="!p-0 transition-opacity hover:opacity-70"
+                            title="Edit comparable"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.5 }}>
+                              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5z"/>
+                            </svg>
+                          </LandscapeButton>
+                        )}
                         <LandscapeButton
                           variant="ghost"
                           color="secondary"

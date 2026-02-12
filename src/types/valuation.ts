@@ -88,6 +88,7 @@ export interface SalesCompAdjustment {
 export interface SalesComparable {
   comparable_id: number;
   project_id: number;
+  property_type?: string | null;
   comp_number: number | null;
   property_name: string | null;
   address: string | null;
@@ -96,11 +97,18 @@ export interface SalesComparable {
   zip: string | null;
   sale_date: string | null;
   sale_price: number | null;
+  sale_conditions?: string | null;
+  property_rights?: string | null;
   price_per_unit: number | null;
   price_per_sf: number | null;
+  price_per_acre?: number | null;
   year_built: number | null;
   units: number | null;
   building_sf: number | string | null; // String for land (entitlements), number for MF (square feet)
+  land_area_sf?: number | null;
+  land_area_acres?: number | null;
+  zoning?: string | null;
+  entitlements?: string | null;
   cap_rate: number | string | null; // String for land (utilities), number for MF (cap rate %)
   grm: number | null;
   distance_from_subject: string | null;
@@ -112,6 +120,7 @@ export interface SalesComparable {
   ai_suggestions: AIAdjustmentSuggestion[];
   adjusted_price_per_unit: number | null;
   total_adjustment_pct: number;
+  extra_data?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -181,44 +190,9 @@ export interface CostApproach {
   updated_at: string;
 }
 
-export interface LandComparable {
-  land_comparable_id: number;
-  project_id: number;
-  comp_number: number | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  sale_date: string | null;
-  sale_price: number | null;
-  land_area_sf: number | null;
-  land_area_acres: number | null;
-  price_per_sf: number | null;
-  price_per_acre: number | null;
-  zoning: string | null;
-  source: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LandComparableForm {
-  comp_number?: number | null;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-  sale_date?: string | null;
-  sale_price?: number | null;
-  land_area_sf?: number | null;
-  zoning?: string | null;
-  source?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  notes?: string | null;
-}
+// Land comps are unified into SalesComparable with property_type='LAND'.
+export type LandComparable = SalesComparable;
+export type LandComparableForm = SalesComparableForm;
 
 export interface LandCompAdjustment {
   adjustment_id: number;
@@ -392,6 +366,7 @@ export interface ValuationSummary {
 
 export interface SalesComparableForm {
   project_id: number;
+  property_type?: string | null;
   comp_number?: number | null;
   property_name?: string | null;
   address?: string | null;
@@ -400,11 +375,18 @@ export interface SalesComparableForm {
   zip?: string | null;
   sale_date?: string | null;
   sale_price?: number | null;
+  sale_conditions?: string | null;
+  property_rights?: string | null;
   price_per_unit?: number | null;
   price_per_sf?: number | null;
+  price_per_acre?: number | null;
   year_built?: number | null;
   units?: number | null;
   building_sf?: number | string | null; // String for land (entitlements), number for MF (square feet)
+  land_area_sf?: number | null;
+  land_area_acres?: number | null;
+  zoning?: string | null;
+  entitlements?: string | null;
   cap_rate?: number | string | null; // String for land (utilities), number for MF (cap rate %)
   grm?: number | null;
   distance_from_subject?: string | null;

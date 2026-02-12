@@ -14,6 +14,10 @@ from .views_scenario import ScenarioViewSet, ScenarioComparisonViewSet
 from .views_valuation import (
     SalesComparableViewSet,
     SalesCompAdjustmentViewSet,
+    LkpSaleTypeViewSet,
+    LkpPriceStatusViewSet,
+    LkpBuyerSellerTypeViewSet,
+    LkpBuildingClassViewSet,
     AIAdjustmentSuggestionViewSet,
     CostApproachViewSet,
     IncomeApproachViewSet,
@@ -94,6 +98,24 @@ router.register(r'valuation/hbu-zoning-docs', HBUZoningDocumentViewSet, basename
 # Property Attributes endpoints
 router.register(r'valuation/property-attributes', PropertyAttributeDefViewSet, basename='propertyattributedef')
 router.register(r'valuation/project-property-attributes', ProjectPropertyAttributesViewSet, basename='projectpropertyattributes')
+
+# New project-scoped Sales Comparable endpoints (additive; legacy valuation routes preserved)
+router.register(
+    r'projects/(?P<project_id>\d+)/sales-comparables',
+    SalesComparableViewSet,
+    basename='sales-comparable',
+)
+router.register(
+    r'comparables/(?P<comparable_id>\d+)/adjustments',
+    SalesCompAdjustmentViewSet,
+    basename='sales-comp-adjustment',
+)
+
+# Comparable lookup endpoints
+router.register(r'lookups/sale-types', LkpSaleTypeViewSet, basename='lkp-sale-type')
+router.register(r'lookups/price-statuses', LkpPriceStatusViewSet, basename='lkp-price-status')
+router.register(r'lookups/buyer-seller-types', LkpBuyerSellerTypeViewSet, basename='lkp-buyer-seller-type')
+router.register(r'lookups/building-classes', LkpBuildingClassViewSet, basename='lkp-building-class')
 
 # Unit Costs and Category Taxonomy endpoints
 router.register(r'unit-costs/tags', CategoryTagLibraryViewSet, basename='categorytags')

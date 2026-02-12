@@ -8,6 +8,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum, Avg, Count, Q
 from django.shortcuts import get_object_or_404
@@ -16,6 +17,10 @@ from decimal import Decimal
 from .models_valuation import (
     SalesComparable,
     SalesCompAdjustment,
+    LkpSaleType,
+    LkpPriceStatus,
+    LkpBuyerSellerType,
+    LkpBuildingClass,
     AIAdjustmentSuggestion,
     CostApproach,
     IncomeApproach,
@@ -28,7 +33,13 @@ from .models_valuation import (
 )
 from .serializers_valuation import (
     SalesComparableSerializer,
+    SalesComparableListSerializer,
+    SalesComparableDetailSerializer,
     SalesCompAdjustmentSerializer,
+    LkpSaleTypeSerializer,
+    LkpPriceStatusSerializer,
+    LkpBuyerSellerTypeSerializer,
+    LkpBuildingClassSerializer,
     AIAdjustmentSuggestionSerializer,
     CostApproachSerializer,
     IncomeApproachSerializer,
@@ -62,23 +73,82 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
     - GET /api/valuation/sales-comps/by_project/:project_id/ - Get comps by project
     """
 
-    queryset = SalesComparable.objects.select_related('project').prefetch_related('adjustments', 'ai_suggestions').all()
+    queryset = SalesComparable.objects.all()
     serializer_class = SalesComparableSerializer
+    lookup_field = 'comparable_id'
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project scope if provided and prefetch related details."""
         queryset = self.queryset
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
-        return queryset.order_by('comp_number')
 
-    @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
-    def by_project(self, request, project_id=None):
+        project_id = self.kwargs.get('project_id')
+        if project_id is not None:
+            queryset = queryset.filter(project_id=project_id)
+        else:
+            query_project_id = self.request.query_params.get('project_id')
+            if query_project_id:
+                queryset = queryset.filter(project_id=query_project_id)
+
+        property_type = self.request.query_params.get('property_type')
+        if property_type:
+            queryset = queryset.filter(property_type=property_type)
+
+        return queryset.select_related(
+            'project',
+            'industrial_details',
+            'hospitality_details',
+            'land_details',
+            'self_storage_details',
+            'specialty_housing_details',
+            'manufactured_details',
+            'retail_details',
+            'office_details',
+            'market_conditions',
+        ).prefetch_related(
+            'unit_mix_details',
+            'tenants',
+            'sale_history',
+            'adjustments',
+            'ai_suggestions',
+        ).order_by('comp_number', '-sale_date')
+
+    def get_serializer_class(self):
+        """Use project-scoped serializers for new endpoints; preserve legacy serializer for old routes."""
+        project_scoped = 'project_id' in self.kwargs
+
+        if self.action == 'list':
+            return SalesComparableListSerializer if project_scoped else SalesComparableSerializer
+
+        if self.action in {'retrieve', 'create', 'update', 'partial_update', 'bulk_import', 'add_adjustment'}:
+            return SalesComparableDetailSerializer if project_scoped else SalesComparableSerializer
+
+        if self.action == 'by_project':
+            return SalesComparableListSerializer
+
+        return SalesComparableSerializer
+
+    def perform_create(self, serializer):
+        """Set project from URL for project-scoped routes."""
+        project_id = self.kwargs.get('project_id')
+        if project_id is not None:
+            serializer.save(project_id=project_id)
+            return
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Prevent project drift when updating via project-scoped routes."""
+        project_id = self.kwargs.get('project_id')
+        if project_id is not None:
+            serializer.save(project_id=project_id)
+            return
+        serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='by_project/(?P<target_project_id>[0-9]+)')
+    def by_project(self, request, target_project_id=None):
         """Get all sales comparables for a specific project."""
-        comps = self.queryset.filter(project_id=project_id)
-        serializer = self.get_serializer(comps, many=True)
+        comps = self.get_queryset().filter(project_id=target_project_id)
+        serializer = SalesComparableListSerializer(comps, many=True)
 
         # Calculate summary statistics
         summary = {
@@ -98,20 +168,68 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def add_adjustment(self, request, pk=None):
+    def add_adjustment(self, request, comparable_id=None):
         """Add an adjustment to a comparable."""
         comparable = self.get_object()
-        adjustment_data = request.data.copy()
-        adjustment_data['comparable_id'] = comparable.comparable_id
+        adjustment_data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
 
         serializer = SalesCompAdjustmentSerializer(data=adjustment_data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(comparable=comparable)
             # Refresh comparable to get updated adjustments
             comparable.refresh_from_db()
             comp_serializer = self.get_serializer(comparable)
             return Response(comp_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='bulk-import')
+    def bulk_import(self, request, project_id=None):
+        """
+        Import multiple comparables at once.
+        Accepts: { "comparables": [ {comp1}, {comp2}, ... ] }
+        """
+        project_scope_id = self.kwargs.get('project_id') or project_id
+        payload = request.data or {}
+        comparables_data = payload.get('comparables')
+
+        if not isinstance(comparables_data, list):
+            return Response(
+                {'detail': 'Request body must include a list at key "comparables".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_ids = []
+        errors = []
+
+        for index, item in enumerate(comparables_data):
+            serializer = SalesComparableDetailSerializer(
+                data=item,
+                context=self.get_serializer_context(),
+            )
+            if not serializer.is_valid():
+                errors.append({'index': index, 'errors': serializer.errors})
+                continue
+
+            try:
+                if project_scope_id is not None:
+                    created = serializer.save(project_id=project_scope_id)
+                else:
+                    created = serializer.save()
+                created_ids.append(created.comparable_id)
+            except Exception as exc:  # pragma: no cover - defensive path
+                errors.append({'index': index, 'errors': str(exc)})
+
+        status_code = status.HTTP_201_CREATED if not errors else (
+            status.HTTP_207_MULTI_STATUS if created_ids else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(
+            {
+                'created': len(created_ids),
+                'comparable_ids': created_ids,
+                'errors': errors,
+            },
+            status=status_code,
+        )
 
 
 class SalesCompAdjustmentViewSet(viewsets.ModelViewSet):
@@ -124,12 +242,57 @@ class SalesCompAdjustmentViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by comparable_id if provided."""
+        """Filter by comparable scope if provided."""
         queryset = self.queryset
-        comparable_id = self.request.query_params.get('comparable_id')
-        if comparable_id:
-            queryset = queryset.filter(comparable_id=comparable_id)
+
+        comparable_id = self.kwargs.get('comparable_id')
+        if comparable_id is not None:
+            return queryset.filter(comparable_id=comparable_id)
+
+        query_comp_id = self.request.query_params.get('comparable_id')
+        if query_comp_id:
+            queryset = queryset.filter(comparable_id=query_comp_id)
+
         return queryset
+
+    def perform_create(self, serializer):
+        """Set comparable from URL kwarg (preferred) or payload for legacy routes."""
+        comparable_id = self.kwargs.get('comparable_id') or self.request.data.get('comparable_id')
+        if not comparable_id:
+            raise ValidationError({'comparable_id': 'This field is required.'})
+        serializer.save(comparable_id=comparable_id)
+
+
+class LkpSaleTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only endpoint for sale type lookup values."""
+
+    queryset = LkpSaleType.objects.all().order_by('sort_order', 'code')
+    serializer_class = LkpSaleTypeSerializer
+    permission_classes = [AllowAny]
+
+
+class LkpPriceStatusViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only endpoint for price status lookup values."""
+
+    queryset = LkpPriceStatus.objects.all().order_by('-reliability_score', 'code')
+    serializer_class = LkpPriceStatusSerializer
+    permission_classes = [AllowAny]
+
+
+class LkpBuyerSellerTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only endpoint for buyer/seller type lookup values."""
+
+    queryset = LkpBuyerSellerType.objects.all().order_by('sort_order', 'code')
+    serializer_class = LkpBuyerSellerTypeSerializer
+    permission_classes = [AllowAny]
+
+
+class LkpBuildingClassViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only endpoint for building class lookup values."""
+
+    queryset = LkpBuildingClass.objects.all().order_by('code')
+    serializer_class = LkpBuildingClassSerializer
+    permission_classes = [AllowAny]
 
 
 class AIAdjustmentSuggestionViewSet(viewsets.ModelViewSet):
@@ -334,10 +497,14 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         """Get complete valuation summary for a project."""
         project = get_object_or_404(Project, project_id=project_id)
 
-        # Get sales comparables
+        # Get sales comparables (optionally filtered by property_type)
         sales_comps = SalesComparable.objects.filter(
             project_id=project_id
         ).prefetch_related('adjustments').order_by('comp_number')
+
+        property_type = request.query_params.get('property_type')
+        if property_type:
+            sales_comps = sales_comps.filter(property_type=property_type)
 
         # Calculate sales comparison summary
         sales_comparison_summary = {

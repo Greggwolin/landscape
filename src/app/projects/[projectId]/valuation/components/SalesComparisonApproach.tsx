@@ -6,21 +6,18 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SalesComparable, ValuationReconciliation } from '@/types/valuation';
 import { ComparablesGrid } from './ComparablesGrid';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
 // LandscaperChatPanel removed - redundant with main Landscaper panel which has tab-aware context
-import { ComparablesMap } from './ComparablesMap';
 import ValuationSalesCompMap from '@/components/map/ValuationSalesCompMap';
 import { LandscapeButton } from '@/components/ui/landscape';
-import { AddComparableModal } from '@/components/valuation/AddComparableModal';
+import { SalesCompDetailModal } from './SalesCompDetailModal';
 import { buildSubjectLocationFromProject } from '@/lib/valuation/subjectLocation';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import {
-  createSalesComparable,
   deleteSalesComparable,
-  updateSalesComparable,
 } from '@/lib/api/valuation';
 
 interface SalesComparisonApproachProps {
@@ -45,6 +42,12 @@ interface ProjectDetails {
   ownership_type?: string;
 }
 
+const IMPROVED_PROPERTY_TYPES = [
+  'MULTIFAMILY', 'MF', 'OFFICE', 'OFF', 'RETAIL', 'RET',
+  'INDUSTRIAL', 'IND', 'HOSPITALITY', 'HTL', 'SELF_STORAGE',
+  'MANUFACTURED', 'SPECIALTY_HOUSING', 'MIXED_USE', 'MXU',
+];
+
 export function SalesComparisonApproach({
   projectId,
   comparables,
@@ -52,7 +55,13 @@ export function SalesComparisonApproach({
   onRefresh,
   mode = 'multifamily'
 }: SalesComparisonApproachProps) {
-  const [mapHeight, setMapHeight] = useState<string>('800px');
+  const displayComparables = useMemo(
+    () => comparables.filter((comp) => {
+      const pt = (comp.property_type ?? '').toUpperCase();
+      return pt !== '' && pt !== 'LAND' && IMPROVED_PROPERTY_TYPES.includes(pt);
+    }),
+    [comparables]
+  );
   const [showModal, setShowModal] = useState(false);
   const [editingComp, setEditingComp] = useState<SalesComparable | null>(null);
   const [subjectProperty, setSubjectProperty] = useState<{
@@ -108,32 +117,6 @@ export function SalesComparisonApproach({
       active = false;
     };
   }, [activeProject, projectId]);
-  // Measure the grid height and set map to match
-  useEffect(() => {
-    const updateMapHeight = () => {
-      if (gridRef.current) {
-        const height = gridRef.current.offsetHeight;
-        setMapHeight(`${height}px`);
-      }
-    };
-
-    // Initial measurement
-    updateMapHeight();
-
-    // Update on window resize
-    window.addEventListener('resize', updateMapHeight);
-
-    // Use ResizeObserver to detect when grid content changes
-    const resizeObserver = new ResizeObserver(updateMapHeight);
-    if (gridRef.current) {
-      resizeObserver.observe(gridRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', updateMapHeight);
-      resizeObserver.disconnect();
-    };
-  }, [comparables]);
 
   const handleEditComp = (comp: SalesComparable) => {
     setEditingComp(comp);
@@ -146,7 +129,7 @@ export function SalesComparisonApproach({
     }
 
     try {
-      await deleteSalesComparable(compId);
+      await deleteSalesComparable(projectId, compId);
       onRefresh?.();
     } catch (error) {
       console.error('Error deleting comparable:', error);
@@ -155,52 +138,43 @@ export function SalesComparisonApproach({
   };
 
   const handleAddComp = () => {
-    console.log('AddComparableModal trigger from SalesComparisonApproach');
     setEditingComp(null);
     setShowModal(true);
   };
-
-  const handleSaveComp = useCallback(
-    async (formData: Record<string, unknown>) => {
-      try {
-        if (editingComp?.id) {
-          await updateSalesComparable(editingComp.id, formData);
-        } else {
-          await createSalesComparable(formData);
-        }
-        onRefresh?.();
-      } catch (error) {
-        console.error('Failed to save comparable:', error);
-        alert(`Failed to save comparable: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    },
-    [editingComp, onRefresh]
-  );
 
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingComp(null);
   };
 
+  const handleSaved = () => {
+    onRefresh?.();
+  };
+
   // Determine layout based on number of comps
   // If more than 5 comps: Map goes above grid (full width)
   // If 5 or fewer comps: Map goes in sidebar (right side)
-  const showMapAbove = comparables.length > 5;
+  const showMapAbove = displayComparables.length > 5;
 
   return (
-    <div className="space-y-6">
-      <AddComparableModal
+    <div className="d-flex flex-column" style={{ gap: '1.5rem' }}>
+      <SalesCompDetailModal
+        projectId={projectId}
+        comparableId={editingComp?.comparable_id}
+        propertyType={editingComp?.property_type ?? 'MULTIFAMILY'}
         isOpen={showModal}
         onClose={handleCloseModal}
-        onSave={handleSaveComp}
-        projectId={projectId}
-        compType="improved"
+        onSaved={handleSaved}
+        compNumber={editingComp
+          ? (editingComp.comp_number ?? displayComparables.indexOf(editingComp) + 1)
+          : displayComparables.length + 1
+        }
+        allComparables={displayComparables}
         subjectLocation={subjectLocation}
-        existingComp={editingComp ?? undefined}
       />
 
       {/* Map Above Grid (when more than 5 comps) */}
-      {comparables.length > 0 && showMapAbove && (
+      {displayComparables.length > 0 && showMapAbove && (
         <ValuationSalesCompMap
           projectId={projectId.toString()}
           styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
@@ -209,23 +183,24 @@ export function SalesComparisonApproach({
       )}
 
       {/* Main Layout: Grid + Sidebar or Full Width */}
-      {comparables.length === 0 ? (
+      {displayComparables.length === 0 ? (
         <div
-          className="text-center py-12 rounded-lg border"
+          className="text-center rounded border"
           style={{
             backgroundColor: 'var(--cui-card-bg)',
-            borderColor: 'var(--cui-border-color)'
+            borderColor: 'var(--cui-border-color)',
+            padding: '3rem 1rem',
           }}
         >
-          <div className="text-6xl mb-4">🏢</div>
+          <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🏢</div>
           <h3
-            className="text-lg font-semibold mb-2"
+            className="fs-5 fw-semibold mb-2"
             style={{ color: 'var(--cui-body-color)' }}
           >
             No Comparables Yet
           </h3>
           <p
-            className="text-sm mb-4"
+            className="small mb-3"
             style={{ color: 'var(--cui-secondary-color)' }}
           >
             Add comparable sales to begin the valuation analysis
@@ -241,11 +216,11 @@ export function SalesComparisonApproach({
       ) : (
         <>
           {/* Top Section: Grid + Map (side by side when 5 or fewer comps) */}
-          <div className={showMapAbove ? "space-y-6" : "grid gap-6"} style={!showMapAbove ? { gridTemplateColumns: 'auto 1fr', alignItems: 'stretch' } : {}}>
+          <div className={showMapAbove ? "d-flex flex-column" : "d-grid"} style={showMapAbove ? { gap: '1.5rem' } : { gridTemplateColumns: 'auto 1fr', alignItems: 'stretch', gap: '1.5rem' }}>
             {/* Main Content - Grid */}
             <div ref={gridRef}>
-              <ComparablesGrid
-                comparables={comparables}
+                <ComparablesGrid
+                comparables={displayComparables}
                 projectId={projectId}
                 subjectProperty={subjectProperty ?? undefined}
                 onEdit={handleEditComp}
@@ -261,7 +236,7 @@ export function SalesComparisonApproach({
               <ValuationSalesCompMap
                 projectId={projectId.toString()}
                 styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
-                height={mapHeight}
+                height="100%"
               />
             )}
           </div>
@@ -269,7 +244,7 @@ export function SalesComparisonApproach({
           {/* Bottom Section: Indicated Value Summary - Full width (Landscaper panel on left handles valuation questions) */}
           <div>
             <IndicatedValueSummary
-              comparables={comparables}
+              comparables={displayComparables}
               reconciliation={reconciliation}
               subjectUnits={113}
               projectId={projectId}

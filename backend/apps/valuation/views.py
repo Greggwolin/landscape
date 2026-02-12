@@ -227,6 +227,12 @@ class ProjectLandComparablesView(APIView):
     def post(self, request, project_id):
         data = request.data.copy()
         data['project_id'] = project_id
+        # Auto-assign comp_number within this project's land comps only
+        if not data.get('comp_number'):
+            max_num = LandComparable.objects.filter(
+                project_id=project_id
+            ).order_by('-comp_number').values_list('comp_number', flat=True).first()
+            data['comp_number'] = (max_num or 0) + 1
         serializer = LandComparableSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
