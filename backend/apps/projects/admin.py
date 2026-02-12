@@ -291,7 +291,8 @@ class AnalysisTypeConfigAdmin(admin.ModelAdmin):
 
     list_display = [
         'analysis_type',
-        'tile_hbu',
+        'analysis_perspective',
+        'analysis_purpose',
         'tile_valuation',
         'tile_capitalization',
         'tile_returns',
@@ -299,17 +300,16 @@ class AnalysisTypeConfigAdmin(admin.ModelAdmin):
         'updated_at',
     ]
 
-    list_filter = ['analysis_type']
+    list_filter = ['analysis_type', 'analysis_perspective', 'analysis_purpose']
 
     readonly_fields = ['config_id', 'created_at', 'updated_at']
 
     fieldsets = (
         ('Analysis Type', {
-            'fields': ('config_id', 'analysis_type')
+            'fields': ('config_id', 'analysis_type', 'analysis_perspective', 'analysis_purpose')
         }),
         ('Tile Visibility', {
             'fields': (
-                'tile_hbu',
                 'tile_valuation',
                 'tile_capitalization',
                 'tile_returns',

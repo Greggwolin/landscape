@@ -42,7 +42,6 @@ type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
 type PostgresError = Error & { code?: string }
 type AnalysisTypeConfigRow = {
   analysis_type: string
-  tile_hbu: boolean
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -51,7 +50,6 @@ type AnalysisTypeConfigRow = {
 
 type AnalysisTypeTileConfig = {
   analysis_type: string
-  tile_hbu: boolean
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -108,7 +106,6 @@ async function queryAnalysisTypeConfigs(): Promise<Map<string, AnalysisTypeTileC
     const rows = await sql<AnalysisTypeConfigRow[]>`
       SELECT
         analysis_type,
-        tile_hbu,
         tile_valuation,
         tile_capitalization,
         tile_returns,
@@ -121,7 +118,6 @@ async function queryAnalysisTypeConfigs(): Promise<Map<string, AnalysisTypeTileC
         row.analysis_type?.toUpperCase(),
         {
           analysis_type: row.analysis_type?.toUpperCase() ?? '',
-          tile_hbu: Boolean(row.tile_hbu),
           tile_valuation: Boolean(row.tile_valuation),
           tile_capitalization: Boolean(row.tile_capitalization),
           tile_returns: Boolean(row.tile_returns),

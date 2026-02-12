@@ -110,6 +110,7 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
             'tenants',
             'sale_history',
             'adjustments',
+            'contacts',
             'ai_suggestions',
         ).order_by('comp_number', '-sale_date')
 

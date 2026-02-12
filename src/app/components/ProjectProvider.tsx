@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext'
 
 interface AnalysisTypeTileConfig {
   analysis_type: string
-  tile_hbu: boolean
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean

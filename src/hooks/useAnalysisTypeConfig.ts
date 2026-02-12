@@ -20,7 +20,6 @@ export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPME
 export interface AnalysisTypeConfig {
   config_id: number
   analysis_type: AnalysisType
-  tile_hbu: boolean
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -39,7 +38,6 @@ export interface AnalysisTypeConfig {
 // Lightweight config for lists
 export interface AnalysisTypeConfigList {
   analysis_type: AnalysisType
-  tile_hbu: boolean
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -75,8 +73,8 @@ const fetcher = (url: string) => fetchJson(url)
  *
  * @example
  * const { config, isLoading, error } = useAnalysisTypeConfig('VALUATION')
- * if (config?.tile_hbu) {
- *   // Show H&BU tile
+ * if (config?.tile_valuation) {
+ *   // Show valuation tile
  * }
  */
 export function useAnalysisTypeConfig(analysisType: AnalysisType | null | undefined) {

@@ -28,6 +28,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Analysis type: VALUATION, INVESTMENT, DEVELOPMENT, or FEASIBILITY"
     )
+    analysis_perspective = serializers.ChoiceField(
+        choices=[('INVESTMENT', 'Investment'), ('DEVELOPMENT', 'Development')],
+        required=False,
+        allow_blank=True,
+        allow_null=True
+    )
+    analysis_purpose = serializers.ChoiceField(
+        choices=[('VALUATION', 'Valuation'), ('UNDERWRITING', 'Underwriting')],
+        required=False,
+        allow_blank=True,
+        allow_null=True
+    )
+    value_add_enabled = serializers.BooleanField(required=False)
 
     class Meta:
         model = Project
@@ -88,6 +101,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'project_type_code',
             'project_type',
             'analysis_type',
+            'analysis_perspective',
+            'analysis_purpose',
+            'value_add_enabled',
             'property_subtype',
             'property_class',
             'jurisdiction_city',
@@ -226,7 +242,8 @@ class AnalysisTypeConfigSerializer(serializers.ModelSerializer):
         fields = [
             'config_id',
             'analysis_type',
-            'tile_hbu',
+            'analysis_perspective',
+            'analysis_purpose',
             'tile_valuation',
             'tile_capitalization',
             'tile_returns',
@@ -258,7 +275,8 @@ class AnalysisTypeConfigListSerializer(serializers.ModelSerializer):
         model = AnalysisTypeConfig
         fields = [
             'analysis_type',
-            'tile_hbu',
+            'analysis_perspective',
+            'analysis_purpose',
             'tile_valuation',
             'tile_capitalization',
             'tile_returns',

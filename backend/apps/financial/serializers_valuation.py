@@ -12,6 +12,7 @@ from django.db import transaction
 from rest_framework import serializers
 from .models_valuation import (
     SalesComparable,
+    SalesCompContact,
     SalesCompUnitMix,
     SalesCompTenant,
     SalesCompHistory,
@@ -148,6 +149,25 @@ class SalesCompAdjustmentSerializer(serializers.ModelSerializer):
         model = SalesCompAdjustment
         exclude = ['comparable']
         read_only_fields = ['adjustment_id', 'created_at', 'comparable_id']
+
+
+class SalesCompContactSerializer(serializers.ModelSerializer):
+    """Nested serializer for sales comparable contacts."""
+
+    class Meta:
+        model = SalesCompContact
+        fields = [
+            'contact_id',
+            'role',
+            'name',
+            'company',
+            'phone',
+            'email',
+            'is_verification_source',
+            'verification_date',
+            'sort_order',
+        ]
+        read_only_fields = ['contact_id']
 
 
 class SalesCompIndustrialSerializer(serializers.ModelSerializer):
@@ -319,6 +339,7 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
     tenants = SalesCompTenantSerializer(many=True, required=False)
     history = SalesCompHistorySerializer(source='sale_history', many=True, required=False)
     adjustments = SalesCompAdjustmentSerializer(many=True, required=False)
+    contacts = SalesCompContactSerializer(many=True, required=False)
 
     industrial_details = SalesCompIndustrialSerializer(read_only=True)
     hospitality_details = SalesCompHospitalitySerializer(read_only=True)
@@ -337,6 +358,7 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
             'tenants',
             'history',
             'adjustments',
+            'contacts',
             'industrial_details',
             'hospitality_details',
             'land_details',
@@ -414,12 +436,20 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
             [SalesCompAdjustment(comparable=comparable, **row) for row in rows]
         )
 
+    def _create_contact_rows(self, comparable, rows):
+        if not rows:
+            return
+        SalesCompContact.objects.bulk_create(
+            [SalesCompContact(comparable=comparable, **row) for row in rows]
+        )
+
     @transaction.atomic
     def create(self, validated_data):
         unit_mix_data = validated_data.pop('unit_mix_details', [])
         tenant_data = validated_data.pop('tenants', [])
         history_data = validated_data.pop('sale_history', [])
         adjustment_data = validated_data.pop('adjustments', [])
+        contact_data = validated_data.pop('contacts', [])
 
         comparable = SalesComparable.objects.create(**validated_data)
         self._recalculate_derived_fields(comparable)
@@ -427,6 +457,7 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
         self._create_tenant_rows(comparable, tenant_data)
         self._create_history_rows(comparable, history_data)
         self._create_adjustment_rows(comparable, adjustment_data)
+        self._create_contact_rows(comparable, contact_data)
         return comparable
 
     @transaction.atomic
@@ -435,6 +466,7 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
         tenant_data = validated_data.pop('tenants', None)
         history_data = validated_data.pop('sale_history', None)
         adjustment_data = validated_data.pop('adjustments', None)
+        contact_data = validated_data.pop('contacts', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -456,6 +488,10 @@ class SalesComparableDetailSerializer(serializers.ModelSerializer):
         if adjustment_data is not None:
             instance.adjustments.all().delete()
             self._create_adjustment_rows(instance, adjustment_data)
+
+        if contact_data is not None:
+            instance.contacts.all().delete()
+            self._create_contact_rows(instance, contact_data)
 
         return instance
 

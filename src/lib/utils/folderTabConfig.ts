@@ -28,7 +28,6 @@ export type AnalysisTypeCode = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVEL
 
 export interface AnalysisTypeTileConfig {
   analysis_type: string;
-  tile_hbu: boolean;
   tile_valuation: boolean;
   tile_capitalization: boolean;
   tile_returns: boolean;
@@ -94,8 +93,7 @@ function shouldShowValuationOrFeasibilityFolder(
   tileConfig: AnalysisTypeTileConfig
 ): boolean {
   return Boolean(
-    tileConfig.tile_hbu
-      || tileConfig.tile_valuation
+    tileConfig.tile_valuation
       || tileConfig.tile_returns
   );
 }

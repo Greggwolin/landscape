@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-12T17:38:17.084420Z",
+  "generated_at": "2026-02-12T21:12:55.203474Z",
   "database": "ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech",
   "schema": "landscape",
   "tables": [
@@ -18459,17 +18459,6 @@
           "column_comment": "Analysis type code: VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY"
         },
         {
-          "column_name": "tile_hbu",
-          "ordinal_position": 3,
-          "data_type": "boolean",
-          "character_maximum_length": null,
-          "numeric_precision": null,
-          "numeric_scale": null,
-          "is_nullable": "YES",
-          "column_default": "false",
-          "column_comment": "Show Highest & Best Use tile in project navigation"
-        },
-        {
           "column_name": "tile_valuation",
           "ordinal_position": 4,
           "data_type": "boolean",
@@ -18599,6 +18588,28 @@
           "numeric_scale": null,
           "is_nullable": "YES",
           "column_default": "CURRENT_TIMESTAMP",
+          "column_comment": null
+        },
+        {
+          "column_name": "analysis_perspective",
+          "ordinal_position": 16,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "analysis_purpose",
+          "ordinal_position": 17,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
           "column_comment": null
         }
       ]
@@ -41075,7 +41086,7 @@
           "numeric_scale": null,
           "is_nullable": "YES",
           "column_default": null,
-          "column_comment": "Top-level analysis category: Land Development or Income Property"
+          "column_comment": "DEPRECATED - use analysis_perspective + analysis_purpose instead. Retained for backward compatibility during migration."
         },
         {
           "column_name": "project_type_code",
@@ -41304,9 +41315,9 @@
           "character_maximum_length": null,
           "numeric_precision": null,
           "numeric_scale": null,
-          "is_nullable": "YES",
+          "is_nullable": "NO",
           "column_default": "false",
-          "column_comment": "Toggle for Value-Add mode in Operations tab. When true, shows Post-Reno input columns."
+          "column_comment": "When true, enables CapEx/renovation inputs within Investment perspective. Replaces VALUE_ADD as analysis_type."
         },
         {
           "column_name": "primary_count",
@@ -41648,6 +41659,28 @@
           "is_nullable": "YES",
           "column_default": null,
           "column_comment": "Flat underwriting fee at close ($). Only used when analysis_type=LOTBANK."
+        },
+        {
+          "column_name": "analysis_perspective",
+          "ordinal_position": 134,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": null,
+          "column_comment": "Financial framework: INVESTMENT (buy/hold) or DEVELOPMENT (build/sell). Drives tile visibility."
+        },
+        {
+          "column_name": "analysis_purpose",
+          "ordinal_position": 135,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": null,
+          "column_comment": "Why analyzing: VALUATION (market value opinion) or UNDERWRITING (deal decision). Toggleable on the fly."
         }
       ]
     },
@@ -47117,6 +47150,144 @@
           "numeric_scale": null,
           "is_nullable": "YES",
           "column_default": null,
+          "column_comment": null
+        }
+      ]
+    },
+    {
+      "object_type": "table",
+      "table_name": "tbl_sales_comp_contacts",
+      "columns": [
+        {
+          "column_name": "contact_id",
+          "ordinal_position": 1,
+          "data_type": "integer",
+          "character_maximum_length": null,
+          "numeric_precision": 32,
+          "numeric_scale": 0,
+          "is_nullable": "NO",
+          "column_default": "nextval('tbl_sales_comp_contacts_contact_id_seq'::regclass)",
+          "column_comment": null
+        },
+        {
+          "column_name": "comparable_id",
+          "ordinal_position": 2,
+          "data_type": "integer",
+          "character_maximum_length": null,
+          "numeric_precision": 32,
+          "numeric_scale": 0,
+          "is_nullable": "NO",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "role",
+          "ordinal_position": 3,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "name",
+          "ordinal_position": 4,
+          "data_type": "character varying",
+          "character_maximum_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "company",
+          "ordinal_position": 5,
+          "data_type": "character varying",
+          "character_maximum_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "phone",
+          "ordinal_position": 6,
+          "data_type": "character varying",
+          "character_maximum_length": 50,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "email",
+          "ordinal_position": 7,
+          "data_type": "character varying",
+          "character_maximum_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "is_verification_source",
+          "ordinal_position": 8,
+          "data_type": "boolean",
+          "character_maximum_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": "false",
+          "column_comment": null
+        },
+        {
+          "column_name": "verification_date",
+          "ordinal_position": 9,
+          "data_type": "date",
+          "character_maximum_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "YES",
+          "column_default": null,
+          "column_comment": null
+        },
+        {
+          "column_name": "sort_order",
+          "ordinal_position": 10,
+          "data_type": "integer",
+          "character_maximum_length": null,
+          "numeric_precision": 32,
+          "numeric_scale": 0,
+          "is_nullable": "NO",
+          "column_default": "0",
+          "column_comment": null
+        },
+        {
+          "column_name": "created_at",
+          "ordinal_position": 11,
+          "data_type": "timestamp with time zone",
+          "character_maximum_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": "now()",
+          "column_comment": null
+        },
+        {
+          "column_name": "updated_at",
+          "ordinal_position": 12,
+          "data_type": "timestamp with time zone",
+          "character_maximum_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": "NO",
+          "column_default": "now()",
           "column_comment": null
         }
       ]
@@ -68811,20 +68982,20 @@
     {
       "object_type": "index",
       "table_name": "tbl_analysis_type_config",
-      "index_name": "idx_analysis_type_config_type",
-      "index_definition": "CREATE INDEX idx_analysis_type_config_type ON landscape.tbl_analysis_type_config USING btree (analysis_type)"
-    },
-    {
-      "object_type": "index",
-      "table_name": "tbl_analysis_type_config",
-      "index_name": "tbl_analysis_type_config_analysis_type_key",
-      "index_definition": "CREATE UNIQUE INDEX tbl_analysis_type_config_analysis_type_key ON landscape.tbl_analysis_type_config USING btree (analysis_type)"
+      "index_name": "idx_analysis_config_perspective_purpose",
+      "index_definition": "CREATE INDEX idx_analysis_config_perspective_purpose ON landscape.tbl_analysis_type_config USING btree (analysis_perspective, analysis_purpose)"
     },
     {
       "object_type": "index",
       "table_name": "tbl_analysis_type_config",
       "index_name": "tbl_analysis_type_config_pkey",
       "index_definition": "CREATE UNIQUE INDEX tbl_analysis_type_config_pkey ON landscape.tbl_analysis_type_config USING btree (config_id)"
+    },
+    {
+      "object_type": "index",
+      "table_name": "tbl_analysis_type_config",
+      "index_name": "uq_analysis_config_perspective_purpose",
+      "index_definition": "CREATE UNIQUE INDEX uq_analysis_config_perspective_purpose ON landscape.tbl_analysis_type_config USING btree (analysis_perspective, analysis_purpose)"
     },
     {
       "object_type": "index",
@@ -71921,6 +72092,18 @@
       "table_name": "tbl_sales_comp_adjustments",
       "index_name": "tbl_sales_comp_adjustments_pkey",
       "index_definition": "CREATE UNIQUE INDEX tbl_sales_comp_adjustments_pkey ON landscape.tbl_sales_comp_adjustments USING btree (adjustment_id)"
+    },
+    {
+      "object_type": "index",
+      "table_name": "tbl_sales_comp_contacts",
+      "index_name": "idx_comp_contacts_comparable",
+      "index_definition": "CREATE INDEX idx_comp_contacts_comparable ON landscape.tbl_sales_comp_contacts USING btree (comparable_id)"
+    },
+    {
+      "object_type": "index",
+      "table_name": "tbl_sales_comp_contacts",
+      "index_name": "tbl_sales_comp_contacts_pkey",
+      "index_definition": "CREATE UNIQUE INDEX tbl_sales_comp_contacts_pkey ON landscape.tbl_sales_comp_contacts USING btree (contact_id)"
     },
     {
       "object_type": "index",
@@ -75465,6 +75648,20 @@
     {
       "object_type": "constraint",
       "table_name": "tbl_analysis_type_config",
+      "constraint_name": "chk_config_perspective",
+      "constraint_type": "CHECK",
+      "constraint_definition": "CHECK (((analysis_perspective IS NULL) OR ((analysis_perspective)::text = ANY ((ARRAY['INVESTMENT'::character varying, 'DEVELOPMENT'::character varying])::text[]))))"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_analysis_type_config",
+      "constraint_name": "chk_config_purpose",
+      "constraint_type": "CHECK",
+      "constraint_definition": "CHECK (((analysis_purpose IS NULL) OR ((analysis_purpose)::text = ANY ((ARRAY['VALUATION'::character varying, 'UNDERWRITING'::character varying])::text[]))))"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_analysis_type_config",
       "constraint_name": "tbl_analysis_type_config_pkey",
       "constraint_type": "PRIMARY KEY",
       "constraint_definition": "PRIMARY KEY (config_id)"
@@ -75472,9 +75669,9 @@
     {
       "object_type": "constraint",
       "table_name": "tbl_analysis_type_config",
-      "constraint_name": "tbl_analysis_type_config_analysis_type_key",
+      "constraint_name": "uq_analysis_config_perspective_purpose",
       "constraint_type": "UNIQUE",
-      "constraint_definition": "UNIQUE (analysis_type)"
+      "constraint_definition": "UNIQUE (analysis_perspective, analysis_purpose)"
     },
     {
       "object_type": "constraint",
@@ -77595,14 +77792,14 @@
       "table_name": "tbl_multifamily_lease",
       "constraint_name": "chk_lease_dates",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK ((lease_end_date > lease_start_date))"
+      "constraint_definition": "CHECK ((lease_expiration_date >= lease_commencement_date))"
     },
     {
       "object_type": "constraint",
       "table_name": "tbl_multifamily_lease",
       "constraint_name": "chk_lease_dates",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK ((lease_expiration_date >= lease_commencement_date))"
+      "constraint_definition": "CHECK ((lease_end_date > lease_start_date))"
     },
     {
       "object_type": "constraint",
@@ -78251,6 +78448,20 @@
     {
       "object_type": "constraint",
       "table_name": "tbl_project",
+      "constraint_name": "chk_analysis_perspective",
+      "constraint_type": "CHECK",
+      "constraint_definition": "CHECK (((analysis_perspective)::text = ANY ((ARRAY['INVESTMENT'::character varying, 'DEVELOPMENT'::character varying])::text[])))"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_project",
+      "constraint_name": "chk_analysis_purpose",
+      "constraint_type": "CHECK",
+      "constraint_definition": "CHECK (((analysis_purpose)::text = ANY ((ARRAY['VALUATION'::character varying, 'UNDERWRITING'::character varying])::text[])))"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_project",
       "constraint_name": "tbl_project_access_rating_check",
       "constraint_type": "CHECK",
       "constraint_definition": "CHECK (((access_rating >= 1) AND (access_rating <= 5)))"
@@ -78260,7 +78471,7 @@
       "table_name": "tbl_project",
       "constraint_name": "tbl_project_analysis_type_check",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((analysis_type IS NULL) OR ((analysis_type)::text = ANY ((ARRAY['VALUATION'::character varying, 'INVESTMENT'::character varying, 'VALUE_ADD'::character varying, 'DEVELOPMENT'::character varying, 'FEASIBILITY'::character varying])::text[]))))"
+      "constraint_definition": "CHECK (((analysis_type IS NULL) OR (length(TRIM(BOTH FROM analysis_type)) > 0)))"
     },
     {
       "object_type": "constraint",
@@ -78940,6 +79151,20 @@
       "constraint_name": "tbl_sales_comp_adjustments_pkey",
       "constraint_type": "PRIMARY KEY",
       "constraint_definition": "PRIMARY KEY (adjustment_id)"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_sales_comp_contacts",
+      "constraint_name": "fk_sales_comp_contacts_comparable",
+      "constraint_type": "FOREIGN KEY",
+      "constraint_definition": "FOREIGN KEY (comparable_id) REFERENCES tbl_sales_comparables(comparable_id) ON DELETE CASCADE"
+    },
+    {
+      "object_type": "constraint",
+      "table_name": "tbl_sales_comp_contacts",
+      "constraint_name": "tbl_sales_comp_contacts_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "constraint_definition": "PRIMARY KEY (contact_id)"
     },
     {
       "object_type": "constraint",
@@ -83070,6 +83295,16 @@
       "object_type": "foreign_key",
       "table_name": "tbl_sales_comp_adjustments",
       "constraint_name": "tbl_sales_comp_adjustments_comparable_id_fkey",
+      "column_name": "comparable_id",
+      "referenced_table": "tbl_sales_comparables",
+      "referenced_column": "comparable_id",
+      "update_rule": "NO ACTION",
+      "delete_rule": "CASCADE"
+    },
+    {
+      "object_type": "foreign_key",
+      "table_name": "tbl_sales_comp_contacts",
+      "constraint_name": "fk_sales_comp_contacts_comparable",
       "column_name": "comparable_id",
       "referenced_table": "tbl_sales_comparables",
       "referenced_column": "comparable_id",

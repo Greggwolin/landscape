@@ -201,6 +201,45 @@ class SalesComparable(models.Model):
         return float(self.price_per_unit) * (1 + float(total_adjustment_pct))
 
 
+class SalesCompContact(models.Model):
+    """Contact associated with a sales comparable (broker, buyer, seller, etc.)."""
+
+    ROLE_CHOICES = [
+        ('selling_broker', 'Selling Broker'),
+        ('buying_broker', 'Buying Broker'),
+        ('buyer', 'Buyer'),
+        ('true_buyer', 'True Buyer'),
+        ('seller', 'Seller'),
+        ('true_seller', 'True Seller'),
+    ]
+
+    contact_id = models.AutoField(primary_key=True)
+    comparable = models.ForeignKey(
+        SalesComparable,
+        on_delete=models.CASCADE,
+        related_name='contacts',
+        db_column='comparable_id',
+    )
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    company = models.CharField(max_length=255, blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    email = models.CharField(max_length=255, blank=True, null=True)
+    is_verification_source = models.BooleanField(default=False)
+    verification_date = models.DateField(blank=True, null=True)
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_sales_comp_contacts'
+        ordering = ['sort_order', 'contact_id']
+
+    def __str__(self):
+        return f"{self.get_role_display()}: {self.name or '(unnamed)'}"
+
+
 class SalesCompUnitMix(models.Model):
     """Unit mix breakdown for multifamily comparables."""
 

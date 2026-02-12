@@ -129,7 +129,6 @@ export async function GET(_req: NextRequest, context: Params) {
           WHEN c.analysis_type IS NULL THEN NULL
           ELSE json_build_object(
             'analysis_type', c.analysis_type,
-            'tile_hbu', c.tile_hbu,
             'tile_valuation', c.tile_valuation,
             'tile_capitalization', c.tile_capitalization,
             'tile_returns', c.tile_returns,

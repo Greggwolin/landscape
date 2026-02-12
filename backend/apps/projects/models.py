@@ -35,6 +35,20 @@ class Project(models.Model):
 
     # New Taxonomy (as of migration 013)
     analysis_type = models.CharField(max_length=50, blank=True, null=True)
+    analysis_perspective = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        choices=[('INVESTMENT', 'Investment'), ('DEVELOPMENT', 'Development')],
+        help_text='Financial framework: INVESTMENT (buy/hold) or DEVELOPMENT (build/sell)'
+    )
+    analysis_purpose = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        choices=[('VALUATION', 'Valuation'), ('UNDERWRITING', 'Underwriting')],
+        help_text='Why analyzing: VALUATION (market value opinion) or UNDERWRITING (deal decision)'
+    )
     property_subtype = models.CharField(max_length=100, blank=True, null=True)
     property_class = models.CharField(max_length=50, blank=True, null=True)
 
@@ -211,7 +225,10 @@ class Project(models.Model):
     dms_template_id = models.BigIntegerField(blank=True, null=True)
     has_takedown_agreement = models.BooleanField(blank=True, null=True, default=False)
     active_opex_discriminator = models.CharField(max_length=100, blank=True, null=True, default='default')
-    value_add_enabled = models.BooleanField(blank=True, null=True, default=False)
+    value_add_enabled = models.BooleanField(
+        default=False,
+        help_text='Enables CapEx/renovation inputs within Investment perspective'
+    )
     cabinet_id = models.BigIntegerField(blank=True, null=True)
     project_focus = models.CharField(max_length=50, blank=True, null=True)
 
@@ -282,14 +299,11 @@ class AnalysisTypeConfig(models.Model):
     - FEASIBILITY: Go/no-go binary decision analysis
     """
     config_id = models.BigAutoField(primary_key=True)
-    analysis_type = models.CharField(
-        max_length=50,
-        unique=True,
-        choices=ANALYSIS_TYPE_CHOICES
-    )
+    analysis_type = models.CharField(max_length=50)
+    analysis_perspective = models.CharField(max_length=50, blank=True, null=True)
+    analysis_purpose = models.CharField(max_length=50, blank=True, null=True)
 
     # Tile visibility flags
-    tile_hbu = models.BooleanField(default=False, help_text="Show H&BU tile")
     tile_valuation = models.BooleanField(default=False, help_text="Show Valuation tile (3 approaches)")
     tile_capitalization = models.BooleanField(default=False, help_text="Show Capitalization tile")
     tile_returns = models.BooleanField(default=False, help_text="Show Returns tile")
@@ -314,6 +328,7 @@ class AnalysisTypeConfig(models.Model):
     class Meta:
         db_table = 'tbl_analysis_type_config'
         managed = False  # Table created by migration
+        unique_together = [['analysis_perspective', 'analysis_purpose']]
         verbose_name = 'Analysis Type Config'
         verbose_name_plural = 'Analysis Type Configs'
 
@@ -326,10 +341,8 @@ class AnalysisTypeConfig(models.Model):
         tiles = ['project_home', 'property', 'market', 'reports', 'documents']
 
         # Conditionally visible based on flags
-        if self.tile_hbu:
-            tiles.insert(3, 'hbu')
         if self.tile_valuation:
-            tiles.insert(4, 'valuation')
+            tiles.insert(3, 'valuation')
         if self.tile_capitalization:
             tiles.append('capitalization')
         if self.tile_returns:
